@@ -29,6 +29,7 @@ import { cityOfficeHolder, LocalOffices, localOfficeTarget, MemberResidence } fr
 import styles from './Personnel.module.css';
 import pageStyles from './PersonnelPage.module.css';
 import { TroopBoard } from './TroopBoard';
+import { CityOfficeVolunteers } from './CityOfficeVolunteers';
 import { DiplomaticDelegates } from './DiplomaticDelegates';
 import { usePersonnelAction } from './usePersonnelAction';
 
@@ -162,6 +163,7 @@ export function PersonnelPage() {
       ) : (
         <LoadingState />
       )}
+      {board.data?.volunteersEnabled ? <CityOfficeVolunteers worldId={worldId} /> : null}
       {roster.nation ? <TroopBoard key={board.data?.actorId} worldId={worldId} /> : null}
       {roster.nation ? (
         <DiplomaticDelegates key={`${roster.nation.id}:${board.data?.actorId ?? ''}`} worldId={worldId} />

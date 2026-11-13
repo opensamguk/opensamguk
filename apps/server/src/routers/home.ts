@@ -31,6 +31,7 @@ import {
   LINEAGE_EXITED_YEAR,
   nowTick,
   OFFICE_EFFECTS_FEATURE,
+  CITY_OFFICE_VOLUNTEER_FEATURE,
   PLAYER_AUTOPLAY_FEATURE,
   playerAutoplayWindow,
   TICKS_PER_MONTH,
@@ -159,7 +160,16 @@ export const homeRouter = router({
               select: { id: true, name: true, nationId: true },
               orderBy: [{ name: 'asc' }, { id: 'asc' }],
             });
+      const pendingCityOfficeRequests =
+        world.ruleFeatures.includes(CITY_OFFICE_VOLUNTEER_FEATURE) &&
+        general.nationId !== null &&
+        general.officerLevel >= 5
+          ? Object.values(state?.cityOfficeVolunteers?.requests ?? {}).filter(
+              (request) => request.nationId === general.nationId && request.status === 'pending',
+            ).length
+          : 0;
       return {
+        ...(pendingCityOfficeRequests > 0 ? { pendingCityOfficeRequests } : {}),
         ...(world.ruleFeatures.includes(HERITAGE_BENEFITS_FEATURE) ? { heritageBenefitsEnabled: true as const } : {}),
         general: {
           ...ownGeneralInfo(general),

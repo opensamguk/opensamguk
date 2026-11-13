@@ -16,6 +16,7 @@ export interface PersonnelBoard {
   topStratagem?: { generalId: number; name: string; portraitId: number | null; successes: number }[];
   appoint: Allowed;
   officeEffectsEnabled?: boolean;
+  volunteersEnabled?: true;
   localOfficeMinimum?: number;
   secretaryEnabled?: boolean;
   officeCities?: CityRef[];

@@ -1,4 +1,10 @@
-import { OFFICE_EFFECTS_FEATURE, defaultOfficeEffects, officeEffectsSchema } from '@opensamguk/rules';
+import {
+  CITY_OFFICE_VOLUNTEER_FEATURE,
+  initialCityOfficeVolunteers,
+  OFFICE_EFFECTS_FEATURE,
+  defaultOfficeEffects,
+  officeEffectsSchema,
+} from '@opensamguk/rules';
 import type { PrismaClient, Prisma } from '@opensamguk/db';
 import type { WorldInit } from '@opensamguk/rules';
 import {
@@ -299,6 +305,9 @@ export function prepareInitialWorld(
           : {}),
         ...(features.includes('city-scale-v1')
           ? { cityRuinsState: initialCityRuins(creationState) as Prisma.InputJsonValue }
+          : {}),
+        ...(features.includes(CITY_OFFICE_VOLUNTEER_FEATURE)
+          ? { cityOfficeVolunteers: initialCityOfficeVolunteers() }
           : {}),
         ...(features.includes('nation-strategy-v1')
           ? { nationStrategyState: initialNationStrategy() as Prisma.InputJsonValue }

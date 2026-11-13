@@ -11,6 +11,7 @@ import {
   type RequestState,
   type AppointResult,
   type RespondResult,
+  type VolunteerResult,
 } from './personnelRequests';
 
 export type PersonnelActorContext = Pick<Context, 'db' | 'sessionId' | 'now'> & { user: { id: string } };
@@ -46,6 +47,10 @@ export function submitAndWaitPersonnel(
   ctx: PersonnelActorContext,
   input: Submission & { kind: 'offer.respond' },
 ): Promise<SubmissionResult<RespondResult>>;
+export function submitAndWaitPersonnel(
+  ctx: PersonnelActorContext,
+  input: Submission & { kind: 'personnel.volunteer' },
+): Promise<SubmissionResult<VolunteerResult>>;
 export async function submitAndWaitPersonnel(
   ctx: PersonnelActorContext,
   input: { worldId: string; requestId: string; kind: PersonnelInputKind; payload: unknown },

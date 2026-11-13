@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util';
 import type { Prisma } from '@opensamguk/db';
 import type { RealtimeSignal } from '@opensamguk/db';
 import type { CommandResult, WorldState } from '@opensamguk/rules';
@@ -63,6 +64,8 @@ export async function persistCommandState(
   await persistGovernanceState(tx, worldId, before, state);
   await persistLineageState(tx, worldId, before, state);
   await persistEquipmentState(tx, worldId, before, state);
+  if (state.cityOfficeVolunteers && !isDeepStrictEqual(before.cityOfficeVolunteers, state.cityOfficeVolunteers))
+    await tx.world.update({ where: { id: worldId }, data: { cityOfficeVolunteers: state.cityOfficeVolunteers } });
   await persistStratagemCardsState(tx, worldId, before, state);
   for (const nation of Object.values(state.nations)) {
     if (!before.nations[nation.id]) {

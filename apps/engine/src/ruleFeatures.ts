@@ -24,6 +24,7 @@ import {
   STAT_GROWTH_FEATURE,
   MILITARY_STAT_GROWTH_FEATURE,
   financeRatesInput,
+  CITY_OFFICE_VOLUNTEER_FEATURE,
   NATION_RESTRICTIONS_FEATURE,
   NATION_RESTRICTIONS_KIND,
   NATION_RESTRICTIONS_MIN_OFFICE,
@@ -294,7 +295,12 @@ const processPersonnelInput: QueuedInputHandler = async (tx, world, event, { tic
   if (event.generalId === null) throw new Error('인사 입력의 장수가 없습니다.');
   await tx.$queryRaw`SELECT id FROM "General" WHERE "worldId" = ${world.id} AND id = ${event.generalId} FOR UPDATE`;
   const kind = event.kind;
-  if (kind !== 'personnel.appoint' && kind !== 'personnel.dismiss' && kind !== 'offer.respond')
+  if (
+    kind !== 'personnel.appoint' &&
+    kind !== 'personnel.dismiss' &&
+    kind !== 'offer.respond' &&
+    kind !== 'personnel.volunteer'
+  )
     throw new Error('인사 입력 종류를 확인하세요.');
   const outcome = applyPersonnelInputStep(
     before.state,
@@ -333,6 +339,7 @@ const processPersonnelInput: QueuedInputHandler = async (tx, world, event, { tic
 
 export const builtInEngineFeatures: readonly EngineFeature[] = [
   { key: 'office-effects' },
+  { key: CITY_OFFICE_VOLUNTEER_FEATURE, queuedInputs: { 'personnel.volunteer': processPersonnelInput } },
   { key: 'nation-strategy-v1' },
   { key: 'prepared-turns-v1' },
   { key: 'nation-research-v1' },

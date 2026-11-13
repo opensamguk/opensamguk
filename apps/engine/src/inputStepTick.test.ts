@@ -12,6 +12,7 @@ function fixture(personnelFormat: 1 | null, policyFromSequence: number | null = 
   const world: World = {
     runtimeOptions: null,
     officeEffects: null,
+    cityOfficeVolunteers: null,
     id: 'world',
     name: '입력 시험',
     operationalMap: null,

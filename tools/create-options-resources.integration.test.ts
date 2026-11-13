@@ -68,6 +68,14 @@ const registered: RuleRegistry = {
   ],
 };
 describe('AC-M3-04 원생성 설정 조회', () => {
+  it('INT-26 도시 관직 자원 원생성 프로필을 조회한다', () => {
+    const data = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v10.json'));
+    expect(data.ruleFeatures).toEqual(expect.arrayContaining(['office-effects', 'city-office-volunteer-v1']));
+    expect(
+      expandedCreationProfile(expandedRows, allPresets, data, ruleRegistry, 'san10-191-city-office'),
+    ).toMatchObject({ available: true, featureProfileKey: data.key });
+  });
+
   it('INT-26 환약이 있는 새 원생성 프로필을 조회한다', () => {
     const data = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v9.json'));
     expect(data).toHaveProperty('featureData.equipment-v1.treatmentTool', true);

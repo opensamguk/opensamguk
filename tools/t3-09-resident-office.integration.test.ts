@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
+import { authzCase } from '../apps/server/src/authz/case';
 import { buildServer } from '../apps/server/src/server';
 import { appRouter } from '../apps/server/src/router';
 import { newSession } from '../apps/server/src/auth/session';
@@ -13,7 +14,13 @@ import { processWorldCreateRequest } from '../apps/engine/src/admin/createReques
 import { prepareWorldReset } from '../apps/engine/src/admin/resetPreparation';
 import { exportReplay, replayArchive } from '../apps/engine/src/replay';
 import { rngFor } from '../packages/shared/src/index';
-import { defaultOfficeEffects, INTEL_FEATURE, residentOfficeBonuses, runMonthly } from '../packages/rules/src/index';
+import {
+  CITY_OFFICE_VOLUNTEER_FEATURE,
+  defaultOfficeEffects,
+  INTEL_FEATURE,
+  residentOfficeBonuses,
+  runMonthly,
+} from '../packages/rules/src/index';
 import { commandInitial } from '../packages/rules/test/commandFixture';
 
 const url = process.env.TEST_DATABASE_URL;
@@ -99,7 +106,7 @@ async function claim(worldId: string, generalId: number, actor: Actor) {
     userId: actor.id,
   });
 }
-async function createWorld(capture = false, fog = false) {
+async function createWorld(capture = false, fog = false, volunteers = false) {
   const initial = commandInitial();
   const base = initial.generals[2]!;
   Object.assign(base, { nationId: 1, cityKey: 1, strength: 65, intel: 65 });
@@ -119,7 +126,13 @@ async function createWorld(capture = false, fog = false) {
   } else {
     initial.diplomacies = [];
   }
-  initial.ruleFeatures = [...(fog ? [INTEL_FEATURE] : []), 'office-effects', 'personnel', 'policy'];
+  initial.ruleFeatures = [
+    ...(fog ? [INTEL_FEATURE] : []),
+    ...(volunteers ? [CITY_OFFICE_VOLUNTEER_FEATURE] : []),
+    'office-effects',
+    'personnel',
+    'policy',
+  ].sort();
   const { worldId } = await saveInitialWorld(db, initial, { name: '주재 검증', turnTermMinutes: 60, endYear: 230 });
   worlds.push(worldId);
   await controlClock(db, worldId, 'start');
@@ -142,6 +155,79 @@ async function enableClaims(worldId: string, operator: Actor) {
   ).toMatchObject({ status: 200 });
   await advance(worldId, 0);
 }
+
+it('INT-26 도시 관직 자원을 접수하고 권한과 자동 거부를 재생한다', async () => {
+  const operator = await identity('ADMIN');
+  const ruler = await identity();
+  const applicant = await identity();
+  const other = await identity();
+  const sanctioned = await identity('USER', 'SANCTIONED');
+  const worldId = await createWorld(false, false, true);
+  await enableClaims(worldId, operator);
+  await claim(worldId, 1, ruler);
+  await claim(worldId, 3, applicant);
+  await claim(worldId, 2, other);
+  const volunteer = { worldId, requestId: randomUUID(), action: { action: 'request', officerLevel: 4 } };
+  const board = { worldId };
+  await authzCase('personnel.volunteers', 'unauthenticated', async () =>
+    expect(await call('personnel.volunteers', board)).toMatchObject({ code: 'UNAUTHORIZED' }),
+  )();
+  await authzCase('personnel.volunteers', 'sanctioned', async () =>
+    expect(await call('personnel.volunteers', board, sanctioned)).toMatchObject({ code: 'UNAUTHORIZED' }),
+  )();
+  await authzCase('personnel.volunteers', 'invalidInput', async () =>
+    expect(await call('personnel.volunteers', {}, applicant)).toMatchObject({
+      code: 'BAD_REQUEST',
+    }),
+  )();
+  await authzCase('personnel.volunteer', 'unauthenticated', async () =>
+    expect(await call('personnel.volunteer', volunteer)).toMatchObject({ code: 'UNAUTHORIZED' }),
+  )();
+  await authzCase('personnel.volunteer', 'sanctioned', async () =>
+    expect(await call('personnel.volunteer', volunteer, sanctioned)).toMatchObject({ code: 'UNAUTHORIZED' }),
+  )();
+  await authzCase('personnel.volunteer', 'invalidInput', async () =>
+    expect(
+      await call('personnel.volunteer', { ...volunteer, action: { action: 'request', officerLevel: 12 } }, applicant),
+    ).toMatchObject({ code: 'BAD_REQUEST' }),
+  )();
+  await authzCase('personnel.volunteer', 'success', async () => {
+    expect(
+      await applyQueued(worldId, 'personnel.volunteer', call('personnel.volunteer', volunteer, applicant)),
+    ).toMatchObject({
+      status: 200,
+      data: { status: 'applied', result: { generalId: 3, quarter: 0, status: 'pending' } },
+    });
+  })();
+  await authzCase('personnel.volunteers', 'success', async () => {
+    expect(await call('personnel.volunteers', board, ruler)).toMatchObject({
+      status: 200,
+      data: { canDecide: true, requests: [{ generalId: 3, defaultDecision: 'reject', status: 'pending' }] },
+    });
+  })();
+  await authzCase('personnel.volunteers', 'otherUser', async () =>
+    expect(await call('personnel.volunteers', board, other)).toMatchObject({ status: 200, data: { requests: [] } }),
+  )();
+  await authzCase('personnel.volunteer', 'otherUser', async () => {
+    const approve = { ...volunteer, requestId: randomUUID(), action: { action: 'approve', generalId: 3, quarter: 0 } };
+    expect(
+      await applyQueued(worldId, 'personnel.volunteer', call('personnel.volunteer', approve, other)),
+    ).toMatchObject({ status: 400 });
+  })();
+  const state = await loadWorld(db, worldId);
+  expect(state.cityOfficeVolunteers).toMatchObject({ requests: { '3': { generalId: 3 } } });
+  const request = state.cityOfficeVolunteers!.requests['3']!;
+  expect(request.defaultReason).toBe('secret');
+  await advance(worldId, request.dueTick);
+  expect(await call('personnel.volunteers', board, applicant)).toMatchObject({
+    status: 200,
+    data: { requests: [{ status: 'rejected', resultReason: '기한 만료로 자동 거부' }] },
+  });
+  const archive = await exportReplay(db, worldId);
+  expect(replayArchive(archive, archive.months.length).map(({ stateHash }) => stateHash)).toEqual(
+    archive.months.map(({ stateHash }) => stateHash),
+  );
+});
 
 it('AC-M3-12 실제 HTTP 임명·교체·이동·해임과 12개월 정산 해시가 일치한다', async () => {
   const operator = await identity('ADMIN'),

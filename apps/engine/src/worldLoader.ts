@@ -4,6 +4,7 @@ import {
   effectiveWorldOptions,
   OFFICE_EFFECTS_FEATURE,
   officeEffectsSchema,
+  readCityOfficeVolunteers,
   readOperationalMap,
   attachOperationalKinds,
   readStoredGovernance,
@@ -188,6 +189,8 @@ export async function loadWorldAfterCapabilityCheck(
     ...(await loadCommandState(tx, worldId, world)),
     ...(capabilities.kind === 'caps' && 'treaty' in capabilities.selection ? await loadTreaties(tx, worldId) : {}),
   };
+  const volunteers = readCityOfficeVolunteers(world.ruleFeatures, world.cityOfficeVolunteers);
+  if (volunteers) state.cityOfficeVolunteers = volunteers;
   const campaign = readStoredCampaign(world.campaignState, state, world.seed);
   if (campaign) state.campaign = campaign;
   const cityResources = readStoredCityResources(world.cityResourcesState, state, armyTypes);

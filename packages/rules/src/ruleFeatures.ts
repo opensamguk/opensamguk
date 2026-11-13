@@ -7,6 +7,7 @@ import type { RecordedInput, ReplayState } from './replay';
 import { enableReplayPolicy } from './policy/replay';
 import { applyPersonnelRecordStep } from './personnel/inputStep';
 import { validatePersonnelRecord } from './personnel/inputs';
+import { CITY_OFFICE_VOLUNTEER_FEATURE } from './personnel/cityOfficeVolunteers';
 import { runPersonnelMonth } from './personnel/monthStep';
 import { updateResidenceAnchors } from './personnel/residence';
 import { recordedLineageSuccession } from './lineage/control';
@@ -148,7 +149,11 @@ export const personnelFeature: RuleFeatureDefinition = {
   },
   checkArchive({ origin, inputs, end }) {
     for (const input of inputs) {
-      if (!['personnel.appoint', 'personnel.dismiss', 'offer.respond', 'nationTurns.set'].includes(input.kind))
+      if (
+        !['personnel.appoint', 'personnel.dismiss', 'offer.respond', 'personnel.volunteer', 'nationTurns.set'].includes(
+          input.kind,
+        )
+      )
         continue;
       const { tick, ...record } = input;
       const { activeTick, ...result } = record.result as Record<string, unknown>;
@@ -238,6 +243,7 @@ export const personnelInputKinds: readonly InputKindDefinition[] = [
     route: 'queued',
     apply: applyPersonnel,
   })),
+  { kind: 'personnel.volunteer', feature: CITY_OFFICE_VOLUNTEER_FEATURE, route: 'queued', apply: applyPersonnel },
   { kind: 'nationTurns.set', feature: 'personnel', route: 'direct', directTick: true, apply: applyPersonnel },
 ];
 

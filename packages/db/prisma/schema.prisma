@@ -64,6 +64,7 @@ model World {
   replayFormat         Int                  @default(1)
   ruleFeatures         String[]             @default([])
   officeEffects        Json?
+  cityOfficeVolunteers Json?
   replayOrigin         Json?
   inputEvents          InputEvent[]
   nationHistory        NationHistory[]

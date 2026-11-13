@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util';
 import type { Prisma } from '@opensamguk/db';
 import {
   assertSlotSet,
@@ -190,6 +191,8 @@ export async function persistMonthly(
   await persistGovernanceState(tx, worldId, before, next);
   await persistLineageState(tx, worldId, before, next);
   await persistEquipmentState(tx, worldId, before, next);
+  if (next.cityOfficeVolunteers && !isDeepStrictEqual(before.cityOfficeVolunteers, next.cityOfficeVolunteers))
+    await tx.world.update({ where: { id: worldId }, data: { cityOfficeVolunteers: next.cityOfficeVolunteers } });
   await persistStratagemCardsState(tx, worldId, before, next, tick);
   await persistCampaignState(tx, worldId, before, next);
   await persistCityResourcesState(
