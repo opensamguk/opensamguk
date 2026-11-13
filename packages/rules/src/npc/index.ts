@@ -30,13 +30,20 @@ export interface NpcContext {
   unitSet?: Actor['unitSet'];
   convergence?: boolean;
   resolver?: CommandResolver | undefined;
+  worldSeed?: string | undefined;
 }
 type General = DeepReadonly<InitialGeneral>;
 const compareText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
 function chooser(view: WorldView, general: General, context: NpcContext, target: 'general' | 'nation') {
   const candidates: NpcCandidate[] = [];
-  const actor: Actor = { generalId: general.id, tick: context.tick ?? 0, unitSet: context.unitSet, target };
+  const actor: Actor = {
+    generalId: general.id,
+    tick: context.tick ?? 0,
+    unitSet: context.unitSet,
+    target,
+    worldSeed: context.worldSeed,
+  };
   return {
     add(key: string, args: Record<string, unknown>, score: number, reason: string) {
       const command = context.resolver ? context.resolver.get(key) : commandRegistry.get(key);

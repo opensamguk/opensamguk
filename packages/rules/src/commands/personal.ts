@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { BALANCE } from '../balance';
 import { defineCommand, fail, noArgs, ownCity, positive, success } from './support';
+import { RICE_MARKET_FEATURE, riceMarketRate, riceMarketTrade } from '../world/riceMarket';
 
 export const personalCommands = [
   defineCommand({
@@ -26,9 +27,19 @@ export const personalCommands = [
     category: 'personal',
     args: z.strictObject({ amount: positive, buy: z.boolean() }),
     check(view, actor, args) {
+      const g = view.generals[actor.generalId]!;
+      if (view.ruleFeatures?.includes(RICE_MARKET_FEATURE)) {
+        const city = view.cities[g.cityKey]!;
+        if (city.nationId !== null && city.nationId !== g.nationId)
+          return fail('NOT_OWN_CITY', '아군이나 공백지의 상인과 거래할 수 있습니다.');
+        if (actor.worldSeed === undefined || riceMarketRate(actor.worldSeed, actor.tick ?? 0, city) === null)
+          return fail('BAD_STATE', '이 도시에 거래할 상인이 없습니다.');
+        if (args.buy && g.gold <= 0) return fail('NO_GOLD', '금이 부족합니다.');
+        if (!args.buy && g.rice <= 0) return fail('NO_RICE', '쌀이 부족합니다.');
+        return null;
+      }
       const failure = ownCity(view, actor);
       if (failure) return failure;
-      const g = view.generals[actor.generalId]!;
       return args.buy
         ? g.gold < args.amount
           ? fail('NO_GOLD', '금이 부족합니다.')
@@ -39,6 +50,16 @@ export const personalCommands = [
     },
     change(state, actor, args) {
       const g = state.generals[actor.generalId]!;
+      if (state.ruleFeatures?.includes(RICE_MARKET_FEATURE)) {
+        const rate = riceMarketRate(actor.worldSeed!, actor.tick ?? 0, state.cities[g.cityKey]!)!;
+        const trade = riceMarketTrade(args.amount, args.buy, rate, g.gold, g.rice);
+        g.gold += trade.gold;
+        g.rice += trade.rice;
+        if (g.nationId !== null) state.nations[g.nationId]!.gold += trade.tax;
+        g.experience += 30;
+        g.dedication += 50;
+        return success(`군량 ${args.buy ? '매입' : '매각'}: 쌀 ${Math.abs(trade.rice)} · 금 ${Math.abs(trade.gold)}`);
+      }
       const delta = args.buy ? args.amount : -args.amount;
       g.gold -= delta;
       g.rice += delta;

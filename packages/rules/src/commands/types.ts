@@ -12,6 +12,7 @@ export interface Actor {
   authority?: 'office';
   campaignOrderId?: number;
   recordBattleStats?: true;
+  worldSeed?: string | undefined;
 }
 export interface Failure {
   code:

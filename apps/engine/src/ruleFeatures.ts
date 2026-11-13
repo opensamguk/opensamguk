@@ -185,6 +185,7 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
   { key: 'nation-research-v1' },
   { key: 'court-rank-v1' },
   { key: 'general-condition-v1' },
+  { key: 'rice-market-v1' },
   { key: RELATIONS_FEATURE },
   { key: 'city-scale-v1' },
   {

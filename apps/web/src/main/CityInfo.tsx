@@ -166,6 +166,11 @@ export function CityInfo({
         </p>
       )}
       <CityStats rows={rows} />
+      {data.riceMarket && (
+        <p className={styles.facts}>
+          쌀 시세 {data.riceMarket.rate === null ? '상인 없음' : `${data.riceMarket.rate}%`}
+        </p>
+      )}
       {/* 태수·군사·종사는 관직 효과 월드에서 서버가 officers로 준다(타국 도시는 첩보 기능이면 빠진다). */}
       {data.nationId !== null && data.kind !== 'PASS' && data.officeEffectsEnabled && data.officers ? (
         <CityOffices officers={data.officers} secretaryEnabled={data.secretaryEnabled === true} />

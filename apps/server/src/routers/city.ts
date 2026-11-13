@@ -14,6 +14,8 @@ import {
   officeEffectsSchema,
   hasCitySecretary,
   nowTick,
+  RICE_MARKET_FEATURE,
+  riceMarketRate,
 } from '@opensamguk/rules';
 import { readCityScaleProjection } from '../game/cityScale';
 import { readCityIntel } from '../game/fog';
@@ -60,6 +62,10 @@ export const cityRouter = router({
           where: { worldId: input.worldId, nationId, cityKey: { in: city.connections } },
         })) > 0;
       const campaignEnabled = world.ruleFeatures.includes('campaign-v1');
+      const marketWorld =
+        world.ruleFeatures.includes(RICE_MARKET_FEATURE) && (full || adjacent)
+          ? await tx.world.findUniqueOrThrow({ where: { id: world.id }, select: { seed: true, monthlyTick: true } })
+          : null;
       const view = campaignEnabled && !garrisonHidden ? await readView(tx, input.worldId) : undefined;
       const units = view?.campaign?.units;
       const ruins = await readCityScaleProjection(tx, input.worldId, world.ruleFeatures);
@@ -119,6 +125,18 @@ export const cityRouter = router({
             }
           : {}),
         ...cityInfo(city, activeViewer, alliedResidence),
+        ...(marketWorld
+          ? {
+              riceMarket: {
+                rate: riceMarketRate(marketWorld.seed, marketWorld.monthlyTick, {
+                  cityKey: city.cityKey,
+                  level: city.level,
+                  supplied: city.supplied,
+                  kind: city.kind === 'PASS' ? 'PASS' : 'CITY',
+                }),
+              },
+            }
+          : {}),
         ...(!garrisonHidden && city.nationId !== null && city.nationId === activeViewer?.nationId
           ? { defense: cityDefense(city, generals, world.startYear, nowTick(worldClock(world), ctx.now), view) }
           : {}),
