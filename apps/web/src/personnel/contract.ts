@@ -15,6 +15,7 @@ export interface PersonnelBoard {
   topStratagem?: { generalId: number; name: string; portraitId: number | null; successes: number }[];
   appoint: Allowed;
   officeEffectsEnabled?: boolean;
+  localOfficeMinimum?: number;
   secretaryEnabled?: boolean;
   officeCities?: CityRef[];
   levels: Array<{ officerLevel: number; title: string; holderId: number | null }>;
@@ -31,6 +32,7 @@ export interface PersonnelMember {
   dedication: number;
   officerCityKey?: number | null;
   resident?: boolean;
+  eligibleLocalOffices?: number[];
 }
 
 export interface Office {

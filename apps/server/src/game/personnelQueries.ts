@@ -6,6 +6,7 @@ import {
   isLocalOffice,
   isOfficeResident,
   localOfficeTitle,
+  localOfficeAbility,
   officerTitle,
 } from '@opensamguk/rules';
 import { TRPCError } from '@trpc/server';
@@ -22,11 +23,13 @@ type PersonnelMember = {
   dedication: number;
   officerCityKey?: number | null;
   resident?: boolean;
+  eligibleLocalOffices?: number[];
 };
 export type PersonnelBoard = {
   actorId: number;
   topStratagem?: { generalId: number; name: string; portraitId: number | null; successes: number }[];
   officeEffectsEnabled?: true;
+  localOfficeMinimum?: number;
   officeCities?: { cityKey: number; name: string }[];
   appoint: Allowed;
   levels: { officerLevel: number; title: string; holderId: number | null }[];
@@ -45,6 +48,7 @@ export async function readPersonnelBoard(
   input: { worldId: string; userId: string },
   officeEffectsEnabled = false,
   courtRankEnabled = false,
+  localOfficeMinimum?: number,
 ): Promise<PersonnelBoard> {
   const actor = await requireGeneral(tx, input.worldId, input.userId);
   if (actor.nationId === null) throw new TRPCError({ code: 'FORBIDDEN', message: '국가에 소속되어야 합니다.' });
@@ -69,6 +73,7 @@ export async function readPersonnelBoard(
       portraitId: true,
       removedAt: true,
       stratagemSuccesses: true,
+      ...(localOfficeMinimum === undefined ? {} : { strength: true, intel: true }),
       ...(officeEffectsEnabled ? { officerCityKey: true } : {}),
       city: { select: { cityKey: true, name: true, ...(officeEffectsEnabled ? { nationId: true } : {}) } },
     },
@@ -92,6 +97,14 @@ export async function readPersonnelBoard(
           ),
         }
       : {}),
+    ...(localOfficeMinimum === undefined
+      ? {}
+      : {
+          eligibleLocalOffices:
+            row.removedAt === null
+              ? ([2, 3, 4] as const).filter((level) => localOfficeAbility(row, level, localOfficeMinimum))
+              : [],
+        }),
     dedication: row.dedication,
   }));
   const topStratagem = rows
@@ -100,6 +113,7 @@ export async function readPersonnelBoard(
     .slice(0, 7);
   return {
     actorId: actor.id,
+    ...(localOfficeMinimum === undefined ? {} : { localOfficeMinimum }),
     ...(topStratagem.length
       ? {
           topStratagem: topStratagem.map(({ id, name, portraitId, stratagemSuccesses }) => ({

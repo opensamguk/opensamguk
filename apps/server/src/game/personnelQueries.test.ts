@@ -116,6 +116,14 @@ describe('인사부 내부 읽기', () => {
       },
     });
   });
+  it('지방 관직의 능력치 기준과 직책별 후보 자격을 내려준다', async () => {
+    const { db, rows } = fixture();
+    rows[2]!.strength = 70;
+    vi.spyOn(db.city, 'findMany').mockResolvedValue([]);
+    const board = await readPersonnelBoard(db, { worldId: 'world', userId: 'own' }, true, false, 60);
+    expect(board.localOfficeMinimum).toBe(60);
+    expect(board.members.map(({ eligibleLocalOffices }) => eligibleLocalOffices)).toEqual([[], [], [2, 4]]);
+  });
   it.each([0, 1, 5, 10, 11, 12])('현재 행위자 직책 %i로만 인사 권한을 계산한다', async (officerLevel) => {
     const { db } = fixture(general({ officerLevel }));
     const input = { worldId: 'world', userId: 'own', generalId: 999, nationId: 999, officerLevel: 12 };
