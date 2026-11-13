@@ -56,3 +56,31 @@ it('honors configured ordering, disabled actions, recruiting population and trea
   nation.npcSettings.generalPriority = [];
   expect(generalTurnCandidates(world, ruler, context).map(({ key }) => key)).toEqual(['rest']);
 });
+
+it('applies cure, leadership and troop readiness to NPC decisions', () => {
+  const world = commandWorld();
+  const nation = world.nations[1]!;
+  const general = world.generals[1]!;
+  Object.assign(general, { leadership: 60, crew: 2500, train: 90, atmos: 90, injury: 15 });
+  Object.assign(world.diplomacies[0]!, { state: 'WAR' });
+  const keys = () => generalTurnCandidates(world, general, { unitSet: testUnits, tick: 100 }).map(({ key }) => key);
+  const before = keys();
+  expect(before).toContain('attack');
+  expect(before).not.toContain('heal');
+  nation.npcSettings = {
+    ...NPC_DEFAULT_POLICY,
+    cureThreshold: 10,
+    minNpcWarLeadership: 61,
+    minWarCrew: 2501,
+  };
+  expect(keys()).toEqual(before);
+  world.ruleFeatures = [NPC_NATION_POLICY_FEATURE];
+  expect(keys()[0]).toBe('heal');
+  expect(keys()).not.toContain('attack');
+  nation.npcSettings.minNpcWarLeadership = 60;
+  expect(keys()).not.toContain('attack');
+  nation.npcSettings.minWarCrew = 2500;
+  expect(keys()).toContain('attack');
+  general.injury = 10;
+  expect(keys()).not.toContain('heal');
+});

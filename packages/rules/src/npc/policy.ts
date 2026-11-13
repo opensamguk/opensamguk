@@ -16,6 +16,9 @@ export const npcPolicyLimits = {
   reserveGold: { min: 0, max: 1_000_000 },
   minReward: { min: 0, max: 1_000_000 },
   maxReward: { min: 1, max: 1_000_000 },
+  minWarCrew: { min: 0, max: 100_000 },
+  minNpcWarLeadership: { min: 0, max: 200 },
+  cureThreshold: { min: 0, max: 100 },
 } as const;
 const bounded = ({ min, max }: { min: number; max: number }) => z.number().int().min(min).max(max);
 export const npcGeneralCommands = [
@@ -36,6 +39,7 @@ export const npcGeneralCommands = [
   'morale',
   'trade_rice',
   'attack',
+  'heal',
 ] as const;
 export const npcNationCommands = [
   'nation_capital',
@@ -63,6 +67,9 @@ export const npcNationPolicySchema = z
     reserveGold: bounded(npcPolicyLimits.reserveGold).optional(),
     minReward: bounded(npcPolicyLimits.minReward).optional(),
     maxReward: bounded(npcPolicyLimits.maxReward).optional(),
+    minWarCrew: bounded(npcPolicyLimits.minWarCrew).optional(),
+    minNpcWarLeadership: bounded(npcPolicyLimits.minNpcWarLeadership).optional(),
+    cureThreshold: bounded(npcPolicyLimits.cureThreshold).optional(),
     generalPriority: priority(npcGeneralCommands).optional(),
     nationPriority: priority(npcNationCommands).optional(),
   })

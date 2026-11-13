@@ -129,6 +129,7 @@ const autoplayCommands = new Set([
   'return',
   'move',
   'attack',
+  'heal',
 ]);
 
 export function chooseAutoplayTurn(view: WorldView, general: General, rng: Rng, context: NpcContext) {
@@ -145,6 +146,10 @@ export function generalTurnCandidates(view: WorldView, general: General, context
   const militaryScore = stats ? Math.max(stats.leadership, stats.strength) : 0;
   const choice = chooser(view, general, context, 'general');
   choice.add('rest', {}, 0, '실행할 명령이 없으면 쉰다.');
+  const nation = general.nationId === null ? undefined : view.nations[general.nationId];
+  const policy = npcNationPolicy(view, nation);
+  if (policy.cureThreshold !== undefined && general.injury > policy.cureThreshold)
+    choice.add('heal', {}, 300, '부상이 운영 기준을 넘으면 요양한다.');
   if (general.nationId === null) {
     for (const nation of Object.values(view.nations))
       choice.add('join', { nationId: nation.id }, 100, '재야 장수는 국가에 임관한다.');
@@ -175,8 +180,11 @@ export function generalTurnCandidates(view: WorldView, general: General, context
       60 + militaryScore,
       '후방에서 자기 영토를 따라 가까운 전선으로 한 칸 이동한다.',
     );
-  if (front && city.nationId === general.nationId) {
-    const policy = npcNationPolicy(view, view.nations[general.nationId]);
+  if (
+    front &&
+    city.nationId === general.nationId &&
+    (stats?.leadership ?? general.leadership) >= (policy.minNpcWarLeadership ?? 0)
+  ) {
     const campaign = view.ruleFeatures?.includes('campaign-v1') ? readCampaignState(view.campaign, view) : undefined;
     const owned = campaign?.units.filter((unit) => unit.ownerId === general.id).sort((a, b) => a.id - b.id);
     const army = owned?.[0];
@@ -244,7 +252,7 @@ export function generalTurnCandidates(view: WorldView, general: General, context
     const bonus = assisted ? ownCities.length : 0;
     for (const key of city.connections) {
       const target = view.cities[key]!;
-      if (target.nationId === general.nationId) continue;
+      if (target.nationId === general.nationId || battleTroops < (policy.minWarCrew ?? 0)) continue;
       choice.add(
         'attack',
         { cityKey: key },
