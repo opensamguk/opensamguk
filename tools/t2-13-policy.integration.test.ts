@@ -1,6 +1,6 @@
 import { BATTLE_TACTICS_FEATURE } from '../packages/rules/src/battle/tactics';
 import { CITY_CONFLICT_FEATURE } from '../packages/rules/src/battle/cityConflict';
-import { STAT_GROWTH_FEATURE } from '../packages/rules/src/general/statGrowth';
+import { MILITARY_STAT_GROWTH_FEATURE, STAT_GROWTH_FEATURE } from '../packages/rules/src/general/statGrowth';
 import { WAR_INCOME_FEATURE } from '../packages/rules/src/monthly/warIncome';
 import { TROOP_FEATURE } from '../packages/rules/src/commands/ext/troop/state';
 import { COMBAT_SPECIALTY_FEATURE } from '../packages/rules/src/general/combatSpecialty';
@@ -1037,7 +1037,7 @@ it('병종 숙련을 징병으로 얻고 변환 명령으로 옮겨도 DB와 재
     turnTermMinutes: 30,
     endYear: null,
     replayFormat: 3,
-    ruleFeatures: [GENERAL_PROFICIENCY_FEATURE, 'policy'],
+    ruleFeatures: [GENERAL_PROFICIENCY_FEATURE, MILITARY_STAT_GROWTH_FEATURE, 'policy', STAT_GROWTH_FEATURE],
   });
   worlds.push(worldId);
   await db.world.update({ where: { id: worldId }, data: { status: 'RUNNING', clockAnchorAt: new Date(now) } });
@@ -1058,8 +1058,10 @@ it('병종 숙련을 징병으로 얻고 변환 명령으로 옮겨도 DB와 재
   await loop.advanceTo(100);
   const read = () => db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
   expect((await read()).proficiency).toEqual({ 1: 1000 });
+  expect((await read()).statExperience).toMatchObject({ leadership: 1 });
   await loop.advanceTo(10100);
   expect((await read()).proficiency).toEqual({ 1: 600, 2: 360 });
+  expect((await read()).statExperience).toMatchObject({ leadership: 3 });
   await loop.advanceTo(20000);
   const home = await rpc('home.get', { worldId }, alice.cookie);
   expect(home.data).toMatchObject({

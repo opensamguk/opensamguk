@@ -23,6 +23,9 @@ import {
   readLogisticsState,
   readStoredGovernance,
   storedGeneralSex,
+  storedStatExperience,
+  storedFinanceRates,
+  storedCityConflict,
   storedGeneralRemoval,
   readStoredLineage,
   readStoredEquipment,
@@ -128,16 +131,22 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
     ...(ext ? { ext } : {}),
     startYear: world.startYear,
     cities: attachOperationalKinds(
-      cities.map(({ seasonalEvent, ...city }) => ({ ...city, ...storedCitySeasonalEvent(seasonalEvent) })),
+      cities.map(({ seasonalEvent, conflict, warCasualties, ...city }) => ({
+        ...city,
+        ...storedCitySeasonalEvent(seasonalEvent),
+        ...storedCityConflict(conflict),
+        ...(warCasualties === null ? {} : { warCasualties }),
+      })),
       readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin),
     ),
-    nations: nations.map(({ diplomaticAidUntilMonth, npcSettings, restrictions, ...nation }) => ({
+    nations: nations.map(({ diplomaticAidUntilMonth, npcSettings, restrictions, financeRates, ...nation }) => ({
       ...nation,
       ...storedNpcNationPolicy(world.ruleFeatures.includes(NPC_NATION_POLICY_FEATURE), npcSettings),
       ...storedNationRestrictions(world.ruleFeatures.includes(NATION_RESTRICTIONS_FEATURE), restrictions),
+      ...(financeRates === null ? {} : { financeRates: storedFinanceRates(financeRates) }),
       ...(diplomaticAidUntilMonth != null ? { diplomaticAidUntilMonth } : {}),
     })),
-    generals: generals.map(({ defenseThreshold, proficiency, heritageBenefits, ...general }) =>
+    generals: generals.map(({ defenseThreshold, proficiency, heritageBenefits, statExperience, ...general }) =>
       storedGeneralRemoval(
         storedGeneralSex(
           {
@@ -145,6 +154,7 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
             ...storedDefenseStance(world.ruleFeatures.includes(DEFENSE_STANCE_FEATURE), defenseThreshold),
             ...storedHeritageBenefits(world.ruleFeatures.includes(HERITAGE_BENEFITS_FEATURE), heritageBenefits),
             ...storedGeneralProficiency(world.ruleFeatures.includes(GENERAL_PROFICIENCY_FEATURE), proficiency),
+            ...storedStatExperience(statExperience),
           },
           world.ruleFeatures.includes('lineage-v1'),
         ),
