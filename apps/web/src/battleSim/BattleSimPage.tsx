@@ -1,4 +1,6 @@
 import { useId, useMemo, useState, type ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useTRPC } from '../trpc';
 import { useHome, useWorldId, useWorldRules } from '../game/queries';
 import { DisabledReason } from '../ui/DisabledReason';
 import { ErrorState, LoadingState } from '../ui/States';
@@ -75,6 +77,14 @@ function BattleSimForm({
   fiveStats: boolean;
 }) {
   const home = useHome(worldId);
+  const trpc = useTRPC();
+  const mine = useQuery({ ...trpc.general.mine.queryOptions({ worldId }), enabled: fiveStats });
+  const campaign = useQuery({
+    ...trpc.campaign.get.queryOptions({ worldId }),
+    enabled: mine.data?.creationRules.campaignEnabled === true && Boolean(home.data?.general),
+    retry: false,
+  });
+  const [campaignUnit, setCampaignUnit] = useState('');
   const general = home.isError ? undefined : home.data?.general;
   const units = useMemo(() => worldUnits(unitSet), [unitSet]);
   // shortcut: 장수 병종이 없는 병종표면 0으로 두어 병종 칸 오류로 보인다. 실제 출병도 그런 표로는 돌지 않는다.
@@ -92,9 +102,15 @@ function BattleSimForm({
   const set = (key: 'wall' | 'defence' | 'attackerTech' | 'defenderTech' | 'seed', value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
   const wall = form.defenderKind === 'wall';
-  const importAttacker = () => {
+  const importAttacker = (unitId?: number) => {
     if (!general) return;
     const nation = home.data?.nation;
+    const unit = unitId === undefined ? undefined : campaign.data?.units.find(({ id }) => id === unitId);
+    if (unitId !== undefined && !unit) return;
+    const commander = unit ? campaign.data?.people.find(({ id }) => id === unit.commanderId) : general;
+    if (!commander) return;
+    const force = unit ?? general;
+    const useOwnTraits = commander.id === general.id;
     const battleHeritage = { ...general.heritageBenefits };
     delete battleHeritage.domesticSuccess;
     delete battleHeritage.domesticFailure;
@@ -110,15 +126,15 @@ function BattleSimForm({
     setForm((current) => ({
       ...current,
       statProfile: fiveStats ? 'five-stats' : 'legacy',
-      attackerTraits: Object.keys(traits).length ? traits : undefined,
+      attackerTraits: useOwnTraits && Object.keys(traits).length ? traits : undefined,
       attacker: {
-        crew: String(general.crew),
-        crewType: units.generals.some(({ id }) => id === general.crewType) ? String(general.crewType) : '',
-        train: String(general.train),
-        atmos: String(general.atmos),
+        crew: String(unit?.troops ?? general.crew),
+        crewType: units.generals.some(({ id }) => id === force.crewType) ? String(force.crewType) : '',
+        train: String(force.train),
+        atmos: String(force.atmos),
       },
       attackerTech: String(nation && 'tech' in nation ? nation.tech : 0),
-      attackerCommander: { leadership: String(general.leadership), strength: String(general.strength) },
+      attackerCommander: { leadership: String(commander.leadership), strength: String(commander.strength) },
     }));
   };
 
@@ -153,9 +169,37 @@ function BattleSimForm({
           <fieldset className={styles.side}>
             <legend>공격</legend>
             {general ? (
-              <button type="button" className={styles.primary} onClick={importAttacker}>
+              <button type="button" className={styles.primary} onClick={() => importAttacker()}>
                 내 장수 값 가져오기
               </button>
+            ) : null}
+            {campaign.data?.units.length ? (
+              <div className={styles.row}>
+                <label className={styles.field}>
+                  내 부곡
+                  <select
+                    className={styles.input}
+                    value={campaignUnit}
+                    onChange={(event) => setCampaignUnit(event.target.value)}
+                  >
+                    <option value="">부곡 선택</option>
+                    {campaign.data.units.map((unit) => (
+                      <option value={unit.id} key={unit.id}>
+                        {units.generals.find(({ id }) => id === unit.crewType)?.name ?? unit.crewType} ·{' '}
+                        {unit.troops.toLocaleString('ko-KR')}명
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  className={styles.secondary}
+                  disabled={!campaignUnit}
+                  onClick={() => importAttacker(Number(campaignUnit))}
+                >
+                  부곡 값 가져오기
+                </button>
+              </div>
             ) : null}
             {form.attackerTraits ? (
               <div className={styles.row}>
