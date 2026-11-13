@@ -14,9 +14,17 @@ export function useRankingData(worldId: string, search: RankingSearch): RankingD
   const trpc = useTRPC();
   const generals = useQuery(
     trpc.ranking.generals.queryOptions(
-      search.tab === 'generals' ? { worldId, by: search.by, ...(search.kind ? { kind: search.kind } : {}) } : skipToken,
+      search.tab === 'generals'
+        ? {
+            worldId,
+            by: search.by,
+            ...(search.kind ? { kind: search.kind } : {}),
+            ...(search.page ? { page: search.page } : {}),
+          }
+        : skipToken,
       {
-        placeholderData: keepPreviousData,
+        placeholderData: (previous) =>
+          search.tab === 'generals' && (previous?.pagination?.page ?? 1) === (search.page ?? 1) ? previous : undefined,
       },
     ),
   );

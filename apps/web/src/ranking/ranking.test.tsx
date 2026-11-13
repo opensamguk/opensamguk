@@ -75,7 +75,7 @@ describe('표시 도우미', () => {
 describe('장수 순위 표', () => {
   it('받은 순서대로 그리고 숫자는 천 단위로 끊는다', () => {
     const top = [general(1, 7, '조조'), general(2, 3, '유비', { id: 2, name: '촉', color: '#2e7d4f' })];
-    render(<GeneralRankingTable ranking={{ top, me: null, at }} by="dedication" onSort={() => {}} />);
+    render(<GeneralRankingTable ranking={{ top, me: null, at, pagination: null }} by="dedication" onSort={() => {}} />);
     const rows = within(screen.getByRole('table', { name: '장수 순위' })).getAllByRole('row');
     expect(rows[1]?.textContent).toContain('조조');
     expect(rows[2]?.textContent).toContain('유비');
@@ -86,7 +86,7 @@ describe('장수 순위 표', () => {
   it('INT-25 이름은 괄호를 빼고 행마다 20×28 thumb 얼굴을 둔다', () => {
     const top = [{ ...general(1, 7, '조조(曹操)'), portraitId: 10006 }, general(2, 3, '유비')];
     const { container } = render(
-      <GeneralRankingTable ranking={{ top, me: null, at }} by="dedication" onSort={() => {}} />,
+      <GeneralRankingTable ranking={{ top, me: null, at, pagination: null }} by="dedication" onSort={() => {}} />,
     );
     expect(screen.getByText('조조')).toBeTruthy();
     expect(screen.queryByText('조조(曹操)')).toBeNull();
@@ -101,7 +101,7 @@ describe('장수 순위 표', () => {
   // 원작 명장일람처럼 전공 옆에 승리·점령을 나눠 쓰고 이름의 괄호는 뺀다 (INT-25).
   it('전공 옆에 승리·점령 열을 따로 두고 이름 괄호를 뺀다', () => {
     const top = [general(1, 7, '조조(曹操)')];
-    render(<GeneralRankingTable ranking={{ top, me: null, at }} by="merit" onSort={() => {}} />);
+    render(<GeneralRankingTable ranking={{ top, me: null, at, pagination: null }} by="merit" onSort={() => {}} />);
     const table = screen.getByRole('table', { name: '장수 순위' });
     const headers = within(table)
       .getAllByRole('columnheader')
@@ -118,7 +118,7 @@ describe('장수 순위 표', () => {
 
   it('재야는 소속이 재야로 나온다', () => {
     const top = [{ ...general(1, 9, '여포'), nation: null }];
-    render(<GeneralRankingTable ranking={{ top, me: null, at }} by="dedication" onSort={() => {}} />);
+    render(<GeneralRankingTable ranking={{ top, me: null, at, pagination: null }} by="dedication" onSort={() => {}} />);
     expect(screen.getByText('재야')).toBeTruthy();
   });
 
@@ -127,7 +127,11 @@ describe('장수 순위 표', () => {
     const scroll = vi.fn();
     Element.prototype.scrollIntoView = scroll;
     render(
-      <GeneralRankingTable ranking={{ top: [general(1, 7, '조조'), me], me, at }} by="dedication" onSort={() => {}} />,
+      <GeneralRankingTable
+        ranking={{ top: [general(1, 7, '조조'), me], me, at, pagination: null }}
+        by="dedication"
+        onSort={() => {}}
+      />,
     );
     const row = screen.getByText('유비').closest('tr');
     expect(row?.getAttribute('data-me')).toBe('true');
@@ -140,7 +144,11 @@ describe('장수 순위 표', () => {
   it('상위 목록 밖이면 표 끝에 따로 한 줄', () => {
     const me = general(250, 42, '장비');
     render(
-      <GeneralRankingTable ranking={{ top: [general(1, 7, '조조')], me, at }} by="dedication" onSort={() => {}} />,
+      <GeneralRankingTable
+        ranking={{ top: [general(1, 7, '조조')], me, at, pagination: null }}
+        by="dedication"
+        onSort={() => {}}
+      />,
     );
     const rows = within(screen.getByRole('table', { name: '장수 순위' })).getAllByRole('row');
     const last = rows.at(-1);
@@ -153,7 +161,11 @@ describe('장수 순위 표', () => {
   it('머리글을 누르면 기준이 바뀌고 지금 기준은 aria-sort로 알린다', () => {
     const onSort = vi.fn();
     render(
-      <GeneralRankingTable ranking={{ top: [general(1, 7, '조조')], me: null, at }} by="experience" onSort={onSort} />,
+      <GeneralRankingTable
+        ranking={{ top: [general(1, 7, '조조')], me: null, at, pagination: null }}
+        by="experience"
+        onSort={onSort}
+      />,
     );
     expect(screen.getByRole('columnheader', { name: /경험/ }).getAttribute('aria-sort')).toBe('descending');
     expect(screen.getByRole('columnheader', { name: /공헌/ }).getAttribute('aria-sort')).toBe('none');
@@ -235,12 +247,43 @@ describe('화면 상태', () => {
     render(
       <RankingView
         search={defaultSearch('generals')}
-        data={{ state: 'ready', tab: 'generals', ranking: { top: [general(1, 7, '조조')], me: null, at } }}
+        data={{
+          state: 'ready',
+          tab: 'generals',
+          ranking: { top: [general(1, 7, '조조')], me: null, at, pagination: null },
+        }}
         onSort={() => {}}
         renderTab={tab}
       />,
     );
     expect(screen.getByText('193년 4월 정산 기준')).toBeTruthy();
     expect(screen.getByRole('table', { name: '장수 순위' })).toBeTruthy();
+  });
+
+  it('100위 이후의 순위와 페이지 이동을 표시한다', () => {
+    const onPage = vi.fn();
+    render(
+      <RankingView
+        search={parseRankingSearch({ tab: 'generals', page: 2 })}
+        data={{
+          state: 'ready',
+          tab: 'generals',
+          ranking: {
+            top: [general(101, 101, '장비')],
+            me: null,
+            at,
+            pagination: { page: 2, pageCount: 2 },
+          },
+        }}
+        onSort={() => {}}
+        onPage={onPage}
+        renderTab={tab}
+      />,
+    );
+    const nav = within(screen.getByRole('navigation', { name: '장수 순위 페이지' }));
+    expect(nav.getByText('2 / 2')).toBeTruthy();
+    expect((nav.getByRole('button', { name: '다음' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(nav.getByRole('button', { name: '이전' }));
+    expect(onPage).toHaveBeenCalledWith(1);
   });
 });

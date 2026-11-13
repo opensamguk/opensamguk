@@ -300,6 +300,19 @@ describe('T2-22 / AC-M2-19 실제 TCP HTTP·PostgreSQL 순위', () => {
     expect((await query('ranking.generals', { worldId, by: 'dedication' })).data.me?.generalId).toBe(105);
   });
 
+  it('100위 이후에도 전역 순번과 내 순위를 유지하며 장수 종류를 먼저 거른다', async () => {
+    const input = { worldId, by: 'dedication' };
+    const first = await query('ranking.generals', input);
+    const second = await query('ranking.generals', { ...input, page: 2 });
+    expect(second.data.pagination).toEqual({ page: 2, pageCount: 2 });
+    expect(second.data.top.map(({ rank }) => rank)).toEqual([101, 102, 103, 104, 105]);
+    expect(second.data.me).toEqual(first.data.me);
+    expect(new Set([...first.data.top, ...second.data.top].map(({ generalId }) => generalId)).size).toBe(105);
+    const filtered = await query('ranking.generals', { ...input, page: 2, kind: 'human' });
+    expect(filtered.data.top.map(({ rank }) => rank)).toEqual([1, 2]);
+    expect(filtered.data.pagination).toBeNull();
+  });
+
   it('국가 병력 추정은 현재 출사 장수만 집계하고 개인 활동 시각을 반환하지 않는다', async () => {
     const id = await fixtureWorld('force-estimate', true);
     await db.world.update({ where: { id }, data: { turnTermMinutes: 20_000 } });
@@ -339,6 +352,7 @@ describe('T2-22 / AC-M2-19 실제 TCP HTTP·PostgreSQL 순위', () => {
         top: [],
         me: null,
         at: null,
+        pagination: null,
       });
     for (const by of ['cities', 'generals', 'power'])
       expect((await query('ranking.nations', { worldId: emptyWorldId, by })).data).toEqual({ items: [], at: null });

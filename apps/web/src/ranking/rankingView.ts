@@ -35,7 +35,7 @@ export const NATION_COLUMNS: ReadonlyArray<{ key: NationSortKey; label: string }
 
 export type GeneralKind = 'all' | 'human' | 'npc';
 export type RankingSearch =
-  { tab: 'generals'; by: GeneralSortKey; kind?: GeneralKind } | { tab: 'nations'; by: NationSortKey };
+  { tab: 'generals'; by: GeneralSortKey; kind?: GeneralKind; page?: number } | { tab: 'nations'; by: NationSortKey };
 
 // 주소의 tab·by가 틀리면 탭마다 첫 기준으로 돌린다. 장수 탭에 국가 기준(by=cities)이 오는 경우도 같다.
 export function parseRankingSearch(search: Record<string, unknown>): RankingSearch {
@@ -45,7 +45,11 @@ export function parseRankingSearch(search: Record<string, unknown>): RankingSear
   }
   const by = GENERAL_COLUMNS.find((c) => c.key === search.by)?.key ?? 'dedication';
   const kind = search.kind === 'human' || search.kind === 'npc' ? search.kind : null;
-  return { tab: 'generals', by, ...(kind ? { kind } : {}) };
+  const page =
+    typeof search.page === 'number' && Number.isInteger(search.page) && search.page > 1 && search.page <= 10_000
+      ? search.page
+      : null;
+  return { tab: 'generals', by, ...(kind ? { kind } : {}), ...(page ? { page } : {}) };
 }
 
 // 탭을 바꾸면 그 탭의 첫 기준부터 본다.

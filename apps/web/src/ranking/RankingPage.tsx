@@ -34,8 +34,9 @@ export function RankingPage() {
     <RankingView
       search={search}
       data={data}
-      onSort={(by) => void navigate({ search: { ...search, by } as RankingSearch, replace: true })}
-      onKind={(kind) => void navigate({ search: parseRankingSearch({ ...search, kind }), replace: true })}
+      onSort={(by) => void navigate({ search: parseRankingSearch({ ...search, by, page: 1 }), replace: true })}
+      onKind={(kind) => void navigate({ search: parseRankingSearch({ ...search, kind, page: 1 }), replace: true })}
+      onPage={(page) => void navigate({ search: parseRankingSearch({ ...search, page }) })}
       freeGenerals={search.tab === 'nations' ? <FreeGenerals worldId={worldId} /> : undefined}
       renderTab={(tab, label, active) => (
         <Link
@@ -60,6 +61,7 @@ export function RankingView({
   onSort,
   renderTab,
   onKind,
+  onPage,
   freeGenerals,
 }: {
   search: RankingSearch;
@@ -67,6 +69,7 @@ export function RankingView({
   onSort: (by: GeneralSortKey | NationSortKey) => void;
   renderTab: (tab: RankingSearch['tab'], label: string, active: boolean) => React.ReactNode;
   onKind?: (kind: GeneralKind) => void;
+  onPage?: (page: number) => void;
   freeGenerals?: React.ReactNode;
 }) {
   return (
@@ -103,8 +106,39 @@ export function RankingView({
         </div>
       ) : null}
       <RankingBody search={search} data={data} onSort={onSort} />
+      {onPage &&
+      search.tab === 'generals' &&
+      data.state === 'ready' &&
+      data.tab === 'generals' &&
+      data.ranking.pagination ? (
+        <RankingPages {...data.ranking.pagination} onPage={onPage} />
+      ) : null}
       {freeGenerals}
     </section>
+  );
+}
+
+function RankingPages({
+  page,
+  pageCount,
+  onPage,
+}: {
+  page: number;
+  pageCount: number;
+  onPage: (page: number) => void;
+}) {
+  return (
+    <nav className={styles.tabs} aria-label="장수 순위 페이지">
+      <button type="button" className={styles.tab} disabled={page === 1} onClick={() => onPage(page - 1)}>
+        이전
+      </button>
+      <span aria-live="polite">
+        {page} / {pageCount}
+      </span>
+      <button type="button" className={styles.tab} disabled={page === pageCount} onClick={() => onPage(page + 1)}>
+        다음
+      </button>
+    </nav>
   );
 }
 
