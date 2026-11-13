@@ -30,6 +30,7 @@ const AREA_PANEL: Record<string, MobilePanel> = {
   nation: 'status',
   general: 'status',
   records: 'records',
+  'activity-records': 'records',
   'general-records': 'records',
   'nation-records': 'records',
   'world-records': 'records',

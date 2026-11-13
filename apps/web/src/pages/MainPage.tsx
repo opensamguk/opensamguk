@@ -419,7 +419,6 @@ export function MainPage() {
             clock={summary.data}
             nations={nations}
             cities={cities}
-            hasNation={homeData ? homeData.nation !== null : !noGeneral}
           />,
         )}
 

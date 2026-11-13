@@ -18,8 +18,6 @@ export function MainRecords({
   clock: WorldSummary | undefined;
   nations: readonly MapNation[];
   cities: readonly MapCity[];
-  // 국가 기록 칸이 있던 때의 값. 메인 쪽 호출을 바꾸지 않도록 받기만 한다.
-  hasNation?: boolean;
 }) {
   return (
     <div className={className ? `${className} ${styles.strip}` : styles.strip}>
