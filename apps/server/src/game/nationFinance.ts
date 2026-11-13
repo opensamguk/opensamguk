@@ -39,7 +39,11 @@ type NationFinanceSource = {
 };
 const wallIncomeNation = (world: World, nation?: NationFinanceSource | null) =>
   world.ruleFeatures.includes(WALL_INCOME_FEATURE) ? (nation ?? undefined) : undefined;
-function projectedWarIncome(world: World, cities: readonly City[], nation?: NationFinanceSource | null) {
+function projectedWarIncome(
+  world: World,
+  cities: readonly City[],
+  nation?: NationFinanceSource | null,
+): { warIncome?: number } {
   if (!world.ruleFeatures.includes(WAR_INCOME_FEATURE)) return {};
   const multiplier = nationPhilosophy(world, nation?.philosophy)?.gold;
   return {
