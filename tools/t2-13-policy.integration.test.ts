@@ -590,7 +590,19 @@ for (const category of ['unauthenticated', 'otherUser', 'sanctioned', 'invalidIn
   );
 }
 
-const editedNpcPolicy = { recruitTarget: 4000, trainingTarget: 85, moraleTarget: 75, rewardGoldTarget: 12000 };
+const editedNpcPolicy = {
+  recruitTarget: 4000,
+  trainingTarget: 85,
+  moraleTarget: 75,
+  rewardGoldTarget: 12000,
+  minRecruitPopulation: 9000,
+  safeRecruitPopulationPercent: 15,
+  reserveGold: 500,
+  minReward: 250,
+  maxReward: 5000,
+  generalPriority: ['recruit', 'farm'],
+  nationPriority: ['nation_reward'],
+};
 
 it(
   '군주의 NPC 운영 기준을 다음 엔진 처리에 적용하고 재생한다',

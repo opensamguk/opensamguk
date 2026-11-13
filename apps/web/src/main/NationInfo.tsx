@@ -196,6 +196,11 @@ const npcPolicyLabels = {
   trainingTarget: '훈련 목표',
   moraleTarget: '사기 목표',
   rewardGoldTarget: '포상 기준 금',
+  minRecruitPopulation: '모집 최소 도시 인구',
+  safeRecruitPopulationPercent: '모집 최소 도시 인구율 (%)',
+  reserveGold: '포상 뒤 보유할 국고 금',
+  minReward: '최소 포상 금',
+  maxReward: '최대 포상 금',
 } satisfies Record<keyof NationNpcSettings, string>;
 
 function NationNpcPolicyEditor({
@@ -215,13 +220,59 @@ function NationNpcPolicyEditor({
       onSuccess: async () => {
         await client.invalidateQueries({ queryKey: trpc.nation.get.queryKey({ worldId, nationId }) });
         setDraft({});
+        setPriorities({});
       },
     }),
   );
+  const [priorities, setPriorities] = useState<{ general?: string[] | null; nation?: string[] | null }>({});
   const editor = policy.editor;
   if (!editor) return null;
   const fields = Object.keys(npcPolicyLabels) as Array<keyof NationNpcSettings>;
-  const value = (field: keyof NationNpcSettings) => draft[field] ?? String(editor.pending?.[field] ?? policy[field]);
+  const value = (field: keyof NationNpcSettings) =>
+    draft[field] ?? String(editor.pending?.[field] ?? policy[field] ?? '');
+  const generalPriority = editor.pending ? editor.pending.generalPriority : policy.generalPriority;
+  const nationPriority = editor.pending ? editor.pending.nationPriority : policy.nationPriority;
+  const priorityFor = (kind: 'general' | 'nation') =>
+    priorities[kind] === null
+      ? undefined
+      : (priorities[kind] ?? (kind === 'general' ? generalPriority : nationPriority));
+  const names: Record<string, string> = {
+    join: '임관',
+    return: '귀환',
+    move: '이동',
+    farm: '농지 개간',
+    commerce: '상업 투자',
+    security: '치안 강화',
+    settle: '정착 장려',
+    goodwill: '민심 수습',
+    defence: '수비 강화',
+    wall: '성벽 보수',
+    research: '기술 연구',
+    form_unit: '빈 부곡 편성',
+    recruit: '모병',
+    train: '훈련',
+    morale: '사기진작',
+    trade_rice: '군량 매입',
+    attack: '출병',
+    nation_capital: '천도',
+    nation_declare: '선전포고',
+    nation_reward: '포상',
+    nation_city_allocate: '도시 병력 배속',
+    nation_mobilize: '백성동원',
+    nation_rivalry: '피장파장',
+    nation_raid: '기습',
+  };
+  const changePriority = (kind: 'general' | 'nation', key: string, direction: -1 | 0 | 1) => {
+    const current = [...(priorityFor(kind) ?? editor.commands[kind])];
+    const index = current.indexOf(key);
+    if (direction === 0) {
+      if (index < 0) current.push(key);
+      else current.splice(index, 1);
+    } else if (index >= 0 && index + direction >= 0 && index + direction < current.length) {
+      [current[index], current[index + direction]] = [current[index + direction]!, current[index]!];
+    }
+    setPriorities((previous) => ({ ...previous, [kind]: current }));
+  };
   return (
     <form
       onSubmit={(event) => {
@@ -235,6 +286,18 @@ function NationNpcPolicyEditor({
             trainingTarget: Number(value('trainingTarget')),
             moraleTarget: Number(value('moraleTarget')),
             rewardGoldTarget: Number(value('rewardGoldTarget')),
+            ...Object.fromEntries(
+              fields
+                .slice(4)
+                .filter((key) => value(key) !== '')
+                .map((key) => [key, Number(value(key))]),
+            ),
+            generalPriority: priorityFor('general')?.filter((key): key is NonNullable<typeof generalPriority>[number] =>
+              (editor.commands.general as readonly string[]).includes(key),
+            ),
+            nationPriority: priorityFor('nation')?.filter((key): key is NonNullable<typeof nationPriority>[number] =>
+              (editor.commands.nation as readonly string[]).includes(key),
+            ),
           },
         });
       }}
@@ -249,7 +312,7 @@ function NationNpcPolicyEditor({
               min={editor.limits[field].min}
               max={editor.limits[field].max}
               step={1}
-              required
+              required={fields.indexOf(field) < 4}
               value={value(field)}
               onChange={(event) => {
                 const next = event.currentTarget.value;
@@ -258,7 +321,55 @@ function NationNpcPolicyEditor({
             />
           </label>
         ))}
-        <button type="submit" disabled={Object.keys(draft).length === 0}>
+        {(['general', 'nation'] as const).map((kind) => {
+          const order = priorityFor(kind);
+          const commands: readonly string[] = editor.commands[kind];
+          const active = order ?? commands;
+          const all = [...active, ...commands.filter((key) => !active.includes(key))];
+          return (
+            <details key={kind}>
+              <summary>{kind === 'general' ? 'NPC 장수 명령 우선순위' : 'NPC 국가 명령 우선순위'}</summary>
+              <button
+                type="button"
+                disabled={order === undefined}
+                onClick={() => setPriorities((previous) => ({ ...previous, [kind]: null }))}
+              >
+                기본 순서로 되돌리기
+              </button>
+              {order === undefined ? <p>상황에 따라 기본 순서를 적용합니다.</p> : null}
+              <ol>
+                {all.map((key) => {
+                  const index = active.indexOf(key);
+                  return (
+                    <li key={key}>
+                      <label>
+                        <input type="checkbox" checked={index >= 0} onChange={() => changePriority(kind, key, 0)} />
+                        {names[key] ?? key}
+                      </label>{' '}
+                      <button
+                        type="button"
+                        aria-label={`${names[key] ?? key} 위로`}
+                        disabled={index <= 0}
+                        onClick={() => changePriority(kind, key, -1)}
+                      >
+                        ↑
+                      </button>{' '}
+                      <button
+                        type="button"
+                        aria-label={`${names[key] ?? key} 아래로`}
+                        disabled={index < 0 || index >= active.length - 1}
+                        onClick={() => changePriority(kind, key, 1)}
+                      >
+                        ↓
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
+            </details>
+          );
+        })}
+        <button type="submit" disabled={Object.keys(draft).length === 0 && Object.keys(priorities).length === 0}>
           저장
         </button>
       </fieldset>

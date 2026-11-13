@@ -15,6 +15,8 @@ import {
   storedNationRestrictions,
   NPC_NATION_POLICY_KIND,
   npcNationPolicy,
+  npcGeneralCommands,
+  npcNationCommands,
   npcNationPolicyInput,
   npcPolicyLimits,
   storedNpcNationPolicy,
@@ -245,6 +247,7 @@ export const nationRouter = router({
                   ? {
                       editor: {
                         limits: npcPolicyLimits,
+                        commands: { general: npcGeneralCommands, nation: npcNationCommands },
                         pending: npcPolicyPending ? npcNationPolicyInput.parse(npcPolicyPending.payload).policy : null,
                       },
                     }
