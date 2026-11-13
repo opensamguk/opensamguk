@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { createRef } from 'react';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { TEST_UNIT_SET } from '../battleSim/testUnitSet';
 import { worldUnits } from '../battleSim/unitChoices';
@@ -64,16 +64,19 @@ it('INT-18C AC-INT-18C 도시 훈련 선택은 target city를 보내며 부곡 �
   );
   fireEvent.click(screen.getByRole('radio', { name: '훈련' }));
   fireEvent.change(screen.getByRole('combobox', { name: '훈련·사기 대상' }), { target: { value: 'city' } });
-  expect((screen.getByRole('combobox', { name: '병종' }) as HTMLSelectElement).value).toBe('1100');
-  fireEvent.change(screen.getByRole('combobox', { name: '병종' }), { target: { value: '1200' } });
+  const crewGroup = () => screen.getByRole('radiogroup', { name: '병종' });
+  expect((within(crewGroup()).getByRole('radio', { checked: true }) as HTMLInputElement).value).toBe('1100');
+  fireEvent.click(within(crewGroup()).getByRole('radio', { name: /궁병/ }));
   fireEvent.click(screen.getByRole('button', { name: '선택에 넣기' }));
   expect(onPut).toHaveBeenLastCalledWith({
     commandKey: 'train',
     args: { crewType: 1200, target: 'city' },
     explicit: true,
   });
-  fireEvent.change(screen.getByRole('combobox', { name: '훈련·사기 대상' }), { target: { value: 'unit' } });
-  expect(screen.queryByRole('combobox', { name: '병종' })).toBeNull();
+  // 넣으면 입력 화면이 닫힌다. 다시 고르면 기존 부곡 갈래부터 시작한다.
+  fireEvent.click(screen.getByRole('radio', { name: '훈련' }));
+  expect((screen.getByRole('combobox', { name: '훈련·사기 대상' }) as HTMLSelectElement).value).toBe('unit');
+  expect(screen.queryByRole('radiogroup', { name: '병종' })).toBeNull();
   fireEvent.change(screen.getByRole('spinbutton', { name: '부곡 번호' }), { target: { value: '7' } });
   fireEvent.click(screen.getByRole('button', { name: '선택에 넣기' }));
   expect(onPut).toHaveBeenLastCalledWith({ commandKey: 'train', args: { unitId: 7 }, explicit: true });

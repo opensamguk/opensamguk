@@ -249,7 +249,7 @@ export function MainPage() {
             도시 선택·재조회 때 다시 만들지 않는다. 그래서 저장하지 않은 편집과 고른 칸이 유지된다. */}
         <Panel title="명령 목록" area="commands" headingId="main-commands">
           <PolicyBar worldId={worldId} />
-          <TurnEditor worldId={worldId} selectedCityKey={cityKey} onStatus={setTurnStatus} />
+          <TurnEditor worldId={worldId} selectedCityKey={selected ?? null} onStatus={setTurnStatus} />
         </Panel>
 
         <Panel title="국가 정보" area="nation" headingId="main-nation">

@@ -298,7 +298,8 @@ test.describe('예턴 편집의 교역 대상', () => {
     await editor.locator('tr[data-slot="5"]').click();
     await editor.getByLabel('명령 찾기').fill('교역');
     await editor.getByRole('radio', { name: '교역' }).check();
-    await expect(editor.getByRole('combobox', { name: /대상 도시/ })).toContainText(away.name);
+    await expect(a.page.getByRole('radiogroup', { name: '대상 도시' })).toContainText(away.name);
+    await a.page.getByRole('button', { name: '명령 취소', exact: true }).click();
 
     // 외교실에 갔다 돌아와도 저장하지 않은 편집과 고른 칸이 그대로다.
     await a.page.goto(`/w/${world}/diplomacy`);
@@ -322,7 +323,7 @@ test.describe('예턴 편집의 교역 대상', () => {
     });
     expect(targets.items).toEqual([]);
     expect(targets.blocked).toBeTruthy();
-    await expect(editor.getByRole('note')).toHaveText(targets.blocked!);
-    await expect(editor.getByRole('combobox', { name: /대상 도시/ }).locator('option')).toHaveCount(1);
+    await expect(a.page.getByTestId('command-args-screen').getByRole('note').first()).toHaveText(targets.blocked!);
+    await expect(a.page.getByRole('radiogroup', { name: '대상 도시' }).getByRole('radio')).toHaveCount(0);
   });
 });

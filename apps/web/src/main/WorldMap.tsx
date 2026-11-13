@@ -61,6 +61,7 @@ export function WorldMap({
   onSelect,
   operationalMap,
   fill = false,
+  focusKey = null,
 }: {
   cities: readonly DrawnCity[];
   nations: readonly DrawnNation[];
@@ -69,6 +70,8 @@ export function WorldMap({
   onSelect?: (key: number) => void;
   operationalMap?: PublicGeography | undefined;
   fill?: boolean;
+  // 운영 지도에서 처음 열 때 가운데 둘 거점 (인자 입력 화면, INT-25).
+  focusKey?: number | null;
 }) {
   if (operationalMap)
     return (
@@ -80,6 +83,7 @@ export function WorldMap({
         {...(onSelect ? { onSelect } : {})}
         map={operationalMap}
         fill={fill}
+        focusKey={focusKey}
       />
     );
   if (cities.some((city) => city.kind !== undefined)) return <p role="alert">운영 지도 자료를 다시 불러오세요.</p>;

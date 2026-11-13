@@ -2,7 +2,15 @@ import { useId, useMemo, useRef, useState, type KeyboardEvent, type RefObject } 
 import { useQuery } from '@tanstack/react-query';
 import type { WorldUnits } from '../battleSim/unitChoices';
 import { DisabledReason } from '../ui/DisabledReason';
-import { argFields, buildArgs, requiredKeys, type ArgField } from './args';
+import { argFields, buildArgs, describeArgs, requiredKeys, type ArgField } from './args';
+import {
+  CityTargetPicker,
+  CommandArgsScreen,
+  GeneralTargetPicker,
+  NationTargetPicker,
+  UnitPicker,
+  type ArgContext,
+} from './CommandArgsScreen';
 import type { Turn } from './draft';
 import type { Check, SourceQuery } from './source';
 import styles from './TurnEditor.module.css';
@@ -55,6 +63,8 @@ interface Props {
   cityChoicesFor?: ((commandKey: string) => CityChoices | null) | undefined;
   // 있으면 고른 명령을 넣기 전에 서버 사전 검사를 받아 경고를 미리 보인다. 30칸 표와 같은 조회 키라 캐시를 같이 쓴다.
   precheck?: ((turn: Turn) => SourceQuery<Check>) | undefined;
+  // 인자 입력 화면이 쓰는 지도·내 장수·병종표 (INT-25). 없으면 지도 없이 목록만 보인다.
+  argContext?: ArgContext | undefined;
 }
 
 // 서버가 준 명령을 카드로 고른다. 카드 선택과 실제 명령/패 소비는 별개다.
@@ -76,6 +86,7 @@ export function CommandPicker({
   onPut,
   cityChoicesFor,
   precheck,
+  argContext = { here: null, ownNationId: null },
 }: Props) {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<string>('all');
@@ -193,6 +204,8 @@ export function CommandPicker({
   const put = () => {
     if (!ready || blockedReason) return;
     onPut(ready);
+    // 인자 입력 화면은 넣은 뒤 닫는다. 인자 없는 명령은 카드 고른 상태를 그대로 둔다.
+    if (fieldsFor(schema).length > 0 || command?.key === 'equipment_trade') close();
   };
 
   const onSearchKey = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -227,6 +240,41 @@ export function CommandPicker({
           : built.missing.length > 0
             ? `${built.missing.join(', ')} 칸을 채우세요.`
             : null);
+
+  // 인자가 있는 명령은 원작처럼 화면 전체의 입력 화면에서 고른다 (INT-25).
+  const needsScreen = Boolean(
+    command && schema && (fields.length > 0 || cityDrill || command.key === 'equipment_trade'),
+  );
+  const close = () => {
+    setChosen(null);
+    setValues({});
+    setPreparationTarget('unit');
+  };
+  const reselect = () => {
+    close();
+    requestAnimationFrame(() => searchRef.current?.focus());
+  };
+  const summary = command
+    ? [
+        command.name,
+        describeArgs(built.args, {
+          city: (key) => cities.find((c) => c.key === key)?.name,
+          nation: (id) => nations.find((n) => n.id === id)?.name,
+          general: generals ? (id) => generals.find((g) => g.id === id)?.name : undefined,
+          unit: (id) => units.name(id),
+        }),
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : '';
+  const putButton =
+    putReason === null ? (
+      <button type="submit" form={formId} className={styles.primary} onClick={needsScreen ? undefined : put}>
+        {targetLabel}에 넣기
+      </button>
+    ) : (
+      <DisabledReason reason={putReason}>{targetLabel}에 넣기</DisabledReason>
+    );
 
   return (
     <section className={styles.picker} aria-label="명령 고르기">
@@ -302,88 +350,141 @@ export function CommandPicker({
         ))}
       </div>
 
-      {command ? (
-        <form
-          id={formId}
-          className={styles.argForm}
-          aria-label={`${command.name} 인자`}
-          onSubmit={(e) => {
-            e.preventDefault();
-            put();
-          }}
-        >
-          {cityDrill ? (
-            <label className={styles.argLabel}>
-              <span>훈련·사기 대상</span>
-              <select
-                value={preparationTarget}
-                onChange={(event) => {
-                  choose(command.key, event.target.value === 'city' ? 'city' : 'unit');
-                }}
-              >
-                <option value="unit">기존 부곡</option>
-                <option value="city">현재 도시 수비병</option>
-              </select>
-            </label>
-          ) : null}
-          {costNote ? (
-            <p className={styles.muted} role="note">
-              {costNote}
-            </p>
-          ) : null}
-          {schema && fields.length === 0 ? <p className={styles.muted}>더 고를 것 없이 바로 넣는 명령입니다.</p> : null}
-          {/* 휴식은 30칸 표처럼 검사하지 않는다. */}
-          {/* 장비매매는 카드가 고른 장비의 서버 판정을 같은 사전 검사 경고로 이미 보인다. 한 번만 적는다. */}
-          {ready && precheck && ready.commandKey !== 'rest' && ready.commandKey !== 'equipment_trade' ? (
-            <PrecheckWarning query={precheck(ready)} />
-          ) : null}
-          {command.key === 'equipment_trade' ? (
-            <EquipmentTradeFields read={equipment} values={values} onChange={setValues} firstArgRef={firstArgRef} />
-          ) : (
-            fields.map((field, i) => (
-              <ArgInput
-                key={field.key}
-                field={field}
-                value={values[field.key] ?? ''}
-                cities={cityOptions}
-                nations={nations}
-                generals={generals}
-                inputRef={i === 0 ? firstArgRef : undefined}
-                onKeyDown={onArgKey}
-                onChange={(value) => setValues((prev) => ({ ...prev, [field.key]: value }))}
-                note={
-                  field.kind === 'city'
-                    ? (choices?.note ?? null)
-                    : field.kind === 'unit' && field.options.length === 0
-                      ? unitNote
-                      : null
-                }
-                mapHint={
-                  field.kind === 'city' &&
-                  selectedCityKey !== null &&
-                  mapCityFor(command.key) !== null &&
-                  values[field.key] !== String(selectedCityKey)
-                    ? {
-                        name: cities.find((c) => c.key === selectedCityKey)?.name ?? `도시 ${selectedCityKey}`,
-                        use: () => setValues((prev) => ({ ...prev, [field.key]: String(selectedCityKey) })),
-                      }
-                    : null
-                }
-              />
-            ))
-          )}
-        </form>
+      {command && !needsScreen ? (
+        <div className={styles.argForm}>
+          {schema ? <p className={styles.muted}>더 고를 것 없이 바로 넣는 명령입니다.</p> : null}
+          {ready && precheck && ready.commandKey !== 'rest' ? <PrecheckWarning query={precheck(ready)} /> : null}
+        </div>
       ) : null}
 
-      <div className={styles.putRow}>
-        {putReason === null ? (
-          <button type="submit" form={formId} className={styles.primary}>
-            {targetLabel}에 넣기
-          </button>
-        ) : (
-          <DisabledReason reason={putReason}>{targetLabel}에 넣기</DisabledReason>
-        )}
-      </div>
+      {command && needsScreen ? (
+        <CommandArgsScreen
+          context={argContext}
+          title={command.name}
+          slotLabel={targetLabel}
+          onCancel={close}
+          onReselect={reselect}
+          summary={summary}
+          notes={
+            <>
+              {costNote ? <p role="note">{costNote}</p> : null}
+              {/* 휴식과 장비매매는 위 카드·표가 이미 판정을 보인다. */}
+              {ready && precheck && ready.commandKey !== 'rest' && ready.commandKey !== 'equipment_trade' ? (
+                <PrecheckWarning query={precheck(ready)} />
+              ) : null}
+            </>
+          }
+          putButton={putButton}
+        >
+          <form
+            id={formId}
+            className={styles.argScreenForm}
+            aria-label={`${command.name} 인자`}
+            onSubmit={(e) => {
+              e.preventDefault();
+              put();
+            }}
+          >
+            {cityDrill ? (
+              <label className={styles.argLabel}>
+                <span>훈련·사기 대상</span>
+                <select
+                  value={preparationTarget}
+                  onChange={(event) => {
+                    choose(command.key, event.target.value === 'city' ? 'city' : 'unit');
+                  }}
+                >
+                  <option value="unit">기존 부곡</option>
+                  <option value="city">현재 도시 수비병</option>
+                </select>
+              </label>
+            ) : null}
+            {command.key === 'equipment_trade' ? (
+              <EquipmentTradeFields read={equipment} values={values} onChange={setValues} firstArgRef={firstArgRef} />
+            ) : (
+              <>
+                <div className={styles.argScreenFields}>
+                  {fields
+                    .filter(
+                      (field) =>
+                        field.kind !== 'city' &&
+                        field.kind !== 'nation' &&
+                        field.kind !== 'unit' &&
+                        !(field.key === 'generalId' && generals),
+                    )
+                    .map((field, i) => (
+                      <ArgInput
+                        key={field.key}
+                        field={field}
+                        value={values[field.key] ?? ''}
+                        cities={cityOptions}
+                        nations={nations}
+                        generals={generals}
+                        inputRef={i === 0 ? firstArgRef : undefined}
+                        onKeyDown={onArgKey}
+                        onChange={(value) => setValues((prev) => ({ ...prev, [field.key]: value }))}
+                        note={field.kind === 'unit' && field.options.length === 0 ? unitNote : null}
+                        mapHint={null}
+                      />
+                    ))}
+                </div>
+                {fields.map((field) => {
+                  const set = (value: string) => setValues((prev) => ({ ...prev, [field.key]: value }));
+                  const value = values[field.key] ?? '';
+                  if (field.kind === 'city')
+                    return (
+                      <CityTargetPicker
+                        key={field.key}
+                        context={argContext}
+                        label={field.label}
+                        value={value}
+                        options={cityOptions}
+                        note={choices?.note ?? null}
+                        onChange={set}
+                      />
+                    );
+                  if (field.kind === 'nation')
+                    return (
+                      <NationTargetPicker
+                        key={field.key}
+                        context={argContext}
+                        label={field.label}
+                        value={value}
+                        options={nations}
+                        onChange={set}
+                      />
+                    );
+                  if (field.key === 'generalId' && generals)
+                    return (
+                      <GeneralTargetPicker
+                        key={field.key}
+                        label={field.label}
+                        value={value}
+                        options={generals}
+                        onChange={set}
+                      />
+                    );
+                  if (field.kind === 'unit')
+                    return (
+                      <UnitPicker
+                        key={field.key}
+                        context={argContext}
+                        label={field.label}
+                        value={value}
+                        options={field.options}
+                        note={field.options.length === 0 ? unitNote : null}
+                        onChange={set}
+                      />
+                    );
+                  return null;
+                })}
+              </>
+            )}
+          </form>
+        </CommandArgsScreen>
+      ) : null}
+
+      {!needsScreen ? <div className={styles.putRow}>{putButton}</div> : null}
     </section>
   );
 }

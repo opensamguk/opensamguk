@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TEST_UNIT_SET } from '../battleSim/testUnitSet';
 import { worldUnits } from '../battleSim/unitChoices';
@@ -476,8 +476,8 @@ describe('예턴 편집의 교역 대상', () => {
       />,
     );
     fireEvent.click(screen.getByRole('radio', { name: '교역' }));
-    const select = screen.getByRole('combobox', { name: /대상 도시/ }) as HTMLSelectElement;
-    expect([...select.options].map((o) => o.textContent)).toEqual(['고르세요']);
+    // 인자 입력 화면(INT-25)의 도시 목록에 후보가 없다.
+    expect(within(screen.getByRole('radiogroup', { name: '대상 도시' })).queryAllByRole('radio')).toHaveLength(0);
     expect(screen.getByText(TRADE_UNSUPPORTED.note!)).toBeTruthy();
   });
 });

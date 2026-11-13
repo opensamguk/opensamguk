@@ -105,6 +105,8 @@ export function OperationalWorldMap({
   selectedKey,
   onSelect,
   fill = false,
+  focusKey = null,
+  focusZoom = 3,
 }: {
   cities: readonly DrawnCity[];
   nations: readonly DrawnNation[];
@@ -114,13 +116,21 @@ export function OperationalWorldMap({
   onSelect?: (key: number) => void;
   /** 부모 상자를 가득 채운다(로그인 배경). 남는 가장자리는 바다색이다. */
   fill?: boolean;
+  /** 처음 열 때 이 거점을 가운데 두고 focusZoom배로 확대한다 (인자 입력 화면, INT-25). */
+  focusKey?: number | null;
+  focusZoom?: number;
 }) {
   const basemap = basemapForOperationalMap(map);
   const canvas = map.canvas;
   const whole = operationalOverview(map);
   const ratio = whole.height / whole.width;
   const clampView = (value: View) => clamp(value, canvas);
-  const [view, setView] = useState(whole);
+  const [view, setView] = useState(() => {
+    const site = focusKey === null ? undefined : map.sites.find((entry) => entry.anchorKey === focusKey);
+    if (!site) return whole;
+    const zoomed = zoomAround(whole, focusZoom, site.position.x, site.position.y, whole.width, ratio);
+    return clamp({ ...zoomed, x: site.position.x - zoomed.width / 2, y: site.position.y - zoomed.height / 2 }, canvas);
+  });
   // anchor: 표식 위에서 시작한 데스크톱 누르기. 4px 넘게 움직여야 끌기로 보고 그때 포인터를 잡는다(그 전엔 클릭 선택).
   const drag = useRef<{
     pointerId: number;

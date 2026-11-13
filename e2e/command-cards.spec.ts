@@ -162,7 +162,12 @@ test('T4-92 명령 카드의 개인 30칸·국가 12칸 저장과 모바일·키
     await editor.getByRole('button', { name: '선택 해제', exact: true }).click();
     await editor.locator('tr[data-slot="12"]').click();
     await picker.getByRole('radio', { name: '천도', exact: true }).check();
-    await picker.getByRole('combobox', { name: '대상 도시' }).selectOption(String(initial.nations[0]!.capitalCityKey));
+    // 인자 입력 화면(INT-25)의 도시 목록에서 고른다.
+    const capitalName = initial.cities.find((city) => city.cityKey === initial.nations[0]!.capitalCityKey)!.name;
+    await page
+      .getByRole('radiogroup', { name: '대상 도시' })
+      .getByRole('radio', { name: new RegExp(`^${capitalName}`) })
+      .click();
     await editor.getByRole('button', { name: '12번 칸에 넣기', exact: true }).click();
     await editor.getByRole('button', { name: '저장', exact: true }).click();
     await expect(editor.getByText('저장했습니다.', { exact: true })).toBeVisible();

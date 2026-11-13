@@ -20,7 +20,7 @@ import { DisabledReason } from '../ui/DisabledReason';
 import { EmptyState, ErrorState, LoadingState } from '../ui/States';
 import { errorCode, retryUnlessClientError } from './apiError';
 import { describeArgs, type ArgNames } from './args';
-import { useWorldUnits } from '../game/queries';
+import { useWorldRules, useWorldUnits } from '../game/queries';
 import { CommandPicker, type CommandInfo } from './CommandPicker';
 import { useEquipment } from '../equipment/useEquipment';
 import {
@@ -229,6 +229,18 @@ function Editor<S extends DisplaySlot>({
   const generals = source.generals;
   // 월드 병종표 (T4-86). 불러오는 중·오류여도 병종 없는 명령·표·저장은 그대로 쓰고 병종은 번호로 적는다.
   const { units, note: unitNote } = useWorldUnits(worldId);
+  const rules = useWorldRules(worldId);
+  const argContext = useMemo(
+    () => ({
+      map: map.data,
+      here: home.data?.general.cityKey ?? null,
+      ownNationId: home.data?.general.nationId ?? null,
+      wallet: home.data ? { gold: home.data.general.gold, rice: home.data.general.rice } : undefined,
+      unitSet: rules.data?.unitSet,
+      recruitment: rules.data && 'recruitment' in rules.data ? rules.data.recruitment : undefined,
+    }),
+    [map.data, home.data, rules.data],
+  );
   const names: ArgNames = useMemo(
     () => ({
       city: (key: number) => cities.find((c) => c.key === key)?.name,
@@ -615,6 +627,7 @@ function Editor<S extends DisplaySlot>({
           onPut={onPut}
           cityChoicesFor={cityChoicesFor}
           precheck={source.precheck}
+          argContext={argContext}
         />
       )}
 

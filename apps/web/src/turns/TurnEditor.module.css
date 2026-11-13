@@ -416,3 +416,21 @@
     flex-wrap: wrap;
   }
 }
+
+/* 인자 입력 화면 안의 폼 (INT-25). 지도·목록 고르기가 위, 수량·문자 같은 나머지 칸이 아래다. */
+.argScreenForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.argScreenFields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+.argScreenFields:empty {
+  display: none;
+}

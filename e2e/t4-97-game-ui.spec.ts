@@ -116,7 +116,9 @@ test('T4-97 메인 HUD 계정 메뉴·예턴 상태·도시에서 명령 고르�
     await expect(editor.getByRole('searchbox')).toBeFocused();
     await expect(turnShortcut).toHaveAttribute('data-turn-status', 'saved');
     await editor.getByRole('radio', { name: move.name, exact: true }).check();
-    await expect(editor.getByRole('combobox', { name: '대상 도시' })).toHaveValue(String(target.key));
+    await expect(
+      page.getByRole('radiogroup', { name: '대상 도시' }).getByRole('radio', { name: new RegExp(`^${target.name}`) }),
+    ).toHaveAttribute('aria-checked', 'true');
     const slot = Number(await editor.locator('tr[aria-selected="true"]').getAttribute('data-slot'));
     await editor.getByRole('button', { name: `${slot}번 칸에 넣기`, exact: true }).click();
     await expect(turnShortcut).toHaveAttribute('data-turn-status', 'unsaved');
