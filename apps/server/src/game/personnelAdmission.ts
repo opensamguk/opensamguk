@@ -2,6 +2,8 @@ import { isDeepStrictEqual } from 'node:util';
 import type { Prisma } from '@opensamguk/db';
 import {
   canManagePersonnel,
+  COURT_RANK_FEATURE,
+  courtOfficeTitle,
   isAppointableOfficerLevel,
   isLocalOffice,
   hasCitySecretary,
@@ -40,6 +42,7 @@ export function requirePersonnelWorld(world: {
   return {
     worldId: world.id,
     personnel: 'ready',
+    ...(world.ruleFeatures.includes(COURT_RANK_FEATURE) ? { courtRankEnabled: true as const } : {}),
     ...(world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE) ? { officeEffectsEnabled: true as const } : {}),
     ...(world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE) &&
     hasCitySecretary(officeEffectsSchema.safeParse(world.officeEffects).data)
@@ -126,6 +129,14 @@ export async function submitPersonnelRequest(
           appointment.expectedHolderId !== undefined
         )
           throw new TRPCError({ code: 'BAD_REQUEST', message: '임명할 수 없는 직책입니다.' });
+        if (world.ruleFeatures.includes(COURT_RANK_FEATURE)) {
+          const nation = await tx.nation.findUniqueOrThrow({
+            where: { worldId_id: { worldId: world.id, id: actor.nationId! } },
+            select: { level: true },
+          });
+          if (courtOfficeTitle(nation.level, appointment.officerLevel) === null)
+            throw new TRPCError({ code: 'BAD_REQUEST', message: '현재 작위에서 열리지 않은 직책입니다.' });
+        }
         const occupied = await tx.general.findFirst({
           where: { worldId: world.id, nationId: actor.nationId, officerLevel: appointment.officerLevel },
           select: { id: true },

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { appointOfficer, dismissOfficer } from './appointments';
+import { COURT_RANK_FEATURE } from './nationRank';
 import { APPOINTABLE_OFFICER_LEVELS } from './permissions';
 import { applied, deepFreeze, personnelWorld } from './testFixture';
 import type { PersonnelState } from './types';
@@ -18,6 +19,16 @@ describe('인사 임명·해임 순수 규칙', () => {
     ]);
     expect(outcome.closedOffers).toEqual([]);
     expect(Object.hasOwn(outcome.state, 'assignmentOffers')).toBe(false);
+  });
+
+  it('작위별 관직을 켜면 빈 자리라도 해당 작위에서 열려야 임명한다', () => {
+    const state = personnelWorld();
+    state.ruleFeatures = ['personnel', COURT_RANK_FEATURE];
+    state.nations[1]!.level = 1;
+    state.generals[4]!.officerLevel = 1;
+    expect(appointOfficer(state, 1, 3, 10)).toMatchObject({ ok: false, code: 'BAD_ARGS' });
+    state.nations[1]!.level = 2;
+    expect(applied(appointOfficer(state, 1, 3, 10)).result).toMatchObject({ title: '비장군' });
   });
 
   it.each([0, 1, 5, 6, 7, 8, 9, 10, 11])('직책 %i는 임명·해임을 할 수 없다', (level) => {

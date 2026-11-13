@@ -20,3 +20,9 @@ export function nationRank(level: number) {
     offices: offices.map((title, index) => ({ officerLevel: 12 - index, title })),
   };
 }
+
+export const COURT_RANK_FEATURE = 'court-rank-v1';
+
+export function courtOfficeTitle(nationLevel: number, officerLevel: number) {
+  return courtTitles[nationLevel]?.[12 - officerLevel] ?? null;
+}

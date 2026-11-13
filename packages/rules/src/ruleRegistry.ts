@@ -1,3 +1,4 @@
+import { COURT_RANK_FEATURE } from './personnel/nationRank';
 import type { JsonValue, WorldView } from './model/world';
 import type { WorldInit } from './world/bootstrap';
 import { checkInitialNpcStatLimits } from './world/initialNpcStats';
@@ -123,6 +124,18 @@ export const ruleRegistry: RuleRegistry = {
     nationResearchFeature,
     relationsFeature,
     personnelFeature,
+    {
+      key: COURT_RANK_FEATURE,
+      requires: ['personnel'],
+      conflicts: [],
+      checkOrigin({ initial, data }) {
+        if (
+          data !== undefined ||
+          initial.nations.some((nation) => !Number.isInteger(nation.level) || nation.level < 0 || nation.level > 7)
+        )
+          throw new Error('작위별 관직의 시작 작위를 확인하세요.');
+      },
+    },
     {
       key: OFFICE_EFFECTS_FEATURE,
       requires: ['personnel'],
