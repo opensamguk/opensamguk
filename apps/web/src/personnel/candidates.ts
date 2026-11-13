@@ -56,6 +56,14 @@ export function statEntries(detail: MemberDetail): Array<{ key: StatKey; label: 
   });
 }
 
+// 고르기 줄의 짧은 능력치 `통/무/지 70/70/70` (원작 인사부 선택 도우미).
+export function statLine(detail: MemberDetail): string {
+  return `통/무/지 ${detail.leadership}/${detail.strength}/${detail.intel}`;
+}
+
+// 부상 표시. 0이면 `없음`이다.
+export const injuryText = (injury: number) => (injury > 0 ? injury.toLocaleString('ko-KR') : '없음');
+
 export const statTotal = (detail: MemberDetail | undefined) =>
   detail === undefined ? null : statEntries(detail).reduce((sum, stat) => sum + stat.value, 0);
 

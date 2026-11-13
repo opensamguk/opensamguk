@@ -6,7 +6,7 @@ import { useHome, useWorldId } from '../game/queries';
 import { Portrait } from '../portrait/Portrait';
 import { useTRPC } from '../trpc';
 import { errorCode, serverMessage } from '../turns/apiError';
-import { DataTable } from '../ui/DataTable';
+import { DataTable, hiddenNumber, type Column } from '../ui/DataTable';
 import { DisabledReason } from '../ui/DisabledReason';
 import { NationBadge } from '../ui/NationBadge';
 import { EmptyState, ErrorState, LoadingState } from '../ui/States';
@@ -14,8 +14,11 @@ import { Tag } from '../ui/Tag';
 import { CandidatePicker } from './CandidatePicker';
 import {
   appointCandidates,
+  injuryText,
   memberDetails,
   nameLabels,
+  STAT_LABELS,
+  statLine,
   traitTags,
   type Candidate,
   type MemberDetail,
@@ -165,7 +168,7 @@ export function PersonnelBoardView({
   const candidates = useMemo(() => appointCandidates(board, details, labels), [board, details, labels]);
   // 후보 목록은 한 번에 한 직책만 펼친다.
   const [openLevel, setOpenLevel] = useState<number | null>(null);
-  const label = (m: PersonnelMember) => labels.get(m.generalId) ?? m.name;
+  const columns = useMemo(() => memberColumns(labels, details), [labels, details]);
   return (
     <>
       <section className={styles.section} aria-labelledby="levels-title">
@@ -208,45 +211,96 @@ export function PersonnelBoardView({
           <DataTable<PersonnelMember>
             rows={board.members}
             rowKey={(m) => m.generalId}
-            columns={[
-              {
-                key: 'name',
-                label: '이름',
-                sortValue: (m) => label(m),
-                render: (m) => (
-                  <>
-                    {label(m)} {m.isHuman ? <Tag tone="accent">사람</Tag> : <Tag tone="muted">NPC</Tag>}
-                  </>
-                ),
-              },
-              { key: 'title', label: '직책', sortValue: (m) => m.officerLevel, render: (m) => m.title },
-              { key: 'city', label: '도시', sortValue: (m) => m.city.name, render: (m) => m.city.name },
-              {
-                key: 'dedication',
-                label: '공헌',
-                numeric: true,
-                sortValue: (m) => m.dedication,
-                render: (m) => m.dedication.toLocaleString('ko-KR'),
-              },
-              {
-                key: 'traits',
-                label: '성격·특기',
-                render: (m) => (
-                  <span className={pageStyles.traits}>
-                    {traitTags(details?.get(m.generalId)).map((trait) => (
-                      <Tag key={trait} tone="muted">
-                        {trait}
-                      </Tag>
-                    ))}
-                  </span>
-                ),
-              },
-            ]}
+            columns={columns}
+            mobileDetails={columns.slice(1).map((c) => c.key)}
           />
         )}
       </section>
     </>
   );
+}
+
+// 소속 장수 표의 열 (INT-25, 원작 인사부 선택 도우미). 능력치·병력·부상은 nation.get에서 이은 값이고,
+// 못 받았거나 공개 범위 밖이면 —로 둔다. 정치·매력은 5능력치 월드에서만 둔다.
+function memberColumns(
+  labels: ReadonlyMap<number, string>,
+  details: ReadonlyMap<number, MemberDetail> | undefined,
+): Column<PersonnelMember>[] {
+  const label = (m: PersonnelMember) => labels.get(m.generalId) ?? m.name;
+  const detail = (m: PersonnelMember) => details?.get(m.generalId);
+  const fiveStats = [...(details?.values() ?? [])].some((d) => d.politics !== undefined);
+  const stats = STAT_LABELS.filter(([key]) => fiveStats || (key !== 'politics' && key !== 'charm')).map(
+    ([key, statLabel]): Column<PersonnelMember> => ({
+      key,
+      label: statLabel,
+      numeric: true,
+      sortValue: (m) => detail(m)?.[key] ?? null,
+      render: (m) => hiddenNumber(detail(m)?.[key]),
+    }),
+  );
+  return [
+    {
+      key: 'name',
+      label: '이름',
+      sortValue: (m) => label(m),
+      render: (m) => (
+        <span className={pageStyles.member}>
+          {/* 이름은 옆 글자로 읽으므로 초상은 읽지 않는다. */}
+          <Portrait
+            id={detail(m)?.portraitId ?? null}
+            name={label(m)}
+            variant="icon"
+            shape="round"
+            decorative
+            className={pageStyles.memberIcon}
+          />
+          <span>
+            {label(m)} {m.isHuman ? <Tag tone="accent">사람</Tag> : <Tag tone="muted">NPC</Tag>}
+          </span>
+        </span>
+      ),
+    },
+    { key: 'title', label: '직책', sortValue: (m) => m.officerLevel, render: (m) => m.title },
+    { key: 'city', label: '도시', sortValue: (m) => m.city.name, render: (m) => m.city.name },
+    ...stats,
+    {
+      key: 'troops',
+      label: '병력',
+      numeric: true,
+      sortValue: (m) => detail(m)?.troops ?? null,
+      render: (m) => hiddenNumber(detail(m)?.troops),
+    },
+    {
+      key: 'injury',
+      label: '부상',
+      numeric: true,
+      sortValue: (m) => detail(m)?.injury ?? null,
+      render: (m) => {
+        const d = detail(m);
+        return d ? injuryText(d.injury) : '—';
+      },
+    },
+    {
+      key: 'dedication',
+      label: '공헌',
+      numeric: true,
+      sortValue: (m) => m.dedication,
+      render: (m) => m.dedication.toLocaleString('ko-KR'),
+    },
+    {
+      key: 'traits',
+      label: '성격·특기',
+      render: (m) => (
+        <span className={pageStyles.traits}>
+          {traitTags(detail(m)).map((trait) => (
+            <Tag key={trait} tone="muted">
+              {trait}
+            </Tag>
+          ))}
+        </span>
+      ),
+    },
+  ];
 }
 
 type Level = PersonnelBoard['levels'][number];
@@ -355,6 +409,7 @@ function LevelRows({
                 <>
                   <span className={pageStyles.chosen}>
                     고른 장수 <strong>{picked.label}</strong>
+                    {picked.detail ? ` · ${statLine(picked.detail)}` : null}
                   </span>
                   <button
                     type="button"

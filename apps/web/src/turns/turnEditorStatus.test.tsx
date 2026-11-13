@@ -24,6 +24,7 @@ import { TurnEditor, type TurnEditorStatus } from './TurnEditor';
 afterEach(() => {
   cleanup();
   sessionStorage.clear();
+  localStorage.clear();
 });
 
 const notFound = () =>
@@ -183,4 +184,68 @@ it('T4-86 AC-P2-26 병종표 조회가 실패해도 표는 병종 번호로 적�
   );
   fireEvent.click(screen.getByRole('button', { name: '저장' }));
   await waitFor(() => expect(save).toHaveBeenCalledOnce());
+});
+
+it('INT-25 넣은 명령은 최근 넣은 명령 줄에 남고 누르면 고른 칸에 같은 넣기 경로로 넣는다', async () => {
+  const onStatus = vi.fn();
+  const view = await open(makeSource(null), 'RUNNING', onStatus);
+  await waitFor(() => expect(document.querySelector('tr[data-slot="1"]')).not.toBeNull());
+  // 아직 넣은 명령이 없으면 줄을 그리지 않는다.
+  expect(screen.queryByRole('group', { name: '최근 넣은 명령' })).toBeNull();
+  fireEvent.click(document.querySelector('tr[data-slot="1"]')!);
+  fireEvent.click(screen.getByRole('radio', { name: '농지 개간' }));
+  fireEvent.click(screen.getByRole('button', { name: '1번 칸에 넣기' }));
+  const recent = await screen.findByRole('group', { name: '최근 넣은 명령' });
+  expect(recent.textContent).toContain('농지 개간');
+  expect(JSON.parse(localStorage.getItem('opensamguk.recentCommands.v1:u1:w1')!)).toEqual([
+    { commandKey: 'farm', args: {} },
+  ]);
+
+  // 1번을 풀고 2번만 고른 뒤 최근 명령을 누른다.
+  fireEvent.click(document.querySelector('tr[data-slot="1"]')!);
+  fireEvent.click(document.querySelector('tr[data-slot="2"]')!);
+  fireEvent.click(screen.getByRole('button', { name: '농지 개간 다시 넣기' }));
+  await waitFor(() => expect(document.querySelector('tr[data-slot="2"]')?.textContent).toContain('농지 개간'));
+  await waitFor(() =>
+    expect(onStatus).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'unsaved', edits: 2 })),
+  );
+
+  // 다시 열어도 계정·월드의 localStorage에서 읽는다.
+  view.unmount();
+  sessionStorage.clear();
+  await open(makeSource(null), 'RUNNING', vi.fn());
+  expect((await screen.findByRole('group', { name: '최근 넣은 명령' })).textContent).toContain('농지 개간');
+});
+
+it('INT-25 칸을 고르기 전에는 최근 명령도 넣지 않고 이유를 보인다', async () => {
+  localStorage.setItem('opensamguk.recentCommands.v1:u1:w1', JSON.stringify([{ commandKey: 'farm', args: {} }]));
+  const onStatus = vi.fn();
+  await open(makeSource(null), 'RUNNING', onStatus);
+  const recent = await screen.findByRole('group', { name: '최근 넣은 명령' });
+  await waitFor(() => expect(onStatus).toHaveBeenLastCalledWith({ kind: 'saved', behind: false, selection: 0 }));
+  fireEvent.click(screen.getByRole('button', { name: /^농지 개간\s*\(사용 불가\)$/ }));
+  expect(recent.querySelector('[role="note"]')?.textContent).toBe('칸을 먼저 고르세요.');
+  expect(onStatus).toHaveBeenLastCalledWith({ kind: 'saved', behind: false, selection: 0 });
+});
+
+it('INT-25 예턴 표 머리에 지금 시각을 시:분:초로 둔다', async () => {
+  await open(makeSource(null), 'RUNNING', vi.fn());
+  const clock = await screen.findByTestId('turn-clock');
+  expect(clock.textContent).toMatch(/^현재 \d{2}:\d{2}:\d{2}$/);
+});
+
+it('INT-25 남의 직책 칸은 넘겨받은 다음 턴 시각에 칸마다 턴 간격을 더해 시:분을 적는다', async () => {
+  const at = new Date(Date.now() + 5 * 60_000);
+  at.setSeconds(0, 0);
+  const source: TurnSourceFactory = (input) => ({
+    ...makeSource('내 직책 칸이 아닙니다')(input),
+    nextTurnAt: at.toISOString(),
+  });
+  await open(source, 'RUNNING', vi.fn());
+  await waitFor(() => expect(document.querySelector('tr[data-slot="3"] time')).not.toBeNull());
+  // 가짜 월드의 턴 간격은 60분이다.
+  expect(document.querySelector('tr[data-slot="1"] time')?.getAttribute('datetime')).toBe(at.toISOString());
+  expect(document.querySelector('tr[data-slot="3"] time')?.getAttribute('datetime')).toBe(
+    new Date(at.getTime() + 2 * 60 * 60_000).toISOString(),
+  );
 });

@@ -142,6 +142,8 @@ export interface ArgNames {
   general?: ((id: number) => string | undefined) | undefined;
   // 월드 병종표의 병종 이름 (T4-86). 없거나 못 읽었으면 병종은 번호로 적는다.
   unit?: ((id: number) => string | undefined) | undefined;
+  // 장비매매의 품목 이름 (equipment.mine). 못 읽었으면 품목 키를 적는다.
+  equipment?: ((itemKey: string) => string | undefined) | undefined;
 }
 
 // 칸에 넣은 인자를 짧게 적는다. 도시·국가는 지도 데이터의 이름을 쓴다.
@@ -155,6 +157,10 @@ export function describeArgs(args: Record<string, unknown>, names: ArgNames): st
     else if (key === 'crewType' && typeof value === 'number') parts.push(names.unit?.(value) ?? `병종 ${value}`);
     else if (key === 'buy' && typeof value === 'boolean') parts.push(value ? '쌀 사기' : '쌀 팔기');
     else if (key === 'resource' && typeof value === 'string') parts.push(ENUM_LABELS[value] ?? value);
+    // 장비매매는 원작 요약처럼 칸 이름(명마·무기·서적)과 장비 이름을 적고, none은 판매다.
+    else if (key === 'slot' && typeof value === 'string') parts.push(ENUM_LABELS[value] ?? value);
+    else if (key === 'itemKey' && typeof value === 'string')
+      parts.push(value === 'none' ? '판매' : (names.equipment?.(value) ?? `장비 ${value}`));
     else if (key === 'target' && value === 'city') parts.push('도시 수비병');
     else parts.push(`${LABELS[key] ?? key} ${String(value)}`);
   }
