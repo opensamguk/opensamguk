@@ -647,6 +647,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       'philosophy',
       'population',
       'populationMax',
+      'rank',
     ]);
     expect(enemy).toMatchObject({
       philosophy: state.nations[1]!.philosophy,

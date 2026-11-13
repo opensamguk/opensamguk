@@ -318,3 +318,5 @@ export {
 } from './nationResearch/state';
 export { readStoredNationResearch } from './nationResearch/origin';
 export { canExecuteResearchNationCommand } from './nationResearch/commands';
+
+export { nationRank } from './personnel/nationRank';

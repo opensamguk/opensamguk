@@ -2,6 +2,7 @@ import { publicGeographySchema } from '@opensamguk/shared';
 import type { Prisma } from '@opensamguk/db';
 import {
   BALANCE,
+  nationRank,
   TICKS_PER_MONTH,
   toGameDate,
   type CampaignUnitState,
@@ -216,7 +217,13 @@ export function cityInfo(city: City, viewer: Viewer, alliedResidence = false) {
 }
 
 export function nationInfo(nation: Nation, counts: { cityCount: number; generalCount: number }, viewer: Viewer) {
-  const publicInfo = { id: nation.id, name: nation.name, color: nation.color, ...counts };
+  const publicInfo = {
+    id: nation.id,
+    name: nation.name,
+    color: nation.color,
+    rank: nationRank(nation.level),
+    ...counts,
+  };
   if (!visibility(viewer).nation(nation)) return publicInfo;
   return {
     ...publicInfo,
