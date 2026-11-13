@@ -1,4 +1,11 @@
-import { BALANCE, simulateBattle, unitSetSchema, commanderBattleModifiers } from '@opensamguk/rules';
+import {
+  BALANCE,
+  simulateBattle,
+  unitSetSchema,
+  commanderBattleModifiers,
+  combatSpecialty,
+  COMBAT_SPECIALTY_FEATURE,
+} from '@opensamguk/rules';
 import { createRng } from '@opensamguk/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createCompute, createWorkerHandler } from './compute';
@@ -60,6 +67,34 @@ describe('AC-INT-11 통합판의 단일 교전', () => {
       message.defender.crew - reply.defender.crew,
     );
     expect(compute({ ...message, recordPhases: false })).toMatchObject({ type: 'error', field: 'recordPhases' });
+  });
+
+  it('가져온 성격·전투 특기·숙련은 엔진과 같은 전투 값으로 적용한다', () => {
+    const attackerTraits = { personality: '대의', specialty: '돌격', proficiency: { '1': 44625 } };
+    const message = general({ attackerTraits });
+    const expected = simulateBattle(
+      {
+        attacker: message.attacker,
+        defender: message.defender,
+        attackerTech: message.attackerTech,
+        defenderTech: message.defenderTech,
+        unitSet,
+        attackerReadiness: { train: -5 },
+        attackerSpecialty: combatSpecialty({ ruleFeatures: [COMBAT_SPECIALTY_FEATURE] }, '돌격'),
+        attackerProficiency: attackerTraits.proficiency,
+      },
+      createRng(message.seed),
+    );
+    expect(compute(message)).toMatchObject({
+      type: 'result',
+      input: { attackerTraits },
+      attacker: expected.attacker,
+      defender: expected.defender,
+    });
+    expect(compute(general({ attackerTraits: { proficiency: { '0': 1 } } }))).toMatchObject({
+      type: 'error',
+      field: 'attackerTraits.proficiency.0',
+    });
   });
 
   it('성벽에는 가짜 지휘관을 만들지 않고 공격 지휘관만 보정한다', () => {

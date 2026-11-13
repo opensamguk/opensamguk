@@ -3,6 +3,11 @@
 
 export type BattleForce = { crew: number; crewType: number; train: number; atmos: number };
 export type CommanderStats = { leadership: number; strength: number };
+export type AttackerTraits = {
+  personality?: string;
+  specialty?: string;
+  proficiency?: Record<string, number>;
+};
 export type BattleCommanders = { attacker: CommanderStats; defender?: CommanderStats };
 
 // simulateBattle의 BattleInput에서 unitSet을 뺀 부분. 병종표는 화면이 Worker를 만들 때 rules 메시지로 한 번 보낸다 (T4-86).
@@ -14,6 +19,7 @@ export type BattleRunInput = {
   defence?: number;
   commanders?: BattleCommanders;
   recordPhases?: true;
+  attackerTraits?: AttackerTraits;
 };
 export type BattleRunBody = BattleRunInput & { seed: string };
 export type BattleRunRequest = BattleRunBody & { type: 'run'; requestId: number };
@@ -81,6 +87,7 @@ const REQUEST_KEYS = new Set([
   'defenderTech',
   'commanders',
   'recordPhases',
+  'attackerTraits',
 ]);
 const FORCE_KEYS = ['crew', 'crewType', 'train', 'atmos'] as const;
 
@@ -116,6 +123,26 @@ export function requestProblems(message: unknown, units: readonly UnitChoice[]):
   }
 
   if ('recordPhases' in message && message.recordPhases !== true) add('recordPhases', { problem: 'unexpected' });
+
+  if ('attackerTraits' in message) {
+    const traits = message.attackerTraits;
+    if (!isRecord(traits)) add('attackerTraits', { problem: 'unexpected' });
+    else {
+      for (const key of Object.keys(traits)) {
+        const value = traits[key];
+        if (key === 'personality' || key === 'specialty') {
+          if (typeof value !== 'string' || value.length < 1 || value.length > 40)
+            add(`attackerTraits.${key}`, { problem: 'unexpected' });
+        } else if (key === 'proficiency' && isRecord(value)) {
+          for (const [armType, points] of Object.entries(value)) {
+            if (!units.some((unit) => unit.armType > 0 && String(unit.armType) === armType))
+              add(`attackerTraits.proficiency.${armType}`, { problem: 'unknownUnit' });
+            else add(`attackerTraits.proficiency.${armType}`, intProblem(points, 0, 2_147_483_647));
+          }
+        } else add(`attackerTraits.${key}`, { problem: 'unexpected' });
+      }
+    }
+  }
 
   const seed = message.seed;
   if (typeof seed !== 'string') add('seed', { problem: 'missing' });
@@ -227,6 +254,14 @@ export function checkRequest(message: unknown, units: readonly UnitChoice[]): Ch
   };
   if (m.defender.crewType === WALL_CREW_TYPE) request.defence = m.defence!;
   if (m.recordPhases) request.recordPhases = true;
+  if (m.attackerTraits) {
+    const { personality, specialty, proficiency } = m.attackerTraits;
+    request.attackerTraits = {
+      ...(personality === undefined ? {} : { personality }),
+      ...(specialty === undefined ? {} : { specialty }),
+      ...(proficiency === undefined ? {} : { proficiency: { ...proficiency } }),
+    };
+  }
   if (m.commanders) {
     const copyStats = (stats: CommanderStats) => ({ leadership: stats.leadership, strength: stats.strength });
     request.commanders = {
@@ -243,6 +278,7 @@ export type DefenderKind = 'general' | 'wall';
 export type BattleForm = {
   statProfile: 'legacy' | 'five-stats';
   attackerCommander: { leadership: string; strength: string };
+  attackerTraits?: AttackerTraits | undefined;
   defenderCommander: { leadership: string; strength: string };
   attacker: ForceForm;
   defender: ForceForm;
@@ -294,6 +330,7 @@ export function formBody(form: BattleForm): Record<string, unknown> {
     defenderTech: toNumber(form.defenderTech),
   };
   if (form.defenderKind === 'wall') body.defence = toNumber(form.defence);
+  if (form.attackerTraits) body.attackerTraits = form.attackerTraits;
   if (form.statProfile === 'five-stats') {
     const commander = (stats: { leadership: string; strength: string }) => ({
       leadership: toNumber(stats.leadership),
@@ -327,6 +364,7 @@ export function requestBody(request: BattleRunRequest): BattleRunBody {
   };
   if (request.defence !== undefined) body.defence = request.defence;
   if (request.recordPhases) body.recordPhases = true;
+  if (request.attackerTraits) body.attackerTraits = request.attackerTraits;
   if (request.commanders) body.commanders = request.commanders;
   return body;
 }
