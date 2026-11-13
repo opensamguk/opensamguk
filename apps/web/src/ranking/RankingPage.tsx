@@ -4,7 +4,15 @@ const rankingIcon = publicImageUrl('apps/web/src/art/icons/ranking.png');
 import { EmptyState, ErrorState } from '../ui/States';
 import styles from './Ranking.module.css';
 import { GeneralRankingTable, NationRankingTable } from './RankingTables';
-import { defaultSearch, formatAt, type GeneralSortKey, type NationSortKey, type RankingSearch } from './rankingView';
+import {
+  defaultSearch,
+  formatAt,
+  parseRankingSearch,
+  type GeneralKind,
+  type GeneralSortKey,
+  type NationSortKey,
+  type RankingSearch,
+} from './rankingView';
 import { useRankingData, type RankingData } from './useRankingData';
 
 const route = getRouteApi('/w/$worldId/ranking');
@@ -23,7 +31,8 @@ export function RankingPage() {
     <RankingView
       search={search}
       data={data}
-      onSort={(by) => void navigate({ search: { tab: search.tab, by } as RankingSearch, replace: true })}
+      onSort={(by) => void navigate({ search: { ...search, by } as RankingSearch, replace: true })}
+      onKind={(kind) => void navigate({ search: parseRankingSearch({ ...search, kind }), replace: true })}
       renderTab={(tab, label, active) => (
         <Link
           key={tab}
@@ -46,11 +55,13 @@ export function RankingView({
   data,
   onSort,
   renderTab,
+  onKind,
 }: {
   search: RankingSearch;
   data: RankingData;
   onSort: (by: GeneralSortKey | NationSortKey) => void;
   renderTab: (tab: RankingSearch['tab'], label: string, active: boolean) => React.ReactNode;
+  onKind?: (kind: GeneralKind) => void;
 }) {
   return (
     <section className={styles.page}>
@@ -64,6 +75,27 @@ export function RankingView({
       <nav className={styles.tabs} aria-label="순위 종류">
         {TABS.map(({ tab, label }) => renderTab(tab, label, tab === search.tab))}
       </nav>
+      {search.tab === 'generals' && onKind ? (
+        <div className={styles.tabs} role="group" aria-label="장수 종류">
+          {(
+            [
+              ['all', '전체'],
+              ['human', '사람'],
+              ['npc', 'NPC'],
+            ] as const
+          ).map(([kind, label]) => (
+            <button
+              key={kind}
+              className={styles.tab}
+              type="button"
+              aria-pressed={(search.kind ?? 'all') === kind}
+              onClick={() => onKind(kind)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      ) : null}
       <RankingBody search={search} data={data} onSort={onSort} />
     </section>
   );

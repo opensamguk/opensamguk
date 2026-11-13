@@ -123,6 +123,7 @@ function GeneralRow({
         <span className={styles.name} data-testid="ranked-general-name" data-general-name>
           {displayName(row.name)}
         </span>
+        {row.isHuman === false ? <span className={styles.name}> NPC</span> : null}
         {me ? <span className={styles.meChip}>나</span> : null}
         {narrow ? (
           <dl className={styles.details}>

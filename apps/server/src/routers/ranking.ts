@@ -46,6 +46,7 @@ export const rankingRouter = router({
       worldInput
         .extend({
           by: z.enum(['dedication', 'experience', 'merit', 'stratagem', 'engagements', 'winRate', 'kills', 'killRate']),
+          kind: z.enum(['all', 'human', 'npc']).default('all'),
         })
         .strict(),
     )
@@ -57,6 +58,17 @@ export const rankingRouter = router({
         });
         if (!snapshot) return { top: [], me: null, at: null };
         const generals = generalRows.parse(snapshot.generals);
+        const identity = new Map(
+          (
+            await tx.general.findMany({
+              where: { worldId: input.worldId, id: { in: generals.map(({ id }) => id) } },
+              select: { id: true, portraitId: true, userId: true },
+            })
+          ).map(({ id, portraitId, userId }) => [id, { portraitId, isHuman: userId !== null }]),
+        );
+        const kind = input.kind;
+        const candidates =
+          kind === 'all' ? generals : generals.filter(({ id }) => identity.get(id)?.isHuman === (kind === 'human'));
         const byId = new Map(generals.map((row) => [row.id, row]));
         const sort = input.by;
         const base = sort === 'dedication' || sort === 'experience' || sort === 'merit';
@@ -64,7 +76,7 @@ export const rankingRouter = router({
           const row = byId.get(id)!;
           return sort === 'stratagem' ? row.stratagemSuccesses : base ? 0 : (row.battleStats?.[sort] ?? -1);
         };
-        const ranked = rankGenerals(generals, base ? sort : 'merit');
+        const ranked = rankGenerals(candidates, base ? sort : 'merit');
         if (!base) ranked.sort((a, b) => value(b.id) - value(a.id) || a.id - b.id);
         const rows = ranked.map(({ id, ...row }, index) => ({
           ...row,
@@ -72,6 +84,8 @@ export const rankingRouter = router({
           rank: index + 1,
           stratagemSuccesses: byId.get(id)!.stratagemSuccesses,
           battleStats: byId.get(id)!.battleStats,
+          portraitId: identity.get(id)?.portraitId ?? null,
+          isHuman: identity.get(id)?.isHuman ?? null,
           ...(!base ? { value: Math.max(0, value(id)) } : {}),
         }));
         const viewer = await tx.general.findUnique({
@@ -80,25 +94,7 @@ export const rankingRouter = router({
         });
         const top = rows.slice(0, 100);
         const me = viewer ? (rows.find((row) => row.generalId === viewer.id) ?? null) : null;
-        const ids = top.map((row) => row.generalId);
-        if (me) ids.push(me.generalId);
-        const portraits = new Map(
-          (
-            await tx.general.findMany({
-              where: { worldId: input.worldId, id: { in: ids } },
-              select: { id: true, portraitId: true },
-            })
-          ).map(({ id, portraitId }) => [id, portraitId]),
-        );
-        const withPortrait = (row: (typeof rows)[number]) => ({
-          ...row,
-          portraitId: portraits.get(row.generalId) ?? null,
-        });
-        return {
-          top: top.map(withPortrait),
-          me: me ? withPortrait(me) : null,
-          at: snapshotAt(snapshot),
-        };
+        return { top, me, at: snapshotAt(snapshot) };
       }),
     ),
   nations: protectedProcedure

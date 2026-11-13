@@ -20,6 +20,7 @@ const general = (rank: number, generalId: number, name: string, nation = wei): R
   rank,
   generalId,
   portraitId: null,
+  isHuman: true,
   name,
   nation,
   dedication: 1000 - rank,
@@ -47,6 +48,14 @@ describe('주소 해석', () => {
     expect(parseRankingSearch({ tab: 'nations', by: 'merit' })).toEqual({ tab: 'nations', by: 'cities' });
     expect(parseRankingSearch({ tab: 'nations', by: 'power' })).toEqual({ tab: 'nations', by: 'power' });
     expect(parseRankingSearch({ tab: 'x', by: 'experience' })).toEqual({ tab: 'generals', by: 'experience' });
+  });
+  it('장수 종류는 장수 순위 주소에서만 해석한다', () => {
+    expect(parseRankingSearch({ tab: 'generals', by: 'wins', kind: 'npc' })).toEqual({
+      tab: 'generals',
+      by: 'dedication',
+      kind: 'npc',
+    });
+    expect(parseRankingSearch({ tab: 'nations', kind: 'npc' })).toEqual({ tab: 'nations', by: 'cities' });
   });
   it('탭을 바꾸면 첫 기준부터', () => {
     expect(defaultSearch('nations')).toEqual({ tab: 'nations', by: 'cities' });
