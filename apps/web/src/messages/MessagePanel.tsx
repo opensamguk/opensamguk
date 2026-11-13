@@ -322,8 +322,11 @@ function Compose({ worldId, scope, draftKey }: { worldId: string; scope: SendSco
             <option value="">고르세요</option>
             {recipients.data?.generals.map((general, _index, all) => {
               const name = pickerName(general.name, all);
-              const office = general.nation && (general.officerLevel === 12 || general.officerLevel === 11);
-              const recipientName = office ? `${name} (${general.officerLevel === 12 ? '군주' : '참모'})` : name;
+              const roles = [];
+              if (general.nation && general.officerLevel === 12) roles.push('군주');
+              if (general.nation && general.officerLevel === 11) roles.push('참모');
+              if (general.isAmbassador) roles.push('외교권자');
+              const recipientName = roles.length ? `${name} (${roles.join(' · ')})` : name;
               return (
                 <option key={general.id} value={general.id}>
                   {general.nation ? `${recipientName} (${general.nation.name})` : `${recipientName} (재야)`}

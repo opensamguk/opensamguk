@@ -249,13 +249,14 @@ describe('메시지 패널', () => {
     expect(other.querySelector('[data-variant="icon"]')!.getAttribute('data-state')).toBe('fallback');
   });
 
-  it('받는 장수 목록에서 군주와 참모를 구별한다', async () => {
+  it('받는 장수 목록에서 군주와 참모와 외교권자를 구별한다', async () => {
     const nation = { id: 1, name: '촉', color: '#445566' };
     on('message.recipients', () => ({
       generals: [
         { id: 7, name: '유비', officerLevel: 12, nation },
         { id: 8, name: '제갈량', officerLevel: 11, nation },
         { id: 9, name: '관우', officerLevel: 10, nation },
+        { id: 10, name: '장비', officerLevel: 1, isAmbassador: true, nation },
       ],
       nations: [],
     }));
@@ -263,6 +264,7 @@ describe('메시지 패널', () => {
     expect(await screen.findByRole('option', { name: '유비 (군주) (촉)' })).toBeTruthy();
     expect(screen.getByRole('option', { name: '제갈량 (참모) (촉)' })).toBeTruthy();
     expect(screen.getByRole('option', { name: '관우 (촉)' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: '장비 (외교권자) (촉)' })).toBeTruthy();
   });
 
   it('보내기 실패는 입력을 지우지 않고 서버 문장을 입력칸 설명으로 붙인다', async () => {

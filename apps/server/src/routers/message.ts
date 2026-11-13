@@ -208,7 +208,14 @@ export const messageRouter = router({
             removedAt: null,
             activeFromYear: { not: LINEAGE_EXITED_YEAR },
           },
-          select: { id: true, name: true, portraitId: true, officerLevel: true, nation: { select: nationTagSelect } },
+          select: {
+            id: true,
+            name: true,
+            portraitId: true,
+            officerLevel: true,
+            nation: { select: nationTagSelect },
+            diplomaticDelegate: { select: { nationId: true, role: true } },
+          },
           orderBy: [{ name: 'asc' }, { id: 'asc' }],
         });
         const nations = await tx.nation.findMany({
@@ -216,7 +223,14 @@ export const messageRouter = router({
           select: nationTagSelect,
           orderBy: [{ name: 'asc' }, { id: 'asc' }],
         });
-        return { generals, nations };
+        return {
+          generals: generals.map(({ diplomaticDelegate, ...general }) => ({
+            ...general,
+            isAmbassador:
+              diplomaticDelegate?.role === 'AMBASSADOR' && diplomaticDelegate.nationId === general.nation?.id,
+          })),
+          nations,
+        };
       },
       { isolationLevel: 'RepeatableRead' },
     ),
