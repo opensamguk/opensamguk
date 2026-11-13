@@ -17,6 +17,17 @@ export interface ProgressSettings {
   npcPlayEnabled?: boolean | undefined;
 }
 
+// 사람 장수 수와 정원 (world.summary.quota, INT-26). 정원(max)이 없으면 수만 쓴다.
+// 숫자만 받으면(로비 목록의 humanGenerals) 그 수를 쓴다. 아무것도 없으면 null이라 줄에서 뺀다.
+export function humanQuotaText(
+  quota: { humans: number; max?: number | null | undefined } | number | null | undefined,
+): string | null {
+  if (quota === null || quota === undefined) return null;
+  const { humans, max } = typeof quota === 'number' ? { humans: quota, max: null } : quota;
+  const count = humans.toLocaleString('ko-KR');
+  return typeof max === 'number' ? `사람 장수 ${count} / 정원 ${max.toLocaleString('ko-KR')}` : `사람 장수 ${count}`;
+}
+
 // 켜진 서버 설정 딱지. 응답이 아직 없으면 그 딱지는 뺀다.
 export function settingTags({ truce, generalCreationEnabled, npcPlayEnabled }: ProgressSettings): string[] {
   return [

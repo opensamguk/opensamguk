@@ -20,10 +20,14 @@ import {
 import type { SiteGate } from './terrainTiles';
 import { basemapForOperationalMap } from './operationalGeography';
 import { mapTapTargets, tapCandidates, type MapView } from './mapTapTargets';
+import { MapGenerals } from './MapGenerals';
+import { generalsByCity, type MapGeneral } from './mapGeneralList';
 import styles from './OperationalWorldMap.module.css';
 
 type MapData = PublicGeography;
 type DrawnCity = Pick<MapCity, 'key' | 'name' | 'kind' | 'x' | 'y' | 'nationId' | 'ruin'> & {
+  // 지역 이름 (world.map regionName, INT-26). 영토 재생처럼 지역을 받지 않는 지도는 없다.
+  regionName?: string | null | undefined;
   supplied?: boolean;
   recorded?: boolean;
   level?: number;
@@ -136,10 +140,13 @@ export function OperationalWorldMap({
   fill = false,
   focusKey = null,
   focusZoom = 3,
+  generals,
 }: {
   cities: readonly DrawnCity[];
   nations: readonly DrawnNation[];
   map: MapData;
+  /** 거점별 장수 (world.map generals, INT-26). 주면 풍선에 얼굴·이름을 쓰고 읽기 이름에 장수 수를 더한다. */
+  generals?: readonly MapGeneral[] | undefined;
   myCityKey: number | null;
   /** 내 국가. 주면 지도 거점 고르기를 본국·타국·공백지로 묶는다(재야는 null). 안 주면 묶지 않는다. */
   myNationId?: number | null | undefined;
@@ -178,6 +185,7 @@ export function OperationalWorldMap({
   const [layout, setLayout] = useState({ mobile: false, width: 0, height: 0 });
   const [choices, setChoices] = useState<number[]>([]);
   // 마우스로 표식 위에 올렸을 때만 보이는 툴팁. 내용은 aria-label·선택 정보와 같다(호버 전용 정보 없음).
+  // 장수 얼굴·이름은 읽기 이름에 장수 수로, 고른 도시 카드의 주둔 장수 표로 같은 내용을 본다.
   const [hover, setHover] = useState<{ siteId: string; x: number; y: number } | null>(null);
   const frame = useRef<HTMLDivElement>(null);
   const firstChoice = useRef<HTMLButtonElement>(null);
@@ -283,6 +291,7 @@ export function OperationalWorldMap({
   const cityByKey = new Map(cities.map((city) => [city.key, city]));
   const nationById = new Map(nations.map((nation) => [nation.id, nation]));
   const siteById = new Map(map.sites.map((site) => [site.id, site]));
+  const generalsAt = generalsByCity(generals);
   // 항구는 켜진 물길이 타고 내리는 자리일 때만 그린다. 물길이 없는 판(SAN10)의 항구 시설은 숨긴다.
   const usedPorts = new Set(
     map.routes.flatMap((route) => (route.enabled && route.mode === 'RIVER' ? (route.portIds ?? []) : [])),
@@ -595,12 +604,15 @@ export function OperationalWorldMap({
           const label = [
             site.name,
             grade ? `${grade} ${labels[site.kind]}` : labels[site.kind],
+            city?.regionName ?? null,
             city?.recorded === false ? '기록 없음' : (nation?.name ?? (city ? '공백지' : null)),
             capital ? '수도' : null,
             parent ? `${parent.name} 소속` : null,
             mine ? '내 위치' : null,
             city?.ruin ? `폐허 복구 ${city.ruin.percent}%` : null,
             city?.supplied === false && city.nationId !== null ? '보급 끊김' : null,
+            // 풍선(aria-hidden)의 장수 얼굴·이름과 같은 정보를 장수 수로 읽게 한다.
+            city && generalsAt.get(city.key) ? `장수 ${generalsAt.get(city.key)!.length}명` : null,
           ]
             .filter(Boolean)
             .join(', ');
@@ -737,7 +749,11 @@ export function OperationalWorldMap({
               >
                 <p className={styles.tooltipTitle}>
                   <span>{site.name}</span>
-                  <span className={styles.tooltipGrade}>{grade ?? shortLabels[site.kind]}</span>
+                  {/* 원작 도시 제목처럼 지역·규모를 함께 쓴다 (【 하북 · 특 】). */}
+                  <span className={styles.tooltipGrade}>
+                    {city?.regionName ? `${city.regionName} · ` : ''}
+                    {grade ?? shortLabels[site.kind]}
+                  </span>
                 </p>
                 {owner ? (
                   <p className={styles.tooltipOwner}>
@@ -750,6 +766,7 @@ export function OperationalWorldMap({
                     {note}
                   </p>
                 ))}
+                {city ? <MapGenerals generals={generalsAt.get(city.key) ?? []} /> : null}
               </div>
             );
           })()

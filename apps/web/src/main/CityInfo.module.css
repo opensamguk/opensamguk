@@ -134,3 +134,10 @@
   color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
 }
+
+/* 도시 제목의 지역·규모 괄호 (원작 【 하북 · 특 】, INT-26). */
+.region {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}

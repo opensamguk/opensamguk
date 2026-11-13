@@ -17,7 +17,7 @@ import { MobileMainBar, MobileTabPanel, panelOfArea, useMainPanel, type MobilePa
 import { NationInfo } from '../main/NationInfo';
 import { Panel } from '../main/Panel';
 import { MainRecords } from '../main/MainRecords';
-import { seasonOf, settingTags } from '../main/mainProgress';
+import { humanQuotaText, seasonOf, settingTags } from '../main/mainProgress';
 import { SeasonResult } from '../main/SeasonResult';
 import { MapLegend, WorldMap } from '../main/WorldMap';
 import { PolicyBar } from '../policy/PolicyBar';
@@ -118,6 +118,8 @@ export function MainPage() {
   });
   const lobbyWorld = lobbyWorlds.data?.find((world) => world.id === worldId);
   const season = summary.data ? seasonOf(summary.data.gameDate.month) : null;
+  // 사람 장수 수와 정원은 world.summary.quota(INT-26)를 먼저 쓰고, 없으면 로비 목록 값을 쓴다.
+  const humans = humanQuotaText(summary.data?.quota ?? lobbyWorld?.humanGenerals);
   const settings = settingTags({
     truce: summary.data?.truce,
     generalCreationEnabled: mine.data?.creationRules.generalCreationEnabled,
@@ -210,7 +212,7 @@ export function MainPage() {
             <span>
               {map.data?.operationalMap ? '거점' : '도시'} {cities.length}
             </span>
-            {lobbyWorld ? <span>사람 장수 {lobbyWorld.humanGenerals.toLocaleString('ko-KR')}</span> : null}
+            {humans ? <span data-testid="main-humans">{humans}</span> : null}
             {lobbyWorld ? (
               <span className={styles.progressTag} data-testid="main-scenario">
                 {lobbyWorld.scenarioTitle}
@@ -302,6 +304,7 @@ export function MainPage() {
                   myNationId={homeData ? homeData.general.nationId : undefined}
                   selectedKey={cityKey}
                   onSelect={selectCity}
+                  generals={map.data.generals}
                 />
                 <MapLegend cities={cities} nations={nations} />
               </div>

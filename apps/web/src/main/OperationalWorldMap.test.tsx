@@ -352,3 +352,24 @@ it('INT-25 AC-INT-25 재야는 본국 없이 타국·공백지로, 내 국가를
   draw();
   expect(screen.getByRole('combobox', { name: '지도 거점' }).querySelectorAll('optgroup')).toHaveLength(0);
 });
+
+it('INT-26 거점 읽기 이름에 지역·장수 수를 넣고 풍선에 지역·규모와 장수 얼굴·이름을 쓴다', () => {
+  render(
+    <WorldMap
+      cities={[{ ...cities[0]!, region: 3, regionName: '예주' }, cities[1]!]}
+      nations={nations}
+      operationalMap={map}
+      onSelect={vi.fn()}
+      generals={[
+        { id: 1, name: '조조(曹操)', cityKey: 1, nationId: 1, portraitId: 1, isHuman: true },
+        { id: 2, name: '전위', cityKey: 1, nationId: 1, portraitId: 2, isHuman: false },
+      ]}
+    />,
+  );
+  const xuchang = screen.getByRole('button', { name: '허창, 진 도시, 예주, 위, 장수 2명' });
+  expect(screen.getByRole('button', { name: '관문, 관문, 위' })).toBeTruthy();
+  fireEvent.pointerMove(xuchang, { pointerType: 'mouse', clientX: 20, clientY: 20 });
+  const balloon = screen.getByTestId('map-tooltip');
+  expect(balloon.textContent).toContain('예주 · 진');
+  expect(screen.getByTestId('map-tooltip-generals').textContent).toBe('장수 2명조조전위NPC');
+});

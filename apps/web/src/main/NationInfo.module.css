@@ -153,3 +153,14 @@
   font-size: var(--text-xs);
   color: var(--color-text-muted);
 }
+
+/* 다음 정산 예상 (세금·세곡·봉급·순수입, INT-26). */
+.finance {
+  display: grid;
+  gap: var(--space-1);
+}
+.financeTitle {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}

@@ -14,7 +14,6 @@ import {
 } from '../game/types';
 import { crewText, missingReason, RECORD_NOTE, recordedAtText, trustText } from '../intel/view';
 import { Portrait } from '../portrait/Portrait';
-import { CityOfficeResidences } from '../personnel/OfficeResidence';
 import { useTRPC } from '../trpc';
 import { DataTable, type Column } from '../ui/DataTable';
 import { NationBadge } from '../ui/NationBadge';
@@ -25,6 +24,7 @@ import { LoadingState } from '../ui/States';
 import statStyles from '../ui/StatTable.module.css';
 import { Tag } from '../ui/Tag';
 import styles from './CityInfo.module.css';
+import { CityOffices } from './CityOffices';
 import { CityResourcesPanel } from './CityResourcesPanel';
 import {
   BAND_LABEL,
@@ -35,10 +35,14 @@ import {
   statBand,
   type StatBand,
 } from './infoView';
+import { levelName } from './siteMarkers';
 import { unitNameOf } from './UnitName';
 import { LogisticsPanel } from '../city/LogisticsPanel';
 
 const HIDDEN_CITY = '다른 국가의 도시입니다';
+// 도시 제목 괄호 안 글자. 규모 이름을 모르면 규모 숫자를 쓴다.
+export const cityRegionTitle = (regionName: string, level: number) =>
+  `${regionName} · ${levelName(level) ?? `규모 ${level}`}`;
 // 서버는 나 자신과 같은 국가 장수의 능력치만 준다(visibility.general). 재야끼리도 서로 보이지 않는다.
 const HIDDEN_GENERAL = '능력치는 같은 국가 장수만 보입니다';
 const GARRISON_HIDDEN = '주둔 장수는 보이지 않습니다';
@@ -126,10 +130,18 @@ export function CityInfo({
   return (
     <div className={styles.city} data-city-key={data.key} data-visibility={detailed ? 'detail' : 'public'}>
       <div className={styles.title}>
+        {/* 원작 도시 카드 제목 【 하북 · 특 】 업. 지역 이름(region·regionName, INT-26)이 없는 지도는 규모만 이름 뒤에 쓴다. */}
+        {data.regionName ? (
+          <span className={styles.region} data-testid="city-region" title={`규모 ${data.level}`}>
+            【 {cityRegionTitle(data.regionName, data.level)} 】
+          </span>
+        ) : null}
         <strong className={styles.name}>{data.name}</strong>
-        <span className={styles.meta} title={`규모 ${data.level}`}>
-          {cityLevelText(data.level)}
-        </span>
+        {data.regionName ? null : (
+          <span className={styles.meta} title={`규모 ${data.level}`}>
+            {cityLevelText(data.level)}
+          </span>
+        )}
         {data.ruin ? <Tag tone="danger">폐허 복구 {data.ruin.percent}%</Tag> : null}
         {owner ? (
           <Link to="/w/$worldId/nation/$nationId" params={{ worldId, nationId: String(owner.id) }}>
@@ -154,8 +166,9 @@ export function CityInfo({
         </p>
       )}
       <CityStats rows={rows} />
+      {/* 태수·군사·종사는 관직 효과 월드에서 서버가 officers로 준다(타국 도시는 첩보 기능이면 빠진다). */}
       {data.nationId !== null && data.kind !== 'PASS' && data.officeEffectsEnabled && data.officers ? (
-        <CityOfficeResidences officers={data.officers} secretaryEnabled={data.secretaryEnabled === true} />
+        <CityOffices officers={data.officers} secretaryEnabled={data.secretaryEnabled === true} />
       ) : null}
       {isDetailedCity(data) ? <CityFacts city={data} /> : null}
       {garrisonHidden ? null : <GarrisonLine generals={data.generals} campaign={data.campaignEnabled === true} />}
@@ -412,7 +425,8 @@ export function GarrisonLine({ generals, campaign }: { generals: readonly Genera
 
 // 장수 이름 칸. 같은 국가 장수는 얼굴(thumb을 20×28로)과 부상을 함께 쓴다. 얼굴은 이름과 겹치므로 읽기 이름에서 뺀다.
 // 국가 표는 관리 칸에 부상을 따로 적으므로 injury={false}로 뺀다.
-// npc는 감찰 자료(직책자만 받는다)의 사람 여부다. 모르면 딱지를 달지 않는다.
+// NPC 딱지는 장수 행의 isHuman(INT-26, 모든 장수 행에 온다)이 false일 때 단다. npc는 감찰 자료의 사람 여부로 덧붙인다.
+// 둘 다 모르면 딱지를 달지 않는다.
 export function GeneralNameCell({
   general,
   injury = true,
@@ -423,6 +437,7 @@ export function GeneralNameCell({
   npc?: boolean;
 }) {
   const name = displayName(general.name);
+  const isNpc = npc || general.isHuman === false;
   return (
     <span className={styles.who}>
       {isDetailedGeneral(general) ? (
@@ -434,7 +449,7 @@ export function GeneralNameCell({
       {injury && isDetailedGeneral(general) && general.injury > 0 ? (
         <Tag tone="warning">부상 {general.injury}</Tag>
       ) : null}
-      {npc ? (
+      {isNpc ? (
         <Tag tone="muted" title="사람이 맡지 않은 장수입니다">
           NPC
         </Tag>

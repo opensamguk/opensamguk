@@ -52,6 +52,7 @@ const HIDDEN_NATION = '다른 국가 정보';
 const n = (value: number) => value.toLocaleString('ko-KR');
 
 type NationSummary = NonNullable<Home['nation']> | NationView;
+type FinanceEstimate = NonNullable<NationView['financeEstimate']>;
 type NationGenerals = NationView['generals'];
 // 공개 국력과 순위 (ranking.nations, 달마다 찍은 값). 아직 정산 전이면 null이다.
 export type NationPower = { power: number; rank: number; at: string } | null;
@@ -75,6 +76,13 @@ export function NationSummaryGrid({
   const heads = generals ? nationHeads(detailed) : undefined;
   const totals = member && generals ? nationTotals(detailed) : null;
   const headValue = (name: string | null | undefined) => (name ? displayName(name) : '—');
+  // 성향은 모든 국가에 공개된다 (nation.get philosophy, INT-26). 홈 응답처럼 값이 없으면 소속국만 보인다.
+  const philosophy = 'philosophy' in nation ? nation.philosophy : undefined;
+  // 총 주민은 nation.get이 모든 국가에 준다 (소유 도시 주민 합계 / 최대, INT-26).
+  const population =
+    'populationMax' in nation && typeof nation.population === 'number' && typeof nation.populationMax === 'number'
+      ? { value: nation.population, max: nation.populationMax }
+      : null;
   return (
     <InfoGrid
       items={[
@@ -82,6 +90,14 @@ export function NationSummaryGrid({
         member ? { label: '참모', value: headValue(heads?.advisor) } : { label: '참모', ...hidden },
         { label: '속령', value: n(nation.cityCount) },
         { label: '장수', value: n(nation.generalCount) },
+        population
+          ? {
+              label: '총 주민',
+              value: `${n(population.value)} / ${n(population.max)}`,
+              title: '소유 도시 주민 합계 / 최대 주민 합계',
+              wide: true,
+            }
+          : { label: '총 주민', value: '—', title: '국가 정보를 불러오는 중입니다', wide: true },
         member
           ? {
               label: '총 병사',
@@ -98,9 +114,46 @@ export function NationSummaryGrid({
         member ? { label: '기술', value: techText(nation.tech) } : { label: '기술', ...hidden },
         // 수도는 지도 응답(world.map)에 모든 국가 것이 있어 다른 국가도 보인다 (원작 세력일람의 [수도]).
         { label: '수도', value: capitalName ?? '—' },
-        member ? { label: '성향', value: nation.philosophy || '—' } : { label: '성향', ...hidden },
+        philosophy !== undefined ? { label: '성향', value: philosophy || '—' } : { label: '성향', ...hidden },
       ]}
     />
+  );
+}
+
+const signed = (value: number) => `${value < 0 ? '−' : '+'}${n(Math.abs(value))}`;
+const due = (row: FinanceEstimate['gold']) => `${row.year}년 ${row.month}월`;
+
+// 다음 세금·세곡 예상과 봉급·순수입 (nation.get financeEstimate, INT-26). 소속국에만 온다.
+// 원작 국가 카드의 세금·세곡·지급률·예산 줄을 글자와 숫자로 쓴다 (색만으로 뜻을 전하지 않는다).
+export function NationFinanceGrid({ nation }: { nation: NationSummary }) {
+  const estimate = 'financeEstimate' in nation ? nation.financeEstimate : undefined;
+  if (!estimate) return null;
+  const rate = 'salaryRate' in nation && typeof nation.salaryRate === 'number' ? nation.salaryRate : undefined;
+  const { gold, rice } = estimate;
+  const toCity = estimate.destination === 'city';
+  return (
+    <div className={styles.finance} data-testid="nation-finance">
+      <p className={styles.financeTitle}>다음 정산 예상</p>
+      <InfoGrid
+        items={[
+          { label: '세금', value: `금 ${n(gold.gross)} · ${due(gold)}`, title: '상업·주민으로 걷는 금', wide: true },
+          { label: '세곡', value: `쌀 ${n(rice.gross)} · ${due(rice)}`, title: '농업·주민으로 걷는 쌀', wide: true },
+          {
+            label: rate === undefined ? '봉급' : `봉급(지급률 ${Math.round(rate * 100)}%)`,
+            value: `금 ${n(gold.payroll)} · 쌀 ${n(rice.payroll)}`,
+            title: '세입 가운데 소속 장수에게 나눠 주는 몫',
+            wide: true,
+          },
+          { label: '1인 봉급', value: `금 ${n(gold.perGeneral)} · 쌀 ${n(rice.perGeneral)}`, wide: true },
+          {
+            label: toCity ? '순수입(도시 창고)' : '순수입(국고)',
+            value: `금 ${signed(gold.net)} · 쌀 ${signed(rice.net)}`,
+            title: toCity ? '봉급을 뺀 나머지가 각 도시 창고로 들어갑니다' : '봉급을 뺀 나머지가 국고로 들어갑니다',
+            wide: true,
+          },
+        ]}
+      />
+    </div>
   );
 }
 
@@ -198,7 +251,14 @@ export function NationInfo({
           국가 화면
         </Link>
       </div>
-      <NationSummaryGrid nation={nation} capitalName={capital?.name} generals={detail.data?.generals} power={power} />
+      {/* 성향·총 주민·정산 예상은 nation.get 값이다 (INT-26). 받기 전에는 홈 응답 값으로 그린다. */}
+      <NationSummaryGrid
+        nation={detail.data ?? nation}
+        capitalName={capital?.name}
+        generals={detail.data?.generals}
+        power={power}
+      />
+      {detail.data ? <NationFinanceGrid nation={detail.data} /> : null}
       <NationExtras worldId={worldId} nation={detail.data ?? nation} />
       {/* 소속 장수·도시 표와 통치는 전용 화면으로 옮겼다 (INT-25). */}
       <p className={styles.links}>
@@ -282,6 +342,10 @@ export function NationTables({
       ?.map((g) => displayName(g.name))
       .join(', ');
   const member = isMemberNation(data);
+  // 지역 이름은 world.map regionName(INT-26)에서 읽는다. 소속국 도시만 주민(city.get 상세 모양)이 온다.
+  const regionName = new Map(map?.cities.map((city) => [city.key, city.regionName ?? null]) ?? []);
+  const showRegion = data.cities.some((city) => regionName.get(city.key));
+  const showPopulation = data.cities.some(isDetailedCity);
   const opened = openCity === null ? undefined : data.cities.find((c) => c.key === openCity);
 
   const cityColumns: Column<City>[] = [
@@ -300,6 +364,17 @@ export function NationTables({
           </Link>
         ),
     },
+    ...(showRegion
+      ? [
+          {
+            key: 'region',
+            label: '지역',
+            // 지역 번호 순서(서버의 소속국 기본 순서)로 정렬한다.
+            sortValue: (c: City) => ('region' in c && typeof c.region === 'number' ? c.region : null),
+            render: (c: City) => regionName.get(c.key) ?? '—',
+          },
+        ]
+      : []),
     {
       key: 'level',
       label: '규모',
@@ -307,6 +382,17 @@ export function NationTables({
       sortValue: (c) => c.level,
       render: (c) => cityLevelText(c.level),
     },
+    ...(showPopulation
+      ? [
+          {
+            key: 'population',
+            label: '주민',
+            numeric: true,
+            sortValue: (c: City) => (isDetailedCity(c) ? c.population : null),
+            render: (c: City) => (isDetailedCity(c) ? `${n(c.population)} / ${n(c.populationMax)}` : '—'),
+          },
+        ]
+      : []),
     {
       key: 'generals',
       label: '장수',
@@ -431,7 +517,7 @@ export function NationTables({
           rows={data.cities}
           columns={cityColumns}
           rowKey={(c) => c.key}
-          mobileDetails={[]}
+          mobileDetails={['region', 'population']}
         />
         {member && opened ? (
           <StationedPanel
@@ -607,6 +693,7 @@ export function StationedTable({
       key: 'name',
       label: '장수',
       sortValue: (g) => displayName(g.name),
+      // NPC 딱지는 장수 행의 isHuman으로 단다. 감찰 자료의 사람 여부도 함께 본다.
       render: (g) => <GeneralNameCell general={g} npc={inspection?.get(g.id)?.isHuman === false} />,
     },
     {
