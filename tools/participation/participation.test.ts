@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { OwnedChildScope } from '../test-support/owned-child-scope';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { parseNative, parseResult, parseCompletion } from './schema';
+import { parseNative, parseResult, parseCompletion, parsePlan } from './schema';
 import { syntheticBundle } from './testFixture';
 import { digest, validateBundle } from './validate';
 
@@ -337,6 +337,49 @@ describe('T2-18/T3-15 evidence tooling, never product acceptance', () => {
     expect((await validateBundle(manifest, 'aaa')).productStatus).toBe('NOT_READY');
     await writeFile(join(f.dir, 'actions.jsonl'), '\n');
     expect((await validateBundle(manifest, f.sourceSHA)).issues).toContain('EVENTS_HASH_MISMATCH');
+  });
+  it('accepts actual account and login references added after plan registration', async () => {
+    const f = await fixture();
+    await f.save();
+    const plan = parsePlan(f.records.get('plan')!.value);
+    expect(plan.participants[0]).toEqual({
+      participantId: 'P1',
+      agent: f.m.participants[0]!.agent,
+      sessionRef: f.m.participants[0]!.sessionRef,
+      nativeRef: f.m.participants[0]!.nativeRef,
+      worldIds: ['world-0'],
+    });
+    const participant = f.m.participants[0]!;
+    participant.accountRef = `account-${digest('post-signup-account')}`;
+    participant.loginSessionRef = `login-${digest('post-signup-session')}`;
+    const loginResult = parseResult(f.records.get('result-0-1')!.value);
+    f.put('result-0-1', 'result', {
+      ...loginResult,
+      login: { accountRef: participant.accountRef, loginSessionRef: participant.loginSessionRef },
+    });
+    expect((await validateBundle(await f.save(false), f.sourceSHA)).issues).toEqual([]);
+  });
+  it('rejects a manifest account that differs from the login evidence', async () => {
+    const f = await fixture();
+    await f.save();
+    f.m.participants[0]!.accountRef = `account-${digest('mismatched-account')}`;
+    const accountMismatch = await validateBundle(await f.save(false), f.sourceSHA);
+    expect(accountMismatch.issues).toContain('LOGIN_IDENTITY_MISMATCH');
+    expect(accountMismatch.issues).not.toContain('FROZEN_PLAN_CHANGED');
+  });
+  it('rejects a native session substituted after plan registration', async () => {
+    const f = await fixture();
+    await f.save();
+    f.m.participants[0]!.sessionRef = 'another-native-session';
+    expect((await validateBundle(await f.save(false), f.sourceSHA)).issues).toContain('FROZEN_PLAN_CHANGED');
+  });
+  it('rejects play in a world absent from the participant’s registered assignment', async () => {
+    const f = await fixture();
+    await f.save();
+    const plan = parsePlan(f.records.get('plan')!.value);
+    plan.participants[0]!.worldIds = ['world-1'];
+    f.put('plan', 'plan', plan);
+    expect((await validateBundle(await f.save(false), f.sourceSHA)).issues).toContain('UNASSIGNED_PARTICIPANT_WORLD');
   });
   it.each(['cookie', 'password', 'email', 'token', 'ip', 'unexpected'])(
     'rejects unknown %s fields without echoing raw values',
