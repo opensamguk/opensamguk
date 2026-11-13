@@ -659,20 +659,38 @@ it('국가 게시판과 기밀실을 현재 소속·직책으로 분리한다', 
     expect((await write({ ...board, content }, f.bob.cookie)).error).toBe('FORBIDDEN');
   })();
   const sanctioned = await user('SANCTIONED');
-  for (const path of ['nationBoard.list', 'nationBoard.write'] as const) {
-    const call = path === 'nationBoard.list' ? list : write;
+  const older = (input: unknown, cookie?: string) => rpc('nationBoard.replies', input, cookie);
+  const replies = await db.nationBoardReply.createManyAndReturn({
+    data: Array.from({ length: 21 }, (_, index) => ({
+      postId,
+      authorName: '장수1',
+      body: `댓글 ${index + 1}`,
+      sentAt: new Date(1000 + index),
+    })),
+  });
+  const olderInput = { ...board, postId, cursor: replies.find((row) => row.body === '댓글 3')!.id };
+  await authzCase('nationBoard.replies', 'success', async () => {
+    expect((await older(olderInput, member.cookie)).data).toMatchObject({
+      items: [{ body: '댓글 1' }, { body: '댓글 2' }],
+      next: null,
+    });
+  })();
+  await authzCase('nationBoard.replies', 'otherUser', async () => {
+    expect((await older(olderInput, f.bob.cookie)).error).toBe('FORBIDDEN');
+    expect((await older({ ...olderInput, confidential: true }, f.alice.cookie)).error).toBe('NOT_FOUND');
+  })();
+  for (const path of ['nationBoard.list', 'nationBoard.write', 'nationBoard.replies'] as const) {
+    const call = path === 'nationBoard.list' ? list : path === 'nationBoard.write' ? write : older;
+    const input =
+      path === 'nationBoard.list' ? board : path === 'nationBoard.write' ? { ...board, content } : olderInput;
     await authzCase(path, 'unauthenticated', async () => {
-      expect((await call({ ...board, ...(path === 'nationBoard.write' ? { content } : {}) })).error).toBe(
-        'UNAUTHORIZED',
-      );
+      expect((await call(input)).error).toBe('UNAUTHORIZED');
     })();
     await authzCase(path, 'sanctioned', async () => {
-      expect(
-        (await call({ ...board, ...(path === 'nationBoard.write' ? { content } : {}) }, sanctioned.cookie)).error,
-      ).toBe('UNAUTHORIZED');
+      expect((await call(input, sanctioned.cookie)).error).toBe('UNAUTHORIZED');
     })();
     await authzCase(path, 'invalidInput', async () => {
-      expect((await call({ ...board, confidential: 'false' }, f.alice.cookie)).error).toBe('BAD_REQUEST');
+      expect((await call({ ...input, confidential: 'false' }, f.alice.cookie)).error).toBe('BAD_REQUEST');
     })();
   }
 });

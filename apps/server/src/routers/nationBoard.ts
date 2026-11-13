@@ -66,6 +66,39 @@ export const nationBoardRouter = router({
       { isolationLevel: 'RepeatableRead' },
     ),
   ),
+  replies: protectedProcedure
+    .input(boardInput.extend({ postId: z.uuid(), cursor: z.uuid() }).strict())
+    .query(({ ctx, input }) =>
+      ctx.db.$transaction(
+        async (tx) => {
+          const actor = await boardActor(tx, ctx, input);
+          const after = await tx.nationBoardReply.findFirst({
+            where: {
+              id: input.cursor,
+              postId: input.postId,
+              post: { worldId: input.worldId, nationId: actor.nationId, confidential: input.confidential },
+            },
+            select: { id: true, sentAt: true },
+          });
+          if (!after) throw new TRPCError({ code: 'NOT_FOUND', message: '댓글을 찾을 수 없습니다.' });
+          const replies = await tx.nationBoardReply.findMany({
+            where: {
+              postId: input.postId,
+              OR: [{ sentAt: { lt: after.sentAt } }, { sentAt: after.sentAt, id: { lt: after.id } }],
+            },
+            orderBy: [...newest],
+            take: 21,
+            select: authorSelect,
+          });
+          const page = replies.slice(0, 20);
+          return {
+            next: replies.length > page.length ? page.at(-1)!.id : null,
+            items: page.reverse().map((reply) => ({ ...reply, sentAt: reply.sentAt.toISOString() })),
+          };
+        },
+        { isolationLevel: 'RepeatableRead' },
+      ),
+    ),
   write: worldVerifiedProcedure
     .input(
       boardInput
