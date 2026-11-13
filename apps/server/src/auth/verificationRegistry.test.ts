@@ -22,12 +22,14 @@ const VERIFIED_MUTATIONS = [
   'diplomaticDocuments.respond',
   'diplomaticDocuments.send',
   'diplomaticDocuments.setDelegate',
+  'entry.draw',
   'entry.possess',
   'general.create',
   'general.setDefenseStance',
   'general.setPolicy',
   'governance.submit',
   'heritage.purchase',
+  'heritage.specialty',
   'lineage.submit',
   'logistics.submit',
   'message.markRead',
@@ -47,6 +49,7 @@ const VERIFIED_MUTATIONS = [
   'operation.create',
   'personnel.appoint',
   'personnel.dismiss',
+  'personnel.volunteer',
   'resourceAdmin.clone',
   'resourceAdmin.discard',
   'resourceAdmin.publish',
@@ -84,7 +87,7 @@ describe('T3-02 AC-M3-01 이메일 인증 경계', () => {
       { _def: { type: string; meta?: ProcedureMeta } }
     >;
     const mutations = Object.entries(procedures).filter(([, procedure]) => procedure._def.type === 'mutation');
-    expect(mutations).toHaveLength(68);
+    expect(mutations).toHaveLength(71);
     expect(
       mutations
         .filter(([, procedure]) => procedure._def.meta?.accountAccess === 'verified')
