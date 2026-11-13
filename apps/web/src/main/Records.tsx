@@ -555,6 +555,14 @@ export function BattleList({ worldId }: { worldId: string }) {
                             {phase.opponent === '성벽' ? ' 피해' : '명 피해'}
                             {phase.attackerEvaded ? ' · 공격 측 회피' : ''}
                             {phase.defenderEvaded ? ' · 수비 측 회피' : ''}
+                            {phase.attackerCritical ? ' · 공격 측 필살' : ''}
+                            {phase.defenderCritical ? ' · 수비 측 필살' : ''}
+                            {phase.attackerTactic
+                              ? ` · 공격 측 ${phase.attackerTactic.name} ${phase.attackerTactic.success ? '성공' : '실패'}`
+                              : ''}
+                            {phase.defenderTactic
+                              ? ` · 수비 측 ${phase.defenderTactic.name} ${phase.defenderTactic.success ? '성공' : '실패'}`
+                              : ''}
                           </>
                         )}
                       </li>

@@ -1,3 +1,4 @@
+import { BATTLE_TACTICS_FEATURE } from '../packages/rules/src/battle/tactics';
 import { TROOP_FEATURE } from '../packages/rules/src/commands/ext/troop/state';
 import { COMBAT_SPECIALTY_FEATURE } from '../packages/rules/src/general/combatSpecialty';
 import { BALANCE } from '../packages/rules/src/balance';
@@ -1033,3 +1034,47 @@ for (const path of ['troop.list', 'troop.update'] as const) {
     );
   }
 }
+
+it('실제 출병 기록에 전투계략을 남기고 월말에 재생한다', async () => {
+  const alice = await user();
+  const initial = commandInitial();
+  initial.generals = initial.generals.slice(0, 2).map((general, index) => ({
+    ...general,
+    userId: index === 0 ? alice.id : null,
+    intel: index === 0 ? 100 : general.intel,
+    nextTurnTick: index === 0 ? 100 : 100000,
+  }));
+  initial.unitSet.crewTypes.find(({ id }) => id === 1100)!.magicCoef = 1;
+  const { worldId } = await saveInitialWorld(db, initial, {
+    name: '전투계략 실제 PG',
+    turnTermMinutes: 30,
+    endYear: null,
+    replayFormat: 3,
+    ruleFeatures: [BATTLE_TACTICS_FEATURE, COMBAT_SPECIALTY_FEATURE, 'policy'],
+  });
+  worlds.push(worldId);
+  await db.world.update({ where: { id: worldId }, data: { status: 'RUNNING', clockAnchorAt: new Date(now) } });
+  const lease = await acquireLease(db, worldId);
+  if (!lease) throw new Error('시험 실행권이 없습니다.');
+  leases.push(lease);
+  const loop = new TurnLoop(db, lease);
+  const slots = Array.from({ length: 30 }, (_, slot) =>
+    slot === 0 ? { commandKey: 'attack', args: { cityKey: 2 } } : null,
+  );
+  expect((await rpc('turns.set', { worldId, revision: 0, slots }, alice.cookie, true)).data).toMatchObject({
+    ok: true,
+  });
+  await loop.advanceTo(100);
+  expect((await rpc('records.battles', { worldId }, alice.cookie)).data).toMatchObject({
+    items: [
+      expect.objectContaining({
+        phases: expect.arrayContaining([
+          expect.objectContaining({ attackerTactic: { name: expect.any(String), success: expect.any(Boolean) } }),
+        ]),
+      }),
+    ],
+  });
+  await loop.advanceTo(10000);
+  const archive = await exportReplay(db, worldId);
+  expect(replayArchive(archive, 1)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
+});

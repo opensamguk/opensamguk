@@ -209,3 +209,7 @@ core2026 커밋 df6c9269fa1e2862418ba9da481c8dd2d758d6c5의 MIT © 2025 devsam �
 ### INT-26 유산 혜택 구매
 
 내정 성공·실패와 전투 회피 확률 보정은 core2026 `c81d304`의 `packages/logic/src/inheritance/inheritBuff.ts`를 참고했다. 포인트 가격은 OpenSamguk의 기수당 최대 5점과 양립하도록 단계별 누적 1·3·6·10·15점을 적용한다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+### INT-26 필살과 전투계략
+
+필살 확률·피해 범위, 전투계략 종류와 피해 배율은 core2026 `c81d304`의 `packages/logic/src/war/units/general.ts`, `war/triggers/che_필살.ts`, `war/triggers/che_계략.ts`를 참고했다. OpenSamguk의 기존 교환 단계에 적용한다. 원저작자 devsam의 위 MIT 고지를 유지한다.

@@ -54,6 +54,7 @@ export {
   heritageBenefitInput,
   heritageBenefitNames,
   heritageBenefitCosts,
+  battleHeritageBenefits,
   heritagePurchase,
   storedHeritageBenefits,
 } from './heritage/benefits';
@@ -376,5 +377,6 @@ export { GENERAL_PERSONALITY_FEATURE, personalityEffects } from './general/perso
 
 export { GENERAL_PROFICIENCY_FEATURE, proficiencyGrade, storedGeneralProficiency } from './general/proficiency';
 
+export { BATTLE_TACTICS_FEATURE } from './battle/tactics';
 export { COMBAT_SPECIALTY_FEATURE, combatSpecialty } from './general/combatSpecialty';
 export { DOMESTIC_SPECIALTY_FEATURE, domesticSpecialty } from './general/domesticSpecialty';
