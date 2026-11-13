@@ -3,7 +3,7 @@ import type { InitialGeneral } from '@opensamguk/rules';
 export function ownGeneral(
   g: Omit<
     InitialGeneral,
-    'politics' | 'charm' | 'removedAt' | 'defenseThreshold' | 'proficiency' | 'heritageBenefits'
+    'politics' | 'charm' | 'removedAt' | 'defenseThreshold' | 'proficiency' | 'heritageBenefits' | 'statExperience'
   > & {
     politics?: number | null;
     charm?: number | null;
