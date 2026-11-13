@@ -194,6 +194,7 @@ function fixture() {
     {
       ...initial.cities[0]!,
       kind: null,
+      seasonalEvent: null,
       worldId: 'world',
       nationId: 1,
       _count: { _all: 1 },
@@ -205,6 +206,7 @@ function fixture() {
     {
       ...initial.cities[1]!,
       kind: null,
+      seasonalEvent: null,
       worldId: 'world',
       nationId: 2,
       _count: { _all: 1 },

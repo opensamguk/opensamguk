@@ -16,6 +16,7 @@ import {
   nowTick,
   RICE_MARKET_FEATURE,
   riceMarketRate,
+  citySeasonalEventInfo,
 } from '@opensamguk/rules';
 import { readCityScaleProjection } from '../game/cityScale';
 import { readCityIntel } from '../game/fog';
@@ -125,6 +126,9 @@ export const cityRouter = router({
             }
           : {}),
         ...cityInfo(city, activeViewer, alliedResidence),
+        ...(city.seasonalEvent && (full || city.nationId === null)
+          ? { seasonalEvent: citySeasonalEventInfo(city.seasonalEvent) }
+          : {}),
         ...(marketWorld
           ? {
               riceMarket: {

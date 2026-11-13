@@ -35,6 +35,7 @@ import {
   assertNationLifecycle,
   OFFICE_EFFECTS_FEATURE,
   officeEffectsSchema,
+  storedCitySeasonalEvent,
 } from '@opensamguk/rules';
 import { z } from 'zod';
 import { worldResolver } from './resolver';
@@ -108,7 +109,7 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
     ...(ext ? { ext } : {}),
     startYear: world.startYear,
     cities: attachOperationalKinds(
-      cities,
+      cities.map(({ seasonalEvent, ...city }) => ({ ...city, ...storedCitySeasonalEvent(seasonalEvent) })),
       readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin),
     ),
     nations: nations.map(({ diplomaticAidUntilMonth, ...nation }) => ({

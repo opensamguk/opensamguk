@@ -121,7 +121,10 @@ export async function persistMonthly(
   for (const city of Object.values(next.cities)) {
     const old = before.cities[city.cityKey]!;
     if (JSON.stringify(city) !== JSON.stringify(old)) {
-      await tx.city.update({ where: { worldId_cityKey: { worldId, cityKey: city.cityKey } }, data: city });
+      await tx.city.update({
+        where: { worldId_cityKey: { worldId, cityKey: city.cityKey } },
+        data: { ...city, ...(old.seasonalEvent ? { seasonalEvent: city.seasonalEvent ?? null } : {}) },
+      });
     }
   }
   for (const nation of Object.values(next.nations)) {
@@ -151,6 +154,19 @@ export async function persistMonthly(
         sequence,
         ordinal,
         commandKey: 'office.residence',
+        kind: 'success',
+      })),
+    });
+  }
+  if (result.seasonalEventLogs.length) {
+    await tx.generalLog.createMany({
+      data: result.seasonalEventLogs.map((log, index) => ({
+        ...log,
+        worldId,
+        tick,
+        sequence,
+        ordinal: result.officeTaxLogs.length + index,
+        commandKey: 'city.seasonal-event',
         kind: 'success',
       })),
     });
