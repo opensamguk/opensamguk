@@ -6,6 +6,7 @@ export interface HeritageIdentity {
 export interface HeritageSnapshot {
   authenticated: boolean;
   balance: number;
+  activeWorlds: { worldId: string; worldName: string; activityMonths: number }[];
   entries: {
     id: string;
     kind: string;

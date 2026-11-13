@@ -34,6 +34,14 @@ export async function readHeritageMine(store: HeritageReadStore, identity: Herit
     perGeneral: HERITAGE_V1.perGeneral,
     perSeason: HERITAGE_V1.perSeason,
     activityMonths: [...HERITAGE_V1.activityMonths],
+    activeWorlds: snapshot.activeWorlds.map((world) => {
+      const next = HERITAGE_V1.activityMonths.find((threshold) => threshold > world.activityMonths);
+      return {
+        ...world,
+        activityPoints: HERITAGE_V1.activityMonths.filter((threshold) => threshold <= world.activityMonths).length,
+        monthsToNextPoint: next === undefined ? null : next - world.activityMonths,
+      };
+    }),
     winPoints: HERITAGE_V1.winPoints,
     entries: snapshot.entries.map((entry) => ({
       id: entry.id,
