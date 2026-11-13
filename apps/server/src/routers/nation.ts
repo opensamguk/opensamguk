@@ -1,8 +1,8 @@
 import { TRPCError } from '@trpc/server';
-import { OFFICE_EFFECTS_FEATURE, TICKS_PER_MONTH, WANDERING_MONTH_LIMIT } from '@opensamguk/rules';
+import { INTEL_FEATURE, OFFICE_EFFECTS_FEATURE, TICKS_PER_MONTH, WANDERING_MONTH_LIMIT } from '@opensamguk/rules';
 import { protectedProcedure, router } from '../trpc';
 import { entityKey, readWorld, viewerGeneral, worldInput } from '../queries';
-import { cityInfo, garrisonGeneralInfo, mapCity, nationInfo, visibility } from '../visibility';
+import { cityCapacity, cityInfo, garrisonGeneralInfo, mapCity, nationInfo, visibility } from '../visibility';
 import { readView } from '../game/queries';
 import { nationPopulation, projectNationFinance, salaryRate } from '../game/nationFinance';
 
@@ -14,6 +14,7 @@ export const nationRouter = router({
         where: { worldId_id: { worldId: input.worldId, id: input.nationId } },
       });
       if (!nation) throw new TRPCError({ code: 'NOT_FOUND', message: '국가를 찾을 수 없습니다.' });
+      const openRoster = !world.ruleFeatures.includes(INTEL_FEATURE);
       const ownNation = visibility(viewer).nation(nation);
       const cities = await tx.city.findMany({
         where: input,
@@ -55,11 +56,13 @@ export const nationRouter = router({
         ...(ownNation ? { salaryRate } : {}),
         ...(finance ? { financeEstimate: finance.financeEstimate } : {}),
         cities: cities.map((city) => {
-          if (!ownNation) return mapCity(city);
+          if (!ownNation) return { ...mapCity(city), ...cityCapacity(city) };
           const incomeEstimate = finance?.cityIncome.get(city.cityKey);
           return { ...cityInfo(city, viewer), ...(incomeEstimate ? { incomeEstimate } : {}) };
         }),
-        generals: generals.map((general) => garrisonGeneralInfo(general, viewer, units)),
+        generals: generals.map((general) =>
+          garrisonGeneralInfo(general, viewer, units, { stats: openRoster, biography: openRoster }),
+        ),
       };
     }),
   ),
