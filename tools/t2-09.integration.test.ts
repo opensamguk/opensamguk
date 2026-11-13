@@ -207,6 +207,7 @@ describe('T2-09 실제 HTTP 메시지·공지 권한 대조', () => {
     'message.list': { worldId, scope: 'PRIVATE' },
     'message.send': { worldId, scope: 'PRIVATE', toGeneralId: 2, body: '권한 시험' },
     'message.markRead': { worldId, ids: [randomUUID()] },
+    'message.retract': { worldId, id: randomUUID() },
     'message.unread': actorInput(),
     'message.recipients': actorInput(),
     'notice.nation.get': actorInput(),
@@ -221,8 +222,18 @@ describe('T2-09 실제 HTTP 메시지·공지 권한 대조', () => {
         authzCase(path, category, async () => {
           if (category === 'sanctioned')
             await db.user.update({ where: { id: users[0]!.id }, data: { status: 'SANCTIONED' } });
-          const input =
+          let input: unknown =
             category === 'invalidInput' ? { unexpected: true } : inputs()[path as keyof ReturnType<typeof inputs>];
+          if (path === 'message.retract' && category === 'success') {
+            const sent = await call<Outputs['message']['send']>('message.send', {
+              worldId,
+              scope: 'PRIVATE',
+              toGeneralId: 2,
+              body: '삭제 권한 시험',
+            });
+            expect(sent.status).toBe(200);
+            input = { worldId, id: sent.data!.item.id };
+          }
           const result = await call(
             path,
             input,
