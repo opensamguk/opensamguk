@@ -25,7 +25,7 @@ import { generalsByCity, type MapGeneral } from './mapGeneralList';
 import styles from './OperationalWorldMap.module.css';
 
 type MapData = PublicGeography;
-type DrawnCity = Pick<MapCity, 'key' | 'name' | 'kind' | 'x' | 'y' | 'nationId' | 'ruin'> & {
+type DrawnCity = Pick<MapCity, 'key' | 'name' | 'kind' | 'x' | 'y' | 'nationId' | 'ruin' | 'events'> & {
   // 지역 이름 (world.map regionName, INT-26). 영토 재생처럼 지역을 받지 않는 지도는 없다.
   regionName?: string | null | undefined;
   supplied?: boolean;
@@ -610,6 +610,7 @@ export function OperationalWorldMap({
             parent ? `${parent.name} 소속` : null,
             mine ? '내 위치' : null,
             city?.ruin ? `폐허 복구 ${city.ruin.percent}%` : null,
+            ...(city?.events?.map(({ name }) => name) ?? []),
             city?.supplied === false && city.nationId !== null ? '보급 끊김' : null,
             // 풍선(aria-hidden)의 장수 얼굴·이름과 같은 정보를 장수 수로 읽게 한다.
             city && generalsAt.get(city.key) ? `장수 ${generalsAt.get(city.key)!.length}명` : null,
@@ -685,6 +686,17 @@ export function OperationalWorldMap({
               {selected && (
                 <circle cx={site.position.x} cy={site.position.y} r={radius + 4} className={styles.selected} />
               )}
+              {city?.events?.[0] ? (
+                <circle
+                  cx={site.position.x}
+                  cy={site.position.y}
+                  r={radius + 2}
+                  fill="none"
+                  stroke={city.events[0].favorable ? 'var(--color-info)' : 'var(--color-danger)'}
+                  strokeWidth={2}
+                  data-city-event={city.events[0].kind}
+                />
+              ) : null}
               <g data-testid={`site-icon-${site.kind.toLowerCase()}`}>
                 <MapSiteMarker
                   x={site.position.x}

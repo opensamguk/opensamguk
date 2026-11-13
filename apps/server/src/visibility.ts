@@ -28,7 +28,9 @@ type General = Omit<
   | 'removedAt'
   | 'officerCityKey'
 > & { politics?: number | null; charm?: number | null };
-type City = Omit<Prisma.CityGetPayload<true>, 'kind' | 'seasonalEvent'> & { kind?: string | null };
+type City = Omit<Prisma.CityGetPayload<true>, 'kind' | 'seasonalEvent' | 'conflictTick' | 'stratagemTick'> & {
+  kind?: string | null;
+};
 type Nation = Omit<
   Prisma.NationGetPayload<true>,
   'notice' | 'noticeDirective' | 'noticeRevision' | 'noticeUpdatedAt' | 'noticeUpdatedBy' | 'diplomaticAidUntilMonth'

@@ -147,6 +147,18 @@ export async function persistCommandReports(
   attackerId: number,
   result: CommandResult,
 ) {
+  if (result.attackTarget) {
+    await tx.city.update({
+      where: { worldId_cityKey: { worldId, cityKey: result.attackTarget.cityKey } },
+      data: { conflictTick: tick },
+    });
+  }
+  if (result.stratagemCityKey !== undefined) {
+    await tx.city.update({
+      where: { worldId_cityKey: { worldId, cityKey: result.stratagemCityKey } },
+      data: { stratagemTick: tick },
+    });
+  }
   if (result.stratagemSucceeded) {
     await tx.general.update({
       where: { worldId_id: { worldId, id: attackerId } },

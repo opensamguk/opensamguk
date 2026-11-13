@@ -21,6 +21,7 @@ import {
 import { readCityScaleProjection } from '../game/cityScale';
 import { readCityIntel } from '../game/fog';
 import { cityDefense } from '../game/defenseRead';
+import { cityEvents } from '../game/cityEvents';
 
 export const cityRouter = router({
   get: protectedProcedure.input(worldInput.extend({ cityKey: entityKey }).strict()).query(({ ctx, input }) =>
@@ -54,6 +55,9 @@ export const cityRouter = router({
         activeViewer.officerLevel > 0 &&
         generals.some((resident) => resident.nationId === nationId);
       const full = alliedResidence || visibility(activeViewer).city(city);
+      const eventTick =
+        world.status === 'ENDED' ? (world.result?.endedTick ?? world.clockTick) : nowTick(worldClock(world), ctx.now);
+      const events = full || city.nationId === null ? cityEvents(city, eventTick) : [];
       const adjacent =
         !garrisonHidden &&
         !full &&
@@ -126,8 +130,11 @@ export const cityRouter = router({
             }
           : {}),
         ...cityInfo(city, activeViewer, alliedResidence),
-        ...(city.seasonalEvent && (full || city.nationId === null)
-          ? { seasonalEvent: citySeasonalEventInfo(city.seasonalEvent) }
+        ...(events.length
+          ? {
+              events,
+              ...(city.seasonalEvent ? { seasonalEvent: citySeasonalEventInfo(city.seasonalEvent) } : {}),
+            }
           : {}),
         ...(marketWorld
           ? {
