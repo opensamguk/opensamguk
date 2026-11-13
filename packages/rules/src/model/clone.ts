@@ -13,8 +13,12 @@ export function cloneWorldWithRegistry(view: WorldView, registry: ExtStateRegist
   const nations: WorldState['nations'] = {};
   const generals: WorldState['generals'] = {};
   for (const key in view.cities) {
-    const city = view.cities[key]!;
-    cities[key] = { ...city, connections: [...city.connections] };
+    const { conflictOrder, ...city } = view.cities[key]!;
+    cities[key] = {
+      ...city,
+      connections: [...city.connections],
+      ...(conflictOrder ? { conflictOrder: [...conflictOrder] } : {}),
+    };
   }
   for (const key in view.nations) {
     const { npcSettings, ...nation } = view.nations[key]!;

@@ -459,7 +459,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
       const cities = await tx.city.findMany({
         where: { worldId },
         orderBy: { cityKey: 'asc' },
-        omit: { conflictTick: true, stratagemTick: true, warCasualties: true, conflict: true },
+        omit: { conflictTick: true, stratagemTick: true, warCasualties: true, conflict: true, conflictOrder: true },
       });
       const nations = await tx.nation.findMany({
         where: { worldId },

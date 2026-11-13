@@ -401,6 +401,7 @@ model City {
   seasonalEvent    String?
   warCasualties    Int?
   conflict         Json?
+  conflictOrder    Json?
   worldId          String
   cityKey          Int
   kind             String?

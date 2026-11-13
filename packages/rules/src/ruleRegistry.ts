@@ -1,6 +1,6 @@
 import { BATTLE_TACTICS_FEATURE } from './battle/tactics';
 import { WAR_INCOME_FEATURE } from './monthly/warIncome';
-import { CITY_CONFLICT_FEATURE } from './battle/cityConflict';
+import { CITY_CONFLICT_AWARD_FEATURE, CITY_CONFLICT_FEATURE } from './battle/cityConflict';
 import { MILITARY_STAT_GROWTH_FEATURE, STAT_GROWTH_FEATURE } from './general/statGrowth';
 import {
   applyFinanceRates,
@@ -197,6 +197,7 @@ export const ruleRegistry: RuleRegistry = {
     { key: WALL_INCOME_FEATURE, requires: [], conflicts: [] },
     { key: WAR_INCOME_FEATURE, requires: [], conflicts: [] },
     { key: CITY_CONFLICT_FEATURE, requires: [], conflicts: [] },
+    { key: CITY_CONFLICT_AWARD_FEATURE, requires: [CITY_CONFLICT_FEATURE], conflicts: [] },
     { key: STAT_GROWTH_FEATURE, requires: [], conflicts: [] },
     { key: MILITARY_STAT_GROWTH_FEATURE, requires: [STAT_GROWTH_FEATURE], conflicts: [] },
     { key: DEFENSE_STANCE_FEATURE, requires: [], conflicts: [] },

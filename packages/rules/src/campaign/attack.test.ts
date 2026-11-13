@@ -5,6 +5,7 @@ import { emptyCityResourcesState } from '../cityResources/state';
 import { applyEffects } from '../commands/effects';
 import { deepFreeze } from '../personnel/testFixture';
 import { campaignAttack, campaignDefenders } from './attack';
+import { CITY_CONFLICT_AWARD_FEATURE, CITY_CONFLICT_FEATURE } from '../battle/cityConflict';
 import { DEFENSE_STANCE_FEATURE } from '../battle/defenders';
 import { emptyCampaignState } from './state';
 
@@ -171,4 +172,17 @@ describe('AC-INT-09 부곡 출병·점령', () => {
     expect(state.generals[1]!.rice).toBe(world.generals[1]!.rice - 90);
     expect(state.campaign!.revision).toBe(1);
   });
+});
+
+it('부곡이 성벽을 무너뜨려도 공성 기여가 큰 국가가 도시를 받는다', () => {
+  const world = fixture();
+  world.ruleFeatures!.push(CITY_CONFLICT_FEATURE, CITY_CONFLICT_AWARD_FEATURE);
+  world.nations[3] = { ...world.nations[2]!, id: 3, name: '국가3', capitalCityKey: 3 };
+  world.cities[3]!.nationId = 3;
+  world.cities[2]!.conflict = { 3: 100, 99: 1000 };
+  world.cities[2]!.conflictOrder = [99, 3];
+  const { result, state } = run(world);
+  expect(state.cities[2]).toMatchObject({ nationId: 3, conflict: {}, conflictOrder: [] });
+  expect(state.generals[1]!.cityKey).toBe(1);
+  expect(result.history).toContainEqual({ nationId: 3, text: expect.stringContaining('국가3에 양도') });
 });

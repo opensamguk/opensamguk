@@ -1,5 +1,5 @@
 import { BATTLE_TACTICS_FEATURE } from '../packages/rules/src/battle/tactics';
-import { CITY_CONFLICT_FEATURE } from '../packages/rules/src/battle/cityConflict';
+import { CITY_CONFLICT_AWARD_FEATURE, CITY_CONFLICT_FEATURE } from '../packages/rules/src/battle/cityConflict';
 import { MILITARY_STAT_GROWTH_FEATURE, STAT_GROWTH_FEATURE } from '../packages/rules/src/general/statGrowth';
 import { WAR_INCOME_FEATURE } from '../packages/rules/src/monthly/warIncome';
 import { TROOP_FEATURE } from '../packages/rules/src/commands/ext/troop/state';
@@ -1432,6 +1432,47 @@ it('실제 출병의 전투계략과 단기 수입을 월말에 재생한다', a
     before.gold + estimate.gold.net + estimate.warIncome,
   );
   expect(await db.city.count({ where: { worldId, warCasualties: { gt: 0 } } })).toBe(0);
+  const archive = await exportReplay(db, worldId);
+  expect(replayArchive(archive, 1)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
+});
+
+it('동률인 공성 기여의 순위대로 도시를 양도하고 월말 해시를 재생한다', async () => {
+  const alice = await user();
+  const initial = commandInitial();
+  initial.cities[1] = { ...initial.cities[1]!, wall: 1, conflict: { 1: 10, 3: 11.05 }, conflictOrder: [3, 1] };
+  initial.cities[2]!.nationId = 3;
+  initial.nations.push({ ...initial.nations[1]!, id: 3, name: '국가3', capitalCityKey: 3 });
+  initial.generals[0]!.userId = alice.id;
+  for (const general of initial.generals.slice(1)) general.nextTurnTick = 100000;
+  const { worldId } = await saveInitialWorld(db, initial, {
+    name: '공성 양도 실제 PG',
+    turnTermMinutes: 30,
+    endYear: null,
+    replayFormat: 3,
+    ruleFeatures: [CITY_CONFLICT_AWARD_FEATURE, CITY_CONFLICT_FEATURE],
+  });
+  worlds.push(worldId);
+  await db.world.update({ where: { id: worldId }, data: { status: 'RUNNING', clockAnchorAt: new Date(now) } });
+  const lease = await acquireLease(db, worldId);
+  if (!lease) throw new Error('시험 실행권이 없습니다.');
+  leases.push(lease);
+  const loop = new TurnLoop(db, lease);
+  const slots = Array.from({ length: 30 }, (_, slot) =>
+    slot === 0 ? { commandKey: 'attack', args: { cityKey: 2 } } : null,
+  );
+  expect((await rpc('turns.set', { worldId, revision: 0, slots }, alice.cookie, true)).data).toMatchObject({
+    ok: true,
+  });
+  await loop.advanceTo(100);
+  expect(await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId, cityKey: 2 } } })).toMatchObject({
+    nationId: 3,
+    conflict: {},
+    conflictOrder: [],
+  });
+  expect(await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } })).toMatchObject({
+    cityKey: 1,
+  });
+  await loop.advanceTo(10000);
   const archive = await exportReplay(db, worldId);
   expect(replayArchive(archive, 1)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
 });

@@ -197,7 +197,7 @@ export const worldRouter = router({
           ? {
               conflicts: cities.flatMap((city) => {
                 if (fogEnabled && city.nationId !== null && city.nationId !== ownNation) return [];
-                const shares = publicCityConflict(city.conflict, nationNames);
+                const shares = publicCityConflict(city.conflict, nationNames, city.conflictOrder);
                 return shares.length ? [{ cityKey: city.cityKey, cityName: city.name, shares }] : [];
               }),
             }

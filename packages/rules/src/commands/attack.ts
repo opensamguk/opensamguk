@@ -14,7 +14,7 @@ import { refreshSupply } from '../supply';
 import { defineCommand, fail, positive, relation, removeNation, success } from './support';
 import { collectModifiers, collectModifiersWith, type ModifierProvider } from '../modifiers';
 import { recordWarCasualties } from '../monthly/warIncome';
-import { recordSiegeContribution } from '../battle/cityConflict';
+import { recordSiegeContribution, settleCityConflict } from '../battle/cityConflict';
 
 type Force = Pick<InitialGeneral, 'crew' | 'crewType' | 'train' | 'atmos' | 'rice'>;
 function feed(force: Force) {
@@ -215,12 +215,11 @@ function makeAttack(collect: typeof collectModifiers) {
       const history: { nationId: number; text: string }[] = [];
       if (captured) {
         battleAwards.push({ generalId: g.id, wins: 0, captures: 1 });
-        city.nationId = attackingNation;
-        if (city.conflict) city.conflict = {};
+        city.nationId = settleCityConflict(state, city, attackingNation, history);
         city.defence = 0;
         city.security = Math.round(city.security * BALANCE.CAPTURE_SECURITY_FACTOR);
         city.trust = Math.max(0, city.trust - BALANCE.CAPTURE_TRUST_LOSS);
-        g.cityKey = city.cityKey;
+        if (city.nationId === attackingNation) g.cityKey = city.cityKey;
         let relocated: { nationId: number; text: string } | undefined;
         if (defendingNation !== null) {
           const nation = state.nations[defendingNation]!;

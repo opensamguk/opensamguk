@@ -21,6 +21,7 @@ import { appliesOperationalOpening, LEGACY_OPENING_CITY_PROFILE, legacyOpeningCi
 
 export interface InitialCity {
   conflict?: Record<string, number>;
+  conflictOrder?: number[];
   warCasualties?: number | null;
   seasonalEvent?: string | null;
   kind?: 'CITY' | 'PASS';

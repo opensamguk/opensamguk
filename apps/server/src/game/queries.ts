@@ -131,10 +131,10 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
     ...(ext ? { ext } : {}),
     startYear: world.startYear,
     cities: attachOperationalKinds(
-      cities.map(({ seasonalEvent, conflict, warCasualties, ...city }) => ({
+      cities.map(({ seasonalEvent, conflict, conflictOrder, warCasualties, ...city }) => ({
         ...city,
         ...storedCitySeasonalEvent(seasonalEvent),
-        ...storedCityConflict(conflict),
+        ...storedCityConflict(conflict, conflictOrder),
         ...(warCasualties == null ? {} : { warCasualties }),
       })),
       readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin),
