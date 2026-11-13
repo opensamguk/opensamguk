@@ -5,6 +5,8 @@ import { ADMIN_RESET_KIND } from '../clock/reset';
 import { ADMIN_GAME_KINDS } from '../admin/game';
 import { ADMIN_SETTING_KINDS } from '../admin/settings';
 import { HERITAGE_SPECIALTY_KIND } from './specialty';
+import { HERITAGE_STAT_RESET_KIND } from './statReset';
+import { HERITAGE_TURN_TIME_KIND } from './turnTime';
 import { HERITAGE_BENEFIT_KIND } from './benefits';
 import { TROOP_ACTION_KIND } from '../commands/ext/troop/actions';
 import { DEFENSE_STANCE_KIND } from '../battle/defenders';
@@ -41,6 +43,8 @@ export const HERITAGE_IGNORED_INPUT_KINDS = [
   TROOP_ACTION_KIND,
   HERITAGE_BENEFIT_KIND,
   HERITAGE_SPECIALTY_KIND,
+  HERITAGE_STAT_RESET_KIND,
+  HERITAGE_TURN_TIME_KIND,
   NPC_NATION_POLICY_KIND,
   NATION_RESTRICTIONS_KIND,
   NATION_FINANCE_KIND,
