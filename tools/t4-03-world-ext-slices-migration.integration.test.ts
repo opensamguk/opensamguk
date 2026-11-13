@@ -178,14 +178,16 @@ async function existingRows(client: PgClient) {
       throw new Error('잘못된 시험 표 이름입니다.');
     const data =
       table === 'World'
-        ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat' - 'replayFormat' - 'ruleFeatures' - 'operationalMap' - 'campaignState' - 'cityResourcesState' - 'logisticsState' - 'governanceState' - 'lineageState' - 'stratagemCardsState' - 'equipmentState' - 'runtimeOptions' - 'cityRuinsState' - 'nationStrategyState' - 'nationLifecycleState' - 'preparedTurnsState' - 'nationResearchState' - 'officeEffects'"
+        ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat' - 'replayFormat' - 'ruleFeatures' - 'operationalMap' - 'campaignState' - 'cityResourcesState' - 'logisticsState' - 'governanceState' - 'lineageState' - 'stratagemCardsState' - 'equipmentState' - 'runtimeOptions' - 'cityRuinsState' - 'nationStrategyState' - 'nationLifecycleState' - 'preparedTurnsState' - 'nationResearchState' - 'officeEffects' - 'cityOfficeVolunteers'"
         : table === 'Nation'
-          ? "to_jsonb(t) - 'noticeDirective' - 'diplomaticAidUntilMonth' - 'recruitmentNotice'"
+          ? "to_jsonb(t) - 'noticeDirective' - 'diplomaticAidUntilMonth' - 'recruitmentNotice' - 'financeRates' - 'npcSettings' - 'restrictions'"
           : table === 'City'
-            ? "to_jsonb(t) - 'kind' - 'seasonalEvent' - 'conflictTick' - 'stratagemTick'"
+            ? "to_jsonb(t) - 'kind' - 'seasonalEvent' - 'conflictTick' - 'stratagemTick' - 'conflict' - 'conflictOrder' - 'warCasualties'"
             : table === 'General'
-              ? "to_jsonb(t) - 'residenceTick' - 'politics' - 'charm' - 'sex' - 'removedAt' - 'officerCityKey' - 'stratagemSuccesses' - 'nationJoinedTick'"
-              : "to_jsonb(t) - 'treatyFormat'";
+              ? "to_jsonb(t) - 'residenceTick' - 'politics' - 'charm' - 'sex' - 'removedAt' - 'officerCityKey' - 'stratagemSuccesses' - 'nationJoinedTick' - 'combatSpecial' - 'defenseThreshold' - 'heritageBenefits' - 'heritageSpecialty' - 'proficiency' - 'statExperience'"
+              : table === 'YearbookSnapshot'
+                ? "to_jsonb(t) - 'activeGenerals'"
+                : "to_jsonb(t) - 'treatyFormat'";
     rows[table] = (await client.query(`SELECT ${data} AS data FROM "${table}" t ORDER BY to_jsonb(t)::text`)).rows;
   }
   return rows;
