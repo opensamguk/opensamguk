@@ -12,6 +12,8 @@ import type { CommandResolver } from '../commands/resolve';
 import { readCampaignState } from '../campaign/state';
 import { cityNpcAllocations, cityNpcPreparation } from '../cityResources/npc';
 import { frontier } from './frontier';
+import { NPC_DEFAULT_POLICY } from './policy';
+export { NPC_DEFAULT_POLICY } from './policy';
 import { crewContext, crewTypeFailure } from '../world/crewRequirements';
 import { nationStrategyNpcCandidates } from '../nationStrategy/npc';
 
@@ -172,7 +174,7 @@ export function generalTurnCandidates(view: WorldView, general: General, context
       ? campaign.units.filter((unit) => unit.commanderId === commander.id).reduce((sum, unit) => sum + unit.troops, 0)
       : general.crew;
     const capacity = commander.leadership * BALANCE.CREW_PER_LEADERSHIP;
-    const minimum = Math.min(capacity, 2000);
+    const minimum = Math.min(capacity, NPC_DEFAULT_POLICY.recruitTarget);
     const requirements = crewContext(view, { generalId: general.id, tick: context.tick ?? 0 });
     const preferred = context.unitSet?.crewTypes.find((u) => u.id === crewType && u.armType > 0);
     const unit =
@@ -199,14 +201,14 @@ export function generalTurnCandidates(view: WorldView, general: General, context
           '전선에서 부족한 병력을 모은다.',
         );
     }
-    if (!cityResources && train < 60)
+    if (!cityResources && train < NPC_DEFAULT_POLICY.trainingTarget)
       choice.add(
         'train',
         army ? { unitId: army.id } : {},
         100 + (stats ? (drillGain(view, commander, false) - 10) * 10 : 0),
         '출병 전에 병력을 훈련한다.',
       );
-    if (!cityResources && atmos < 70)
+    if (!cityResources && atmos < NPC_DEFAULT_POLICY.moraleTarget)
       choice.add(
         'morale',
         army ? { unitId: army.id } : {},
@@ -279,7 +281,8 @@ export function chooseNationTurn(view: WorldView, ruler: General, rng: Rng, cont
         choice.add('nation_declare', { nationId: id }, 100, '교전국이 없어 접경 국가에 선전포고한다.');
     }
   }
-  if (nation.gold >= 10000) {
+  const rewardGoldTarget = NPC_DEFAULT_POLICY.rewardGoldTarget;
+  if (nation.gold >= rewardGoldTarget) {
     const members = Object.values(view.generals).filter(
       (g) =>
         g.removedAt === undefined &&
@@ -287,10 +290,10 @@ export function chooseNationTurn(view: WorldView, ruler: General, rng: Rng, cont
         g.activeFromYear <= view.startYear + Math.floor((context.tick ?? 0) / (12 * TICKS_PER_MONTH)),
     );
     const poorest = members.sort((a, b) => a.gold - b.gold || a.id - b.id)[0];
-    if (poorest && poorest.gold < 10000)
+    if (poorest && poorest.gold < rewardGoldTarget)
       choice.add(
         'nation_reward',
-        { generalId: poorest.id, resource: 'gold', amount: Math.min(10000 - poorest.gold, nation.gold) },
+        { generalId: poorest.id, resource: 'gold', amount: Math.min(rewardGoldTarget - poorest.gold, nation.gold) },
         50,
         '국고의 금을 자원이 부족한 장수에게 포상한다.',
       );

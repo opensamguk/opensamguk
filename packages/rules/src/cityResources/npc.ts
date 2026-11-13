@@ -2,6 +2,7 @@ import { BALANCE } from '../balance';
 import { affordableRecruits } from '../commands/statScores';
 import type { DeepReadonly, WorldState, WorldView } from '../model/world';
 import type { NpcCandidate, NpcContext } from '../npc';
+import { NPC_DEFAULT_POLICY } from '../npc/policy';
 import { readCampaignState } from '../campaign/state';
 import { readCityResourcesState } from './state';
 import { affordableByGoods } from '../logistics/consumption';
@@ -47,7 +48,7 @@ export function cityNpcRecruitPlan(
     type,
     row,
     recruitable: crewTypeFailure(type, requirements) === null,
-    limit: Math.max(0, Math.min(2000 - (row?.troops ?? 0), city.population)),
+    limit: Math.max(0, Math.min(NPC_DEFAULT_POLICY.recruitTarget - (row?.troops ?? 0), city.population)),
   };
 }
 
@@ -65,16 +66,16 @@ export function cityNpcPreparation(view: WorldView, generalId: number, context: 
   if (recruitable && !army && general.leadership > 0 && row?.troops)
     choices.push(candidate('form_unit', { crewType: type.id }, 180, '도시 병력을 배속할 빈 부곡을 편성한다.'));
   if (row?.troops) {
-    if (row.atmos < 70)
+    if (row.atmos < NPC_DEFAULT_POLICY.moraleTarget)
       choices.push(
         candidate('morale', { target: 'city', crewType: type.id }, 170, '배속·수비 전에 도시 병사의 사기를 높인다.'),
       );
-    else if (row.train < 60)
+    else if (row.train < NPC_DEFAULT_POLICY.trainingTarget)
       choices.push(
         candidate('train', { target: 'city', crewType: type.id }, 160, '배속·수비 전에 도시 병사를 훈련한다.'),
       );
   }
-  if (recruitable && (row?.troops ?? 0) < 2000) {
+  if (recruitable && (row?.troops ?? 0) < NPC_DEFAULT_POLICY.recruitTarget) {
     let amount = affordableRecruits(view, { ...general, gold: resources.gold }, type.cost, limit);
     if (view.ruleFeatures?.includes('logistics-v1')) {
       const logistics = view.logistics,
@@ -89,8 +90,10 @@ export function cityNpcPreparation(view: WorldView, generalId: number, context: 
       );
   }
   if (army && army.troops > 0) {
-    if (army.atmos < 70) choices.push(candidate('morale', { unitId: army.id }, 175, '출병할 부곡의 사기를 회복한다.'));
-    else if (army.train < 60) choices.push(candidate('train', { unitId: army.id }, 165, '출병할 부곡을 훈련한다.'));
+    if (army.atmos < NPC_DEFAULT_POLICY.moraleTarget)
+      choices.push(candidate('morale', { unitId: army.id }, 175, '출병할 부곡의 사기를 회복한다.'));
+    else if (army.train < NPC_DEFAULT_POLICY.trainingTarget)
+      choices.push(candidate('train', { unitId: army.id }, 165, '출병할 부곡을 훈련한다.'));
   }
   return choices;
 }
@@ -106,12 +109,16 @@ export function cityNpcAllocations(view: WorldView, nationId: number): NpcCandid
     const city = view.cities[owner.cityKey]!;
     if (city.nationId !== nationId) continue;
     const row = ledger.cities[String(city.cityKey)]!.garrison.find((entry) => entry.crewType === unit.crewType);
-    if (!row || row.train < 60 || row.atmos < 70) continue;
+    if (!row || row.train < NPC_DEFAULT_POLICY.trainingTarget || row.atmos < NPC_DEFAULT_POLICY.moraleTarget) continue;
     const capacity = commander.leadership * BALANCE.CREW_PER_LEADERSHIP;
     const commanded = campaign.units
       .filter((entry) => entry.commanderId === commander.id)
       .reduce((sum, entry) => sum + entry.troops, 0);
-    const amount = Math.min(row.troops, Math.min(capacity, 2000) - unit.troops, capacity - commanded);
+    const amount = Math.min(
+      row.troops,
+      Math.min(capacity, NPC_DEFAULT_POLICY.recruitTarget) - unit.troops,
+      capacity - commanded,
+    );
     if (amount > 0)
       choices.push(
         candidate(
