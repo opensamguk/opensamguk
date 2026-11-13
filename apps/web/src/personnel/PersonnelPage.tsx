@@ -305,7 +305,12 @@ function memberColumns(
       ),
     },
     { key: 'title', label: '직책', sortValue: (m) => m.officerLevel, render: (m) => m.title },
-    { key: 'city', label: '도시', sortValue: (m) => m.city.name, render: (m) => (cityCell ? cityCell(m) : m.city.name) },
+    {
+      key: 'city',
+      label: '도시',
+      sortValue: (m) => m.city.name,
+      render: (m) => (cityCell ? cityCell(m) : m.city.name),
+    },
     ...stats,
     {
       key: 'troops',
