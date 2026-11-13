@@ -121,6 +121,22 @@ function SeasonGenerals({ winnerNationId }: { winnerNationId: number | null }) {
           />
         </details>
       ) : null}
+      {query.data?.nations?.length ? (
+        <details>
+          <summary>국가별 기록</summary>
+          <ul>
+            {query.data.nations.map((nation) => (
+              <li key={nation.nationId}>
+                <NationBadge name={nation.name} color={nation.color} />
+                {' · '}종료 장수 {n(nation.finalGenerals)}
+                {nation.peakCities === null ? '' : ` · 월간 최대 영토 ${n(nation.peakCities)}`}
+                {nation.peakPower === null ? '' : ` · 월간 최고 국력 ${n(nation.peakPower)}`}
+                {nation.cities.length ? <p>{nation.cities.map(({ name }) => name).join(' · ')}</p> : null}
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
       {winner && (
         <>
           <h3>통일 국가 현황</h3>
