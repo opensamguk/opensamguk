@@ -67,6 +67,15 @@ describe('주둔 병력 요약 줄', () => {
     render(
       <GarrisonLine
         campaign={false}
+        defense={{
+          minimumTraining: 20,
+          minimumMorale: 20,
+          troops: 4000,
+          generals: [
+            { generalId: 1, troops: 3000 },
+            { generalId: 2, troops: 1000 },
+          ],
+        }}
         generals={[
           detailed(1, '가', { crew: 3000, train: 95, atmos: 92 }),
           detailed(2, '나', { crew: 1000, train: 70, atmos: 65 }),
@@ -80,6 +89,7 @@ describe('주둔 병력 요약 줄', () => {
     expect(line).toContain('아군 병력 4,000 · 병력 있는 장수 2명 / 아군 3명');
     expect(line).toContain('훈련·사기 90 이상 3,000명(1장수) · 60 이상 4,000명(2장수)');
     expect(line).toContain('타국 장수 1명 · 재야 1명');
+    expect(line).toContain('수비 참가 4,000명 · 장수 2명');
   });
 });
 
