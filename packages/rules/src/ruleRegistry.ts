@@ -4,6 +4,7 @@ import {
   NATION_FINANCE_FEATURE,
   NATION_FINANCE_KIND,
   RANKED_PAYROLL_FEATURE,
+  WALL_INCOME_FEATURE,
 } from './personnel/financeRates';
 import { applyHeritagePurchase, HERITAGE_BENEFIT_KIND, HERITAGE_BENEFITS_FEATURE } from './heritage/benefits';
 import { applyDefenseStance, DEFENSE_STANCE_FEATURE, DEFENSE_STANCE_KIND } from './battle/defenders';
@@ -190,6 +191,7 @@ export const ruleRegistry: RuleRegistry = {
     { key: NPC_NATION_POLICY_FEATURE, requires: [], conflicts: [] },
     { key: NATION_FINANCE_FEATURE, requires: [], conflicts: [] },
     { key: RANKED_PAYROLL_FEATURE, requires: [NATION_FINANCE_FEATURE], conflicts: [] },
+    { key: WALL_INCOME_FEATURE, requires: [], conflicts: [] },
     { key: DEFENSE_STANCE_FEATURE, requires: [], conflicts: [] },
     { key: PLAYER_AUTOPLAY_FEATURE, requires: ['policy'], conflicts: [] },
     { key: CITY_SEASONAL_EVENTS_FEATURE, requires: [], conflicts: [] },

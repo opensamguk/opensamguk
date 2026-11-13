@@ -9,7 +9,13 @@ import { readCampaignState } from '../campaign/state';
 import { residentOfficeBonuses, type OfficeBonuses } from '../personnel/residentOffice';
 import { applyCityResourceIncome } from '../cityResourceIncome';
 import { CITY_SEASONAL_EVENTS_FEATURE, settleCitySeasonalEvents } from './citySeasonalEvents';
-import { financeRates, rankedPayroll, RANKED_PAYROLL_FEATURE } from '../personnel/financeRates';
+import {
+  financeRates,
+  rankedPayroll,
+  RANKED_PAYROLL_FEATURE,
+  WALL_INCOME_FEATURE,
+  wallRiceIncome,
+} from '../personnel/financeRates';
 
 export const MONTHLY_STAGES = ['income', 'population', 'supply', 'diplomacy', 'yearbook'] as const;
 export interface NationSummary {
@@ -38,16 +44,24 @@ const generalsById = (state: WorldView) =>
     .sort((a, b) => a.id - b.id);
 const nationsById = (state: WorldView) => Object.values(state.nations).sort((a, b) => a.id - b.id);
 
+export type TaxCity = Parameters<typeof wallRiceIncome>[0] & {
+  cityKey: number;
+  commerce: number;
+  agriculture: number;
+  population: number;
+};
+
 export function estimateTaxIncome(
-  cities: readonly { cityKey: number; commerce: number; agriculture: number; population: number }[],
+  cities: readonly TaxCity[],
   memberCount: number,
   resource: 'gold' | 'rice',
   bonuses?: ReturnType<typeof residentOfficeBonuses>,
   incomeMultiplier = 1,
   rates = financeRates(),
   reserves = 0,
+  wallIncome?: { capitalCityKey: number | null; level: number },
 ) {
-  const gross = Math.round(
+  const tax = Math.round(
     incomeMultiplier *
       cities.reduce(
         (sum, city) =>
@@ -59,10 +73,34 @@ export function estimateTaxIncome(
         0,
       ),
   );
+  const wall =
+    resource === 'rice' && wallIncome
+      ? Math.round(
+          cities.reduce(
+            (sum, city) =>
+              sum +
+              wallRiceIncome(
+                city,
+                rates.taxRate,
+                incomeMultiplier,
+                1 + (bonuses?.get(city.cityKey)?.tax?.percent ?? 0) / 100,
+                city.cityKey === wallIncome.capitalCityKey ? wallIncome.level : 0,
+              ),
+            0,
+          ),
+        )
+      : 0;
+  const gross = tax + wall;
   const payrollBudget = Math.min(gross + reserves, Math.round(gross * rates.salaryRate));
   const perGeneral = memberCount ? Math.floor(payrollBudget / memberCount) : 0;
   const payroll = perGeneral * memberCount;
-  return { gross, perGeneral, payroll, net: gross - payroll };
+  return {
+    gross,
+    perGeneral,
+    payroll,
+    net: gross - payroll,
+    ...(wallIncome && resource === 'rice' ? { wallIncome: wall } : {}),
+  };
 }
 
 export function settleIncome(
@@ -89,6 +127,7 @@ export function settleIncome(
       multiplier,
       rates,
       reserves,
+      next.ruleFeatures?.includes(WALL_INCOME_FEATURE) ? nation : undefined,
     );
     if (next.ruleFeatures?.includes(RANKED_PAYROLL_FEATURE)) {
       const payments = rankedPayroll(members, rates.salaryRate, gross + reserves);

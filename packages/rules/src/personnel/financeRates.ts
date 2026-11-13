@@ -5,6 +5,31 @@ import type { RecordedInput, ReplayState } from '../replay';
 export const NATION_FINANCE_FEATURE = 'nation-finance-v1';
 export const NATION_FINANCE_KIND = 'nation.setFinanceRates';
 export const RANKED_PAYROLL_FEATURE = 'ranked-payroll-v1';
+export const WALL_INCOME_FEATURE = 'wall-income-v1';
+
+type WallIncomeCity = {
+  supplied: boolean;
+  defence: number;
+  wall: number;
+  wallMax: number;
+  security: number;
+  securityMax: number;
+};
+
+// core2026 c81d304, packages/logic/src/economy/nationIncome.ts. MIT (c) 2025 devsam.
+export function wallRiceIncome(
+  city: WallIncomeCity,
+  taxRate: number,
+  multiplier: number,
+  officeBonus: number,
+  capitalLevel: number,
+) {
+  if (!city.supplied) return 0;
+  const base = (city.defence * city.wall) / Math.max(1, city.wallMax) / 3;
+  const security = 1 + city.security / Math.max(1, city.securityMax) / 10;
+  const capital = capitalLevel > 0 ? 1 + 1 / (3 * capitalLevel) : 1;
+  return Math.round(base * security * capital * officeBonus * multiplier) * (taxRate / 0.2);
+}
 
 // core2026 c81d304, packages/logic/src/economy/nationIncome.ts. MIT (c) 2025 devsam.
 export function salaryByDedication(dedication: number) {

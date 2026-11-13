@@ -15,6 +15,7 @@ import {
   NATION_FINANCE_FEATURE,
   NATION_FINANCE_KIND,
   RANKED_PAYROLL_FEATURE,
+  WALL_INCOME_FEATURE,
 } from '../packages/rules/src/personnel/financeRates';
 import type { PolicyKey, PolicySlot } from '../packages/rules/src/policy';
 import { GENERAL_PROFICIENCY_FEATURE } from '../packages/rules/src/general/proficiency';
@@ -74,12 +75,14 @@ async function fixture(
     restrictions?: boolean;
     finance?: boolean;
     rankedPayroll?: boolean;
+    wallIncome?: boolean;
   } = {},
 ) {
   const alice = await user(),
     bob = await user();
   const initial = commandInitial();
   if (options.farmMax) initial.cities[0]!.agriculture = initial.cities[0]!.agricultureMax;
+  if (options.wallIncome) initial.cities[0]!.defence = 300;
   initial.generals = initial.generals.slice(0, 2).map((general, i) => ({
     ...general,
     userId: i ? (options.npc ? null : bob.id) : alice.id,
@@ -106,6 +109,7 @@ async function fixture(
                   : NATION_RESTRICTIONS_FEATURE,
             'policy',
             ...(options.rankedPayroll ? [RANKED_PAYROLL_FEATURE] : []),
+            ...(options.wallIncome ? [WALL_INCOME_FEATURE] : []),
           ],
         }
       : { replayFormat: 'policy' }),
@@ -677,6 +681,30 @@ it('국가 세율·지급률을 예산 예상과 실제 월말 정산에 적용�
     const archive = await exportReplay(db, f.worldId);
     expect(replayArchive(archive, 1)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
   })();
+});
+
+it('둔전 쌀이 도시·국가 전망과 실제 4월 월말 재생에 반영된다', async () => {
+  const f = await fixture({ finance: true, wallIncome: true });
+  await f.loop.advanceTo(39999);
+  const city = await rpc<{ incomeEstimate: { rice: { wallIncome: number } } }>(
+    'city.get',
+    { worldId: f.worldId, cityKey: 1 },
+    f.alice.cookie,
+  );
+  const nation = await rpc<{ financeEstimate: { rice: { wallIncome: number; net: number } } }>(
+    'nation.get',
+    { worldId: f.worldId, nationId: 1 },
+    f.alice.cookie,
+  );
+  const estimate = nation.data!.financeEstimate.rice;
+  expect(estimate.wallIncome).toBeGreaterThan(0);
+  expect(city.data!.incomeEstimate.rice.wallIncome).toBeGreaterThan(0);
+  const where = { worldId_id: { worldId: f.worldId, id: 1 } };
+  const before = await db.nation.findUniqueOrThrow({ where });
+  await f.loop.advanceTo(40000);
+  expect((await db.nation.findUniqueOrThrow({ where })).rice).toBe(before.rice + estimate.net);
+  const archive = await exportReplay(db, f.worldId);
+  expect(replayArchive(archive, 4)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
 });
 
 it('공헌도별 지급액을 장수에게 예고하고 같은 금액을 월말에 지급한다', async () => {
