@@ -19,6 +19,9 @@ type Results = {
   'city.get': Out['city']['get'];
   'nation.get': Out['nation']['get'];
   'treaty.relations': Out['treaty']['relations'];
+  'diplomaticDocuments.list': Out['diplomaticDocuments']['list'];
+  'diplomaticDocuments.send': Out['diplomaticDocuments']['send'];
+  'diplomaticDocuments.respond': Out['diplomaticDocuments']['respond'];
   'commands.recruitCandidates': Out['commands']['recruitCandidates'];
   'records.general': Out['records']['general'];
   'records.battles': Out['records']['battles'];
@@ -216,6 +219,53 @@ afterAll(async () => {
 });
 
 describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
+  it('외교 문서는 당사국에만 보이고 승인된 후속 문서가 기존 합의를 대체한다', async () => {
+    const world = await fixtureWorld('diplomatic-documents');
+    const changeOfficer = (index: number, nationId: number, officerLevel: number) =>
+      db.general.update({
+        where: { worldId_userId: { worldId: world, userId: users[index]!.id } },
+        data: { nationId, officerLevel },
+      });
+    await db.nation.create({
+      data: { ...state.nations[0]!, worldId: world, id: 3, capitalCityKey: null, name: '제삼국' },
+    });
+    await changeOfficer(0, 1, 12);
+    await changeOfficer(1, 2, 12);
+    await changeOfficer(2, 3, 12);
+    const payload = {
+      worldId: world,
+      requestId: randomUUID(),
+      toNationId: 2,
+      brief: '공동 방어 협의',
+      detail: '양국 외교부만 볼 본문',
+    };
+    const send = (input: typeof payload & { previousId?: number } = payload) =>
+      query('diplomaticDocuments.send', input, users[0]!.cookie, 'POST');
+    const list = (index: number) => query('diplomaticDocuments.list', { worldId: world }, users[index]!.cookie);
+    const respond = (id: number, action: 'accept' | 'decline' | 'withdraw', index = 1) =>
+      query('diplomaticDocuments.respond', { worldId: world, id, action }, users[index]!.cookie, 'POST');
+    const [sent, retry] = await Promise.all([send(), send()]);
+    expect(sent.status).toBe(200);
+    expect(retry.data).toEqual(sent.data);
+    expect((await send({ ...payload, brief: '다른 내용' })).status).toBe(409);
+    expect((await list(2)).data.items).toEqual([]);
+    expect((await respond(sent.data.id, 'accept', 2)).status).toBe(404);
+    await changeOfficer(1, 2, 1);
+    expect((await list(1)).data.items).toMatchObject([{ brief: payload.brief, detail: null }]);
+    expect((await respond(sent.data.id, 'accept')).status).toBe(403);
+    await changeOfficer(1, 2, 12);
+    expect((await list(1)).data.items).toMatchObject([{ detail: payload.detail }]);
+    expect((await respond(sent.data.id, 'accept')).data.status).toBe('ACTIVE');
+    const successor = { ...payload, previousId: sent.data.id, brief: '후속 문서' };
+    const rejected = await send({ ...successor, requestId: randomUUID() });
+    expect((await respond(rejected.data.id, 'decline')).data.status).toBe('CANCELLED');
+    expect((await list(1)).data.items.map(({ status }) => status)).toEqual(['CANCELLED', 'ACTIVE']);
+    const next = await send({ ...successor, requestId: randomUUID() });
+    expect(next.status).toBe(200);
+    expect((await send({ ...successor, requestId: randomUUID() })).status).toBe(409);
+    expect((await respond(next.data.id, 'accept')).data.status).toBe('ACTIVE');
+    expect((await list(0)).data.items.map(({ status }) => status)).toEqual(['ACTIVE', 'CANCELLED', 'REPLACED']);
+  });
   it('AC-INT-26 외교 관계표는 모든 국가 쌍과 공개 외교 상태만 반환한다', async () => {
     const world = await fixtureWorld('relations');
     await db.nation.create({

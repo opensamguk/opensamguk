@@ -52,6 +52,7 @@ model World {
   cities               City[]
   generals             General[]
   diplomacies          Diplomacy[]
+  diplomaticDocuments  DiplomaticDocument[]
   engineLease          EngineLease?
   engineHeartbeat      EngineHeartbeat?
   monthlyTick          Int                  @default(0)
@@ -615,6 +616,41 @@ model GeneralBattleStats {
   world       World  @relation(fields: [worldId], references: [id], onDelete: Cascade)
 
   @@id([worldId, generalId])
+}
+
+enum DiplomaticDocumentStatus {
+  PROPOSED
+  ACTIVE
+  CANCELLED
+  REPLACED
+}
+
+model DiplomaticDocument {
+  worldId         String
+  id              Int                      @default(autoincrement())
+  requestId       String                   @db.Uuid
+  fromNationId    Int
+  toNationId      Int
+  fromNationName  String
+  toNationName    String
+  senderId        Int
+  senderName      String
+  responderName   String?
+  previousId      Int?
+  status          DiplomaticDocumentStatus @default(PROPOSED)
+  brief           String
+  detail          String
+  responseReason  String?
+  createdAt       DateTime                 @default(now())
+  world           World                    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  previous        DiplomaticDocument?      @relation("DocumentHistory", fields: [worldId, previousId], references: [worldId, id], onDelete: NoAction, onUpdate: NoAction)
+  successors      DiplomaticDocument[]     @relation("DocumentHistory")
+
+  @@id([worldId, id])
+  @@unique([worldId, requestId])
+  @@index([worldId, fromNationId, id])
+  @@index([worldId, toNationId, id])
+  @@index([worldId, previousId])
 }
 
 model BattleLog {
