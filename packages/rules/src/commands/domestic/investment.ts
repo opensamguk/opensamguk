@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import { philosophyDomestic } from '../../personnel/nationPhilosophy';
+import { toGameDate } from '../../clock/clock';
+import { RESEARCH_ERA_FEATURE, researchEra } from '../../nationResearch/era';
 import { BALANCE } from '../../balance';
 import type { WorldView } from '../../model/world';
 import type { Actor, CommandDef, Failure } from '../types';
@@ -133,7 +135,12 @@ function makeInvestmentWithCollector(spec: Spec, collect: typeof collectModifier
       const thresholds = view.presetRules?.boost.smallWorld;
       const humanCount = thresholds ? Object.values(view.generals).filter((g) => g.userId !== null).length : 0;
       const multiplier = thresholds?.find((row) => humanCount < row.below)?.multiplier ?? 1;
-      const cityScore = score * (spec.effectFactor ?? 1) * multiplier;
+      const delayedResearch =
+        spec.field === 'tech' &&
+        view.ruleFeatures?.includes(RESEARCH_ERA_FEATURE) &&
+        view.nations[general.nationId!]!.tech >=
+          researchEra(view.startYear, toGameDate(view.startYear, actor.tick ?? 0).year).threshold;
+      const cityScore = score * (spec.effectFactor ?? 1) * multiplier * (delayedResearch ? 0.25 : 1);
       const change = spec.field === 'trust' ? cityScore : Math.round(cityScore);
       const effect: Effect =
         spec.field === 'tech'

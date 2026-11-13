@@ -236,6 +236,12 @@ export function MainPage() {
               </span>
             ) : null}
             {summary.data.engineStale === true ? <span role="status">엔진 응답 지연</span> : null}
+            {summary.data.technologyEra ? (
+              <span title="기준에 도달한 국가는 기술 연구 증가량이 4분의 1로 줄어듭니다">
+                기술 {summary.data.technologyEra.level}등급 기준
+                {summary.data.technologyEra.nextYear ? ` · 다음 ${summary.data.technologyEra.nextYear}년` : ''}
+              </span>
+            ) : null}
             {lobbyWorld ? (
               <span className={styles.progressTag} data-testid="main-scenario">
                 {lobbyWorld.scenarioTitle}
