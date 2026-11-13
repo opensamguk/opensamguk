@@ -232,12 +232,20 @@ function renderRecords(
   return <WorldHistoryList items={items} nations={nations} cities={cities} compact={compact} lines={worldLines} />;
 }
 
+const executionTime = new Intl.DateTimeFormat('ko-KR', {
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+  timeZone: 'Asia/Seoul',
+});
+
 interface GeneralItem {
   id: string;
   tick: number;
   commandKey: string;
   kind: string;
   text: string;
+  createdAt?: string;
 }
 interface NationItem {
   tick: number;
@@ -256,6 +264,11 @@ export function GeneralLogList({ items, clock }: { items: readonly GeneralItem[]
           <span className={`num ${styles.date}`}>{logDateOf(item.tick, clock)}</span>
           {item.kind === 'failure' ? <Tag tone="danger">실패</Tag> : null}
           <span className={styles.text}>{item.text}</span>
+          {item.createdAt && Number.isFinite(Date.parse(item.createdAt)) ? (
+            <time className={styles.date} dateTime={item.createdAt} title="실행 시각 (한국 표준시)">
+              {executionTime.format(new Date(item.createdAt))}
+            </time>
+          ) : null}
         </li>
       ))}
     </ol>

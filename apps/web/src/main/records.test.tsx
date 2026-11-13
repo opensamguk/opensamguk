@@ -62,6 +62,14 @@ const items = [{ id: 'log-1', tick: 119_999, commandKey: 'farm', kind: 'success'
 const shownDate = () => screen.getByRole('listitem').firstElementChild?.textContent;
 
 describe('개인 기록 연월 (T1-27 종료 뒤)', () => {
+  it('보관된 실행 시각을 한국 표준시로 표시한다', () => {
+    const createdAt = '2026-11-13T20:10:00.000Z';
+    const { container } = render(<GeneralLogList items={[{ ...items[0]!, createdAt }]} clock={running} />);
+    const time = container.querySelector('time')!;
+    expect(time.getAttribute('datetime')).toBe(createdAt);
+    expect(time.textContent).toBe('05:10');
+  });
+
   it('종료 직전, 종료 직후, 재조회 뒤 같은 로그를 모두 300년 12월로 쓴다', () => {
     const { rerender } = render(<GeneralLogList items={items} clock={running} />);
     expect(shownDate()).toBe('300년 12월');
