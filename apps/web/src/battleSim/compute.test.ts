@@ -47,6 +47,21 @@ describe('AC-INT-11 통합판의 단일 교전', () => {
     expect(compute(message)).toEqual(reply);
     expect(message).toEqual(original);
   });
+  it('요청한 교전 단계는 엔진의 단계별 병력 손실을 돌려준다', () => {
+    const message = general({ recordPhases: true });
+    const reply = compute(message);
+    expect(reply).toMatchObject({ type: 'result', input: { recordPhases: true } });
+    if (reply.type !== 'result') throw new Error('교전 결과가 없습니다.');
+    expect(reply.phases?.some(({ kind }) => kind === 'exchange')).toBe(true);
+    expect(reply.phases?.reduce((total, phase) => total + phase.attackerLoss, 0)).toBe(
+      message.attacker.crew - reply.attacker.crew,
+    );
+    expect(reply.phases?.reduce((total, phase) => total + phase.defenderLoss, 0)).toBe(
+      message.defender.crew - reply.defender.crew,
+    );
+    expect(compute({ ...message, recordPhases: false })).toMatchObject({ type: 'error', field: 'recordPhases' });
+  });
+
   it('성벽에는 가짜 지휘관을 만들지 않고 공격 지휘관만 보정한다', () => {
     const commanders = { attacker: { leadership: 78, strength: 80 } };
     const message = wall({ commanders });

@@ -13,11 +13,18 @@ export type BattleRunInput = {
   defenderTech: number;
   defence?: number;
   commanders?: BattleCommanders;
+  recordPhases?: true;
 };
 export type BattleRunBody = BattleRunInput & { seed: string };
 export type BattleRunRequest = BattleRunBody & { type: 'run'; requestId: number };
 // 월드 병종표. Worker 하나에 병종표 하나이며 Worker가 처음 받은 것만 쓴다 (compute.ts createWorkerHandler).
 export type BattleRulesMessage = { type: 'rules'; unitSet: unknown };
+
+export type BattlePhase = {
+  kind: 'volley' | 'hold' | 'exchange';
+  attackerLoss: number;
+  defenderLoss: number;
+};
 
 export type BattleRunResult = {
   type: 'result';
@@ -27,6 +34,7 @@ export type BattleRunResult = {
   unitSetId: string;
   attacker: BattleForce;
   defender: BattleForce;
+  phases?: BattlePhase[];
 };
 export type BattleRunErrorCode = 'INVALID_INPUT' | 'UNIT_SET_INVALID' | 'FAILED';
 export type BattleRunError = { type: 'error'; requestId: number | null; code: BattleRunErrorCode; field?: string };
@@ -72,6 +80,7 @@ const REQUEST_KEYS = new Set([
   'attackerTech',
   'defenderTech',
   'commanders',
+  'recordPhases',
 ]);
 const FORCE_KEYS = ['crew', 'crewType', 'train', 'atmos'] as const;
 
@@ -105,6 +114,8 @@ export function requestProblems(message: unknown, units: readonly UnitChoice[]):
   for (const key of Object.keys(message)) {
     if (!REQUEST_KEYS.has(key) && key !== 'defence') add(key, { problem: 'unexpected' });
   }
+
+  if ('recordPhases' in message && message.recordPhases !== true) add('recordPhases', { problem: 'unexpected' });
 
   const seed = message.seed;
   if (typeof seed !== 'string') add('seed', { problem: 'missing' });
@@ -215,6 +226,7 @@ export function checkRequest(message: unknown, units: readonly UnitChoice[]): Ch
     defenderTech: m.defenderTech,
   };
   if (m.defender.crewType === WALL_CREW_TYPE) request.defence = m.defence!;
+  if (m.recordPhases) request.recordPhases = true;
   if (m.commanders) {
     const copyStats = (stats: CommanderStats) => ({ leadership: stats.leadership, strength: stats.strength });
     request.commanders = {
@@ -297,8 +309,8 @@ export function formBody(form: BattleForm): Record<string, unknown> {
 
 export type FormCheck = { body: BattleRunBody; problems: [] } | { body: null; problems: FieldProblem[] };
 
-export function checkForm(form: BattleForm, units: readonly UnitChoice[]): FormCheck {
-  const message = { type: 'run', requestId: 1, ...formBody(form) };
+export function checkForm(form: BattleForm, units: readonly UnitChoice[], recordPhases?: true): FormCheck {
+  const message = { type: 'run', requestId: 1, ...formBody(form), ...(recordPhases ? { recordPhases } : {}) };
   const checked = checkRequest(message, units);
   if (!checked.ok) return { body: null, problems: requestProblems(message, units) };
   return { body: requestBody(checked.request), problems: [] };
@@ -314,6 +326,7 @@ export function requestBody(request: BattleRunRequest): BattleRunBody {
     defenderTech: request.defenderTech,
   };
   if (request.defence !== undefined) body.defence = request.defence;
+  if (request.recordPhases) body.recordPhases = true;
   if (request.commanders) body.commanders = request.commanders;
   return body;
 }
