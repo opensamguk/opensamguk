@@ -219,18 +219,41 @@ export function NationInfo({
   worldId,
   nation,
   cities,
+  nations,
+  presence,
 }: {
   worldId: string;
   nation: Home['nation'];
   cities: readonly MapCity[];
+  nations: readonly { id: number; name: string }[];
+  presence: Home['presence'];
 }) {
   const detail = useNation(worldId, nation?.id ?? 1, nation !== null);
   const power = useNationPower(worldId, nation?.id ?? null);
+  const onlineNations = nations
+    .filter(({ id }) => presence?.nationIds.includes(id))
+    .map(({ name }) => displayName(name));
+  const presenceGrid = (
+    <InfoGrid
+      items={[
+        { label: '접속 중인 국가', value: onlineNations.join(', ') || '—' },
+        ...(nation && presence
+          ? [
+              {
+                label: '접속 중인 우리 장수',
+                value: presence.allies.map(({ name }) => displayName(name)).join(', ') || '—',
+              },
+            ]
+          : []),
+      ]}
+    />
+  );
   // 통치(황실·정통성)는 전용 화면으로 옮겼다 (INT-25). 재야 장수도 링크로 공개 정보를 본다.
   if (nation === null)
     return (
       <>
         <EmptyState title="재야입니다">국가에 임관하면 국고·군량과 소속 장수를 여기서 봅니다.</EmptyState>
+        {presenceGrid}
         <p className={styles.links}>
           <Link to="/w/$worldId/nation/governance" params={{ worldId }}>
             통치
@@ -272,6 +295,7 @@ export function NationInfo({
           통치
         </Link>
       </p>
+      {presenceGrid}
       <NationNoticeBox worldId={worldId} />
     </div>
   );

@@ -538,6 +538,23 @@ describe('T2-09 국가 공지 revision', () => {
 });
 
 describe('T2-09 실제 PostgreSQL LISTEN·SSE', () => {
+  it('INT-26 메인에 접속 중인 국가와 같은 나라 장수만 표시한다', async () => {
+    const ally = await stream(1);
+    await stream(1);
+    await stream(2);
+    await stream(5, base, otherWorldId);
+    const read = async () => {
+      const result = await call<Outputs['home']['get']>('home.get', actorInput());
+      expect(result.status).toBe(200);
+      return result.data!.presence;
+    };
+    expect(await read()).toEqual({ nationIds: [1, 2], allies: [{ id: 2, name: '메시지장수2' }] });
+    ally.abort();
+    expect((await read()).allies).toEqual([{ id: 2, name: '메시지장수2' }]);
+    await db.session.update({ where: { id: users[1]!.sessionId }, data: { expiresAt: new Date(0) } });
+    expect(await read()).toEqual({ nationIds: [2], allies: [] });
+  });
+
   it('AC-M2-07 계정과 서버 연결 한도를 각각 적용하고 종료 뒤 다시 받는다', async () => {
     const limited = await buildServer({
       db,

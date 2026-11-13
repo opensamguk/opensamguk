@@ -106,7 +106,7 @@ export function MainPage() {
   const { city: selected } = useSearch({ from: '/w/$worldId/' });
   const navigate = useNavigate({ from: '/w/$worldId/' });
   const summary = useWorldSummary(worldId);
-  const home = useHome(worldId);
+  const home = useHome(worldId, true);
   const trpc = useTRPC();
   const mine = useQuery(trpc.general.mine.queryOptions({ worldId }));
   // 사람 장수 수와 시나리오 이름은 world.summary에 없어 로비 목록(로비·장수 생성 화면과 같은 캐시)에서 읽는다.
@@ -387,7 +387,13 @@ export function MainPage() {
           'status',
           <Panel title="국가 정보" area="nation" headingId="main-nation">
             {withHome((data) => (
-              <NationInfo worldId={worldId} nation={data.nation} cities={cities} />
+              <NationInfo
+                worldId={worldId}
+                nation={data.nation}
+                cities={cities}
+                nations={nations}
+                presence={data.presence}
+              />
             ))}
           </Panel>,
           'nation',

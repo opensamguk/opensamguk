@@ -4,6 +4,7 @@ import { cityInfo, ownGeneralInfo, logInfo, logSelect, nationInfo } from '../vis
 import {
   GENERAL_CONDITION_FEATURE,
   generalCondition,
+  LINEAGE_EXITED_YEAR,
   nowTick,
   OFFICE_EFFECTS_FEATURE,
   policyOptions,
@@ -63,6 +64,23 @@ export const homeRouter = router({
         take: 10,
         select: logSelect,
       });
+      const sessions = ctx.connectedSessions?.(input.worldId) ?? [];
+      const connected =
+        sessions.length === 0
+          ? []
+          : await tx.general.findMany({
+              where: {
+                worldId: input.worldId,
+                removedAt: null,
+                activeFromYear: { not: LINEAGE_EXITED_YEAR },
+                user: {
+                  status: 'ACTIVE',
+                  sessions: { some: { id: { in: [...sessions] }, expiresAt: { gt: new Date(ctx.now) } } },
+                },
+              },
+              select: { id: true, name: true, nationId: true },
+              orderBy: [{ name: 'asc' }, { id: 'asc' }],
+            });
       return {
         general: {
           ...ownGeneralInfo(general),
@@ -109,6 +127,15 @@ export const homeRouter = router({
                 ...(finance ? { financeEstimate: finance.financeEstimate } : {}),
               },
         nextTurnAt: nextTurnAt(world, general.nextTurnTick),
+        presence: {
+          nationIds: [...new Set(connected.flatMap(({ nationId }) => (nationId === null ? [] : [nationId])))].sort(
+            (a, b) => a - b,
+          ),
+          allies:
+            general.nationId === null
+              ? []
+              : connected.filter(({ nationId }) => nationId === general.nationId).map(({ id, name }) => ({ id, name })),
+        },
         turnSchedule: turnSchedule(world, general.nextTurnTick),
         turnsPreview: Array.from({ length: 5 }, (_, slot) => ({ slot, ...turns[slot]! })),
         recentLogs: logs.map(logInfo),
