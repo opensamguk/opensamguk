@@ -181,7 +181,7 @@ function MyGeneral({ general }: { general: MyGeneralInfo }) {
   const name = displayName(general.name);
   const stats = general.stats;
   return (
-    <div className={styles.myGeneral}>
+    <div className={styles.myGeneral} role="group" aria-label="내 장수">
       <Portrait id={general.portraitId ?? null} name={name} variant="icon" shape="round" className={styles.myFace} />
       <div className={styles.myInfo}>
         <span className={styles.myName}>

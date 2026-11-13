@@ -137,9 +137,9 @@ export function CityTargetPicker({
   const candidates = useMemo(
     () =>
       cities
-        .filter((city) => allowed.has(city.key) && city.key !== here)
+        .filter((city) => allowed.has(city.key))
         .filter((city) => query.trim() === '' || city.name.includes(query.trim())),
-    [cities, allowed, here, query],
+    [cities, allowed, query],
   );
   const groups = useMemo(() => groupByDistance(candidates, distances, ownNation), [candidates, distances, ownNation]);
   const selected = cities.find((city) => String(city.key) === value) ?? null;
@@ -201,7 +201,8 @@ export function CityTargetPicker({
           {groups.map((group) => (
             <div key={group.distance ?? 'none'} className={styles.group}>
               <p className={styles.groupHead}>
-                {group.distance === null ? '연결 없음' : `${group.distance}칸`} · {group.items.length}곳
+                {group.distance === null ? '연결 없음' : group.distance === 0 ? '현재 도시' : `${group.distance}칸`} ·{' '}
+                {group.items.length}곳
               </p>
               {group.items.map((city) => {
                 const nation = city.nationId === null ? undefined : nationById.get(city.nationId);
@@ -212,6 +213,7 @@ export function CityTargetPicker({
                     key={city.key}
                     type="button"
                     role="radio"
+                    data-value={city.key}
                     aria-checked={String(city.key) === value}
                     className={styles.row}
                     onClick={() => pick(city.key)}
@@ -305,6 +307,7 @@ export function NationTargetPicker({
               key={nation.id}
               type="button"
               role="radio"
+              data-value={nation.id}
               aria-checked={String(nation.id) === value}
               className={styles.row}
               onClick={() => onChange(String(nation.id))}
@@ -354,6 +357,7 @@ export function GeneralTargetPicker({
             key={general.id}
             type="button"
             role="radio"
+            data-value={general.id}
             aria-checked={String(general.id) === value}
             className={styles.row}
             onClick={() => onChange(String(general.id))}

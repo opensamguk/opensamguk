@@ -70,7 +70,10 @@ test('로그인 → 로비 → 장수 만들기 → 메인 → 로비로 돌아�
   await expect(page.getByRole('heading', { level: 1, name: '군략도' })).toBeVisible();
   await page.getByRole('link', { name: '로비', exact: true }).click();
   await expect(page).toHaveURL('/lobby');
-  await expect(target.getByText(`내 장수: ${general.name} (재야)`)).toBeVisible();
+  // 로비 카드의 내 장수 칸은 얼굴·이름·소속을 함께 보인다 (INT-25).
+  const mine = target.getByRole('group', { name: '내 장수', exact: true });
+  await expect(mine).toContainText(general.name);
+  await expect(mine).toContainText('재야');
   await target.getByRole('link', { name: '들어가기' }).click();
   await expect(page).toHaveURL(`/w/${world}`);
 });

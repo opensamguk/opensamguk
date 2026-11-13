@@ -249,6 +249,11 @@ test('T4-24 장비 카드 예약·실제 매매·100 초과 표시와 세 화면
           4.5,
         );
       }
+    // 넣으면 인자 입력 화면이 닫힌다 (INT-25). 같은 칸을 다시 골라 화면을 연다.
+    await editor.getByRole('button', { name: '선택 해제', exact: true }).click();
+    await editor.locator('tr[data-slot="1"]').click();
+    await editor.getByRole('searchbox').fill('장비');
+    await editor.getByRole('radio', { name: '장비매매', exact: true }).check();
     await slot.selectOption('weapon');
     await item.selectOption('weapon_06');
     // 지금 상태의 경고는 30칸 표의 사전 검사와 같은 말이고, 경고가 있어도 넣을 수 있다고 바로 이어 적는다.

@@ -681,10 +681,17 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
     await editor.getByLabel('명령 찾기', { exact: true }).fill(name);
     await editor.getByRole('radio', { name, exact: true }).check();
     for (const [label, value] of Object.entries(fields)) {
+      // 대상 도시·국가·장수와 병종은 인자 입력 화면의 고르기 목록이다 (INT-25). 번호로 고른다.
+      const group = editor.getByRole('radiogroup', { name: label, exact: true });
       const control = editor
         .getByRole('combobox', { name: label, exact: true })
         .or(editor.getByRole('spinbutton', { name: label, exact: true }))
         .or(editor.getByRole('textbox', { name: label, exact: true }));
+      await group.or(control).first().waitFor();
+      if ((await group.count()) > 0) {
+        await group.locator(`[data-value="${value}"], input[value="${value}"]`).first().click();
+        continue;
+      }
       if ((await control.evaluate((element) => element.tagName)) === 'SELECT') await control.selectOption(value);
       else await control.fill(value);
     }
