@@ -3,7 +3,7 @@ import type { Prisma } from '@opensamguk/db';
 import { protectedProcedure, publicProcedure, router } from '../trpc';
 import { readWorld, worldInput, worldSummary } from '../queries';
 import { mapCity, publicMapInfo } from '../visibility';
-import { readOperationalMap, operationalMapDisplay } from '@opensamguk/rules';
+import { cityRegionName, readOperationalMap, operationalMapDisplay } from '@opensamguk/rules';
 import { readCityScaleProjection } from '../game/cityScale';
 import { readMapBackgrounds } from '../resourceAdmin/mapBackground';
 
@@ -85,6 +85,8 @@ export const worldRouter = router({
         background: backgrounds.get(world.mapKey) ?? null,
         cities: cities.map((city) => ({
           ...mapCity(city),
+          region: city.region,
+          regionName: cityRegionName(city.region, world.mapKey, map?.regionScheme),
           ...(ruins ? { ruin: ruins.get(city.cityKey) ?? null } : {}),
         })),
         nations,

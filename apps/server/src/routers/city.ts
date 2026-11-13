@@ -4,11 +4,13 @@ import { entityKey, readWorld, viewerGeneral, worldInput } from '../queries';
 import { cityInfo, garrisonGeneralInfo, visibility } from '../visibility';
 import { readView } from '../game/queries';
 import {
+  cityRegionName,
   INTEL_FEATURE,
   LINEAGE_EXITED_YEAR,
   OFFICE_EFFECTS_FEATURE,
   toGameDate,
   isOfficeResident,
+  readOperationalMap,
 } from '@opensamguk/rules';
 import { readCityScaleProjection } from '../game/cityScale';
 import { readCityIntel } from '../game/fog';
@@ -19,7 +21,10 @@ export const cityRouter = router({
       const fogEnabled = world.ruleFeatures.includes(INTEL_FEATURE);
       const general = await viewerGeneral(tx, input.worldId, ctx.user.id);
       const viewer = fogEnabled && general?.removedAt != null ? null : general;
-      const city = await tx.city.findUnique({ where: { worldId_cityKey: input } });
+      const city = await tx.city.findUnique({
+        where: { worldId_cityKey: input },
+        include: { world: { select: { mapKey: true, operationalMap: true } } },
+      });
       if (!city) throw new TRPCError({ code: 'NOT_FOUND', message: '도시를 찾을 수 없습니다.' });
       const garrisonHidden = fogEnabled && city.nationId !== null && viewer?.nationId !== city.nationId;
       const generals = garrisonHidden
@@ -73,6 +78,12 @@ export const cityRouter = router({
             }
           : {}),
         ...cityInfo(city, viewer),
+        region: city.region,
+        regionName: cityRegionName(
+          city.region,
+          city.world.mapKey,
+          readOperationalMap(city.world.operationalMap, world.ruleFeatures)?.regionScheme,
+        ),
         ...(ruins ? { ruin: ruins.get(city.cityKey) ?? null } : {}),
         ...(campaignEnabled ? { campaignEnabled: true as const } : {}),
         ...(world.ruleFeatures.includes('five-stats') ? { fiveStats: true as const } : {}),
