@@ -29,6 +29,7 @@ function transaction() {
     removedNation: { create: write('removedNation.create') },
     publicNationEvent: { createMany: write('publicNationEvent.createMany') },
     $executeRaw: write('$executeRaw'),
+    $queryRaw: write('$queryRaw'),
   };
   return { tx: tx as unknown as Prisma.TransactionClient, calls };
 }
