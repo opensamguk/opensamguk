@@ -1362,10 +1362,11 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
           병종: '1100',
           '부곡 번호': '1',
         });
-        await expect(oldActor.page.getByTestId('turn-editor').getByLabel('부곡 번호', { exact: true })).toBeVisible();
-        await expect(
-          oldActor.page.getByTestId('turn-editor').getByLabel('훈련·사기 대상', { exact: true }),
-        ).toHaveCount(0);
+        const oldEditor = oldActor.page.getByTestId('turn-editor');
+        await oldEditor.getByRole('radio', { name: '모병', exact: true }).check();
+        await expect(oldEditor.getByLabel('부곡 번호', { exact: true })).toBeVisible();
+        await expect(oldEditor.getByLabel('훈련·사기 대상', { exact: true })).toHaveCount(0);
+        await oldEditor.getByRole('button', { name: '명령 취소', exact: true }).click();
         expect(oldCalls.filter((call) => call.path.startsWith('cityResources.'))).toHaveLength(0);
         expect((await db.world.findUniqueOrThrow({ where: { id: oldWorld.id } })).cityResourcesState).toBeNull();
         await photo(oldActor.page, info, '07-legacy-without-city-resources');

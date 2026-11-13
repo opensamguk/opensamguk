@@ -243,9 +243,9 @@ function Editor<S extends DisplaySlot>({
       ownNationId: home.data?.general.nationId ?? null,
       wallet: home.data ? { gold: home.data.general.gold, rice: home.data.general.rice } : undefined,
       unitSet: rules.data?.unitSet,
-      recruitment: rules.data && 'recruitment' in rules.data ? rules.data.recruitment : undefined,
+      recruitment: needsRecruitmentRefresh ? undefined : recruitment,
     }),
-    [map.data, home.data, rules.data],
+    [map.data, home.data, rules.data?.unitSet, needsRecruitmentRefresh, recruitment],
   );
   const names: ArgNames = useMemo(
     () => ({
@@ -632,7 +632,6 @@ function Editor<S extends DisplaySlot>({
             recruitment?.cityKey != null
               ? {
                   city: cities.find(({ key }) => key === (city?.key ?? recruitment.cityKey))?.name ?? '현재 도시',
-                  byCrewType: needsRecruitmentRefresh ? {} : recruitment.byCrewType,
                 }
               : undefined
           }

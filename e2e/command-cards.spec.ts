@@ -240,11 +240,10 @@ test('AC-M2-03 프리셋이 켠 화계와 대상 도시 칸을 실제 화면에�
       await expect(fire).toHaveCount(0);
       continue;
     }
-    await fire.check();
-    const city = picker.getByRole('combobox', { name: '대상 도시', exact: true });
-    await expect(city).toBeVisible();
-    await city.selectOption(String(target.cityKey));
     await editor.locator('tr[data-slot="1"]').click();
+    await fire.check();
+    const cities = picker.getByRole('radiogroup', { name: '대상 도시', exact: true });
+    await cities.locator(`[data-value="${target.cityKey}"]`).click();
     await picker.getByRole('button', { name: '1번 칸에 넣기', exact: true }).click();
     await editor.getByRole('button', { name: '저장', exact: true }).click();
     await expect(editor.getByText('저장했습니다.', { exact: true })).toBeVisible();

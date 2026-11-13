@@ -316,10 +316,10 @@ test.describe('예턴 편집의 교역 대상', () => {
     await expect(editor.getByTestId('selection')).not.toContainText('3, 5번 칸');
     await editor.getByLabel('명령 찾기').fill('교역');
     await editor.getByRole('radio', { name: '교역' }).check();
-    const target = editor.getByRole('combobox', { name: /대상 도시/ });
-    const label = (await target.locator('option', { hasText: away.name }).first().textContent())!.trim();
-    await target.selectOption({ label });
-    await expect(target).toHaveValue(String(away.key));
+    const target = editor.getByRole('radiogroup', { name: '대상 도시', exact: true });
+    const city = target.locator(`[data-value="${away.key}"]`);
+    await city.click();
+    await expect(city).toHaveAttribute('aria-checked', 'true');
     await editor.getByRole('button', { name: '5번 칸에 넣기', exact: true }).click();
     await expect(editor.locator('tr[data-slot="5"]')).toContainText('교역');
     await expect(editor.locator('tr[data-slot="5"]')).toContainText(away.name);

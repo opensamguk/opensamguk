@@ -38,6 +38,7 @@ describe('형식 3 교역의 엔진·API·재생 연결', () => {
         tick: 100,
         sequence: 5,
         treatyTradeEnabled: true,
+        treatyExpandedEnabled: false,
         ...(kind === 'treaty.break' ? { treatyBreakEnabled: true } : {}),
       });
     }

@@ -262,6 +262,7 @@
 /* 명령 선택기의 분류·검색·넣기는 모든 폭에서 44px 누름 영역을 지킨다 (T4-92). */
 .picker .chip,
 .picker .primary,
+.picker .secondary,
 .picker button[data-unavailable],
 .search input {
   min-width: 44px;
@@ -418,6 +419,11 @@
 }
 
 /* 인자 입력 화면 안의 폼 (INT-25). 지도·목록 고르기가 위, 수량·문자 같은 나머지 칸이 아래다. */
+.argScreenForm select,
+.argScreenForm input:not([type='radio']) {
+  min-height: 44px;
+}
+
 .argScreenForm {
   display: flex;
   flex-direction: column;

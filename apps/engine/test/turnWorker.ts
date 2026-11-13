@@ -31,7 +31,12 @@ if (!lease) {
       ? {
           beforeCommit: async (tx) => {
             // 대상을 지정한 시험은 해당 효과를 쓴 트랜잭션에서 멈춘다.
-            if (commandKey && !(await tx.generalLog.count({ where: { worldId, tick, commandKey, kind: 'success' } })))
+            if (
+              commandKey &&
+              !(await tx.generalLog.count({
+                where: { worldId, tick, commandKey, ...(commandKey === 'trade' ? {} : { kind: 'success' }) },
+              }))
+            )
               return;
             if (
               inputId !== undefined &&

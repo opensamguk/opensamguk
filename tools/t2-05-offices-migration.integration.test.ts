@@ -213,13 +213,13 @@ async function existingRows(client: PgClient) {
   ]) {
     const data =
       table === 'World'
-        ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat' - 'replayFormat' - 'ruleFeatures' - 'operationalMap' - 'campaignState' - 'cityResourcesState' - 'logisticsState' - 'governanceState' - 'lineageState' - 'stratagemCardsState' - 'equipmentState' - 'runtimeOptions' - 'cityRuinsState' - 'nationStrategyState' - 'nationLifecycleState' - 'preparedTurnsState' - 'nationResearchState'"
+        ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat' - 'replayFormat' - 'ruleFeatures' - 'operationalMap' - 'campaignState' - 'cityResourcesState' - 'logisticsState' - 'governanceState' - 'lineageState' - 'stratagemCardsState' - 'equipmentState' - 'runtimeOptions' - 'cityRuinsState' - 'nationStrategyState' - 'nationLifecycleState' - 'preparedTurnsState' - 'nationResearchState' - 'officeEffects'"
         : table === 'Nation'
           ? "to_jsonb(t) - 'noticeDirective'"
           : table === 'City'
             ? "to_jsonb(t) - 'kind'"
             : table === 'General'
-              ? "to_jsonb(t) - 'residenceTick' - 'politics' - 'charm' - 'sex' - 'removedAt'"
+              ? "to_jsonb(t) - 'residenceTick' - 'politics' - 'charm' - 'sex' - 'removedAt' - 'officerCityKey'"
               : "to_jsonb(t) - 'treatyFormat'";
     rows[table] = (await client.query(`SELECT ${data} AS data FROM "${table}" t ORDER BY to_jsonb(t)::text`)).rows;
   }
@@ -428,6 +428,8 @@ it.each(['empty', 'legacy'] as const)(
       expect((await client.query('SELECT id FROM "World" WHERE "governanceState" IS NOT NULL')).rows).toEqual([]);
       expect((await client.query('SELECT id FROM "World" WHERE "stratagemCardsState" IS NOT NULL')).rows).toEqual([]);
       expect((await client.query('SELECT id FROM "World" WHERE "equipmentState" IS NOT NULL')).rows).toEqual([]);
+      expect((await client.query('SELECT id FROM "World" WHERE "officeEffects" IS NOT NULL')).rows).toEqual([]);
+      expect((await client.query('SELECT id FROM "General" WHERE "officerCityKey" IS NOT NULL')).rows).toEqual([]);
       expect((await client.query('SELECT count(*)::int AS count FROM "GovernanceMovement"')).rows).toEqual([
         { count: 0 },
       ]);

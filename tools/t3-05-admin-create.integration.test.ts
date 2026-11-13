@@ -753,6 +753,7 @@ for (const profileKey of [
     );
     if (!selected?.available) throw new Error('실제 확장 선택지가 필요합니다.');
     const profile = await loadFeatureProfile(profileKey);
+    const createdFeatures = [...new Set([...profile.value.ruleFeatures, 'office-effects'])].sort();
     if (selected.featureProfileKey === profileKey) expect(selected.featureProfileHash).toBe(profile.contentHash);
     const pair = await accepted(actor, signal, {
       ...selected.selection,
@@ -774,7 +775,7 @@ for (const profileKey of [
       featureProfile: { key: profile.value.key, contentHash: profile.contentHash },
     });
     const world = await db.world.findUniqueOrThrow({ where: { id: stored.worldId! } });
-    expect(world.ruleFeatures).toEqual(profile.value.ruleFeatures);
+    expect(world.ruleFeatures).toEqual(createdFeatures);
     expect(world.replayOrigin).toMatchObject({ featureData: profile.value.featureData });
     expect(world.logisticsState).not.toBeNull();
     expect(world.governanceState).not.toBeNull();
@@ -792,7 +793,7 @@ for (const profileKey of [
         expect(world.nationLifecycleState).toEqual({ version: 1, nations: {} });
       else expect(world.nationLifecycleState).toBeNull();
       if (profileKey === 'expanded-191-v6' || profileKey === 'expanded-191-v7') {
-        expect(world.ruleFeatures).toHaveLength(profileKey === 'expanded-191-v7' ? 23 : 22);
+        expect(world.ruleFeatures).toHaveLength(profileKey === 'expanded-191-v7' ? 24 : 23);
         expect(world.preparedTurnsState).toEqual({ version: 1, nations: {} });
         expect(world.nationResearchState).toEqual({ version: 1, nations: {} });
       } else {
@@ -832,7 +833,7 @@ for (const profileKey of [
     expect(
       initialReplayStateWithRegistry(archive.origin.initial, ruleRegistry, archive.origin.featureData).state
         .ruleFeatures,
-    ).toEqual(profile.value.ruleFeatures);
+    ).toEqual(createdFeatures);
     expect((await create(actor, pair.payload, signal)).data?.worldId).toBe(world.id);
     expect(await auditCount('world.create.applied', stored.id)).toBe(1);
     await controlClock(db, world.id, 'start');
@@ -890,7 +891,7 @@ for (const profileKey of [
     expect(
       initialReplayStateWithRegistry(targetArchive.origin.initial, ruleRegistry, targetArchive.origin.featureData).state
         .ruleFeatures,
-    ).toEqual(profile.value.ruleFeatures);
+    ).toEqual(createdFeatures);
     expect(replayToEnd(await exportReplay(db, world.id))).toMatchObject({ reason: 'ADMIN_RESET' });
   }, 30000);
 

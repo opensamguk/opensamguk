@@ -227,7 +227,9 @@ beforeAll(
           all = (await checked(async () => readdir(directory))).filter((value) => /^\d{14}_/.test(value)).sort();
         expect(all).toContain(migration);
         expect(all.indexOf('20261117000000_stratagem_cards_state')).toBe(44);
-        for (const item of all.filter((value) => value !== migration)) {
+        for (const item of all.filter(
+          (value) => value !== migration && value !== '20261215000000_resident_city_offices',
+        )) {
           signal.throwIfAborted();
           await checked(async () =>
             gate.query(await checked(async () => readFile(new URL(item + '/migration.sql', directory), 'utf8'))),
@@ -407,6 +409,12 @@ it('AC-M3-04 새 생성 요청 migration은 기존 모든 표·값·sequence를 
   expect(await rowsHash(beforeTables)).toBe(beforeHash);
   expect(await sequences()).toEqual(beforeSequences);
   expect((await gate.query('SELECT * FROM "WorldCreateRequest"')).rows).toEqual([]);
+  await gate.query(
+    await readFile(
+      new URL('../packages/db/prisma/migrations/20261215000000_resident_city_offices/migration.sql', import.meta.url),
+      'utf8',
+    ),
+  );
 });
 async function transaction(work: () => Promise<void>) {
   operationSignals.getStore()?.throwIfAborted();
@@ -578,6 +586,12 @@ it('AC-M3-04 결과 월드·행위자 삭제는 NO ACTION이며 기존 모든 �
   });
   expect(await rowsHash(beforeTables)).toBe(beforeHash);
   expect((await gate.query('SELECT * FROM "WorldCreateRequest"')).rows).toEqual([]);
+  await gate.query(
+    await readFile(
+      new URL('../packages/db/prisma/migrations/20261215000000_resident_city_offices/migration.sql', import.meta.url),
+      'utf8',
+    ),
+  );
 });
 afterAll(
   () =>
