@@ -7,6 +7,7 @@ export type EquipmentBattleEffects = {
   damageFactor?: number;
   riceFactor?: number;
   evasionLeadership?: number;
+  protectsFromBattleInjury?: true;
   tacticsTrial?: number;
   opposingTacticsSuccess?: number;
   tacticsDamageFactor?: number;
@@ -25,13 +26,17 @@ export function equipmentBattleEffects(world: WorldView, generalId: number): Equ
   const equipment = world.equipment;
   if (!equipment || !('fullRareEquipment' in equipment.config)) return undefined;
   const slots = equipment.generals[String(generalId)];
-  if (!slots) return undefined;
   const effects: EquipmentBattleEffects = {};
+  if (!slots) return effects;
   const bookTrial = standardBookTrial(slots.book);
   if (bookTrial) effects.tacticsTrial = bookTrial / 100;
   switch (slots.horse) {
     case 'horse_07_기주마':
       effects.extraPhases = 1;
+      break;
+    case 'horse_07_백마':
+    case 'horse_12_사륜거':
+      effects.protectsFromBattleInjury = true;
       break;
     case 'horse_07_백상':
       Object.assign(effects, { extraPhases: -1, damageFactor: 1.2, riceFactor: 1.1 });

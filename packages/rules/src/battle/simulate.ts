@@ -281,7 +281,18 @@ export function simulateBattle(input: BattleInput, rng: Rng): BattleResult {
     attacker.atmos = Math.max(0, attacker.atmos - BALANCE.BATTLE_ATMOS_LOSS);
     defender.atmos = Math.max(0, defender.atmos - BALANCE.BATTLE_ATMOS_LOSS);
   }
+  if (!input.openingSkirmish) {
+    const attackerWound = battleEndInjury(result.attackerInjury ?? input.attackerInjury, input.attackerEquipment, rng);
+    const defenderWound = battleEndInjury(result.defenderInjury ?? input.defenderInjury, input.defenderEquipment, rng);
+    if (attackerWound !== undefined) result.attackerInjury = attackerWound;
+    if (defenderWound !== undefined) result.defenderInjury = defenderWound;
+  }
   return result;
+}
+
+function battleEndInjury(injury: number | undefined, equipment: EquipmentBattleEffects | undefined, rng: Rng) {
+  if (injury !== undefined && equipment && !equipment.protectsFromBattleInjury && rng.next() < 0.05)
+    return snipeInjury(injury, [10, 80], rng);
 }
 
 function equipmentEvasion(force: BattleForce, equipment: EquipmentBattleEffects | undefined) {

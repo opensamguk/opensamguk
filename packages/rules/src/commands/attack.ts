@@ -107,6 +107,7 @@ function makeAttack(collect: typeof collectModifiers) {
           {
             attacker: g,
             attackerEquipment,
+            attackerInjury: g.injury,
             attackerReadiness: personalityEffects(state, g.personality),
             attackerProficiency: g.proficiency,
             attackerSpecialty: combatSpecialty(state, combatSpecialtyKey(g)),
@@ -133,6 +134,7 @@ function makeAttack(collect: typeof collectModifiers) {
         consumeSnipeTool(state, g.id, battle.attackerSniped);
         recordWarCasualties(state, g.cityKey, city.cityKey, g.crew - battle.attacker.crew);
         Object.assign(g, battle.attacker);
+        if (battle.attackerInjury !== undefined) g.injury = battle.attackerInjury;
         const wallDamage = city.wall - battle.defender.crew;
         addGeneralProficiency(state, g, 5, wallDamage);
         city.wall = battle.defender.crew;

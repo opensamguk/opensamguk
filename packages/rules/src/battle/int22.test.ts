@@ -96,6 +96,15 @@ it('INT-26 저격은 첫 교전에만 사기를 올리고 장수의 부상을 80
   expect(wall.attacker.atmos).toBe(20);
 });
 
+it('INT-26 백마와 사륜거 효과는 전투 종료 부상 판정만 건너뛴다', () => {
+  const input = { ...fixture(), attackerInjury: 20, attackerEquipment: {} };
+  expect(run(input, [0.5, 0.5, 0.01]).attackerInjury).toBeGreaterThanOrEqual(30);
+  const protectedInput = { ...input, attackerEquipment: { protectsFromBattleInjury: true as const } };
+  expect(run(protectedInput, [0.5, 0.5, 0.01])).not.toHaveProperty('attackerInjury');
+  const sniper = { snipe: { chance: 1, morale: 20, injury: [20, 40] as const } };
+  expect(run({ ...protectedInput, defenderEquipment: sniper }, [0.01]).attackerInjury).toBeGreaterThanOrEqual(40);
+});
+
 describe('AC-INT-22 기존 월드 전투', () => {
   it.each(legacyBattleGolden)('$a → $b의 실제 기존 결과와 난수 상태를 보존한다', (golden) => {
     const input = {

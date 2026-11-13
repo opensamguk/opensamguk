@@ -8,7 +8,14 @@ export const additionalRareEquipment = [
     bonus: 7,
     description: '통솔 +7. 공격 시 교전 단계 +1.',
   },
-  { key: 'horse_07_백마', name: '백마', slot: 'horse', stat: 'leadership', bonus: 7, description: '통솔 +7' },
+  {
+    key: 'horse_07_백마',
+    name: '백마',
+    slot: 'horse',
+    stat: 'leadership',
+    bonus: 7,
+    description: '통솔 +7. 전투 종료 부상을 막습니다.',
+  },
   {
     key: 'horse_07_백상',
     name: '백상',
@@ -26,7 +33,14 @@ export const additionalRareEquipment = [
   { key: 'horse_10_옥추마', name: '옥추마', slot: 'horse', stat: 'leadership', bonus: 10, description: '통솔 +10' },
   { key: 'horse_11_서량마', name: '서량마', slot: 'horse', stat: 'leadership', bonus: 11, description: '통솔 +11' },
   { key: 'horse_11_화종마', name: '화종마', slot: 'horse', stat: 'leadership', bonus: 11, description: '통솔 +11' },
-  { key: 'horse_12_사륜거', name: '사륜거', slot: 'horse', stat: 'leadership', bonus: 12, description: '통솔 +12' },
+  {
+    key: 'horse_12_사륜거',
+    name: '사륜거',
+    slot: 'horse',
+    stat: 'leadership',
+    bonus: 12,
+    description: '통솔 +12. 전투 종료 부상을 막습니다.',
+  },
   {
     key: 'horse_12_옥란백용구',
     name: '옥란백용구',

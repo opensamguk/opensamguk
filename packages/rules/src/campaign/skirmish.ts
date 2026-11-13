@@ -155,6 +155,7 @@ export function fightCampaignWall(
     {
       attacker: force(attacker),
       attackerEquipment,
+      attackerInjury: state.generals[attacker.commanderId]!.injury,
       attackerReadiness: personalityEffects(state, state.generals[attacker.commanderId]!.personality),
       attackerProficiency: state.generals[attacker.commanderId]!.proficiency,
       attackerSpecialty: combatSpecialty(state, combatSpecialtyKey(state.generals[attacker.commanderId]!)),
@@ -175,6 +176,7 @@ export function fightCampaignWall(
     rng,
   );
   consumeSnipeTool(state, attacker.commanderId, result.attackerSniped);
+  if (result.attackerInjury !== undefined) state.generals[attacker.commanderId]!.injury = result.attackerInjury;
   city.wall = result.defender.crew;
   finish(state, attacker, result.attacker);
   return { state, ...result };
@@ -227,6 +229,7 @@ export function fightCampaignCityGarrison(
     {
       attacker: force(attacker),
       attackerEquipment,
+      attackerInjury: state.generals[attacker.commanderId]!.injury,
       attackerReadiness: personalityEffects(state, state.generals[attacker.commanderId]!.personality),
       attackerProficiency: state.generals[attacker.commanderId]!.proficiency,
       attackerSpecialty: combatSpecialty(state, combatSpecialtyKey(state.generals[attacker.commanderId]!)),
@@ -245,6 +248,7 @@ export function fightCampaignCityGarrison(
     rng,
   );
   consumeSnipeTool(state, attacker.commanderId, result.attackerSniped);
+  if (result.attackerInjury !== undefined) state.generals[attacker.commanderId]!.injury = result.attackerInjury;
   defender.troops = result.defender.crew;
   defender.train = result.defender.train;
   defender.atmos = result.defender.atmos;
