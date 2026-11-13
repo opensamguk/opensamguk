@@ -131,9 +131,41 @@ export function generalInfo(general: General, viewer: Viewer) {
   return visibility(viewer).general(general) ? ownGeneralInfo(general) : generalIdentity(general);
 }
 
+export function publicGeneralStats(general: General) {
+  const { leadership, strength, intel, politics, charm, portraitId, officerLevel, injury } = general;
+  return {
+    leadership,
+    strength,
+    intel,
+    ...(politics != null && charm != null ? { politics, charm } : {}),
+    portraitId,
+    officerLevel,
+    injury,
+  };
+}
+
+export function commandedTroops(general: Pick<General, 'id' | 'crew'>, units?: readonly CampaignUnitState[]) {
+  return units === undefined
+    ? general.crew
+    : units.reduce((total, unit) => total + (unit.commanderId === general.id ? unit.troops : 0), 0);
+}
+
 // 병력은 부곡에만 저장한다. 주둔 표는 실제 지휘관별 병력과 병력 가중 평균을 읽는다.
-export function garrisonGeneralInfo(general: General, viewer: Viewer, units?: readonly CampaignUnitState[]) {
-  if (!visibility(viewer).general(general)) return generalIdentity(general);
+export function garrisonGeneralInfo(
+  general: General,
+  viewer: Viewer,
+  units?: readonly CampaignUnitState[],
+  disclosure?: { stats: boolean; troops?: boolean; biography?: boolean },
+) {
+  if (!visibility(viewer).general(general))
+    return {
+      ...generalIdentity(general),
+      ...(disclosure?.stats ? publicGeneralStats(general) : {}),
+      ...(disclosure?.biography
+        ? { age: general.age, personality: general.personality, special: general.special }
+        : {}),
+      ...(disclosure?.troops ? { crew: commandedTroops(general, units) } : {}),
+    };
   const detail = ownGeneralInfo(general);
   if (units === undefined) return detail;
   let troops = 0,
@@ -155,24 +187,30 @@ export function garrisonGeneralInfo(general: General, viewer: Viewer, units?: re
   };
 }
 
-export function cityInfo(city: City, viewer: Viewer) {
-  const publicInfo = mapCity(city);
-  if (!visibility(viewer).city(city)) return publicInfo;
+export function cityCapacity(city: City) {
+  return {
+    populationMax: city.populationMax,
+    agricultureMax: city.agricultureMax,
+    commerceMax: city.commerceMax,
+    securityMax: city.securityMax,
+    defenceMax: city.defenceMax,
+    wallMax: city.wallMax,
+  };
+}
+
+export function cityInfo(city: City, viewer: Viewer, alliedResidence = false) {
+  const publicInfo = { ...mapCity(city), ...cityCapacity(city) };
+  if (!alliedResidence && !visibility(viewer).city(city))
+    return city.nationId === null ? { ...publicInfo, defence: city.defence, wall: city.wall } : publicInfo;
   return {
     ...publicInfo,
     region: city.region,
     population: city.population,
-    populationMax: city.populationMax,
     agriculture: city.agriculture,
-    agricultureMax: city.agricultureMax,
     commerce: city.commerce,
-    commerceMax: city.commerceMax,
     security: city.security,
-    securityMax: city.securityMax,
     defence: city.defence,
-    defenceMax: city.defenceMax,
     wall: city.wall,
-    wallMax: city.wallMax,
     trust: city.trust,
   };
 }

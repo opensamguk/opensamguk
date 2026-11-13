@@ -2,6 +2,7 @@ import { TRPCError } from '@trpc/server';
 import {
   BALANCE,
   estimateTaxIncome,
+  INTEL_FEATURE,
   nowTick,
   OFFICE_EFFECTS_FEATURE,
   residentOfficeBonuses,
@@ -11,7 +12,7 @@ import {
 } from '@opensamguk/rules';
 import { protectedProcedure, router } from '../trpc';
 import { entityKey, readWorld, viewerGeneral, worldClock, worldInput } from '../queries';
-import { cityInfo, garrisonGeneralInfo, mapCity, nationInfo, visibility } from '../visibility';
+import { cityCapacity, cityInfo, garrisonGeneralInfo, mapCity, nationInfo, visibility } from '../visibility';
 import { readView } from '../game/queries';
 
 export const nationRouter = router({
@@ -22,6 +23,7 @@ export const nationRouter = router({
         where: { worldId_id: { worldId: input.worldId, id: input.nationId } },
       });
       if (!nation) throw new TRPCError({ code: 'NOT_FOUND', message: '국가를 찾을 수 없습니다.' });
+      const openRoster = !world.ruleFeatures.includes(INTEL_FEATURE);
       const ownNation = visibility(viewer).nation(nation);
       const cities = await tx.city.findMany({
         where: input,
@@ -79,8 +81,15 @@ export const nationRouter = router({
         populationMax: settlements.reduce((sum, city) => sum + city.populationMax, 0),
         ...(ownNation ? { salaryRate: BALANCE.MONTHLY_SALARY_RATE } : {}),
         ...(financeEstimate ? { financeEstimate } : {}),
-        cities: cities.map((city) => (ownNation ? cityInfo(city, viewer) : mapCity(city))),
-        generals: generals.map((general) => garrisonGeneralInfo(general, viewer, units)),
+        cities: cities.map((city) =>
+          ownNation ? cityInfo(city, viewer) : { ...mapCity(city), ...cityCapacity(city) },
+        ),
+        generals: generals.map((general) =>
+          garrisonGeneralInfo(general, viewer, units, {
+            stats: openRoster,
+            biography: openRoster,
+          }),
+        ),
       };
     }),
   ),

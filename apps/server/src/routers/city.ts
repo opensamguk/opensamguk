@@ -1,7 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import { protectedProcedure, router } from '../trpc';
 import { entityKey, readWorld, viewerGeneral, worldInput } from '../queries';
-import { cityInfo, garrisonGeneralInfo, visibility } from '../visibility';
+import { cityInfo, commandedTroops, garrisonGeneralInfo, visibility } from '../visibility';
 import { readView } from '../game/queries';
 import {
   cityRegionName,
@@ -40,6 +40,23 @@ export const cityRouter = router({
             },
             orderBy: { id: 'asc' },
           });
+      const activeViewer = viewer?.removedAt == null ? viewer : null;
+      const nationId = activeViewer?.nationId;
+      const alliedResidence =
+        !garrisonHidden &&
+        nationId != null &&
+        activeViewer !== null &&
+        activeViewer.officerLevel > 0 &&
+        generals.some((resident) => resident.nationId === nationId);
+      const full = alliedResidence || visibility(activeViewer).city(city);
+      const adjacent =
+        !garrisonHidden &&
+        !full &&
+        nationId != null &&
+        city.connections.length > 0 &&
+        (await tx.city.count({
+          where: { worldId: input.worldId, nationId, cityKey: { in: city.connections } },
+        })) > 0;
       const campaignEnabled = world.ruleFeatures.includes('campaign-v1');
       const units =
         campaignEnabled && !garrisonHidden ? (await readView(tx, input.worldId)).campaign!.units : undefined;
@@ -99,7 +116,7 @@ export const cityRouter = router({
                 : {}),
             }
           : {}),
-        ...cityInfo(city, viewer),
+        ...cityInfo(city, activeViewer, alliedResidence),
         region: city.region,
         regionName: cityRegionName(
           city.region,
@@ -110,7 +127,19 @@ export const cityRouter = router({
         ...(campaignEnabled ? { campaignEnabled: true as const } : {}),
         ...(world.ruleFeatures.includes('five-stats') ? { fiveStats: true as const } : {}),
         ...(fogEnabled ? { fog: { intel, garrisonHidden } } : {}),
-        generals: generals.map((general) => garrisonGeneralInfo(general, viewer, units)),
+        ...(full && !garrisonHidden && nationId != null
+          ? {
+              enemyCrew: generals
+                .filter((resident) => resident.nationId !== null && resident.nationId !== nationId)
+                .reduce((sum, resident) => sum + commandedTroops(resident, units), 0),
+            }
+          : {}),
+        generals: generals.map((resident) =>
+          garrisonGeneralInfo(resident, activeViewer, units, {
+            stats: !garrisonHidden && (full || adjacent),
+            troops: !garrisonHidden && full,
+          }),
+        ),
       };
     }),
   ),
