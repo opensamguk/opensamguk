@@ -1,5 +1,5 @@
 import { useId, useMemo, useState, type ReactNode } from 'react';
-import { useWorldId, useWorldRules } from '../game/queries';
+import { useHome, useWorldId, useWorldRules } from '../game/queries';
 import { DisabledReason } from '../ui/DisabledReason';
 import { ErrorState, LoadingState } from '../ui/States';
 import { ValueDelta } from '../ui/ValueDelta';
@@ -24,7 +24,7 @@ import { useBattleWorker, type BattleWorkerState } from './useBattleWorker';
 import styles from './BattleSimPage.module.css';
 
 // /w/:worldId/simulator. 보조 화면이다 (T4-34). 사용자가 넣은 가정으로 교전 한 번을 Web Worker에서 계산한다.
-// 이 월드의 병종표 조회(resources.worldRules) 말고는 tRPC를 부르지 않고 게임 상태에서 값을 채우지 않는다 (T4-86).
+// 내 장수 가져오기는 게임 레이아웃과 같은 home.get 조회를 쓴다 (INT-26).
 // 저장소(sessionStorage 등)를 읽거나 쓰지 않는다.
 
 const ERROR_TEXT: Record<Exclude<BattleWorkerState, { status: 'idle' | 'running' | 'done' }>['code'], string> = {
@@ -42,7 +42,13 @@ export function BattleSimPage() {
       <h1 id="battle-sim-title">전투 시뮬레이터</h1>
       {rules.data ? (
         // 월드가 바뀌면 폼과 Worker를 새로 만든다. 앞 월드의 병종표가 남지 않는다.
-        <BattleSimForm key={worldId} unitSetKey={rules.data.unitSetKey} unitSet={rules.data.unitSet} />
+        <BattleSimForm
+          key={worldId}
+          worldId={worldId}
+          unitSetKey={rules.data.unitSetKey}
+          unitSet={rules.data.unitSet}
+          fiveStats={rules.data.statRules.count === 5}
+        />
       ) : (
         <>
           {rules.isError ? (
@@ -57,7 +63,19 @@ export function BattleSimPage() {
   );
 }
 
-function BattleSimForm({ unitSetKey, unitSet }: { unitSetKey: string; unitSet: WorldUnitSet }) {
+function BattleSimForm({
+  worldId,
+  unitSetKey,
+  unitSet,
+  fiveStats,
+}: {
+  worldId: string;
+  unitSetKey: string;
+  unitSet: WorldUnitSet;
+  fiveStats: boolean;
+}) {
+  const home = useHome(worldId);
+  const general = home.isError ? undefined : home.data?.general;
   const units = useMemo(() => worldUnits(unitSet), [unitSet]);
   // shortcut: 장수 병종이 없는 병종표면 0으로 두어 병종 칸 오류로 보인다. 실제 출병도 그런 표로는 돌지 않는다.
   const [form, setForm] = useState<BattleForm>(() => defaultForm(units.defaultId ?? 0));
@@ -74,12 +92,27 @@ function BattleSimForm({ unitSetKey, unitSet }: { unitSetKey: string; unitSet: W
   const set = (key: 'wall' | 'defence' | 'attackerTech' | 'defenderTech' | 'seed', value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
   const wall = form.defenderKind === 'wall';
+  const importAttacker = () => {
+    if (!general) return;
+    const nation = home.data?.nation;
+    setForm((current) => ({
+      ...current,
+      statProfile: fiveStats ? 'five-stats' : 'legacy',
+      attacker: {
+        crew: String(general.crew),
+        crewType: units.generals.some(({ id }) => id === general.crewType) ? String(general.crewType) : '',
+        train: String(general.train),
+        atmos: String(general.atmos),
+      },
+      attackerTech: String(nation && 'tech' in nation ? nation.tech : 0),
+      attackerCommander: { leadership: String(general.leadership), strength: String(general.strength) },
+    }));
+  };
 
   return (
     <>
       <p className={styles.muted}>
-        양쪽 값과 시드를 직접 넣으면 교전 한 번을 계산합니다. 다른 국가의 값은 불러오지 않습니다. 병종표는 이 월드의
-        병종표({unitSetKey}) 기준입니다.
+        이 월드의 병종표({unitSetKey})로 교전 한 번을 계산합니다. 공격 칸에는 내 장수의 값을 가져올 수 있습니다.
       </p>
 
       <form
@@ -103,12 +136,14 @@ function BattleSimForm({ unitSetKey, unitSet }: { unitSetKey: string; unitSet: W
             <option value="five-stats">통합판 5능력치, 지휘관 보정</option>
           </select>
         </label>
-        <p className={styles.muted}>
-          월드의 규칙에 맞춰 고릅니다. 지휘관 값은 가정을 직접 입력하며 실제 장수의 비공개 수치를 불러오지 않습니다.
-        </p>
         <div className={styles.sides}>
           <fieldset className={styles.side}>
             <legend>공격</legend>
+            {general ? (
+              <button type="button" className={styles.primary} onClick={importAttacker}>
+                내 장수 값 가져오기
+              </button>
+            ) : null}
             <ForceFields
               side="attacker"
               form={form.attacker}
