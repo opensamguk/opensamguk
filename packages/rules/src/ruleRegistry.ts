@@ -8,6 +8,7 @@ import {
 import { inactiveRemovalFeature, INACTIVE_REMOVAL_FEATURE } from './policy/inactiveRemoval';
 import { GENERAL_PROFICIENCY_FEATURE } from './general/proficiency';
 import { convertProficiency } from './commands/convertProficiency';
+import { DOMESTIC_SPECIALTY_FEATURE } from './general/domesticSpecialty';
 import { GENERAL_PERSONALITY_FEATURE } from './general/personality';
 import { RESEARCH_ERA_FEATURE } from './nationResearch/era';
 import { NATION_PHILOSOPHY_FEATURE } from './personnel/nationPhilosophy';
@@ -190,6 +191,7 @@ export const ruleRegistry: RuleRegistry = {
       conflicts: [],
       commandBindings: [{ definition: convertProficiency, sliceKeys: [] }],
     },
+    { key: DOMESTIC_SPECIALTY_FEATURE, requires: [], conflicts: [] },
     { key: GENERAL_PERSONALITY_FEATURE, requires: [], conflicts: [] },
     { key: GENERAL_CONDITION_FEATURE, requires: ['five-stats'], conflicts: [] },
     { key: RICE_MARKET_FEATURE, requires: [], conflicts: [] },

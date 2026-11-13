@@ -1,7 +1,7 @@
 import { BALANCE } from '../balance';
 import { applyCampaignPreparation } from '../campaign/preparation';
 import type { WorldView } from '../model/world';
-import { DOMESTIC_SPECS } from './domestic/investment';
+import { DOMESTIC_SPECS, domesticInvestmentCost } from './domestic/investment';
 import { recruitArgs } from './military';
 import { domesticStatScore, drillGain, recruitCost } from './statScores';
 import type { Actor } from './types';
@@ -44,7 +44,7 @@ export function commandStatPreview(
   if (spec)
     return {
       statScore: domesticStatScore(view, general, key, spec.stat),
-      goldCost: BALANCE.DEVEL_COST * (spec.costFactor ?? 1),
+      goldCost: domesticInvestmentCost(view, general, spec),
     };
   if (key === 'train' || key === 'morale')
     return {

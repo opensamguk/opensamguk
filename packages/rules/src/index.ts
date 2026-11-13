@@ -362,3 +362,5 @@ export { INACTIVE_REMOVAL_FEATURE, inactiveRemovalTick } from './policy/inactive
 export { GENERAL_PERSONALITY_FEATURE, personalityEffects } from './general/personality';
 
 export { GENERAL_PROFICIENCY_FEATURE, proficiencyGrade, storedGeneralProficiency } from './general/proficiency';
+
+export { DOMESTIC_SPECIALTY_FEATURE, domesticSpecialty } from './general/domesticSpecialty';

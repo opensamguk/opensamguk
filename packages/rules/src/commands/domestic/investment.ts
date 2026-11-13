@@ -7,6 +7,7 @@ import type { WorldView } from '../../model/world';
 import type { Actor, CommandDef, Failure } from '../types';
 import type { CityField, Effect } from '../effects';
 import { applyModifiers, collectModifiers, collectModifiersWith, type ModifierProvider } from '../../modifiers';
+import { domesticSpecialtyFor } from '../../general/domesticSpecialty';
 import { domesticStatScore } from '../statScores';
 import { checkCityGoods, consumeCityGoods } from '../../logistics/consumption';
 import { cloneWorld } from '../../model/clone';
@@ -68,12 +69,15 @@ export function makeInvestmentWithProviders(spec: Spec, providers: readonly Modi
   );
 }
 
+export function domesticInvestmentCost(view: WorldView, general: WorldView['generals'][number], spec: Spec) {
+  const base = BALANCE.DEVEL_COST * (spec.costFactor ?? 1);
+  const philosophy = philosophyDomestic(view, general.nationId, spec.key).cost;
+  const specialty = domesticSpecialtyFor(view, general, spec.key)?.cost ?? 1;
+  return philosophy === 1 && specialty === 1 ? base : Math.round(base * philosophy * specialty);
+}
+
 function makeInvestmentWithCollector(spec: Spec, collect: typeof collectModifiers): CommandDef {
-  const baseCost = BALANCE.DEVEL_COST * (spec.costFactor ?? 1);
-  const cost = (view: WorldView, nationId: number | null) => {
-    const multiplier = philosophyDomestic(view, nationId, spec.key).cost;
-    return multiplier === 1 ? baseCost : Math.round(baseCost * multiplier);
-  };
+  const cost = (view: WorldView, general: WorldView['generals'][number]) => domesticInvestmentCost(view, general, spec);
   const construction = spec.field === 'wall' || spec.field === 'defence' ? spec.field : null;
   function check(view: WorldView, actor: Actor): Failure | null {
     const general = view.generals[actor.generalId];
@@ -86,7 +90,7 @@ function makeInvestmentWithCollector(spec: Spec, collect: typeof collectModifier
     if (city.kind === 'PASS' && spec.field !== 'defence' && spec.field !== 'wall')
       return { code: 'BAD_TARGET', message: '관문에서는 수비와 성벽을 보강할 수 있습니다.' };
     if (!city.supplied) return { code: 'NO_SUPPLY', message: '보급이 끊긴 도시입니다.' };
-    if (general.gold < cost(view, general.nationId)) return { code: 'NO_GOLD', message: '금이 부족합니다.' };
+    if (general.gold < cost(view, general)) return { code: 'NO_GOLD', message: '금이 부족합니다.' };
     const value = spec.field === 'tech' ? nation.tech : city[spec.field];
     const max =
       spec.field === 'tech' ? BALANCE.MAX_TECH : spec.field === 'trust' ? BALANCE.MAX_TRUST : city[`${spec.field}Max`];
@@ -122,9 +126,11 @@ function makeInvestmentWithCollector(spec: Spec, collect: typeof collectModifier
       // Replay order: base score, critical roll, then a multiplier only for a critical.
       let score =
         ((domesticStatScore(view, general, spec.key, spec.stat) * city.trust) / 100) * (0.8 + rng.next() * 0.4);
+      const trait = domesticSpecialtyFor(view, general, spec.key);
       const critical = rng.next();
-      if (critical < 0.1) score *= 2.2 + rng.next() * 0.8;
-      else if (critical < 0.2) score *= 0.2 + rng.next() * 0.2;
+      if (critical < 0.1 + (trait?.successBonus ?? 0)) score *= 2.2 + rng.next() * 0.8;
+      else if (critical < 0.2 + (trait?.successBonus ?? 0)) score *= 0.2 + rng.next() * 0.2;
+      if (trait) score *= trait.score;
       if (isFront(view, city.cityKey)) score *= BALANCE.FRONT_FACTOR;
       score = applyModifiers(score, collect(view, general.id, { stage: 'domestic.score', commandKey: spec.key }), {
         min: 0,
@@ -150,7 +156,7 @@ function makeInvestmentWithCollector(spec: Spec, collect: typeof collectModifier
         effects: [
           ...material,
           effect,
-          { kind: 'general', id: general.id, field: 'gold', op: 'add', value: -cost(view, general.nationId) },
+          { kind: 'general', id: general.id, field: 'gold', op: 'add', value: -cost(view, general) },
           { kind: 'general', id: general.id, field: 'experience', op: 'add', value: Math.round(score * 0.7) },
           { kind: 'general', id: general.id, field: 'dedication', op: 'add', value: points },
         ],

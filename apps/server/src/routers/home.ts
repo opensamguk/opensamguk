@@ -4,6 +4,7 @@ import { cityInfo, ownGeneralInfo, logInfo, logSelect, nationInfo } from '../vis
 import {
   GENERAL_CONDITION_FEATURE,
   personalityEffects,
+  domesticSpecialty,
   GENERAL_PROFICIENCY_FEATURE,
   proficiencyGrade,
   storedGeneralProficiency,
@@ -133,7 +134,9 @@ export const homeRouter = router({
       return {
         general: {
           ...ownGeneralInfo(general),
+
           personalityEffects: personalityEffects(world, general.personality) ?? null,
+          domesticSpecialty: domesticSpecialty(world, general.special) ?? null,
           ...(unitSet
             ? {
                 proficiency: Object.entries(unitSet.armTypes)

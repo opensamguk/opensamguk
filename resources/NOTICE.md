@@ -189,3 +189,7 @@ core2026 커밋 df6c9269fa1e2862418ba9da481c8dd2d758d6c5의 MIT © 2025 devsam �
 ### INT-26 병종 숙련
 
 숙련 등급 구간, 숙련전환 공식과 전투 등급 보정은 core2026 `c81d304`의 `app/game-frontend/src/utils/legacyProgress.ts`와 `packages/logic/src/actions/turn/general/che_숙련전환.ts`, `packages/logic/src/war/utils.ts`를 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+### INT-26 장수 내정 특기
+
+내정 특기의 비용·효과·성공 확률은 core2026 `c81d304`의 `packages/logic/src/actionModules/traits/domestic/`를 참고했다. OpenSamguk 내정의 성공률 보정은 기존 대성공 구간에 적용한다. 원저작자 devsam의 위 MIT 고지를 유지한다.
