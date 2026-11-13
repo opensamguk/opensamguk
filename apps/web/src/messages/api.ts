@@ -26,6 +26,7 @@ export const MESSAGE_SCOPES = ['PRIVATE', 'NATION', 'DIPLOMACY', 'WORLD'] as con
 // 이벤트 이름이 kind이고 data는 { kind, scope? } JSON이다. 본문·수치는 싣지 않는다.
 export type WorldEvent =
   | { kind: 'ready' }
+  | { kind: 'activity.updated' }
   | { kind: 'turn.result' }
   | { kind: 'message.new'; scope: MessageScope }
   | { kind: 'monthly.done' }
@@ -34,6 +35,7 @@ export type WorldEvent =
   | { kind: 'notice.updated'; scope: 'nation' | 'world' };
 export const WORLD_EVENT_KINDS = [
   'ready',
+  'activity.updated',
   'turn.result',
   'message.new',
   'monthly.done',

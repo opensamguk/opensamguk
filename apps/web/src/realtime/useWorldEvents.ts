@@ -21,6 +21,8 @@ export function invalidationTargets(event: WorldEvent, worldId: string, trpc: Tr
   switch (event.kind) {
     case 'ready':
       return 'all';
+    case 'activity.updated':
+      return [trpc.records.activity.queryKey({ worldId }), trpc.records.world.queryKey({ worldId })];
     case 'turn.result':
       return [
         trpc.equipment.mine.queryKey({ worldId }),

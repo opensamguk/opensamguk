@@ -96,6 +96,10 @@ describe('SSE 알림 해석', () => {
       [['message', 'list'], { input: { worldId: WORLD, scope: 'PRIVATE' }, type: 'infinite' }],
       [['message', 'unread'], { input: { worldId: WORLD }, type: 'query' }],
     ]);
+    expect(invalidationTargets({ kind: 'activity.updated' }, WORLD, trpc)).toEqual([
+      trpc.records.activity.queryKey({ worldId: WORLD }),
+      trpc.records.world.queryKey({ worldId: WORLD }),
+    ]);
     expect(invalidationTargets({ kind: 'turn.result' }, WORLD, trpc)).toEqual([
       trpc.equipment.mine.queryKey({ worldId: WORLD }),
       trpc.home.get.queryKey({ worldId: WORLD }),

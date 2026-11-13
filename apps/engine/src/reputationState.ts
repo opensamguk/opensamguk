@@ -1,3 +1,4 @@
+import { notifyActivityOnCommit } from '@opensamguk/db';
 import type { Prisma } from '@opensamguk/db';
 import {
   compareMonthlyReviews,
@@ -88,7 +89,8 @@ export async function appendReputationEvents(
     };
   });
   // 월드 잠금 안에서 처음 적용된 사건을 보존한다.
-  await tx.reputationEvent.createMany({ data, skipDuplicates: true });
+  const { count } = await tx.reputationEvent.createMany({ data, skipDuplicates: true });
+  if (count > 0) await notifyActivityOnCommit(tx, worldId);
 }
 
 export async function persistMonthlyReview(
