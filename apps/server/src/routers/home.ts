@@ -4,6 +4,10 @@ import { cityInfo, ownGeneralInfo, logInfo, logSelect, nationInfo } from '../vis
 import {
   GENERAL_CONDITION_FEATURE,
   personalityEffects,
+  GENERAL_PROFICIENCY_FEATURE,
+  proficiencyGrade,
+  storedGeneralProficiency,
+  unitSetSchema,
   INACTIVE_REMOVAL_FEATURE,
   inactiveRemovalTick,
   DEFENSE_STANCES,
@@ -65,6 +69,20 @@ export const homeRouter = router({
         world.status !== 'ENDED'
           ? playerAutoplayWindow(general.lastActiveTick, world.turnTermMinutes)
           : null;
+      const proficiencyEnabled = world.ruleFeatures.includes(GENERAL_PROFICIENCY_FEATURE);
+      const proficiency = proficiencyEnabled
+        ? storedGeneralProficiency(true, general.proficiency).proficiency
+        : undefined;
+      const unitSet = proficiencyEnabled
+        ? unitSetSchema.parse(
+            (
+              await tx.world.findUniqueOrThrow({
+                where: { id: input.worldId },
+                select: { unitSet: true },
+              })
+            ).unitSet,
+          )
+        : undefined;
       const stanceEnabled = world.ruleFeatures.includes(DEFENSE_STANCE_FEATURE);
       const limits = defenseRequirements(stanceEnabled, general.defenseThreshold);
       const pendingDefense = stanceEnabled
@@ -116,6 +134,15 @@ export const homeRouter = router({
         general: {
           ...ownGeneralInfo(general),
           personalityEffects: personalityEffects(world, general.personality) ?? null,
+          ...(unitSet
+            ? {
+                proficiency: Object.entries(unitSet.armTypes)
+                  .map(([armType, name]) => ({ armType: Number(armType), name }))
+                  .filter(({ armType }) => armType > 0)
+                  .sort((a, b) => a.armType - b.armType)
+                  .map(({ armType, name }) => ({ armType, name, ...proficiencyGrade(proficiency?.[armType] ?? 0) })),
+              }
+            : {}),
           battleStats:
             battle === null
               ? null

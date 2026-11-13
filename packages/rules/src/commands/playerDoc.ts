@@ -45,6 +45,11 @@ export const commandPlayerDocs: Readonly<Record<string, PlayerDoc>> = {
       ];
     }),
   ),
+  convert_proficiency: {
+    summary: '병종 숙련의 40%를 빼고 그중 90%를 다른 계열에 옮깁니다.',
+    requires: [ownCity, '숙련을 가진 병종과 서로 다른 대상 병종'],
+    cost: `금 ${BALANCE.DEVEL_COST}, 쌀 ${BALANCE.DEVEL_COST}`,
+  },
   rest: { summary: '이번 장수 턴에 쉽니다.', requires: [], cost: null },
   recruit: { summary: '병사를 모집합니다.', requires: recruit, cost: recruitCost },
   conscript: {

@@ -185,3 +185,7 @@ core2026 커밋 df6c9269fa1e2862418ba9da481c8dd2d758d6c5의 MIT © 2025 devsam �
 ### INT-26 장수 성격
 
 성격별 전투 훈련·사기, 징·모병 비용, 명성·공헌 보정은 core2026 `c81d304`의 `packages/logic/src/actionModules/traits/personality/`와 `packages/logic/src/war/units/general.ts`를 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+### INT-26 병종 숙련
+
+숙련 등급 구간과 숙련전환 공식은 core2026 `c81d304`의 `app/game-frontend/src/utils/legacyProgress.ts`와 `packages/logic/src/actions/turn/general/che_숙련전환.ts`를 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다.

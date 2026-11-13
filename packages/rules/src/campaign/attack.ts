@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { Rng } from '@opensamguk/shared';
+import { addGeneralProficiency } from '../general/proficiency';
 import { nationRestrictions } from '../personnel/nationRestrictions';
 import { BALANCE } from '../balance';
 import { canDefend, DEFENSE_STANCE_FEATURE } from '../battle/defenders';
@@ -117,6 +118,7 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
   for (const attackerId of attackingIds) {
     let attackerFirstVolleyUsed = false;
     const fightWall = (openingSkirmish = false) => {
+      const priorWall = state.cities[cityKey]!.wall;
       const outcome = fightCampaignWall(state, attackerId, cityKey, actor.unitSet!, rng, {
         openingSkirmish,
         attackerFirstVolleyUsed,
@@ -124,6 +126,8 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
       });
       state = outcome.state;
       attackerFirstVolleyUsed ||= outcome.attackerFirstVolleyFired === true;
+      const unit = get(attackerId);
+      addGeneralProficiency(state, state.generals[unit.commanderId]!, 5, priorWall - state.cities[cityKey]!.wall);
       const name = openingSkirmish ? '성벽 선제 교전' : '성벽 교전';
       for (const phase of outcome.phases ?? []) attackPhases.push({ ...phase, opponent: '성벽' });
       rounds.push(`부곡${attackerId} ${name}: 공격 ${get(attackerId).troops}명, 성벽 ${state.cities[cityKey]!.wall}`);
@@ -156,6 +160,19 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
       attackerFirstVolleyUsed ||= outcome.attackerFirstVolleyFired === true;
       const a = get(attackerId),
         d = get(defenderId);
+      const arms = actor.unitSet!.crewTypes;
+      addGeneralProficiency(
+        state,
+        state.generals[attackerCommander]!,
+        arms.find((type) => type.id === a.crewType)!.armType,
+        defenderTroops - d.troops,
+      );
+      addGeneralProficiency(
+        state,
+        state.generals[defenderCommander]!,
+        arms.find((type) => type.id === d.crewType)!.armType,
+        (attackerTroops - a.troops) * 0.8,
+      );
       generalEngagements.push({
         attackerId: attackerCommander,
         defenderId: defenderCommander,
@@ -192,6 +209,7 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
       .map((row) => row.crewType)
       .sort((a, b) => a - b)) {
       if (!alive(get(attackerId))) break;
+      const prior = cityDefense().find((row) => row.crewType === crewType)?.troops ?? 0;
       const outcome = fightCampaignCityGarrison(
         state,
         attackerId,
@@ -204,6 +222,10 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
       );
       state = outcome.state;
       attackerFirstVolleyUsed ||= outcome.attackerFirstVolleyFired === true;
+      const unit = get(attackerId);
+      const remaining = cityDefense().find((row) => row.crewType === crewType)?.troops ?? 0;
+      const armType = actor.unitSet!.crewTypes.find((type) => type.id === unit.crewType)!.armType;
+      addGeneralProficiency(state, state.generals[unit.commanderId]!, armType, prior - remaining);
       rounds.push(outcome.text);
       for (const phase of outcome.phases ?? []) attackPhases.push({ ...phase, opponent: `도시 병종${crewType}` });
       if (cityDefense().some((row) => row.crewType === crewType && row.troops > 0 && row.atmos > 0)) break;

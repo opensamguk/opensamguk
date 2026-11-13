@@ -459,6 +459,7 @@ model General {
   removedAt         Int?
   personality       String?
   defenseThreshold  Int?
+  proficiency       Json?
   special           String?
   gold              Int
   rice              Int

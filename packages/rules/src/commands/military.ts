@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { addGeneralProficiency } from '../general/proficiency';
 import { BALANCE } from '../balance';
 import { defineCommand, fail, noArgs, ownCity, positive, success } from './support';
 import { drillGain, recruitCost } from './statScores';
@@ -41,6 +42,7 @@ const recruits = (forced: boolean) =>
       general.crew += args.amount;
       general.crewType = args.crewType;
       city.population -= args.amount;
+      if (forced) addGeneralProficiency(state, general, unit.armType, args.amount);
       if (forced) city.trust = Math.max(0, city.trust - BALANCE.CONSCRIPT_TRUST_LOSS);
       return success(`${forced ? '징병' : '모병'}: ${args.amount}명, 병력 ${general.crew}명`);
     },
@@ -63,7 +65,10 @@ const drill = (morale: boolean) =>
       const general = state.generals[actor.generalId]!;
       general.gold -= BALANCE.DRILL_COST;
       const field = morale ? 'atmos' : 'train';
-      general[field] = Math.min(100, general[field] + drillGain(state, general, morale));
+      const before = general[field];
+      general[field] = Math.min(100, before + drillGain(state, general, morale));
+      const armType = actor.unitSet?.crewTypes.find((unit) => unit.id === general.crewType)?.armType;
+      if (armType !== undefined) addGeneralProficiency(state, general, armType, general[field] - before);
       return success(`${morale ? '사기진작' : '훈련'}: ${general[field]}`);
     },
   });

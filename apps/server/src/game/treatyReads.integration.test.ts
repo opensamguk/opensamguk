@@ -98,6 +98,7 @@ function general(patch: Partial<General> = {}): General {
     officerCityKey: null,
     nationJoinedTick: null,
     defenseThreshold: null,
+    proficiency: null,
     removedAt: null,
     sex: null,
     politics: null,
