@@ -77,7 +77,10 @@ export const nationCommandsRouter = router({
                     .map((generalId) => ({ generalId, troopName: troop.name })),
                 )
             : undefined;
-        const availability = commandAvailability(def, view, commandActor, ended);
+        const availability =
+          !ended && availableMonth > current
+            ? { available: false, reason: `${availableMonth - current}개월 더 기다려야 합니다.` }
+            : commandAvailability(def, view, commandActor, ended);
         return {
           ...describeCommand(def),
           group:

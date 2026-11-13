@@ -21,6 +21,13 @@ vi.mock('./resolver', () => ({
       list: () => [
         { key: 'nation_rest', name: '휴식', target: 'nation', args: z.strictObject({}), precheck: () => null },
         { key: 'nation_city_allocate', name: '도시 병력 배속', target: 'nation', args: cityResourceInputSchema },
+        {
+          key: 'nation_mobilize',
+          name: '백성동원',
+          category: 'strategy',
+          target: 'nation',
+          args: z.strictObject({ cityKey: z.number() }),
+        },
       ],
       get: (key: string) =>
         key === 'nation_city_allocate'
@@ -63,12 +70,30 @@ describe('AC-INT-18B 도시 배속 국가 예약의 서버 권한', () => {
       commandKey: 'nation_rest',
       args: {},
     });
-    expect(await f.caller.list({ worldId: f.world.id })).toEqual([expect.objectContaining({ key: 'nation_rest' })]);
+    expect(await f.caller.list({ worldId: f.world.id })).toEqual([
+      expect.objectContaining({ key: 'nation_rest' }),
+      expect.objectContaining({ key: 'nation_mobilize' }),
+    ]);
   });
   it.each([0, 4, 13])('직책 %i는 추가 권한을 얻지 않는다', async (level) => {
     const f = fixture(true, level);
     expect(() => parseOfficeTurn(f.world, level, { commandKey: 'nation_city_allocate', args })).toThrow('명령과 인자');
     await expect(f.caller.list({ worldId: f.world.id })).rejects.toHaveProperty('code', 'FORBIDDEN');
+  });
+  it('인자를 고르기 전에도 공통·개별 전략 대기를 명령 카드에 반환한다', async () => {
+    const f = fixture();
+    f.world.startYear = 191;
+    vi.mocked(readView).mockResolvedValue({
+      nationStrategy: { version: 1, nations: { 1: { strategicUntil: 4, commands: { nation_mobilize: 6 } } } },
+    } as Awaited<ReturnType<typeof readView>>);
+    expect(await f.caller.list({ worldId: f.world.id })).toContainEqual(
+      expect.objectContaining({
+        key: 'nation_mobilize',
+        available: false,
+        reason: '6개월 더 기다려야 합니다.',
+        cooldown: { remainingMonths: 6, availableAt: { year: 191, month: 7 } },
+      }),
+    );
   });
   it('잘못된 수량과 전역 revision을 새 예약 인자로 받지 않는다', () => {
     const f = fixture();
