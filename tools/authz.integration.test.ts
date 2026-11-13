@@ -53,6 +53,7 @@ const paths = [
   'home.get',
   'city.get',
   'nation.get',
+  'treaty.relations',
   'records.general',
   'records.nation',
   'records.world',
@@ -232,12 +233,13 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
               : path === 'auth.login' && category === 'sanctioned'
                 ? { email: users[2]!.email, password }
                 : input(path);
-          const commandsOwner = path === 'commands.list' && category === 'otherUser' ? await session() : undefined;
+          const publicWorldRead = path === 'commands.list' || path === 'treaty.relations';
+          const ownerCookie = publicWorldRead && category === 'otherUser' ? await session() : undefined;
           const before = await snapshot();
           const result = await request(path, data, cookie);
           if (category === 'otherUser') {
             if (path === 'commands.list') {
-              const owner = await request(path, data, commandsOwner);
+              const owner = await request(path, data, ownerCookie);
               expect(owner.status).toBe(200);
               expect(owner.code).toBeUndefined();
               expect(result.status).toBe(200);
@@ -249,6 +251,10 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
                   expect.objectContaining({ key: 'farm' }),
                 ]),
               );
+            } else if (path === 'treaty.relations') {
+              const owner = await request(path, data, ownerCookie);
+              expect(owner.status).toBe(200);
+              expect(result).toEqual(owner);
             } else if (path === 'heritage.mine') {
               expect(result.status).toBe(200);
               expect(result.data).toMatchObject({ userId: users[3]!.id, balance: 0, entries: [] });

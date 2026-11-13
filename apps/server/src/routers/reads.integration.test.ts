@@ -16,6 +16,7 @@ type Results = {
   'home.get': Out['home']['get'];
   'city.get': Out['city']['get'];
   'nation.get': Out['nation']['get'];
+  'treaty.relations': Out['treaty']['relations'];
   'records.general': Out['records']['general'];
   'records.nation': Out['records']['nation'];
   'records.world': Out['records']['world'];
@@ -26,6 +27,7 @@ const routes = [
   'home.get',
   'city.get',
   'nation.get',
+  'treaty.relations',
   'records.general',
   'records.nation',
   'records.world',
@@ -205,6 +207,28 @@ afterAll(async () => {
 });
 
 describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
+  it('AC-INT-26 외교 관계표는 모든 국가 쌍과 공개 외교 상태만 반환한다', async () => {
+    const world = await fixtureWorld('relations');
+    await db.nation.create({
+      data: { ...state.nations[0]!, worldId: world, id: 3, name: '제삼국', capitalCityKey: null },
+    });
+    await db.diplomacy.create({
+      data: { worldId: world, nationA: 1, nationB: 2, state: 'NON_AGGRESSION', untilTick: 0 },
+    });
+    const result = await query('treaty.relations', { worldId: world }, users[3]!.cookie);
+    expect(result.status).toBe(200);
+    expect(result.data.nations).toEqual([
+      ...state.nations.map(({ id, name, color }) => ({ id, name, color })),
+      { id: 3, name: '제삼국', color: state.nations[0]!.color },
+    ]);
+    expect(result.data.pairs).toEqual([
+      { nationA: 1, nationB: 2, relation: 'NON_AGGRESSION', relationEndAt: { year: state.startYear, month: 1 } },
+      { nationA: 1, nationB: 3, relation: 'NONE', relationEndAt: null },
+      { nationA: 2, nationB: 3, relation: 'NONE', relationEndAt: null },
+    ]);
+    const other = await query('treaty.relations', { worldId: otherWorldId });
+    expect(other.data.pairs).toEqual([{ nationA: 1, nationB: 2, relation: 'NONE', relationEndAt: null }]);
+  });
   it('summary는 서버 시계와 공개 기수 설정을 반환한다', async () => {
     expect(await query('world.summary', { worldId })).toEqual({
       status: 200,
