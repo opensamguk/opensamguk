@@ -260,6 +260,8 @@ export {
   TREATMENT_TOOL,
   MORALE_TOOL,
   availableEquipmentTools,
+  availableRareEquipmentTools,
+  allEquipmentTools,
   hasTreatmentTool,
   hasMoraleTool,
   hasRareEquipment,

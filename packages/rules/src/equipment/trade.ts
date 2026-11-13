@@ -11,7 +11,8 @@ import {
   equipmentKeySchema,
   equipmentSlotSchema,
   equipmentTools,
-  equipmentToolKeySchema,
+  buyableEquipmentToolKeySchema,
+  availableRareEquipmentTools,
   rareEquipmentKeySchema,
   toolSaleProceeds,
 } from './config';
@@ -19,7 +20,7 @@ import { readEquipmentState } from './state';
 
 const argsSchema = z.union([
   z.strictObject({ slot: equipmentSlotSchema, itemKey: z.union([z.literal('none'), equipmentKeySchema]) }),
-  z.strictObject({ slot: z.literal('tool'), itemKey: z.union([z.literal('none'), equipmentToolKeySchema]) }),
+  z.strictObject({ slot: z.literal('tool'), itemKey: z.union([z.literal('none'), buyableEquipmentToolKeySchema]) }),
 ]);
 const proceeds = (cost: number, rate: number) => Math.floor((cost * rate) / 10_000);
 
@@ -45,6 +46,8 @@ export const equipmentTrade = defineCommand({
       return fail('BAD_STATE', '경험의 한도에 도달했습니다.');
     if (args.slot === 'tool') {
       if (!hasTreatmentTool(equipment.config)) return fail('COMMAND_DISABLED', '도구를 사용할 수 없는 월드입니다.');
+      if (availableRareEquipmentTools(equipment.config).some(({ key }) => key === slots?.tool?.key))
+        return fail('BAD_STATE', '명품 도구는 거래할 수 없습니다.');
       if (args.itemKey === 'none') {
         if (!slots?.tool) return fail('BAD_STATE', '판매할 도구가 없습니다.');
         return general.gold > EQUIPMENT_MAX - toolSaleProceeds(slots.tool, equipment.config.sellRateBp)

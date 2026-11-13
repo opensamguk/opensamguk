@@ -1,5 +1,7 @@
 import type { WorldState, WorldView } from '../model/world';
-import type { EquipmentConfig } from './config';
+import { EQUIPMENT_MAX, rareEquipmentTools, type EquipmentConfig } from './config';
+import type { Rng } from '@opensamguk/shared';
+import type { InitialGeneral } from '../world/bootstrap';
 import { consumeBattleTool } from './morale';
 
 export type EquipmentBattleEffects = {
@@ -80,6 +82,34 @@ export function equipmentBattleEffects(world: WorldView, generalId: number): Equ
 
 export function consumeSnipeTool(state: WorldState, generalId: number, fired: boolean | undefined) {
   if (fired && state.equipment?.generals[generalId]?.tool?.key === 'tool_06') consumeBattleTool(state, generalId);
+}
+
+// Rival generals can each trigger the jade tool. Resolve both amounts from pre-loot holdings.
+export function applyBattleLoot(state: WorldState, attacker: InitialGeneral, defender: InitialGeneral, rng: Rng) {
+  const equipment = state.equipment;
+  if (!equipment || !('rareTools' in equipment.config) || !equipment.config.rareTools || attacker.id === defender.id)
+    return '';
+  const tool = rareEquipmentTools.tool_07;
+  const attempt = (general: InitialGeneral) =>
+    equipment.generals[general.id]?.tool?.key === tool.key && rng.next() < tool.lootChance;
+  const attack = attempt(attacker),
+    defend = attempt(defender);
+  if (!attack && !defend) return '';
+  const amounts = (resource: 'gold' | 'rice') => {
+    const a = Math.min(Math.floor(defender[resource] * tool.lootShare), EQUIPMENT_MAX - attacker[resource]);
+    const d = Math.min(Math.floor(attacker[resource] * tool.lootShare), EQUIPMENT_MAX - defender[resource]);
+    const taken = attack ? a : 0,
+      lost = defend ? d : 0;
+    attacker[resource] += taken - lost;
+    defender[resource] += lost - taken;
+    return [taken, lost] as const;
+  };
+  const [aGold, dGold] = amounts('gold');
+  const [aRice, dRice] = amounts('rice');
+  return [
+    ...(attack ? [`${attacker.name} 약탈 · 금 ${aGold} · 쌀 ${aRice}`] : []),
+    ...(defend ? [`${defender.name} 약탈 · 금 ${dGold} · 쌀 ${dRice}`] : []),
+  ].join(' · ');
 }
 
 export function regularEquipmentBattleDescription(config: Readonly<EquipmentConfig>, key: string) {

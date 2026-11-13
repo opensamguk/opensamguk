@@ -196,7 +196,7 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
         battleAwards.push({ generalId: defenderCommander, wins: 1, captures: 0 });
         if (reputation) battleOutcomes.push({ winnerId: defenderCommander, loserId: attackerCommander });
       }
-      const text = `${state.generals[attackerCommander]!.name} 부곡${attackerId} 대 ${state.generals[defenderCommander]!.name} 부곡${defenderId}: 공격 ${a.troops}명, 수비 ${d.troops}명`;
+      const text = `${state.generals[attackerCommander]!.name} 부곡${attackerId} 대 ${state.generals[defenderCommander]!.name} 부곡${defenderId}: 공격 ${a.troops}명, 수비 ${d.troops}명${outcome.loot ? ` · ${outcome.loot}` : ''}`;
       rounds.push(text);
       const opponent = `${state.generals[defenderCommander]!.name} 부곡${defenderId}`;
       for (const phase of outcome.phases ?? []) attackPhases.push({ ...phase, opponent });

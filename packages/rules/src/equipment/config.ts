@@ -65,7 +65,22 @@ export const equipmentTools = {
     requiredSecurity: 1000,
   },
 } as const;
-export const equipmentToolKeySchema = z.enum(['tool_01', 'tool_02', 'tool_03', 'tool_04', 'tool_05', 'tool_06']);
+// core2026 c81d304, packages/logic/src/items/che_약탈_옥벽.ts (MIT).
+export const rareEquipmentTools = {
+  tool_07: {
+    key: 'tool_07',
+    name: '옥벽(약탈)',
+    description: '새 상대 장수와 교전할 때 20% 확률로 금·쌀의 10%를 약탈합니다.',
+    cost: 200,
+    charges: 1,
+    slot: 'tool',
+    lootChance: 0.2,
+    lootShare: 0.1,
+  },
+} as const;
+export const allEquipmentTools = { ...equipmentTools, ...rareEquipmentTools };
+export const equipmentToolKeySchema = z.enum(Object.keys(allEquipmentTools) as (keyof typeof allEquipmentTools)[]);
+export const buyableEquipmentToolKeySchema = z.enum(Object.keys(equipmentTools) as (keyof typeof equipmentTools)[]);
 export const equipmentSlotSchema = z.enum(['horse', 'weapon', 'book']);
 export const equipmentKeySchema = z.string().regex(/^(horse|weapon|book)_0[1-6]$/);
 export const rareEquipmentKeySchema = z.string().regex(/^(horse|weapon|book)_(15|(?:0[7-9]|1[0-5])_[가-힣0-9]+)$/);
@@ -119,13 +134,15 @@ const moraleEquipmentConfigSchema = baseEquipmentConfigSchema.extend({
   moraleTool: z.literal(true),
 });
 const rareEquipmentConfigSchema = moraleEquipmentConfigSchema.extend({ rareEquipment: z.literal(true) });
+const fullRareEquipmentConfigSchema = rareEquipmentConfigSchema.extend({ fullRareEquipment: z.literal(true) });
 export const equipmentConfigSchema = z
   .union([
     baseEquipmentConfigSchema,
     baseEquipmentConfigSchema.extend({ treatmentTool: z.literal(true) }),
     moraleEquipmentConfigSchema,
     rareEquipmentConfigSchema,
-    rareEquipmentConfigSchema.extend({ fullRareEquipment: z.literal(true) }),
+    fullRareEquipmentConfigSchema,
+    fullRareEquipmentConfigSchema.extend({ rareTools: z.literal(true) }),
   ])
   .superRefine((config, context) => {
     const keys = new Set<string>();
@@ -168,8 +185,12 @@ export function equippedItem(
   return config.items.find((item) => item.key === key) ?? rareEquipmentCatalog(config).find((item) => item.key === key);
 }
 
-export function toolSaleProceeds(held: { key: keyof typeof equipmentTools; charges: number }, sellRateBp: number) {
-  const tool = equipmentTools[held.key];
+export function availableRareEquipmentTools(config: Readonly<EquipmentConfig>) {
+  return 'rareTools' in config && config.rareTools ? Object.values(rareEquipmentTools) : [];
+}
+
+export function toolSaleProceeds(held: { key: keyof typeof allEquipmentTools; charges: number }, sellRateBp: number) {
+  const tool = allEquipmentTools[held.key];
   const value = Math.floor((tool.cost * held.charges) / tool.charges);
   return Math.floor((value * sellRateBp) / 10_000);
 }

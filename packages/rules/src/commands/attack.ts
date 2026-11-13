@@ -1,5 +1,5 @@
 import { useBattleTool } from '../equipment/morale';
-import { consumeSnipeTool, equipmentBattleEffects } from '../equipment/battle';
+import { applyBattleLoot, consumeSnipeTool, equipmentBattleEffects } from '../equipment/battle';
 import { battleTacticsStats } from '../battle/tactics';
 import { combatSpecialty, combatSpecialtyKey } from '../general/combatSpecialty';
 import { TICKS_PER_MONTH } from '../clock/constants';
@@ -221,7 +221,8 @@ function makeAttack(collect: typeof collectModifiers) {
           battleAwards.push({ generalId: defender.id, wins: 1, captures: 0 });
           if (reputation) battleOutcomes.push({ winnerId: defender.id, loserId: g.id });
         }
-        const text = `${g.name} 대 ${defender.name}: 공격 ${g.crew}명, 수비 ${defender.crew}명`;
+        const loot = applyBattleLoot(state, g, defender, rng);
+        const text = `${g.name} 대 ${defender.name}: 공격 ${g.crew}명, 수비 ${defender.crew}명${loot ? ` · ${loot}` : ''}`;
         rounds.push(text);
         for (const phase of battle.phases ?? []) attackPhases.push({ ...phase, opponent: defender.name });
         reports.push({ generalId: defender.id, text, ...(battle.phases?.length ? { phases: battle.phases } : {}) });

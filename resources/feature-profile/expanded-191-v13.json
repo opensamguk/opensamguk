@@ -743,7 +743,8 @@
       "treatmentTool": true,
       "moraleTool": true,
       "rareEquipment": true,
-      "fullRareEquipment": true
+      "fullRareEquipment": true,
+      "rareTools": true
     },
     "stratagem-cards-v1": {
       "version": 1,

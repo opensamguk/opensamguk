@@ -6,7 +6,8 @@ import {
   regularEquipmentBattleDescription,
   hasRareEquipment,
   rareEquipmentCatalog,
-  equipmentTools,
+  allEquipmentTools,
+  availableRareEquipmentTools,
   toolSaleProceeds,
   hasTreatmentTool,
   equipmentBonus,
@@ -37,7 +38,7 @@ export function readEquipmentBoard(ctx: PersonnelActorContext, worldId: string, 
       const actor = { generalId: general.id };
       const { leadership, strength, intel, politics, charm } = state.generals[general.id]!;
       const baseStats = fiveStatsSchema.parse({ leadership, strength, intel, politics, charm });
-      const toolEntry = (tool: (typeof equipmentTools)[keyof typeof equipmentTools]) => ({
+      const toolEntry = (tool: (typeof allEquipmentTools)[keyof typeof allEquipmentTools]) => ({
         ...tool,
         remainingCharges: slots.tool?.key === tool.key ? slots.tool.charges : 0,
         failure: command.check(state, actor, { slot: 'tool', itemKey: tool.key }),
@@ -50,7 +51,7 @@ export function readEquipmentBoard(ctx: PersonnelActorContext, worldId: string, 
         generalId: general.id,
         slots,
         ...(hasTreatmentTool(equipment.config)
-          ? { tool: toolEntry(slots.tool ? equipmentTools[slots.tool.key] : TREATMENT_TOOL) }
+          ? { tool: toolEntry(slots.tool ? allEquipmentTools[slots.tool.key] : TREATMENT_TOOL) }
           : {}),
         ...(tools.length > 1 ? { tools: tools.map(toolEntry) } : {}),
         ...(hasRareEquipment(equipment.config)
@@ -92,22 +93,26 @@ export function readRareEquipment(db: PersonnelActorContext['db'], worldId: stri
     if (!hasRareEquipment(equipment.config)) return { enabled: false, items: [] };
     return {
       enabled: true,
-      items: rareEquipmentCatalog(equipment.config).map((item) => {
-        const match = Object.entries(equipment.generals).find(([, slots]) => slots[item.slot] === item.key);
-        const owner = match ? state.generals[Number(match[0])] : undefined;
-        const nation = owner?.nationId != null ? state.nations[owner.nationId] : undefined;
-        return {
-          ...item,
-          owner: owner
-            ? {
-                id: owner.id,
-                name: owner.name,
-                portraitId: owner.portraitId,
-                nation: nation ? { id: nation.id, name: nation.name, color: nation.color } : null,
-              }
-            : null,
-        };
-      }),
+      items: [...rareEquipmentCatalog(equipment.config), ...availableRareEquipmentTools(equipment.config)].map(
+        (item) => {
+          const match = Object.entries(equipment.generals).find(
+            ([, slots]) => (item.slot === 'tool' ? slots.tool?.key : slots[item.slot]) === item.key,
+          );
+          const owner = match ? state.generals[Number(match[0])] : undefined;
+          const nation = owner?.nationId != null ? state.nations[owner.nationId] : undefined;
+          return {
+            ...item,
+            owner: owner
+              ? {
+                  id: owner.id,
+                  name: owner.name,
+                  portraitId: owner.portraitId,
+                  nation: nation ? { id: nation.id, name: nation.name, color: nation.color } : null,
+                }
+              : null,
+          };
+        },
+      ),
     };
   });
 }

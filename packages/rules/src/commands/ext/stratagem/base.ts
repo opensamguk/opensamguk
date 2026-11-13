@@ -12,7 +12,7 @@ import { fail, ownCity, positive, relation } from '../../support';
 import type { Actor, CommandResult, Failure } from '../../types';
 import { fiveStatsSchema } from '../../../general/fiveStats';
 import { equipmentBonus } from '../../../equipment/stats';
-import { equipmentTools } from '../../../equipment/config';
+import { allEquipmentTools } from '../../../equipment/config';
 import { consumeBattleTool } from '../../../equipment/morale';
 import { commandConditionStats, GENERAL_CONDITION_FEATURE, generalCondition } from '../../../general/condition';
 
@@ -126,7 +126,7 @@ function stratagemTool(view: WorldView, generalId: number) {
   const equipment = view.equipment;
   if (!equipment || !('fullRareEquipment' in equipment.config)) return undefined;
   const key = equipment.generals[generalId]?.tool?.key;
-  const tool = key && equipmentTools[key];
+  const tool = key && allEquipmentTools[key];
   return tool && 'stratagemBonus' in tool ? tool : undefined;
 }
 

@@ -95,7 +95,7 @@ async function fixture(
   enabled = true,
   lineage = false,
   specialty: 'iron' | 'horses' = 'iron',
-  toolProfile: boolean | 'morale' | 'rare' | 'fullRare' = false,
+  toolProfile: boolean | 'morale' | 'rare' | 'fullRare' | 'rareTools' = false,
 ) {
   const input = operationalInput();
   const template = input.map.sites.find((site) => site.kind === 'CITY')!;
@@ -120,7 +120,7 @@ async function fixture(
   });
   const initial = buildInitialWorld(input);
   initial.seed = `equipment-pg-${randomUUID()}`;
-  if (toolProfile === 'rare' || toolProfile === 'fullRare') {
+  if (toolProfile === 'rare' || toolProfile === 'fullRare' || toolProfile === 'rareTools') {
     for (let i = 0; ; i++) {
       const seed = `equipment-rare-${i}`;
       if (rngFor(seed, 'monthly', initial.startYear, 1).next() < 0.1) {
@@ -171,8 +171,11 @@ async function fixture(
                   ...STANDARD_EQUIPMENT_CONFIG,
                   treatmentTool: true,
                   ...(typeof toolProfile === 'string' ? { moraleTool: true } : {}),
-                  ...(toolProfile === 'rare' || toolProfile === 'fullRare' ? { rareEquipment: true } : {}),
-                  ...(toolProfile === 'fullRare' ? { fullRareEquipment: true } : {}),
+                  ...(toolProfile === 'rare' || toolProfile === 'fullRare' || toolProfile === 'rareTools'
+                    ? { rareEquipment: true }
+                    : {}),
+                  ...(toolProfile === 'fullRare' || toolProfile === 'rareTools' ? { fullRareEquipment: true } : {}),
+                  ...(toolProfile === 'rareTools' ? { rareTools: true } : {}),
                 }
               : STANDARD_EQUIPMENT_CONFIG,
           }
@@ -409,6 +412,23 @@ it('INT-26 SAN10 명품 목록은 60개를 공개하고 월말 발견을 재생�
   await advance(f.id, 10_000);
   const after = (await board()).data!.items;
   expect(after.filter(({ owner }) => owner?.id === f.actorId)).toHaveLength(1);
+  const archive = await exportReplay(db, f.id);
+  expect(replayArchive(archive, archive.months.length)).toEqual(
+    archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })),
+  );
+});
+
+it('INT-26 SAN10 옥벽을 명품 도구로 조회하고 매매 목록에서 제외한다', async () => {
+  const f = await fixture(true, false, 'iron', 'rareTools');
+  const before = await rpc('equipment.rare', { worldId: f.id }, f.player);
+  expect(before.data?.items).toHaveLength(61);
+  expect(before.data?.items).toContainEqual(
+    expect.objectContaining({ key: 'tool_07', slot: 'tool', name: '옥벽(약탈)', owner: null }),
+  );
+  expect((await rpc('equipment.mine', { worldId: f.id }, f.player)).data?.tools?.map(({ key }) => key)).not.toContain(
+    'tool_07',
+  );
+  await advance(f.id, 10_000);
   const archive = await exportReplay(db, f.id);
   expect(replayArchive(archive, archive.months.length)).toEqual(
     archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })),

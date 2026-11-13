@@ -41,6 +41,35 @@ describe('attack', () => {
       result.reports?.find(({ generalId }) => generalId === 1)?.phases?.filter(({ attackerSniped }) => attackerSniped),
     ).toHaveLength(1);
   });
+  it('INT-26 옥벽은 실제 장수 교전에서 금과 쌀을 옮기고 장착 상태를 보존한다', () => {
+    const world = commandWorld();
+    Object.assign(world.generals[1]!, { crew: 10_000, atmos: 100, gold: 1000, rice: 10_000 });
+    Object.assign(world.generals[2]!, { crew: 1, train: 100, atmos: 100, gold: 4000, rice: 7000 });
+    world.generals[3]!.crew = 0;
+    world.cities[2]!.wall = 0;
+    world.equipment = initialEquipment({
+      ...TEST_EQUIPMENT_CONFIG,
+      treatmentTool: true,
+      moraleTool: true,
+      rareEquipment: true,
+      fullRareEquipment: true,
+      rareTools: true,
+    });
+    world.equipment.generals['1'] = { tool: { key: 'tool_07', charges: 1 } };
+    const rng = rngFor('jade-tool');
+    const result = attack.execute(
+      world,
+      { generalId: 1, tick: 100, unitSet: testUnits },
+      { cityKey: 2 },
+      { ...rng, next: () => 0.1 },
+    );
+    const after = applyEffects(world, result.effects);
+    expect(after.generals[1]!.gold).toBe(1400);
+    expect(after.generals[2]!.gold).toBe(3600);
+    expect(after.generals[2]!.rice).toBeLessThan(7000);
+    expect(after.equipment!.generals['1']?.tool?.key).toBe('tool_07');
+    expect(result.reports?.find(({ generalId }) => generalId === 2)?.text).toContain('약탈 · 금 400');
+  });
   it('INT-26 명마 효과를 실제 출병의 교전 단계와 군량에 반영한다', () => {
     const fight = (horse?: 'horse_07_기주마' | 'horse_07_백상') => {
       const world = commandWorld();

@@ -49,7 +49,8 @@ export function EquipmentStatus({ read }: { read: EquipmentRead }) {
                   label: '도구',
                   value: read.data.tool.remainingCharges ? (
                     <span title={read.data.tool.description}>
-                      {read.data.tool.name} · {read.data.tool.remainingCharges}회
+                      {read.data.tool.name}
+                      {'slot' in read.data.tool ? null : ` · ${read.data.tool.remainingCharges}회`}
                     </span>
                   ) : (
                     '미장착'

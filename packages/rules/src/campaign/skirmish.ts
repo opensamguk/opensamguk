@@ -1,5 +1,5 @@
 import { useBattleTool } from '../equipment/morale';
-import { consumeSnipeTool, equipmentBattleEffects } from '../equipment/battle';
+import { applyBattleLoot, consumeSnipeTool, equipmentBattleEffects } from '../equipment/battle';
 import { battleTacticsStats } from '../battle/tactics';
 import { combatSpecialty, combatSpecialtyKey } from '../general/combatSpecialty';
 import type { Rng } from '@opensamguk/shared';
@@ -127,7 +127,8 @@ export function fightCampaignUnits(
   defender.train = result.defender.train;
   defender.atmos = result.defender.atmos;
   finish(state, attacker, result.attacker);
-  return { state, ...result };
+  const loot = applyBattleLoot(state, attackerCommander, defenderCommander, rng);
+  return { state, ...result, ...(loot ? { loot } : {}) };
 }
 
 export function fightCampaignWall(

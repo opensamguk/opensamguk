@@ -48,7 +48,7 @@ export function EquipmentTradeFields({
   const sale = equippedTool?.sale ?? board.sales.find((row) => row.slot === slot)!;
   const selling = values.itemKey === 'none';
   const held = [...board.items, ...(board.rare ?? [])].find((row) => row.key === board.slots[slot]);
-  const rareHeld = !!board.rare?.some(({ key }) => key === held?.key);
+  const rareHeld = (equippedTool && 'slot' in equippedTool) || !!board.rare?.some(({ key }) => key === held?.key);
   const materials = item
     ? [
         item.goods.iron ? `철 ${n(item.goods.iron)}` : '',
@@ -105,7 +105,7 @@ export function EquipmentTradeFields({
       <p className={styles.muted}>
         현재 장착:{' '}
         {equippedTool?.remainingCharges
-          ? `${equippedTool.name} · ${equippedTool.remainingCharges}회`
+          ? `${equippedTool.name}${'slot' in equippedTool ? '' : ` · ${equippedTool.remainingCharges}회`}`
           : (held?.name ?? '미장착')}
       </p>
       {tool ? (

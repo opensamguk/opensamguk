@@ -4,11 +4,12 @@ import { LINEAGE_EXITED_YEAR } from '../lineage/config';
 import {
   EQUIPMENT_MAX,
   availableEquipmentTools,
+  availableRareEquipmentTools,
   equipmentConfigSchema,
   equippedItemKeySchema,
   rareEquipmentCatalog,
   equipmentToolKeySchema,
-  equipmentTools,
+  allEquipmentTools,
   type EquipmentConfig,
 } from './config';
 
@@ -22,7 +23,7 @@ export const equipmentSlotsSchema = z
         key: equipmentToolKeySchema,
         charges: z.number().int().min(1),
       })
-      .refine(({ key, charges }) => charges <= equipmentTools[key].charges, '도구 사용 횟수가 한도를 넘었습니다.')
+      .refine(({ key, charges }) => charges <= allEquipmentTools[key].charges, '도구 사용 횟수가 한도를 넘었습니다.')
       .optional(),
   })
   .refine(
@@ -61,8 +62,15 @@ export function readEquipmentState(value: unknown, world: WorldView): EquipmentS
     let hasRare = false;
     for (const [slot, itemKey] of Object.entries(slots)) {
       if (slot === 'tool') {
-        if (!availableEquipmentTools(state.config).some(({ key }) => key === slots.tool?.key))
+        const tool = slots.tool!;
+        if (availableRareEquipmentTools(state.config).some(({ key }) => key === tool.key)) {
+          if (unique.has(tool.key)) throw new Error('명품 장비가 중복 장착됐습니다.');
+          unique.add(tool.key);
+          if (hasRare) throw new Error('한 장수는 명품 장비 한 점만 장착할 수 있습니다.');
+          hasRare = true;
+        } else if (!availableEquipmentTools(state.config).some(({ key }) => key === tool.key)) {
           throw new Error('도구를 사용할 수 없는 월드입니다.');
+        }
         continue;
       }
       const item = typeof itemKey === 'string' ? items.get(itemKey) : undefined;
