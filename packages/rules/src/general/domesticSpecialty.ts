@@ -12,7 +12,9 @@ const specialties: Record<string, readonly string[]> = {
   귀모: ['stratagem'],
 };
 
-export const domesticSpecialtyNames = Object.keys(specialties);
+export function domesticSpecialtyNames() {
+  return Object.keys(specialties);
+}
 
 export function domesticSpecialty(view: Pick<WorldView, 'ruleFeatures'>, key: string | null | undefined) {
   const name = key?.replace(/^che_/, '');

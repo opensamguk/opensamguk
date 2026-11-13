@@ -21,8 +21,8 @@ export const MORALE_TOOL = {
   requiredSecurity: 1_000,
   morale: 30,
 } as const;
-export const equipmentTools = { [TREATMENT_TOOL.key]: TREATMENT_TOOL, [MORALE_TOOL.key]: MORALE_TOOL };
-export const equipmentToolKeySchema = z.enum([TREATMENT_TOOL.key, MORALE_TOOL.key]);
+export const equipmentTools = { tool_01: TREATMENT_TOOL, tool_02: MORALE_TOOL };
+export const equipmentToolKeySchema = z.enum(['tool_01', 'tool_02']);
 export const equipmentSlotSchema = z.enum(['horse', 'weapon', 'book']);
 export const equipmentKeySchema = z.string().regex(/^(horse|weapon|book)_0[1-6]$/);
 export const rareEquipmentKeySchema = z.string().regex(/^(horse|weapon|book)_15$/);

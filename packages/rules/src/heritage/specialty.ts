@@ -113,7 +113,7 @@ export function settleHeritageSpecialties(state: WorldState, year: number, rng: 
           general.combatSpecial = combat.name;
           general.heritageSpecialty ??= { next: null, resets: 0 };
         }
-        general.special = rng.pick(domesticSpecialtyNames);
+        general.special = rng.pick(domesticSpecialtyNames());
         logs.push({ generalId: general.id, text: `내정 특기 【${general.special}】 습득` });
       }
     for (const general of generals) {
