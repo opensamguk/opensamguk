@@ -833,6 +833,14 @@ it('병종 숙련을 징병으로 얻고 변환 명령으로 옮겨도 DB와 재
       ]),
     },
   });
+  const ranking = await rpc('ranking.generals', { worldId, by: 'proficiency2' }, alice.cookie);
+  expect(ranking.data).toMatchObject({
+    proficiencyEnabled: true,
+    top: [
+      expect.objectContaining({ generalId: 1, value: 360, proficiency: { 1: 600, 2: 360 } }),
+      expect.objectContaining({ generalId: 2, value: 0 }),
+    ],
+  });
   const archive = await exportReplay(db, worldId);
   expect(replayArchive(archive, 2)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
 });

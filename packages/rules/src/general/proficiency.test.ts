@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import { rngFor } from '@opensamguk/shared';
 import { commandWorld, testUnits } from '../../test/commandFixture';
+import { simulateBattle } from '../battle/simulate';
 import { applyEffects } from '../commands/effects';
 import { resolverForRuleFeatures } from '../ruleCommands';
 import { GENERAL_PROFICIENCY_FEATURE, proficiencyGrade } from './proficiency';
@@ -24,4 +25,28 @@ it('gains proficiency from training and converts it only between distinct valid 
   expect(applyEffects(next, conversion.effects).generals[1]!.proficiency).toEqual({ 1: 600, 2: 360 });
   expect(proficiencyGrade(350)).toMatchObject({ grade: 'F', progress: 0 });
   expect(proficiencyGrade(1275975)).toMatchObject({ grade: 'EX+', overall: 100, nextGrade: null });
+});
+
+it('compares both sides in the attacking arm and changes damage by the original grade difference', () => {
+  const force = { crew: 9000, crewType: 1100, train: 100, atmos: 100 };
+  const input = {
+    attacker: force,
+    defender: force,
+    attackerTech: 0,
+    defenderTech: 0,
+    unitSet: testUnits,
+    recordPhases: true,
+  };
+  const normal = simulateBattle(input, rngFor('proficiency-damage'));
+  const advantage = simulateBattle({ ...input, attackerProficiency: { 1: 1275975 } }, rngFor('proficiency-damage'));
+  expect(advantage.phases?.[0]?.defenderLoss).toBeGreaterThan(normal.phases?.[0]?.defenderLoss ?? 0);
+  const same = simulateBattle(
+    {
+      ...input,
+      attackerProficiency: { 1: 1275975 },
+      defenderProficiency: { 1: 1275975 },
+    },
+    rngFor('proficiency-damage'),
+  );
+  expect(same).toEqual(normal);
 });

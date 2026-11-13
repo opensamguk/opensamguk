@@ -11,8 +11,18 @@ const thresholds = [
 ];
 const grades = ['F', 'E', 'D', 'C', 'B', 'A', 'S', 'Z', 'EX'].flatMap((letter) => [letter + '-', letter, letter + '+']);
 
+const proficiencyLevel = (value: number) =>
+  Math.max(
+    0,
+    thresholds.findLastIndex((limit) => value >= limit),
+  );
+
+export function proficiencyDamageFactor(attack: number, defense: number) {
+  return 1 + (proficiencyLevel(attack) - proficiencyLevel(defense)) / 55;
+}
+
 export function proficiencyGrade(value: number) {
-  const index = thresholds.findLastIndex((limit) => value >= limit);
+  const index = proficiencyLevel(value);
   const floor = thresholds[index]!;
   const next = thresholds[index + 1];
   return {

@@ -99,6 +99,7 @@ function makeAttack(collect: typeof collectModifiers) {
           {
             attacker: g,
             attackerReadiness: personalityEffects(state, g.personality),
+            attackerProficiency: g.proficiency,
             defender: wall,
             recordPhases: actor.recordBattleStats === true,
             attackerTech: aTech,
@@ -133,8 +134,10 @@ function makeAttack(collect: typeof collectModifiers) {
           {
             attacker: g,
             attackerReadiness: personalityEffects(state, g.personality),
+            attackerProficiency: g.proficiency,
             defender,
             defenderReadiness: personalityEffects(state, defender.personality),
+            defenderProficiency: defender.proficiency,
             recordPhases: actor.recordBattleStats === true,
             attackerTech: aTech,
             defenderTech: bTech,

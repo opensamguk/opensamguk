@@ -83,8 +83,10 @@ export function fightCampaignUnits(
     {
       attacker: force(attacker),
       attackerReadiness: personalityEffects(state, state.generals[attacker.commanderId]!.personality),
+      attackerProficiency: state.generals[attacker.commanderId]!.proficiency,
       defender: force(defender),
       defenderReadiness: personalityEffects(state, state.generals[defender.commanderId]!.personality),
+      defenderProficiency: state.generals[defender.commanderId]!.proficiency,
       attackerTech: state.nations[aNation]!.tech,
       defenderTech: state.nations[bNation]!.tech,
       unitSet,
@@ -127,6 +129,7 @@ export function fightCampaignWall(
     {
       attacker: force(attacker),
       attackerReadiness: personalityEffects(state, state.generals[attacker.commanderId]!.personality),
+      attackerProficiency: state.generals[attacker.commanderId]!.proficiency,
       defender: { crew: city.wall, crewType: 1000, train: 100, atmos: 100 },
       attackerTech: state.nations[aNation]!.tech,
       defenderTech: city.nationId === null ? 0 : state.nations[city.nationId]!.tech,
@@ -191,6 +194,7 @@ export function fightCampaignCityGarrison(
     {
       attacker: force(attacker),
       attackerReadiness: personalityEffects(state, state.generals[attacker.commanderId]!.personality),
+      attackerProficiency: state.generals[attacker.commanderId]!.proficiency,
       defender: { crew: defender.troops, crewType: defender.crewType, train: defender.train, atmos: defender.atmos },
       attackerTech: state.nations[aNation]!.tech,
       defenderTech: state.nations[city.nationId]!.tech,

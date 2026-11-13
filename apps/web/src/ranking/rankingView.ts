@@ -27,6 +27,11 @@ export const GENERAL_COLUMNS: ReadonlyArray<{ key: GeneralSortKey; label: string
   { key: 'killRate', label: '살상률' },
   { key: 'humanKills', label: '대인 사살' },
   { key: 'humanKillRate', label: '대인 살상률' },
+  { key: 'proficiency1', label: '보병 숙련' },
+  { key: 'proficiency2', label: '궁병 숙련' },
+  { key: 'proficiency3', label: '기병 숙련' },
+  { key: 'proficiency4', label: '귀병 숙련' },
+  { key: 'proficiency5', label: '차병 숙련' },
 ];
 
 export const NATION_COLUMNS: ReadonlyArray<{ key: NationSortKey; label: string }> = [
