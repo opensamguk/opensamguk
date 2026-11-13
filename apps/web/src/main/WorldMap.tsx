@@ -46,6 +46,7 @@ export function cityLabel(city: DrawnCity, nation: DrawnNation | undefined, mine
     isCapital(city, nation) ? '수도' : null,
     isCut(city) ? '보급 끊김' : null,
     mine ? '내 위치' : null,
+    city.ruin ? `폐허 복구 ${city.ruin.percent}%` : null,
   ]
     .filter(Boolean)
     .join(', ');
@@ -108,7 +109,7 @@ export function WorldMap({
         const mine = city.key === myCityKey;
         const selected = city.key === selectedKey;
         const r = cityRadius(city.level);
-        const name = isCapital(city, nation) ? `${CAPITAL_MARK}${city.name}` : city.name;
+        const name = `${isCapital(city, nation) ? CAPITAL_MARK : ''}${city.name}${city.ruin ? ' (폐허)' : ''}`;
         const labelWidth = Array.from(name).length * 10 + 6;
         const select = onSelect ? () => onSelect(city.key) : undefined;
         return (
@@ -121,6 +122,7 @@ export function WorldMap({
             aria-pressed={select ? selected : undefined}
             data-city-key={city.key}
             data-nation-id={city.nationId ?? ''}
+            data-ruin={city.ruin?.percent}
             data-supplied={city.supplied}
             data-cut={isCut(city) || undefined}
             data-mine={mine || undefined}

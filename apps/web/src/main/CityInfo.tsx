@@ -76,6 +76,7 @@ export function CityInfo({
       <div className={styles.title}>
         <strong className={styles.name}>{data.name}</strong>
         <span className={styles.meta}>규모 {data.level}</span>
+        {data.ruin ? <Tag tone="danger">폐허 복구 {data.ruin.percent}%</Tag> : null}
         {owner ? (
           <Link to="/w/$worldId/nation/$nationId" params={{ worldId, nationId: String(owner.id) }}>
             <NationBadge name={owner.name} color={owner.color} />
