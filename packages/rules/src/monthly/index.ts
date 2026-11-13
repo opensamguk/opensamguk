@@ -288,7 +288,7 @@ export function runMonthly(state: WorldView, tick: number, rng: Rng) {
   next = settleSupply(next, bonuses);
   if (next.ruleFeatures?.includes(WAR_INCOME_FEATURE)) settleWarIncome(next);
   next = settleDiplomacy(next, tick);
-  settleHeritageSpecialties(next, date.year);
+  const specialtyGrowthLogs = settleHeritageSpecialties(next, date.year, rng);
   if (state.ruleFeatures?.includes(COURT_PROMOTION_FEATURE)) promoteNationCourts(next);
   const seasonalEventLogs = state.ruleFeatures?.includes(CITY_SEASONAL_EVENTS_FEATURE)
     ? settleCitySeasonalEvents(next, date, rng)
@@ -319,6 +319,7 @@ export function runMonthly(state: WorldView, tick: number, rng: Rng) {
     officeTaxLogs,
     seasonalEventLogs,
     rareEquipmentLogs,
+    specialtyGrowthLogs,
     stages: [...MONTHLY_STAGES],
     yearbook: buildYearbook(next, date.year),
   };
