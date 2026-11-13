@@ -300,8 +300,8 @@ function NationNpcPolicyEditor({
     nation_seize: 'NPC 몰수',
     nation_city_allocate: '도시 병력 배속',
     nation_mobilize: '백성동원',
-    nation_rivalry: '피장파장',
-    nation_raid: '기습',
+    nation_rivalry: '이호경식',
+    nation_raid: '급습',
   };
   const changePriority = (kind: 'general' | 'nation', key: string, direction: -1 | 0 | 1) => {
     const current = [...(priorityFor(kind) ?? editor.commands[kind])];
