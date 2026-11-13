@@ -4,7 +4,8 @@ import { commandWorld, testUnits } from '../../test/commandFixture';
 import { emptyCityResourcesState } from '../cityResources/state';
 import { applyEffects } from '../commands/effects';
 import { deepFreeze } from '../personnel/testFixture';
-import { campaignAttack } from './attack';
+import { campaignAttack, campaignDefenders } from './attack';
+import { DEFENSE_STANCE_FEATURE } from '../battle/defenders';
 import { emptyCampaignState } from './state';
 
 function fixture() {
@@ -51,6 +52,18 @@ describe('AC-P2-24 공성 부곡의 성벽선제', () => {
 });
 
 describe('AC-M2-18 부곡의 실제 출병 대상', () => {
+  it('수비 기준은 부곡 소유자 대신 현 지휘관에게서 읽는다', () => {
+    const world = fixture();
+    world.ruleFeatures!.push(DEFENSE_STANCE_FEATURE);
+    world.generals[2]!.defenseThreshold = 999;
+    world.generals[3]!.defenseThreshold = 40;
+    world.campaign!.links = [{ masterId: 2, personId: 3, relation: 'LIEUTENANT' }];
+    world.campaign!.units[1]!.commanderId = 3;
+    world.campaign!.units[1]!.train = 40;
+    expect(campaignDefenders(world, 100, 2).map(({ id }) => id)).toEqual([2, 3]);
+    world.campaign!.units[1]!.atmos = 39;
+    expect(campaignDefenders(world, 100, 2).map(({ id }) => id)).toEqual([3]);
+  });
   it.each([10000, 0])('수비 부곡 없이 성벽 %i를 공격해도 점령 전 국가를 반환한다', (wall) => {
     const world = fixture();
     world.campaign!.units = world.campaign!.units.filter((unit) => unit.ownerId === 1);

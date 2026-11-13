@@ -32,7 +32,10 @@ export function useHome(worldId: string, watchPresence = false) {
   return useQuery({
     ...trpc.home.get.queryOptions({ worldId }),
     retry: retryUnlessClientError,
-    refetchInterval: (query) => (watchPresence && query.state.data ? 60_000 : false),
+    refetchInterval: (query) => {
+      if (query.state.data?.general.defense?.stance?.pendingThreshold != null) return 1_000;
+      return watchPresence && query.state.data ? 60_000 : false;
+    },
   });
 }
 

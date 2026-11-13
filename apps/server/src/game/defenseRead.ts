@@ -1,4 +1,4 @@
-import { BALANCE, campaignDefenders, canDefend, toGameDate, type WorldView } from '@opensamguk/rules';
+import { campaignDefenders, canDefend, defenseRequirements, toGameDate, type WorldView } from '@opensamguk/rules';
 
 type Garrison = {
   id: number;
@@ -7,6 +7,7 @@ type Garrison = {
   crew: number;
   train: number;
   atmos: number;
+  defenseThreshold?: number | null;
 };
 
 export function cityDefense(
@@ -15,6 +16,7 @@ export function cityDefense(
   startYear: number,
   tick: number,
   view?: WorldView,
+  stanceEnabled = false,
 ) {
   const troopsByGeneral = new Map<number, number>();
   if (view?.campaign) {
@@ -27,15 +29,17 @@ export function cityDefense(
       if (
         general.nationId === city.nationId &&
         general.activeFromYear <= year &&
-        canDefend(general.crew, general.train, general.atmos)
+        canDefend(general.crew, general.train, general.atmos, stanceEnabled, general.defenseThreshold)
       ) {
         troopsByGeneral.set(general.id, general.crew);
       }
     }
   }
+  const { minimumTraining, minimumMorale } = defenseRequirements(stanceEnabled, null);
   return {
-    minimumTraining: BALANCE.DEFEND_TRAIN,
-    minimumMorale: BALANCE.DEFEND_ATMOS,
+    minimumTraining,
+    minimumMorale,
+    ...(stanceEnabled ? { individualThresholds: true as const } : {}),
     troops: [...troopsByGeneral.values()].reduce((sum, troops) => sum + troops, 0),
     generals: [...troopsByGeneral].sort(([a], [b]) => a - b).map(([generalId, troops]) => ({ generalId, troops })),
   };

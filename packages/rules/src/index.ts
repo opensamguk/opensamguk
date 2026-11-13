@@ -19,7 +19,15 @@ export {
 export { checkOperationalProfile } from './world/map/profile';
 export type { OperationalMapResource } from './world/map/operational';
 export * from './clock/constants';
-export { canDefend } from './battle/defenders';
+export {
+  canDefend,
+  defenseRequirements,
+  DEFENSE_STANCES,
+  DEFENSE_STANCE_FEATURE,
+  DEFENSE_STANCE_KIND,
+  defenseStanceInput,
+  storedDefenseStance,
+} from './battle/defenders';
 export * from './clock/clock';
 export * from './clock/admin';
 export * from './admin/game';

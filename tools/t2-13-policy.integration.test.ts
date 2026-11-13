@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
+import { DEFENSE_STANCE_FEATURE, DEFENSE_STANCE_KIND } from '../packages/rules/src/battle/defenders';
 import type { PolicyKey, PolicySlot } from '../packages/rules/src/policy';
 import { commandInitial } from '../packages/rules/test/commandFixture';
 import { renewLeaseDuringTest } from '../apps/engine/test/leaseHeartbeat';
@@ -44,7 +45,7 @@ async function user(status: 'ACTIVE' | 'SANCTIONED' = 'ACTIVE') {
   await db.session.create({ data: { id: session.id, userId: row.id, expiresAt: session.expiresAt } });
   return { id: row.id, email, cookie: `sid=${session.token}`, sessionId: session.id };
 }
-async function fixture(options: { farmMax?: boolean; npc?: boolean } = {}) {
+async function fixture(options: { farmMax?: boolean; npc?: boolean; defense?: boolean } = {}) {
   const alice = await user(),
     bob = await user();
   const initial = commandInitial();
@@ -59,7 +60,9 @@ async function fixture(options: { farmMax?: boolean; npc?: boolean } = {}) {
     turnTermMinutes: 30,
     endYear: null,
     // 이 회귀 시험은 archive 5와 기존 전환 표지 계약을 검증한다.
-    replayFormat: 'policy',
+    ...(options.defense
+      ? { replayFormat: 3, ruleFeatures: [DEFENSE_STANCE_FEATURE, 'policy'] }
+      : { replayFormat: 'policy' }),
   });
   worlds.push(worldId);
   await db.world.update({ where: { id: worldId }, data: { status: 'RUNNING', clockAnchorAt: new Date(now) } });
@@ -506,3 +509,58 @@ it('표지가 없는 옛 월드는 쓰기를 거부하되 기존 생성·직접 
   const input = await db.inputEvent.findFirstOrThrow({ where: { worldId: f.worldId, kind: 'general.create' } });
   expect(input.result).not.toHaveProperty('activeTick');
 });
+
+it(
+  '수비 기준을 접수하고 엔진이 적용한 뒤 실제 홈 조회와 재생에 반영한다',
+  authzCase(DEFENSE_STANCE_KIND, 'success', async () => {
+    const f = await fixture({ defense: true });
+    const input = { worldId: f.worldId, threshold: 999 };
+    const request = () => rpc(DEFENSE_STANCE_KIND, input, f.alice.cookie, true);
+    const home = () => rpc('home.get', { worldId: f.worldId }, f.alice.cookie);
+    expect((await home()).data).toMatchObject({
+      general: {
+        defense: { minimumTraining: 80, minimumMorale: 80, stance: { enabled: true, pendingThreshold: null } },
+      },
+    });
+    expect((await request()).data).toEqual({ status: 'pending' });
+    expect((await request()).data).toEqual({ status: 'pending' });
+    expect((await rpc(DEFENSE_STANCE_KIND, { ...input, threshold: 60 }, f.alice.cookie, true)).error).toBe('CONFLICT');
+    expect((await home()).data).toMatchObject({
+      general: { defense: { stance: { enabled: true, pendingThreshold: 999 } } },
+    });
+    expect(await db.inputEvent.count({ where: { worldId: f.worldId, kind: DEFENSE_STANCE_KIND } })).toBe(1);
+    await f.loop.advanceTo(0);
+    expect((await home()).data).toMatchObject({
+      general: { defense: { participating: false, stance: { enabled: false, pendingThreshold: null } } },
+    });
+    await f.loop.advanceTo(10000);
+    const archive = await exportReplay(db, f.worldId);
+    expect(replayArchive(archive, 1)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
+  }),
+);
+
+for (const category of ['unauthenticated', 'otherUser', 'sanctioned', 'invalidInput'] as const) {
+  it(
+    `수비 기준 접근 경계 ${category}`,
+    authzCase(DEFENSE_STANCE_KIND, category, async () => {
+      const f = await fixture({ defense: true });
+      const actor =
+        category === 'otherUser' ? await user() : category === 'sanctioned' ? await user('SANCTIONED') : f.alice;
+      const result = await rpc(
+        DEFENSE_STANCE_KIND,
+        { worldId: f.worldId, threshold: category === 'invalidInput' ? 70 : 60 },
+        category === 'unauthenticated' ? undefined : actor.cookie,
+        true,
+      );
+      expect(result.error).toBe(
+        {
+          unauthenticated: 'UNAUTHORIZED',
+          otherUser: 'NOT_FOUND',
+          sanctioned: 'UNAUTHORIZED',
+          invalidInput: 'BAD_REQUEST',
+        }[category],
+      );
+      expect(await db.inputEvent.count({ where: { worldId: f.worldId, kind: DEFENSE_STANCE_KIND } })).toBe(0);
+    }),
+  );
+}

@@ -4,12 +4,28 @@ import { commandWorld, testUnits } from '../../test/commandFixture';
 import type { WorldState } from '../model/world';
 import { applyEffects } from './effects';
 import { attack } from './attack';
+import { DEFENSE_STANCE_FEATURE } from '../battle/defenders';
 import { runCommand } from './registry';
 import { verifySuccess, verifyFailure } from './contracts';
 
 describe('attack', () => {
   it('성공', () => verifySuccess('attack'));
   it('실패', () => verifyFailure('attack'));
+  it('실제 교전은 수비를 끈 장수를 제외하고 조건을 충족한 장수를 포함한다', () => {
+    const world = commandWorld();
+    world.ruleFeatures = [DEFENSE_STANCE_FEATURE];
+    Object.assign(world.generals[2]!, { train: 100, atmos: 100, defenseThreshold: 999 });
+    Object.assign(world.generals[3]!, { train: 60, atmos: 60, defenseThreshold: 60 });
+    const result = runCommand(
+      world,
+      { generalId: 1, tick: 100, unitSet: testUnits },
+      'attack',
+      { cityKey: 2 },
+      rngFor('defense-stance', 1),
+    );
+    if ('code' in result) throw Error(result.message);
+    expect(result.reports?.map(({ generalId }) => generalId)).toEqual([3]);
+  });
 });
 
 describe('AC-P2-24 공성 병종의 성벽선제', () => {

@@ -478,6 +478,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
           lastActiveAt: true,
           residenceTick: true,
           nationJoinedTick: true,
+          defenseThreshold: true,
         },
       });
       const diplomacies = await tx.diplomacy.findMany({

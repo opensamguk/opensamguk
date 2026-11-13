@@ -36,6 +36,8 @@ import {
   OFFICE_EFFECTS_FEATURE,
   officeEffectsSchema,
   storedCitySeasonalEvent,
+  storedDefenseStance,
+  DEFENSE_STANCE_FEATURE,
 } from '@opensamguk/rules';
 import { z } from 'zod';
 import { worldResolver } from './resolver';
@@ -125,8 +127,14 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
       ...nation,
       ...(diplomaticAidUntilMonth != null ? { diplomaticAidUntilMonth } : {}),
     })),
-    generals: generals.map((general) =>
-      storedGeneralRemoval(storedGeneralSex(general, world.ruleFeatures.includes('lineage-v1')), world.replayFormat),
+    generals: generals.map(({ defenseThreshold, ...general }) =>
+      storedGeneralRemoval(
+        storedGeneralSex(
+          { ...general, ...storedDefenseStance(world.ruleFeatures.includes(DEFENSE_STANCE_FEATURE), defenseThreshold) },
+          world.ruleFeatures.includes('lineage-v1'),
+        ),
+        world.replayFormat,
+      ),
     ),
     diplomacies,
     ...(world.commandMeta ? { commandMeta: world.commandMeta } : {}),

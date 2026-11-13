@@ -169,3 +169,7 @@ core2026 커밋 df6c9269fa1e2862418ba9da481c8dd2d758d6c5의 MIT © 2025 devsam �
 ## 접경귀환
 
 `packages/rules/src/commands/ext/return_border/`는 core2026 `df6c9269fa1e2862418ba9da481c8dd2d758d6c5`의 `packages/logic/src/actions/turn/general/che_접경귀환.ts`에서 연결 3칸의 탐색 규칙을 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+### INT-26 장수 수비 기준
+
+장수별 수비 기준과 기본값 80은 core2026 `c81d304`의 `app/game-frontend/src/views/MyPageView.vue`, `app/game-engine/src/turn/worldCommandHandler.ts`, `packages/logic/src/war/engine.ts`를 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다.

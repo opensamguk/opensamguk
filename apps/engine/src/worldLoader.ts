@@ -16,6 +16,8 @@ import {
   readStoredRelations,
   assertNationLifecycle,
   storedCitySeasonalEvent,
+  storedDefenseStance,
+  DEFENSE_STANCE_FEATURE,
   type WorldState,
 } from '@opensamguk/rules';
 import { engineFeatures } from './features';
@@ -117,7 +119,16 @@ export async function loadWorldAfterCapabilityCheck(
     ),
     generals: Object.fromEntries(
       generals.map(
-        ({ turnRevision, battleWins, captures, stratagemSuccesses, residenceTick, officerCityKey, ...general }) => {
+        ({
+          turnRevision,
+          battleWins,
+          captures,
+          stratagemSuccesses,
+          residenceTick,
+          officerCityKey,
+          defenseThreshold,
+          ...general
+        }) => {
           void turnRevision;
           void residenceTick;
           // 순위용 누계는 게임 규칙 입력이 아니다. 기존 재생 해시에 섞지 않는다.
@@ -129,7 +140,11 @@ export async function loadWorldAfterCapabilityCheck(
             storedGeneralStats(
               storedGeneralRemoval(
                 storedGeneralSex(
-                  { ...stripWorldId(general), ...(officerCityKey == null ? {} : { officerCityKey }) },
+                  {
+                    ...stripWorldId(general),
+                    ...(officerCityKey == null ? {} : { officerCityKey }),
+                    ...storedDefenseStance(world.ruleFeatures.includes(DEFENSE_STANCE_FEATURE), defenseThreshold),
+                  },
                   world.ruleFeatures.includes('lineage-v1'),
                 ),
                 world.replayFormat,

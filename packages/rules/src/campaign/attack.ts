@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { Rng } from '@opensamguk/shared';
 import { BALANCE } from '../balance';
-import { canDefend } from '../battle/defenders';
+import { canDefend, DEFENSE_STANCE_FEATURE } from '../battle/defenders';
 import type { BattlePhase } from '../battle/simulate';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import { fail, positive, relation, removeNation, success } from '../commands/support';
@@ -43,7 +43,13 @@ export function campaignDefenders(view: WorldView, tick: number, cityKey: number
         owner.nationId === city.nationId &&
         commander.cityKey === cityKey &&
         commander.activeFromYear <= year(view, tick) &&
-        canDefend(unit.troops, unit.train, unit.atmos)
+        canDefend(
+          unit.troops,
+          unit.train,
+          unit.atmos,
+          view.ruleFeatures?.includes(DEFENSE_STANCE_FEATURE),
+          commander.defenseThreshold,
+        )
       );
     })
     .sort((a, b) => b.troops - a.troops || a.id - b.id);

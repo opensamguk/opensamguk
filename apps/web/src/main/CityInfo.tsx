@@ -449,7 +449,13 @@ export function GarrisonLine({
         {n(sum.ready60.count)}장수)
       </span>
       {defense ? (
-        <span title={`훈련 ${defense.minimumTraining}, 사기 ${defense.minimumMorale} 이상`}>
+        <span
+          title={
+            defense.individualThresholds
+              ? '각 장수의 수비 기준과 현재 훈련·사기로 집계합니다'
+              : `훈련 ${defense.minimumTraining}, 사기 ${defense.minimumMorale} 이상`
+          }
+        >
           수비 참가 {n(defense.troops)}명 · 장수 {n(defense.generals.length)}명
         </span>
       ) : null}
