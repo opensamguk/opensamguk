@@ -86,6 +86,7 @@
   grid-template-columns: repeat(10, minmax(0, 1fr));
   grid-template-areas:
     'map map map map map map map commands commands commands'
+    'menu menu menu menu menu menu menu commands commands commands'
     'city city city city city city city commands commands commands'
     'nation nation nation nation nation general general general general general'
     'records records records records records records records records records records';
@@ -139,9 +140,59 @@
 @media (max-width: 1100px) {
   .layout {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: 'map' 'city' 'commands' 'nation' 'general' 'records';
+    grid-template-areas: 'map' 'city' 'commands' 'nation' 'general' 'menu' 'records';
   }
   .records {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* 국가·내 장수 메뉴 (INT-25): 원작 국가 메뉴처럼 2줄 단추 */
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: var(--frame);
+  box-shadow: var(--frame-inset), var(--shadow-step);
+  grid-area: menu;
+}
+.menuRow {
+  display: grid;
+  grid-template-columns: 56px repeat(8, minmax(0, 1fr));
+  gap: var(--space-2);
+  align-items: center;
+}
+.menuHead {
+  font-family: var(--font-title);
+  font-size: var(--title-sm);
+}
+.menuItem {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 var(--space-1);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  color: var(--color-text);
+  text-decoration: none;
+  background: var(--color-surface-raised);
+  border: 2px solid var(--color-ink);
+  box-shadow: var(--shadow-button);
+}
+.menuItem:hover {
+  background: var(--color-surface-muted);
+}
+@media (max-width: 767px) {
+  .menuRow {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .menuHead {
+    grid-column: 1 / -1;
+  }
+  .menuItem {
+    min-height: 44px;
   }
 }

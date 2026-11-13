@@ -3,7 +3,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TRPCClientError } from '@trpc/client';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { NationInfo } from '../main/NationInfo';
 import { GovernancePanel } from './GovernancePanel';
 import { governanceStorageKey, readGovernancePending, writeGovernancePending } from './governanceRequestState';
 import { testBoard, testView } from './testView';
@@ -43,8 +42,6 @@ vi.mock('../trpc', () => {
   };
   return { useTRPC: () => options, useTRPCClient: () => api };
 });
-// 재야 NationInfo는 공지 칸을 그리지 않는다. 공지 모듈은 실제 tRPC 클라이언트를 읽으므로 빈 칸으로 바꾼다.
-vi.mock('../messages/NationNotice', () => ({ NationNoticeBox: () => null }));
 
 const WORLD = 'world-one';
 const requestId = '12345678-1234-4234-8234-123456789abc';
@@ -298,7 +295,7 @@ it('T4-94 AC-P2-31 봉신 탭은 내 계열과 제안 보내기를 먼저 보이
   expect(mocks.submit).not.toHaveBeenCalled();
 });
 
-it('T4-94 AC-P2-31 재야 장수도 재야 안내 아래에서 공개 황실 칸을 보고, 기능을 끈 월드면 묻지 않는다', async () => {
+it('T4-94 AC-P2-31 재야 장수도 통치 화면에서 공개 황실 칸을 보고, 기능을 끈 월드면 묻지 않는다', async () => {
   const neutral = () =>
     testBoard(mocks.user, WORLD, testView({ viewerGeneralId: 30, ownNationId: null, realmNationId: null }));
   mocks.get.mockImplementation(async () => neutral());
@@ -306,10 +303,9 @@ it('T4-94 AC-P2-31 재야 장수도 재야 안내 아래에서 공개 황실 칸
   clients.push(client);
   const view = render(
     <QueryClientProvider client={client}>
-      <NationInfo worldId={WORLD} nation={null} cities={[]} onSelectCity={() => {}} />
+      <GovernancePanel worldId={WORLD} />
     </QueryClientProvider>,
   );
-  expect(screen.getByText('재야입니다')).toBeTruthy();
   await screen.findByRole('region', { name: '황실' });
   expect(screen.getByText('소속 국가가 없습니다.')).toBeTruthy();
   expect(screen.queryByRole('button', { name: '즉위 요청' })).toBeNull();
@@ -322,10 +318,9 @@ it('T4-94 AC-P2-31 재야 장수도 재야 안내 아래에서 공개 황실 칸
   clients.push(off);
   render(
     <QueryClientProvider client={off}>
-      <NationInfo worldId={WORLD} nation={null} cities={[]} onSelectCity={() => {}} />
+      <GovernancePanel worldId={WORLD} />
     </QueryClientProvider>,
   );
-  expect(screen.getByText('재야입니다')).toBeTruthy();
   await waitFor(() => expect(off.getQueryData(['summary'])).toBeDefined());
   expect(mocks.get).not.toHaveBeenCalled();
   expect(screen.queryByRole('region', { name: '황실' })).toBeNull();

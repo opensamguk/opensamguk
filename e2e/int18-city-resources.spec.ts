@@ -884,6 +884,8 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
           independentHumanCommands: true,
           resourceOrPositionInjection: false,
         };
+        // 휘하·부곡은 전용 화면이다 (INT-25). 부곡을 편성한 뒤 군략도로 돌아간다.
+        await owner.page.goto(`/w/${main.id}/campaign`);
         const campaign = owner.page.getByRole('region', {
           name: '개인 휘하·부곡',
           exact: true,
@@ -917,6 +919,7 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
         expect(await turns(main, other)).toHaveLength(30);
         await expect(campaign).toContainText('소유 부곡 1개');
         await photo(owner.page, info, '02-person-30slots-empty-unit');
+        await owner.page.goto(`/w/${main.id}`);
         // 같은 세수 준비를 첫 검사에 둔다. 다음 검사는 기존 네 명령과 단차 검증을 이어서 실행한다.
         actor = owner!;
         protectedActor = other!;

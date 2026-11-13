@@ -82,7 +82,7 @@ test('AC-P2-32 실제 성별 선택·사람 혼인 수락·계승 동의와 세 
     await advance(0);
     const general = await stack.db.general.findFirstOrThrow({ where: { worldId, userId: player.id } });
     expect(general.sex).toBe(sex === '남' ? 'MALE' : 'FEMALE');
-    await player.page.goto(`/w/${worldId}`);
+    await player.page.goto(`/w/${worldId}/me`);
     await expect(family(player.page)).toBeVisible();
     return general.id;
   };
@@ -152,7 +152,7 @@ test('AC-P2-32 실제 성별 선택·사람 혼인 수락·계승 동의와 세 
     ).toBeHidden();
     const confirmPage = await father.context.newPage();
     confirmPage.on('pageerror', (error) => errors.push(error.message));
-    await confirmPage.goto(`/w/${worldId}`);
+    await confirmPage.goto(`/w/${worldId}/me`);
     await family(confirmPage).getByRole('tab', { name: '계승', exact: true }).click();
     await family(confirmPage).getByRole('button', { name: '계승 확정…', exact: true }).click();
     const dialog = confirmPage.getByRole('dialog', { name: /계승 확정/ }),

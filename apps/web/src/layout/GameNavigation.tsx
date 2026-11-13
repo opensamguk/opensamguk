@@ -138,23 +138,10 @@ export function GameNavigation({
     <>
       {NAV.map(navigationLink)}
       {campaignEnabled ? (
-        pathname.replace(/\/$/, '') === `/w/${worldId}` ? (
-          <a className={styles.link} href="#campaign-title" onClick={() => close()}>
-            <Icon src={personnelIcon} />
-            휘하·부곡
-          </a>
-        ) : (
-          <Link
-            to="/w/$worldId"
-            params={{ worldId }}
-            hash="campaign-title"
-            className={styles.link}
-            onClick={() => close()}
-          >
-            <Icon src={personnelIcon} />
-            휘하·부곡
-          </Link>
-        )
+        <Link to="/w/$worldId/campaign" params={{ worldId }} className={styles.link} onClick={() => close()}>
+          <Icon src={personnelIcon} />
+          휘하·부곡
+        </Link>
       ) : null}
       {officerLevel >= OFFICER_MIN_LEVEL ? (
         <Link to="/w/$worldId/nation/inspection" params={{ worldId }} className={styles.link} onClick={() => close()}>

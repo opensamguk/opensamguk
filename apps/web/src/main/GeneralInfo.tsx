@@ -2,7 +2,6 @@ import { Link } from '@tanstack/react-router';
 import { officerName } from '../game/names';
 import { useWorldSummary } from '../game/queries';
 import type { Home, MapNation, WorldSummary } from '../game/types';
-import { LineagePanel } from '../lineage/LineagePanel';
 import { Portrait } from '../portrait/Portrait';
 import { NationBadge } from '../ui/NationBadge';
 import { Tag } from '../ui/Tag';
@@ -66,7 +65,7 @@ export function GeneralInfo({
   return (
     <div className={styles.general} data-general-id={g.id}>
       <div className={styles.head}>
-        <Portrait id={g.portraitId} name={g.name} variant="icon" />
+        <Portrait id={g.portraitId} name={g.name} variant="portrait" />
         <div className={styles.who}>
           <strong className={styles.name}>{g.name}</strong>
           <span className={styles.line}>
@@ -112,9 +111,16 @@ export function GeneralInfo({
           { label: '기본 방침', value: g.policy.name },
         ]}
       />
-      {/* 가문 칸(T4-95)은 lineage-v1 월드에서만 그린다. 계승으로 장수가 바뀌어도 대기 요청을 이어 보도록 장수 id로 다시 만들지 않는다. */}
+      {/* 장착 장비는 원작 장수 칸처럼 여기 둔다. 가문(T4-95)은 내 정보 화면(/me)으로 옮겼다 (INT-25). */}
       {equipment ? <EquipmentStatus read={equipment} /> : null}
-      <LineagePanel worldId={worldId} />
+      <p className={styles.links}>
+        <Link to="/w/$worldId/me" params={{ worldId }}>
+          내 정보
+        </Link>
+        <Link to="/w/$worldId/me" params={{ worldId }} hash="lineage">
+          가문
+        </Link>
+      </p>
     </div>
   );
 }

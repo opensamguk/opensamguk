@@ -22,6 +22,7 @@ import { NotificationSettingsPage } from './notifications/NotificationSettingsPa
 import { DevUiPage } from './pages/DevUiPage';
 import { LoginPage } from './pages/LoginPage';
 import { MainPage } from './pages/MainPage';
+import { CampaignPage, GovernancePage, MePage } from './pages/MyPages';
 import { SignupPage } from './pages/SignupPage';
 import { NationTurnsPage } from './personnel/NationTurnsPage';
 import { PersonnelPage } from './personnel/PersonnelPage';
@@ -405,6 +406,15 @@ const inspectionRoute = createRoute({
   component: InspectionPage,
 });
 
+// 메인에서 옮긴 전용 화면 (INT-25, D-085). 통치는 nation/$nationId보다 먼저 맞는다(정적 경로 우선).
+const governanceRoute = createRoute({
+  getParentRoute: () => worldRoute,
+  path: 'nation/governance',
+  component: GovernancePage,
+});
+const campaignRoute = createRoute({ getParentRoute: () => worldRoute, path: 'campaign', component: CampaignPage });
+const meRoute = createRoute({ getParentRoute: () => worldRoute, path: 'me', component: MePage });
+
 const createGeneralRoute = createRoute({
   getParentRoute: () => worldRoute,
   path: 'create',
@@ -523,6 +533,9 @@ const routeTree = rootRoute.addChildren([
     operationsRoute,
     operationRoute,
     inspectionRoute,
+    governanceRoute,
+    campaignRoute,
+    meRoute,
     createGeneralRoute,
   ]),
   ...(import.meta.env.DEV ? [devUiRoute] : []),

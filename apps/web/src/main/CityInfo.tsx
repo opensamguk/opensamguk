@@ -35,6 +35,7 @@ export function CityInfo({
   onSelectCity,
   showGenerals = true,
   logisticsEnabled = false,
+  summary = false,
 }: {
   worldId: string;
   cityKey: number;
@@ -43,6 +44,8 @@ export function CityInfo({
   showGenerals?: boolean;
   // world.summary.logisticsEnabled가 true인 월드에서만 물류 칸을 그리고 조회한다 (T4-93).
   logisticsEnabled?: boolean;
+  // 메인의 요약 칸 (INT-25). 주둔 장수 표·물류는 도시 화면으로 보내고 링크만 둔다.
+  summary?: boolean;
 }) {
   const city = useCity(worldId, cityKey);
   if (city.isPending) return <LoadingState />;
@@ -91,8 +94,24 @@ export function CityInfo({
         </p>
       )}
       <StatTable rows={rows} />
+      {/* 도시 금·쌀·수비병(INT-18)은 모병·배속 명령과 함께 쓰므로 메인에도 둔다. */}
       <CityResourcesPanel worldId={worldId} cityKey={cityKey} />
-      {logisticsEnabled ? <LogisticsPanel worldId={worldId} cityKey={cityKey} /> : null}
+      {summary ? (
+        <p className={styles.links}>
+          <Link to="/w/$worldId/city/$cityKey" params={{ worldId, cityKey: String(cityKey) }}>
+            주둔 장수 {data.generals.length}명
+          </Link>
+          {logisticsEnabled ? (
+            <Link to="/w/$worldId/city/$cityKey" params={{ worldId, cityKey: String(cityKey) }} hash="logistics">
+              물류
+            </Link>
+          ) : null}
+        </p>
+      ) : logisticsEnabled ? (
+        <div id="logistics">
+          <LogisticsPanel worldId={worldId} cityKey={cityKey} />
+        </div>
+      ) : null}
       {data.links.length > 0 ? (
         <p className={styles.links}>
           <span className={styles.meta}>연결</span>
@@ -106,7 +125,7 @@ export function CityInfo({
           ))}
         </p>
       ) : null}
-      {showGenerals ? (
+      {showGenerals && !summary ? (
         <Garrison
           generals={data.generals}
           nations={nationById}
