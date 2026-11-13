@@ -4,7 +4,14 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 const fallbackUrl = publicImageUrl('apps/web/src/portrait/fallback.svg');
 import { Portrait } from './Portrait';
-import { DEFAULT_IMAGE_BASE_URL, imageBaseUrl, isPortraitId, portraitUrl, resolveImageBaseUrl } from './portraitUrl';
+import {
+  DEFAULT_IMAGE_BASE_URL,
+  imageBaseUrl,
+  isPortraitId,
+  portraitIdOf,
+  portraitUrl,
+  resolveImageBaseUrl,
+} from './portraitUrl';
 
 afterEach(cleanup);
 
@@ -96,5 +103,41 @@ describe('Portrait', () => {
     fireEvent.error(screen.getByRole('img', { name: '정원' }));
     rerender(<Portrait id={11000} name="공도" />);
     expect(screen.getByRole('img', { name: '공도' }).getAttribute('src')).toBe(portraitUrl(11000, 'portrait'));
+  });
+});
+
+describe('INT-25 줄인 초상과 이름 옆 초상', () => {
+  it('size는 폭을 정하고 높이는 변형 비율을 따른다', () => {
+    const { container } = render(<Portrait id={10002} name="정원" variant="thumb" size={20} />);
+    const frame = container.querySelector<HTMLElement>('[data-variant="thumb"]')!;
+    expect([frame.style.width, frame.style.height]).toEqual(['20px', '28px']);
+  });
+
+  it('원형은 icon에만 붙는다', () => {
+    const { container } = render(
+      <>
+        <Portrait id={10002} name="정원" variant="icon" shape="round" />
+        <Portrait id={10002} name="정원" variant="thumb" shape="round" />
+      </>,
+    );
+    const [icon, thumb] = Array.from(container.querySelectorAll('[data-variant]'));
+    expect(icon?.className.split(' ')).toHaveLength(3);
+    expect(thumb?.className.split(' ')).toHaveLength(2);
+  });
+
+  it('decorative면 alt를 비워 이름을 두 번 읽지 않는다', () => {
+    const { container } = render(<Portrait id={null} name="유비" variant="icon" decorative />);
+    expect(container.querySelector('img')?.getAttribute('alt')).toBe('');
+    expect(screen.queryByRole('img', { name: '유비' })).toBeNull();
+    // 첫 글자는 CSS로만 그려 옆 이름과 함께 읽히는 글자에 섞이지 않는다.
+    expect(container.textContent).toBe('');
+    expect(container.querySelector('[data-initial]')?.getAttribute('data-initial')).toBe('유');
+  });
+
+  it('portraitIdOf는 응답에 숫자 portraitId가 있을 때만 그 값을 준다', () => {
+    expect(portraitIdOf({ portraitId: 10006 })).toBe(10006);
+    expect(portraitIdOf({ portraitId: null })).toBeNull();
+    expect(portraitIdOf({ name: '조조' })).toBeNull();
+    expect(portraitIdOf(undefined)).toBeNull();
   });
 });

@@ -1,7 +1,7 @@
 import type { AppRouter } from '@opensamguk/server/router';
 import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
 import { OFFICE_LABEL } from '../governance/governanceModel';
-import { officerName } from '../game/names';
+import { displayName, officerName } from '../game/names';
 
 // 가문 API 계약의 화면 쪽 타입과 표시 도움 함수 (T4-95, AC-P2-32).
 // 자격·사유·미리보기는 lineage.get이 준 값만 쓴다. 화면은 성별·나이로 거르거나 판정하지 않는다.
@@ -37,8 +37,12 @@ export const failureLabel = (failure: { code: string }) => FAILURE_LABEL[failure
 export const formatCount = (value: number) => value.toLocaleString('ko-KR');
 export const personOf = (view: LineageView, id: number | null) =>
   id === null ? undefined : view.people.find((row) => row.id === id);
-export const personName = (view: LineageView, id: number | null) =>
-  id === null ? '—' : (personOf(view, id)?.name ?? `장수 ${id}`);
+// 장수 이름은 괄호를 뺀다 (D-085).
+export const personName = (view: LineageView, id: number | null) => {
+  if (id === null) return '—';
+  const name = personOf(view, id)?.name;
+  return name === undefined ? `장수 ${id}` : displayName(name);
+};
 export const nationOf = (view: LineageView, id: number | null) =>
   id === null ? undefined : view.nations.find((row) => row.id === id);
 export const cityName = (view: LineageView, key: number) =>
@@ -213,10 +217,10 @@ export function describeAction(view: LineageView, payload: LineageInput): string
 export function proposalRule(view: LineageView, targetId: number): string {
   const target = personOf(view, targetId);
   if (!target || typeof target.isHuman !== 'boolean')
-    return `처리할 때 ${target ? `${target.name}이(가) ` : '상대가 '}사람 장수면 제안이 가고 직접 수락해야 혼인합니다. NPC면 소속·친화 조건으로 바로 판정합니다.`;
+    return `처리할 때 ${target ? `${displayName(target.name)}이(가) ` : '상대가 '}사람 장수면 제안이 가고 직접 수락해야 혼인합니다. NPC면 소속·친화 조건으로 바로 판정합니다.`;
   return target.isHuman
-    ? `${target.name}은(는) 사람 장수입니다. 제안이 가고 상대가 기한 안에 직접 수락해야 혼인합니다. 자동으로 수락되지 않습니다.`
-    : `${target.name}은(는) NPC입니다. 처리할 때 소속·친화 조건으로 바로 판정하고 맞으면 제안 없이 바로 혼인합니다.`;
+    ? `${displayName(target.name)}은(는) 사람 장수입니다. 제안이 가고 상대가 기한 안에 직접 수락해야 혼인합니다. 자동으로 수락되지 않습니다.`
+    : `${displayName(target.name)}은(는) NPC입니다. 처리할 때 소속·친화 조건으로 바로 판정하고 맞으면 제안 없이 바로 혼인합니다.`;
 }
 
 // 미등장 인물의 등장 연도. 퇴장했거나 이미 등장했거나, 서버가 정수 연도를 주지 않았으면 null이다.
@@ -227,8 +231,8 @@ export function appliedMessage(view: LineageView, payload: LineageInput, action:
   const target = payload.type === 'marriage.propose' ? personOf(view, payload.targetGeneralId) : undefined;
   if (!target || typeof target.isHuman !== 'boolean') return APPLIED_MESSAGE[action];
   return target.isHuman
-    ? `${target.name}에게 혼인 제안을 보냈습니다. 상대가 직접 수락해야 혼인합니다. 제안 탭에서 확인하세요.`
-    : `${target.name}(NPC)과(와) 혼인했습니다. 혼인 탭에서 확인하세요.`;
+    ? `${displayName(target.name)}에게 혼인 제안을 보냈습니다. 상대가 직접 수락해야 혼인합니다. 제안 탭에서 확인하세요.`
+    : `${displayName(target.name)}(NPC)과(와) 혼인했습니다. 혼인 탭에서 확인하세요.`;
 }
 
 export const APPLIED_MESSAGE: Record<LineageInput['type'], string> = {

@@ -2,6 +2,7 @@ import type { AppRouter } from '@opensamguk/server/router';
 import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
+import { displayName } from '../game/names';
 import { useTRPC } from '../trpc';
 import { errorCode, serverMessage } from '../turns/apiError';
 import { Portrait } from '../portrait/Portrait';
@@ -268,7 +269,18 @@ function CampaignControls({
   const [relation, setRelation] = useState<keyof typeof relations>('STAFF');
   const [commander, setCommander] = useState(board.actorId);
   const [crewType, setCrewType] = useState(board.armyTypes[0]?.id ?? 1100);
-  const names = new Map(board.people.map((person) => [person.id, person.name]));
+  // 장수 이름은 괄호를 뺀다 (D-085).
+  const names = new Map(board.people.map((person) => [person.id, displayName(person.name)]));
+  const face = (id: number) => (
+    <Portrait
+      id={board.people.find((person) => person.id === id)?.portraitId ?? null}
+      name={names.get(id) ?? `장수 ${id}`}
+      variant="icon"
+      shape="round"
+      size={28}
+      decorative
+    />
+  );
   const disabled = busy || board.status !== 'RUNNING';
   const rel = (payload: Inputs['relationship']['payload']) => act({ kind: 'campaign.relationship', payload });
   const unit = (payload: Inputs['unit']['payload']) => act({ kind: 'campaign.unit', payload });
@@ -290,6 +302,7 @@ function CampaignControls({
           .filter((offer) => offer.personId === board.actorId && offer.status === 'PENDING')
           .map((offer) => (
             <div className={styles.row} key={offer.id}>
+              {face(offer.masterId)}
               <span>
                 {names.get(offer.masterId)}의 {relations[offer.relation]} 제안
               </span>
@@ -321,6 +334,7 @@ function CampaignControls({
         {ownLinks.length ? (
           ownLinks.map((link) => (
             <div className={styles.row} key={link.personId}>
+              {face(link.personId)}
               <span>
                 {names.get(link.masterId)} → {names.get(link.personId)} ({relations[link.relation]})
               </span>
@@ -369,10 +383,17 @@ function CampaignControls({
             const noGold = !person.isHuman && board.resources.gold < board.npcPledge.cost;
             return (
               <article key={id} className={styles.person}>
-                <Portrait id={person.portraitId} name={person.name} variant="icon" />
+                <Portrait
+                  id={person.portraitId}
+                  name={displayName(person.name)}
+                  variant="icon"
+                  shape="round"
+                  size={64}
+                  decorative
+                />
                 <div>
                   <span>
-                    {person.name} · {person.isHuman ? '사람' : 'NPC'} · 명망{person.renownCost}
+                    {displayName(person.name)} · {person.isHuman ? '사람' : 'NPC'} · 명망{person.renownCost}
                   </span>
                   <small>
                     통솔{person.leadership} 무력{person.strength} 지력{person.intel} 정치{person.politics} 매력
@@ -388,7 +409,7 @@ function CampaignControls({
                         ? '명망 수용량 부족'
                         : noGold
                           ? `서약 금${board.npcPledge.cost} 부족`
-                          : `${person.name}에게 제안`}
+                          : `${displayName(person.name)}에게 제안`}
                   </button>
                 </div>
               </article>

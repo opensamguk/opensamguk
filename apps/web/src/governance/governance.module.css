@@ -376,3 +376,11 @@
   min-height: 44px;
   padding: var(--space-1) var(--space-3);
 }
+
+/* 장수 한 명: 원형 icon과 이름·이름표를 한 줄에 둔다 (D-085). */
+.person {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
