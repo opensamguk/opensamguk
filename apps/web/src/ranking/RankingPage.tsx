@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '../trpc';
 import { displayName } from '../game/names';
 import { formatYearMonth } from '../game/gameDate';
+import { Portrait } from '../portrait/Portrait';
 const rankingIcon = publicImageUrl('apps/web/src/art/icons/ranking.png');
 import { EmptyState, ErrorState } from '../ui/States';
 import styles from './Ranking.module.css';
@@ -42,6 +43,7 @@ export function RankingPage() {
       supplemental={
         <>
           {search.tab === 'nations' ? <FreeGenerals worldId={worldId} /> : <HeritageRankings worldId={worldId} />}
+          <RareEquipmentOwners worldId={worldId} />
           <TrafficRecords worldId={worldId} />
         </>
       }
@@ -146,6 +148,33 @@ function RankingPages({
         다음
       </button>
     </nav>
+  );
+}
+
+function RareEquipmentOwners({ worldId }: { worldId: string }) {
+  const trpc = useTRPC();
+  const query = useQuery(trpc.equipment.rare.queryOptions({ worldId }));
+  if (!query.data?.enabled) return null;
+  return (
+    <details>
+      <summary>명품 소유자</summary>
+      <ul>
+        {query.data.items.map((item) => (
+          <li key={item.key}>
+            <strong title={item.description}>{item.name}</strong>
+            {' · '}
+            {item.owner ? (
+              <>
+                <Portrait id={item.owner.portraitId} name={item.owner.name} variant="icon" shape="round" decorative />
+                {displayName(item.owner.name)} · {item.owner.nation?.name ?? '재야'}
+              </>
+            ) : (
+              '미발견'
+            )}
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 

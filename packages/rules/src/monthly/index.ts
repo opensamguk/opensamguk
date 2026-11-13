@@ -1,6 +1,7 @@
 import type { GameDate, Rng } from '@opensamguk/shared';
 import { COURT_PROMOTION_FEATURE, promoteNationCourts } from '../personnel/nationRank';
 import { nationPhilosophy } from '../personnel/nationPhilosophy';
+import { discoverRareEquipment } from '../equipment/rare';
 import { settleHeritageSpecialties } from '../heritage/specialty';
 import { BALANCE } from '../balance';
 import { TICKS_PER_MONTH } from '../clock/constants';
@@ -292,6 +293,7 @@ export function runMonthly(state: WorldView, tick: number, rng: Rng) {
   const seasonalEventLogs = state.ruleFeatures?.includes(CITY_SEASONAL_EVENTS_FEATURE)
     ? settleCitySeasonalEvents(next, date, rng)
     : [];
+  const rareEquipmentLogs = discoverRareEquipment(next, date.year, rng);
   // 미등장 장수는 턴을 쌓지 않는다. 등장 연도 1월에는 원래 offset부터 실행한다.
   for (const general of generalsById(next)) {
     if (general.activeFromYear > date.year) {
@@ -316,6 +318,7 @@ export function runMonthly(state: WorldView, tick: number, rng: Rng) {
     date,
     officeTaxLogs,
     seasonalEventLogs,
+    rareEquipmentLogs,
     stages: [...MONTHLY_STAGES],
     yearbook: buildYearbook(next, date.year),
   };

@@ -11,6 +11,7 @@ import {
   equipmentSlotSchema,
   equipmentTools,
   equipmentToolKeySchema,
+  rareEquipmentKeySchema,
   toolSaleProceeds,
 } from './config';
 import { readEquipmentState } from './state';
@@ -63,6 +64,8 @@ export const equipmentTrade = defineCommand({
       return general.gold < tool.cost ? fail('NO_GOLD', '금이 부족합니다.') : null;
     }
     const held = slots?.[args.slot];
+    if (held && rareEquipmentKeySchema.safeParse(held).success)
+      return fail('BAD_STATE', '명품 장비는 거래할 수 없습니다.');
     if (args.itemKey === 'none') {
       if (!held) return fail('BAD_STATE', '판매할 장비가 없습니다.');
       const item = equipment.config.items.find((entry) => entry.key === held)!;

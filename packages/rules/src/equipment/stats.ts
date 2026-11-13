@@ -1,4 +1,5 @@
 import type { WorldView } from '../model/world';
+import { equippedItem } from './config';
 import type { FiveStats } from '../general/fiveStats';
 
 export function equipmentBonus(world: WorldView, generalId: number) {
@@ -11,7 +12,7 @@ export function equipmentBonus(world: WorldView, generalId: number) {
   if (equipped)
     for (const [slot, key] of Object.entries(equipped)) {
       if (slot === 'tool') continue;
-      const item = state.config.items.find((item) => item.key === key);
+      const item = typeof key === 'string' ? equippedItem(state.config, key) : undefined;
       if (!item || item.slot !== slot) throw new Error('장착한 장비의 번호와 칸이 맞지 않습니다.');
       bonus[item.stat] += item.bonus;
     }

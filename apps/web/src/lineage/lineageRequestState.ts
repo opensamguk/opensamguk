@@ -37,7 +37,7 @@ function readEquipmentSlots(value: unknown): NonNullable<SuccessionPreview['equi
   for (const slot of slots) {
     if (!Object.hasOwn(raw, slot)) continue;
     const key = raw[slot];
-    if (typeof key !== 'string' || !new RegExp(`^${slot}_0[1-6]$`).test(key)) return undefined;
+    if (typeof key !== 'string' || !new RegExp(`^${slot}_(0[1-6]|15)$`).test(key)) return undefined;
     result[slot] = key;
   }
   if (Object.hasOwn(raw, 'tool')) {

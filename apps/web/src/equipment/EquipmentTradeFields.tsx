@@ -47,7 +47,8 @@ export function EquipmentTradeFields({
   const item = items.find((row) => row.key === values.itemKey);
   const sale = equippedTool?.sale ?? board.sales.find((row) => row.slot === slot)!;
   const selling = values.itemKey === 'none';
-  const held = board.items.find((row) => row.key === board.slots[slot]);
+  const held = [...board.items, ...(board.rare ?? [])].find((row) => row.key === board.slots[slot]);
+  const rareHeld = !!board.rare?.some(({ key }) => key === held?.key);
   const materials = item
     ? [
         item.goods.iron ? `철 ${n(item.goods.iron)}` : '',
@@ -130,8 +131,8 @@ export function EquipmentTradeFields({
           )}
         </p>
       ) : null}
-      {selling ? <p>현재 장착품 기준 판매 금액: 금 {n(sale.proceeds)}</p> : null}
-      {(item && held && held.key !== item.key) ||
+      {selling && !rareHeld ? <p>현재 장착품 기준 판매 금액: 금 {n(sale.proceeds)}</p> : null}
+      {(item && held && held.key !== item.key && !rareHeld) ||
       (tool && equippedTool?.remainingCharges && equippedTool.key !== tool.key) ? (
         <p className={styles.warn} role="note">
           교체하면 기존 장비 금액은 돌려받지 않습니다.

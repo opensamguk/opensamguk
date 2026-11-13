@@ -68,6 +68,17 @@ const registered: RuleRegistry = {
   ],
 };
 describe('AC-M3-04 원생성 설정 조회', () => {
+  it('INT-26 명품 발견 프로필을 선택할 수 있다', () => {
+    const data = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v12.json'));
+    expect(data).toHaveProperty('featureData.equipment-v1.rareEquipment', true);
+    expect(
+      expandedCreationProfile(expandedRows, allPresets, data, ruleRegistry, 'san10-191-rare-equipment'),
+    ).toMatchObject({
+      available: true,
+      featureProfileKey: data.key,
+    });
+  });
+
   it('INT-26 탁주와 유산 특기는 새 SAN10 프로필에서 선택할 수 있다', () => {
     const data = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v11.json'));
     expect(data).toHaveProperty('featureData.equipment-v1.moraleTool', true);
