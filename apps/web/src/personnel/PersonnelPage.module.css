@@ -33,6 +33,18 @@
   height: auto;
   padding: var(--space-2) 0;
 }
+/* 소속 장수 표 이름 앞의 원형 icon (INT-25). 28px 행 안에 들어가게 24px로 줄인다. */
+.member {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.memberIcon {
+  flex: none;
+  width: 24px;
+  height: 24px;
+}
 .traits {
   display: inline-flex;
   flex-wrap: wrap;

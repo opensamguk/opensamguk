@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
 import { Portrait } from '../portrait/Portrait';
 import { Tag } from '../ui/Tag';
-import { matchesCandidate, statEntries, traitTags, type Candidate } from './candidates';
+import { injuryText, matchesCandidate, statEntries, traitTags, type Candidate } from './candidates';
 import styles from './CandidatePicker.module.css';
 
 const n = (value: number) => value.toLocaleString('ko-KR');
@@ -120,8 +120,7 @@ function CandidateCard({
               ))}
             </span>
             <span className={styles.meta}>
-              병력 {n(detail.troops)}
-              {detail.injury > 0 ? ` · 부상 ${n(detail.injury)}` : null}
+              병력 {n(detail.troops)} · 부상 {injuryText(detail.injury)}
             </span>
           </>
         ) : null}

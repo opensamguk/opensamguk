@@ -233,6 +233,18 @@ describe('국가 칸 저장', () => {
     expect(nationSource(fakeApi({}), tab, { onOfficeChanged: vi.fn() })(context).readOnly).toBeNull();
   });
 
+  it('INT-25 남의 칸만 직책자의 다음 턴 시각을 넘겨 실행 시기를 센다', () => {
+    const other = { ...tab, edit: { ok: false as const, reason: '내 직책 칸이 아닙니다' } };
+    const at = '2026-11-13T09:00:00.000Z';
+    expect(
+      nationSource(fakeApi({}), other, { onOfficeChanged: vi.fn(), holderNextTurnAt: at })(context).nextTurnAt,
+    ).toBe(at);
+    // 내 칸은 내 장수의 시각(home.get)으로 센다.
+    expect(
+      nationSource(fakeApi({}), tab, { onOfficeChanged: vi.fn(), holderNextTurnAt: at })(context).nextTurnAt,
+    ).toBeUndefined();
+  });
+
   it('초안 키는 계정·월드와 본 직책(tenure 포함)마다 다르다', () => {
     const key = nationDraftKey('u1', 'w1', tab.office);
     expect(key).not.toBe(nationDraftKey('u1', 'w1', { ...tab.office, tenure: 4 }));
@@ -417,6 +429,44 @@ describe('인사부', () => {
     expect(onDismiss.mock.calls).toEqual([[2, 11]]);
     expect(screen.getAllByText('사람')).toHaveLength(2);
     expect(screen.getByText('NPC')).toBeTruthy();
+  });
+
+  it('INT-25 소속 장수 표에 원형 얼굴과 능력치·병력·부상을 두고 고른 장수 줄에 통/무/지를 적는다', () => {
+    render(
+      <PersonnelBoardView board={board} details={details} busyTarget={null} onAppoint={vi.fn()} onDismiss={vi.fn()} />,
+    );
+    const table = screen.getByRole('heading', { name: '소속 장수' }).parentElement!.querySelector('table')!;
+    expect([...table.querySelectorAll('thead th')].map((th) => th.textContent?.replace(/[▲▼]/g, ''))).toEqual([
+      '이름',
+      '직책',
+      '도시',
+      '통솔',
+      '무력',
+      '지력',
+      '정치',
+      '매력',
+      '병력',
+      '부상',
+      '공헌',
+      '성격·특기',
+    ]);
+    const rows = [...table.querySelectorAll('tbody tr')];
+    const zhao = rows.find((row) => row.textContent?.includes('조운'))!;
+    expect(zhao.querySelector('[data-variant="icon"]')).not.toBeNull();
+    expect([...zhao.querySelectorAll('td')].map((td) => td.textContent)).toEqual(
+      expect.arrayContaining(['90', '96', '76', '65', '81', '3,000', '12']),
+    );
+    // 5능력치가 없는 장수의 정치·매력은 —, 부상이 없으면 없음이다.
+    const liu = [...rows.find((row) => row.textContent?.includes('유비'))!.querySelectorAll('td')].map(
+      (td) => td.textContent,
+    );
+    expect(liu.slice(3, 10)).toEqual(['90', '80', '80', '—', '—', '0', '없음']);
+
+    fireEvent.click(screen.getByRole('button', { name: '수뇌 임명할 장수 고르기' }));
+    const picker = screen.getByRole('group', { name: '수뇌 임명 후보' });
+    expect(picker.querySelector('[data-general-id="2"]')?.textContent).toContain('병력 0 · 부상 없음');
+    fireEvent.click(picker.querySelector('[data-general-id="3"]')!);
+    expect(document.querySelector('tr[data-level="10"]')?.textContent).toContain('고른 장수 조운 · 통/무/지 90/96/76');
   });
 
   it('후보는 이름·도시로 거르고 앉은 장수 칸에 소재 도시를 적는다', () => {

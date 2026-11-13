@@ -356,6 +356,53 @@
   font-weight: 600;
 }
 
+/* 예턴 표 머리의 지금 시각 (INT-25). 저장 상태 글자 옆에 작게 둔다. */
+.clock {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 최근 넣은 명령 한 줄 (INT-25). 줄이 넘치면 줄 안에서 옆으로 밀고, 화면 폭은 넘지 않는다. */
+.recent {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.recentLabel {
+  flex: none;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.recentList {
+  display: flex;
+  flex: 1 1 auto;
+  gap: var(--space-1);
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.recentList > * {
+  flex: none;
+}
+
+.recentItem {
+  max-width: 16em;
+}
+
+.recentText {
+  display: block;
+  max-width: 16em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* 국가 예턴 위의 국고 한 줄. */
 .treasury {
   margin: 0;
