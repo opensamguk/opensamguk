@@ -1552,10 +1552,15 @@ it('유산 턴 시간 초기화는 다음 턴을 유지하고 다다음 턴과 �
   await db.heritageAccount.create({ data: { userId: player.id, balance: 3000 } });
   const request = { worldId, requestId: randomUUID(), expectedGeneralId: 1, expectedCost: 1000 };
   const buy = (input = request) => rpc('heritage.turnTime', input, player);
+  await authzCase('heritage.turnTime', 'otherUser', async () => {
+    expect((await rpc('heritage.turnTime', request, await user())).status).toBe(404);
+  })();
   expect((await buy({ ...request, expectedCost: 999 })).status).toBe(409);
-  const first = await buy();
-  expect(first.status).toBe(200);
-  expect((await buy()).data).toEqual(first.data);
+  await authzCase('heritage.turnTime', 'success', async () => {
+    const first = await buy();
+    expect(first.status).toBe(200);
+    expect((await buy()).data).toEqual(first.data);
+  })();
   expect((await buy({ ...request, requestId: randomUUID() })).status).toBe(409);
   await advance(worldId);
   const general = () => db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
@@ -1644,7 +1649,7 @@ it('미접속 퇴장 시 미사용 특기 예약을 한 번만 반환한다', as
   );
 }, 60_000);
 
-for (const path of ['heritage.benefits', 'heritage.purchase', 'heritage.specialty'] as const) {
+for (const path of ['heritage.benefits', 'heritage.purchase', 'heritage.specialty', 'heritage.turnTime'] as const) {
   for (const category of ['unauthenticated', 'sanctioned', 'invalidInput'] as const) {
     it(
       `유산 혜택 접근 경계 ${path} ${category}`,
@@ -1659,7 +1664,9 @@ for (const path of ['heritage.benefits', 'heritage.purchase', 'heritage.specialt
             ? { expectedGeneralId: 1, expectedCost: 1, benefit: 'evasion', level: 1 }
             : path === 'heritage.specialty'
               ? { requestId: randomUUID(), expectedGeneralId: 1, expectedCost: 1000, action: { action: 'reset' } }
-              : {}),
+              : path === 'heritage.turnTime'
+                ? { requestId: randomUUID(), expectedGeneralId: 1, expectedCost: 1000 }
+                : {}),
         };
         const result = await rpc(path, input, category === 'unauthenticated' ? undefined : player);
         expect(result.error?.data.code).toBe(category === 'invalidInput' ? 'BAD_REQUEST' : 'UNAUTHORIZED');
