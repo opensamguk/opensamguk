@@ -3,6 +3,8 @@ import { nextTurnAt, turnSchedule, readWorld, requireGeneral, worldClock, worldI
 import { cityInfo, ownGeneralInfo, logInfo, logSelect, nationInfo } from '../visibility';
 import {
   GENERAL_CONDITION_FEATURE,
+  BATTLE_TACTICS_FEATURE,
+  storedHeritageBenefits,
   TROOP_FEATURE,
   HERITAGE_BENEFITS_FEATURE,
   readTroops,
@@ -171,6 +173,12 @@ export const homeRouter = router({
           personalityEffects: personalityEffects(world, general.personality) ?? null,
           domesticSpecialty: domesticSpecialty(world, general.special) ?? null,
           combatSpecialty: combatSpecialty(world, general.special) ?? null,
+          ...(world.ruleFeatures.includes(BATTLE_TACTICS_FEATURE)
+            ? { battleTactics: { leadership: general.leadership, strength: general.strength, intel: general.intel } }
+            : {}),
+          ...(world.ruleFeatures.includes(HERITAGE_BENEFITS_FEATURE)
+            ? { heritageBenefits: storedHeritageBenefits(true, general.heritageBenefits).heritageBenefits ?? null }
+            : {}),
           troop:
             troop && troopLeader
               ? {

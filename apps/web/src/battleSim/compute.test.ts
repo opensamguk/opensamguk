@@ -97,6 +97,21 @@ describe('AC-INT-11 통합판의 단일 교전', () => {
     });
   });
 
+  it('불러온 전투계략과 유산은 교전 계산의 실제 입력에 들어간다', () => {
+    const tactics = { leadership: 30, strength: 50, intel: 100 };
+    const heritage = { tactics: 5, opponentEvasion: 4 };
+    const message = general({ recordPhases: true, attackerTraits: { tactics, heritage } });
+    expect(compute(message)).toMatchObject({ type: 'result', phases: expect.any(Array) });
+    expect(simulateBattle).toHaveBeenLastCalledWith(
+      expect.objectContaining({ attackerTactics: tactics, attackerHeritage: heritage, recordPhases: true }),
+      expect.anything(),
+    );
+    expect(compute(general({ attackerTraits: { heritage: { tactics: 6 } } }))).toMatchObject({
+      type: 'error',
+      field: 'attackerTraits.heritage.tactics',
+    });
+  });
+
   it('성벽에는 가짜 지휘관을 만들지 않고 공격 지휘관만 보정한다', () => {
     const commanders = { attacker: { leadership: 78, strength: 80 } };
     const message = wall({ commanders });

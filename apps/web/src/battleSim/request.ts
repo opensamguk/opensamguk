@@ -7,6 +7,8 @@ export type AttackerTraits = {
   personality?: string;
   specialty?: string;
   proficiency?: Record<string, number>;
+  tactics?: CommanderStats & { intel: number };
+  heritage?: Partial<Record<(typeof combatHeritageKeys)[number], number>>;
 };
 export type BattleCommanders = { attacker: CommanderStats; defender?: CommanderStats };
 
@@ -30,6 +32,12 @@ export type BattlePhase = {
   kind: 'volley' | 'hold' | 'exchange';
   attackerLoss: number;
   defenderLoss: number;
+  attackerEvaded?: boolean;
+  defenderEvaded?: boolean;
+  attackerCritical?: boolean;
+  defenderCritical?: boolean;
+  attackerTactic?: { name: string; success: boolean };
+  defenderTactic?: { name: string; success: boolean };
 };
 
 export type BattleRunResult = {
@@ -89,6 +97,14 @@ const REQUEST_KEYS = new Set([
   'recordPhases',
   'attackerTraits',
 ]);
+const combatHeritageKeys = [
+  'evasion',
+  'opponentEvasion',
+  'critical',
+  'opponentCritical',
+  'tactics',
+  'opponentTactics',
+] as const;
 const FORCE_KEYS = ['crew', 'crewType', 'train', 'atmos'] as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -133,6 +149,17 @@ export function requestProblems(message: unknown, units: readonly UnitChoice[]):
         if (key === 'personality' || key === 'specialty') {
           if (typeof value !== 'string' || value.length < 1 || value.length > 40)
             add(`attackerTraits.${key}`, { problem: 'unexpected' });
+        } else if (key === 'tactics' && isRecord(value)) {
+          const stats = ['leadership', 'strength', 'intel'];
+          for (const stat of stats) add(`attackerTraits.tactics.${stat}`, intProblem(value[stat], 0, 100));
+          for (const stat of Object.keys(value))
+            if (!stats.includes(stat)) add(`attackerTraits.tactics.${stat}`, { problem: 'unexpected' });
+        } else if (key === 'heritage' && isRecord(value)) {
+          for (const [benefit, level] of Object.entries(value)) {
+            if ((combatHeritageKeys as readonly string[]).includes(benefit))
+              add(`attackerTraits.heritage.${benefit}`, intProblem(level, 1, 5));
+            else add(`attackerTraits.heritage.${benefit}`, { problem: 'unexpected' });
+          }
         } else if (key === 'proficiency' && isRecord(value)) {
           for (const [armType, points] of Object.entries(value)) {
             if (!units.some((unit) => unit.armType > 0 && String(unit.armType) === armType))
@@ -255,11 +282,13 @@ export function checkRequest(message: unknown, units: readonly UnitChoice[]): Ch
   if (m.defender.crewType === WALL_CREW_TYPE) request.defence = m.defence!;
   if (m.recordPhases) request.recordPhases = true;
   if (m.attackerTraits) {
-    const { personality, specialty, proficiency } = m.attackerTraits;
+    const { personality, specialty, proficiency, tactics, heritage } = m.attackerTraits;
     request.attackerTraits = {
       ...(personality === undefined ? {} : { personality }),
       ...(specialty === undefined ? {} : { specialty }),
       ...(proficiency === undefined ? {} : { proficiency: { ...proficiency } }),
+      ...(tactics === undefined ? {} : { tactics: { ...tactics } }),
+      ...(heritage === undefined ? {} : { heritage: { ...heritage } }),
     };
   }
   if (m.commanders) {
