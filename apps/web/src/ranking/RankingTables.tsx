@@ -113,7 +113,9 @@ function GeneralRow({
           decorative
           className={styles.face}
         />
-        <span className={styles.name}>{displayName(row.name)}</span>
+        <span className={styles.name} data-general-name>
+          {displayName(row.name)}
+        </span>
         {me ? <span className={styles.meChip}>나</span> : null}
         {narrow ? (
           <dl className={styles.details}>

@@ -257,7 +257,10 @@ test('정지 중에 가속으로 바꾸고 재개하면 두 화면이 따라오�
     const result = await expectResult(a.page, world.worldId);
     expect(result.reason).toBe('UNIFIED');
     expect(result.winner).not.toBeNull();
-    await expect(a.page.getByRole('region', { name: '기수 결과' }).getByText(result.winner!.name)).toBeVisible();
+    // 승자 이름은 승자 줄과 오호장군 목록(INT-25)에 함께 나올 수 있어 승자 줄에서 본다.
+    await expect(
+      a.page.getByRole('region', { name: '기수 결과' }).getByTestId('season-winner').getByText(result.winner!.name),
+    ).toBeVisible();
     // 종료 전환 때 지도도 다시 받아 승자가 모든 도시를 가진 모습이 결과 칸과 맞는다.
     const map = await query<{ cities: Array<{ nationId: number | null }> }>(a.page, 'world.map', {
       worldId: world.worldId,
@@ -288,7 +291,9 @@ test('정지 중에 가속으로 바꾸고 재개하면 두 화면이 따라오�
       await screen.page.reload();
       await expectResult(screen.page, world.worldId);
     }
-    await expect(b.page.getByRole('region', { name: '기수 결과' }).getByText(result.winner!.name)).toBeVisible();
+    await expect(
+      b.page.getByRole('region', { name: '기수 결과' }).getByTestId('season-winner').getByText(result.winner!.name),
+    ).toBeVisible();
   } finally {
     await releaseHold(world.hold);
   }

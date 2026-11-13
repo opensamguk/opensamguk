@@ -282,7 +282,8 @@ export function MainPage() {
 
         {tab(
           'menu',
-          <>
+          // 두 메뉴를 한 칸(격자 menu)에 쌓는다. 따로 두면 같은 격자 칸에 겹친다.
+          <div className={styles.menuStack}>
             <MainMenu
               worldId={worldId}
               nationId={homeData?.nation?.id ?? null}
@@ -291,7 +292,7 @@ export function MainPage() {
             />
             {/* 좁은 메인에는 게임 메뉴 막대가 없으므로 그 막대의 나머지 화면과 계정 조작을 여기에 둔다. */}
             {narrow ? <MobileMoreMenu worldId={worldId} city={selected} /> : null}
-          </>,
+          </div>,
         )}
 
         {tab(

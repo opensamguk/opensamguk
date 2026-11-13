@@ -38,12 +38,12 @@ async function query<T>(page: Page, path: string, input: object): Promise<T> {
 }
 
 const generalsTable = (page: Page) => page.getByRole('table', { name: '장수 순위' });
-// 상위 목록(첫 tbody)의 장수 이름. 「나」 칩은 이름 옆 다른 span이라 빠진다.
+// 상위 목록(첫 tbody)의 장수 이름. 이름 앞의 얼굴(INT-25)과 「나」 칩은 다른 요소라 빠진다.
 const topNames = (page: Page, count: number) =>
   generalsTable(page)
     .locator('tbody')
     .first()
-    .locator('tr td:nth-child(2) > span:first-child')
+    .locator('tr td:nth-child(2) [data-general-name]')
     .allInnerTexts()
     .then((names) => names.slice(0, count));
 
