@@ -139,8 +139,16 @@ export function GeneralInfo({
             ? [
                 {
                   label: '도시 수비',
-                  value: defense.participating ? `참전 · ${n(defense.troops)}명` : '참전 조건 미충족',
-                  title: `수비 기준은 훈련 ${defense.minimumTraining}, 사기 ${defense.minimumMorale} 이상입니다`,
+                  value:
+                    defense.stance?.enabled === false
+                      ? '수비 안 함'
+                      : defense.participating
+                        ? `참전 · ${n(defense.troops)}명`
+                        : '참전 조건 미충족',
+                  title:
+                    defense.stance?.enabled === false
+                      ? undefined
+                      : `수비 기준은 훈련 ${defense.minimumTraining}, 사기 ${defense.minimumMorale} 이상입니다`,
                 },
               ]
             : []),

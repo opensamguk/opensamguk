@@ -456,6 +456,7 @@ model General {
   activeFromYear    Int
   removedAt         Int?
   personality       String?
+  defenseThreshold  Int?
   special           String?
   gold              Int
   rice              Int

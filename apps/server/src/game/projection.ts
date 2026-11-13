@@ -1,7 +1,10 @@
 import type { InitialGeneral } from '@opensamguk/rules';
 // 명시한 공개 필드만 반환한다. DB·입력 기록을 그대로 직렬화하지 않는다.
 export function ownGeneral(
-  g: Omit<InitialGeneral, 'politics' | 'charm' | 'removedAt'> & { politics?: number | null; charm?: number | null },
+  g: Omit<InitialGeneral, 'politics' | 'charm' | 'removedAt' | 'defenseThreshold'> & {
+    politics?: number | null;
+    charm?: number | null;
+  },
 ) {
   return {
     id: g.id,

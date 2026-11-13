@@ -2,6 +2,9 @@ import type { Prisma } from '@opensamguk/db';
 import {
   assertSlotSet,
   CITY_SEASONAL_EVENTS_FEATURE,
+  DEFENSE_STANCE_FEATURE,
+  DEFENSE_STANCE_KIND,
+  defenseStanceInput,
   COURT_PROMOTION_FEATURE,
   DIPLOMATIC_COOLDOWN_FEATURE,
   NATION_PHILOSOPHY_FEATURE,
@@ -114,6 +117,22 @@ export async function persistPersonnelPacket(
   await persistResidenceAnchors(tx, worldId, before.residenceAnchors!, anchors);
 }
 
+const processDefenseStance: QueuedInputHandler = async (tx, world, event) => {
+  const reject = (code: string, message: string) => ({ status: 'REJECTED' as const, result: { code, message } });
+  if (world.status === 'ENDED') return reject('WORLD_CLOSED', '종료된 월드입니다.');
+  await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${event.userId} FOR SHARE`;
+  const user = await tx.user.findUnique({ where: { id: event.userId }, select: { status: true } });
+  if (user?.status !== 'ACTIVE') return reject('ACTOR_INACTIVE', '활성 계정이 아닙니다.');
+  if (event.generalId === null) return reject('NO_GENERAL', '장수가 없습니다.');
+  const where = { worldId_id: { worldId: world.id, id: event.generalId } };
+  const general = await tx.general.findUnique({ where, select: { userId: true } });
+  if (general?.userId !== event.userId) return reject('NO_GENERAL', '내 장수가 아닙니다.');
+  const stance = defenseStanceInput.safeParse(event.payload);
+  if (!stance.success) return reject('BAD_STANCE', '수비 기준을 확인하세요.');
+  await tx.general.update({ where, data: { defenseThreshold: stance.data.threshold } });
+  return { status: 'APPLIED', result: stance.data };
+};
+
 const processPolicyInput: QueuedInputHandler = async (tx, world, event, { tick }) => {
   const reject = (code: string, message: string) => ({ status: 'REJECTED' as const, result: { code, message } });
   if (world.status === 'ENDED') return reject('WORLD_CLOSED', '종료된 월드입니다.');
@@ -193,6 +212,7 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
   { key: 'court-rank-v1' },
   { key: COURT_PROMOTION_FEATURE },
   { key: CITY_SEASONAL_EVENTS_FEATURE },
+  { key: DEFENSE_STANCE_FEATURE, queuedInputs: { [DEFENSE_STANCE_KIND]: processDefenseStance } },
   { key: NATION_PHILOSOPHY_FEATURE },
   { key: PLAYER_AUTOPLAY_FEATURE },
   { key: 'general-condition-v1' },

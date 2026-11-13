@@ -77,6 +77,7 @@ export interface InitialGeneral {
   charm?: number;
   officerLevel: number;
   officerCityKey?: number | null;
+  defenseThreshold?: number;
   birthYear: number;
   deathYear: number;
   activeFromYear: number;

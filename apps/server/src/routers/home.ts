@@ -3,6 +3,11 @@ import { nextTurnAt, turnSchedule, readWorld, requireGeneral, worldClock, worldI
 import { cityInfo, ownGeneralInfo, logInfo, logSelect, nationInfo } from '../visibility';
 import {
   GENERAL_CONDITION_FEATURE,
+  DEFENSE_STANCES,
+  DEFENSE_STANCE_FEATURE,
+  DEFENSE_STANCE_KIND,
+  defenseRequirements,
+  defenseStanceInput,
   generalCondition,
   LINEAGE_EXITED_YEAR,
   nowTick,
@@ -57,7 +62,22 @@ export const homeRouter = router({
         world.status !== 'ENDED'
           ? playerAutoplayWindow(general.lastActiveTick, world.turnTermMinutes)
           : null;
-      const defense = cityDefense(city, general.removedAt === null ? [general] : [], world.startYear, tick, state);
+      const stanceEnabled = world.ruleFeatures.includes(DEFENSE_STANCE_FEATURE);
+      const limits = defenseRequirements(stanceEnabled, general.defenseThreshold);
+      const pendingDefense = stanceEnabled
+        ? await tx.inputEvent.findFirst({
+            where: { worldId: input.worldId, generalId: general.id, kind: DEFENSE_STANCE_KIND, status: 'PENDING' },
+            select: { payload: true },
+          })
+        : null;
+      const defense = cityDefense(
+        city,
+        general.removedAt === null ? [general] : [],
+        world.startYear,
+        tick,
+        state,
+        stanceEnabled,
+      );
       const defendingTroops =
         general.removedAt === null
           ? (defense.generals.find(({ generalId }) => generalId === general.id)?.troops ?? 0)
@@ -111,8 +131,20 @@ export const homeRouter = router({
           defense: {
             participating: defendingTroops > 0,
             troops: defendingTroops,
-            minimumTraining: defense.minimumTraining,
-            minimumMorale: defense.minimumMorale,
+            minimumTraining: limits.minimumTraining,
+            minimumMorale: limits.minimumMorale,
+            ...(stanceEnabled
+              ? {
+                  stance: {
+                    enabled: limits.enabled,
+                    options: DEFENSE_STANCES,
+                    editable: world.status !== 'ENDED' && general.removedAt === null,
+                    pendingThreshold: pendingDefense
+                      ? defenseStanceInput.parse(pendingDefense.payload).threshold
+                      : null,
+                  },
+                }
+              : {}),
           },
           ...(finance
             ? {

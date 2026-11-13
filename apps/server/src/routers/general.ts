@@ -4,6 +4,9 @@ import { TRPCError } from '@trpc/server';
 import {
   POSSESSION_KIND,
   CREATION_ERRORS,
+  DEFENSE_STANCE_FEATURE,
+  DEFENSE_STANCE_KIND,
+  defenseStanceInput,
   creationBlock,
   effectiveWorldOptions,
   parsePreset,
@@ -17,7 +20,7 @@ import {
 } from '@opensamguk/rules';
 import { z } from 'zod';
 import { router, protectedProcedure, worldVerifiedProcedure } from '../trpc';
-import { requireGeneral, requireWorld, worldInput } from '../game/queries';
+import { requireGeneral, requireRuleFeature, requireWorld, worldInput } from '../game/queries';
 import { countHumanGenerals } from '../queries';
 import { ownGeneral } from '../game/projection';
 import { readPolicy, requirePolicyReady } from '../game/policy';
@@ -78,6 +81,39 @@ export const generalRouter = router({
       { isolationLevel: 'RepeatableRead' },
     ),
   ),
+  setDefenseStance: worldVerifiedProcedure
+    .input(defenseStanceInput.extend(worldInput.shape))
+    .mutation(({ ctx, input }) =>
+      ctx.db.$transaction(async (tx) => {
+        const world = await requireWorld(tx, input.worldId, true);
+        requireRuleFeature(world, DEFENSE_STANCE_FEATURE);
+        if (world.status === 'ENDED')
+          throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '종료된 월드입니다.' });
+        const general = await requireGeneral(tx, input.worldId, ctx.user.id, true);
+        if (general.removedAt !== null)
+          throw new TRPCError({ code: 'FORBIDDEN', message: '은퇴한 장수의 수비 기준은 바꿀 수 없습니다.' });
+        const pending = await tx.inputEvent.findFirst({
+          where: { worldId: world.id, generalId: general.id, kind: DEFENSE_STANCE_KIND, status: 'PENDING' },
+          select: { payload: true },
+        });
+        if (pending) {
+          if (defenseStanceInput.parse(pending.payload).threshold !== input.threshold)
+            throw new TRPCError({ code: 'CONFLICT', message: '다른 수비 기준 요청을 처리하고 있습니다.' });
+        } else {
+          await tx.inputEvent.create({
+            data: {
+              worldId: world.id,
+              userId: ctx.user.id,
+              generalId: general.id,
+              kind: DEFENSE_STANCE_KIND,
+              idempotencyKey: `${DEFENSE_STANCE_KIND}:${randomUUID()}`,
+              payload: { threshold: input.threshold },
+            },
+          });
+        }
+        return { status: 'pending' as const };
+      }),
+    ),
   setPolicy: worldVerifiedProcedure
     .input(worldInput.extend({ policy: policyKeySchema }))
     .mutation(async ({ ctx, input }) => {

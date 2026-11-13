@@ -22,6 +22,7 @@ function general(changes: Partial<General> = {}): General {
     userId: 'own',
     nationId: 1,
     nationJoinedTick: null,
+    defenseThreshold: null,
     cityKey: 1,
     officerLevel: 12,
     officerCityKey: null,

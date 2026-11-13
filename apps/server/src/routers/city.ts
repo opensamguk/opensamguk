@@ -6,6 +6,7 @@ import { readView } from '../game/queries';
 import { NATION_PHILOSOPHY_FEATURE } from '@opensamguk/rules';
 import {
   cityRegionName,
+  DEFENSE_STANCE_FEATURE,
   INTEL_FEATURE,
   LINEAGE_EXITED_YEAR,
   OFFICE_EFFECTS_FEATURE,
@@ -172,7 +173,16 @@ export const cityRouter = router({
             }
           : {}),
         ...(!garrisonHidden && city.nationId !== null && city.nationId === activeViewer?.nationId
-          ? { defense: cityDefense(city, generals, world.startYear, nowTick(worldClock(world), ctx.now), view) }
+          ? {
+              defense: cityDefense(
+                city,
+                generals,
+                world.startYear,
+                eventTick,
+                view,
+                world.ruleFeatures.includes(DEFENSE_STANCE_FEATURE),
+              ),
+            }
           : {}),
         region: city.region,
         regionName: cityRegionName(

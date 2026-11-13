@@ -1,9 +1,10 @@
 import { Link } from '@tanstack/react-router';
-import { useQuery } from '@tanstack/react-query';
-import type { ReactNode } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState, type ReactNode } from 'react';
 import { useEquipment } from '../equipment/useEquipment';
 import { errorCode } from '../game/errors';
 import { NoGeneral, QueryError } from '../game/QueryState';
+import type { Home } from '../game/types';
 import { useHome, useWorldId, useWorldMap, useWorldSummary } from '../game/queries';
 import { GovernancePanel } from '../governance/GovernancePanel';
 import { LineagePanel } from '../lineage/LineagePanel';
@@ -68,7 +69,7 @@ export function GovernancePage() {
 // /w/:worldId/me: 내 장수 상세. 초상 portrait·장비와 가문을 함께 본다.
 export function MePage() {
   const worldId = useWorldId();
-  const home = useHome(worldId);
+  const home = useHome(worldId, true);
   const map = useWorldMap(worldId);
   const summary = useWorldSummary(worldId);
   const trpc = useTRPC();
@@ -101,6 +102,9 @@ export function MePage() {
               onSelectCity={() => undefined}
               equipment={equipment}
             />
+            {data.general.defense.stance?.editable ? (
+              <DefenseStance worldId={worldId} defense={data.general.defense} />
+            ) : null}
           </Panel>
           <div id="lineage">
             <LineagePanel worldId={worldId} />
@@ -108,5 +112,54 @@ export function MePage() {
         </>
       )}
     </SubPage>
+  );
+}
+
+function DefenseStance({ worldId, defense }: { worldId: string; defense: Home['general']['defense'] }) {
+  const trpc = useTRPC();
+  const client = useQueryClient();
+  const [choice, setChoice] = useState<NonNullable<Home['general']['defense']['stance']>['options'][number]>();
+  const save = useMutation(
+    trpc.general.setDefenseStance.mutationOptions({
+      onSuccess: async () => {
+        await client.invalidateQueries({ queryKey: trpc.home.get.queryKey({ worldId }) });
+        setChoice(undefined);
+      },
+    }),
+  );
+  const options = defense.stance?.options ?? [];
+  const pending = defense.stance?.pendingThreshold;
+  const active = defense.stance?.enabled ? defense.minimumTraining : 999;
+  const selected = choice ?? pending ?? active;
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (choice !== undefined && choice !== active && pending == null) save.mutate({ worldId, threshold: choice });
+      }}
+    >
+      <label>
+        수비 기준{' '}
+        <select
+          value={selected}
+          disabled={save.isPending || pending != null}
+          onChange={(event) => {
+            const value = options.find((threshold) => threshold === Number(event.target.value));
+            if (value !== undefined) setChoice(value);
+          }}
+        >
+          {options.map((threshold) => (
+            <option key={threshold} value={threshold}>
+              {threshold === 999 ? '수비 안 함' : `훈련·사기 ${threshold} 이상`}
+            </option>
+          ))}
+        </select>
+      </label>{' '}
+      <button type="submit" disabled={choice === undefined || choice === active || save.isPending || pending != null}>
+        저장
+      </button>
+      {pending != null ? <p role="status">수비 기준 변경을 처리하고 있습니다.</p> : null}
+      {save.isError ? <p role="alert">{save.error.message}</p> : null}
+    </form>
   );
 }
