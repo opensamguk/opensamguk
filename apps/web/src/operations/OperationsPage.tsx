@@ -100,7 +100,7 @@ function OperationTable({ worldId, items }: { worldId: string; items: OperationR
             </td>
             <td>
               <Portrait
-                id={portraitIdOf(op.createdBy)}
+                id={op.createdBy.portraitId ?? null}
                 name={displayName(op.createdBy.name)}
                 variant="thumb"
                 size={20}

@@ -115,6 +115,7 @@ beforeEach(() => {
   on('auth.me', () => ({ user: { id: 'u1' } }));
   on('home.get', () => ({ nation: { id: 1 } }));
   on('world.map', () => ({ cities: [], nations: [nation(1, '조조'), nation(2, '원소'), nation(3, '유표')] }));
+  on('treaty.relations', () => ({ nations: [nation(1, '조조'), nation(2, '원소')], pairs: [] }));
 });
 afterEach(cleanup);
 
@@ -531,6 +532,28 @@ describe('외교실 국가 탭 (INT-20)', () => {
     expect(within(table).getByText('교전').dataset.tone).toBe('danger');
     expect(callsTo('treaty.trust')).toHaveLength(0);
     expect(callsTo('ranking.nations').map((call) => call.input)).toEqual([{ worldId: 'w1', by: 'power' }]);
+  });
+
+  it('상대 표 아래에 treaty.relations의 국가×국가 외교 현황을 우리 국가 기준으로 그린다', async () => {
+    on('treaty.list', () => listPage({}));
+    on('ranking.nations', () => ({ items: [], at: null }));
+    on('world.summary', () => ({ gameDate: { year: 191, month: 3 } }));
+    on('treaty.relations', () => ({
+      nations: [nation(1, '조조'), nation(2, '원소'), nation(3, '유표')],
+      pairs: [
+        { nationA: 1, nationB: 2, relation: 'NONE', relationEndAt: null },
+        { nationA: 1, nationB: 3, relation: 'WAR', relationEndAt: null },
+        { nationA: 2, nationB: 3, relation: 'DECLARED', relationEndAt: { year: 191, month: 9 } },
+      ],
+    }));
+    renderPage('nations');
+    const grid = await screen.findByTestId('relation-grid');
+    expect(screen.getByRole('heading', { name: '외교 현황' })).toBeTruthy();
+    const rows = within(grid).getAllByRole('row');
+    // 다른 국가끼리의 선포도 보인다. 우리 줄은 home.get의 국가(1)다.
+    expect(within(rows[2]!).getAllByRole('cell')[2]!.textContent).toBe('▲원소·유표 선포 (191년 9월까지)');
+    expect(within(rows[1]!).getByRole('rowheader').dataset.own).toBe('true');
+    expect(callsTo('treaty.relations').map((call) => call.input)).toEqual([{ worldId: 'w1' }]);
   });
 
   it('순위 조회가 실패해도 관계 표는 그대로 보이고 수치 칸만 비운다', async () => {

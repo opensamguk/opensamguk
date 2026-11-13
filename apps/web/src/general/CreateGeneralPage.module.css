@@ -523,3 +523,33 @@
     grid-row: 1 / span 8;
   }
 }
+
+/* NPC 무장 맡기 후보 줄 (INT-26). 선택 칸·원형 얼굴·이름과 능력치를 한 줄에 두고 좁은 화면에서는 글만 접는다. */
+.npcList {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0;
+}
+
+.npcRow {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.npcInfo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.npcStats {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}

@@ -32,6 +32,7 @@ import {
   type Finished,
   type Tracked,
 } from './requests';
+import { RelationGrid } from './RelationGrid';
 import { nationName, TreatyCard } from './TreatyCard';
 import { relationText, TreatyComposer } from './TreatyComposer';
 import { useTreatyRequests } from './useTreatyRequests';
@@ -259,7 +260,10 @@ function Diplomacy({
           <LoadingState />
         )
       ) : tab === 'nations' ? (
-        <NationTable worldId={worldId} targets={head.targets} items={items} canPropose={head.canPropose.ok} />
+        <>
+          <NationTable worldId={worldId} targets={head.targets} items={items} canPropose={head.canPropose.ok} />
+          <RelationGrid worldId={worldId} ownNationId={ownNationId} />
+        </>
       ) : tab === 'trust' ? (
         head.breakEnabled ? (
           <TrustTable worldId={worldId} />

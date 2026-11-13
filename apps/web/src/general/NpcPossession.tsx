@@ -3,10 +3,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import type { inferRouterOutputs } from '@trpc/server';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { displayName } from '../game/names';
 import { Portrait } from '../portrait/Portrait';
 import { useTRPC, useTRPCClient } from '../trpc';
 import { errorCode, retryUnlessClientError, serverMessage } from '../turns/apiError';
 import styles from './CreateGeneralPage.module.css';
+import { candidateStats, sortByStatTotal, statTotal } from './npcCandidates';
 
 type Reply = inferRouterOutputs<AppRouter>['entry']['possess'];
 const roles = { ruler: '군주', core: '중견', retainer: '부하', free: '재야' } as const;
@@ -153,8 +155,11 @@ function NpcEntry({
   }
 
   const group = candidates.data?.roles[role] ?? [];
-  const filtered = group.filter((general) =>
-    [general.name, general.nation?.name, general.city.name].some((value) => value?.includes(search.trim())),
+  // 서버는 국가 순으로 준다. 화면은 역할 묶음 안에서 능력치 합이 큰 순으로 다시 둔다 (원작 빙의 후보 순서).
+  const filtered = sortByStatTotal(
+    group.filter((general) =>
+      [general.name, general.nation?.name, general.city.name].some((value) => value?.includes(search.trim())),
+    ),
   );
   const picked = group.find((general) => general.generalId === selected);
   if (!enabled && !receipt) return null;
@@ -249,18 +254,38 @@ function NpcEntry({
               {candidates.data?.blockedReason ? <p>{candidates.data.blockedReason}</p> : null}
               {candidates.data?.canPossess && filtered.length === 0 ? <p>조건에 맞는 무장이 없습니다.</p> : null}
               {filtered.length > 0 ? (
-                <fieldset className={styles.portraits}>
+                <fieldset className={`${styles.portraits} ${styles.npcList}`} aria-describedby="npc-order">
                   <legend>{roles[role]} 무장</legend>
+                  <p id="npc-order" className={styles.npcStats}>
+                    능력치 합이 큰 순입니다.
+                  </p>
                   {filtered.slice(0, limit).map((general) => (
-                    <label key={general.generalId}>
+                    <label key={general.generalId} className={styles.npcRow}>
                       <input
                         type="radio"
                         name="npc-general"
                         checked={selected === general.generalId}
                         onChange={() => setSelected(general.generalId)}
                       />
-                      <Portrait id={general.portraitId} name={general.name} variant="icon" />
-                      <strong>{general.name}</strong> · {general.nation?.name ?? '재야'} · {general.city.name}
+                      <Portrait
+                        id={general.portraitId}
+                        name={displayName(general.name)}
+                        variant="icon"
+                        shape="round"
+                        decorative
+                      />
+                      <span className={styles.npcInfo}>
+                        <span>
+                          <strong>{displayName(general.name)}</strong> · {general.nation?.name ?? '재야'} ·{' '}
+                          {general.city.name}
+                        </span>
+                        <span className={`num ${styles.npcStats}`} data-testid="npc-stats">
+                          {candidateStats(general)
+                            .map((cell) => `${cell.label} ${cell.value}`)
+                            .join(' · ')}{' '}
+                          · 합 {statTotal(general)}
+                        </span>
+                      </span>
                     </label>
                   ))}
                 </fieldset>
@@ -287,7 +312,7 @@ function NpcEntry({
                     void send(current);
                   }}
                 >
-                  {picked.name}(으)로 시작
+                  {displayName(picked.name)}(으)로 시작
                 </button>
               ) : null}
             </>

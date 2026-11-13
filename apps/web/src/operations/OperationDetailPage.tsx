@@ -7,7 +7,6 @@ import { QueryError } from '../game/QueryState';
 import { displayName } from '../game/names';
 import { useWorldId, useWorldMap, useWorldUnits } from '../game/queries';
 import { Portrait } from '../portrait/Portrait';
-import { portraitIdOf } from '../portrait/portraitUrl';
 import { useTRPC } from '../trpc';
 import { serverMessage } from '../turns/apiError';
 import type { ArgNames } from '../turns/args';
@@ -255,7 +254,14 @@ export function MemberRow({
       data-verdict={member.verdict}
     >
       <th scope="row">
-        <Portrait id={portraitIdOf(member)} name={name} variant="thumb" size={20} decorative className={styles.face} />
+        <Portrait
+          id={member.portraitId ?? null}
+          name={name}
+          variant="thumb"
+          size={20}
+          decorative
+          className={styles.face}
+        />
         {name}
         {member.isMe ? <span className={styles.muted}> (나)</span> : null}
         <span className={styles.sub}>
