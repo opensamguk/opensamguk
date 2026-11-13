@@ -174,6 +174,7 @@ describe('T4-02 등록된 확장 명령 대조', () => {
         '../general/fiveStats.ts',
         '../equipment/stats.ts',
         '../general/condition.ts',
+        '../personnel/nationPhilosophy.ts',
       ].map((file) => [
         file,
         readFileSync(join(root, 'packages/rules/src/commands', file), 'utf8').replaceAll('\r\n', '\n'),
