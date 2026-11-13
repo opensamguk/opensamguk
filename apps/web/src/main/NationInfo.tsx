@@ -78,6 +78,7 @@ export function NationSummaryGrid({
   const headValue = (name: string | null | undefined) => (name ? displayName(name) : '—');
   // 성향은 모든 국가에 공개된다 (nation.get philosophy, INT-26). 홈 응답처럼 값이 없으면 소속국만 보인다.
   const philosophy = 'philosophy' in nation ? nation.philosophy : undefined;
+  const strategy = 'strategyStatus' in nation ? nation.strategyStatus : undefined;
   // 총 주민은 nation.get이 모든 국가에 준다 (소유 도시 주민 합계 / 최대, INT-26).
   const population =
     'populationMax' in nation && typeof nation.population === 'number' && typeof nation.populationMax === 'number'
@@ -112,6 +113,31 @@ export function NationSummaryGrid({
         member ? { label: '군량', value: n(nation.rice) } : { label: '군량', ...hidden },
         member ? { label: '세율', value: `${Math.round(nation.taxRate * 100)}%` } : { label: '세율', ...hidden },
         member ? { label: '기술', value: techText(nation.tech) } : { label: '기술', ...hidden },
+        ...(strategy
+          ? [
+              {
+                label: '전략',
+                wide: true,
+                value: (
+                  <details>
+                    <summary>
+                      {strategy.remainingMonths ? `${strategy.remainingMonths}개월 대기` : '공통 대기 없음'}
+                    </summary>
+                    <ul>
+                      {strategy.commands.map((command) => (
+                        <li key={command.key}>
+                          {command.name} ·{' '}
+                          {command.availableAt
+                            ? `${command.remainingMonths}개월 대기 (${command.availableAt.year}년 ${command.availableAt.month}월)`
+                            : '대기 없음'}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                ),
+              },
+            ]
+          : []),
         // 수도는 지도 응답(world.map)에 모든 국가 것이 있어 다른 국가도 보인다 (원작 세력일람의 [수도]).
         { label: '수도', value: capitalName ?? '—' },
         philosophy !== undefined ? { label: '성향', value: philosophy || '—' } : { label: '성향', ...hidden },
