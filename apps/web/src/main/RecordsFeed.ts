@@ -20,6 +20,7 @@ export interface FeedLine {
   kind: string;
   text: string;
   // 장수 동향의 소속 국가. 재야면 null, 국가 사건·월단평은 없다.
+  portrait?: { id: number | null; name: string };
   nation?: { name: string; color: string } | null;
 }
 
@@ -79,6 +80,7 @@ export function activityLine(item: ActivityItem): FeedLine {
     ...base,
     source: 'reputation',
     text: reputationSentence(item),
+    portrait: { id: item.portraitId, name: displayName(item.data.name) },
     nation: nation ? { name: nation.name, color: nation.color } : null,
   };
 }

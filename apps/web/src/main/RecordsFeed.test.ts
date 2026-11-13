@@ -28,6 +28,7 @@ const reputation = (
   id,
   source: 'reputation',
   generalId: 7,
+  portraitId: 7,
   year: 191,
   month: extra.month ?? 3,
   kind,
@@ -45,7 +46,7 @@ const nationEvent = (
   text: string,
   month = 3,
   kind: 'found' | 'fall' | 'declare' | 'capture' = 'capture',
-): ActivityItem => ({ source: 'nation', id, tick, year: 191, month, kind, text });
+): ActivityItem => ({ source: 'nation', id, tick, year: 191, month, kind, text, portraitId: null });
 
 describe('장수 동향 문장', () => {
   it('받침에 따라 이·가를 고른다', () => {
@@ -72,6 +73,7 @@ describe('장수 동향 문장', () => {
       year: 191,
       month: 3,
       source: 'reputation',
+      portrait: { id: 7, name: '조조' },
       kind: 'domestic',
       text: '조조가 내정 목표를 채웠다.',
       nation: { name: '위', color: '#000080' },
@@ -99,8 +101,8 @@ describe('이어 받은 쪽 펴기', () => {
   });
 
   it('전투 기록은 tick과 공격 장수로 가른다', () => {
-    const a = { tick: 5, attackerId: 1, text: 'a', gameDate: { year: 191, month: 1 } };
-    const b = { tick: 5, attackerId: 2, text: 'b', gameDate: { year: 191, month: 1 } };
+    const a = { tick: 5, attackerId: 1, portraitId: null, text: 'a', gameDate: { year: 191, month: 1 } };
+    const b = { tick: 5, attackerId: 2, portraitId: null, text: 'b', gameDate: { year: 191, month: 1 } };
     expect(flattenPages([{ items: [a, b] }, { items: [b] }], battleKey)).toEqual([a, b]);
   });
 

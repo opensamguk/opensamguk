@@ -1,3 +1,4 @@
+import { Portrait } from '../portrait/Portrait';
 import { useInfiniteQuery, type QueryKey } from '@tanstack/react-query';
 import { retryUnlessClientError, errorCode } from '../game/errors';
 import { formatYearMonth, personalLogDate, tickDate } from '../game/gameDate';
@@ -365,7 +366,7 @@ export function WorldHistoryList({
   );
 }
 
-// 달마다 묶은 사건 글줄. 장수 동향은 줄 앞에 소속 국가 이름표를 붙인다. 초상 번호가 응답에 없어 얼굴은 쓰지 않는다.
+// 달마다 묶은 사건 글줄. 장수 동향은 줄 앞에 소속 국가 이름표를 붙인다.
 function FeedList({ months, testId }: { months: readonly FeedMonth[]; testId: string }) {
   return (
     <ol className={styles.lines} data-testid={testId}>
@@ -383,6 +384,9 @@ function FeedList({ months, testId }: { months: readonly FeedMonth[]; testId: st
                 data-feed-kind={line.kind}
                 data-testid={line.source === 'review' ? 'world-review-headline' : undefined}
               >
+                {line.portrait ? (
+                  <Portrait id={line.portrait.id} name={line.portrait.name} variant="icon" size={20} decorative />
+                ) : null}
                 {line.nation ? <NationBadge name={line.nation.name} color={line.nation.color} /> : null}
                 {line.nation ? ' ' : null}
                 {line.text}
@@ -482,7 +486,10 @@ export function BattleList({ worldId }: { worldId: string }) {
           {items.map((item) => (
             <li key={battleKey(item)} className={styles.line} data-battle-tick={item.tick}>
               <span className={`num ${styles.date}`}>{formatYearMonth(item.gameDate)}</span>
-              <span className={styles.text}>{battleText(item.text)}</span>
+              <span className={styles.text}>
+                <Portrait id={item.portraitId} name="공격 장수" variant="icon" size={20} decorative />{' '}
+                {battleText(item.text)}
+              </span>
             </li>
           ))}
         </ol>
