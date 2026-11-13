@@ -63,6 +63,7 @@ export const homeRouter = router({
                     defence: true,
                     wall: true,
                     wallMax: true,
+                    warCasualties: true,
                     security: true,
                     securityMax: true,
                   },

@@ -487,6 +487,9 @@ export function NationFinanceGrid({ nation }: { nation: NationSummary }) {
       <InfoGrid
         items={[
           { label: '세금', value: `금 ${n(gold.gross)} · ${due(gold)}`, title: '상업·주민으로 걷는 금', wide: true },
+          ...(estimate.warIncome === undefined
+            ? []
+            : [{ label: '단기', value: `금 ${n(estimate.warIncome)} · 다음 월말`, wide: true }]),
           {
             label: '세곡',
             value: `쌀 ${n(rice.gross - (rice.wallIncome ?? 0))} · ${due(rice)}`,

@@ -8,6 +8,7 @@ import { refreshSupply } from '../supply';
 import { readCampaignState } from '../campaign/state';
 import { residentOfficeBonuses, type OfficeBonuses } from '../personnel/residentOffice';
 import { applyCityResourceIncome } from '../cityResourceIncome';
+import { WAR_INCOME_FEATURE, settleWarIncome } from './warIncome';
 import { CITY_SEASONAL_EVENTS_FEATURE, settleCitySeasonalEvents } from './citySeasonalEvents';
 import {
   financeRates,
@@ -263,6 +264,7 @@ export function runMonthly(state: WorldView, tick: number, rng: Rng) {
   if (state.ruleFeatures?.includes('city-resources-v1')) next = applyCityResourceIncome(state, next, date, bonuses);
   next = settlePopulation(next);
   next = settleSupply(next, bonuses);
+  if (next.ruleFeatures?.includes(WAR_INCOME_FEATURE)) settleWarIncome(next);
   next = settleDiplomacy(next, tick);
   if (state.ruleFeatures?.includes(COURT_PROMOTION_FEATURE)) promoteNationCourts(next);
   const seasonalEventLogs = state.ruleFeatures?.includes(CITY_SEASONAL_EVENTS_FEATURE)

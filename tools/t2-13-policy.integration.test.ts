@@ -1,4 +1,5 @@
 import { BATTLE_TACTICS_FEATURE } from '../packages/rules/src/battle/tactics';
+import { WAR_INCOME_FEATURE } from '../packages/rules/src/monthly/warIncome';
 import { TROOP_FEATURE } from '../packages/rules/src/commands/ext/troop/state';
 import { COMBAT_SPECIALTY_FEATURE } from '../packages/rules/src/general/combatSpecialty';
 import { BALANCE } from '../packages/rules/src/balance';
@@ -1318,7 +1319,7 @@ for (const path of ['troop.list', 'troop.update'] as const) {
   }
 }
 
-it('실제 출병 기록에 전투계략을 남기고 월말에 재생한다', async () => {
+it('실제 출병의 전투계략과 단기 수입을 월말에 재생한다', async () => {
   const alice = await user();
   const initial = commandInitial();
   initial.generals = initial.generals.slice(0, 2).map((general, index) => ({
@@ -1328,12 +1329,13 @@ it('실제 출병 기록에 전투계략을 남기고 월말에 재생한다', a
     nextTurnTick: index === 0 ? 100 : 100000,
   }));
   initial.unitSet.crewTypes.find(({ id }) => id === 1100)!.magicCoef = 1;
+  initial.nations[0]!.level = 1;
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '전투계략 실제 PG',
     turnTermMinutes: 30,
     endYear: null,
     replayFormat: 3,
-    ruleFeatures: [BATTLE_TACTICS_FEATURE, COMBAT_SPECIALTY_FEATURE, 'policy'],
+    ruleFeatures: [BATTLE_TACTICS_FEATURE, COMBAT_SPECIALTY_FEATURE, 'policy', WAR_INCOME_FEATURE],
   });
   worlds.push(worldId);
   await db.world.update({ where: { id: worldId }, data: { status: 'RUNNING', clockAnchorAt: new Date(now) } });
@@ -1357,7 +1359,21 @@ it('실제 출병 기록에 전투계략을 남기고 월말에 재생한다', a
       }),
     ],
   });
+  const projection = await rpc<{ financeEstimate: { warIncome: number; gold: { net: number } } }>(
+    'nation.get',
+    { worldId, nationId: 1 },
+    alice.cookie,
+  );
+  const estimate = projection.data!.financeEstimate;
+  expect(estimate.warIncome).toBeGreaterThan(0);
+  const where = { worldId_id: { worldId, id: 1 } };
+  const before = await db.nation.findUniqueOrThrow({ where });
+  expect(await db.city.count({ where: { worldId, warCasualties: { gt: 0 } } })).toBe(2);
   await loop.advanceTo(10000);
+  expect((await db.nation.findUniqueOrThrow({ where })).gold).toBe(
+    before.gold + estimate.gold.net + estimate.warIncome,
+  );
+  expect(await db.city.count({ where: { worldId, warCasualties: { gt: 0 } } })).toBe(0);
   const archive = await exportReplay(db, worldId);
   expect(replayArchive(archive, 1)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
 });

@@ -112,9 +112,10 @@ export async function loadWorldAfterCapabilityCheck(
     startYear: world.startYear,
     cities: Object.fromEntries(
       attachOperationalKinds(
-        cities.map(({ seasonalEvent, ...city }) => ({
+        cities.map(({ seasonalEvent, warCasualties, ...city }) => ({
           ...stripWorldId(city),
           ...storedCitySeasonalEvent(seasonalEvent),
+          ...(warCasualties === null ? {} : { warCasualties }),
         })),
         operationalMap,
       ).map((city) => [city.cityKey, city]),

@@ -399,6 +399,7 @@ model City {
   conflictTick     Int?
   stratagemTick    Int?
   seasonalEvent    String?
+  warCasualties    Int?
   worldId          String
   cityKey          Int
   kind             String?
