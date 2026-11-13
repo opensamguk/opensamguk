@@ -158,6 +158,8 @@ export const entryRouter = router({
           officerLevel: number;
           age: number;
           dedication: number;
+          personality?: string;
+          special?: string;
           generalType: ReturnType<typeof generalType>;
           progression: ReturnType<typeof generalProgress>;
           recommendedNation: { id: number; name: string; reason: string } | null;
@@ -200,6 +202,8 @@ export const entryRouter = router({
               officerLevel: general.officerLevel,
               age: Math.max(0, gameDate.year - general.birthYear),
               dedication: general.dedication,
+              ...(general.personality ? { personality: general.personality.replace(/^che_/, '') } : {}),
+              ...(general.special ? { special: general.special.replace(/^che_/, '') } : {}),
               generalType: generalType(general),
               progression: generalProgress(general.experience, general.dedication),
               recommendedNation: suggested

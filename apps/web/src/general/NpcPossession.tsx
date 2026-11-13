@@ -286,6 +286,16 @@ function NpcEntry({
                             {officerName(general.officerLevel, general.nation !== null)}
                           </span>
                         )}
+                        {general.personality || general.special ? (
+                          <span className={styles.npcStats}>
+                            {[
+                              general.personality && `성격 ${general.personality}`,
+                              general.special && `특기 ${general.special}`,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </span>
+                        ) : null}
                         <span className={`num ${styles.npcStats}`} data-testid="npc-stats">
                           {candidateStats(general)
                             .map((cell) => `${cell.label} ${cell.value}`)

@@ -437,6 +437,10 @@ it(
   authzCase('entry.roles', 'success', async () => {
     const worldId = await world();
     await enable(worldId);
+    await db.general.update({
+      where: { worldId_id: { worldId, id: 4 } },
+      data: { personality: 'che_대의', special: 'che_기병' },
+    });
     const response = await call<{ roles: Record<string, Array<Record<string, unknown>>> }>(
       'entry.roles',
       { worldId },
@@ -446,7 +450,12 @@ it(
     expect(response.data).toMatchObject({ canPossess: true, mine: null, quota: { humans: 0, max: 500 } });
     expect(response.data!.roles.ruler!.map((row) => row.generalId)).toEqual([1, 2]);
     expect(response.data!.roles.core!.map((row) => row.generalId)).toEqual([3]);
-    expect(response.data!.roles.free![0]).toMatchObject({ generalId: 4, recommendedNation: { id: 1 } });
+    expect(response.data!.roles.free![0]).toMatchObject({
+      generalId: 4,
+      recommendedNation: { id: 1 },
+      personality: '대의',
+      special: '기병',
+    });
     for (const candidate of Object.values(response.data!.roles).flat())
       expect(Object.keys(candidate).sort()).toEqual(
         [
@@ -464,6 +473,7 @@ it(
           'generalType',
           'progression',
           'recommendedNation',
+          ...(candidate.generalId === 4 ? ['personality', 'special'] : []),
         ].sort(),
       );
   }),
