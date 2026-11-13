@@ -32,6 +32,8 @@ type General = Omit<
   | 'proficiency'
   | 'statExperience'
   | 'heritageBenefits'
+  | 'heritageSpecialty'
+  | 'combatSpecial'
 > & { politics?: number | null; charm?: number | null };
 type City = Omit<
   Prisma.CityGetPayload<true>,

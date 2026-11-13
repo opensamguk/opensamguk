@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { AppRouter } from '@opensamguk/server/router';
 import type { inferRouterOutputs } from '@trpc/server';
 import { useTRPC } from '../trpc';
@@ -129,10 +129,129 @@ function PurchaseForm({
           ) : null}
         </form>
       ) : null}
+      {data.specialty ? <SpecialtyPurchase worldId={worldId} data={data} pending={pending} refresh={refresh} /> : null}
       {pending ? <p role="status">구매 처리 중</p> : null}
       {mutation.isError || data.latest?.status === 'REJECTED' ? (
         <p role="alert">{mutation.isError ? serverMessage(mutation.error) : data.latest?.message}</p>
       ) : null}
     </details>
+  );
+}
+
+function SpecialtyPurchase({
+  worldId,
+  data,
+  pending,
+  refresh,
+}: {
+  worldId: string;
+  data: Benefits;
+  pending: boolean;
+  refresh: () => Promise<unknown>;
+}) {
+  const trpc = useTRPC();
+  const [selected, setSelected] = useState('');
+  const [confirm, setConfirm] = useState<'reserve' | 'reset' | null>(null);
+  const requestId = useRef<string | null>(null);
+  const mutation = useMutation(trpc.heritage.specialty.mutationOptions());
+  const specialty = data.specialty!;
+  const option = specialty.options.find(({ name }) => name === selected);
+  const busy = pending || mutation.isPending;
+  const cost = confirm === 'reserve' ? specialty.reserveCost : specialty.resetCost;
+  return (
+    <div>
+      <h3>전투 특기</h3>
+      <p>
+        현재 {specialty.current ?? '없음'} · 예약 {specialty.next ?? '없음'}
+      </p>
+      {data.canPurchase ? (
+        <>
+          <label>
+            다음 전투 특기
+            <select
+              disabled={busy || specialty.next !== null}
+              value={selected}
+              onChange={(event) => {
+                setSelected(event.currentTarget.value);
+                setConfirm(null);
+                requestId.current = null;
+              }}
+            >
+              <option value="">선택</option>
+              {specialty.options
+                .filter(({ name }) => name !== specialty.current)
+                .map(({ name }) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+            </select>
+          </label>
+          {option ? <p>{option.description}</p> : null}
+          <button
+            type="button"
+            disabled={busy || !option || !!specialty.next || specialty.reserveCost > data.balance}
+            onClick={() => {
+              setConfirm('reserve');
+              requestId.current = null;
+            }}
+          >
+            다음 특기 예약 · {specialty.reserveCost}점
+          </button>
+          {specialty.resetCost !== null ? (
+            <button
+              type="button"
+              disabled={busy || specialty.resetCost > data.balance}
+              onClick={() => {
+                setConfirm('reset');
+                requestId.current = null;
+              }}
+            >
+              전투 특기 초기화 · {specialty.resetCost}점
+            </button>
+          ) : null}
+          {confirm && cost ? (
+            <div>
+              <p role="status">
+                {confirm === 'reserve' ? option?.name + ' 예약' : '전투 특기 초기화'}에 {cost}점을 사용합니다.
+              </p>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  const action =
+                    confirm === 'reset'
+                      ? { action: 'reset' as const }
+                      : { action: 'reserve' as const, specialty: selected };
+                  requestId.current ??= crypto.randomUUID();
+                  mutation.mutate(
+                    {
+                      worldId,
+                      action,
+                      requestId: requestId.current,
+                      expectedGeneralId: data.generalId,
+                      expectedCost: cost,
+                    },
+                    {
+                      onSuccess: async () => {
+                        await refresh();
+                        setConfirm(null);
+                        requestId.current = null;
+                      },
+                    },
+                  );
+                }}
+              >
+                구매 확정
+              </button>
+              <button type="button" disabled={busy} onClick={() => setConfirm(null)}>
+                취소
+              </button>
+            </div>
+          ) : null}
+          {mutation.isError ? <p role="alert">{serverMessage(mutation.error)}</p> : null}
+        </>
+      ) : null}
+    </div>
   );
 }

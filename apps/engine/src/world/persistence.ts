@@ -1,5 +1,7 @@
 import {
   CITY_OFFICE_VOLUNTEER_FEATURE,
+  HERITAGE_SPECIALTY_FEATURE,
+  storedHeritageSpecialty,
   initialCityOfficeVolunteers,
   OFFICE_EFFECTS_FEATURE,
   defaultOfficeEffects,
@@ -539,7 +541,16 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
           return { ...stripWorldId(nation), capitalCityKey: nation.capitalCityKey };
         }),
         generals: generals.map(
-          ({ turnRevision, battleWins, captures, stratagemSuccesses, officerCityKey, ...general }) => {
+          ({
+            turnRevision,
+            battleWins,
+            captures,
+            stratagemSuccesses,
+            officerCityKey,
+            combatSpecial,
+            heritageSpecialty,
+            ...general
+          }) => {
             void turnRevision;
             void battleWins;
             void captures;
@@ -547,7 +558,15 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
             return storedGeneralStats(
               storedGeneralRemoval(
                 storedGeneralSex(
-                  { ...stripWorldId(general), ...(officerCityKey == null ? {} : { officerCityKey }) },
+                  {
+                    ...stripWorldId(general),
+                    ...(officerCityKey == null ? {} : { officerCityKey }),
+                    ...storedHeritageSpecialty(
+                      world.ruleFeatures.includes(HERITAGE_SPECIALTY_FEATURE),
+                      heritageSpecialty,
+                    ),
+                    ...(heritageSpecialty === null ? {} : { combatSpecial }),
+                  },
                   world.ruleFeatures.includes('lineage-v1'),
                 ),
                 world.replayFormat,

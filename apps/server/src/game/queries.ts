@@ -39,6 +39,8 @@ import {
   OFFICE_EFFECTS_FEATURE,
   officeEffectsSchema,
   readCityOfficeVolunteers,
+  HERITAGE_SPECIALTY_FEATURE,
+  storedHeritageSpecialty,
   storedCitySeasonalEvent,
   storedDefenseStance,
   storedGeneralProficiency,
@@ -147,20 +149,31 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
       ...(financeRates === null ? {} : { financeRates: storedFinanceRates(financeRates) }),
       ...(diplomaticAidUntilMonth != null ? { diplomaticAidUntilMonth } : {}),
     })),
-    generals: generals.map(({ defenseThreshold, proficiency, heritageBenefits, statExperience, ...general }) =>
-      storedGeneralRemoval(
-        storedGeneralSex(
-          {
-            ...general,
-            ...storedDefenseStance(world.ruleFeatures.includes(DEFENSE_STANCE_FEATURE), defenseThreshold),
-            ...storedHeritageBenefits(world.ruleFeatures.includes(HERITAGE_BENEFITS_FEATURE), heritageBenefits),
-            ...storedGeneralProficiency(world.ruleFeatures.includes(GENERAL_PROFICIENCY_FEATURE), proficiency),
-            ...storedStatExperience(statExperience),
-          },
-          world.ruleFeatures.includes('lineage-v1'),
+    generals: generals.map(
+      ({
+        defenseThreshold,
+        proficiency,
+        heritageBenefits,
+        heritageSpecialty,
+        combatSpecial,
+        statExperience,
+        ...general
+      }) =>
+        storedGeneralRemoval(
+          storedGeneralSex(
+            {
+              ...general,
+              ...storedDefenseStance(world.ruleFeatures.includes(DEFENSE_STANCE_FEATURE), defenseThreshold),
+              ...storedHeritageSpecialty(world.ruleFeatures.includes(HERITAGE_SPECIALTY_FEATURE), heritageSpecialty),
+              ...(heritageSpecialty === null ? {} : { combatSpecial }),
+              ...storedHeritageBenefits(world.ruleFeatures.includes(HERITAGE_BENEFITS_FEATURE), heritageBenefits),
+              ...storedGeneralProficiency(world.ruleFeatures.includes(GENERAL_PROFICIENCY_FEATURE), proficiency),
+              ...storedStatExperience(statExperience),
+            },
+            world.ruleFeatures.includes('lineage-v1'),
+          ),
+          world.replayFormat,
         ),
-        world.replayFormat,
-      ),
     ),
     diplomacies,
     ...(world.commandMeta ? { commandMeta: world.commandMeta } : {}),

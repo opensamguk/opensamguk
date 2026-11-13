@@ -1,5 +1,9 @@
 import {
   BATTLE_TACTICS_FEATURE,
+  HERITAGE_SPECIALTY_KIND,
+  heritageSpecialtyInput,
+  heritageSpecialtyPurchase,
+  storedHeritageSpecialty,
   battleHeritageBenefits,
   heritageBenefitInput,
   heritagePurchase,
@@ -11,9 +15,13 @@ import { databaseNow } from './lease';
 export const processHeritagePurchase: QueuedInputHandler = async (tx, world, event, { sequence }) => {
   const reject = (code: string, message: string) => ({ status: 'REJECTED' as const, result: { code, message } });
   if (world.status !== 'RUNNING') return reject('WORLD_CLOSED', '실행 중인 월드가 아닙니다.');
-  const action = heritageBenefitInput.safeParse(event.payload);
-  if (!action.success) return reject('BAD_BENEFIT', '구매할 유산 혜택을 확인하세요.');
+  const specialtyAction =
+    event.kind === HERITAGE_SPECIALTY_KIND ? heritageSpecialtyInput.safeParse(event.payload) : undefined;
+  const action = specialtyAction ? undefined : heritageBenefitInput.safeParse(event.payload);
+  if (specialtyAction?.success === false || action?.success === false)
+    return reject('BAD_BENEFIT', '구매할 유산 혜택을 확인하세요.');
   if (
+    action?.success &&
     (battleHeritageBenefits as readonly string[]).includes(action.data.benefit) &&
     !world.ruleFeatures.includes(BATTLE_TACTICS_FEATURE)
   )
@@ -38,13 +46,36 @@ export const processHeritagePurchase: QueuedInputHandler = async (tx, world, eve
   const where = { worldId_id: { worldId: world.id, id: event.generalId } };
   const general = await tx.general.findUnique({
     where,
-    select: { userId: true, removedAt: true, heritageBenefits: true },
+    select: {
+      userId: true,
+      removedAt: true,
+      heritageBenefits: true,
+      special: true,
+      combatSpecial: true,
+      heritageSpecialty: true,
+    },
   });
   if (general?.userId !== event.userId || general.removedAt !== null)
     return reject('NO_GENERAL', '내 장수가 아닙니다.');
   const { heritageBenefits } = storedHeritageBenefits(true, general.heritageBenefits);
-  const purchase = heritagePurchase(heritageBenefits, action.data);
-  if (!purchase) return reject('ALREADY_OWNED', '이미 같은 단계 이상의 혜택을 보유했습니다.');
+  const specialty = specialtyAction?.success
+    ? heritageSpecialtyPurchase(
+        world,
+        {
+          special: general.special,
+          ...(general.heritageSpecialty === null ? {} : { combatSpecial: general.combatSpecial }),
+          ...storedHeritageSpecialty(true, general.heritageSpecialty),
+        },
+        specialtyAction.data,
+      )
+    : null;
+  const benefit = action?.success ? heritagePurchase(heritageBenefits, action.data) : null;
+  const purchase = specialty ?? benefit;
+  if (!purchase)
+    return reject(
+      'ALREADY_OWNED',
+      specialtyAction ? '현재 선택한 특기 요청을 처리할 수 없습니다.' : '이미 같은 단계 이상의 혜택을 보유했습니다.',
+    );
   const debit = await tx.heritageAccount.updateMany({
     where: { userId: event.userId, balance: { gte: purchase.cost } },
     data: { balance: { decrement: purchase.cost } },
@@ -62,7 +93,9 @@ export const processHeritagePurchase: QueuedInputHandler = async (tx, world, eve
   });
   await tx.general.update({
     where,
-    data: { heritageBenefits: { ...heritageBenefits, [purchase.benefit]: purchase.level } },
+    data: specialty
+      ? { combatSpecial: specialty.combatSpecial, heritageSpecialty: specialty.heritageSpecialty }
+      : { heritageBenefits: { ...heritageBenefits, [benefit!.benefit]: benefit!.level } },
   });
   return { status: 'APPLIED', result: purchase };
 };

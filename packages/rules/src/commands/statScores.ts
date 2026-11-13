@@ -1,4 +1,4 @@
-import { combatSpecialty } from '../general/combatSpecialty';
+import { combatSpecialty, combatSpecialtyKey } from '../general/combatSpecialty';
 import { personalityEffects } from '../general/personality';
 import { BALANCE } from '../balance';
 import { FIVE_STAT_KEYS, fiveStatsSchema, type FiveStats } from '../general/fiveStats';
@@ -51,7 +51,7 @@ export function recruitCost(
 ): number {
   const stats = commandFiveStats(view, general);
   const rate = personalityEffects(view, general.personality)?.recruitPercent;
-  const specialty = combatSpecialty(view, general.special);
+  const specialty = combatSpecialty(view, combatSpecialtyKey(general));
   const discount = armType !== undefined && specialty?.armType === armType ? 90 : undefined;
   if (rate === undefined && discount === undefined) {
     if (forced) return Math.ceil(amount * unitCost * BALANCE.CONSCRIPT_COST_FACTOR);

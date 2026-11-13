@@ -182,7 +182,9 @@ export const homeRouter = router({
 
           personalityEffects: personalityEffects(world, general.personality) ?? null,
           domesticSpecialty: domesticSpecialty(world, general.special) ?? null,
-          combatSpecialty: combatSpecialty(world, general.special) ?? null,
+          combatSpecialty:
+            combatSpecialty(world, general.heritageSpecialty === null ? general.special : general.combatSpecial) ??
+            null,
           ...(world.ruleFeatures.includes(BATTLE_TACTICS_FEATURE)
             ? { battleTactics: { leadership: general.leadership, strength: general.strength, intel: general.intel } }
             : {}),

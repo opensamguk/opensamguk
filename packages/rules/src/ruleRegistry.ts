@@ -9,6 +9,11 @@ import {
   RANKED_PAYROLL_FEATURE,
   WALL_INCOME_FEATURE,
 } from './personnel/financeRates';
+import {
+  applyHeritageSpecialtyPurchase,
+  HERITAGE_SPECIALTY_FEATURE,
+  HERITAGE_SPECIALTY_KIND,
+} from './heritage/specialty';
 import { applyHeritagePurchase, HERITAGE_BENEFIT_KIND, HERITAGE_BENEFITS_FEATURE } from './heritage/benefits';
 import { applyDefenseStance, DEFENSE_STANCE_FEATURE, DEFENSE_STANCE_KIND } from './battle/defenders';
 import { NPC_NATION_POLICY_FEATURE, NPC_NATION_POLICY_KIND, applyNpcNationPolicy } from './npc/policy';
@@ -161,6 +166,7 @@ export interface RuleRegistry {
 export const ruleRegistry: RuleRegistry = {
   features: [
     { key: BATTLE_TACTICS_FEATURE, requires: ['combat-specialty-v1'], conflicts: [] },
+    { key: HERITAGE_SPECIALTY_FEATURE, requires: [HERITAGE_BENEFITS_FEATURE, 'combat-specialty-v1'], conflicts: [] },
     { key: HERITAGE_BENEFITS_FEATURE, requires: ['heritage-v1'], conflicts: [] },
     preparedTurnsFeature,
     nationResearchFeature,
@@ -307,6 +313,12 @@ export const ruleRegistry: RuleRegistry = {
     TROOP_FEATURE,
   ],
   inputKinds: [
+    {
+      kind: HERITAGE_SPECIALTY_KIND,
+      feature: HERITAGE_SPECIALTY_FEATURE,
+      route: 'queued',
+      apply: applyHeritageSpecialtyPurchase,
+    },
     { kind: HERITAGE_BENEFIT_KIND, feature: HERITAGE_BENEFITS_FEATURE, route: 'queued', apply: applyHeritagePurchase },
     { kind: TROOP_ACTION_KIND, feature: TROOP_FEATURE, route: 'queued', apply: applyTroopInput },
     ...ADMIN_SETTING_KINDS.map((kind) => ({

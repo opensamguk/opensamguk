@@ -4,6 +4,15 @@ import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import {
   HERITAGE_BENEFIT_KIND,
+  HERITAGE_SPECIALTY_FEATURE,
+  HERITAGE_SPECIALTY_KIND,
+  combatSpecialty,
+  combatSpecialtyNames,
+  heritageSpecialtyCost,
+  heritageSpecialtyInput,
+  heritageSpecialtyPurchase,
+  heritageSpecialtyResetCost,
+  storedHeritageSpecialty,
   BATTLE_TACTICS_FEATURE,
   battleHeritageBenefits,
   HERITAGE_BENEFITS_FEATURE,
@@ -43,13 +52,38 @@ export const heritageRouter = router({
           select: { balance: true },
         });
         const latest = await tx.inputEvent.findFirst({
-          where: { worldId: world.id, userId: ctx.user.id, generalId: general.id, kind: HERITAGE_BENEFIT_KIND },
+          where: {
+            worldId: world.id,
+            userId: ctx.user.id,
+            generalId: general.id,
+            kind: { in: [HERITAGE_BENEFIT_KIND, HERITAGE_SPECIALTY_KIND] },
+          },
           orderBy: { id: 'desc' },
           select: { status: true, result: true },
         });
         const result = latest?.result;
+        const { heritageSpecialty } = storedHeritageSpecialty(
+          world.ruleFeatures.includes(HERITAGE_SPECIALTY_FEATURE),
+          general.heritageSpecialty,
+        );
+        const current =
+          combatSpecialty(world, heritageSpecialty ? general.combatSpecial : general.special)?.name ?? null;
         return {
           enabled: true as const,
+          ...(world.ruleFeatures.includes(HERITAGE_SPECIALTY_FEATURE)
+            ? {
+                specialty: {
+                  current,
+                  next: heritageSpecialty?.next ?? null,
+                  resetCost: current ? heritageSpecialtyResetCost(heritageSpecialty?.resets ?? 0) : null,
+                  reserveCost: heritageSpecialtyCost,
+                  options: combatSpecialtyNames.flatMap((name) => {
+                    const entry = combatSpecialty(world, name);
+                    return entry ? [{ name, description: entry.description }] : [];
+                  }),
+                },
+              }
+            : {}),
           generalId: general.id,
           canPurchase: world.status === 'RUNNING' && general.removedAt === null,
           balance: balance?.balance ?? 0,
@@ -78,6 +112,72 @@ export const heritageRouter = router({
       { isolationLevel: 'RepeatableRead' },
     ),
   ),
+  specialty: worldVerifiedProcedure
+    .input(
+      worldInput
+        .extend({
+          requestId: z.uuid(),
+          action: heritageSpecialtyInput,
+          expectedGeneralId: z.number().int().positive(),
+          expectedCost: z.number().int().positive().max(2_147_483_647),
+        })
+        .strict(),
+    )
+    .mutation(({ ctx, input }) =>
+      ctx.db.$transaction(async (tx) => {
+        const world = await requireWorld(tx, input.worldId, true);
+        requireRuleFeature(world, HERITAGE_SPECIALTY_FEATURE);
+        if (world.status !== 'RUNNING')
+          throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '실행 중인 월드가 아닙니다.' });
+        const general = await requireGeneral(tx, world.id, ctx.user.id, true);
+        if (general.id !== input.expectedGeneralId || general.removedAt !== null)
+          throw new TRPCError({ code: 'CONFLICT', message: '내 장수를 다시 확인하세요.' });
+        const idempotencyKey = HERITAGE_SPECIALTY_KIND + ':' + input.requestId;
+        const prior = await tx.inputEvent.findUnique({
+          where: { worldId_userId_idempotencyKey: { worldId: world.id, userId: ctx.user.id, idempotencyKey } },
+          select: { id: true, payload: true, generalId: true },
+        });
+        if (prior) {
+          if (prior.generalId !== general.id || !isDeepStrictEqual(prior.payload, input.action))
+            throw new TRPCError({ code: 'CONFLICT', message: '같은 요청 번호의 내용이 다릅니다.' });
+          return { id: String(prior.id) };
+        }
+        const purchase = heritageSpecialtyPurchase(
+          world,
+          {
+            special: general.special,
+            ...(general.heritageSpecialty === null ? {} : { combatSpecial: general.combatSpecial }),
+            ...storedHeritageSpecialty(true, general.heritageSpecialty),
+          },
+          input.action,
+        );
+        if (!purchase || purchase.cost !== input.expectedCost)
+          throw new TRPCError({ code: 'CONFLICT', message: '전투 특기와 구매 가격을 다시 확인하세요.' });
+        const pending = await tx.inputEvent.findFirst({
+          where: { worldId: world.id, generalId: general.id, kind: HERITAGE_SPECIALTY_KIND, status: 'PENDING' },
+          select: { id: true },
+        });
+        if (pending) throw new TRPCError({ code: 'CONFLICT', message: '다른 전투 특기 구매를 처리하고 있습니다.' });
+        const balance = await tx.heritageAccount.findUnique({
+          where: { userId: ctx.user.id },
+          select: { balance: true },
+        });
+        if ((balance?.balance ?? 0) < purchase.cost)
+          throw new TRPCError({ code: 'CONFLICT', message: '유산 포인트가 부족합니다.' });
+        const event = await tx.inputEvent.create({
+          data: {
+            worldId: world.id,
+            userId: ctx.user.id,
+            generalId: general.id,
+            kind: HERITAGE_SPECIALTY_KIND,
+            idempotencyKey,
+            payload: input.action,
+          },
+          select: { id: true },
+        });
+        return { id: String(event.id) };
+      }),
+    ),
   purchase: worldVerifiedProcedure
     .input(
       heritageBenefitInput.extend({
