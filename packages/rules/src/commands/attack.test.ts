@@ -14,6 +14,33 @@ import { TEST_EQUIPMENT_CONFIG } from '../equipment/testFixture';
 describe('attack', () => {
   it('성공', () => verifySuccess('attack'));
   it('실패', () => verifyFailure('attack'));
+  it('INT-26 수극을 첫 상대에게만 쓰고 실제 출병의 장수 부상과 기록에 반영한다', () => {
+    const world = commandWorld();
+    Object.assign(world.generals[1]!, { crew: 20_000, atmos: 100, rice: 10_000 });
+    for (const id of [2, 3]) Object.assign(world.generals[id]!, { crew: 1, atmos: 100 });
+    world.cities[2]!.wall = 100_000;
+    world.equipment = initialEquipment({
+      ...TEST_EQUIPMENT_CONFIG,
+      treatmentTool: true,
+      moraleTool: true,
+      rareEquipment: true,
+      fullRareEquipment: true,
+    });
+    world.equipment.generals['1'] = { tool: { key: 'tool_06', charges: 1 } };
+    const result = attack.execute(
+      world,
+      { generalId: 1, tick: 100, unitSet: testUnits, recordBattleStats: true },
+      { cityKey: 2 },
+      rngFor('snipe-tool'),
+    );
+    const after = applyEffects(world, result.effects);
+    expect(after.equipment!.generals['1']).toBeUndefined();
+    expect(after.generals[2]!.injury).toBeGreaterThanOrEqual(20);
+    expect(after.generals[3]!.injury).toBe(world.generals[3]!.injury);
+    expect(
+      result.reports?.find(({ generalId }) => generalId === 1)?.phases?.filter(({ attackerSniped }) => attackerSniped),
+    ).toHaveLength(1);
+  });
   it('INT-26 명마 효과를 실제 출병의 교전 단계와 군량에 반영한다', () => {
     const fight = (horse?: 'horse_07_기주마' | 'horse_07_백상') => {
       const world = commandWorld();

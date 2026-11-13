@@ -1,5 +1,6 @@
-import type { WorldView } from '../model/world';
+import type { WorldState, WorldView } from '../model/world';
 import type { EquipmentConfig } from './config';
+import { consumeBattleTool } from './morale';
 
 export type EquipmentBattleEffects = {
   extraPhases?: number;
@@ -68,7 +69,12 @@ export function equipmentBattleEffects(world: WorldView, generalId: number): Equ
       effects.snipe = { chance: 0.1, morale: 10, injury: [20, 40] };
       break;
   }
+  if (slots.tool?.key === 'tool_06') effects.snipe = { chance: 1, morale: 20, injury: [20, 40] };
   return effects;
+}
+
+export function consumeSnipeTool(state: WorldState, generalId: number, fired: boolean | undefined) {
+  if (fired && state.equipment?.generals[generalId]?.tool?.key === 'tool_06') consumeBattleTool(state, generalId);
 }
 
 export function regularEquipmentBattleDescription(config: Readonly<EquipmentConfig>, key: string) {

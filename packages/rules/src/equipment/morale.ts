@@ -11,7 +11,12 @@ export function useBattleTool(state: WorldState, generalId: number, force: { atm
   else if (slots.tool.key === TRAINING_TOOL.key && 'fullRareEquipment' in equipment.config)
     force.train = Math.min(100, force.train + TRAINING_TOOL.train);
   else return;
-  const remaining = { ...slots };
+  consumeBattleTool(state, generalId);
+}
+
+export function consumeBattleTool(state: WorldState, generalId: number) {
+  const equipment = state.equipment!;
+  const remaining = { ...equipment.generals[generalId]! };
   delete remaining.tool;
   if (Object.keys(remaining).length > 0) equipment.generals[generalId] = remaining;
   else delete equipment.generals[generalId];

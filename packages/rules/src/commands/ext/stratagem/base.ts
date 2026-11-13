@@ -13,6 +13,7 @@ import type { Actor, CommandResult, Failure } from '../../types';
 import { fiveStatsSchema } from '../../../general/fiveStats';
 import { equipmentBonus } from '../../../equipment/stats';
 import { equipmentTools } from '../../../equipment/config';
+import { consumeBattleTool } from '../../../equipment/morale';
 import { commandConditionStats, GENERAL_CONDITION_FEATURE, generalCondition } from '../../../general/condition';
 
 // S1: 연도와 무관하게 금·쌀 각 100. S2: 부상으로 능력치를 줄이지 않는다.
@@ -250,9 +251,7 @@ export function executeStratagem(
   const tool = stratagemTool(view, general.id);
   if (tool) {
     const state = applyEffects(view, effects);
-    const slots = state.equipment!.generals[general.id]!;
-    delete slots.tool;
-    if (Object.keys(slots).length === 0) delete state.equipment!.generals[general.id];
+    consumeBattleTool(state, general.id);
     effects.splice(0, effects.length, { kind: 'world', state });
   }
   const amounts = spec.fields

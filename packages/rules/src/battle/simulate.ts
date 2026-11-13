@@ -145,6 +145,8 @@ type BattleResult = {
   attackerFirstVolleyFired?: true;
   attackerInjury?: number;
   defenderInjury?: number;
+  attackerSniped?: true;
+  defenderSniped?: true;
   phases?: BattlePhase[];
 };
 
@@ -161,11 +163,13 @@ export function simulateBattle(input: BattleInput, rng: Rng): BattleResult {
   const defenderSniped = defenderSnipe && rng.next() < defenderSnipe.chance;
   const snipes = { ...(attackerSniped ? { attackerSniped } : {}), ...(defenderSniped ? { defenderSniped } : {}) };
   if (attackerSniped) {
+    result.attackerSniped = true;
     attacker.atmos = Math.min(100, attacker.atmos + attackerSnipe.morale);
     if (input.defenderInjury !== undefined)
       result.defenderInjury = snipeInjury(input.defenderInjury, attackerSnipe.injury, rng);
   }
   if (defenderSniped) {
+    result.defenderSniped = true;
     defender.atmos = Math.min(100, defender.atmos + defenderSnipe.morale);
     if (input.attackerInjury !== undefined)
       result.attackerInjury = snipeInjury(input.attackerInjury, defenderSnipe.injury, rng);

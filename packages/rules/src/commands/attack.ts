@@ -1,5 +1,5 @@
 import { useBattleTool } from '../equipment/morale';
-import { equipmentBattleEffects } from '../equipment/battle';
+import { consumeSnipeTool, equipmentBattleEffects } from '../equipment/battle';
 import { battleTacticsStats } from '../battle/tactics';
 import { combatSpecialty, combatSpecialtyKey } from '../general/combatSpecialty';
 import { TICKS_PER_MONTH } from '../clock/constants';
@@ -91,7 +91,6 @@ function makeAttack(collect: typeof collectModifiers) {
       const battleOutcomes: NonNullable<CommandResult['battleOutcomes']> = [];
       const generalEngagements: NonNullable<CommandResult['generalEngagements']> = [];
       const reputation = state.ruleFeatures?.includes('reputation-v1');
-      const attackerEquipment = equipmentBattleEffects(state, g.id);
       const rounds: string[] = [];
       const attackPhases: BattlePhase[] = [];
       let attackerFirstVolleyUsed = false;
@@ -100,6 +99,7 @@ function makeAttack(collect: typeof collectModifiers) {
         city.wall > 0 &&
         actor.unitSet!.crewTypes.find((unit) => unit.id === g.crewType)?.effects?.includes('wallFirst');
       const fightWall = (openingSkirmish = false) => {
+        const attackerEquipment = equipmentBattleEffects(state, g.id);
         const wall: Force = { crew: city.wall, crewType: 1000, train: 100, atmos: 100, rice: 0 };
         feed(g, attackerEquipment?.riceFactor);
         useBattleTool(state, g.id, g);
@@ -130,6 +130,7 @@ function makeAttack(collect: typeof collectModifiers) {
           rng,
         );
         attackerFirstVolleyUsed ||= battle.attackerFirstVolleyFired === true;
+        consumeSnipeTool(state, g.id, battle.attackerSniped);
         recordWarCasualties(state, g.cityKey, city.cityKey, g.crew - battle.attacker.crew);
         Object.assign(g, battle.attacker);
         const wallDamage = city.wall - battle.defender.crew;
@@ -143,6 +144,7 @@ function makeAttack(collect: typeof collectModifiers) {
       if (wallFirst) fightWall(true);
       let cleared = g.crew > 0 && g.atmos > 0;
       for (const defender of cleared ? defenders : []) {
+        const attackerEquipment = equipmentBattleEffects(state, g.id);
         const defenderEquipment = equipmentBattleEffects(state, defender.id);
         feed(g, attackerEquipment?.riceFactor);
         feed(defender, defenderEquipment?.riceFactor);
@@ -184,6 +186,8 @@ function makeAttack(collect: typeof collectModifiers) {
           rng,
         );
         attackerFirstVolleyUsed ||= battle.attackerFirstVolleyFired === true;
+        consumeSnipeTool(state, g.id, battle.attackerSniped);
+        consumeSnipeTool(state, defender.id, battle.defenderSniped);
         const attackerLoss = g.crew - battle.attacker.crew;
         const defenderLoss = defender.crew - battle.defender.crew;
         recordWarCasualties(state, g.cityKey, city.cityKey, attackerLoss + defenderLoss);

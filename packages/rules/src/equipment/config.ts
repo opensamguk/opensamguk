@@ -55,8 +55,17 @@ export const equipmentTools = {
     requiredSecurity: 2000,
     stratagemBonus: 0.5,
   },
+  // core2026 c81d304, packages/logic/src/items/che_저격_수극.ts (MIT).
+  tool_06: {
+    key: 'tool_06',
+    name: '수극(저격)',
+    description: '교전 시작 때 저격하고 사기 +20. 1회용.',
+    cost: 1000,
+    charges: 1,
+    requiredSecurity: 1000,
+  },
 } as const;
-export const equipmentToolKeySchema = z.enum(['tool_01', 'tool_02', 'tool_03', 'tool_04', 'tool_05']);
+export const equipmentToolKeySchema = z.enum(['tool_01', 'tool_02', 'tool_03', 'tool_04', 'tool_05', 'tool_06']);
 export const equipmentSlotSchema = z.enum(['horse', 'weapon', 'book']);
 export const equipmentKeySchema = z.string().regex(/^(horse|weapon|book)_0[1-6]$/);
 export const rareEquipmentKeySchema = z.string().regex(/^(horse|weapon|book)_(15|(?:0[7-9]|1[0-5])_[가-힣0-9]+)$/);

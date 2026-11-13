@@ -1,5 +1,5 @@
 import { useBattleTool } from '../equipment/morale';
-import { equipmentBattleEffects } from '../equipment/battle';
+import { consumeSnipeTool, equipmentBattleEffects } from '../equipment/battle';
 import { battleTacticsStats } from '../battle/tactics';
 import { combatSpecialty, combatSpecialtyKey } from '../general/combatSpecialty';
 import type { Rng } from '@opensamguk/shared';
@@ -119,6 +119,8 @@ export function fightCampaignUnits(
     rng,
   );
   // 두 부곡의 최종 피해를 함께 반영한 뒤 전체 지휘 상한을 검사한다.
+  consumeSnipeTool(state, attacker.commanderId, result.attackerSniped);
+  consumeSnipeTool(state, defender.commanderId, result.defenderSniped);
   if (result.attackerInjury !== undefined) attackerCommander.injury = result.attackerInjury;
   if (result.defenderInjury !== undefined) defenderCommander.injury = result.defenderInjury;
   defender.troops = result.defender.crew;
@@ -172,6 +174,7 @@ export function fightCampaignWall(
     },
     rng,
   );
+  consumeSnipeTool(state, attacker.commanderId, result.attackerSniped);
   city.wall = result.defender.crew;
   finish(state, attacker, result.attacker);
   return { state, ...result };
@@ -241,6 +244,7 @@ export function fightCampaignCityGarrison(
     },
     rng,
   );
+  consumeSnipeTool(state, attacker.commanderId, result.attackerSniped);
   defender.troops = result.defender.crew;
   defender.train = result.defender.train;
   defender.atmos = result.defender.atmos;

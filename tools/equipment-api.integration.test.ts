@@ -424,6 +424,7 @@ it('INT-26 SAN10 훈련 청주는 장비매매로 구매하고 보유 도구로 
     'tool_03',
     'tool_04',
     'tool_05',
+    'tool_06',
   ]);
   expect((await board()).data?.items).toEqual(
     expect.arrayContaining([
