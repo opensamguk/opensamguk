@@ -375,6 +375,7 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
       'merit',
       'name',
       'nation',
+      'officerLevel',
       'rank',
       'value',
       'wins',
@@ -385,9 +386,17 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
     expect((await request('records.season', { ...input, userId: users[1]!.id }, cookie)).code).toBe('BAD_REQUEST');
     const generalId = Number(rows[0]!.generalId);
     const where = { worldId_id: { worldId: endedWorldId, id: generalId } };
-    const general = await db.general.findUniqueOrThrow({ where, select: { battleWins: true } });
+    const archived = await db.seasonGeneral.findUniqueOrThrow({
+      where: { worldId_generalId: { worldId: endedWorldId, generalId } },
+      select: { officerLevel: true },
+    });
+    expect(rows[0]?.officerLevel).toBe(archived.officerLevel);
+    const general = await db.general.findUniqueOrThrow({ where, select: { battleWins: true, officerLevel: true } });
     try {
-      await db.general.update({ where, data: { battleWins: general.battleWins + 1 } });
+      await db.general.update({
+        where,
+        data: { battleWins: general.battleWins + 1, officerLevel: general.officerLevel === 0 ? 1 : 0 },
+      });
       expect(await request('records.season', input, cookie)).toEqual(original);
     } finally {
       await db.general.update({ where, data: general });

@@ -237,9 +237,17 @@ export const logSelect = {
   commandKey: true,
   kind: true,
   text: true,
+  createdAt: true,
 } as const satisfies Prisma.GeneralLogSelect;
 export function logInfo(log: Prisma.GeneralLogGetPayload<{ select: typeof logSelect }>) {
-  return { id: log.id.toString(), tick: log.tick, commandKey: log.commandKey, kind: log.kind, text: log.text };
+  return {
+    id: log.id.toString(),
+    tick: log.tick,
+    commandKey: log.commandKey,
+    kind: log.kind,
+    text: log.text,
+    createdAt: log.createdAt.toISOString(),
+  };
 }
 
 // 월간 JSON은 저장 형태를 그대로 반환하지 않는다. 공개 허용 필드만 파싱한다.
