@@ -28,6 +28,9 @@ function Party({ nation, id }: { nation: NationRef | null; id: number }) {
   );
 }
 
+// 파기한 쪽. 서버는 BROKEN 조약에만 brokenBy를 준다 (원작 외교부의 '송신측의 파기 요청').
+export const brokenByText = (nation: NationRef) => `파기: ${nation.name}`;
+
 const gold = (value: number) => value.toLocaleString('ko-KR');
 
 // 제안 중 비용은 지금 도시 수로 낸 추정이다. 수락 때 엔진이 다시 계산한다.
@@ -45,6 +48,7 @@ export function paidText(treaty: TreatyItem, cost: NonNullable<TreatyItem['cost'
 
 interface Props {
   treaty: TreatyItem;
+  cityLabel?: (key: number) => string;
   // 이 조약에 결과를 기다리는 요청이 있으면 그 안내. 있으면 단추를 잠근다.
   busy: string | null;
   onRespond: (accept: boolean) => void;
@@ -101,7 +105,15 @@ function CostFact({ treaty }: { treaty: TreatyItem }) {
   );
 }
 
-export function TreatyCard({ treaty, busy, onRespond, onBreak }: Props) {
+export function TreatyCard({ treaty, cityLabel = (key) => `도시 ${key}`, busy, onRespond, onBreak }: Props) {
+  const labels = {
+    city: cityLabel,
+    nation: (id: number) => nationName(id === treaty.fromNationId ? treaty.from : treaty.to, id),
+    recipient: (id: number) =>
+      id === treaty.fromNationId
+        ? nationName(treaty.to, treaty.toNationId)
+        : nationName(treaty.from, treaty.fromNationId),
+  };
   const [confirmBreak, setConfirmBreak] = useState(false);
   const status = STATUS_LABELS[treaty.status];
   const enforced = treaty.clauses.filter((c) => isEnforced(c.kind));
@@ -118,10 +130,18 @@ export function TreatyCard({ treaty, busy, onRespond, onBreak }: Props) {
       aria-label={`${nationName(treaty.from, treaty.fromNationId)}와 ${nationName(treaty.to, treaty.toNationId)}의 조약`}
     >
       <header className={styles.cardHead}>
+        <span className={`num ${styles.muted} ${styles.treatyNo}`} data-testid="treaty-number">
+          조약 #{treaty.id}
+        </span>
         <Party nation={treaty.from} id={treaty.fromNationId} />
         <span aria-hidden="true">→</span>
         <Party nation={treaty.to} id={treaty.toNationId} />
         <Tag tone={status.tone}>{status.text}</Tag>
+        {treaty.status === 'BROKEN' && treaty.brokenBy ? (
+          <span className={styles.muted} data-testid="treaty-broken-by">
+            {brokenByText(treaty.brokenBy)}
+          </span>
+        ) : null}
         {busy !== null ? <Tag tone="warning">처리 중</Tag> : null}
       </header>
 
@@ -156,7 +176,7 @@ export function TreatyCard({ treaty, busy, onRespond, onBreak }: Props) {
           <h4 className={styles.clauseHead}>서버가 집행하는 조항</h4>
           <ul className={styles.clauses}>
             {enforced.map((clause, i) => (
-              <li key={i}>{describeClause(clause)}</li>
+              <li key={i}>{describeClause(clause, labels)}</li>
             ))}
           </ul>
         </section>

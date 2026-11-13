@@ -50,10 +50,14 @@ const paths = [
   'turns.edit',
   'turns.precheck',
   'commands.list',
+  'commands.recruitCandidates',
   'home.get',
   'city.get',
   'nation.get',
+  'treaty.relations',
   'records.general',
+  'records.battles',
+  'records.activity',
   'records.nation',
   'records.world',
   'records.season',
@@ -232,23 +236,42 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
               : path === 'auth.login' && category === 'sanctioned'
                 ? { email: users[2]!.email, password }
                 : input(path);
-          const commandsOwner = path === 'commands.list' && category === 'otherUser' ? await session() : undefined;
+          const publicWorldRead =
+            path === 'commands.list' || path === 'treaty.relations' || path === 'records.activity';
+          const ownerCookie = publicWorldRead && category === 'otherUser' ? await session() : undefined;
           const before = await snapshot();
           const result = await request(path, data, cookie);
           if (category === 'otherUser') {
             if (path === 'commands.list') {
-              const owner = await request(path, data, commandsOwner);
+              const owner = await request(path, data, ownerCookie);
               expect(owner.status).toBe(200);
               expect(owner.code).toBeUndefined();
               expect(result.status).toBe(200);
               expect(result.code).toBeUndefined();
-              expect(result.data).toEqual(owner.data);
+              const stripAvailability = (rows: unknown) =>
+                (rows as Array<Record<string, unknown>>).map(({ key, name, category, argsSchema }) => ({
+                  key,
+                  name,
+                  category,
+                  argsSchema,
+                }));
+              expect(stripAvailability(result.data)).toEqual(stripAvailability(owner.data));
               expect(result.data).toEqual(
                 expect.arrayContaining([
-                  expect.objectContaining({ key: 'rest' }),
-                  expect.objectContaining({ key: 'farm' }),
+                  expect.objectContaining({ key: 'rest', available: false, reason: '이 월드에 내 장수가 없습니다.' }),
+                  expect.objectContaining({ key: 'farm', available: false }),
                 ]),
               );
+              expect(owner.data).toEqual(
+                expect.arrayContaining([
+                  expect.objectContaining({ key: 'rest', available: true, reason: null }),
+                  expect.objectContaining({ key: 'invite', available: null, reason: expect.any(String) }),
+                ]),
+              );
+            } else if (path === 'treaty.relations' || path === 'records.activity') {
+              const owner = await request(path, data, ownerCookie);
+              expect(owner.status).toBe(200);
+              expect(result).toEqual(owner);
             } else if (path === 'heritage.mine') {
               expect(result.status).toBe(200);
               expect(result.data).toMatchObject({ userId: users[3]!.id, balance: 0, entries: [] });
@@ -319,6 +342,21 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
     await request('auth.logout', undefined, a);
     expect((await request('auth.me', undefined, b)).data).toHaveProperty('user.id', users[1]!.id);
   });
+  it('AC-INT-26 예약 칸은 같은 월드의 대상 이름을 반환한다', async () => {
+    const cookie = await session();
+    const city = state.cities[0]!;
+    const before = await request('turns.get', { worldId }, cookie);
+    const { revision } = before.data as { revision: number };
+    const result = await request(
+      'turns.edit',
+      { worldId, revision, op: { put: { from: 0, to: 0, commandKey: 'move', args: { cityKey: city.cityKey } } } },
+      cookie,
+    );
+    expect(result.data).toMatchObject({ ok: true });
+    const turn = await request('turns.get', { worldId }, cookie);
+    expect(turn.status).toBe(200);
+    expect(turn.data).toHaveProperty('slots.0.targets.city', city.name);
+  });
   it('AC-P2-22 종료 장수 순위는 저장 당시 값과 공개 항목만 돌려준다', async () => {
     const input = { worldId: endedWorldId, by: 'merit' };
     const cookie = await session();
@@ -337,6 +375,7 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
       'merit',
       'name',
       'nation',
+      'officerLevel',
       'rank',
       'value',
       'wins',
@@ -347,9 +386,17 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
     expect((await request('records.season', { ...input, userId: users[1]!.id }, cookie)).code).toBe('BAD_REQUEST');
     const generalId = Number(rows[0]!.generalId);
     const where = { worldId_id: { worldId: endedWorldId, id: generalId } };
-    const general = await db.general.findUniqueOrThrow({ where, select: { battleWins: true } });
+    const archived = await db.seasonGeneral.findUniqueOrThrow({
+      where: { worldId_generalId: { worldId: endedWorldId, generalId } },
+      select: { officerLevel: true },
+    });
+    expect(rows[0]?.officerLevel).toBe(archived.officerLevel);
+    const general = await db.general.findUniqueOrThrow({ where, select: { battleWins: true, officerLevel: true } });
     try {
-      await db.general.update({ where, data: { battleWins: general.battleWins + 1 } });
+      await db.general.update({
+        where,
+        data: { battleWins: general.battleWins + 1, officerLevel: general.officerLevel === 0 ? 1 : 0 },
+      });
       expect(await request('records.season', input, cookie)).toEqual(original);
     } finally {
       await db.general.update({ where, data: general });

@@ -16,6 +16,7 @@ import { buildServer } from '../apps/server/src/server';
 import { newSession } from '../apps/server/src/auth/session';
 import type { AppRouter } from '../apps/server/src/router';
 import { testDatabaseUrl } from './test-database';
+import { recoverTurnAfterCrash, turnCrashPhases } from './turn-process-test';
 
 // AC-P2-08·09: 4명·고정 일정의 실제 TCP/DB/엔진 시험이다. 정식491명 결합은 별도 시험이다.
 const url = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
@@ -148,10 +149,11 @@ async function propose(worldId: string, actor: User, text: string, tick: number)
     await waiting;
   }
 }
-async function fixture(enabled = true) {
+async function fixture(enabled = true, borderReturn = false) {
   const initial = commandInitial();
   initial.seed = `nation-lifecycle-${randomUUID()}`;
   initial.ruleFeatures = [
+    ...(borderReturn ? ['border-return-v1'] : []),
     ...(enabled ? ['nation-lifecycle-v1'] : []),
     'personnel',
     'policy',
@@ -253,6 +255,7 @@ it('기능·세션·권한·엄격한 인자와 기존 월드의 NULL·조회 �
   expect((await rpc('commands.list', { worldId: f.worldId }, f.ruler)).data!.map((row) => row.key)).toEqual(
     expect.arrayContaining(['abdicate', 'wander', 'resettle', 'disband']),
   );
+  expect((await reserve(f, f.ruler, [{ commandKey: 'return_border', args: {} }])).status).toBe(400);
   expect((await rpc('general.mine', { worldId: f.worldId }, f.ruler)).data!.creationRules).toMatchObject({
     nationLifecycleEnabled: true,
   });
@@ -286,107 +289,161 @@ it('기능·세션·권한·엄격한 인자와 기존 월드의 NULL·조회 �
   );
 });
 
-it('사람 선양은 경험70%·두 직책 초기화·후계자의 개인30칸 보존을 실제 턴과 재생에 기록한다', async () => {
-  const f = await fixture();
-  for (const [actor, level] of [
-    [f.ruler, 12],
-    [f.successor, 11],
-  ] as const) {
-    const tabs = (await rpc('nationTurns.get', { worldId: f.worldId }, actor)).data!.tabs;
-    const tab = tabs.find((row) => row.officerLevel === level)!;
-    expect(
-      (
-        await rpc(
-          'nationTurns.set',
-          {
-            worldId: f.worldId,
-            office: tab.office,
-            revision: tab.revision,
-            slots: Array.from({ length: 12 }, (_, index) =>
-              index === 0 ? { commandKey: 'nation_reward', args: { generalId: 3, resource: 'gold', amount: 1 } } : null,
-            ),
-          },
-          actor,
-          true,
-        )
-      ).status,
-    ).toBe(200);
-  }
-  expect((await reserve(f, f.successor, [{ commandKey: 'farm', args: {} }])).status).toBe(200);
-  expect((await reserve(f, f.ruler, [{ commandKey: 'abdicate', args: { generalId: 3 } }])).status).toBe(200);
-  const before = await snapshot(f.worldId);
-  await advance(f.worldId, 100);
-  const after = await snapshot(f.worldId);
-  expect(after.state.generals[1]).toMatchObject({ officerLevel: 1, experience: 71, userId: f.ruler.id });
-  expect(after.state.generals[3]).toMatchObject({ officerLevel: 12, userId: f.successor.id });
-  expect(after.state.nations[1]!.isNpc).toBe(false);
-  expect(after.turns[3]).toEqual(before.turns[3]);
-  expect(after.revisions[3]).toBe(before.revisions[3]);
-  for (const level of [11, 12]) expect(after.offices![1]![level]!.tenure).toBe(before.offices![1]![level]!.tenure + 1);
-  await advance(f.worldId, 10000);
-  await expectReplay(f.worldId, 1);
-});
-
-it('방랑·사람 동행·재정착은 예턴으로 저장하고 재시작과 재생에 보존한다', async () => {
-  const f = await fixture();
+it('AC-M1-14 접경귀환은 실제 HTTP 예턴을 저장하고 턴 재시도와 재생에서 같은 도시를 고른다', async () => {
+  const f = await fixture(true, true);
+  const input = { worldId: f.worldId, commandKey: 'return_border', args: {} };
+  expect((await rpc('turns.precheck', input)).status).toBe(401);
+  expect((await rpc('commands.list', { worldId: f.worldId }, f.ruler)).data).toEqual(
+    expect.arrayContaining([expect.objectContaining({ key: 'return_border', name: '접경귀환', category: 'military' })]),
+  );
+  expect((await rpc('turns.precheck', input, f.ruler)).data).toMatchObject({ ok: false, code: 'BAD_STATE' });
+  expect((await rpc('turns.precheck', { ...input, args: { cityKey: 1 } }, f.ruler)).status).toBe(400);
   expect(
     (
       await reserve(f, f.ruler, [
-        { commandKey: 'wander', args: {} },
         { commandKey: 'move', args: { cityKey: 3 } },
-        { commandKey: 'resettle', args: {} },
+        { commandKey: 'return_border', args: {} },
       ])
     ).status,
   ).toBe(200);
-  await advance(f.worldId, 100);
+  await advance(f.worldId, 10000);
   const before = await snapshot(f.worldId);
-  expect(before.state.nationLifecycle!.nations['1']).toEqual({ sinceTick: 100 });
-  expect((await rpc('nation.get', { worldId: f.worldId, nationId: 1 }, f.ruler)).data).toMatchObject({
-    wandering: { sinceTick: 100, expiresTick: 240100 },
+  expect(before.state.generals[1]!.cityKey).toBe(3);
+  expect((await rpc('turns.precheck', input, f.ruler)).data).toMatchObject({ ok: true });
+  await expect(advance(f.worldId, 10100, true)).rejects.toThrow('lifecycle-save-failure');
+  expect(await snapshot(f.worldId)).toEqual(before);
+  await advance(f.worldId, 10100);
+  const general = (await snapshot(f.worldId)).state.generals[1]!;
+  expect(general).toMatchObject({
+    cityKey: 1,
+    gold: before.state.generals[1]!.gold,
+    rice: before.state.generals[1]!.rice,
+    experience: before.state.generals[1]!.experience,
   });
-  await advance(f.worldId, 10100);
-  expect((await snapshot(f.worldId)).state.generals[3]!.cityKey).toBe(3);
-  await advance(f.worldId, 20100);
-  const after = await snapshot(f.worldId);
-  expect(after.state.nations[1]!.capitalCityKey).toBe(3);
-  expect(after.state.cities[3]!.nationId).toBe(1);
-  expect(after.state.nationLifecycle!.nations).toEqual({});
-  await advance(f.worldId, 30000);
-  await expectReplay(f.worldId, 3);
-});
-
-it('수동 해산은 전원 재야·병력 해산·각1000 상한과 국가 기록을 보존한다', async () => {
-  const f = await fixture();
-  expect(
-    (
-      await reserve(f, f.ruler, [
-        { commandKey: 'wander', args: {} },
-        { commandKey: 'disband', args: {} },
-      ])
-    ).status,
-  ).toBe(200);
-  await advance(f.worldId, 100);
-  expect(
-    (await rpc('turns.precheck', { worldId: f.worldId, commandKey: 'disband', args: {} }, f.ruler)).data,
-  ).toMatchObject({ ok: true });
-  await advance(f.worldId, 10100);
-  const state = (await snapshot(f.worldId)).state;
-  expect(state.nations[1]).toBeUndefined();
-  for (const id of [1, 3])
-    expect(state.generals[id]).toMatchObject({
-      nationId: null,
-      officerLevel: 0,
-      crew: 0,
-      train: 0,
-      atmos: 0,
-      gold: 1000,
-      rice: 1000,
-    });
-  expect(await db.removedNation.count({ where: { worldId: f.worldId, nationId: 1 } })).toBe(1);
-  expect(await db.nationOffice.count({ where: { worldId: f.worldId, nationId: 1 } })).toBe(0);
   await advance(f.worldId, 20000);
   await expectReplay(f.worldId, 2);
 });
+
+it.each(turnCrashPhases)(
+  '사람 선양은 경험70%·두 직책 초기화·후계자의 개인30칸 보존을 실제 턴과 재생에 기록한다 (%s)',
+  async (phase) => {
+    const f = await fixture();
+    for (const [actor, level] of [
+      [f.ruler, 12],
+      [f.successor, 11],
+    ] as const) {
+      const tabs = (await rpc('nationTurns.get', { worldId: f.worldId }, actor)).data!.tabs;
+      const tab = tabs.find((row) => row.officerLevel === level)!;
+      expect(
+        (
+          await rpc(
+            'nationTurns.set',
+            {
+              worldId: f.worldId,
+              office: tab.office,
+              revision: tab.revision,
+              slots: Array.from({ length: 12 }, (_, index) =>
+                index === 0
+                  ? { commandKey: 'nation_reward', args: { generalId: 3, resource: 'gold', amount: 1 } }
+                  : null,
+              ),
+            },
+            actor,
+            true,
+          )
+        ).status,
+      ).toBe(200);
+    }
+    expect((await reserve(f, f.successor, [{ commandKey: 'farm', args: {} }])).status).toBe(200);
+    expect((await reserve(f, f.ruler, [{ commandKey: 'abdicate', args: { generalId: 3 } }])).status).toBe(200);
+    const before = await snapshot(f.worldId);
+    await advance(f.worldId, 99);
+    await recoverTurnAfterCrash(db, url, f.worldId, 1, 100, 'abdicate', phase);
+    const after = await snapshot(f.worldId);
+    expect(after.state.generals[1]).toMatchObject({ officerLevel: 1, experience: 71, userId: f.ruler.id });
+    expect(after.state.generals[3]).toMatchObject({ officerLevel: 12, userId: f.successor.id });
+    expect(after.state.nations[1]!.isNpc).toBe(false);
+    expect(after.turns[3]).toEqual(before.turns[3]);
+    expect(after.revisions[3]).toBe(before.revisions[3]);
+    for (const level of [11, 12])
+      expect(after.offices![1]![level]!.tenure).toBe(before.offices![1]![level]!.tenure + 1);
+    await advance(f.worldId, 10000);
+    await expectReplay(f.worldId, 1);
+  },
+  90_000,
+);
+
+it.each(turnCrashPhases)(
+  '방랑·사람 동행·재정착은 예턴으로 저장하고 재시작과 재생에 보존한다 (%s)',
+  async (phase) => {
+    const f = await fixture();
+    expect(
+      (
+        await reserve(f, f.ruler, [
+          { commandKey: 'wander', args: {} },
+          { commandKey: 'move', args: { cityKey: 3 } },
+          { commandKey: 'resettle', args: {} },
+        ])
+      ).status,
+    ).toBe(200);
+    await advance(f.worldId, 99);
+    await recoverTurnAfterCrash(db, url, f.worldId, 1, 100, 'wander', phase);
+    const before = await snapshot(f.worldId);
+    expect(before.state.nationLifecycle!.nations['1']).toEqual({ sinceTick: 100 });
+    expect((await rpc('nation.get', { worldId: f.worldId, nationId: 1 }, f.ruler)).data).toMatchObject({
+      wandering: { sinceTick: 100, expiresTick: 240100 },
+    });
+    await advance(f.worldId, 10100);
+    expect((await snapshot(f.worldId)).state.generals[3]!.cityKey).toBe(3);
+    await advance(f.worldId, 20099);
+    await recoverTurnAfterCrash(db, url, f.worldId, 1, 20100, 'resettle', phase);
+    const after = await snapshot(f.worldId);
+    expect(after.state.nations[1]!.capitalCityKey).toBe(3);
+    expect(after.state.cities[3]!.nationId).toBe(1);
+    expect(after.state.nationLifecycle!.nations).toEqual({});
+    await advance(f.worldId, 30000);
+    await expectReplay(f.worldId, 3);
+  },
+  90_000,
+);
+
+it.each(turnCrashPhases)(
+  '수동 해산은 전원 재야·병력 해산·각1000 상한과 국가 기록을 보존한다 (%s)',
+  async (phase) => {
+    const f = await fixture();
+    expect(
+      (
+        await reserve(f, f.ruler, [
+          { commandKey: 'wander', args: {} },
+          { commandKey: 'disband', args: {} },
+        ])
+      ).status,
+    ).toBe(200);
+    await advance(f.worldId, 100);
+    expect(
+      (await rpc('turns.precheck', { worldId: f.worldId, commandKey: 'disband', args: {} }, f.ruler)).data,
+    ).toMatchObject({ ok: true });
+    await advance(f.worldId, 10099);
+    await recoverTurnAfterCrash(db, url, f.worldId, 1, 10100, 'disband', phase);
+    const state = (await snapshot(f.worldId)).state;
+    expect(state.nations[1]).toBeUndefined();
+    for (const id of [1, 3])
+      expect(state.generals[id]).toMatchObject({
+        nationId: null,
+        officerLevel: 0,
+        crew: 0,
+        train: 0,
+        atmos: 0,
+        gold: 1000,
+        rice: 1000,
+      });
+    expect(await db.removedNation.count({ where: { worldId: f.worldId, nationId: 1 } })).toBe(1);
+    expect(await db.nationOffice.count({ where: { worldId: f.worldId, nationId: 1 } })).toBe(0);
+    await advance(f.worldId, 20000);
+    await expectReplay(f.worldId, 2);
+  },
+  90_000,
+);
 
 it('24개월 자동 해산은 월간 저장·삭제·로그·재생 스냅샷을 같은 트랜잭션에 남긴다', async () => {
   const f = await fixture();

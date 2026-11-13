@@ -6,7 +6,7 @@ import type { AppRouter } from '../apps/server/src/router';
 import type { inferRouterOutputs } from '@trpc/server';
 import { TICKS_PER_MONTH } from '../packages/rules/src/index';
 import { isDetailedGeneral } from '../apps/web/src/game/types';
-import { officerName } from '../apps/web/src/game/names';
+import { displayName, officerName } from '../apps/web/src/game/names';
 import { createAccount, withE2eDb } from './account';
 import { holdLease, releaseHold, query } from './game';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
@@ -77,7 +77,7 @@ function expectedDetails(general: General, kind: 'city' | 'nation', cities: Map<
   const detailed = isDetailedGeneral(general);
   const hidden = kind === 'city' ? '능력치는 같은 국가 장수만 보입니다' : '다른 국가 정보';
   // 도시 표의 숨긴 장수는 접은 칸이 모두 같은 이유라 칸마다 되풀이하지 않고 이유를 한 줄로 적는다.
-  if (kind === 'city' && !detailed) return { name: general.name, fields: [], reason: hidden, troops: '—' };
+  if (kind === 'city' && !detailed) return { name: displayName(general.name), fields: [], reason: hidden, troops: '—' };
   const numeric = (value: number | undefined) =>
     detailed ? (value === undefined ? '—' : number(value)) : `— (${hidden})`;
   const army = detailed
@@ -85,13 +85,16 @@ function expectedDetails(general: General, kind: 'city' | 'nation', cities: Map<
       ? general.commandedArmy
       : { troops: general.crew, train: general.train, atmos: general.atmos }
     : undefined;
+  // 도시 표도 소속 옆에 직책 열을 둔다 (INT-25). 접은 칸 이유가 같아야 숨긴 장수의 이유가 한 줄로 모인다.
   const fields: [string, string][] =
     kind === 'nation'
       ? [
           ['직책', detailed ? officerName(general.officerLevel, general.nationId !== null) : '—'],
-          ['위치', detailed ? String(cities.get(general.cityKey) ?? general.cityKey) : '—'],
+          ['위치', detailed ? String(cities.get(general.cityKey) ?? general.cityKey ?? '—') : '—'],
         ]
-      : [];
+      : detailed
+        ? [['직책', officerName(general.officerLevel, general.nationId !== null)]]
+        : [];
   for (const [label, key] of stats) fields.push([label, numeric(detailed ? general[key] : undefined)]);
   fields.push(['평균 훈련', numeric(army?.train)], ['평균 사기', numeric(army?.atmos)]);
   if (kind === 'nation') {
@@ -101,7 +104,7 @@ function expectedDetails(general: General, kind: 'city' | 'nation', cities: Map<
     if (army && army.troops > 0 && army.atmos < 50) care.push('사기 부족');
     fields.push(['관리', care.join('')]);
   }
-  return { name: general.name, fields, reason: null, troops: detailed ? numeric(army?.troops) : '—' };
+  return { name: displayName(general.name), fields, reason: null, troops: detailed ? numeric(army?.troops) : '—' };
 }
 async function assertMobileDetails(
   table: Locator,
@@ -115,7 +118,8 @@ async function assertMobileDetails(
     .poll(() =>
       rows.evaluateAll((els) =>
         els.map((el) => ({
-          name: el.querySelector('td')!.firstChild!.textContent,
+          // 이름 칸에는 얼굴과 부상 딱지가 함께 있어 이름 글자만 읽는다 (INT-25).
+          name: el.querySelector('td [data-general-name]')!.textContent,
           fields: Array.from(el.querySelectorAll('dl > div'), (item) => [
             item.querySelector('dt')!.textContent,
             item.querySelector('dd')!.textContent,
@@ -152,7 +156,8 @@ async function statValue(row: Locator, label: string, value: string, mobile: boo
 }
 
 test('T3-10 정식191년 도시·국가·월간 순위 표의 모든 값·정렬·375px와 초안 보존', async ({ page }, info) => {
-  test.setTimeout(120000);
+  // 정식 시나리오에서 여러 화면의 4개 너비·정렬·스크린샷을 한 브라우저로 검증한다.
+  test.setTimeout(240000);
   const execution = (async () => {
     ownWorld = (
       await withE2eDb(async (db) => {
@@ -221,42 +226,52 @@ test('T3-10 정식191년 도시·국가·월간 순위 표의 모든 값·정렬
     const own = city.generals.find((g) => g.id === actor.id)!;
     expect(isDetailedGeneral(own)).toBe(true);
     const measurements = [];
+    const garrison = page.getByRole('table', { name: /^주둔 장수/ });
+    const generals = page.getByRole('table', { name: /^소속 장수/ });
+    const cities = page.getByRole('table', { name: /^소유 도시/ });
     for (const width of [375, 390, 768, 1440]) {
       const mobile = width < 768;
       await page.setViewportSize({ width, height: 900 });
-      await page.getByRole('button', { name: '소속 장수·도시 펼치기', exact: true }).click();
-      const garrison = page.getByRole('table', { name: /^주둔 장수/ });
-      const generals = page.getByRole('table', { name: /^소속 장수/ });
-      const cities = page.getByRole('table', { name: /^소유 도시/ });
-      await expect(generals.locator('tbody tr')).toHaveCount(nation.generals.length);
-      for (const table of [garrison, generals, cities]) await tableGeometry(table, mobile);
+      // 주둔 장수 표는 도시 화면, 소속 장수·소유 도시 표는 국가 화면에 있다 (INT-25).
+      await page.goto(`/w/${ownWorld}/city/${actor.cityKey}`);
+      await expect(garrison).toBeVisible();
+      await tableGeometry(garrison, mobile);
       await noOverflow(page);
       if (mobile) {
-        expect(city.generals.some((g) => !isDetailedGeneral(g))).toBe(true);
         await assertMobileDetails(garrison, city.generals, 'city', new Map());
+      }
+      const ownRow = garrison
+        .locator('tbody tr')
+        .filter({ has: page.locator('td:first-child').filter({ hasText: '표검사장수' }) });
+      if (!isDetailedGeneral(own)) throw new Error('자기 장수 공개 계약 오류');
+      // 장수·소속·직책 다음이 능력치다 (INT-25에서 직책 열을 더했다).
+      for (const [label, key, index] of [
+        ['통솔', 'leadership', 3],
+        ['무력', 'strength', 4],
+        ['지력', 'intel', 5],
+        ['정치', 'politics', 6],
+        ['매력', 'charm', 7],
+      ] as const)
+        await statValue(ownRow, label, number(own[key]!), mobile, index);
+      await page.screenshot({ path: info.outputPath(`formal-city-${width}.png`), fullPage: true });
+      await garrison.locator('caption').scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath(`formal-garrison-viewport-${width}.png`) });
+
+      await page.goto(`/w/${ownWorld}/nation/1`);
+      await expect(generals.locator('tbody tr')).toHaveCount(nation.generals.length);
+      for (const table of [generals, cities]) await tableGeometry(table, mobile);
+      await noOverflow(page);
+      if (mobile) {
         await assertMobileDetails(
           generals,
           nation.generals,
           'nation',
           new Map(nation.cities.map((c) => [c.key, c.name])),
         );
-        expect(await cities.locator('tbody tr td:first-child').allTextContents()).toEqual(
+        // 좁은 화면은 지역·주민을 이름 칸 아래에 접어 두므로 이름 링크 글자만 읽는다 (INT-26).
+        expect(await cities.locator('tbody tr td:first-child > a').allTextContents()).toEqual(
           nation.cities.map((c) => c.name),
         );
-      }
-      const ownRow = garrison
-        .locator('tbody tr')
-        .filter({ has: page.locator('td:first-child').filter({ hasText: '표검사장수' }) });
-      if (!isDetailedGeneral(own)) throw new Error('자기 장수 공개 계약 오류');
-      for (const [label, key, index] of [
-        ['통솔', 'leadership', 2],
-        ['무력', 'strength', 3],
-        ['지력', 'intel', 4],
-        ['정치', 'politics', 5],
-        ['매력', 'charm', 6],
-      ] as const)
-        await statValue(ownRow, label, number(own[key]!), mobile, index);
-      if (mobile) {
         const select = generals.locator('..').getByRole('combobox');
         await select.selectOption('intel');
         await expect(generals.locator('..').getByRole('button', { name: /정렬 방향 내림차순, 바꾸기$/ })).toHaveText(
@@ -268,11 +283,11 @@ test('T3-10 정식191년 도시·국가·월간 순위 표의 모든 값·정렬
               bv = isDetailedGeneral(b) ? b.intel : null;
             return av === null || bv === null ? (av === bv ? 0 : av === null ? 1 : -1) : bv - av;
           })
-          .map((g) => g.name);
+          .map((g) => displayName(g.name));
         expect(
           await generals
             .locator('tbody tr > td:first-child')
-            .evaluateAll((els) => els.map((el) => el.firstChild!.textContent)),
+            .evaluateAll((els) => els.map((el) => el.querySelector('[data-general-name]')!.textContent)),
         ).toEqual(expected);
         await page.setViewportSize({ width: 768, height: 900 });
         await expect(generals.getByRole('columnheader', { name: /^지력/ })).toHaveAttribute('aria-sort', 'descending');
@@ -283,16 +298,16 @@ test('T3-10 정식191년 도시·국가·월간 순위 표의 모든 값·정렬
       measurements.push({ width, cityRows: city.generals.length, nationRows: nation.generals.length });
       await page.screenshot({ path: info.outputPath(`formal-tables-${width}.png`), fullPage: true });
       for (const [name, table] of [
-        ['garrison', garrison],
         ['nation', generals],
         ['cities', cities],
       ] as const) {
         await table.locator('caption').scrollIntoViewIfNeeded();
         await page.screenshot({ path: info.outputPath(`formal-${name}-viewport-${width}.png`) });
       }
-      await page.getByRole('button', { name: '소속 장수·도시 접기', exact: true }).click();
-      await expect(editor.locator('tr[data-slot="30"]')).toContainText('농지 개간');
     }
+    // 화면을 오가도 저장하지 않은 예턴 편집은 sessionStorage에 남아 있다.
+    await page.goto(`/w/${ownWorld}`);
+    await expect(editor.locator('tr[data-slot="30"]')).toContainText('농지 개간');
     expect(
       await hold.db.generalTurn.findMany({
         where: { worldId: ownWorld, generalId: actor.id },
@@ -304,11 +319,11 @@ test('T3-10 정식191년 도시·국가·월간 순위 표의 모든 값·정렬
       await page.goto(`/w/${ownWorld}/nation/2`);
       const other = await query<Out['nation']['get']>(page, 'nation.get', { worldId: ownWorld, nationId: 2 });
       expect(other.generals.length).toBeGreaterThan(0);
-      expect(other.generals.every((g) => !isDetailedGeneral(g))).toBe(true);
+      expect(other.generals.every((g) => isDetailedGeneral(g) && !('gold' in g))).toBe(true);
       const table = page.getByRole('table', { name: /^소속 장수/ });
       await assertMobileDetails(table, other.generals, 'nation', new Map());
       await expect(
-        page.getByRole('note').filter({ hasText: '다른 국가 정보라 장수 수치와 국고는 보이지 않습니다.' }),
+        page.getByRole('note').filter({ hasText: '타국 국고와 장수의 비공개 항목은 —로 표시합니다.' }),
       ).toBeVisible();
       await tableGeometry(table, true);
       await noOverflow(page);
@@ -342,11 +357,18 @@ test('T3-10 정식191년 도시·국가·월간 순위 표의 모든 값·정렬
                 by: key,
               });
               await expect(table.locator('tbody').first().locator('tr')).toHaveCount(data.top.length);
-              await expect(table.locator('tbody').first().locator('tr td:nth-child(2) > span:first-child')).toHaveText(
-                data.top.map((r) => r.name),
+              await expect(table.locator('tbody').first().getByTestId('ranked-general-name')).toHaveText(
+                data.top.map((r) => displayName(r.name)),
               );
+              // 전공 다음에 승리·점령을 따로 접어 둔다 (INT-25).
               await expect(table.locator('tbody').first().locator('tr td:nth-child(2) dl dd')).toHaveText(
-                data.top.flatMap((r) => [number(r.dedication), number(r.experience), number(r.merit)]),
+                data.top.flatMap((r) => [
+                  number(r.dedication),
+                  number(r.experience),
+                  number(r.merit),
+                  number(r.wins),
+                  number(r.captures),
+                ]),
               );
               expect(data.me).not.toBeNull();
               if (data.me) {

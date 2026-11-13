@@ -37,9 +37,13 @@ const generalRows = Array.from({ length: 105 }, (_, index) => {
     captures: id % 5,
   };
 });
-const publicGeneral = ({ id, ...row }: (typeof generalRows)[number]) => ({ generalId: id, ...row });
+const publicGeneral = ({ id, ...row }: (typeof generalRows)[number]) => ({
+  generalId: id,
+  portraitId: id === 105 ? 10001 : null,
+  ...row,
+});
 const nationRows = [
-  { id: 3, name: '셋째 국가', color: '#333333', cities: 1, generals: 12, power: 19 },
+  { id: 3, name: '셋째 국가', color: '#333333', philosophy: '법가', cities: 1, generals: 12, power: 19 },
   { id: 2, name: '둘째 국가', color: '#222222', cities: 3, generals: 2, power: 19 },
   { ...nationIdentity, cities: 3, generals: 7, power: 24 },
 ];
@@ -102,6 +106,7 @@ async function fixtureWorld(label: string, snapshot: boolean, other = false) {
       worldId: world.id,
       id: row.id,
       name: `실시간 장수 ${row.id}`,
+      portraitId: row.id === 105 ? 10001 : null,
       dedication: 50_000,
       experience: 60_000,
       userId: row.id === (other ? 1 : 105) ? users[0]!.id : row.id === (other ? 105 : 1) ? users[1]!.id : null,
@@ -229,6 +234,7 @@ describe('T2-22 / AC-M2-19 실제 TCP HTTP·PostgreSQL 순위', () => {
     expect(result.data).toEqual({
       items: ids.map((id, index) => ({
         nationId: id,
+        philosophy: id === 3 ? '법가' : (state.nations.find((nation) => nation.id === id)?.philosophy ?? null),
         ...Object.fromEntries(
           Object.entries(nationRows.find((nation) => nation.id === id)!).filter(([key]) => key !== 'id'),
         ),
@@ -299,6 +305,7 @@ describe('T2-22 / AC-M2-19 실제 TCP HTTP·PostgreSQL 순위', () => {
       'generalId',
       'name',
       'nation',
+      'portraitId',
       'dedication',
       'experience',
       'wins',
@@ -318,6 +325,7 @@ describe('T2-22 / AC-M2-19 실제 TCP HTTP·PostgreSQL 순위', () => {
         'generals',
         'name',
         'nationId',
+        'philosophy',
         'power',
         'rank',
         'value',

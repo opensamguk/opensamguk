@@ -3,9 +3,10 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Link, useRouterState } from '@tanstack/react-router';
 import { useMemo } from 'react';
 import { errorCode, retryUnlessClientError } from '../game/errors';
-import { formatYearMonth } from '../game/gameDate';
+import { formatYearMonth, type YearMonth } from '../game/gameDate';
 import { NoGeneral, QueryError } from '../game/QueryState';
-import { useHome, useWorldId, useWorldMap } from '../game/queries';
+import { displayName } from '../game/names';
+import { useHome, useWorldId, useWorldMap, useWorldSummary } from '../game/queries';
 import { useTRPC } from '../trpc';
 import { serverMessage } from '../turns/apiError';
 import { NationBadge } from '../ui/NationBadge';
@@ -31,6 +32,7 @@ import {
   type Finished,
   type Tracked,
 } from './requests';
+import { RelationGrid } from './RelationGrid';
 import { nationName, TreatyCard } from './TreatyCard';
 import { relationText, TreatyComposer } from './TreatyComposer';
 import { useTreatyRequests } from './useTreatyRequests';
@@ -110,7 +112,7 @@ export function busyText(
   const mine = trackedFor(tracked, { treatyId });
   if (mine) return `${actionLabel(mine.action)} ${phaseText(mine.phase)}`;
   const other = pending.find((p) => p.kind !== 'treaty.propose' && p.treatyId === treatyId);
-  return other ? `${other.requestedBy.name}의 요청을 처리하는 중입니다.` : null;
+  return other ? `${displayName(other.requestedBy.name)}의 요청을 처리하는 중입니다.` : null;
 }
 
 // 형식 1(legacy) 월드는 서버가 PRECONDITION_FAILED로 조약 조회를 막는다. 빈 목록으로 그리지 않고 그 문장을 보인다.
@@ -143,7 +145,15 @@ export function DiplomacyPage({ tab }: { tab: DiplomacyTab }) {
     );
   else {
     const storageKey = requestsStorageKey(userId, worldId);
-    body = <Diplomacy key={storageKey} worldId={worldId} tab={tab} storageKey={storageKey} />;
+    body = (
+      <Diplomacy
+        key={storageKey}
+        worldId={worldId}
+        tab={tab}
+        storageKey={storageKey}
+        ownNationId={home.data.nation.id}
+      />
+    );
   }
 
   return (
@@ -157,7 +167,17 @@ export function DiplomacyPage({ tab }: { tab: DiplomacyTab }) {
   );
 }
 
-function Diplomacy({ worldId, tab, storageKey }: { worldId: string; tab: DiplomacyTab; storageKey: string }) {
+function Diplomacy({
+  worldId,
+  tab,
+  storageKey,
+  ownNationId,
+}: {
+  worldId: string;
+  tab: DiplomacyTab;
+  storageKey: string;
+  ownNationId: number;
+}) {
   const trpc = useTRPC();
   const href = useRouterState({ select: (state) => state.location.href });
   const map = useWorldMap(worldId);
@@ -179,6 +199,7 @@ function Diplomacy({ worldId, tab, storageKey }: { worldId: string; tab: Diploma
   // 끝난 요청의 조약은 국가 ID만 담는다. 이름은 공개 지도에서 찾는다. 지도에 없으면 없는 국가로 적는다.
   const nationLabel = (id: number) =>
     map.data ? nationName(map.data.nations.find((n) => n.id === id) ?? null, id) : `국가 ${id}`;
+  const cityLabel = (key: number) => map.data?.cities.find((city) => city.key === key)?.name ?? `도시 ${key}`;
   const treatyName = (treatyId: string) => {
     const t = items.find((row) => row.id === treatyId);
     return t ? `${nationName(t.from, t.fromNationId)}·${nationName(t.to, t.toNationId)} 조약` : '조약';
@@ -239,7 +260,10 @@ function Diplomacy({ worldId, tab, storageKey }: { worldId: string; tab: Diploma
           <LoadingState />
         )
       ) : tab === 'nations' ? (
-        <NationTable worldId={worldId} targets={head.targets} items={items} canPropose={head.canPropose.ok} />
+        <>
+          <NationTable worldId={worldId} targets={head.targets} items={items} canPropose={head.canPropose.ok} />
+          <RelationGrid worldId={worldId} ownNationId={ownNationId} />
+        </>
       ) : tab === 'trust' ? (
         head.breakEnabled ? (
           <TrustTable worldId={worldId} />
@@ -252,6 +276,9 @@ function Diplomacy({ worldId, tab, storageKey }: { worldId: string; tab: Diploma
             worldId={worldId}
             targets={head.targets}
             tradeEnabled={head.tradeEnabled === true}
+            expandedEnabled={head.expandedEnabled === true}
+            ownNationId={ownNationId}
+            map={map.data}
             busyFor={(toNationId) => {
               const mine = trackedFor(requests.tracked, { toNationId });
               if (mine) return `이 상대에게 보낸 제안이 ${phaseText(mine.phase)}`;
@@ -269,6 +296,7 @@ function Diplomacy({ worldId, tab, storageKey }: { worldId: string; tab: Diploma
           <TreatyList
             treaties={treatiesForTab(items, tab)}
             empty={emptyText(TAB_LABELS[tab], list.hasNextPage)}
+            cityLabel={cityLabel}
             busy={(id) => busyText(id, requests.tracked, pending)}
             onRespond={(treatyId, accept) => requests.send({ kind: 'treaty.respond', input: { treatyId, accept } })}
             onBreak={(treatyId) => requests.send({ kind: 'treaty.break', input: { treatyId } })}
@@ -369,12 +397,14 @@ function RequestPanel({
 function TreatyList({
   treaties,
   empty,
+  cityLabel,
   busy,
   onRespond,
   onBreak,
 }: {
   treaties: TreatyItem[];
   empty: string;
+  cityLabel: (key: number) => string;
   busy: (treatyId: string) => string | null;
   onRespond: (treatyId: string, accept: boolean) => void;
   onBreak: (treatyId: string) => void;
@@ -386,6 +416,7 @@ function TreatyList({
         <TreatyCard
           key={t.id}
           treaty={t}
+          cityLabel={cityLabel}
           busy={busy(t.id)}
           onRespond={(accept) => onRespond(t.id, accept)}
           onBreak={() => onBreak(t.id)}
@@ -395,8 +426,32 @@ function TreatyList({
   );
 }
 
-// 국가 탭: 다른 국가마다 우리와의 관계와 이어 볼 곳을 한 줄에 둔다 (INT-20 외교실 시안).
-// 이미 받은 treaty.list의 상대 목록과 조약만 쓴다. 마지막 파기는 신의 탭이 따로 조회하므로 여기에는 없다.
+// 남은 개월 수. 끝나는 연월에서 지금 연월(world.summary의 gameDate)을 뺀다.
+export const monthsLeft = (end: YearMonth, now: YearMonth) => end.year * 12 + end.month - (now.year * 12 + now.month);
+
+// 관계 칸 꼬리 (원작 내무부의 외교 기간). 지금 연월을 모르면 적지 않는다.
+export function monthsLeftText(end: YearMonth | null, now: YearMonth | undefined): string | null {
+  if (end === null || now === undefined) return null;
+  const left = monthsLeft(end, now);
+  return left > 0 ? `(${left}개월 남음)` : '(이번 달 끝남)';
+}
+
+export type NationStats = { power: number; generals: number; cities: number };
+
+// 순위 스냅숏(ranking.nations)의 줄을 nationId로 찾는다. 스냅숏에 없는 국가는 null이다.
+export function statsByNation(
+  rows: ReadonlyArray<{ nationId: number } & NationStats> | undefined,
+): Map<number, NationStats> {
+  return new Map(
+    (rows ?? []).map((row) => [row.nationId, { power: row.power, generals: row.generals, cities: row.cities }]),
+  );
+}
+
+const count = (value: number | undefined) => (value === undefined ? '—' : value.toLocaleString('ko-KR'));
+
+// 국가 탭: 다른 국가마다 국력·장수·도시, 우리와의 관계, 이어 볼 곳을 한 줄에 둔다 (INT-20 외교실 시안, 원작 내무부 외교관계 표).
+// 관계는 이미 받은 treaty.list의 상대 목록과 조약을 쓴다. 국력·장수·도시는 순위 화면과 같은 ranking.nations 스냅숏을 nationId로 합친다.
+// 마지막 파기는 신의 탭이 따로 조회하므로 여기에는 없다.
 function NationTable({
   worldId,
   targets,
@@ -408,14 +463,43 @@ function NationTable({
   items: readonly TreatyItem[];
   canPropose: boolean;
 }) {
+  const trpc = useTRPC();
+  const ranking = useQuery({
+    ...trpc.ranking.nations.queryOptions({ worldId, by: 'power' }),
+    retry: retryUnlessClientError,
+    staleTime: 60_000,
+  });
+  const summary = useWorldSummary(worldId);
+  const now = summary.data?.gameDate;
+  const stats = statsByNation(ranking.data?.items);
   if (targets.length === 0) return <EmptyState title="다른 국가가 없습니다" />;
   const withNation = (id: number) => items.filter((t) => t.fromNationId === id || t.toNationId === id);
+  const at = ranking.data?.at;
+  const caption = ranking.isError
+    ? '국력·장수·도시를 불러오지 못했습니다.'
+    : !ranking.data
+      ? '국력·장수·도시를 불러오는 중입니다.'
+      : at
+        ? `국력·장수·도시는 ${at.year}년 ${at.month}월 정산 기준입니다.`
+        : '국력·장수·도시는 아직 정산 전입니다.';
   return (
     <div className={styles.sheet}>
       <table className={styles.table} data-testid="nation-relations">
+        <caption className={styles.caption} data-testid="nation-stats-note">
+          {caption}
+        </caption>
         <thead>
           <tr>
             <th scope="col">국가</th>
+            <th scope="col" className={styles.num}>
+              국력
+            </th>
+            <th scope="col" className={styles.num}>
+              장수
+            </th>
+            <th scope="col" className={styles.num}>
+              도시
+            </th>
             <th scope="col">우리와의 관계</th>
             <th scope="col">이어 보기</th>
           </tr>
@@ -432,13 +516,24 @@ function NationTable({
                 : canPropose
                   ? { tab: 'write', text: '조약서 쓰기' }
                   : null;
+            const row = stats.get(target.nation.id);
+            const left = monthsLeftText(target.relationEndAt, now);
             return (
               <tr key={target.nation.id}>
                 <td>
                   <NationBadge name={target.nation.name} color={target.nation.color} />
                 </td>
+                <td className={`num ${styles.num}`}>{count(row?.power)}</td>
+                <td className={`num ${styles.num}`}>{count(row?.generals)}</td>
+                <td className={`num ${styles.num}`}>{count(row?.cities)}</td>
                 <td>
                   <RelationTag target={target} />
+                  {left ? (
+                    <span className={styles.muted} data-testid="relation-months-left">
+                      {' '}
+                      {left}
+                    </span>
+                  ) : null}
                 </td>
                 <td>
                   {next ? (

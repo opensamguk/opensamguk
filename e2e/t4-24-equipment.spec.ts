@@ -191,6 +191,13 @@ test('T4-24 장비 카드 예약·실제 매매·100 초과 표시와 세 화면
     await page.goto(`/w/${worldId}`);
     const editor = page.getByTestId('turn-editor'),
       picker = editor.getByRole('region', { name: '명령 고르기', exact: true });
+    // 768px 미만 메인은 하단 막대로 패널을 하나씩 본다 (INT-25). 장수 칸은 `현황`, 예턴은 `예턴` 패널이다.
+    // 인자 입력 화면(모달)을 연 동안에는 그 패널이 늘 그려지므로 막대를 누르지 않는다.
+    const showPanel = async (name: '현황' | '예턴') => {
+      if ((page.viewportSize()?.width ?? 1440) >= 768) return;
+      const tab = page.getByRole('tablist', { name: '메인 화면', exact: true }).getByRole('tab', { name, exact: true });
+      if ((await tab.getAttribute('aria-selected')) !== 'true') await tab.click();
+    };
     await editor.getByRole('button', { name: '선택 해제', exact: true }).click();
     await editor.locator('tr[data-slot="1"]').click();
     await editor.getByRole('searchbox').fill('장비');
@@ -229,6 +236,8 @@ test('T4-24 장비 카드 예약·실제 매매·100 초과 표시와 세 화면
     // SSE가 실제 저장 결과를 다시 조회해야 한다. 새로고침으로 갱신 누락을 숨기지 않는다.
     const equipment = page.getByRole('region', { name: '장착 장비', exact: true });
     await expect(equipment.getByText('단도', { exact: true })).toBeVisible();
+    // 이름 옆에 장비 효과를 적는다 (INT-25 p3-generals-20).
+    await expect(equipment.getByTestId('equipment-effect')).toHaveText('(무력 +1)');
     const generalPanel = page.locator('[data-general-id]');
     await expect(generalPanel.getByText('101', { exact: true })).toBeVisible();
     await expect(generalPanel.getByText('기본 100 + 장비 1', { exact: true })).toBeVisible();
@@ -243,12 +252,18 @@ test('T4-24 장비 카드 예약·실제 매매·100 초과 표시와 세 화면
       for (const width of [375, 768, 1440]) {
         await page.emulateMedia({ colorScheme });
         await page.setViewportSize({ width, height: 900 });
+        await showPanel('현황');
         await generalPanel.evaluate((node) => node.scrollIntoView({ block: 'center' }));
         await generalPanel.screenshot({ path: info.outputPath(`t4-24-stats-${colorScheme}-${width}.png`) });
         expect(await textContrast(generalPanel.getByText('기본 100 + 장비 1', { exact: true }))).toBeGreaterThanOrEqual(
           4.5,
         );
       }
+    // 넣으면 인자 입력 화면이 닫힌다 (INT-25). 같은 칸을 다시 골라 화면을 연다.
+    await editor.getByRole('button', { name: '선택 해제', exact: true }).click();
+    await editor.locator('tr[data-slot="1"]').click();
+    await editor.getByRole('searchbox').fill('장비');
+    await editor.getByRole('radio', { name: '장비매매', exact: true }).check();
     await slot.selectOption('weapon');
     await item.selectOption('weapon_06');
     // 지금 상태의 경고는 30칸 표의 사전 검사와 같은 말이고, 경고가 있어도 넣을 수 있다고 바로 이어 적는다.
@@ -296,11 +311,22 @@ test('T4-24 장비 카드 예약·실제 매매·100 초과 표시와 세 화면
       else await route.continue();
     });
     await page.reload();
+    await showPanel('현황');
     const statusAlert = generalPanel.getByRole('alert').filter({ hasText: '장비 정보를 불러오지 못했습니다.' });
     await expect(statusAlert).toBeVisible({ timeout: 20_000 });
     await expect(generalPanel.getByText('무력', { exact: true }).locator('xpath=following-sibling::dd')).toHaveText(
       '100',
     );
+    // 375px은 장수 칸(현황)과 명령 칸(예턴)이 다른 패널이라 장수 칸의 다시 시도를 먼저 잰다.
+    for (const colorScheme of ['light', 'dark'] as const) {
+      await page.emulateMedia({ colorScheme });
+      const box = (await statusAlert.getByRole('button', { name: '다시 시도', exact: true }).boundingBox())!;
+      expect(box.height).toBeGreaterThanOrEqual(44);
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(376);
+      await generalPanel.screenshot({ path: info.outputPath(`t4-24-retry-stats-${colorScheme}-375.png`) });
+    }
+    await showPanel('예턴');
     await editor.getByRole('button', { name: '선택 해제', exact: true }).click();
     await editor.locator('tr[data-slot="1"]').click();
     await editor.getByRole('searchbox').fill('장비');
@@ -310,22 +336,20 @@ test('T4-24 장비 카드 예약·실제 매매·100 초과 표시와 세 화면
     await expect(picker.getByRole('button', { name: '1번 칸에 넣기 (사용 불가)', exact: true })).toBeVisible();
     for (const colorScheme of ['light', 'dark'] as const) {
       await page.emulateMedia({ colorScheme });
-      for (const retry of [
-        statusAlert.getByRole('button', { name: '다시 시도', exact: true }),
-        pickerAlert.getByRole('button', { name: '다시 시도', exact: true }),
-      ]) {
-        const box = (await retry.boundingBox())!;
-        expect(box.height).toBeGreaterThanOrEqual(44);
-        expect(box.x).toBeGreaterThanOrEqual(0);
-        expect(box.x + box.width).toBeLessThanOrEqual(376);
-      }
+      const box = (await pickerAlert.getByRole('button', { name: '다시 시도', exact: true }).boundingBox())!;
+      expect(box.height).toBeGreaterThanOrEqual(44);
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(376);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       await picker.screenshot({ path: info.outputPath(`t4-24-retry-trade-${colorScheme}-375.png`) });
-      await generalPanel.screenshot({ path: info.outputPath(`t4-24-retry-stats-${colorScheme}-375.png`) });
     }
     await page.unroute('**/trpc/**');
     await pickerAlert.getByRole('button', { name: '다시 시도', exact: true }).click();
     await expect(slot).toBeVisible();
+    // 인자 입력 화면을 닫고 현황 패널에서 장비 카드가 돌아온 것을 본다.
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('command-args-screen')).toBeHidden();
+    await showPanel('현황');
     await expect(equipment.getByText('미장착', { exact: true }).first()).toBeVisible();
     await expect(statusAlert).toHaveCount(0);
     await page.reload();

@@ -1,0 +1,147 @@
+/* 인사부 임명 후보 카드 (INT-25 단계 3). 모서리는 둥글리지 않고 초상 icon만 원형이다. */
+.picker {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: var(--frame);
+  border-radius: var(--radius);
+  background: var(--color-surface-muted);
+}
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.search {
+  display: flex;
+  flex: 1 1 220px;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--text-sm);
+}
+.search input {
+  flex: 1;
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  font: inherit;
+}
+.count,
+.note,
+.empty {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+.list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: var(--space-2);
+  max-height: 520px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.list li {
+  display: flex;
+  min-width: 0;
+}
+/* 왼쪽 띠: 초록은 임명 가능, 호박은 다른 관직 재직 (원작 인사부). 글자 딱지를 함께 둔다. */
+.card {
+  display: grid;
+  flex: 1;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: start;
+  min-width: 0;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-success);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.card[data-state='office'] {
+  border-left-color: var(--color-warning);
+}
+.card:hover {
+  border-color: var(--color-border-strong);
+}
+.card[aria-pressed='true'] {
+  border-color: var(--color-accent);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+  background: var(--color-surface-raised);
+}
+.card:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.face {
+  display: flex;
+}
+.icon {
+  width: 48px;
+  height: 48px;
+}
+.body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.nameLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+.name {
+  overflow-wrap: anywhere;
+}
+.meta {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--space-2);
+  font-size: var(--text-sm);
+}
+.stat {
+  white-space: nowrap;
+}
+.statLabel {
+  color: var(--color-text-muted);
+}
+.statValue {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.traits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+@media (max-width: 767px) {
+  .search input {
+    min-height: 44px;
+  }
+  .card {
+    min-height: 44px;
+  }
+  .list {
+    max-height: 70vh;
+  }
+}

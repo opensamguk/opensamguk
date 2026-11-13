@@ -21,12 +21,19 @@ export function invalidationTargets(event: WorldEvent, worldId: string, trpc: Tr
   switch (event.kind) {
     case 'ready':
       return 'all';
+    case 'activity.updated':
+      return [trpc.records.activity.queryKey({ worldId }), trpc.records.world.queryKey({ worldId })];
     case 'turn.result':
       return [
         trpc.equipment.mine.queryKey({ worldId }),
         trpc.home.get.queryKey({ worldId }),
         trpc.turns.get.queryKey({ worldId }),
         trpc.records.general.pathKey(),
+        // 내 턴의 교전 보고와 그 턴이 남긴 공개 사건(장수 동향·중원 정세 두 scope 모두).
+        trpc.records.battles.queryKey({ worldId }),
+        trpc.records.activity.queryKey({ worldId }),
+        trpc.city.get.queryKey({ worldId }),
+        trpc.personnel.officers.queryKey({ worldId }),
       ];
     case 'message.new':
       return [
@@ -35,21 +42,36 @@ export function invalidationTargets(event: WorldEvent, worldId: string, trpc: Tr
       ];
     case 'monthly.done':
       return [
+        trpc.city.get.queryKey({ worldId }),
+        trpc.personnel.officers.queryKey({ worldId }),
         trpc.equipment.mine.queryKey({ worldId }),
         trpc.world.summary.queryKey({ worldId }),
         trpc.home.get.queryKey({ worldId }),
         trpc.world.map.queryKey({ worldId }),
+        trpc.advice.get.queryKey({ worldId }),
+        // 월단평(T3-08). 지난 달 review.get은 바뀌지 않아 latest·months와 그 월드의 중원 정세 목록만 다시 읽는다.
+        trpc.review.latest.queryKey({ worldId }),
+        trpc.review.months.queryKey({ worldId }),
+        trpc.records.world.queryKey({ worldId }),
+        // 정산 중 생긴 국가 사건(멸망 등)과 평판 사건. 다른 장수의 턴은 알림이 없어 정산 때 함께 다시 읽는다.
+        trpc.records.activity.queryKey({ worldId }),
       ];
     // 발령 상자(T2-06 offers·personnel)와 외교실(T2-08 treaty)의 경로 키다. 그 라우터가 없으면 맞는 query가 없어 아무 일도 없다.
     case 'offer.new':
       return [[['offers']], [['personnel']]];
     case 'treaty.new':
-      return [[['treaty']]];
+      return [
+        [['treaty']],
+        trpc.world.map.queryKey({ worldId }),
+        trpc.city.get.queryKey({ worldId }),
+        trpc.home.get.queryKey({ worldId }),
+      ];
     case 'notice.updated':
       return [
-        event.scope === 'nation'
-          ? trpc.notice.nation.get.queryKey({ worldId })
-          : trpc.notice.world.list.queryKey({ worldId }),
+        ...(event.scope === 'nation'
+          ? // 국가 공지는 군사 조언의 공지 출처이기도 하다.
+            [trpc.notice.nation.get.queryKey({ worldId }), trpc.advice.get.queryKey({ worldId })]
+          : [trpc.notice.world.list.queryKey({ worldId })]),
       ];
   }
 }

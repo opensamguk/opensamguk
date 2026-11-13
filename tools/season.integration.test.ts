@@ -98,7 +98,9 @@ for (const reason of ['END_YEAR', 'UNIFIED'] as const) {
           if (batch.status === 'ENDED' && !batch.more) break;
         }
         const first = await request('world.summary', { worldId }, a.cookie);
-        expect(first.data).toEqual((await request('world.summary', { worldId }, b.cookie)).data);
+        const second = await request('world.summary', { worldId }, b.cookie);
+        expect(Date.parse(first.data.serverTime)).toBeLessThanOrEqual(Date.parse(second.data.serverTime));
+        expect(first.data).toEqual({ ...second.data, serverTime: first.data.serverTime });
         expect(first.data).toMatchObject({
           status: 'ENDED',
           clockMode: 'ACCELERATED',

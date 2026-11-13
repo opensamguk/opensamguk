@@ -18,6 +18,7 @@ const generalRows = z.array(
 );
 const nationRows = z.array(
   nationIdentity.extend({
+    philosophy: z.string().optional(),
     cities: z.number().int().nonnegative(),
     generals: z.number().int().nonnegative(),
     power: z.number().int().nonnegative(),
@@ -53,9 +54,25 @@ export const rankingRouter = router({
           where: { worldId_userId: { worldId: input.worldId, userId: ctx.user.id } },
           select: { id: true },
         });
+        const top = rows.slice(0, 100);
+        const me = viewer ? (rows.find((row) => row.generalId === viewer.id) ?? null) : null;
+        const ids = top.map((row) => row.generalId);
+        if (me) ids.push(me.generalId);
+        const portraits = new Map(
+          (
+            await tx.general.findMany({
+              where: { worldId: input.worldId, id: { in: ids } },
+              select: { id: true, portraitId: true },
+            })
+          ).map(({ id, portraitId }) => [id, portraitId]),
+        );
+        const withPortrait = (row: (typeof rows)[number]) => ({
+          ...row,
+          portraitId: portraits.get(row.generalId) ?? null,
+        });
         return {
-          top: rows.slice(0, 100),
-          me: viewer ? (rows.find((row) => row.generalId === viewer.id) ?? null) : null,
+          top: top.map(withPortrait),
+          me: me ? withPortrait(me) : null,
           at: snapshotAt(snapshot),
         };
       }),
@@ -75,9 +92,20 @@ export const rankingRouter = router({
           select: { tick: true, year: true, month: true, nations: true },
         });
         if (!snapshot) return { items: [], at: null };
+        const nations = nationRows.parse(snapshot.nations);
+        const missingPhilosophy = nations.filter((nation) => nation.philosophy === undefined).map(({ id }) => id);
+        const liveNations = missingPhilosophy.length
+          ? await tx.nation.findMany({
+              where: { worldId: input.worldId, id: { in: missingPhilosophy } },
+              select: { id: true, philosophy: true },
+            })
+          : [];
+        const philosophy = new Map(liveNations.map((nation) => [nation.id, nation.philosophy]));
+        for (const nation of nations) if (nation.philosophy !== undefined) philosophy.set(nation.id, nation.philosophy);
         return {
-          items: rankNations(nationRows.parse(snapshot.nations), input.by).map(({ id, ...row }) => ({
+          items: rankNations(nations, input.by).map(({ id, ...row }) => ({
             nationId: id,
+            philosophy: philosophy.get(id) ?? null,
             ...row,
           })),
           at: snapshotAt(snapshot),

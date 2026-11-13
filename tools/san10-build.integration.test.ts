@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { afterAll, beforeAll, expect, it } from 'vitest';
-import { buildSan10Map, buildSan10Scenarios } from './map-data/san10';
+import { buildSan10Map, buildSan10MapV2, buildSan10Scenarios } from './map-data/san10';
 import { buildInitialWorld } from '../packages/rules/src/world/bootstrap';
 import { validateWorldResources } from '../packages/rules/src/world/validate';
 import { compileOperationalGraph, operationalMapSchema } from '../packages/rules/src/world/map/operational';
@@ -9,7 +9,8 @@ import { publicGeographySchema } from '../packages/shared/src/publicGeography';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { loadInitialWorldFromDb, loadPreset, resolveWorldResourceSelection } from '../apps/engine/src/world/resources';
 import { san10ResourceRows } from './san10-resources';
-import { prepareInitialWorld } from '../apps/engine/src/world/persistence';
+import { prepareInitialWorld, readWorldState, saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { checkOperationalProfile } from '../packages/rules/src/world/map/profile';
 import { toWorldState } from '../packages/rules/src/model/world';
 import { emptyCityResourcesState, readCityResourcesState } from '../packages/rules/src/cityResources/state';
 import { commandRegistry } from '../packages/rules/src/commands/registry';
@@ -55,7 +56,12 @@ it('AC-INT-22: 두 번 생성한 지도·병종·시나리오가 게시 명세�
   const source = await readExpandedSource();
   const build = () => {
     const map = buildSan10Map(hash);
-    return [map, ...Object.values(buildSan10Scenarios(map, original1030)), buildExpandedUnitSet(source, map)];
+    return [
+      map,
+      ...Object.values(buildSan10Scenarios(map, original1030)),
+      buildExpandedUnitSet(source, map),
+      buildSan10MapV2(map),
+    ];
   };
   const first = build().map(hashState),
     second = build().map(hashState),
@@ -205,8 +211,30 @@ it('두 시나리오는 동일한 지리·도로를 쓰고 역사는21국491명,
   expect((await loadPreset('regular')).map).toBe('san10');
   expect((await loadPreset('empty')).scenario).toBe('san10-empty');
   expect((await san10ResourceRows()).map((row) => row.contentHash)).toEqual(
-    [map, historical, empty, read('resources/unitset/expanded.json')].map(hashState),
+    [map, historical, empty, read('resources/unitset/expanded.json'), buildSan10MapV2(map)].map(hashState),
   );
+});
+
+it('D-082 새 공통 삼10 판은 사곡관과 양방향 두 길을 선택한 월드에만 넣는다', async () => {
+  const revised = buildSan10MapV2(map);
+  expect(revised).toEqual(read('resources/map/san10-v2.json'));
+  expect(revised.sites.slice(0, -1)).toEqual(map.sites);
+  expect(revised.routes.slice(0, -2)).toEqual(map.routes);
+  expect(revised.sites).toHaveLength(156);
+  expect(revised.routes).toHaveLength(193);
+  const selection = { scenario: 'san10-191', seed: 'san10-sagok' };
+  const original = await loadInitialWorldFromDb(db, { ...selection, map: 'san10' });
+  const updated = await loadInitialWorldFromDb(db, { ...selection, map: 'san10@2' });
+  expect(original.cities).toHaveLength(155);
+  expect(original.cities.some((city) => city.cityKey === 72)).toBe(false);
+  expect(updated.mapKey).toBe('san10@2');
+  expect(updated.cities.find((city) => city.cityKey === 72)).toMatchObject({
+    kind: 'PASS',
+    name: '사곡관',
+    connections: [3, 42],
+    nationId: null,
+  });
+  for (const key of [3, 42]) expect(updated.cities.find((city) => city.cityKey === key)?.connections).toContain(72);
 });
 
 it('가변 캔버스도 실제 범위를 넘는 점·잘못된 GIS 범위·과대 면적을 거부한다', () => {
@@ -278,6 +306,31 @@ it('역사491명의 ID·소속·5능력치·초상은 기존191정본과 같고 
   expect(historical.nations.map(({ id, name }) => ({ id, name }))).toEqual(
     original.nations.map(({ id, name }) => ({ id, name })),
   );
+});
+
+it('T4-46 AC-P2-24: 개막 도시 보정을 저장하고 다시 읽어도 생성 해시가 같다', async () => {
+  const initial = buildInitialWorld({
+    ...materials,
+    scenario: { ...historical, openingCityProfile: 'legacy-research-70' },
+    scenarioKey: 'san10-191@3',
+    mapKey: 'san10',
+    unitSetKey: 'basic',
+    seed: 'san10-opening-reload',
+  });
+  const saved = await saveInitialWorld(db, initial, {
+    name: '삼10 개막 재적재',
+    turnTermMinutes: 60,
+    endYear: null,
+    ruleFeatures: initial.ruleFeatures,
+  });
+  try {
+    const reloaded = await readWorldState(db, saved.worldId);
+    expect(reloaded.openingCityProfile).toBe('legacy-research-70');
+    expect(hashState(reloaded)).toBe(saved.stateHash);
+    expect(() => checkOperationalProfile(reloaded)).not.toThrow();
+  } finally {
+    await db.world.delete({ where: { id: saved.worldId } });
+  }
 });
 
 it.each(['san10-191', 'san10-empty'])('%s의 9기능 원생성은155거점 빈 원장 하나만 허용한다', async (scenario) => {

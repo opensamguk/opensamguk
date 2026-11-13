@@ -257,7 +257,7 @@ test('정지 중에 가속으로 바꾸고 재개하면 두 화면이 따라오�
     const result = await expectResult(a.page, world.worldId);
     expect(result.reason).toBe('UNIFIED');
     expect(result.winner).not.toBeNull();
-    await expect(a.page.getByRole('region', { name: '기수 결과' }).getByText(result.winner!.name)).toBeVisible();
+    await expect(a.page.getByTestId('season-winner').getByText(result.winner!.name)).toBeVisible();
     // 종료 전환 때 지도도 다시 받아 승자가 모든 도시를 가진 모습이 결과 칸과 맞는다.
     const map = await query<{ cities: Array<{ nationId: number | null }> }>(a.page, 'world.map', {
       worldId: world.worldId,
@@ -271,7 +271,7 @@ test('정지 중에 가속으로 바꾸고 재개하면 두 화면이 따라오�
     // 장수가 있는 계정의 예턴 편집은 막혀 있고 이유를 보여 준다.
     const editor = a.page.getByTestId('turn-editor');
     await expect(editor.getByTestId('turns-locked')).toHaveText('끝난 판이라 예턴을 바꿀 수 없습니다.');
-    const save = editor.getByRole('button', { name: '저장 (사용 불가)' });
+    const save = editor.getByRole('button', { name: '저장 (사용 불가)', exact: true });
     await save.click();
     await expect(editor.getByRole('note')).toHaveText('끝난 판이라 예턴을 바꿀 수 없습니다.');
 
@@ -288,7 +288,7 @@ test('정지 중에 가속으로 바꾸고 재개하면 두 화면이 따라오�
       await screen.page.reload();
       await expectResult(screen.page, world.worldId);
     }
-    await expect(b.page.getByRole('region', { name: '기수 결과' }).getByText(result.winner!.name)).toBeVisible();
+    await expect(b.page.getByTestId('season-winner').getByText(result.winner!.name)).toBeVisible();
   } finally {
     await releaseHold(world.hold);
   }

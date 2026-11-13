@@ -6,6 +6,7 @@ export function ownGeneral(
   return {
     id: g.id,
     name: g.name,
+    isHuman: g.userId !== null,
     portraitId: g.portraitId,
     nationId: g.nationId,
     cityKey: g.cityKey,

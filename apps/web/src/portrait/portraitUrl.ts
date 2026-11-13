@@ -1,15 +1,10 @@
 import { PLAYER_PORTRAIT_MIN_ID } from '@opensamguk/shared';
+import { resolveImageBaseUrl } from './imageBase';
+
+export { DEFAULT_IMAGE_BASE_URL, resolveImageBaseUrl } from './imageBase';
 
 // 초상 경로 규칙: docs/image-assets.md §2. 게임 데이터는 초상 ID만 저장하고 주소는 화면이 만든다 (FR-IMG-01·02).
-
-// 공개 빌드(`vite build --mode public`)는 기존 게임 초상을 기본 이미지로만 보여 준다 (D-031, T3-13).
-// 조건은 빌드 때 상수로 바뀌므로 아래 주소 문자열과 경로 틀이 공개 번들에서 지워진다. 변수에 담지 않고 그 자리에 쓴다.
-
-// 이미지 서버(T2-15) 전 개발 기본값. jsDelivr의 50MB 패키지 제한을 피하고 같은 고정 커밋의 원본을 읽는다.
-export const DEFAULT_IMAGE_BASE_URL =
-  import.meta.env.MODE === 'public'
-    ? ''
-    : 'https://raw.githubusercontent.com/opensamguk/opensamguk-images/48163bd1ce8d54c54c94fb5484b05f9db9e50c62';
+// 공개 빌드(`vite build --mode public`)도 같은 규칙으로 초상을 보인다 (D-087, D-031의 공개 빌드 초상 부분을 대체).
 
 export const PORTRAIT_ID_MIN = 10001;
 export const PORTRAIT_ID_MAX = 11008;
@@ -22,23 +17,16 @@ export const PORTRAIT_VARIANTS = {
 
 export type PortraitVariant = keyof typeof PORTRAIT_VARIANTS;
 
-// 비었으면 기본값. 끝의 /는 떼어 경로를 붙일 때 //가 생기지 않게 한다.
-export function resolveImageBaseUrl(raw: string | undefined): string {
-  const trimmed = raw?.trim() ?? '';
-  return (trimmed === '' ? DEFAULT_IMAGE_BASE_URL : trimmed).replace(/\/+$/, '');
-}
-
 // VITE_IMAGE_BASE_URL은 빌드 때 박힌다. 값만 바꿔 다시 빌드하면 모든 초상 주소가 바뀐다.
-// 공개 빌드는 이 값을 쓰지 않는다. 값이 있으면 vite.config.ts가 빌드를 멈춘다.
-export const imageBaseUrl =
-  import.meta.env.MODE === 'public' ? '' : resolveImageBaseUrl(import.meta.env.VITE_IMAGE_BASE_URL);
+// 공개 빌드에서는 vite.config.ts가 https 주소인지 보고, 공개 자산 검사가 승인 목록(remoteImageBases)과 대조한다.
+export const imageBaseUrl = resolveImageBaseUrl(import.meta.env.VITE_IMAGE_BASE_URL);
 
 export function isPortraitId(id: number | null | undefined): id is number {
   return typeof id === 'number' && Number.isInteger(id) && id >= PORTRAIT_ID_MIN && id <= PORTRAIT_ID_MAX;
 }
 
 // 범위 밖이거나 null이면 null을 돌려준다. 이때 화면은 기본 이미지를 쓴다.
-// 계정 초상은 같은 출처에서 제공한다. 공개 빌드는 기존 게임 초상 ID에 null을 돌려준다.
+// 계정 초상은 같은 출처에서 제공한다. 보충 8명(11001~11008)은 개발 서버에서만 원본을 읽는다.
 export function portraitUrl(
   id: number | null | undefined,
   variant: PortraitVariant,
@@ -46,8 +34,15 @@ export function portraitUrl(
 ): string | null {
   if (typeof id === 'number' && Number.isInteger(id) && id >= PLAYER_PORTRAIT_MIN_ID && id <= 2_147_483_647)
     return `/trpc/player-portrait/${id}`;
-  if (import.meta.env.MODE === 'public') return null;
   if (!isPortraitId(id)) return null;
   if (id > 11000) return import.meta.env.DEV ? `/__dev-portraits/${id}` : null;
   return `${base}/portraits/${variant}/${id}.${PORTRAIT_VARIANTS[variant].ext}`;
+}
+
+// 서버 응답에 portraitId가 있으면 그 값을, 없으면 null(실루엣)을 준다.
+// 메시지·순위처럼 아직 초상 번호를 주지 않는 응답도 같은 화면 코드로 쓰고, 서버가 값을 더하면 바로 얼굴이 보인다 (INT-26).
+export function portraitIdOf(value: unknown): number | null {
+  if (typeof value !== 'object' || value === null || !('portraitId' in value)) return null;
+  const id = value.portraitId;
+  return typeof id === 'number' ? id : null;
 }

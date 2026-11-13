@@ -1,6 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useRef } from 'react';
 import { errorCode } from '../game/errors';
+import { displayName } from '../game/names';
+import { Portrait } from '../portrait/Portrait';
 import { QueryError } from '../game/QueryState';
 import { serverMessage } from '../turns/apiError';
 import { useTRPC } from '../trpc';
@@ -73,15 +75,13 @@ export function MessagePanel({ worldId }: { worldId: string }) {
       <div id={`${baseId}-view`} role="tabpanel" aria-labelledby={`${baseId}-${active}`} className={styles.view}>
         {/* enabled가 꺼져도 캐시의 data는 남는다. 권한 값을 정하기 전이나 서버가 권한을 거둔 뒤에는 남은 목록·받는 사람·공지를
             그리지 않고 읽음 처리와 보내기도 하지 않는다. 쓰던 글은 drafts.ts에 그대로 있다. */}
-        {!authority.ready ? (
-          <LoadingState />
-        ) : active === 'WORLD' ? (
+        {authority.ready ? (
           <>
-            <WorldNotices worldId={worldId} />
-            <p className={styles.note}>전체 메시지는 운영자가 보냅니다.</p>
+            {active === 'WORLD' ? <WorldNotices worldId={worldId} /> : null}
+            <Compose key={draftKey} worldId={worldId} scope={active} draftKey={draftKey} />
           </>
         ) : (
-          <Compose key={draftKey} worldId={worldId} scope={active} draftKey={draftKey} />
+          <LoadingState />
         )}
         {authority.ready ? (
           <MessageList key={`list-${active}-${authority.epoch}`} worldId={worldId} scope={active} />
@@ -170,10 +170,25 @@ function MessageList({ worldId, scope }: { worldId: string; scope: MessageScope 
   );
 }
 
+// 장수가 보낸·받은 쪽이면 원형 icon과 괄호를 뺀 이름을 보인다 (D-085). 국가 명의는 이름만 둔다.
+function partyName(party: Party): string {
+  return party.generalId !== null ? displayName(party.name) : party.name;
+}
+
 function PartyName({ party }: { party: Party }) {
   return (
     <span className={styles.party}>
-      <span>{party.name}</span>
+      {party.generalId !== null ? (
+        <Portrait
+          id={party.portraitId ?? null}
+          name={partyName(party)}
+          variant="icon"
+          shape="round"
+          size={24}
+          decorative
+        />
+      ) : null}
+      <span>{partyName(party)}</span>
       {party.nation && party.generalId !== null ? (
         <NationBadge name={party.nation.name} color={party.nation.color} />
       ) : null}
@@ -208,13 +223,19 @@ export function MessageRow({ item }: { item: MessageItem }) {
 }
 
 function partiesLabel(item: MessageItem): string {
-  return item.to ? `보낸 이 ${item.from.name}, 받는 이 ${item.to.name}` : `보낸 이 ${item.from.name}`;
+  return item.to ? `보낸 이 ${partyName(item.from)}, 받는 이 ${partyName(item.to)}` : `보낸 이 ${partyName(item.from)}`;
 }
 
 export function formatTime(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
   return date.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+// 받는 장수 고르기에서는 괄호를 뺀 이름이 다른 장수와 겹치면 원래 이름(괄호 포함)을 그대로 둔다 (INT-25).
+export function pickerName(name: string, all: readonly { name: string }[]): string {
+  const shown = displayName(name);
+  return all.some((other) => other.name !== name && displayName(other.name) === shown) ? name : shown;
 }
 
 interface ComposeDraft {
@@ -236,8 +257,8 @@ function Compose({ worldId, scope, draftKey }: { worldId: string; scope: SendSco
   const [draft, setDraft] = useDraft<ComposeDraft>(draftKey, EMPTY_DRAFT);
   const send = useMutation(trpc.message.send.mutationOptions());
   const error = send.isError ? sendFailure(send.error) : null;
-  const needsRecipient = scope !== 'NATION';
-  const recipients = useRecipients(worldId);
+  const needsRecipient = scope === 'PRIVATE' || scope === 'DIPLOMACY';
+  const recipients = useRecipients(worldId, needsRecipient);
   const fieldId = useId();
   const errorId = `${fieldId}-error`;
   const length = bodyLength(draft.body);
@@ -299,11 +320,14 @@ function Compose({ worldId, scope, draftKey }: { worldId: string; scope: SendSco
             }
           >
             <option value="">고르세요</option>
-            {recipients.data?.generals.map((general) => (
-              <option key={general.id} value={general.id}>
-                {general.nation ? `${general.name} (${general.nation.name})` : `${general.name} (재야)`}
-              </option>
-            ))}
+            {recipients.data?.generals.map((general, _index, all) => {
+              const name = pickerName(general.name, all);
+              return (
+                <option key={general.id} value={general.id}>
+                  {general.nation ? `${name} (${general.nation.name})` : `${name} (재야)`}
+                </option>
+              );
+            })}
           </select>
         </label>
       ) : null}
@@ -329,6 +353,7 @@ function Compose({ worldId, scope, draftKey }: { worldId: string; scope: SendSco
         <p className={styles.error}>받는 사람 목록을 불러오지 못했습니다.</p>
       ) : null}
       {scope === 'NATION' ? <p className={styles.note}>내 국가 장수 모두가 받습니다.</p> : null}
+      {scope === 'WORLD' ? <p className={styles.note}>이 월드의 모든 장수가 볼 수 있습니다.</p> : null}
       <label className={styles.field} htmlFor={fieldId}>
         <span>메시지 내용</span>
         <span className={styles.counter} aria-hidden="true">

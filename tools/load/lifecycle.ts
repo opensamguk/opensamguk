@@ -13,7 +13,23 @@ export type CommandReceipt = {
   exitCode: number | null;
   signal: string | null;
   failed: boolean;
+  diagnostic?: string;
 };
+export const helperDiagnosticPattern =
+  /^(LOAD_WORKER_(DATABASE|RESOURCES_SQL_READ|RESOURCES_BASELINE_SQL|RESOURCES_BASELINE_VERIFY|RESOURCES_INTEGRATION|WITNESS|DISCONNECT)|HELPER_(ENTRYPOINT|MODULE_NOT_FOUND|SYNTAX|PERMISSION|NATIVE_LIBRARY|EXEC))$/;
+export const workerFailureReasonPattern =
+  /^(SETUP_TIMEOUT|BODY_TIMEOUT|ABORTED|OTHER|P\d{4}|LOAD_(FRESH_DEDICATED_DATABASE_REQUIRED|FORMAL_PROFILE_REQUIRED|API_CREATION_(REJECTED|NOT_APPLIED|EVIDENCE_MISSING)|WORLD_POPULATION_MISMATCH|FIXTURE_CARDINALITY_MISMATCH|GENERATOR_INCOMPLETE|SETUP_(DEADLINE_EXCEEDED|HANDOFF_INVALID|OPERATOR_ROLE_INVALID|TURN_TERM_NOT_APPLIED)|HTTP_REQUEST_FAILED))$/;
+
+function helperDiagnostic(stderr: string): string | undefined {
+  const worker = stderr.split(/\r?\n/).find((line) => helperDiagnosticPattern.test(line));
+  if (worker) return worker;
+  if (stderr.includes('실행 비밀 파일과 명령을 확인하세요.')) return 'HELPER_ENTRYPOINT';
+  if (/ERR_MODULE_NOT_FOUND|MODULE_NOT_FOUND/.test(stderr)) return 'HELPER_MODULE_NOT_FOUND';
+  if (stderr.includes('ERR_DLOPEN_FAILED')) return 'HELPER_NATIVE_LIBRARY';
+  if (stderr.includes('SyntaxError:')) return 'HELPER_SYNTAX';
+  if (/\b(?:EACCES|EPERM)\b/.test(stderr)) return 'HELPER_PERMISSION';
+  if (/OCI runtime exec failed|Error response from daemon/.test(stderr)) return 'HELPER_EXEC';
+}
 export function commandSettled(receipt: CommandReceipt): boolean {
   return receipt.actualClose && receipt.closedAt !== null && receipt.stdoutEnded && receipt.stderrEnded;
 }
@@ -93,8 +109,13 @@ export class OwnedCommands {
         stop();
       } else output += bytes.toString('utf8');
     });
-    // 네이티브 오류/컨테이너 로그에 연결 문자열이 포함될 수 있으므로 stderr 원문을 저장하지 않는다.
-    child.stderr.resume();
+    // Keep a bounded tail in memory for owned helper diagnostics. The receipt records only fixed codes.
+    let helperStderr = '';
+    if (/^(?:initialize-private-volumes|migrations|resources|witness)-execute$/.test(options.label)) {
+      child.stderr.on('data', (bytes: Buffer) => {
+        helperStderr = (helperStderr + bytes.subarray(-4096).toString('utf8')).slice(-4096);
+      });
+    } else child.stderr.resume();
     child.stdout.on('end', () => {
       receipt.stdoutEnded = true;
     });
@@ -115,6 +136,11 @@ export class OwnedCommands {
       receipt.closedAt = Date.now();
       receipt.exitCode = code;
       receipt.signal = signal;
+      if (code !== 0) {
+        const diagnostic = helperDiagnostic(helperStderr);
+        if (diagnostic) receipt.diagnostic = diagnostic;
+      }
+      helperStderr = '';
       this.pending.delete(closed);
       resolveClosed();
     });

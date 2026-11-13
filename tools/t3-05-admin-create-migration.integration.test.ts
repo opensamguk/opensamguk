@@ -50,6 +50,7 @@ let oid: string | undefined,
   address = '',
   ownerId = '',
   passwordHash = '';
+const officeRequestColumn = 'ALTER TABLE "WorldCreateRequest" ADD COLUMN "officeEffects" JSONB;';
 const migration = '20261110000000_world_create_requests',
   origin = 'http://127.0.0.1:5173';
 function track<T>(work: () => Promise<T>) {
@@ -229,9 +230,12 @@ beforeAll(
         expect(all.indexOf('20261117000000_stratagem_cards_state')).toBe(44);
         for (const item of all.filter((value) => value !== migration)) {
           signal.throwIfAborted();
-          await checked(async () =>
-            gate.query(await checked(async () => readFile(new URL(item + '/migration.sql', directory), 'utf8'))),
-          );
+          const sql = await checked(async () => readFile(new URL(item + '/migration.sql', directory), 'utf8'));
+          if (item === '20261215000000_resident_city_offices') {
+            expect(sql).toContain(officeRequestColumn);
+            // The current client needs the new office columns, except on the request table that this test migrates.
+            await checked(async () => gate.query(sql.replace(officeRequestColumn, '')));
+          } else await checked(async () => gate.query(sql));
         }
         await checked(async () =>
           initializeResources(
@@ -407,6 +411,7 @@ it('AC-M3-04 새 생성 요청 migration은 기존 모든 표·값·sequence를 
   expect(await rowsHash(beforeTables)).toBe(beforeHash);
   expect(await sequences()).toEqual(beforeSequences);
   expect((await gate.query('SELECT * FROM "WorldCreateRequest"')).rows).toEqual([]);
+  await gate.query(officeRequestColumn);
 });
 async function transaction(work: () => Promise<void>) {
   operationSignals.getStore()?.throwIfAborted();

@@ -185,19 +185,21 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
       orderBy: { slot: 'asc' },
     });
     expect(targetTurns).toHaveLength(30);
-    await expect(panel(owner)).toBeVisible();
     const editor = owner.page.getByTestId('turn-editor');
     await editor.locator('tr[data-slot="1"]').click();
     await editor.getByLabel('명령 찾기').fill('농지 개간');
     await editor.getByRole('radio', { name: '농지 개간', exact: true }).check();
     await editor.getByRole('button', { name: /에 넣기$/ }).click();
     await expect(editor.locator('tr[data-slot="1"]')).toContainText('농지 개간');
-    const selectedBeforeAnchor = new URL(owner.page.url()).search;
-    await owner.page.getByRole('link', { name: '휘하·부곡', exact: true }).click();
-    expect(new URL(owner.page.url()).search).toBe(selectedBeforeAnchor);
-    expect(new URL(owner.page.url()).hash).toBe('#campaign-title');
-    await expect(owner.page.getByRole('heading', { name: '개인 휘하·부곡', exact: true })).toBeFocused();
+    // 휘하·부곡은 전용 화면이다 (INT-25). 화면을 오가도 저장하지 않은 예턴 편집은 그대로 남는다.
+    await owner.page.getByRole('link', { name: '휘하·부곡', exact: true }).first().click();
+    await expect(owner.page).toHaveURL(new RegExp(`/w/${worldId}/campaign$`));
+    await expect(panel(owner)).toBeVisible();
+    await owner.page.goBack();
     await expect(editor.locator('tr[data-slot="1"]')).toContainText('농지 개간');
+    await owner.page.goForward();
+    await expect(panel(owner)).toBeVisible();
+    await target.page.goto(`/w/${worldId}/campaign`);
     await panel(owner).getByRole('button', { name: '화면장수1에게 제안', exact: true }).click();
     await pending('campaign.relationship');
     await advance();
@@ -207,7 +209,6 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
     await pending('campaign.relationship');
     await advance();
     await expect(panel(owner)).toContainText('화면장수0 → 화면장수1 (가신)');
-    await expect(editor.locator('tr[data-slot="1"]')).toContainText('농지 개간');
     expect(
       await db.generalTurn.findMany({ where: { worldId, generalId: targetId }, orderBy: { slot: 'asc' } }),
     ).toEqual(targetTurns);
@@ -269,14 +270,17 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
     });
     tick = actor.nextTurnTick;
     await advance();
-    await owner.page.reload();
+    // 주둔 장수 표는 도시 화면에 있다 (INT-25).
+    const ownerCity = (await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: ownerId } } })).cityKey;
+    await owner.page.goto(`/w/${worldId}/city/${ownerCity}`);
     const garrison = owner.page.getByRole('table', { name: /^주둔 장수/ });
     await expect(garrison.getByRole('columnheader', { name: '정치' })).toBeVisible();
     await expect(garrison.getByRole('columnheader', { name: '매력' })).toBeVisible();
     const ownRow = garrison
       .getByRole('row')
       .filter({ has: owner.page.getByRole('cell', { name: '화면장수0', exact: true }) });
-    await expect(ownRow.getByRole('cell').nth(7)).toHaveText('10');
+    // 장수·소속·직책·통솔·무력·지력·정치·매력 다음이 지휘 병력이다 (INT-25에서 직책 열을 더했다).
+    await expect(ownRow.getByRole('cell').nth(8)).toHaveText('10');
     expect((await apiQuery<Board>(owner, 'campaign.get', { worldId })).units[0]!.troops).toBe(10);
     expect((await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: ownerId } } })).crew).toBe(0);
     expect(
@@ -306,7 +310,8 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
     expect(nation.generals.find((general) => general.id === npc!.id)).toMatchObject({
       commandedArmy: { troops: npcTroops },
     });
-    await owner.page.getByRole('button', { name: '소속 장수·도시 펼치기', exact: true }).click();
+    // 소속 장수 표는 국가 화면에 있다 (INT-25).
+    await owner.page.goto(`/w/${worldId}/nation/1`);
     const nationTable = owner.page.getByRole('table', { name: /^소속 장수/ });
     for (const label of ['정치', '매력', '지휘 병력', '평균 훈련', '평균 사기'])
       await expect(nationTable.getByRole('columnheader', { name: label, exact: true })).toBeVisible();
@@ -322,12 +327,18 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
     await expect(nationRow.getByRole('cell').nth(11)).toContainText('사기 부족');
     const previousCommanderRow = nationTable
       .getByRole('row')
-      .filter({ has: owner.page.getByRole('cell', { name: npc!.name, exact: true }) });
+      .filter({ has: owner.page.getByText(npc!.name, { exact: true }).and(owner.page.locator('[data-general-name]')) });
     await expect(previousCommanderRow.getByRole('cell').nth(8)).toHaveText(npcTroops.toLocaleString('ko-KR'));
     if (npcTroops === 0) await expect(previousCommanderRow.getByRole('cell').nth(11)).not.toContainText('훈련 부족');
     await owner.page.screenshot({ path: 'test-results/int11-formal-nation-commanded-army.png', fullPage: true });
-    await owner.page.getByRole('button', { name: '소속 장수·도시 접기', exact: true }).click();
-    await owner.page.reload();
+    // 예턴 편집은 메인에서 하고, 저장하지 않은 편집(sessionStorage)이 휘하·부곡 화면의 폭 변경 동안 그대로인지 본다.
+    await owner.page.goto(`/w/${worldId}`);
+    await editor.locator('tr[data-slot="30"]').click();
+    await editor.getByLabel('명령 찾기').fill('농지 개간');
+    await editor.getByRole('radio', { name: '농지 개간', exact: true }).check();
+    await editor.getByRole('button', { name: /에 넣기$/ }).click();
+    await expect(editor.locator('tr[data-slot="30"]')).toContainText('농지 개간');
+    await owner.page.goto(`/w/${worldId}/campaign`);
     await expect(panel(owner)).toBeVisible();
     await owner.page.setViewportSize({ width: 1440, height: 900 });
     await expect(panel(owner).getByRole('button', { name: '빈 부곡 편성', exact: true })).toBeVisible();
@@ -342,11 +353,6 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
       .locator('select')
       .evaluateAll((elements) => elements.map((element) => element.value));
     expect(selections.length).toBeGreaterThan(0);
-    await editor.locator('tr[data-slot="30"]').click();
-    await editor.getByLabel('명령 찾기').fill('농지 개간');
-    await editor.getByRole('radio', { name: '농지 개간', exact: true }).check();
-    await editor.getByRole('button', { name: /에 넣기$/ }).click();
-    await expect(editor.locator('tr[data-slot="30"]')).toContainText('농지 개간');
     const localState = () =>
       owner.page.evaluate(() => Object.entries(sessionStorage).sort(([a], [b]) => a.localeCompare(b)));
     const draftBeforeResize = await localState();
@@ -387,7 +393,6 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
           .locator('select')
           .evaluateAll((elements) => elements.map((element) => element.value)),
       ).toEqual(selections);
-      await expect(editor.locator('tr[data-slot="30"]')).toContainText('농지 개간');
       expect(await localState()).toEqual(draftBeforeResize);
     }
     expect(
@@ -396,6 +401,9 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
     expect(await db.inputEvent.count({ where: { worldId } })).toBe(inputsBeforeResize);
     await owner.page.setViewportSize({ width: 375, height: 812 });
     await owner.page.screenshot({ path: 'test-results/int11-formal-campaign-mobile.png', fullPage: true });
+    await owner.page.goto(`/w/${worldId}`);
+    await owner.page.getByRole('tab', { name: '예턴', exact: true }).click();
+    await expect(editor.locator('tr[data-slot="30"]')).toContainText('농지 개간');
   } finally {
     await releaseHold(hold);
     await db.world.deleteMany({ where: { id: worldId } });

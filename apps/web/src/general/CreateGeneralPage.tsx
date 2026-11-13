@@ -26,7 +26,9 @@ import {
   type HeritageRules,
 } from './heritage';
 import { HeritageAllocation } from './HeritageAllocation';
+import { NpcPossession } from './NpcPossession';
 import { stepStat, summarizeStats } from './statSummary';
+import { WorldGlanceMap, WorldStatusLine } from './WorldGlance';
 
 const EVEN: StatValues = { leadership: '55', strength: '55', intel: '55', politics: '55', charm: '55' };
 
@@ -69,6 +71,7 @@ function CreateGeneral({ worldId }: { worldId: string }) {
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   // 이 화면에서 보낸 요청이나 대기하던 요청이 만들어지면 메인으로 간다. 처음부터 장수가 있으면 안내만 한다.
   const [creationStarted, setCreationStarted] = useState(false);
+  const [npcPending, setNpcPending] = useState(false);
   const mineKey = trpc.general.mine.queryKey({ worldId });
 
   const mine = useQuery({
@@ -158,50 +161,57 @@ function CreateGeneral({ worldId }: { worldId: string }) {
           </p>
         ) : null}
         {/* 계정이 바뀌면 폼을 새로 그려 이전 계정의 요청 상태·오류·알림이 남지 않게 한다. */}
-        <CreateForm
-          key={draft.owner ?? ''}
+        <NpcPossession
           worldId={worldId}
-          rules={mine.data.creationRules}
-          lineage={'lineageEnabled' in mine.data.creationRules && mine.data.creationRules.lineageEnabled === true}
-          heritage={'heritage' in mine.data.creationRules ? mine.data.creationRules.heritage : undefined}
-          currentOwner={owner}
-          heritageState={heritageState}
-          onHeritageShort={() => setHeritageState('stale')}
-          onHeritageRefresh={() => {
-            const pinned = draft.owner;
-            void mine.refetch().then((result) => {
-              // 다시 읽은 계정이 다르면 입력은 이미 버렸다. 새 입력에 「다시 확인했습니다」를 붙이지 않는다.
-              if (!result.isError && heritageOwner(result.data) === pinned) setHeritageState('refreshed');
-            });
-          }}
-          draft={draft}
-          onDraft={setDraft}
-          rejected={mine.data.creation?.status === 'rejected' ? mine.data.creation.message : null}
-          onSubmitting={() => {
-            setCreationStarted(true);
-            setHeritageState((prev) => (prev === 'refreshed' ? 'ok' : prev));
-          }}
-          onPending={async () => {
-            // 보내기 전에 시작한 조회가 늦게 와서 pending을 덮지 않게 멈춘다. 결과는 다시 묻기로 받는다.
-            await queryClient.cancelQueries({ queryKey: mineKey });
-            queryClient.setQueryData(mineKey, {
-              general: null,
-              creation: { status: 'pending' as const },
-              creationRules: mine.data!.creationRules,
-            });
-          }}
-          // 계정이 바뀌었다는 CONFLICT도 여기서 다시 읽는다. 새 계정이 오면 위에서 입력을 버리고 다시 보내지 않는다.
-          onFailed={() => void queryClient.invalidateQueries({ queryKey: mineKey })}
-          onCreated={(created) => {
-            queryClient.setQueryData(mineKey, {
-              general: created,
-              creation: null,
-              creationRules: mine.data!.creationRules,
-            });
-            void queryClient.invalidateQueries({ queryKey: trpc.home.get.queryKey({ worldId }) });
-            void navigate({ to: '/w/$worldId', params: { worldId } });
-          }}
+          enabled={mine.data.creationRules.npcPlayEnabled === true}
+          onPendingChange={setNpcPending}
         />
+        {npcPending ? null : (
+          <CreateForm
+            key={draft.owner ?? ''}
+            worldId={worldId}
+            rules={mine.data.creationRules}
+            lineage={'lineageEnabled' in mine.data.creationRules && mine.data.creationRules.lineageEnabled === true}
+            heritage={'heritage' in mine.data.creationRules ? mine.data.creationRules.heritage : undefined}
+            currentOwner={owner}
+            heritageState={heritageState}
+            onHeritageShort={() => setHeritageState('stale')}
+            onHeritageRefresh={() => {
+              const pinned = draft.owner;
+              void mine.refetch().then((result) => {
+                // 다시 읽은 계정이 다르면 입력은 이미 버렸다. 새 입력에 「다시 확인했습니다」를 붙이지 않는다.
+                if (!result.isError && heritageOwner(result.data) === pinned) setHeritageState('refreshed');
+              });
+            }}
+            draft={draft}
+            onDraft={setDraft}
+            rejected={mine.data.creation?.status === 'rejected' ? mine.data.creation.message : null}
+            onSubmitting={() => {
+              setCreationStarted(true);
+              setHeritageState((prev) => (prev === 'refreshed' ? 'ok' : prev));
+            }}
+            onPending={async () => {
+              // 보내기 전에 시작한 조회가 늦게 와서 pending을 덮지 않게 멈춘다. 결과는 다시 묻기로 받는다.
+              await queryClient.cancelQueries({ queryKey: mineKey });
+              queryClient.setQueryData(mineKey, {
+                general: null,
+                creation: { status: 'pending' as const },
+                creationRules: mine.data!.creationRules,
+              });
+            }}
+            // 계정이 바뀌었다는 CONFLICT도 여기서 다시 읽는다. 새 계정이 오면 위에서 입력을 버리고 다시 보내지 않는다.
+            onFailed={() => void queryClient.invalidateQueries({ queryKey: mineKey })}
+            onCreated={(created) => {
+              queryClient.setQueryData(mineKey, {
+                general: created,
+                creation: null,
+                creationRules: mine.data!.creationRules,
+              });
+              void queryClient.invalidateQueries({ queryKey: trpc.home.get.queryKey({ worldId }) });
+              void navigate({ to: '/w/$worldId', params: { worldId } });
+            }}
+          />
+        )}
       </>
     );
   }
@@ -214,7 +224,11 @@ function CreateGeneral({ worldId }: { worldId: string }) {
         <p className={styles.lead}>
           이름과 초상, 능력치를 정해 이 월드의 내 장수를 만듭니다. 한 월드에 장수는 하나입니다.
         </p>
+        {/* 원작 장수 선택 화면의 안내와 서버 정보 (INT-25 단계 3). 새 장수는 무작위 도시에서 재야로 시작한다. */}
+        <p className={styles.lead}>무작위 도시에서 재야로 시작합니다. 임관과 건국은 들어간 뒤 명령으로 합니다.</p>
+        <WorldStatusLine worldId={worldId} />
       </div>
+      <WorldGlanceMap worldId={worldId} />
       {body}
     </section>
   );

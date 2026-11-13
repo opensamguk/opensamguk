@@ -26,6 +26,10 @@ function array<T>(parse: Parser<T>): Parser<T[]> {
 function nullable<T>(parse: Parser<T>): Parser<T | null> {
   return (value) => (value === null ? null : parse(value));
 }
+const optional =
+  <T>(parse: Parser<T>): Parser<T | undefined> =>
+  (value) =>
+    value === undefined ? undefined : parse(value);
 const integer: Parser<number> = (value) =>
   typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : fail();
 const version: Parser<1> = (value) => (value === 1 ? 1 : fail());
@@ -39,14 +43,16 @@ const timestamp: Parser<string> = (value) => {
   return Number.isFinite(Date.parse(parsed)) && new Date(parsed).toISOString() === parsed ? parsed : fail();
 };
 const endCondition = object({ type: choices('unification', 'year'), year: integer });
-const participant = object({
+const participantIdentity = {
   participantId,
   agent: object({ provider: label, model: label }),
   sessionRef: ref,
+  nativeRef: ref,
+};
+const loginIdentity = {
   loginSessionRef: text(/^login-[a-f0-9]{64}$/),
   accountRef: text(/^account-[a-f0-9]{64}$/),
-  nativeRef: ref,
-});
+};
 const world = object({
   worldId: ref,
   scenario: label,
@@ -63,12 +69,15 @@ const planShape = {
   registeredAt: timestamp,
   startsAt: timestamp,
   endsAt: timestamp,
-  participants: array(participant),
   worlds: array(world),
 };
-export const parsePlan = object(planShape);
+export const parsePlan = object({
+  ...planShape,
+  participants: array(object({ ...participantIdentity, worldIds: array(ref) })),
+});
 export const parseManifest = object({
   ...planShape,
+  participants: array(object({ ...participantIdentity, ...loginIdentity })),
   kind: choices('actual', 'synthetic', 'probe'),
   planRef: ref,
   events: object({ file: text(/^[a-zA-Z0-9_-]+\.jsonl$/), sha256: hash }),
@@ -147,6 +156,7 @@ export const parseResult = object({
   at: timestamp,
   status: choices('ok', 'blocked'),
   observationRef: ref,
+  login: optional(object(loginIdentity)),
 });
 export const parseCompletion = object({
   version,

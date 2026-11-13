@@ -1,3 +1,4 @@
+import { COURT_RANK_FEATURE } from './personnel/nationRank';
 import type { JsonValue, WorldView } from './model/world';
 import type { WorldInit } from './world/bootstrap';
 import { checkInitialNpcStatLimits } from './world/initialNpcStats';
@@ -12,6 +13,7 @@ import {
   treatyFeature,
   treatyBreakFeature,
   treatyTradeFeature,
+  treatyExpandedFeature,
   fiveStatsFeature,
   operationalMapFeature,
   basicStratagemFeature,
@@ -39,6 +41,7 @@ import { ADMIN_GAME_KINDS } from './admin/game';
 import { applyAdminGameRecord } from './admin/apply';
 import { ADMIN_SETTING_KINDS, applyAdminSettingRecord } from './admin/settings';
 import type { UnitSetResource } from './world/resources';
+import { OFFICE_EFFECTS_FEATURE, officeEffectsSchema } from './personnel/residentOffice';
 import { reputationFeature } from './review/feature';
 import { cityScaleFeature } from './cityScale/feature';
 import { checkCityScaleInitial } from './cityScale/state';
@@ -46,8 +49,10 @@ import { nationStrategyFeature } from './nationStrategy/feature';
 import { nationLifecycleFeature } from './nationLifecycle/feature';
 import { preparedTurnsFeature } from './preparedTurns/feature';
 import { nationResearchFeature } from './nationResearch/feature';
+import { relationsFeature } from './relations/data';
 import { INTEL_FEATURE, spyBinding } from './commands/ext/intel/record';
 import { spy } from './commands/ext/intel/spy';
+import { returnBorder } from './commands/ext/return_border/return_border';
 
 export interface ReplayOriginV1 {
   version: 1;
@@ -62,6 +67,18 @@ export interface ReplayOriginV3 {
   resourceHash: string;
   featureData?: Record<string, JsonValue>;
 }
+export function replayResourceHashInput(initial: WorldInit, featureData?: ReplayOriginV3['featureData']) {
+  return {
+    scenarioKey: initial.scenarioKey,
+    mapKey: initial.mapKey,
+    unitSetKey: initial.unitSetKey,
+    statRules: initial.statRules,
+    unitSet: initial.unitSet,
+    ...(initial.operationalMap ? { operationalMap: initial.operationalMap } : {}),
+    ...(featureData === undefined ? {} : { featureData }),
+  };
+}
+
 export interface RuleFeatureDefinition {
   key: string;
   requires: readonly string[];
@@ -105,11 +122,36 @@ export const ruleRegistry: RuleRegistry = {
   features: [
     preparedTurnsFeature,
     nationResearchFeature,
+    relationsFeature,
     personnelFeature,
+    {
+      key: COURT_RANK_FEATURE,
+      requires: ['personnel'],
+      conflicts: [],
+      checkOrigin({ initial, data }) {
+        if (
+          data !== undefined ||
+          initial.nations.some((nation) => !Number.isInteger(nation.level) || nation.level < 0 || nation.level > 7)
+        )
+          throw new Error('작위별 관직의 시작 작위를 확인하세요.');
+      },
+    },
+    {
+      key: OFFICE_EFFECTS_FEATURE,
+      requires: ['personnel'],
+      conflicts: [],
+      checkOrigin({ data }) {
+        officeEffectsSchema.parse(data);
+      },
+      initReplayState(replay, { data }) {
+        return { ...replay, state: { ...replay.state, officeEffects: officeEffectsSchema.parse(data) } };
+      },
+    },
     policyFeature,
     treatyFeature,
     treatyBreakFeature,
     treatyTradeFeature,
+    treatyExpandedFeature,
     fiveStatsFeature,
     operationalMapFeature,
     basicStratagemFeature,
@@ -127,6 +169,12 @@ export const ruleRegistry: RuleRegistry = {
     cityScaleFeature,
     nationStrategyFeature,
     nationLifecycleFeature,
+    {
+      key: 'border-return-v1',
+      requires: [NATION_LIFECYCLE_FEATURE],
+      conflicts: [],
+      commandBindings: [{ definition: returnBorder, sliceKeys: [] }],
+    },
     {
       key: INTEL_FEATURE,
       requires: ['policy'],
@@ -248,6 +296,13 @@ export function checkReplayOrigin(
   const origin = value as ReplayOriginV3 | ReplayOriginV1;
   if (!origin || ![1, 3].includes(origin.version) || !origin.initial || typeof origin.initial !== 'object')
     throw new Error('재생 생성 기록의 버전을 확인하세요.');
+  if (
+    Object.hasOwn(origin.initial, 'recruitmentLocation') &&
+    (origin.version !== 3 || origin.initial.recruitmentLocation !== 'city')
+  )
+    throw new Error('재생 생성 기록의 모집 위치를 확인하세요.');
+  if (origin.initial.generals.some((general) => Object.hasOwn(general, 'officerCityKey')))
+    throw new Error('초기 장수에는 도시 관직을 배정할 수 없습니다.');
   checkStatProfile(origin.initial);
   checkInitialNpcStatLimits(origin.initial, origin.version === 3 ? 'current' : 'legacy');
   checkCityScaleInitial(origin.initial);

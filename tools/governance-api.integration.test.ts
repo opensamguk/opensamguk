@@ -195,7 +195,9 @@ function selectPlayer(seed: string, id: number, tick: number, excluded: readonly
       cityKeys: initial.cities.filter((city) => city.kind !== 'PASS').map((city) => city.cityKey),
       unitSet: initial.unitSet,
     });
+    // 월말 스냅샷 뒤 같은 tick에 장수 턴이 실행되는 경우를 피한다.
     if (
+      preview.nextTurnTick % TICKS_PER_MONTH !== 0 &&
       preview.nextTurnTick > tick &&
       preview.nextTurnTick < beforeTick &&
       cities.some((city) => city.cityKey === preview.cityKey)
@@ -588,7 +590,10 @@ describe('AC-P2-31 실제 HTTP 황실 접수·동의·경제', () => {
     const world = await fixture();
     const nationId = world.ruler.nationId!;
     const lowerNationId = world.lower.nationId!;
-    const successor = await createGeneralWithOrder(world.id, await user(), '후임장수', {
+    const timing = await db.world.findUniqueOrThrow({ where: { id: world.id }, select: { clockTick: true } });
+    const successorId = Math.max(...initial.generals.map(({ id }) => id)) + 3;
+    const candidate = selectPlayer(world.seed, successorId, timing.clockTick, [], timing.clockTick + TICKS_PER_MONTH);
+    const successor = await createGeneralWithOrder(world.id, await user(candidate.userId), '후임장수', {
       commandKey: 'join',
       args: { nationId },
     });
@@ -830,6 +835,89 @@ describe('AC-P2-31 실제 HTTP 황실 접수·동의·경제', () => {
     } finally {
       await db.governanceMovement.update({ where: key, data: { delta: firstRow.delta } });
     }
+  }, 120_000);
+
+  it('하위 봉신 사도의 공납 면제를 막고 군주가 하위 계약을 해제해도 세 나라가 존속한다', async () => {
+    const world = await fixture(true);
+    const { player, ruler } = world.rival!;
+    const emperorNationId = world.ruler.nationId!;
+    const upperNationId = world.lower.nationId!;
+    const lowerNationId = ruler.nationId!;
+    await send(world, world.emperor, { type: 'throne.ascend' });
+    await send(world, world.emperor, {
+      type: 'vassal.offer',
+      authority: 'OWN',
+      direction: 'DEMAND',
+      targetNationId: upperNationId,
+      goldBp: 1000,
+      riceBp: 1000,
+    });
+    await send(world, world.vassal, { type: 'vassal.respond', offerId: 1, accept: true });
+    await send(world, world.vassal, {
+      type: 'vassal.offer',
+      authority: 'OWN',
+      direction: 'DEMAND',
+      targetNationId: lowerNationId,
+      goldBp: 1000,
+      riceBp: 1000,
+    });
+    await send(world, player, { type: 'vassal.respond', offerId: 2, accept: true });
+    await send(world, world.emperor, { type: 'court.offer', office: 'minister', generalId: ruler.id });
+    await send(world, player, { type: 'court.respond', offerId: 3, accept: true });
+
+    const before = await snapshot(world.id);
+    const [direct, indirect] = before.state.governance!.vassals;
+    expect(direct).toMatchObject({ overlordNationId: emperorNationId, vassalNationId: upperNationId });
+    expect(indirect).toMatchObject({ overlordNationId: upperNationId, vassalNationId: lowerNationId });
+    expect(before.state.governance!.court.minister?.generalId).toBe(ruler.id);
+    for (const vassalId of [direct!.id, indirect!.id]) {
+      const requestId = randomUUID();
+      const rejected = await rpc(
+        'governance.submit',
+        {
+          worldId: world.id,
+          requestId,
+          expectedUserId: player.id,
+          payload: { type: 'court.remit', vassalId, months: 6 },
+        },
+        player,
+      );
+      expect(rejected).toMatchObject({ status: 403, error: { data: { code: 'FORBIDDEN' } } });
+      expect(
+        await db.inputEvent.count({ where: { worldId: world.id, idempotencyKey: `governance:${requestId}` } }),
+      ).toBe(0);
+    }
+    expect(hashState(await snapshot(world.id))).toBe(hashState(before));
+
+    await send(world, world.emperor, { type: 'court.remit', vassalId: direct!.id, months: 6 });
+    await advance(world.id, 70_000);
+    const tribute = await db.governanceMovement.findMany({
+      where: { worldId: world.id, tick: 70_000, kind: 'TRIBUTE' },
+      orderBy: { ordinal: 'asc' },
+    });
+    const payment = { refId: indirect!.id, resource: 'gold', fromNationId: lowerNationId, toNationId: upperNationId };
+    expect(tribute).toMatchObject([
+      { ...payment, holderId: ruler.cityKey },
+      { ...payment, holderId: world.lower.cityKey },
+    ]);
+    expect(tribute[0]!.delta).toBeLessThan(0);
+    expect(tribute[1]!.delta).toBe(-tribute[0]!.delta);
+
+    await send(world, world.vassal, { type: 'vassal.release', vassalId: indirect!.id });
+    await advance(world.id, 80_000);
+    const final = await snapshot(world.id);
+    expect(final.state.governance!.vassals.map((row) => row.id)).toEqual([direct!.id]);
+    expect(final.state.governance!.court.minister).toBeNull();
+    for (const nation of [world.ruler, world.lower, ruler]) {
+      expect(final.state.nations[nation.nationId!]?.capitalCityKey).toBe(nation.cityKey);
+      expect(final.state.cities[nation.cityKey!]?.nationId).toBe(nation.nationId);
+      expect(final.state.generals[nation.id]).toMatchObject({ nationId: nation.nationId, officerLevel: 12 });
+    }
+    const archive = await exportReplay(db, world.id);
+    expect(replayArchive(archive, 8).map((month) => month.stateHash)).toEqual(
+      archive.months.map((month) => month.stateHash),
+    );
+    expect(archive.months.at(-1)?.stateHash).toBe(hashState(final));
   }, 120_000);
 
   for (const route of ['governance.get', 'governance.submit', 'governance.request'] as const) {

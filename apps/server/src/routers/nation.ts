@@ -1,9 +1,10 @@
 import { TRPCError } from '@trpc/server';
-import { TICKS_PER_MONTH, WANDERING_MONTH_LIMIT } from '@opensamguk/rules';
+import { INTEL_FEATURE, OFFICE_EFFECTS_FEATURE, TICKS_PER_MONTH, WANDERING_MONTH_LIMIT } from '@opensamguk/rules';
 import { protectedProcedure, router } from '../trpc';
 import { entityKey, readWorld, viewerGeneral, worldInput } from '../queries';
-import { garrisonGeneralInfo, mapCity, nationInfo, visibility } from '../visibility';
+import { cityCapacity, cityInfo, garrisonGeneralInfo, mapCity, nationInfo, visibility } from '../visibility';
 import { readView } from '../game/queries';
+import { nationPopulation, projectNationFinance, salaryRate } from '../game/nationFinance';
 
 export const nationRouter = router({
   get: protectedProcedure.input(worldInput.extend({ nationId: entityKey }).strict()).query(({ ctx, input }) =>
@@ -13,19 +14,28 @@ export const nationRouter = router({
         where: { worldId_id: { worldId: input.worldId, id: input.nationId } },
       });
       if (!nation) throw new TRPCError({ code: 'NOT_FOUND', message: '국가를 찾을 수 없습니다.' });
+      const openRoster = !world.ruleFeatures.includes(INTEL_FEATURE);
+      const ownNation = visibility(viewer).nation(nation);
       const cities = await tx.city.findMany({
         where: input,
-        orderBy: visibility(viewer).nation(nation)
-          ? [{ region: 'asc' }, { level: 'desc' }, { cityKey: 'asc' }]
-          : { cityKey: 'asc' },
+        orderBy: ownNation ? [{ region: 'asc' }, { level: 'desc' }, { cityKey: 'asc' }] : { cityKey: 'asc' },
       });
       const generals = await tx.general.findMany({ where: input, orderBy: { id: 'asc' } });
-      const state = world.ruleFeatures.some((feature) => ['campaign-v1', 'nation-lifecycle-v1'].includes(feature))
-        ? await readView(tx, input.worldId)
-        : undefined;
+      const needsOfficeEffects =
+        ownNation && world.status !== 'ENDED' && world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE);
+      const state =
+        needsOfficeEffects ||
+        world.ruleFeatures.some((feature) => ['campaign-v1', 'nation-lifecycle-v1'].includes(feature))
+          ? await readView(tx, input.worldId)
+          : undefined;
       const units = state?.campaign?.units;
       const lifecycle = state?.nationLifecycle;
       const wandering = lifecycle?.nations[String(nation.id)];
+      const settlements = cities.filter((city) => city.kind !== 'PASS').sort((a, b) => a.cityKey - b.cityKey);
+      const finance =
+        ownNation && world.status !== 'ENDED'
+          ? projectNationFinance(world, ctx.now, settlements, generals, state)
+          : undefined;
       return {
         ...(lifecycle
           ? {
@@ -40,13 +50,19 @@ export const nationRouter = router({
           : {}),
         ...(units === undefined ? {} : { campaignEnabled: true as const }),
         ...(world.ruleFeatures.includes('five-stats') ? { fiveStats: true as const } : {}),
-        ...nationInfo(
-          nation,
-          { cityCount: cities.filter((city) => city.kind !== 'PASS').length, generalCount: generals.length },
-          viewer,
+        ...nationInfo(nation, { cityCount: settlements.length, generalCount: generals.length }, viewer),
+        philosophy: nation.philosophy,
+        ...nationPopulation(settlements),
+        ...(ownNation ? { salaryRate } : {}),
+        ...(finance ? { financeEstimate: finance.financeEstimate } : {}),
+        cities: cities.map((city) => {
+          if (!ownNation) return { ...mapCity(city), ...cityCapacity(city) };
+          const incomeEstimate = finance?.cityIncome.get(city.cityKey);
+          return { ...cityInfo(city, viewer), ...(incomeEstimate ? { incomeEstimate } : {}) };
+        }),
+        generals: generals.map((general) =>
+          garrisonGeneralInfo(general, viewer, units, { stats: openRoster, biography: openRoster }),
         ),
-        cities: cities.map(mapCity),
-        generals: generals.map((general) => garrisonGeneralInfo(general, viewer, units)),
       };
     }),
   ),

@@ -7,12 +7,15 @@ import { createDb, type Prisma } from '../packages/db/src/index';
 import { buildServer } from '../apps/server/src/server';
 import { newSession } from '../apps/server/src/auth/session';
 import { monthlyFixture } from '../apps/engine/test/monthlyFixture';
+import { commandInitial } from '../packages/rules/test/commandFixture';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { exportReplay, replayArchive } from '../apps/engine/src/replay';
-import { CREATION_ERRORS, commands } from '../packages/rules/src/index';
+import { loadReplayState } from '../apps/engine/src/monthly';
+import { CREATION_ERRORS, TICKS_PER_MONTH, commands } from '../packages/rules/src/index';
+import { hashState } from '../packages/shared/src/node/hashState';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
@@ -107,6 +110,7 @@ describe('T1-11 실제 HTTP·PostgreSQL 권한', () => {
     const mine = await request('general.mine', { worldId }, a.cookie);
     const fields = [
       'id',
+      'isHuman',
       'name',
       'nationId',
       'portraitId',
@@ -134,9 +138,12 @@ describe('T1-11 실제 HTTP·PostgreSQL 권한', () => {
     ].sort();
     expect(home.code).toBeUndefined();
     expect(mine.code).toBeUndefined();
-    expect(Object.keys(home.data.general).sort()).toEqual([...fields, 'policy'].sort());
+    expect(Object.keys(home.data.general).sort()).toEqual([...fields, 'policy', 'defense', 'salaryEstimate'].sort());
     expect(Object.keys(mine.data.general).sort()).toEqual(fields);
-    const { policy, ...homeGeneral } = home.data.general;
+    const { policy, defense, salaryEstimate, ...homeGeneral } = home.data.general;
+    expect(defense).toMatchObject({ troops: expect.any(Number) });
+    expect(salaryEstimate).toMatchObject({ gold: expect.any(Number), rice: expect.any(Number) });
+    expect(mine.data.general.isHuman).toBe(true);
     expect(policy).toEqual({ key: 'none', name: '없음' });
     expect(homeGeneral).toEqual(mine.data.general);
     expect(mine.data).toHaveProperty('creation', null);
@@ -558,6 +565,127 @@ describe('T1-11 생성 접수와 엔진', () => {
     expect(await db.general.count({ where: { worldId, userId: a.id } })).toBe(1);
   });
 });
+
+it('AC-M1-14 내정 8종과 휴식은 실제 예약·프로세스 재시작·월 재생을 보존한다', async () => {
+  const domestic = [
+    { commandKey: 'farm', field: 'agriculture', cost: 100 },
+    { commandKey: 'commerce', field: 'commerce', cost: 100 },
+    { commandKey: 'security', field: 'security', cost: 100 },
+    { commandKey: 'settle', field: 'population', cost: 200 },
+    { commandKey: 'goodwill', field: 'trust', cost: 200 },
+    { commandKey: 'defence', field: 'defence', cost: 100 },
+    { commandKey: 'wall', field: 'wall', cost: 100 },
+    { commandKey: 'research', field: 'tech', cost: 100 },
+  ] as const;
+  const cases = [
+    ...domestic.map(({ commandKey }) => ({ commandKey, accepted: true })),
+    { commandKey: 'rest', accepted: true },
+    ...domestic.map(({ commandKey }) => ({ commandKey, accepted: false })),
+  ];
+  const actors: Awaited<ReturnType<typeof identity>>[] = [];
+  for (let index = 0; index < cases.length; index++) actors.push(await identity());
+  const initial = commandInitial();
+  initial.diplomacies = [];
+  const ruler = initial.generals[0]!;
+  initial.generals = cases.map(({ accepted }, index) => ({
+    ...ruler,
+    id: index + 1,
+    name: `내정장수${index + 1}`,
+    userId: actors[index]!.id,
+    officerLevel: index === 0 ? 12 : 1,
+    gold: accepted ? 1000 : 0,
+    nextTurnTick: 100 + index,
+  }));
+  const { worldId } = await saveInitialWorld(db, initial, {
+    replayFormat: 3,
+    name: '내정 예턴 재시작 시험',
+    turnTermMinutes: 60,
+    endYear: null,
+  });
+  worlds.push(worldId);
+  await controlClock(db, worldId, 'start');
+  for (const [index, { commandKey, accepted }] of cases.entries()) {
+    const { cookie } = actors[index]!;
+    const turn = { commandKey, args: {} };
+    expect((await request('turns.precheck', { worldId, ...turn }, cookie)).data).toEqual(
+      accepted ? { ok: true } : expect.objectContaining({ ok: false, code: 'NO_GOLD' }),
+    );
+    expect(
+      (await request('turns.set', { worldId, revision: 0, slots: [turn, ...empty().slice(1)] }, cookie)).data,
+    ).toMatchObject({ ok: true, revision: 1 });
+    expect((await request('turns.get', { worldId }, cookie)).data.slots[0]).toMatchObject(turn);
+  }
+
+  async function runAndStop() {
+    const child = spawn(process.execPath, ['--import', 'tsx', 'apps/engine/test/turnWorker.ts', worldId, 'committed'], {
+      cwd: new URL('../', import.meta.url),
+      env: { ...process.env, TEST_DATABASE_URL: url },
+      stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
+      windowsHide: true,
+    });
+    const closed = once(child, 'close');
+    try {
+      const [message] = await Promise.race([
+        once(child, 'message', { signal: AbortSignal.timeout(20_000) }),
+        closed.then(() => {
+          throw new Error('내정 명령 실행 전에 프로세스가 끝났습니다.');
+        }),
+      ]);
+      expect(message).toBe('committed');
+      expect(child.kill('SIGKILL')).toBe(true);
+      expect(await closed).toEqual([null, 'SIGKILL']);
+    } finally {
+      if (child.exitCode === null && child.signalCode === null && !child.killed) child.kill('SIGKILL');
+      await closed;
+    }
+    const lease = await db.engineLease.findUniqueOrThrow({ where: { worldId } });
+    await db.engineLease.update({
+      where: { worldId, fencingToken: lease.fencingToken },
+      data: { expiresAt: new Date(0) },
+    });
+  }
+
+  await runAndStop();
+  const snapshot = () => db.$transaction((tx) => loadReplayState(tx, worldId));
+  const committed = await snapshot();
+  const readLogs = () => db.generalLog.findMany({ where: { worldId }, orderBy: { generalId: 'asc' } });
+  const logs = await readLogs();
+  expect(logs).toHaveLength(cases.length);
+  for (const [index, { commandKey, accepted }] of cases.entries()) {
+    const id = index + 1;
+    expect(logs[index]).toMatchObject({
+      generalId: id,
+      commandKey,
+      tick: 100 + index,
+      kind: accepted ? 'success' : 'failure',
+    });
+    const spec = domestic.find((row) => row.commandKey === commandKey);
+    const general = committed.state.generals[id]!;
+    expect(general.gold).toBe(accepted ? 1000 - (spec?.cost ?? 0) : 0);
+    if (!accepted) expect(logs[index]!.text).toContain('NO_GOLD');
+    else if (!spec) expect(general.injury).toBeLessThan(ruler.injury);
+    else if (spec.field === 'tech') expect(committed.state.nations[1]!.tech).toBeGreaterThan(initial.nations[0]!.tech);
+    else expect(committed.state.cities[1]![spec.field]).toBeGreaterThan(initial.cities[0]![spec.field]);
+    expect(committed.turns[id]![0]).toMatchObject({ commandKey: 'rest' });
+  }
+  await runAndStop();
+  expect(await snapshot()).toEqual(committed);
+  expect(await readLogs()).toEqual(logs);
+
+  const lease = await acquireLease(db, worldId);
+  if (!lease) throw new Error('내정 명령 재생 시험의 실행권이 없습니다.');
+  try {
+    await new TurnLoop(db, lease).advanceTo(TICKS_PER_MONTH);
+  } finally {
+    await releaseLease(db, lease);
+  }
+  const archive = await exportReplay(db, worldId);
+  expect(archive.inputs.filter((input) => input.kind === 'turns.set' && input.status === 'APPLIED')).toHaveLength(
+    cases.length,
+  );
+  expect(archive.months).toHaveLength(1);
+  expect(replayArchive(archive, 1)[0]!.stateHash).toBe(hashState(await snapshot()));
+}, 60_000);
 
 describe('T1-11 군사 명령 API·엔진 결합', () => {
   it('등용 수락 사전 검사는 같은 월드의 서버 저장 제안을 읽는다', async () => {

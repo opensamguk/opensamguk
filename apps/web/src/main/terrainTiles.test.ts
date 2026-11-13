@@ -6,6 +6,7 @@ import {
   SOUTH,
   TERRAINS,
   WEST,
+  bundledRun,
   clearRun,
   gatedWalk,
   isWaterRoute,
@@ -297,4 +298,50 @@ it('D-055 지나가는 길은 다른 표식 상자를 비켜 가고 반듯하게
   expect(turns).toBe(4);
   for (let i = 1; i < walk.length; i += 1)
     expect(Math.abs(walk[i]!.x - walk[i - 1]!.x) + Math.abs(walk[i]!.y - walk[i - 1]!.y)).toBe(1);
+});
+
+it('AC-INT-20 지형을 읽으면 길은 산줄기를 넘지 않고 골짜기 틈으로 돌며, 지형이 없거나 모르면 기존 길이다', () => {
+  // 44×30칸 평지에 x=18~23 산줄기가 y=17 한 줄 틈만 남기고 막는다. a 칸 (5,10), b 칸 (38,10).
+  const rows = Array.from({ length: 30 }, (_, y) =>
+    Array.from({ length: 44 }, (_, x): keyof typeof palette =>
+      x >= 18 && x <= 23 && y !== 17 ? 'mountains' : 'plains',
+    ),
+  );
+  const ground = grid(rows);
+  const mountain = (point: { x: number; y: number }) => rows[point.y]?.[point.x] === 'mountains';
+  const map = { sites: [city('a', 11, 21), city('b', 77, 21)], routes: [land('ab', 'a', 'b')] };
+  const before = { cells: [...ground.cells], map: JSON.stringify(map) };
+  const flat = roadWalks(map).get('ab')!;
+  expect(flat.some(mountain)).toBe(true);
+  const routed = roadWalks(map, new Set(), () => 0, 2, ground).get('ab')!;
+  expect(routed.some(mountain)).toBe(false);
+  expect(routed).toContainEqual({ x: 20, y: 17 });
+  expect(routed[0]).toEqual({ x: 5, y: 10 });
+  expect(routed.at(-1)).toEqual({ x: 38, y: 10 });
+  for (let i = 1; i < routed.length; i += 1)
+    expect(Math.abs(routed[i]!.x - routed[i - 1]!.x) + Math.abs(routed[i]!.y - routed[i - 1]!.y)).toBe(1);
+  // 같은 입력이면 같은 길이고, 지형 칸과 지도 자료는 바뀌지 않는다.
+  expect(roadWalks(map, new Set(), () => 0, 2, ground).get('ab')).toEqual(routed);
+  expect([...ground.cells]).toEqual(before.cells);
+  expect(JSON.stringify(map)).toBe(before.map);
+  // 바탕을 읽기 전(null)이나 색 판 밖 칸(-1)뿐이면 지형이 없을 때와 같은 길이다.
+  expect(roadWalks(map, new Set(), () => 0, 2, null).get('ab')).toEqual(flat);
+  const unknown = { cells: new Int8Array(44 * 30).fill(-1), columns: 44, rows: 30 };
+  expect(roadWalks(map, new Set(), () => 0, 2, unknown).get('ab')).toEqual(flat);
+});
+
+it('AC-INT-20 지형 길값은 두 점 둘레 8칸 범위 칸만 한 번씩 읽고 지도 전체를 찾지 않는다', () => {
+  const seen: { x: number; y: number }[] = [];
+  const extra = (point: { x: number; y: number }) => {
+    seen.push(point);
+    return point.x === 5 ? 99 : 0;
+  };
+  const path = bundledRun({ x: 0, y: 0 }, { x: 10, y: 0 }, { dx: 1, dy: 0 }, () => false, new Set(), extra);
+  // 범위는 x -8~18(27칸), y -8~8(17칸)이다.
+  expect(seen).toHaveLength(27 * 17);
+  expect(new Set(seen.map(cellKey)).size).toBe(27 * 17);
+  expect(seen.every((point) => point.x >= -8 && point.x <= 18 && point.y >= -8 && point.y <= 8)).toBe(true);
+  // x=5 줄 전체가 비싸도 반드시 건너야 하므로 곧게 한 번 건넌다(값은 상한으로 자른다).
+  expect(path).toHaveLength(10);
+  expect(path.at(-1)).toEqual({ x: 10, y: 0 });
 });

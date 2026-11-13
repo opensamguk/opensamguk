@@ -194,7 +194,7 @@ it('AC-P2-28 지도 권한·다른 판·메타데이터 공개 범위와 공개 
   expect((await rpc('world.map', { worldId: oldWorld }, true)).data.background).toBeNull();
   const privateMap = await rpc('world.map', { worldId: newWorld }, true);
   expect(privateMap.status).toBe(200);
-  expect(privateMap.data).toEqual({ cities: [], nations: [], background: expected });
+  expect(privateMap.data).toEqual({ cities: [], nations: [], generals: [], background: expected });
   await db.publicMapSnapshot.create({
     data: {
       worldId: newWorld,

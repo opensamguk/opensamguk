@@ -1,16 +1,19 @@
 import type { Prisma } from '@opensamguk/db';
 import {
   assertSlotSet,
-  emptyQueue,
   isPolicyKey,
   activityPayloadSchema,
   applyPersonnelInputStep,
   completePersonnelStep,
+  treatyOptions,
+  EXPANDED_TREATY_FEATURE,
   setPolicyPayloadSchema,
   updateResidenceAnchors,
   recordedLineageSuccession,
   reputationInputEvents,
+  RELATIONS_FEATURE,
   recordedPossession,
+  type TreatyAidFailure,
   type PersonnelMonthResult,
   type PersonnelStepPacket,
   type ReplayState,
@@ -20,7 +23,7 @@ import {
 import type { EngineFeature, QueuedInputHandler } from './features';
 import { loadReplayState } from './monthly';
 import { loadWorld } from './worldLoader';
-import { loadOfficeState, persistOfficeState } from './personnelState';
+import { loadOfficeRevisions, loadOfficeState, persistOfficeState } from './personnelState';
 import { loadAssignmentState, persistAssignmentState } from './assignmentState';
 import { appendNationHistory } from './commandPersistence';
 import { persistEffects } from './persist';
@@ -47,38 +50,35 @@ import { persistNationLifecycleMonth } from './nationLifecycleState';
 
 export async function loadPersonnelTurnContext(tx: Prisma.TransactionClient, worldId: string, state: WorldState) {
   if (state.ruleFeatures?.includes('policy')) {
-    const expectedSlots = emptyQueue().map((_, slot) => slot);
-    // 조인 계획이 바뀌어도 이 조회의 예턴 집계는 한 번만 계산한다.
+    // 복합 PK가 칸 중복을 금지한다. 개수와 양 끝 값으로 같은 연속 범위를 검증한다.
     const rows = await tx.$queryRaw<
       {
         id: number;
         defaultPolicy: string | null;
         userId: string | null;
         lastActiveTick: number | null;
-        slots: number[] | null;
+        validSlots: boolean;
       }[]
     >`
       WITH turn_slots AS MATERIALIZED (
-        SELECT "generalId", array_agg(slot ORDER BY slot) AS slots
+        SELECT "generalId", count(*) = 30 AND min(slot) = 0 AND max(slot) = 29 AS valid
         FROM "GeneralTurn" WHERE "worldId" = ${worldId}
         GROUP BY "generalId"
       )
       SELECT g.id, g."defaultPolicy", g."userId", g."lastActiveTick",
-        CASE WHEN t.slots = ${expectedSlots}::integer[] THEN NULL
-          ELSE COALESCE(t.slots, ARRAY[]::integer[]) END AS slots
+        COALESCE(t.valid, false) AS "validSlots"
       FROM "General" g
       LEFT JOIN turn_slots t ON t."generalId" = g.id
       WHERE g."worldId" = ${worldId}
       ORDER BY g.id
     `;
-    // NULL은 정본 칸 배열과의 동등 검사를 마친 행이다.
-    for (const row of rows) if (row.slots !== null) assertSlotSet(row.slots.map((slot) => ({ slot })));
+    if (rows.some((row) => !row.validSlots)) assertSlotSet([]);
     for (const row of rows) {
       if (!isPolicyKey(row.defaultPolicy)) throw new Error('저장된 기본 방침이 올바르지 않습니다.');
       if (row.userId !== null && row.lastActiveTick === null) throw new Error('사람 장수의 활동 tick이 없습니다.');
     }
   }
-  const { offices } = await loadOfficeState(tx, worldId);
+  const offices = await loadOfficeRevisions(tx, worldId);
   const residenceAnchors = await loadResidenceAnchors(tx, worldId);
   return { state, offices, residenceAnchors };
 }
@@ -163,18 +163,28 @@ const processPersonnelInput: QueuedInputHandler = async (tx, world, event, { tic
     tick,
     createdHumanId: null,
   });
-  await persistEffects(tx, world.id, outcome.packet.state, [{ kind: 'world', state: outcome.packet.state }], {
-    tick,
-    sequence,
-  });
+  await persistEffects(
+    tx,
+    world.id,
+    outcome.packet.state,
+    [{ kind: 'world', state: outcome.packet.state }],
+    {
+      tick,
+      sequence,
+    },
+    before.state,
+  );
   await persistPersonnelPacket(tx, world.id, before, outcome.packet, anchors, { tick, sequence });
   return { status: 'APPLIED', result: outcome.result as unknown as Prisma.InputJsonValue };
 };
 
 export const builtInEngineFeatures: readonly EngineFeature[] = [
+  { key: 'office-effects' },
   { key: 'nation-strategy-v1' },
   { key: 'prepared-turns-v1' },
   { key: 'nation-research-v1' },
+  { key: 'court-rank-v1' },
+  { key: RELATIONS_FEATURE },
   { key: 'city-scale-v1' },
   {
     key: 'stratagem-cards-v1',
@@ -219,6 +229,7 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
   { key: 'city-resources-v1', queuedInputs: { 'city.resources': processCityResourceInput } },
   { key: 'five-stats' },
   { key: 'battle-affinity-v2' },
+  { key: 'border-return-v1' },
   { key: 'intel-v1' },
   { key: 'equipment-v1' },
   { key: 'operational-map' },
@@ -280,10 +291,14 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
         succession: recordedLineageSuccession(input),
         possession: recordedPossession(input),
       });
-      await persistEffects(tx, world.id, packet.state, [{ kind: 'world', state: packet.state }], {
-        tick: input.tick!,
-        sequence: input.sequence,
-      });
+      await persistEffects(
+        tx,
+        world.id,
+        packet.state,
+        [{ kind: 'world', state: packet.state }],
+        { tick: input.tick!, sequence: input.sequence },
+        state,
+      );
       await persistPersonnelPacket(tx, world.id, before, packet, anchors, {
         tick: input.tick!,
         sequence: input.sequence,
@@ -299,22 +314,26 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
     key: 'treaty',
     loadWorld: async (tx, worldId, state) => ({
       ...state,
-      ...(await loadTreaties(tx, worldId, { tradeEnabled: state.ruleFeatures?.includes('treaty-trade') ?? false })),
+      ...(await loadTreaties(tx, worldId, treatyOptions(state.ruleFeatures ?? []))),
     }),
     queuedInputs: {
       'treaty.propose': (tx, world, event, context) =>
         processTreatyQueuedInput(tx, world, event, {
           ...context,
           treatyTradeEnabled: world.ruleFeatures.includes('treaty-trade'),
+          treatyExpandedEnabled: world.ruleFeatures.includes(EXPANDED_TREATY_FEATURE),
         }),
       'treaty.respond': (tx, world, event, context) =>
         processTreatyQueuedInput(tx, world, event, {
           ...context,
           treatyTradeEnabled: world.ruleFeatures.includes('treaty-trade'),
+          treatyExpandedEnabled: world.ruleFeatures.includes(EXPANDED_TREATY_FEATURE),
         }),
     },
-    async persistMonthly(tx, worldId, before, next, _effects, context) {
+    async persistMonthly(tx, worldId, before, next, effects, context) {
       await persistTreatyClosures(tx, worldId, before.state, next.state, context);
+      for (const failure of effects as readonly TreatyAidFailure[])
+        await appendNationHistory(tx, worldId, context.tick, failure.nationId, failure.text);
     },
   },
   {
@@ -326,10 +345,12 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
           ...context,
           treatyBreakEnabled: true,
           treatyTradeEnabled: world.ruleFeatures.includes('treaty-trade'),
+          treatyExpandedEnabled: world.ruleFeatures.includes(EXPANDED_TREATY_FEATURE),
         }),
     },
   },
   { key: 'treaty-trade' },
+  { key: EXPANDED_TREATY_FEATURE },
   {
     key: 'reputation-v1',
     async loadReplayState(tx, worldId, replay) {

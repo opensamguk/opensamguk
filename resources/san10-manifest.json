@@ -30,5 +30,13 @@
     "version": 1,
     "contentHash": "e2e988c441efddc28079b461205353f766af9077f61b61017760aff9dae9f3b3",
     "source": "D-045/D-056; SAN10 user survey / core2026 df6c926 MIT / Natural Earth v5.1.2 public domain; resources/map-drafts/san10/NOTICE.md"
+  },
+  {
+    "kind": "MAP",
+    "name": "san10",
+    "path": "resources/map/san10-v2.json",
+    "version": 2,
+    "contentHash": "c775b4205d2aa3117704eecfb48588b9c5ea12994db73e5a169c6f24c4ca0815",
+    "source": "D-082; core2026 df6c926 MIT; resources/map-drafts/san10/NOTICE.md"
   }
 ]

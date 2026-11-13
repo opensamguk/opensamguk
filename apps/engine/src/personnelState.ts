@@ -92,11 +92,8 @@ export async function loadOfficeState(
       orderBy: [{ nationId: 'asc' }, { officerLevel: 'asc' }, { slot: 'asc' }],
     }),
   ]);
-  const offices: OfficeRevisions = {};
+  const offices = officeRevisions(officeRows);
   const officeTurns: OfficeTurns = {};
-  for (const row of officeRows) {
-    (offices[row.nationId] ??= {})[row.officerLevel] = { revision: row.turnRevision, tenure: row.tenure };
-  }
   for (const row of turnRows) {
     if (!integer(row.slot, 0, 11)) throw new Error('저장된 직책 예턴의 칸 번호를 확인하세요.');
     const nation = (officeTurns[row.nationId] ??= {});
@@ -109,6 +106,28 @@ export async function loadOfficeState(
   const result = { offices, ...(turnRows.length ? { officeTurns } : {}) };
   validate(result);
   return result;
+}
+
+function officeRevisions(
+  rows: readonly { nationId: number; officerLevel: number; turnRevision: number; tenure: number }[],
+): OfficeRevisions {
+  const offices: OfficeRevisions = {};
+  for (const row of rows) {
+    (offices[row.nationId] ??= {})[row.officerLevel] = { revision: row.turnRevision, tenure: row.tenure };
+  }
+  return offices;
+}
+
+export async function loadOfficeRevisions(tx: Prisma.TransactionClient, worldId: string): Promise<OfficeRevisions> {
+  const offices = officeRevisions(
+    await tx.nationOffice.findMany({
+      where: { worldId },
+      orderBy: [{ nationId: 'asc' }, { officerLevel: 'asc' }],
+      select: { nationId: true, officerLevel: true, turnRevision: true, tenure: true },
+    }),
+  );
+  validate({ offices });
+  return offices;
 }
 
 // 호출자가 같은 World 잠금·펜싱 트랜잭션에서 읽은 before와 규칙 실행 뒤 next를 넘긴다.

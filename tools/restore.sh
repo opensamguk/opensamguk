@@ -5,6 +5,7 @@ export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*'
 source "$(dirname -- "${BASH_SOURCE[0]}")/backup.sh"
 
 docker= container= system= role= admin= archive= manifest= target=
+approved_source= approved_source_oid= approved_manifest_hash= approved_revision= stage_receipt=
 declare -A supplied=()
 while [[ $# -gt 0 ]]; do
   [[ $# -ge 2 && -n "$2" && -z "${supplied[$1]:-}" ]] || t215_fail ARGUMENT
@@ -12,7 +13,10 @@ while [[ $# -gt 0 ]]; do
   case "$key" in
     --docker) docker=$value;; --container) container=$value;; --system-identifier) system=$value;;
     --db-user) role=$value;; --admin-db) admin=$value;; --archive) archive=$value;;
-    --manifest) manifest=$value;; --target-db) target=$value;; *) t215_fail ARGUMENT;;
+    --manifest) manifest=$value;; --target-db) target=$value;;
+    --approved-source-db) approved_source=$value;; --approved-source-oid) approved_source_oid=$value;;
+    --approved-manifest-sha256) approved_manifest_hash=$value;; --approved-release-sha) approved_revision=$value;;
+    --stage-receipt) stage_receipt=$value;; *) t215_fail ARGUMENT;;
   esac
 done
 [[ -n "$docker" && -n "$container" && -n "$system" && -n "$role" && -n "$admin" && -n "$archive" && -n "$manifest" && -n "$target" ]] || t215_fail ARGUMENT
@@ -20,6 +24,19 @@ t215_name "$target" || t215_fail TARGET_NAME
 [[ "$target" =~ ^t215_dst_[0-9a-f]{32}_test$ || "$target" =~ ^opensamguk_restore_[0-9]{8}t[0-9]{6}z_[0-9a-f]{8}$ ]] || t215_fail TARGET_NAME
 [[ "$admin" != "$target" ]] || t215_fail TARGET_ADMIN
 t215_absolute "$archive" && t215_absolute "$manifest" && [[ -f "$archive" && -f "$manifest" ]] || t215_fail ARCHIVE_PATH
+staged=false
+if [[ "$target" =~ ^opensamguk_restore_ ]]; then
+  t215_name "$approved_source" && [[ "$approved_source" != "$target" && "$approved_source" != "$admin" ]] ||
+    t215_fail OPERATIONAL_RESTORE_UNASSIGNED
+  [[ "$approved_source_oid" =~ ^[0-9]{1,10}$ && "$approved_manifest_hash" =~ ^[0-9a-f]{64}$ && "$approved_revision" =~ ^[0-9a-f]{40}$ ]] ||
+    t215_fail STAGE_APPROVAL
+  t215_absolute "$stage_receipt" && [[ ! -e "$stage_receipt" && ! -L "$stage_receipt" && ! -L "$archive" && ! -L "$manifest" ]] ||
+    t215_fail STAGE_RECEIPT
+  [[ "$(sha256sum <"$manifest" | cut -d ' ' -f 1)" == "$approved_manifest_hash" ]] || t215_fail STAGE_APPROVAL
+  staged=true
+elif [[ -n "$approved_source$approved_source_oid$approved_manifest_hash$approved_revision$stage_receipt" ]]; then
+  t215_fail STAGE_APPROVAL
+fi
 t215_init
 work_dir=$(dirname -- "$manifest")
 lock="$work_dir/.t215.lock"; locked=false; partials=(); created=false; target_oid=
@@ -68,6 +85,10 @@ trap 't215_fail INTERNAL' ERR
 : >"$err"
 t215_identity
 manifest_json=$(cat -- "$manifest") || t215_fail MANIFEST_READ
+if [[ "$staged" == true ]]; then
+  # The backup writer terminates its canonical manifest with one newline.
+  [[ "$(printf '%s\n' "$manifest_json" | sha256sum | cut -d ' ' -f 1)" == "$approved_manifest_hash" ]] || t215_fail STAGE_APPROVAL
+fi
 header=$(t215_psql "$admin" -v "manifest=$manifest_json" <<'SQL'
 -- t215:manifest
 WITH m AS (SELECT :'manifest'::jsonb j)
@@ -84,8 +105,23 @@ t215_name "$source_name" && [[ "$source_oid" =~ ^[0-9]+$ && "$source_system" =~ 
 if [[ "$target" =~ ^t215_dst_ ]]; then
   [[ "$source_name" =~ ^t215_src_[0-9a-f]{32}_test$ && "$source_system" == "$system" ]] || t215_fail MANIFEST_IDENTITY
 else
-  # B2·B3의 현재 비밀 파일 계약은 아직 없으므로 운영 복구는 안전하게 거부한다.
-  t215_fail OPERATIONAL_RESTORE_UNASSIGNED
+  [[ "$source_name" == "$approved_source" && "$source_oid" == "$approved_source_oid" && "$source_system" == "$system" && "$consistency" == quiesced ]] ||
+    t215_fail STAGE_APPROVAL
+  actual_revision=$(t215_psql "$admin" -v "manifest=$manifest_json" <<'SQL'
+SELECT :'manifest'::jsonb->>'releaseSha';
+SQL
+  ) || t215_fail STAGE_APPROVAL
+  [[ "$actual_revision" == "$approved_revision" ]] || t215_fail STAGE_APPROVAL
+  stage_identity() {
+    local identity
+    identity=$(t215_psql "$admin" -v "source=$approved_source" <<'SQL'
+SELECT oid || '|' || (SELECT rolsuper FROM pg_roles WHERE rolname=current_user)
+FROM pg_database WHERE datname=:'source';
+SQL
+    ) || t215_fail STAGE_SOURCE
+    [[ "$identity" == "$approved_source_oid|true" ]] || t215_fail STAGE_SOURCE
+  }
+  stage_identity
 fi
 case "$consistency" in
   quiesced) [[ "$content_hash" =~ ^[0-9a-f]{64}$ && "$content_reason" == quiesced ]] || t215_fail CONTENT_MANIFEST;;
@@ -111,10 +147,17 @@ t215_validate_migrations "$expected_rows"
 t215_archive_migrations
 cmp -s -- "$migration_rows" "$expected_rows" || t215_fail MIGRATIONS_ARCHIVE_MISMATCH
 t215_identity
-t215_psql "$admin" -v "target=$target" <<'SQL' >/dev/null || t215_fail CREATE_FAILED
+if [[ "$staged" == true ]]; then
+  stage_identity
+  t215_psql "$admin" -v "target=$target" <<'SQL' >/dev/null || t215_fail CREATE_FAILED
+CREATE DATABASE :"target" TEMPLATE template0 CONNECTION LIMIT 0;
+SQL
+else
+  t215_psql "$admin" -v "target=$target" <<'SQL' >/dev/null || t215_fail CREATE_FAILED
 -- t215:create
 CREATE DATABASE :"target" TEMPLATE template0;
 SQL
+fi
 created=true
 target_oid=$(t215_psql "$admin" -v "target=$target" <<'SQL'
 -- t215:target-oid
@@ -135,5 +178,24 @@ cmp -s -- "$migration_rows" "$expected_rows" || t215_fail MIGRATIONS_TARGET_MISM
 if [[ "$consistency" == quiesced ]]; then
   t215_quiesced "$target"
   [[ "$(t215_content "$target")" == "$content_hash" ]] || t215_fail CONTENT_MISMATCH
+fi
+if [[ "$staged" == true ]]; then
+  t215_identity
+  stage_identity
+  sealed=$(t215_psql "$admin" -q -v "target=$target" <<'SQL'
+ALTER DATABASE :"target" ALLOW_CONNECTIONS false;
+SELECT oid || '|' || datconnlimit || '|' || datallowconn || '|' ||
+       (SELECT count(*) FROM pg_stat_activity WHERE datid=pg_database.oid)
+FROM pg_database WHERE datname=:'target';
+SQL
+  ) || t215_fail TARGET_IDENTITY
+  [[ "$sealed" == "$target_oid|0|false|0" ]] || t215_fail TARGET_IDENTITY
+  receipt_partial=$(mktemp "$(dirname -- "$stage_receipt")/.restore-staged-$run_id.XXXXXXXX") || t215_fail STAGE_RECEIPT
+  partials+=("$receipt_partial")
+  printf '{"version":1,"outcome":"restore-staged","source":{"database":"%s","oid":"%s","systemIdentifier":"%s"},"target":{"database":"%s","oid":"%s","systemIdentifier":"%s","connectionLimit":0,"allowsConnections":false},"sourceRevision":"%s","backupManifestSha256":"%s","backupArchiveSha256":"%s","contentSha256":"%s","activeDatabaseChanged":false,"cutoverAuthorized":false}\n' \
+    "$source_name" "$source_oid" "$source_system" "$target" "$target_oid" "$system" "$approved_revision" "$approved_manifest_hash" "$expected_hash" "$content_hash" >"$receipt_partial" || t215_fail STAGE_RECEIPT
+  sync || t215_fail SYNC
+  ln -- "$receipt_partial" "$stage_receipt" || t215_fail STAGE_RECEIPT
+  sync || t215_fail SYNC
 fi
 printf 'ok %s %s\n' "$target" "$target_oid"

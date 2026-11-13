@@ -29,12 +29,33 @@
 .text {
   min-width: 0;
 }
+.headline {
+  flex: 1 0 100%;
+  font-size: var(--text-sm);
+}
 .yearbook {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
   align-items: baseline;
   padding: var(--space-1) 0;
   border-bottom: 1px solid var(--color-border);
+}
+/* 중원 정세 글줄 (INT-25). 한 달에 여러 줄이면 아래로 쌓는다. */
+.yearbook:has(.events) {
+  flex-wrap: wrap;
+}
+.events {
+  display: grid;
+  gap: 2px;
+  flex: 1 1 12em;
+  min-width: 0;
+}
+.event {
+  overflow-wrap: anywhere;
+}
+.events + .nations {
+  flex-basis: 100%;
 }
 .nations {
   display: flex;
@@ -99,4 +120,11 @@
   margin: 0;
   color: var(--color-danger);
   font-size: var(--text-sm);
+}
+/* 좁은 화면에서 더 보기는 손가락 크기(44px) 이상이다. */
+@media (max-width: 767px) {
+  .more {
+    min-width: 44px;
+    min-height: 44px;
+  }
 }

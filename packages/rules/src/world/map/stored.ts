@@ -1,4 +1,13 @@
+import { LEGACY_OPENING_CITY_PROFILE } from '../openingCityProfile';
 import { operationalMapSchema, type OperationalMapResource } from './operational';
+
+export function readOpeningCityProfile(origin: unknown) {
+  const initial = origin && typeof origin === 'object' && 'initial' in origin ? origin.initial : undefined;
+  if (!initial || typeof initial !== 'object' || !Object.hasOwn(initial, 'openingCityProfile')) return undefined;
+  if (!('openingCityProfile' in initial) || initial.openingCityProfile !== LEGACY_OPENING_CITY_PROFILE)
+    throw new Error('운영 지도의 개막 도시 설정을 확인하세요.');
+  return initial.openingCityProfile;
+}
 
 export function readOperationalMap(
   value: unknown,

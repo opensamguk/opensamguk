@@ -1,0 +1,42 @@
+/* 도시 관직 칸 (INT-26). 자리 이름·얼굴·이름·NPC·주재를 한 줄에 쓰고 좁은 화면에서는 줄을 바꾼다. */
+.offices {
+  display: grid;
+  gap: var(--space-1);
+}
+.heading {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+}
+.seat {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.title {
+  color: var(--color-text-muted);
+}
+.holder {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.presence {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.empty {
+  color: var(--color-text-muted);
+}

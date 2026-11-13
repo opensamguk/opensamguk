@@ -22,6 +22,8 @@ export interface AssignmentOffer {
 export type OfficeTurns = Record<number, Record<number, { commandKey: string; args: unknown }[]>>;
 export type OfficeRevisions = Record<number, Record<number, { revision: number; tenure: number }>>;
 export interface WorldState {
+  relations?: import('../relations/data').RelationsData;
+  officeEffects?: import('../personnel/residentOffice').OfficeEffects;
   preparedTurns?: import('../preparedTurns/state').PreparedTurnsState;
   nationResearch?: import('../nationResearch/state').NationResearchState;
   nationLifecycle?: import('../nationLifecycle/state').NationLifecycleState;
@@ -35,6 +37,7 @@ export interface WorldState {
   cityResources?: CityResourcesState;
   campaign?: CampaignState;
   presetRules?: PresetRules;
+  recruitmentLocation?: 'city';
   ruleFeatures?: string[];
   ext?: WorldExt;
   startYear: number;
@@ -75,6 +78,7 @@ export function toWorldStateWithRegistry(initial: WorldInit, registry: ExtStateR
   return {
     ...(ext ? { ext } : {}),
     ...(state.presetRules ? { presetRules: state.presetRules } : {}),
+    ...(state.recruitmentLocation ? { recruitmentLocation: state.recruitmentLocation } : {}),
     ...(state.ruleFeatures ? { ruleFeatures: state.ruleFeatures } : {}),
     startYear: state.startYear,
     cities: Object.fromEntries(state.cities.map((city) => [city.cityKey, city])),

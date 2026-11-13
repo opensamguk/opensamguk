@@ -3,6 +3,9 @@ import type { AppRouter } from '../apps/server/src/router';
 import { readFixture } from '../apps/server/test/readFixture';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
+import { loadPreset } from '../apps/engine/src/world/resources';
+import { commandInitial } from '../packages/rules/test/commandFixture';
+import { hashState } from '../packages/shared/src/node/hashState';
 import { holdLease, releaseHold } from './game';
 import { test, expect, apiQuery } from './t210-fixture';
 
@@ -52,6 +55,15 @@ test('T4-92 명령 카드의 개인 30칸·국가 12칸 저장과 모바일·키
     for (const command of listed) {
       const radio = picker.getByRole('radio', { name: command.name, exact: true });
       await expect(radio).toHaveAttribute('aria-describedby', /.+/);
+      // INT-26: 지금 실행할 수 없는 명령(available false)만 흐리고 사유를 적는다. null(인자 필요)은 흐리지 않는다.
+      const card = radio.locator('xpath=ancestor::label[1]');
+      if (command.available === false) {
+        await expect(card).toHaveAttribute('data-available', 'false');
+        await expect(card.getByTestId('command-reason')).toHaveText(command.reason ?? '지금은 실행할 수 없습니다.');
+      } else {
+        await expect(card).not.toHaveAttribute('data-available', /.*/);
+        await expect(card.getByTestId('command-reason')).toHaveCount(0);
+      }
     }
     for (const colorScheme of ['light', 'dark'] as const) {
       await page.emulateMedia({ colorScheme });
@@ -133,8 +145,7 @@ test('T4-92 명령 카드의 개인 30칸·국가 12칸 저장과 모바일·키
       await editor.getByRole('button', { name: '선택 해제', exact: true }).click();
       await editor.locator('tr[data-slot="2"]').click();
       await editor.getByRole('radio', { name: '농지 개간', exact: true }).check();
-      await editor.getByRole('button', { name: '2번 칸에 넣기', exact: true }).click();
-      await editor.getByRole('button', { name: '저장', exact: true }).click();
+      await editor.getByRole('button', { name: '2번 칸에 저장', exact: true }).click();
       await expect(editor.getByText('저장했습니다.', { exact: true })).toBeVisible();
       await late.getByRole('button', { name: '저장', exact: true }).click();
       const conflict = late.getByTestId('stale-alert');
@@ -162,7 +173,12 @@ test('T4-92 명령 카드의 개인 30칸·국가 12칸 저장과 모바일·키
     await editor.getByRole('button', { name: '선택 해제', exact: true }).click();
     await editor.locator('tr[data-slot="12"]').click();
     await picker.getByRole('radio', { name: '천도', exact: true }).check();
-    await picker.getByRole('combobox', { name: '대상 도시' }).selectOption(String(initial.nations[0]!.capitalCityKey));
+    // 인자 입력 화면(INT-25)의 도시 목록에서 고른다.
+    const capitalName = initial.cities.find((city) => city.cityKey === initial.nations[0]!.capitalCityKey)!.name;
+    await page
+      .getByRole('radiogroup', { name: '대상 도시' })
+      .getByRole('radio', { name: new RegExp(`^${capitalName}`) })
+      .click();
     await editor.getByRole('button', { name: '12번 칸에 넣기', exact: true }).click();
     await editor.getByRole('button', { name: '저장', exact: true }).click();
     await expect(editor.getByText('저장했습니다.', { exact: true })).toBeVisible();
@@ -200,5 +216,63 @@ test('T4-92 명령 카드의 개인 30칸·국가 12칸 저장과 모바일·키
   } finally {
     await page.close();
     await releaseHold(hold);
+  }
+});
+
+test('AC-M2-03 프리셋이 켠 화계와 대상 도시 칸을 실제 화면에서 선택하고 저장한다', async ({ world }) => {
+  test.setTimeout(120_000);
+  const actor = await world.user('ruler');
+  const db = world.hold.db;
+  const content = { id: 'command-test', title: '프리셋 명령 비교' };
+  await db.gameResource.create({
+    data: {
+      kind: 'SCENARIO',
+      name: content.id,
+      version: 1,
+      status: 'PUBLISHED',
+      content,
+      contentHash: hashState(content),
+      source: 'command-cards browser fixture',
+      publishedAt: new Date(),
+    },
+  });
+  for (const enabled of [false, true]) {
+    const initial = commandInitial();
+    const general = initial.generals[0]!;
+    general.userId = actor.userId;
+    const target = initial.cities.find((city) => city.nationId !== null && city.nationId !== general.nationId)!;
+    const key = enabled ? 'speed' : 'beginner';
+    const preset = {
+      ...(await loadPreset(key)),
+      commands: enabled ? { general: ['fire_attack'], nation: [] } : null,
+    };
+    const { worldId } = await saveInitialWorld(db, initial, {
+      name: '프리셋 명령 비교',
+      turnTermMinutes: preset.turnTermMinutes,
+      endYear: null,
+      preset: { key, value: preset },
+      ...(enabled ? { extFormat: 1 } : {}),
+    });
+    await controlClock(db, worldId, 'start');
+    await actor.page.goto(`/w/${worldId}/turns`);
+    const editor = actor.page.getByTestId('turn-editor');
+    const picker = editor.getByRole('region', { name: '명령 고르기' });
+    await expect(picker.getByRole('radio', { name: '농지 개간', exact: true })).toBeVisible();
+    const fire = picker.getByRole('radio', { name: '화계', exact: true });
+    if (!enabled) {
+      await expect(fire).toHaveCount(0);
+      continue;
+    }
+    await editor.locator('tr[data-slot="1"]').click();
+    await fire.check();
+    const cities = picker.getByRole('radiogroup', { name: '대상 도시', exact: true });
+    await cities.locator(`[data-value="${target.cityKey}"]`).click();
+    await picker.getByRole('button', { name: '1번 칸에 넣기', exact: true }).click();
+    await editor.getByRole('button', { name: '저장', exact: true }).click();
+    await expect(editor.getByText('저장했습니다.', { exact: true })).toBeVisible();
+    await actor.page.reload();
+    await expect(editor.locator('tr[data-slot="1"]')).toContainText('화계');
+    const row = await db.generalTurn.findFirstOrThrow({ where: { worldId, generalId: general.id, slot: 0 } });
+    expect(row).toMatchObject({ commandKey: 'fire_attack', args: { cityKey: target.cityKey } });
   }
 });

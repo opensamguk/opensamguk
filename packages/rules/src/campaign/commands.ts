@@ -4,7 +4,6 @@ import type { CommandResolver } from '../commands/resolve';
 import { fail, success } from '../commands/support';
 import type { Actor, CommandDef, CommandResult } from '../commands/types';
 import type { WorldView } from '../model/world';
-import { cloneWorld } from '../model/clone';
 import { campaignAttack } from './attack';
 import { followCampaignCommanders } from './movement';
 import {
@@ -123,7 +122,7 @@ export function createCampaignCommandResolver(base: CommandResolver): CommandRes
             : [],
         );
         let state = applyEffects(
-          cloneWorld(view),
+          view,
           result.effects.filter(
             (effect) =>
               !(stratagems.has(key) && effect.kind === 'general' && ['crew', 'train', 'atmos'].includes(effect.field)),

@@ -1,5 +1,9 @@
 import type { AdmissionSample, AdmissionReason, LoadBudget } from './admission';
 import type { DockerBinding } from './docker';
+export function workerAncestor(
+  pid?: number,
+  proc?: { readStat?: (path: string) => Promise<string>; readExecutable?: (path: string) => Promise<string> },
+): Promise<boolean>;
 export function bootstrapSnapshot(
   root: string,
   native: (

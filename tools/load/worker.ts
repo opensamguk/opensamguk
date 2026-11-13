@@ -2,16 +2,25 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+import { z } from 'zod';
 import { createDb, type PrismaClient } from '../../packages/db/src/index';
 import { TICKS_PER_MONTH, toGameDate } from '../../packages/rules/src/index';
-import { initializeResources } from '../init-resources';
+import { initializeResources, ResourceInitializationError } from '../init-resources';
 import { initializeIntegrationResources } from '../integration-resources';
+import { LOAD_CONTRACT, LOAD_PREPARATION_TURN_MINUTES } from './contract';
 import { prepareLoadFixtures } from './fixtures';
 import { runNativeLoad } from './generator';
+import { LoadHttpError } from './http';
 import { nativeJournal } from './journal';
-import { writeEvidence } from './lifecycle';
+import { workerFailureReasonPattern, writeEvidence } from './lifecycle';
 import { loadDatabaseUrl } from './server';
 import type { LoadRun } from './report';
+
+const turnSettingResult = z.object({
+  version: z.literal(1),
+  before: z.object({ turnTermMinutes: z.literal(LOAD_PREPARATION_TURN_MINUTES) }),
+  after: z.object({ turnTermMinutes: z.union([z.literal(1), z.literal(2)]) }),
+});
 
 export function assertActionCoverage(input: {
   worldId: string;
@@ -71,6 +80,34 @@ export async function readDatabaseWitness(db: PrismaClient, worldIds: readonly s
         ]);
         const own = assertActionCoverage({ worldId, lastSequence: world.actionSequence, turns, months, inputs });
         witnesses.push(...own);
+        const settings = await tx.inputEvent.findMany({ where: { worldId, kind: 'admin.world.setTurnTerm' } });
+        const setting = settings[0];
+        const settingResult = turnSettingResult.safeParse(setting?.result);
+        if (
+          settings.length !== 1 ||
+          setting?.status !== 'APPLIED' ||
+          setting.sequence === null ||
+          !settingResult.success ||
+          settingResult.data.after.turnTermMinutes !== world.turnTermMinutes
+        )
+          throw new Error('LOAD_SETUP_HANDOFF_INVALID');
+        const settingSequence = setting.sequence;
+        const registrations = await tx.inputEvent.findMany({
+          where: { worldId, kind: 'general.create' },
+          select: { status: true, sequence: true },
+        });
+        const applied = await tx.auditLog.findMany({
+          where: { worldId, action: 'world.setting.applied', inputEventId: setting.id },
+          select: { at: true },
+        });
+        if (
+          registrations.length !== LOAD_CONTRACT.humansPerWorld ||
+          registrations.some(
+            (row) => row.status !== 'APPLIED' || row.sequence === null || row.sequence >= settingSequence,
+          ) ||
+          applied.length !== 1
+        )
+          throw new Error('LOAD_SETUP_HANDOFF_INVALID');
         const millisecondsPerTick = (world.turnTermMinutes * 60_000) / TICKS_PER_MONTH;
         const epoch = world.clockAnchorAt.getTime() - world.clockTick * millisecondsPerTick;
         const cutoffTick = Math.ceil((cutoffAt - epoch) / millisecondsPerTick) - 1;
@@ -88,6 +125,12 @@ export async function readDatabaseWitness(db: PrismaClient, worldIds: readonly s
           pendingDueMonthly,
           committedActionCount: own.length,
           lastSequence: world.actionSequence,
+          preparation: {
+            turnTermMinutes: LOAD_PREPARATION_TURN_MINUTES,
+            appliedRegistrations: LOAD_CONTRACT.humansPerWorld,
+            settingSequence,
+            settingAppliedAt: applied[0]!.at.getTime(),
+          },
         });
       }
       return { databaseWitnesses: witnesses, databaseCoverage: coverage };
@@ -105,28 +148,40 @@ function deadline(env: NodeJS.ProcessEnv, key: string): number {
 async function main() {
   const command = process.argv[2];
   if (!['resources', 'generate', 'witness'].includes(command ?? '')) throw new Error('LOAD_WORKER_COMMAND_INVALID');
-  const db = createDb(loadDatabaseUrl(process.env));
+  let db: PrismaClient;
+  try {
+    db = createDb(loadDatabaseUrl(process.env));
+  } catch {
+    process.stderr.write('LOAD_WORKER_DATABASE\n');
+    throw new Error('LOAD_WORKER_FAILED');
+  }
   const controller = new AbortController(),
     worldIds: string[] = [];
   let failed = false,
     journal: ReturnType<typeof nativeJournal> | undefined;
   let setupTimer: ReturnType<typeof setTimeout> | undefined, bodyTimer: ReturnType<typeof setTimeout> | undefined;
+  let setupDeadline: number | undefined, bodyDeadline: number | undefined;
+  let deadlineFailure: string | undefined;
   let phase = 'starting';
+  let actorsPrepared = 0;
+  let sseReady = 0;
   const stop = () => controller.abort();
   process.once('SIGINT', stop);
   process.once('SIGTERM', stop);
   const work = async () => {
     if (command === 'resources') {
-      await initializeResources(
-        db,
-        await readFile(new URL('../../packages/db/sql/resources-init.sql', import.meta.url), 'utf8'),
-      );
+      phase = 'resources-sql-read';
+      const sql = await readFile(new URL('../../packages/db/sql/resources-init.sql', import.meta.url), 'utf8');
+      phase = 'resources-baseline-sql';
+      await initializeResources(db, sql);
       controller.signal.throwIfAborted();
+      phase = 'resources-integration';
       await initializeIntegrationResources(db);
       controller.signal.throwIfAborted();
       return;
     }
     if (command === 'witness') {
+      phase = 'witness';
       const fragment: unknown = JSON.parse(await readFile('/evidence/fragment.json', 'utf8'));
       if (
         !fragment ||
@@ -156,10 +211,17 @@ async function main() {
     const runId = process.env.LOAD_RUN_ID ?? '',
       mode = process.env.LOAD_MODE;
     if (mode !== 'formal' && mode !== 'smoke') throw new Error('LOAD_MODE_INVALID');
-    const setupDeadline = deadline(process.env, 'LOAD_SETUP_DEADLINE'),
-      bodyDeadline = deadline(process.env, 'LOAD_BODY_DEADLINE');
-    setupTimer = setTimeout(stop, setupDeadline - Date.now());
-    bodyTimer = setTimeout(stop, bodyDeadline - Date.now());
+    const setupEndsAt = deadline(process.env, 'LOAD_SETUP_DEADLINE');
+    setupDeadline = setupEndsAt;
+    bodyDeadline = deadline(process.env, 'LOAD_BODY_DEADLINE');
+    setupTimer = setTimeout(() => {
+      deadlineFailure = 'SETUP_TIMEOUT';
+      stop();
+    }, setupEndsAt - Date.now());
+    bodyTimer = setTimeout(() => {
+      deadlineFailure = 'BODY_TIMEOUT';
+      stop();
+    }, bodyDeadline - Date.now());
     journal = nativeJournal('/evidence/generator.jsonl');
     await writeEvidence('/evidence/worker-started.json', {
       version: 1,
@@ -177,6 +239,9 @@ async function main() {
       signal: controller.signal,
       onWorldCreated: (id) => {
         worldIds.push(id);
+      },
+      onActorPrepared: () => {
+        actorsPrepared++;
       },
       startEngine: async (worldId) => {
         // 기존 실제 엔진 감독이 새 월드의 lease를 얻을 때까지 기다리며 tick은 주입하지 않는다.
@@ -197,8 +262,9 @@ async function main() {
       signal: controller.signal,
       onEvent: async (event) => {
         controller.signal.throwIfAborted();
+        if (event.kind === 'sse' && event.state === 'ready') sseReady++;
         if (event.kind === 'start') {
-          if (event.at > setupDeadline || Date.now() > setupDeadline) throw new Error('LOAD_SETUP_DEADLINE_EXCEEDED');
+          if (event.at > setupEndsAt || Date.now() > setupEndsAt) throw new Error('LOAD_SETUP_DEADLINE_EXCEEDED');
           clearTimeout(setupTimer);
           await writeEvidence('/evidence/setup-completed.json', {
             completedAt: event.at,
@@ -206,7 +272,11 @@ async function main() {
             worlds: 2,
             fixtureAccounts: fixtures.fixtureAccounts,
             apiHumans: fixtures.realApiHumans,
+            pendingInputs: fixtures.pendingInputs,
+            temporaryOperators: fixtures.temporaryOperators,
+            turnTermMinutes: fixtures.worlds.map((world) => world.turnTermMinutes),
           });
+          phase = 'measurement';
           controller.signal.throwIfAborted();
         }
         await journal!.sink(event);
@@ -256,10 +326,35 @@ async function main() {
   };
   try {
     await work();
-  } catch {
+  } catch (error) {
     failed = true;
+    const helperPhases: Partial<Record<string, string>> = {
+      'resources-sql-read': 'LOAD_WORKER_RESOURCES_SQL_READ',
+      'resources-baseline-sql':
+        error instanceof ResourceInitializationError && !error.message.startsWith('초기화 자원 SQL 실패:')
+          ? 'LOAD_WORKER_RESOURCES_BASELINE_VERIFY'
+          : 'LOAD_WORKER_RESOURCES_BASELINE_SQL',
+      'resources-integration': 'LOAD_WORKER_RESOURCES_INTEGRATION',
+      witness: 'LOAD_WORKER_WITNESS',
+    };
+    const helperPhase = helperPhases[phase];
+    if (helperPhase) process.stderr.write(`${helperPhase}\n`);
     try {
-      await writeEvidence('/evidence/worker-failure.json', { failed: true, phase, worldIds, at: Date.now() });
+      const now = Date.now();
+      const stable = error instanceof Error && 'code' in error ? error.code : error instanceof Error && error.message;
+      const reason = deadlineFailure ?? (controller.signal.aborted ? 'ABORTED' : stable);
+      await writeEvidence('/evidence/worker-failure.json', {
+        failed: true,
+        phase,
+        worldIds,
+        actorsPrepared,
+        sseReady,
+        reason: typeof reason === 'string' && workerFailureReasonPattern.test(reason) ? reason : 'OTHER',
+        setupRemainingMs: setupDeadline === undefined ? null : setupDeadline - now,
+        bodyRemainingMs: bodyDeadline === undefined ? null : bodyDeadline - now,
+        http: error instanceof LoadHttpError ? { procedure: error.procedure, status: error.status } : null,
+        at: now,
+      });
     } catch {
       /* 원 실패를 유지한다. */
     }
@@ -274,6 +369,7 @@ async function main() {
     try {
       await db.$disconnect();
     } catch {
+      if (!failed && command !== 'generate') process.stderr.write('LOAD_WORKER_DISCONNECT\n');
       failed = true;
     }
     process.removeListener('SIGINT', stop);

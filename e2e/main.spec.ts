@@ -132,8 +132,8 @@ test.describe('장수가 있는 계정', () => {
       '도시 정보',
       '국가 정보',
       '장수 정보',
+      '장수 동향',
       '개인 기록',
-      '국가 기록',
       '중원 정세',
     ])
       await expect(page.getByRole('region', { name, exact: true })).toBeVisible();
@@ -182,7 +182,7 @@ test.describe('장수가 있는 계정', () => {
     await shot(page, '01-main.png');
   });
 
-  test('지도에서 적 도시를 고르면 메인을 떠나지 않고 도시 정보만 바뀌며 수치는 보이지 않는다', async ({ page }) => {
+  test('지도에서 적 도시를 고르면 메인을 떠나지 않고 도시 정보만 바뀌며 주민 최대치를 보여 준다', async ({ page }) => {
     await openMain(page);
     const city = page.getByRole('region', { name: '도시 정보', exact: true });
     await expect(city.locator(`[data-city-key="${ctx.home.general.cityKey}"]`)).toBeVisible();
@@ -191,14 +191,14 @@ test.describe('장수가 있는 계정', () => {
     const keyPattern = new RegExp(`%22cityKey%22%3A${enemy.key}(?!\\d)`);
     const response = page.waitForResponse((r) => r.url().includes('city.get') && keyPattern.test(r.url()));
     await page.getByTestId('world-map').locator(`[data-city-key="${enemy.key}"]`).click();
-    // 서버 응답 자체에 적 도시 수치와 적 장수 상세가 없어야 한다 (화면에서 숨기기만 하는 것이 아님).
+    // D-088에 따라 도시 최대치가 공개되고 현재 주민 수는 서버 응답에서 제외된다.
     const res = await response;
     const procedures = new URL(res.url()).pathname.replace('/trpc/', '').split(',');
     const payload = (await res.json()) as unknown[];
     const cityPayload = JSON.stringify(payload[procedures.indexOf('city.get')]);
     expect(cityPayload).toContain(`"key":${enemy.key}`);
-    expect(cityPayload).not.toContain('population');
-    expect(cityPayload).not.toContain('leadership');
+    expect(cityPayload).toContain('"populationMax":');
+    expect(cityPayload).not.toContain('"population":');
 
     await expect(page).toHaveURL(new RegExp(`/w/${ctx.worldId}\\?city=${enemy.key}$`));
     expect(await page.evaluate(() => (window as unknown as { __sameDocument?: boolean }).__sameDocument)).toBe(true);
@@ -254,7 +254,9 @@ test.describe('장수가 있는 계정', () => {
     await editor(page).getByRole('button', { name: '선택 해제' }).click();
     await row(page, 4).click();
     await pick(page, '이동');
-    await expect(editor(page).getByRole('combobox', { name: '대상 도시' })).toHaveValue(String(enemy.key));
+    await expect(
+      page.getByRole('radiogroup', { name: '대상 도시' }).getByRole('radio', { name: new RegExp(`^${enemy.name}`) }),
+    ).toHaveAttribute('aria-checked', 'true');
     await expect(row(page, 4)).toContainText('휴식');
     await editor(page).getByRole('button', { name: '4번 칸에 넣기', exact: true }).click();
     await expect(row(page, 4)).toContainText(enemy.name);
@@ -359,10 +361,15 @@ test.describe('장수가 있는 계정', () => {
     await shot(page, '12-main-turn-result.png');
   });
 
-  test('국가 정보에서 소속 장수·소유 도시 표를 펼치고 정렬한다', async ({ page }) => {
+  test('국가 정보의 세력 장수 링크로 국가 화면에서 소속 장수·소유 도시 표를 보고 정렬한다', async ({ page }) => {
     await openMain(page);
-    const nation = page.getByRole('region', { name: '국가 정보', exact: true });
-    await nation.getByRole('button', { name: '소속 장수·도시 펼치기' }).click();
+    // 표는 국가 화면에 있다 (INT-25). 메인 국가 칸에는 링크만 둔다.
+    await page
+      .getByRole('region', { name: '국가 정보', exact: true })
+      .getByRole('link', { name: /^세력 장수/ })
+      .click();
+    await expect(page).toHaveURL(new RegExp(`/w/${ctx.worldId}/nation/${ctx.home.general.nationId}$`));
+    const nation = page.getByRole('main');
     await expect(nation.getByRole('table').filter({ hasText: '소속 장수' })).toBeVisible();
     const cityTable = nation.getByRole('table').filter({ hasText: '소유 도시' });
     await expect(cityTable).toBeVisible();
@@ -417,7 +424,8 @@ test.describe('장수가 있는 계정', () => {
     await expect(logs.first()).toBeVisible({ timeout: 30_000 });
   });
 
-  test('월간 정산 뒤 국가 기록과 중원 정세가 메인에 쌓인다', async ({ page }) => {
+  // 메인 기록 줄은 장수 동향 | 개인 기록 | 중원 정세다 (INT-25, D-085). 국가 기록은 기록 화면 국가 역사 탭에 남는다.
+  test('월간 정산 뒤 중원 정세가 메인에, 국가 기록이 기록 화면에 쌓인다', async ({ page }) => {
     test.setTimeout(180_000);
     await expect
       .poll(
@@ -432,10 +440,12 @@ test.describe('장수가 있는 계정', () => {
     await openMain(page);
     const world = page.getByRole('region', { name: '중원 정세', exact: true });
     await expect(world.locator('li').first()).toContainText(/\d+년 \d+월/);
-    const nationRecords = page.getByRole('region', { name: '국가 기록', exact: true });
-    await expect(nationRecords.locator('tbody tr').first()).toBeVisible();
+    await expect(page.getByRole('region', { name: '국가 기록', exact: true })).toHaveCount(0);
     await world.scrollIntoViewIfNeeded();
     await shot(page, '04-main-records.png');
+    await page.goto(`/w/${ctx.worldId}/records?tab=nation`);
+    const nationRecords = page.getByRole('region', { name: '국가 기록', exact: true });
+    await expect(nationRecords.locator('tbody tr').first()).toBeVisible();
   });
 
   test('보조 주소도 같은 실제 데이터로 열린다', async ({ page }) => {
@@ -451,7 +461,7 @@ test.describe('장수가 있는 계정', () => {
 
     await page.goto(`/w/${ctx.worldId}/nation/${enemy.nationId}`);
     await expect(page.getByRole('heading', { level: 1, name: /^국가 정보 · / })).toBeVisible();
-    await expect(page.getByRole('note').first()).toContainText('다른 국가 정보');
+    await expect(page.getByRole('note').first()).toContainText('타국 국고와 장수의 비공개 항목');
     await expect(page.locator('[title="다른 국가 정보"] dd').first()).toHaveText('—');
     await shot(page, '07-nation-other.png');
 
@@ -469,6 +479,18 @@ test.describe('장수가 있는 계정', () => {
     test(`T3-10 AC-M3-08 v1 공통 메뉴 ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await openMain(page);
+      if (width < 768) {
+        // 좁은 메인은 게임 메뉴 막대 대신 메인 하단 막대 하나를 쓴다 (INT-25). 공통 메뉴는 다른 화면에서 본다.
+        await expect(page.getByRole('navigation', { name: '게임 메뉴' }).filter({ visible: true })).toHaveCount(0);
+        const bar = page.getByRole('tablist', { name: '메인 화면', exact: true });
+        await expect(bar.getByRole('tab')).toHaveCount(6);
+        await bar.getByRole('tab', { name: '메뉴', exact: true }).click();
+        await page
+          .getByRole('navigation', { name: '공통 메뉴', exact: true })
+          .getByRole('link', { name: '기록', exact: true })
+          .click();
+        await expect(page.getByRole('heading', { level: 1, name: '기록 · 내 장수' })).toBeVisible();
+      }
       const nav = page.getByRole('navigation', { name: '게임 메뉴' }).filter({ visible: true });
       await expect(nav).toHaveCount(1);
       await page.getByRole('banner').locator('a,button').filter({ visible: true }).last().focus();
@@ -580,11 +602,13 @@ test('장수 생성 API로 만든 재야 장수는 메인에서 바로 재야 �
   await expect(general.getByText(name, { exact: true })).toBeVisible();
   await expect(general.getByText('재야').first()).toBeVisible();
   await expect(page.getByRole('region', { name: '국가 정보', exact: true }).getByText('재야입니다')).toBeVisible();
+  await expect(editor(page).locator('tr[data-slot]')).toHaveCount(30);
+  await expect(page.getByTestId('world-map').locator('[data-mine="true"]')).toHaveCount(1);
+  // 국가 기록은 메인 기록 줄에서 빠져 기록 화면 국가 역사 탭에서 본다 (D-085).
+  await page.goto(`/w/${ctx.worldId}/records?tab=nation`);
   await expect(
     page.getByRole('region', { name: '국가 기록', exact: true }).getByText('소속 국가가 없습니다'),
   ).toBeVisible();
-  await expect(editor(page).locator('tr[data-slot]')).toHaveCount(30);
-  await expect(page.getByTestId('world-map').locator('[data-mine="true"]')).toHaveCount(1);
 });
 
 test('장수가 없는 계정은 장수 만들기 안내와 공개 지도를 본다', async ({ page }) => {

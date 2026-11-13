@@ -1,9 +1,17 @@
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
+import { retryUnlessClientError } from '../game/errors';
+import { displayName } from '../game/names';
 import { useWorldId } from '../game/queries';
+import { useTRPC } from '../trpc';
+import type { AppRouter } from '@opensamguk/server/router';
+import type { inferRouterOutputs } from '@trpc/server';
+import type { CommandInfo, GeneralChoice } from '../turns/CommandPicker';
+import { formatTime } from '../turns/schedule';
 import type { Check, TurnList, TurnSourceFactory } from '../turns/source';
 import { TurnEditor } from '../turns/TurnEditor';
 import { LoadingState } from '../ui/States';
+import { Tag } from '../ui/Tag';
 import {
   personnelKeys,
   usePersonnelApi,
@@ -26,14 +34,17 @@ export const nationDraftKey = (userId: string, worldId: string, office: Office) 
 type TabsData = { actorId: number; tabs: NationTurnTab[] };
 // 국가 칸은 임시 계약(PersonnelApi)의 칸 모양 그대로 캐시와 저장 결과에 쓴다. 개인 칸 모양과 섞지 않는다.
 type NationSlot = NationTurnTab['slots'][number];
+type NationCommandRow = inferRouterOutputs<AppRouter>['nationCommands']['list'][number];
 
 // 국가 직책 12칸 연결. 저장은 읽은 탭의 office와 revision을 그대로 돌려보낸다 (T2-05 국가 예턴 절).
 export function nationSource(
   api: PersonnelApi,
   tab: NationTurnTab,
   options: {
-    generals?: Array<{ id: number; name: string }> | undefined;
+    generals?: GeneralChoice[] | undefined;
     onOfficeChanged: (message: string) => void;
+    // 칸 주인의 다음 턴 시각(감찰 조회). 남의 직책 칸의 실행 시기를 센다. 모르면 undefined.
+    holderNextTurnAt?: string | null | undefined;
   },
 ): TurnSourceFactory<NationSlot> {
   const level = tab.officerLevel;
@@ -63,12 +74,21 @@ export function nationSource(
               }
             : old,
         ),
-      save: ({ revision, slots }) => api.setNationTurns({ worldId, office, revision, slots }),
+      save: ({ revision, slots, expectedActorId }) =>
+        api.setNationTurns({
+          worldId,
+          office,
+          revision,
+          slots,
+          expectedUserId: userId,
+          ...(expectedActorId === undefined ? {} : { expectedActorId }),
+        }),
       commands: {
         queryKey: personnelKeys.nationCommands(worldId),
         queryFn: () => api.nationCommands({ worldId }),
-        select: (data) =>
-          (data as Array<{ key: string; name: string; argsSchema: unknown }>).map((c) => ({
+        // 서버가 실은 실행 가능 여부·사유(available·reason, INT-26)를 그대로 넘겨 명령 카드가 흐림과 사유를 그린다.
+        select: (data): CommandInfo[] =>
+          (data as NationCommandRow[]).map((c) => ({
             ...c,
             category: 'nation',
           })),
@@ -83,8 +103,10 @@ export function nationSource(
       }),
       precheckRoot: personnelKeys.precheckRoot,
       timed: tab.edit.ok,
+      nextTurnAt: tab.edit.ok ? undefined : options.holderNextTurnAt,
       readOnly: tab.edit.ok ? null : tab.edit.reason,
       generals: options.generals,
+      walletKind: 'nation',
       onOfficeChanged: options.onOfficeChanged,
     };
   };
@@ -94,6 +116,7 @@ export function nationSource(
 export function NationTurnsPage() {
   const worldId = useWorldId();
   const api = usePersonnelApi();
+  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const tabs = useQuery({
     queryKey: personnelKeys.nationTurns(worldId),
@@ -106,6 +129,17 @@ export function NationTurnsPage() {
     queryFn: () => api.officers({ worldId }),
     retry: false,
   });
+  // 직책자마다 다음 턴 시각. 감찰과 같은 조회이며 직책자(수뇌 이상)만 받는다. 못 받으면 남의 칸 시각을 비워 둔다.
+  const inspection = useQuery({
+    ...trpc.inspection.members.queryOptions({ worldId }),
+    refetchInterval: (query) => (query.state.error ? false : 60_000),
+    retry: retryUnlessClientError,
+  });
+  const nextTurnAt = useMemo(
+    () => new Map(inspection.data?.items.map((row) => [row.generalId, row.nextTurnAt]) ?? []),
+    [inspection.data],
+  );
+  const isHuman = useMemo(() => new Map(board.data?.members.map((m) => [m.generalId, m.isHuman]) ?? []), [board.data]);
   const [chosen, setChosen] = useState<number | null>(null);
   const [officeNotice, setOfficeNotice] = useState<string | null>(null);
 
@@ -122,12 +156,14 @@ export function NationTurnsPage() {
   const list = tabs.data?.tabs ?? [];
   const tab = list.find((t) => t.officerLevel === chosen) ?? list.find((t) => t.edit.ok) ?? list[0];
   const generals = useMemo(() => membersOf(board.data), [board.data]);
+  const holderNextTurnAt = tab?.holder ? nextTurnAt.get(tab.holder.generalId) : undefined;
   const source = useMemo(
-    () => (tab ? nationSource(api, tab, { generals, onOfficeChanged }) : null),
+    () => (tab ? nationSource(api, tab, { generals, onOfficeChanged, holderNextTurnAt }) : null),
     // 조회 결과가 같으면 TanStack Query가 같은 객체를 돌려주므로 칸이 실제로 바뀔 때만 새로 만든다.
     // 편집기는 storageKey(본 직책)가 같으면 다시 만들지 않으므로 초안은 그대로다.
-    [api, tab, generals, onOfficeChanged],
+    [api, tab, generals, onOfficeChanged, holderNextTurnAt],
   );
+  const now = new Date();
 
   return (
     <section className={styles.page}>
@@ -156,8 +192,16 @@ export function NationTurnsPage() {
                 aria-selected={t === tab}
                 onClick={() => setChosen(t.officerLevel)}
               >
-                {t.title} · {t.holder?.name ?? '빈 자리'}
+                {t.title} · {t.holder ? displayName(t.holder.name) : '빈 자리'}
+                {/* 사람·NPC는 인사부 조회(personnel.officers)의 isHuman으로 가린다. 모르면 붙이지 않는다. */}
+                {t.holder && isHuman.get(t.holder.generalId) === false ? (
+                  <>
+                    {' '}
+                    <Tag tone="muted">NPC</Tag>
+                  </>
+                ) : null}
                 {t.edit.ok ? <span className={styles.mine}>(내 칸)</span> : null}
+                <TabNextTurn at={t.holder ? nextTurnAt.get(t.holder.generalId) : undefined} now={now} />
               </button>
             ))}
           </div>
@@ -172,6 +216,17 @@ export function NationTurnsPage() {
   );
 }
 
-function membersOf(board: PersonnelBoard | undefined) {
-  return board?.members.map((m) => ({ id: m.generalId, name: m.name }));
+// 탭 단추의 다음 턴 시각. 서버가 시각을 주지 않았거나(멈춘 월드·가속) 모르면 적지 않는다.
+function TabNextTurn({ at, now }: { at: string | null | undefined; now: Date }) {
+  if (!at) return null;
+  return (
+    <span className={styles.tabTime}>
+      다음 턴 <time dateTime={at}>{formatTime(new Date(at), now)}</time>
+    </span>
+  );
+}
+
+// 인자 입력 화면의 대상 장수 후보. 소재 도시와 유저 여부도 넘겨 `이름 (도시)`와 NPC 표시에 쓴다 (INT-25).
+function membersOf(board: PersonnelBoard | undefined): GeneralChoice[] | undefined {
+  return board?.members.map((m) => ({ id: m.generalId, name: m.name, cityName: m.city.name, isHuman: m.isHuman }));
 }

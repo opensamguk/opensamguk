@@ -105,7 +105,8 @@ it('AC-P2-26 월드별 저장 규칙과 같고 비공개 메타데이터를 응�
     const stored = await db.world.findUniqueOrThrow({ where: { id } }),
       result = await query({ worldId: id });
     expect(result.status).toBe(200);
-    expect(result.body.result?.data).toEqual({
+    const data = result.body.result?.data;
+    expect(data && { ...data, unitSet: unitSetSchema.parse(data.unitSet) }).toEqual({
       unitSetKey: stored.unitSetKey,
       unitSet: unitSetSchema.parse(stored.unitSet),
       statRules: { ...statRulesSchema.parse({ stat: stored.statRules }).stat, count: id === five ? 5 : 3 },
@@ -168,4 +169,21 @@ it.each(['unitSet', 'statRules'] as const)('AC-P2-26 잘못 저장된 %s의 내�
   expect(result.body.error?.message).toBe('요청을 처리하지 못했습니다.');
   expect(result.text).not.toContain(privateMarker);
   expect(result.text).not.toContain('stack');
+});
+
+it('같은 판의 병종 설명만 표시하고 저장 규칙을 바꾸지 않는다', async () => {
+  const world = await db.world.findUniqueOrThrow({ where: { id: primary } });
+  const unitSet = unitSetSchema.parse(world.unitSet);
+  const info = ['표준적인 보병입니다.', '보병은 방어특화이며,', '상대가 회피하기 어렵습니다.'];
+  const result = await query({ worldId: primary });
+  expect(result.status).toBe(200);
+  expect(result.body.result?.data.unitSet.crewTypes[1]).toHaveProperty('info', info);
+  expect((await db.world.findUniqueOrThrow({ where: { id: primary } })).unitSet).toEqual(world.unitSet);
+  const modified = { ...unitSet, crewTypes: unitSet.crewTypes.map((unit) => ({ ...unit, attack: unit.attack + 1 })) };
+  await db.world.update({ where: { id: primary }, data: { unitSet: modified } });
+  try {
+    expect((await query({ worldId: primary })).body.result?.data.unitSet.crewTypes[1]).not.toHaveProperty('info');
+  } finally {
+    await db.world.update({ where: { id: primary }, data: { unitSet } });
+  }
 });

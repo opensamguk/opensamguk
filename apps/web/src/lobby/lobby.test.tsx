@@ -10,10 +10,31 @@ import {
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { LobbyNotice, LobbyWorld } from './contract';
-import { NoticeBoard, WorldList } from './LobbyPage';
-import { generalsText, lobbyAction, metaText, myGeneralText, startedText, STATUS_LABEL } from './lobbyView';
+import { NoticeBoard, PastSeasons, WorldList } from './LobbyPage';
+import {
+  endedText,
+  generalsText,
+  lobbyAction,
+  metaText,
+  myGeneralText,
+  splitWorlds,
+  startedText,
+  STATUS_LABEL,
+} from './lobbyView';
 
 afterEach(cleanup);
+
+const myGeneral: NonNullable<LobbyWorld['myGeneral']> = {
+  id: 7,
+  name: '조운',
+  nationName: '공손찬',
+  portraitId: 5,
+  nationColor: '#112233',
+  officerTitle: '장수',
+  courtTitle: null,
+  cityName: '북평',
+  stats: { leadership: 90, strength: 97, intel: 75, politics: 60, charm: 80 },
+};
 
 // AppRouter의 lobby.worlds 응답 모양을 따른 월드 하나. D-025 승인 전 응답이라 maxHumanGenerals 키가 없다.
 const world = (extra: Partial<LobbyWorld> = {}): LobbyWorld => ({
@@ -27,6 +48,7 @@ const world = (extra: Partial<LobbyWorld> = {}): LobbyWorld => ({
   turnTermMinutes: 60,
   startedAt: '2026-10-18T03:00:00.000Z',
   humanGenerals: 34,
+  winner: null,
   myGeneral: null,
   createBlockedReason: null,
   ...extra,
@@ -65,14 +87,14 @@ describe('카드 글자', () => {
   });
 
   it('내 장수는 이름과 국가, 재야면 재야, 없으면 내 장수 없음', () => {
-    expect(myGeneralText({ id: 1, name: '조운', nationName: '공손찬' })).toBe('내 장수: 조운 (공손찬)');
-    expect(myGeneralText({ id: 1, name: '조운', nationName: null })).toBe('내 장수: 조운 (재야)');
+    expect(myGeneralText(myGeneral)).toBe('내 장수: 조운 (공손찬)');
+    expect(myGeneralText({ ...myGeneral, nationName: null })).toBe('내 장수: 조운 (재야)');
     expect(myGeneralText(null)).toBe('내 장수 없음');
   });
 });
 
 describe('버튼 고르기 (T2-04 버튼 표 5줄)', () => {
-  const mine = { id: 7, name: '조운', nationName: '공손찬' };
+  const mine = myGeneral;
   it('로그인 · 내 장수 있음 · 이유 없음 → 들어가기', () => {
     expect(lobbyAction(true, { myGeneral: mine, createBlockedReason: null })).toEqual({ kind: 'enter' });
   });
@@ -112,7 +134,7 @@ describe('월드 카드', { timeout: 30_000 }, () => {
       <WorldList
         loggedIn
         worlds={[
-          world({ myGeneral: { id: 7, name: '조운', nationName: '공손찬' } }),
+          world({ myGeneral: myGeneral }),
           world({
             id: '00000000-0000-4000-8000-000000000002',
             name: '2월드',
@@ -129,7 +151,9 @@ describe('월드 카드', { timeout: 30_000 }, () => {
     expect(within(first).getByText('진행 중').getAttribute('data-tone')).toBe('accent');
     expect(within(first).getByText('정규')).toBeTruthy();
     expect(within(first).getByText('군웅할거(191) · 193년 4월 · 턴 60분 · 장수 34 · 시작 10/18')).toBeTruthy();
-    expect(within(first).getByText('내 장수: 조운 (공손찬)')).toBeTruthy();
+    // 내 장수는 얼굴(원형 icon)과 이름·소속으로 보인다 (D-085).
+    expect(within(first).getByRole('img', { name: '조운' })).toBeTruthy();
+    expect(within(first).getByText('공손찬')).toBeTruthy();
     expect(within(first).getByRole('link', { name: '들어가기' }).getAttribute('href')).toBe(
       '/w/00000000-0000-4000-8000-000000000001',
     );
@@ -193,6 +217,49 @@ describe('월드 카드', { timeout: 30_000 }, () => {
       <WorldList loggedIn worlds={[world({ status: 'ENDED', createBlockedReason: '끝난 월드입니다' })]} />,
     );
     expect(screen.getByText('끝남').getAttribute('data-tone')).toBe('muted');
+  });
+});
+
+// 지난 기수 (INT-26, p7-records-20). lobby.worlds({ includeEnded: true })의 끝난 월드 행을 한 줄씩 그린다.
+describe('지난 기수', { timeout: 30_000 }, () => {
+  const ended = (extra: Partial<LobbyWorld>) =>
+    world({ status: 'ENDED', createBlockedReason: '끝난 월드입니다', gameDate: { year: 230, month: 7 }, ...extra });
+
+  it('끝난 월드만 따로 모으고 각 묶음은 서버 순서를 지킨다', () => {
+    const a = world({ id: 'a' });
+    const b = ended({ id: 'b' });
+    const c = world({ id: 'c', status: 'PAUSED' });
+    const d = ended({ id: 'd' });
+    expect(splitWorlds([a, b, c, d])).toEqual({ live: [a, c], ended: [b, d] });
+    expect(endedText(b)).toBe('230년 7월 끝남');
+  });
+
+  it('줄마다 기수 이름, 통일 국가 이름·색, 끝난 연월, 영토 재생 링크를 둔다. 내 장수가 있으면 기록 보기도 둔다', async () => {
+    await renderInRouter(
+      <PastSeasons
+        worlds={[
+          ended({
+            id: '00000000-0000-4000-8000-000000000003',
+            name: '3기',
+            winner: { name: '위', color: '#336699' },
+            myGeneral,
+          }),
+          ended({ id: '00000000-0000-4000-8000-000000000004', name: '4기', winner: null }),
+        ]}
+      />,
+    );
+    expect(screen.getByRole('heading', { name: '지난 기수' })).toBeTruthy();
+    const [third, fourth] = screen.getAllByTestId('past-season');
+    expect(third!.textContent).toBe('3기통일위230년 7월 끝남영토 재생기록 보기');
+    expect(within(third!).getByText('위').getAttribute('style')).toContain('background: rgb(51, 102, 153)');
+    expect(within(third!).getByRole('link', { name: '3기 영토 재생 보기' }).getAttribute('href')).toBe(
+      '/share/timelapse/00000000-0000-4000-8000-000000000003',
+    );
+    expect(within(third!).getByRole('link', { name: '3기 기록 보기' }).getAttribute('href')).toBe(
+      '/w/00000000-0000-4000-8000-000000000003',
+    );
+    expect(fourth!.textContent).toBe('4기통일 국가 없음230년 7월 끝남영토 재생');
+    expect(within(fourth!).getAllByRole('link')).toHaveLength(1);
   });
 });
 

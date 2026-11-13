@@ -12,6 +12,17 @@
 
 ## 2. 배포
 
+### 배포 관리 호스트
+
+`tools/release-console-host.ps1 -Config <절대경로> -Watch`를 운영 호스트에서 PowerShell 7로 실행한다. `-Watch`를 생략하면 현재 판과 승인 목록을 게시하고 대기 중인 요청 한 건을 검사한다. 구성과 실행 기록 디렉터리는 저장소 및 웹 프로세스의 쓰기 범위 밖에 둔다. 서버와 엔진 이미지의 현재 판이 같고 PostgreSQL 컨테이너 ID·시스템 ID·DB OID가 일치해야 한다.
+
+호스트 설정은 `dockerExecutable`, `project`, `databaseContainer`, `database`, `dbUser`, `databaseSystemId`, `databaseOid`, `runDirectory`, `drivers`, `candidates`를 받는다. 경로는 절대 경로이며 DB 식별값은 문자열이다. `drivers`의 키는 `DEPLOY`, `ROLLBACK`이며 승인한 실행기의 `path`와 `sha256`을 지정한다. `candidates`는 최대32행이며 각 행에 `fromRevision`, `revision`, `operation`, `manifest`, `manifestSha256`, `receipt`, `receiptSha256`을 넣는다. 호스트는 검증된 산출물 영수증과 등록한 해시가 모두 일치하는 대상만 게시한다.
+
+호스트는 요청 만료, 관리자 자격, 현재 버전, 승인 목록을 다시 확인해 한 건만 실행한다. 실행기에 `-Operation`, `-ExpectedRevision`, `-Revision`, `-ManifestPath`, `-PreflightReceiptPath`, `-RequestId`를 전달한다. 실행기에는 사유를 넘기지 않는다. 웹에는 Docker 접근 권한, 호스트 파일 경로, 실행 로그를 전달하지 않는다. 새 버전의 서버와 엔진을 확인한 뒤 성공을 기록한다. 실행 중 호스트가 종료되거나 오류가 발생하면 자동 재실행을 차단한다. 운영 상태와 실행 기록을 확인한 운영자가 `-ResolveRequest <UUID>`로 실제 이전 판 또는 대상 판과 결과를 대조해 이력을 확정한다.
+
+저장소의 Compose 배포 실행기는 `tools/release-compose-driver.ps1`이다. `OPENSAMGUK_RELEASE_COMPOSE_CONFIG`가 가리키는 호스트 설정에는 위 DB·프로젝트·Docker 항목과 `bashExecutable`, `backupScript`, `backupScriptSha256`, `backupDirectory`, `backupDockerConfig`, `runtimeDirectory`, `publicOrigin`을 지정한다. 현재 서비스 정지, 기존 `backup.sh`로 백업, 새 migration 적용, 서비스와 공개 HTML 해시 확인 순서로 실행한다. migration 시도 또는 새 writer 기동 뒤 실패하면 서비스를 정지하고 호스트 점검을 기다린다.
+
+되돌리기는 현재 DB를 그대로 쓰는 경우에 같은 실행기를 등록한다. Compose 설정의 `rollbackPairs`에는 소유자가 애플리케이션 데이터 호환성을 검토한 `fromRevision`, `revision`, `currentManifest`, `currentManifestSha256`, `targetManifestSha256`을 지정한다. 실행기는 양쪽 산출물의 migration 이름·해시와 자원 SQL 해시, 현재 이미지 ID, 실제 DB의 적용 기록을 모두 확인한다. 서비스 정지와 백업 뒤 같은 DB로 이전 이미지를 기동하고 공개 화면을 확인한다. DB 스키마 또는 자료 계약이 다르면 별도 DB 복원과 전환 절차를 검증한 뒤 승인한다. 스키마가 다른 배포판의 전환은 별도 승인을 거친다. 아래 단계에서 승인된 백업을 격리 DB로 준비할 수 있다.
 <!-- TODO(M2): 명령 하나로 배포 (AC-M2-08). migration 적용 → server·engine 재시작 → 상태 확인. -->
 
 ### 로컬 산출물 사전 확인 (T2-15 B2b3a)
@@ -87,7 +98,9 @@ Windows 시험은 PATH의 Bash 대신 `C:/Program Files/Git/bin/bash.exe`를 사
 
 dump와 성공 manifest가 한 쌍이어야 백업 성공입니다. manifest에는 아카이브 SHA-256과 같은 snapshot의 적용 migration 목록을 남깁니다. 성공 실행 뒤에만 7일보다 오래된 성공 백업을 정리합니다. 외부 복사는 `not-configured`입니다. 매일 실행할 일정 설치와 외부 복사는 아직 하지 않았습니다.
 
-복구는 새 리허설 대상만 받으며 기존 DB를 덮어쓰지 않습니다. 복원 실패 시 이번 실행이 만든 대상의 OID와 연결 0을 확인해야 삭제합니다. 운영 복구 대상의 비밀 파일·cutover 계약은 B2·B3 배정 전이므로 운영 복구는 거부합니다.
+복구는 새 DB에만 수행합니다. 리허설 복원 실패 시 이번 실행이 만든 대상의 OID와 연결 0을 확인한 뒤 삭제합니다. 격리된 운영 복원 대상에서 실패한 경우에는 확인할 수 있도록 대상 DB를 보존합니다.
+
+전환 전 운영 복원 준비에는 `opensamguk_restore_<UTC시각>_<8자리 hex>`의 새 대상과 `--approved-source-db`, `--approved-source-oid`, `--approved-manifest-sha256`, `--approved-release-sha`, `--stage-receipt`를 지정합니다. 원본과 백업의 PostgreSQL 시스템 식별자·DB OID·승인 릴리스가 같고 서비스 정지 시점의 백업이어야 합니다. 복원 후 대상 DB의 migration 원장과 내용 해시를 백업과 대조합니다. 성공 영수증은 대상의 OID와 원본·백업 해시, 연결 차단 및 전환 미승인 상태를 기록합니다. 원본 DB와 서비스 연결은 그대로 둡니다. 실제 전환은 별도의 호스트 실행 계약에서 다룹니다.
 
 리허설의 준비와 각 진행 단계는 자체20초 기한을 둡니다. 기한을 넘기면 다음 진행을 막고 남은 작업의 종료를 기다린 뒤 자기 DB만 정리합니다. 기존 시험의30초 상한은 늘리지 않습니다.
 
@@ -191,12 +204,14 @@ Node24.22.0·pnpm10.33.0을 준비한 뒤 의존성 없는 `bootstrap.mjs`가 �
 
 설치 전에 호스트의 실제60초 CPU, 메모리·cgroup 조상과 Docker 자료/근거 파일시스템 두 곳의 여유를1 CPU·2GiB·4GiB 예산으로 심사합니다. 의존성 설치는 새 systemd scope에서 CPU100%·메모리2GiB·추가 swap0으로 제한합니다. scope 내부에서 비root UID, 실제 조상과 커널 제한을 다시 확인한 뒤 설치하고 종료·잔여 scope를 확인합니다. 설치 전 점검과 설치·정리는 합계5분 안에 마쳐야 합니다. scope가 조상 관계를 끊거나 실제 제한을 확인하지 못하면 실패합니다.
 
-설치 뒤에는 기존 심사 코드로 다시 확인하고 전용 BuildKit builder를 만듭니다. 공식 `moby/buildkit:v0.34.1`의 고정 digest, 실제1 CPU·2GiB 제한과 로컬 커널의 parent를 확인한 뒤 기존 `deploy/Dockerfile`의 runtime을 빌드합니다. 이 builder는 공식 Docker container driver의 privileged 동작을 사용하므로 사용자 서버에서 실행하지 않습니다. 임시 GitHub VM 안에서만 쓰고 측정 전 정상 종료·삭제를 확인합니다. 공식 [driver 동작](https://docs.docker.com/build/builders/drivers/docker-container/)과 [고정 release](https://github.com/moby/buildkit/releases/tag/v0.34.1)를 참고합니다.
+설치 뒤에는 기존 심사 코드로 다시 확인하고 전용 BuildKit builder를 만듭니다. 공식 `moby/buildkit:v0.34.1`의 고정 digest, 실제1 CPU·2GiB 제한과 로컬 커널의 parent를 확인한 뒤 `deploy/Dockerfile`의 검증 전용 `load-runtime`을 빌드합니다. 이 단계에 검증 실행 코드와 생성한 Prisma client가 들어갑니다. 이 builder는 공식 Docker container driver의 privileged 동작을 사용하므로 사용자 서버에서 실행하지 않습니다. 임시 GitHub VM 안에서만 쓰고 측정 전 정상 종료·삭제를 확인합니다. 공식 [driver 동작](https://docs.docker.com/build/builders/drivers/docker-container/)과 [고정 release](https://github.com/moby/buildkit/releases/tag/v0.34.1)를 참고합니다.
 
 BuildKit와 PostgreSQL 고정 이미지의 pull·압축 해제는 Docker daemon이 수행하며 builder의 CPU·메모리 제한 밖입니다. 이를 제한된 작업으로 표시하지 않습니다. 두 고정 digest의 실제 image ID와 플랫폼을 검증하고 준비 뒤 호스트·cgroup·두 디스크를 재심사합니다. 이미지 준비·재심사·빌드의 합계 제한은15분, 자기 builder 정리는2분입니다. 실제 준비 IO나 자원 부족 때문에 이 한도를 넘기면 실패로 남깁니다.
 
 정식 부하는 두 월드 각각491 NPC와 실제 API로 만든 사람 장수109명, 합계 시험 계정218개와 예턴6540칸을 준비합니다. 월드별 시계는1분·2분이고 동시 SSE100개, 준비 운동120초와 측정900초를 유지합니다. API p95는300ms 미만, 턴 저장 지연의 보수적 상계는10초 미만이어야 합니다. 시험 생성자의 명시 정책만 쓰며 운영 정책 승인이나 메일 수신을 대신하지 않습니다. smoke는 동시 SSE10개·준비 운동1초·측정60초의 연결 확인이며 정식 통과로 세지 않습니다.
 
-`pnpm load:m3`와 `pnpm load:smoke`는 기존 실행기 `run.ts`의 직접 진입점입니다. 직접 실행하려면 검증한 이미지 ID와 `--source-head`, `--source-sha256`, 승인된 장소의 `--site github-hosted`가 필요합니다. 수동 워크플로의 `ci.ts`가 설치·빌드·입장 심사·직접 실행을 순서대로 연결합니다. 실행기의 준비180초·실행1200초·정리300초는 바꾸지 않습니다. 워크플로75분은 설치5분, 빌드 전 심사11분, 이미지 준비·빌드15분, builder 정리2분, 측정 심사와 실행·정리36분, 요약2분의71분 상계와 action 준비4분을 합한 값입니다.
+`pnpm load:m3`와 `pnpm load:smoke`는 실행기 `run.ts`의 직접 진입점입니다. 직접 실행하려면 검증한 이미지 ID와 `--source-head`, `--source-sha256`, 승인된 장소의 `--site github-hosted`가 필요합니다. 수동 워크플로의 `ci.ts`가 설치·빌드·입장 심사·직접 실행을 순서대로 연결합니다. 공식 준비 상한은 360초이며 준비를 포함한 실행 상한은 1380초입니다. 스모크 준비 상한은 180초이고 실행 상한은 1200초입니다. 정리 상한은 각각 300초입니다. 워크플로 상한은 공식 78분과 스모크 75분입니다.
+
+격리 월드는 60분 턴 간격으로 시작해 일반 장수 등록 API와 엔진으로 월드마다 109명을 준비합니다. 준비가 끝나면 운영 설정 API와 엔진으로 턴 간격을 1분과 2분으로 적용합니다. 대기 입력과 임시 운영자 계정 수가 모두 0인 상태에서 준비 운동을 시작합니다. 최종 DB 대조는 각 월드의 설정 변경 시퀀스를 기준으로 준비와 실측의 시계를 각각 확인합니다.
 
 원자료는 실행기의 `.load-reports/`에 보존하고 공개 Actions 산출물로 업로드하지 않습니다. 공개 저장소에서는 소유자만 내려받도록 보장할 수 없기 때문입니다. 공개 job summary에는 소스 SHA·판정·개수·지연 수치와 정리 확인만 씁니다. 계정·월드 UUID, 로그·쿠키·연결 문자열·volume 내용은 내보내지 않습니다. 임시 VM이 없어지면 상세 실패 근거도 소실되므로 재현 실행이나 별도 승인한 비공개 보관 경로가 필요합니다. 정상 종료·같은 DB OID·연결0·소유 자원 정리·원자료 재집계 중 하나라도 확인하지 못하면 공개 성공으로 표시하지 않습니다. 기존 사용자 점검용5200과 기존 DB는 이 경로에서 사용하지 않습니다.

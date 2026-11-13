@@ -16,7 +16,6 @@ export type TreatyTarget = TreatyListPage['targets'][number];
 export type Relation = TreatyTarget['relation'];
 export type PendingAction = TreatyListPage['pending'][number];
 export type RecentAction = TreatyListPage['myRecent'][number];
-// 저장된 조항. 첫 세 조항(종전·불가침·기록만 남길 약속)뿐이다.
 export type Clause = TreatyItem['clauses'][number];
 export type ClauseKind = Clause['kind'];
 export type Quote = Outputs['quote'];
@@ -26,7 +25,7 @@ export type RequestKind = RequestState['kind'];
 export type FinishedTreaty = Extract<RequestState, { status: 'applied' }>['treaty'];
 export type RequestId = RequestState['requestId'];
 
-// 서버 입력의 toNationId·clauses는 unknown으로 받고 서버가 정규화한다. 화면은 첫 세 조항만 만들어 보낸다.
+// 서버가 제안 입력을 검증하고 정규화한다.
 export type ProposeInput = { toNationId: number; clauses: Clause[] };
 export type RespondInput = { treatyId: string; accept: boolean };
 export type ActionInput =

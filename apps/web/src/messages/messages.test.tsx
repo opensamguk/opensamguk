@@ -7,7 +7,7 @@ import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { bodyLength, type MessageItem, type MessageScope, type NationNotice, type UnreadResponse } from './api';
 import { clearDrafts, readDraft } from './drafts';
-import { mergeMessages, prependSent, unreadReceivedIds, unreadTotal, visibleScopes } from './merge';
+import { mergeMessages, prependSent, unreadBadges, unreadReceivedIds, unreadTotal, visibleScopes } from './merge';
 
 // 화면은 실제 AppRouter 타입의 tRPC 클라이언트로 부른다. 여기서는 네트워크 대신 마지막 link만 바꿔
 // 실제로 나가는 path·input·AbortSignal을 기록하고 path별 처리기의 값을 돌려준다.
@@ -43,8 +43,9 @@ vi.mock('../trpc', async (importOriginal) => {
 
 const { TRPCProvider, trpc, trpcClient } = await import('../trpc');
 const { useAuthorityWatch } = await import('./authority');
-const { MessagePanel } = await import('./MessagePanel');
+const { MessagePanel, MessageRow, pickerName } = await import('./MessagePanel');
 const { NationNoticeBox, NationNoticePopup } = await import('./NationNotice');
+const { MessageButton } = await import('./MessageDock');
 
 const WORLD = 'w1';
 const keys = {
@@ -60,8 +61,8 @@ const item = (id: string, extra: Partial<MessageItem> = {}): MessageItem => ({
   id,
   scope: 'PRIVATE',
   direction: 'received',
-  from: { generalId: 2, name: '하후돈', nation: { id: 1, name: '위', color: '#000080' } },
-  to: { generalId: 1, name: '조조', nation: { id: 1, name: '위', color: '#000080' } },
+  from: { portraitId: null, generalId: 2, name: '하후돈', nation: { id: 1, name: '위', color: '#000080' } },
+  to: { portraitId: null, generalId: 1, name: '조조', nation: { id: 1, name: '위', color: '#000080' } },
   body: `본문 ${id}`,
   sentAt: `2026-10-23T10:00:0${id.length}Z`,
   gameDate: { year: 191, month: 1 },
@@ -175,6 +176,18 @@ describe('메시지 목록 합치기', () => {
     ]);
     expect(unreadTotal({ PRIVATE: 0, NATION: 1, DIPLOMACY: 2, WORLD: 0 })).toBe(3);
     expect(unreadTotal(undefined)).toBe(0);
+    // 위 띠 배지는 개인·외교를 따로, 국가·전체를 기타로 센다 (INT-25 AC-INT-25).
+    expect(unreadBadges({ PRIVATE: 2, NATION: 1, DIPLOMACY: 3, WORLD: 4 })).toEqual({
+      private: 2,
+      diplomacy: 3,
+      other: 5,
+    });
+    expect(unreadBadges({ PRIVATE: 1, NATION: null, DIPLOMACY: null, WORLD: 0 })).toEqual({
+      private: 1,
+      diplomacy: 0,
+      other: 0,
+    });
+    expect(unreadBadges(undefined)).toEqual({ private: 0, diplomacy: 0, other: 0 });
     expect(unreadReceivedIds([item('a', { read: false }), item('b', { read: false, direction: 'sent' })])).toEqual([
       'a',
     ]);
@@ -210,6 +223,30 @@ describe('메시지 패널', () => {
     expect(await screen.findByRole('tab', { name: '개인' })).toBeTruthy();
     await waitFor(() => expect(screen.queryByText('안 읽음')).toBeNull());
     expect(screen.getByText('더 이전 메시지가 없습니다.')).toBeTruthy();
+  });
+
+  // INT-26: message.list의 보낸·받은 장수에 portraitId가 오면 원형 icon이 실제 얼굴이 된다.
+  it('보낸 장수의 portraitId로 얼굴을 그리고 번호가 없으면 실루엣이다', async () => {
+    on('message.list', () => ({
+      items: [
+        item('a', {
+          from: {
+            portraitId: 10001,
+            generalId: 2,
+            name: '하후돈(夏侯惇)',
+            nation: { id: 1, name: '위', color: '#000080' },
+          },
+        }),
+      ],
+      next: null,
+    }));
+    on('message.markRead', () => ({ updated: 0, unread: { PRIVATE: 0, NATION: null, DIPLOMACY: null, WORLD: 0 } }));
+    renderWith(<MessagePanel worldId={WORLD} />);
+    const name = await screen.findByText('하후돈', {}, { timeout: 5_000 });
+    const party = name.parentElement!;
+    expect(party.querySelector('[data-variant="icon"]')!.getAttribute('data-state')).toBe('image');
+    const other = screen.getByText('조조').parentElement!;
+    expect(other.querySelector('[data-variant="icon"]')!.getAttribute('data-state')).toBe('fallback');
   });
 
   it('보내기 실패는 입력을 지우지 않고 서버 문장을 입력칸 설명으로 붙인다', async () => {
@@ -250,7 +287,7 @@ describe('메시지 패널', () => {
       direction: 'sent',
       body: '보낸 글',
       sentAt: '2026-10-23T12:00:00Z',
-      to: { generalId: 7, name: '유비', nation: null },
+      to: { portraitId: null, generalId: 7, name: '유비', nation: null },
     });
     on('message.list', () => ({ items: [item('a')], next: null }));
     on('message.send', () => ({ item: sent }));
@@ -282,7 +319,7 @@ describe('메시지 패널', () => {
     expect(box.value).toBe('쓰던 글');
   });
 
-  it('전체 탭은 고정 공지를 맨 위에 두고 작성 칸이 없다', async () => {
+  it('전체 탭은 고정 공지를 보이고 수신자 지정 없이 보낸다', async () => {
     on('notice.world.list', () => ({
       items: [{ id: 'n1', body: '점검 안내', pinned: true, publishedAt: '2026-10-23T00:00:00Z' }],
     }));
@@ -290,7 +327,15 @@ describe('메시지 패널', () => {
     fireEvent.click(await screen.findByRole('tab', { name: '전체' }));
     expect(await screen.findByText('점검 안내')).toBeTruthy();
     expect(screen.getByText('고정')).toBeTruthy();
-    expect(screen.queryByRole('textbox')).toBeNull();
+    const box = await screen.findByRole('textbox', { name: '메시지 내용' });
+    expect(screen.queryByRole('combobox')).toBeNull();
+    fireEvent.change(box, { target: { value: '월드 대화' } });
+    fireEvent.click(screen.getByRole('button', { name: '보내기' }));
+    await waitFor(() =>
+      expect(callsTo('message.send').map((call) => call.input)).toEqual([
+        { worldId: WORLD, scope: 'WORLD', body: '월드 대화' },
+      ]),
+    );
   });
 
   it('본문이 코드포인트 1,000자를 넘으면 보내지 않고 서버와 같은 이유를 보인다', async () => {
@@ -415,7 +460,10 @@ describe('권한 변경', () => {
       pages: [{ items: [item('x', { read: false, body: '남의 본문' })], next: null }],
       pageParams: [null],
     });
-    client.setQueryData(keys.recipients, { generals: [{ id: 99, name: '남의 장수', nation: null }], nations: [] });
+    client.setQueryData(keys.recipients, {
+      generals: [{ id: 99, portraitId: null, name: '남의 장수', nation: null }],
+      nations: [],
+    });
     client.setQueryData(keys.worldNotices, {
       items: [{ id: 'n9', body: '남의 공지', pinned: true, publishedAt: '2026-10-23T00:00:00Z' }],
     });
@@ -781,5 +829,59 @@ describe('국가 공지 팝업', () => {
     await waitFor(() => expect(screen.getByRole('dialog').getAttribute('data-nation-id')).toBe('1'));
     expect(screen.getByRole('dialog').getAttribute('data-revision')).toBe('3');
     expect(screen.getByRole('dialog').textContent).toContain('A 공지');
+  });
+});
+
+describe('INT-25 메시지의 장수 얼굴과 이름', () => {
+  it('보낸·받는 장수는 괄호를 뺀 이름과 원형 icon으로 보인다', () => {
+    const { container } = render(
+      <ul>
+        <MessageRow
+          item={item('a', {
+            from: {
+              portraitId: null,
+              generalId: 2,
+              name: '하후돈(夏侯惇)',
+              nation: { id: 1, name: '위', color: '#000080' },
+            },
+          })}
+        />
+      </ul>,
+    );
+    expect(screen.getByLabelText('보낸 이 하후돈, 받는 이 조조')).toBeTruthy();
+    expect(container.textContent).not.toContain('夏侯惇');
+    expect(container.querySelectorAll('[data-variant="icon"]')).toHaveLength(2);
+  });
+
+  it('받는 장수 고르기는 괄호를 뺀 이름이 겹칠 때만 원래 이름을 둔다', () => {
+    const all = [{ name: '유도(145년생)' }, { name: '유도(170년생)' }, { name: '조조(曹操)' }];
+    expect(pickerName('조조(曹操)', all)).toBe('조조');
+    expect(pickerName('유도(145년생)', all)).toBe('유도(145년생)');
+  });
+});
+
+describe('INT-25 AC-INT-25 위 띠 메시지 단추', () => {
+  it('안 읽음 배지를 개인·외교·기타로 나누고 외교는 다른 색으로 쓴다', async () => {
+    on('message.unread', () => ({ PRIVATE: 2, NATION: 1, DIPLOMACY: 3, WORLD: 0 }));
+    renderWith(<MessageButton worldId={WORLD} open={false} onToggle={() => {}} />);
+    const button = await screen.findByRole(
+      'button',
+      { name: '메시지, 안 읽음 개인 2건, 외교 3건, 기타 1건' },
+      { timeout: 5_000 },
+    );
+    expect(within(button).getByTestId('unread-badge-private').textContent).toBe('개인 2');
+    const diplomacy = within(button).getByTestId('unread-badge-diplomacy');
+    expect(diplomacy.textContent).toBe('외교 3');
+    expect(diplomacy.className).not.toBe(within(button).getByTestId('unread-badge-private').className);
+    expect(within(button).getByTestId('unread-badge-other').textContent).toBe('기타 1');
+  });
+
+  it('안 읽은 메시지가 없으면 배지 없이 메시지만 쓴다', async () => {
+    on('message.unread', () => ({ PRIVATE: 0, NATION: null, DIPLOMACY: null, WORLD: 0 }));
+    renderWith(<MessageButton worldId={WORLD} open={false} onToggle={() => {}} />);
+    await waitFor(() => expect(callsTo('message.unread').length).toBeGreaterThan(0));
+    await settle();
+    const button = screen.getByRole('button', { name: '메시지' });
+    expect(within(button).queryByTestId(/^unread-badge/)).toBeNull();
   });
 });

@@ -84,10 +84,37 @@
   gap: var(--space-1);
   font-variant-numeric: tabular-nums;
 }
+/* 공백지 이름 펼치기 (INT-25) */
+.emptyList > summary {
+  cursor: pointer;
+  list-style: none;
+  text-decoration: underline;
+}
+.emptyList > summary::-webkit-details-marker {
+  display: none;
+}
+.emptyList[open] {
+  flex-basis: 100%;
+}
+.emptyNames {
+  display: block;
+  padding-top: var(--space-1);
+  color: var(--color-text);
+}
+@media (max-width: 767px) {
+  .emptyList > summary {
+    min-height: 44px;
+  }
+}
 .swatch {
   display: inline-block;
   width: 10px;
   height: 10px;
   border-radius: 2px;
   border: 1px solid var(--color-border-strong);
+}
+
+/* 장수 풍선을 띄우는 고전 지도의 틀 (INT-26). 풍선은 이 틀 기준으로 놓는다. */
+.frame {
+  position: relative;
 }

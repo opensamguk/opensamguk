@@ -92,6 +92,8 @@ describe('T1-11 순수 규칙과 공개 명령', () => {
     }
     for (const item of commandList) {
       expect(() => JSON.stringify(item.argsSchema)).not.toThrow();
+      expect(item.description).not.toBe('');
+      expect(item.turns).toBe(1);
       if (current.has(item.key))
         expect(item.argsSchema).toMatchObject({ type: 'object', properties: {}, additionalProperties: false });
     }

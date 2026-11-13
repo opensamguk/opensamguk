@@ -3,6 +3,10 @@ import {
   canExecuteCityNationCommand,
   canExecuteResearchNationCommand,
   canUseNationTurns,
+  STRATEGY_KEYS,
+  strategyMonth,
+  TICKS_PER_MONTH,
+  toGameDate,
   unitSetSchema,
 } from '@opensamguk/rules';
 import { TRPCError } from '@trpc/server';
@@ -12,6 +16,7 @@ import { requireGeneral, requireWorld, readView, worldInput } from '../game/quer
 import { worldResolver } from '../game/resolver';
 import { withPersonnel } from '../game/personnelApi';
 import { commandInput } from '../game/slots';
+import { commandAvailability } from '../game/commandAvailability';
 
 async function actorCommands(tx: Parameters<typeof requireWorld>[0], worldId: string, userId: string) {
   const world = await requireWorld(tx, worldId);
@@ -31,12 +36,38 @@ async function actorCommands(tx: Parameters<typeof requireWorld>[0], worldId: st
 export const nationCommandsRouter = router({
   list: protectedProcedure.input(worldInput).query(({ ctx, input }) =>
     withPersonnel(ctx, input.worldId, async (tx) => {
-      const { commands } = await actorCommands(tx, input.worldId, ctx.user.id);
-      return commands.map((def) => ({
-        key: def.key,
-        name: def.name,
-        argsSchema: z.toJSONSchema(def.args, { io: 'input' }),
-      }));
+      const { world, actor, commands } = await actorCommands(tx, input.worldId, ctx.user.id);
+      const ended = world.status === 'ENDED';
+      const view = ended ? null : await readView(tx, input.worldId);
+      const commandActor = {
+        generalId: actor.id,
+        target: 'nation' as const,
+        authority: 'office' as const,
+        tick: actor.nextTurnTick,
+        unitSet: unitSetSchema.safeParse(world.unitSet).data,
+      };
+      const cooldown = view?.nationStrategy?.nations[actor.nationId!];
+      const current = strategyMonth(commandActor.tick);
+      return commands.map((def) => {
+        const key = STRATEGY_KEYS.find((key) => key === def.key);
+        const availableMonth = key ? Math.max(cooldown?.strategicUntil ?? 0, cooldown?.commands[key] ?? 0) : 0;
+        return {
+          key: def.key,
+          name: def.name,
+          category: def.category,
+          ...(key
+            ? {
+                cooldown: {
+                  remainingMonths: Math.max(0, availableMonth - current),
+                  availableAt:
+                    availableMonth > current ? toGameDate(world.startYear, availableMonth * TICKS_PER_MONTH) : null,
+                },
+              }
+            : {}),
+          argsSchema: z.toJSONSchema(def.args, { io: 'input' }),
+          ...commandAvailability(def, view, commandActor, ended),
+        };
+      });
     }),
   ),
   precheck: protectedProcedure.input(worldInput.extend(commandInput)).query(({ ctx, input }) =>

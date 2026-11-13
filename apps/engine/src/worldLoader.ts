@@ -1,6 +1,9 @@
+import { hashState } from '@opensamguk/shared/node';
 import type { Prisma } from '@opensamguk/db';
 import {
   effectiveWorldOptions,
+  OFFICE_EFFECTS_FEATURE,
+  officeEffectsSchema,
   readOperationalMap,
   attachOperationalKinds,
   readStoredGovernance,
@@ -10,6 +13,7 @@ import {
   readStoredStratagemCards,
   readStoredEquipment,
   readStoredNationLifecycle,
+  readStoredRelations,
   assertNationLifecycle,
   type WorldState,
 } from '@opensamguk/rules';
@@ -46,7 +50,7 @@ export async function loadWorldAfterCapabilityCheck(
     ? ((capabilities.kind === 'registry' ? capabilities.armyTypes : undefined) ?? readCampaignArmyTypes(world))
     : [];
   const { preset, commands } = engineResolver(world);
-  const rules = effectiveWorldOptions(preset, world.runtimeOptions).presetRules;
+  const { presetRules: rules, recruitmentLocation } = effectiveWorldOptions(preset, world.runtimeOptions);
   if (world.replayFormat === 3) await assertPersonnelStorage(tx, worldId, world.ruleFeatures.includes('personnel'));
   const ext = await loadExt(tx, worldId, commands, world.ruleFeatures);
   const cities = await tx.city.findMany({ where: { worldId } });
@@ -68,8 +72,21 @@ export async function loadWorldAfterCapabilityCheck(
     void ignored;
     return value;
   };
+  const officeEnabled = world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE);
+  const officeEffects = officeEnabled ? officeEffectsSchema.parse(world.officeEffects) : undefined;
+  if (officeEffects) {
+    const origin = world.replayOrigin as { featureData?: Record<string, unknown> } | null;
+    if (
+      hashState(officeEffects) !== hashState(officeEffectsSchema.parse(origin?.featureData?.[OFFICE_EFFECTS_FEATURE]))
+    )
+      throw new Error('저장된 주재 효과와 월드 생성 기록이 다릅니다.');
+  } else if (world.officeEffects != null || generals.some((general) => general.officerCityKey != null)) {
+    throw new Error('주재 효과를 사용하지 않는 월드에 도시 관직 자료가 있습니다.');
+  }
   let state: WorldState = {
+    ...(officeEffects ? { officeEffects } : {}),
     ...(rules ? { presetRules: rules } : {}),
+    ...(recruitmentLocation === 'city' ? { recruitmentLocation } : {}),
     ...(world.ruleFeatures?.length ? { ruleFeatures: [...world.ruleFeatures] } : {}),
     ...(ext ? { ext } : {}),
     startYear: world.startYear,
@@ -82,7 +99,7 @@ export async function loadWorldAfterCapabilityCheck(
       }),
     ),
     generals: Object.fromEntries(
-      generals.map(({ turnRevision, battleWins, captures, residenceTick, ...general }) => {
+      generals.map(({ turnRevision, battleWins, captures, residenceTick, officerCityKey, ...general }) => {
         void turnRevision;
         void residenceTick;
         // 순위용 누계는 게임 규칙 입력이 아니다. 기존 재생 해시에 섞지 않는다.
@@ -92,7 +109,10 @@ export async function loadWorldAfterCapabilityCheck(
           general.id,
           storedGeneralStats(
             storedGeneralRemoval(
-              storedGeneralSex(stripWorldId(general), world.ruleFeatures.includes('lineage-v1')),
+              storedGeneralSex(
+                { ...stripWorldId(general), ...(officerCityKey == null ? {} : { officerCityKey }) },
+                world.ruleFeatures.includes('lineage-v1'),
+              ),
               world.replayFormat,
             ),
             world.ruleFeatures?.includes('five-stats') ?? false,
@@ -116,6 +136,8 @@ export async function loadWorldAfterCapabilityCheck(
   if (preparedTurns) state.preparedTurns = preparedTurns;
   const nationResearch = readStoredNationResearch(world);
   if (nationResearch) state.nationResearch = nationResearch;
+  const relations = readStoredRelations(world, hashState);
+  if (relations) state.relations = relations;
   const nationLifecycle = readStoredNationLifecycle(world);
   if (nationLifecycle) state.nationLifecycle = nationLifecycle;
   assertNationLifecycle(state);

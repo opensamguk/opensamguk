@@ -672,7 +672,14 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
     expect(await turns(world, actor)).toHaveLength(30);
     return actor;
   }
-  async function put(actor: Actor, slot: number, name: string, fields: Record<string, string> = {}) {
+  // beforePut은 넣기 전, 인자 입력 화면이 열려 있을 때 화면을 검사한다. 넣으면 화면이 닫힌다 (INT-25).
+  async function put(
+    actor: Actor,
+    slot: number,
+    name: string,
+    fields: Record<string, string> = {},
+    beforePut?: (editor: Locator) => Promise<void>,
+  ) {
     await actor.page.bringToFront();
     const editor = actor.page.getByTestId('turn-editor');
     await expect(editor.locator('tr[data-slot]')).toHaveCount(30);
@@ -681,13 +688,21 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
     await editor.getByLabel('명령 찾기', { exact: true }).fill(name);
     await editor.getByRole('radio', { name, exact: true }).check();
     for (const [label, value] of Object.entries(fields)) {
+      // 대상 도시·국가·장수와 병종은 인자 입력 화면의 고르기 목록이다 (INT-25). 번호로 고른다.
+      const group = editor.getByRole('radiogroup', { name: label, exact: true });
       const control = editor
         .getByRole('combobox', { name: label, exact: true })
         .or(editor.getByRole('spinbutton', { name: label, exact: true }))
         .or(editor.getByRole('textbox', { name: label, exact: true }));
+      await group.or(control).first().waitFor();
+      if ((await group.count()) > 0) {
+        await group.locator(`[data-value="${value}"], input[value="${value}"]`).first().click();
+        continue;
+      }
       if ((await control.evaluate((element) => element.tagName)) === 'SELECT') await control.selectOption(value);
       else await control.fill(value);
     }
+    if (beforePut) await beforePut(editor);
     await editor.getByRole('button', { name: `${slot}번 칸에 넣기`, exact: true }).click();
     await expect(editor.locator(`tr[data-slot="${slot}"]`)).toContainText(name);
   }
@@ -884,6 +899,8 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
           independentHumanCommands: true,
           resourceOrPositionInjection: false,
         };
+        // 휘하·부곡은 전용 화면이다 (INT-25). 부곡을 편성한 뒤 군략도로 돌아간다.
+        await owner.page.goto(`/w/${main.id}/campaign`);
         const campaign = owner.page.getByRole('region', {
           name: '개인 휘하·부곡',
           exact: true,
@@ -917,6 +934,7 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
         expect(await turns(main, other)).toHaveLength(30);
         await expect(campaign).toContainText('소유 부곡 1개');
         await photo(owner.page, info, '02-person-30slots-empty-unit');
+        await owner.page.goto(`/w/${main.id}`);
         // 같은 세수 준비를 첫 검사에 둔다. 다음 검사는 기존 네 명령과 단차 검증을 이어서 실행한다.
         actor = owner!;
         protectedActor = other!;
@@ -1273,6 +1291,11 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
         ).toEqual({ userId: actor.userId, actorId: actor.generalId, cityKey: enemy.cityKey, visible: false });
         await actor.page.setViewportSize({ width: 375, height: 812 });
         await actor.page.getByRole('button', { name: '내 도시로', exact: true }).click();
+        // 375px 메인은 하단 막대로 패널을 바꾼다 (INT-25). 도시 자원과 배속은 `현황` 패널의 도시 칸에 있다.
+        await actor.page
+          .getByRole('tablist', { name: '메인 화면', exact: true })
+          .getByRole('tab', { name: '현황', exact: true })
+          .click();
         await showResources(main, actor, cityKey);
         await expect(editor.locator('tr[data-slot="4"]')).toContainText('농지 개간');
         const form = actor.page.getByRole('form', { name: '도시 병력 배속', exact: true });
@@ -1347,15 +1370,20 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
         });
         expect(Object.hasOwn(summary, 'cityResourcesEnabled')).toBe(false);
         await expect(resourcePanel(oldActor.page)).toHaveCount(0);
-        await put(oldActor, 1, '모병', {
-          수량: '1',
-          병종: '1100',
-          '부곡 번호': '1',
-        });
-        await expect(oldActor.page.getByTestId('turn-editor').getByLabel('부곡 번호', { exact: true })).toBeVisible();
-        await expect(
-          oldActor.page.getByTestId('turn-editor').getByLabel('훈련·사기 대상', { exact: true }),
-        ).toHaveCount(0);
+        await put(
+          oldActor,
+          1,
+          '모병',
+          {
+            수량: '1',
+            병종: '1100',
+            '부곡 번호': '1',
+          },
+          async (editor) => {
+            await expect(editor.getByLabel('부곡 번호', { exact: true })).toBeVisible();
+            await expect(editor.getByLabel('훈련·사기 대상', { exact: true })).toHaveCount(0);
+          },
+        );
         expect(oldCalls.filter((call) => call.path.startsWith('cityResources.'))).toHaveLength(0);
         expect((await db.world.findUniqueOrThrow({ where: { id: oldWorld.id } })).cityResourcesState).toBeNull();
         await photo(oldActor.page, info, '07-legacy-without-city-resources');

@@ -1,4 +1,4 @@
-import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useRouterState } from '@tanstack/react-router';
 import {
   useCallback,
@@ -13,15 +13,17 @@ import {
 } from 'react';
 import { emptySlotLabel } from '../policy/policyText';
 import { usePolicyQuery } from '../policy/usePolicy';
-import { TRADE_COMMAND_KEY } from '../diplomacy/contract';
+import { fetchTreatyPage, TRADE_COMMAND_KEY } from '../diplomacy/contract';
 import { useTradeCityChoices } from '../diplomacy/tradeTargets';
 import { useTRPC } from '../trpc';
 import { DisabledReason } from '../ui/DisabledReason';
 import { EmptyState, ErrorState, LoadingState } from '../ui/States';
 import { errorCode, retryUnlessClientError } from './apiError';
-import { describeArgs, type ArgNames } from './args';
-import { useWorldUnits } from '../game/queries';
-import { CommandPicker, type CommandInfo } from './CommandPicker';
+import { describeArgs, withTargets, type ArgNames, type SlotTargets } from './args';
+import { useWorldRules, useWorldUnits } from '../game/queries';
+import { isDetailedCity, isDetailedGeneral, isMemberNation } from '../game/types';
+import type { ArgContext, ArgNeed, RecruitChoices } from './CommandArgsScreen';
+import { CommandPicker, equipmentName, type CommandInfo } from './CommandPicker';
 import { useEquipment } from '../equipment/useEquipment';
 import {
   describeSelection,
@@ -34,8 +36,10 @@ import {
   type QuickSelect,
   type Turn,
 } from './draft';
+import { recentCommandsKey, useRecentCommands, type RecentCommand } from './recentCommands';
 import { slotTimes, type SlotTime } from './schedule';
 import { personalSource, type Check, type DisplaySlot, type TurnSource, type TurnSourceFactory } from './source';
+import { relationLabel } from './targets';
 import styles from './TurnEditor.module.css';
 import { useStoredSelection, useTurnDraft, type TurnDraftState } from './useTurnDraft';
 
@@ -126,6 +130,7 @@ function SourceEditor<S extends DisplaySlot>({
     <Editor
       key={made.storageKey}
       worldId={worldId}
+      recentKey={recentCommandsKey(userId ?? '', worldId)}
       selectedCityKey={selectedCityKey}
       source={made}
       renderTop={renderTop}
@@ -150,12 +155,15 @@ type PrecheckResult = Check | { ok: 'error'; message: string } | undefined;
 
 function Editor<S extends DisplaySlot>({
   worldId,
+  recentKey,
   selectedCityKey,
   source,
   renderTop,
   report,
 }: {
   worldId: string;
+  // 최근 넣은 명령을 두는 localStorage 키(계정·월드).
+  recentKey: string;
   selectedCityKey: number | null;
   source: TurnSource<S>;
   renderTop?: TurnEditorProps['renderTop'];
@@ -201,6 +209,7 @@ function Editor<S extends DisplaySlot>({
   const rowRefs = useRef<Array<HTMLTableRowElement | null>>([]);
   const searchRef = useRef<HTMLInputElement | null>(null);
   const helpId = useId();
+  const [recent, rememberRecent] = useRecentCommands(recentKey);
 
   // 서버 목록이 바뀌면(저장·턴 실행) 사전 검사도 새로 받는다. 장수 상태가 바뀌었을 수 있다.
   const revision = server.data?.revision;
@@ -228,16 +237,169 @@ function Editor<S extends DisplaySlot>({
   const nations = useMemo(() => map.data?.nations ?? [], [map.data]);
   const generals = source.generals;
   // 월드 병종표 (T4-86). 불러오는 중·오류여도 병종 없는 명령·표·저장은 그대로 쓰고 병종은 번호로 적는다.
-  const { units, note: unitNote } = useWorldUnits(worldId);
+  const { units, note: unitNote, recruitment } = useWorldUnits(worldId);
+  const city = home.data?.city;
+  const needsRecruitmentRefresh = recruitment?.cityKey != null && city != null && recruitment.cityKey !== city.key;
+  useEffect(() => {
+    if (needsRecruitmentRefresh)
+      void queryClient.invalidateQueries({ queryKey: trpc.resources.worldRules.queryKey({ worldId }) });
+  }, [needsRecruitmentRefresh, city?.key, queryClient, trpc, worldId]);
+  const rules = useWorldRules(worldId);
+
+  // 인자 입력 화면이 국가·장수 대상을 열면 그때부터 받는 조회 (INT-25 3단계). 한 번 열면 편집기가 있는 동안 계속 쓴다.
+  const [needs, setNeeds] = useState<Record<ArgNeed, boolean>>({ nations: false, generals: false, recruits: false });
+  const onNeed = useCallback(
+    (kind: ArgNeed) => setNeeds((prev) => (prev[kind] ? prev : { ...prev, [kind]: true })),
+    [],
+  );
+  const myNationId = home.data?.general.nationId ?? null;
+  // 같은 국가 장수 상세(능력치·병력·물자·얼굴). 메인 국가 정보 칸과 같은 조회다.
+  const nationView = useQuery({
+    ...trpc.nation.get.queryOptions({ worldId, nationId: myNationId ?? 0 }),
+    enabled: needs.generals && myNationId !== null,
+    staleTime: 15_000,
+    retry: retryUnlessClientError,
+  });
+  // 국가별 국력·도시·장수. 순위 화면과 같은 조회다.
+  const ranking = useQuery({
+    ...trpc.ranking.nations.queryOptions({ worldId, by: 'power' }),
+    enabled: needs.nations,
+    staleTime: 60_000,
+    retry: retryUnlessClientError,
+  });
+  // 우리와의 관계. 외교실과 같은 조회 키다. 조약을 쓰지 않는 월드는 서버가 거절하고 관계를 적지 않는다.
+  const treaties = useInfiniteQuery({
+    queryKey: trpc.treaty.list.infiniteQueryKey({ worldId }),
+    queryFn: ({ pageParam, signal }) => fetchTreatyPage(worldId, pageParam, signal),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.nextCursor,
+    enabled: needs.nations && myNationId !== null,
+    retry: false,
+  });
+  const treatyTargets = treaties.data?.pages[0]?.targets;
+  // 등용 후보 재야 장수 (INT-26). 등용 인자 화면을 열면 받는다. 국가 칸에는 등용 명령이 없다.
+  const recruitQuery = useQuery({
+    ...trpc.commands.recruitCandidates.queryOptions({ worldId }),
+    enabled: needs.recruits,
+    staleTime: 15_000,
+    retry: retryUnlessClientError,
+  });
+  const gameDate = summary.data?.gameDate;
+
+  const recruits = useMemo((): RecruitChoices => {
+    const data = recruitQuery.data;
+    if (data)
+      return {
+        list: data.map((candidate) => ({
+          id: candidate.id,
+          name: candidate.name,
+          portraitId: candidate.portraitId,
+          isHuman: candidate.isHuman,
+          cityName: candidate.cityName ?? undefined,
+        })),
+        note: null,
+      };
+    return {
+      list: [],
+      note: recruitQuery.isError
+        ? '등용 후보를 불러오지 못했습니다. 화면을 닫았다가 다시 여세요.'
+        : '등용 후보를 불러오는 중입니다.',
+    };
+  }, [recruitQuery.data, recruitQuery.isError]);
+
+  const argContext = useMemo((): ArgContext => {
+    const general = home.data?.general;
+    const nation = home.data?.nation;
+    const city = home.data?.city;
+    const cityName = (key: number) => map.data?.cities.find((c) => c.key === key)?.name;
+    const members = nationView.data?.generals.filter(isDetailedGeneral).map((g) => {
+      const army = 'commandedArmy' in g ? g.commandedArmy : undefined;
+      return {
+        id: g.id,
+        name: g.name,
+        portraitId: g.portraitId,
+        cityName: cityName(g.cityKey),
+        leadership: g.leadership,
+        strength: g.strength,
+        intel: g.intel,
+        gold: g.gold,
+        rice: g.rice,
+        crew: army ? army.troops : g.crew,
+        train: army ? army.train : g.train,
+        atmos: army ? army.atmos : g.atmos,
+      };
+    });
+    return {
+      map: map.data,
+      here: general?.cityKey ?? null,
+      ownNationId: general?.nationId ?? null,
+      wallet: general ? { gold: general.gold, rice: general.rice } : undefined,
+      walletKind: source.walletKind,
+      treasury: nation && isMemberNation(nation) ? { gold: nation.gold, rice: nation.rice } : undefined,
+      unitSet: rules.data?.unitSet,
+      recruitment: needsRecruitmentRefresh ? undefined : recruitment,
+      me: general
+        ? {
+            id: general.id,
+            leadership: general.leadership,
+            crew: general.crew,
+            crewType: general.crewType,
+            gold: general.gold,
+          }
+        : undefined,
+      tech: nation && isMemberNation(nation) ? nation.tech : undefined,
+      security: city && isDetailedCity(city) ? city.security : undefined,
+      members,
+      nationFacts: ranking.data
+        ? new Map(
+            ranking.data.items.map((row) => [
+              row.nationId,
+              { power: row.power, cities: row.cities, generals: row.generals },
+            ]),
+          )
+        : undefined,
+      relations: treatyTargets
+        ? new Map(
+            treatyTargets.map((target) => [
+              target.nation.id,
+              relationLabel(target.relation, target.relationEndAt, gameDate),
+            ]),
+          )
+        : undefined,
+      recruits,
+    };
+  }, [
+    map.data,
+    home.data,
+    rules.data?.unitSet,
+    needsRecruitmentRefresh,
+    recruitment,
+    source.walletKind,
+    nationView.data,
+    ranking.data,
+    treatyTargets,
+    gameDate,
+    recruits,
+  ]);
   const names: ArgNames = useMemo(
     () => ({
       city: (key: number) => cities.find((c) => c.key === key)?.name,
       nation: (id: number) => nations.find((n) => n.id === id)?.name,
-      general: generals ? (id: number) => generals.find((g) => g.id === id)?.name : undefined,
+      // 국가 칸은 넘겨받은 장수 목록, 개인 칸은 받아 둔 등용 후보에서 장수 이름을 찾는다.
+      general: generals
+        ? (id: number) => generals.find((g) => g.id === id)?.name
+        : (id: number) => recruits.list.find((g) => g.id === id)?.name,
       unit: units.name,
+      equipment: equipmentName(equipment),
     }),
-    [cities, nations, generals, units],
+    [cities, nations, generals, units, equipment, recruits],
   );
+  // 서버 칸이 실은 대상 이름. 칸을 당기거나 밀어도 같은 명령·인자면 같은 이름을 쓴다.
+  const slotTargets = useMemo(() => {
+    const byKey = new Map<string, SlotTargets>();
+    for (const slot of server.data?.slots ?? []) if (slot.targets) byKey.set(turnKey(toTurn(slot)), slot.targets);
+    return byKey;
+  }, [server.data]);
 
   // 같은 명령·인자는 사전 검사를 한 번만 묻는다. 휴식은 묻지 않는다.
   // 읽기 전용 칸은 내 상태로 검사할 수 없으므로 묻지 않는다.
@@ -271,9 +433,12 @@ function Editor<S extends DisplaySlot>({
       });
   });
 
+  // 남의 직책 칸은 그 직책자의 다음 턴 시각(감찰 조회)을 받았을 때만 시:분을 센다. 연월은 세지 않는다 (INT-25).
   const times30: SlotTime[] = source.timed
     ? slotTimes(slotCount, summary.data, home.data?.general.nextTurnTick, home.data?.nextTurnAt)
-    : Array.from({ length: slotCount }, () => ({ date: null, time: null, iso: null }));
+    : source.nextTurnAt !== undefined
+      ? slotTimes(slotCount, summary.data, undefined, source.nextTurnAt)
+      : Array.from({ length: slotCount }, () => ({ date: null, time: null, iso: null }));
 
   const focusRow = (i: number) => {
     const next = Math.max(0, Math.min(slotCount - 1, i));
@@ -343,9 +508,12 @@ function Editor<S extends DisplaySlot>({
         ? `반복 횟수는 1~${slotCount - 1}입니다.`
         : null);
 
-  const onPut = (turn: Turn) => {
+  const onPut = (turn: Turn, save = false) => {
     if (putBlocked) return;
-    state.edit({ put: { indices: [...selected].sort((a, b) => a - b), turn } });
+    const edit = { put: { indices: [...selected].sort((a, b) => a - b), turn } };
+    if (save) state.editAndSave(edit);
+    else state.edit(edit);
+    rememberRecent(turn);
     rowRefs.current[focus]?.focus();
   };
   const onClear = () => onPut(EMPTY);
@@ -403,9 +571,12 @@ function Editor<S extends DisplaySlot>({
   if (readOnly !== null)
     return (
       <div className={styles.editor} data-testid="turn-editor" data-readonly="true">
-        <p className={styles.saveState} data-testid="readonly-reason">
-          읽기 전용: {readOnly}
-        </p>
+        <div className={styles.saveBar}>
+          <p className={styles.saveState} data-testid="readonly-reason">
+            읽기 전용: {readOnly}
+          </p>
+          <NowClock />
+        </div>
         <ReadOnlySlots label={source.gridLabel} slots={server.data?.slots ?? []} times={times30} names={names} />
       </div>
     );
@@ -413,10 +584,17 @@ function Editor<S extends DisplaySlot>({
   return (
     <div className={styles.editor} data-testid="turn-editor">
       {renderTop?.(state)}
+      {argContext.walletKind === 'nation' && argContext.treasury ? (
+        <p className={styles.treasury} data-testid="nation-treasury">
+          국고 금 <span className="num">{argContext.treasury.gold.toLocaleString('ko-KR')}</span> · 쌀{' '}
+          <span className="num">{argContext.treasury.rice.toLocaleString('ko-KR')}</span>
+        </p>
+      ) : null}
       <div className={styles.saveBar}>
         <p className={styles.saveState} data-testid="draft-state">
           {editCount > 0 ? `저장하지 않은 편집 ${editCount}건` : '저장된 목록'}
         </p>
+        <NowClock />
         {draft && !state.saving && !ended ? (
           <button type="button" className={styles.primary} onClick={state.submit}>
             저장
@@ -522,7 +700,7 @@ function Editor<S extends DisplaySlot>({
               const changed = !!draft && !pending && !!serverTurns && turnKey(serverTurns[i]!) !== turnKey(turn);
               const check = turn.commandKey === 'rest' ? undefined : precheckByKey.get(turnKey(turn));
               const isEmpty = !turn.explicit;
-              const args = describeArgs(turn.args, names);
+              const args = describeArgs(turn.args, withTargets(names, slotTargets.get(turnKey(turn))));
               const time = times30[i]!;
               return (
                 <tr
@@ -608,13 +786,33 @@ function Editor<S extends DisplaySlot>({
           defaultCrewType={home.data?.general.crewType}
           units={units}
           unitNote={unitNote}
+          recruitment={
+            recruitment?.cityKey != null
+              ? {
+                  city: cities.find(({ key }) => key === (city?.key ?? recruitment.cityKey))?.name ?? '현재 도시',
+                }
+              : undefined
+          }
           cityResources={summary.data?.cityResourcesEnabled === true}
           blockedReason={putBlocked}
           targetLabel={targetLabel}
           searchRef={searchRef}
           onPut={onPut}
+          onSave={(turn) => onPut(turn, true)}
           cityChoicesFor={cityChoicesFor}
           precheck={source.precheck}
+          argContext={argContext}
+          onNeed={onNeed}
+          recent={
+            <RecentRow
+              recent={recent}
+              commands={commandList}
+              commandName={commandName}
+              names={names}
+              blockedReason={putBlocked}
+              onPut={onPut}
+            />
+          }
         />
       )}
 
@@ -703,7 +901,7 @@ function ReadOnlySlots({
   names,
 }: {
   label: string;
-  slots: Array<{ commandKey: string; args?: unknown; name: string }>;
+  slots: DisplaySlot[];
   times: SlotTime[];
   names: ArgNames;
 }) {
@@ -721,13 +919,14 @@ function ReadOnlySlots({
         </thead>
         <tbody>
           {slots.map((slot, i) => {
-            const args = describeArgs(toTurn(slot).args, names);
+            const args = describeArgs(toTurn(slot).args, withTargets(names, slot.targets));
             const time = times[i];
             return (
               <tr key={i} className={styles.row} data-slot={i + 1}>
                 <td className="num">{i + 1}</td>
                 <td className={styles.when}>
-                  <span>{time?.date ?? '—'}</span>
+                  {time?.date || !time?.time ? <span>{time?.date ?? '—'}</span> : null}
+                  {time?.time ? <time dateTime={time.iso ?? undefined}>{time.time}</time> : null}
                 </td>
                 <td>
                   <span className={styles.command}>{slot.name}</span>
@@ -738,6 +937,77 @@ function ReadOnlySlots({
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// 예턴 표 머리의 지금 시각 시:분:초 (원작 예턴 편집기의 시계). 칸의 실행 시각과 같은 기준(이 기기 시계)으로 적는다.
+// 1초마다 이 부품만 다시 그린다. 화면 낭독기가 매초 읽지 않도록 알림 영역으로 두지 않는다.
+function NowClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return (
+    <span
+      className={styles.clock}
+      data-testid="turn-clock"
+      title="이 기기의 지금 시각입니다. 칸의 실행 시각과 같은 기준입니다."
+    >
+      현재{' '}
+      <time dateTime={now.toISOString()}>
+        {pad(now.getHours())}:{pad(now.getMinutes())}:{pad(now.getSeconds())}
+      </time>
+    </span>
+  );
+}
+
+// 최근 넣은 명령 줄 (원작 최근 실행, INT-25). 지금 명령 목록에 있는 것만 보이고, 누르면 고른 칸에 같은 넣기 경로로 넣는다.
+// 한 줄로 두고 넘치면 줄 안에서 옆으로 민다. 예턴 칸 아래 명령 고르기 안에 있어 첫 화면 칸 수를 줄이지 않는다.
+function RecentRow({
+  recent,
+  commands,
+  commandName,
+  names,
+  blockedReason,
+  onPut,
+}: {
+  recent: readonly RecentCommand[];
+  commands: readonly CommandInfo[];
+  commandName: (key: string) => string;
+  names: ArgNames;
+  blockedReason: string | null;
+  onPut: (turn: Turn) => void;
+}) {
+  const shown = recent.filter((item) => commands.some((command) => command.key === item.commandKey));
+  if (shown.length === 0) return null;
+  return (
+    <div className={styles.recent} role="group" aria-label="최근 넣은 명령">
+      <span className={styles.recentLabel}>최근</span>
+      <div className={styles.recentList}>
+        {shown.map((item) => {
+          const summary = [commandName(item.commandKey), describeArgs(item.args, names)].filter(Boolean).join(' · ');
+          const key = turnKey({ ...item, explicit: true });
+          return blockedReason ? (
+            <DisabledReason key={key} reason={blockedReason}>
+              <span className={styles.recentText}>{summary}</span>
+            </DisabledReason>
+          ) : (
+            <button
+              key={key}
+              type="button"
+              className={`${styles.chip} ${styles.recentItem}`}
+              aria-label={`${summary} 다시 넣기`}
+              title={summary}
+              onClick={() => onPut({ commandKey: item.commandKey, args: { ...item.args }, explicit: true })}
+            >
+              <span className={styles.recentText}>{summary}</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

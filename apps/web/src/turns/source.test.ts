@@ -78,11 +78,13 @@ describe('개인 예턴 연결', () => {
     const { source } = setup();
     setMutate.mockResolvedValueOnce(setOutput({ ok: true, revision: 5, slots: read.slots }));
     const turns = applyOps(read.slots.map(toTurn), [{ shift: 1 }]);
-    await source.save({ revision: read.revision, slots: toSaveSlots(turns) });
+    await source.save({ revision: read.revision, slots: toSaveSlots(turns), expectedActorId: read.actorId });
     expect(setMutate).toHaveBeenCalledTimes(1);
     const sent = setMutate.mock.calls[0]![0] as { worldId: string; revision: number; slots: unknown[] };
     expect(sent).toStrictEqual({
       worldId: 'w1',
+      expectedUserId: 'u1',
+      expectedActorId: 7,
       revision: 4,
       slots: [
         null,

@@ -72,46 +72,46 @@ const NA: WorldSpec = {
   ],
 };
 // 사본 A를 찍은 뒤 가 월드에서 바꾸는 것. 사본 B가 이 값을 담는다.
-const B_NATION = { id: 2, name: '사본 B 오', color: '#00aa00' };
+const B_NATION = { id: 2, name: '사본 B 오', color: '#00aa00', capitalCityKey: 4 };
 // 사본 B를 찍은 뒤 다시 바꾼 현재 값. 어느 사본에도 없다.
 const NOW_NATION = { name: '지금 오', color: '#123456' };
 
 // 서버 원본 응답의 기대값. 도시 key·links는 문자열이다 (T2-24).
 const RAW_GA = {
   cities: [
-    { key: '1', name: '업', level: 7, x: 120, y: 90, nationId: 1, links: ['2'] },
-    { key: '2', name: '허창', level: 6, x: 300, y: 220, nationId: 2, links: ['1', '3', '4'] },
-    { key: '3', name: '낙양', level: 8, x: 480, y: 120, nationId: 1, links: ['2'] },
-    { key: '4', name: '완', level: 5, x: 320, y: 400, nationId: 2, links: ['2'] },
+    { key: '1', name: '업', level: 7, x: 120, y: 90, nationId: 1, links: ['2'], supplied: true },
+    { key: '2', name: '허창', level: 6, x: 300, y: 220, nationId: 2, links: ['1', '3', '4'], supplied: true },
+    { key: '3', name: '낙양', level: 8, x: 480, y: 120, nationId: 1, links: ['2'], supplied: true },
+    { key: '4', name: '완', level: 5, x: 320, y: 400, nationId: 2, links: ['2'], supplied: true },
   ],
   nations: [
-    { id: 1, name: '위', color: '#000080' },
-    { id: 2, name: '오', color: '#ff0000' },
+    { id: 1, name: '위', color: '#000080', capitalCityKey: 1 },
+    { id: 2, name: '오', color: '#ff0000', capitalCityKey: 4 },
   ],
 };
 const RAW_NA = {
   cities: [
-    { key: '1', name: '성도', level: 8, x: 25, y: 20, nationId: 1, links: ['2'] },
+    { key: '1', name: '성도', level: 8, x: 25, y: 20, nationId: 1, links: ['2'], supplied: true },
     { key: '2', name: '면죽', level: 4, x: 250, y: 200, nationId: null, links: ['1', '3'] },
-    { key: '3', name: '한중', level: 6, x: 460, y: 300, nationId: 1, links: ['2', '4'] },
-    { key: '4', name: '장안', level: 8, x: 680, y: 480, nationId: 2, links: ['3'] },
+    { key: '3', name: '한중', level: 6, x: 460, y: 300, nationId: 1, links: ['2', '4'], supplied: true },
+    { key: '4', name: '장안', level: 8, x: 680, y: 480, nationId: 2, links: ['3'], supplied: true },
   ],
   nations: [
-    { id: 1, name: '촉', color: '#008000' },
-    { id: 2, name: '한', color: '#ffd700' },
+    { id: 1, name: '촉', color: '#008000', capitalCityKey: 1 },
+    { id: 2, name: '한', color: '#ffd700', capitalCityKey: 4 },
   ],
 };
 
 // 화면에 그려진 기대값. 도시 점 색은 브라우저 계산값, 연결선은 양 끝 좌표다.
 const DRAWN_GA = {
   cities: [
-    { key: '1', label: '업, 위', fill: 'rgb(0, 0, 128)' },
+    { key: '1', label: '업, 위, 수도', fill: 'rgb(0, 0, 128)' },
     { key: '2', label: '허창, 오', fill: 'rgb(255, 0, 0)' },
     { key: '3', label: '낙양, 위', fill: 'rgb(0, 0, 128)' },
-    { key: '4', label: '완, 오', fill: 'rgb(255, 0, 0)' },
+    { key: '4', label: '완, 오, 수도', fill: 'rgb(255, 0, 0)' },
   ],
   lines: ['120,90,300,220', '300,220,320,400', '300,220,480,120'],
-  legend: '공백지 0위 2오 2',
+  legend: '보급 끊김 0공백지 0위 2오 2',
   nations: [
     { id: '1', text: '위 2', swatch: 'rgb(0, 0, 128)' },
     { id: '2', text: '오 2', swatch: 'rgb(255, 0, 0)' },
@@ -119,13 +119,13 @@ const DRAWN_GA = {
 };
 const DRAWN_NA = {
   cities: [
-    { key: '1', label: '성도, 촉', fill: 'rgb(0, 128, 0)' },
+    { key: '1', label: '성도, 촉, 수도', fill: 'rgb(0, 128, 0)' },
     { key: '2', label: '면죽, 공백지', fill: 'rgb(214, 208, 196)' },
     { key: '3', label: '한중, 촉', fill: 'rgb(0, 128, 0)' },
-    { key: '4', label: '장안, 한', fill: 'rgb(255, 215, 0)' },
+    { key: '4', label: '장안, 한, 수도', fill: 'rgb(255, 215, 0)' },
   ],
   lines: ['25,20,250,200', '250,200,460,300', '460,300,680,480'],
-  legend: '공백지 1촉 2한 1',
+  legend: '보급 끊김 0공백지 1촉 2한 1',
   nations: [
     { id: '1', text: '촉 2', swatch: 'rgb(0, 128, 0)' },
     { id: '2', text: '한 1', swatch: 'rgb(255, 215, 0)' },
@@ -413,7 +413,7 @@ test('지연 시간 전에는 바뀐 도시 소유·국가 이름·색 대신 �
   await expect(when(page).locator('time')).toHaveAttribute('datetime', iso(paused));
 });
 
-test('장수·병력·보급·국고는 응답과 화면에 없고 지도는 읽기 전용이다', async ({ page }) => {
+test('수도와 보급을 표시하고 장수·병력·국고 없이 읽기 전용으로 동작한다', async ({ page }) => {
   const { ga, na, generalNames } = fixture();
   const raw = await open(page, '/login');
   const text = JSON.stringify(raw);
@@ -425,8 +425,18 @@ test('장수·병력·보급·국고는 응답과 화면에 없고 지도는 읽
   for (const map of [raw.worlds[0]!.map!, raw.worlds[1]!.map!]) {
     expect(Object.keys(map).sort()).toEqual(['cities', 'month', 'nations', 'takenAt', 'year']);
     for (const city of map.cities)
-      expect(Object.keys(city).sort()).toEqual(['key', 'level', 'links', 'name', 'nationId', 'x', 'y']);
-    for (const nation of map.nations) expect(Object.keys(nation).sort()).toEqual(['color', 'id', 'name']);
+      expect(Object.keys(city).sort()).toEqual([
+        'key',
+        'level',
+        'links',
+        'name',
+        'nationId',
+        ...(city.nationId === null ? [] : ['supplied']),
+        'x',
+        'y',
+      ]);
+    for (const nation of map.nations)
+      expect(Object.keys(nation).sort()).toEqual(['capitalCityKey', 'color', 'id', 'name']);
   }
   expect(generalNames).toHaveLength(3);
   for (const name of generalNames) expect(text).not.toContain(name);
@@ -435,10 +445,11 @@ test('장수·병력·보급·국고는 응답과 화면에 없고 지도는 읽
     await choose(page, index, world.id);
     const map = worldMap(page);
     await expect(map).toHaveCount(1);
-    await expect(map.locator('[data-supplied], [data-cut], [data-mine]')).toHaveCount(0);
+    await expect(map.locator('[data-supplied="true"]')).toHaveCount(index === 0 ? 4 : 3);
+    await expect(map.locator('[data-mine]')).toHaveCount(0);
     await expect(map.getByRole('button')).toHaveCount(0);
     await expect(map.locator('[tabindex]')).toHaveCount(0);
-    await expect(area(page)).not.toContainText(/보급|내 위치|병력|장수|국고/);
+    await expect(area(page)).not.toContainText(/내 위치|병력|장수|국고/);
     for (const name of generalNames) await expect(area(page)).not.toContainText(name);
   }
   // 로그인 화면은 지도를 배경으로 깔고 양식 첩을 위에 띄워 도시가 양식 밑에 있을 수 있다. 위치와 상관없이

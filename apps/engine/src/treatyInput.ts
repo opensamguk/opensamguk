@@ -14,6 +14,7 @@ import {
   type TreatyInput,
   type TreatyRecord,
   type TreatyRecordContext,
+  type TreatyOptions,
   type TreatyRejected,
   type WorldState,
 } from '@opensamguk/rules';
@@ -23,6 +24,7 @@ import { loadReplayState } from './monthly';
 import { databaseNow } from './lease';
 import { readAdminEndTick } from './admin/end';
 import { enqueueTreatyOffer } from './notifications';
+import { persistEffects } from './persist';
 
 type StoredWorld = Prisma.WorldGetPayload<Record<string, never>>;
 type StoredInput = Prisma.InputEventGetPayload<Record<string, never>>;
@@ -90,6 +92,7 @@ type TreatyQueuedContext = {
   sequence: number;
   treatyBreakEnabled?: boolean;
   treatyTradeEnabled?: boolean;
+  treatyExpandedEnabled?: boolean;
   emit?: (signal: RealtimeSignal) => void;
 };
 
@@ -122,6 +125,7 @@ async function resolveTreatyInput(
   const context: TreatyRecordContext = {
     treaty: { version: 1 },
     ...(at.treatyTradeEnabled ? { treatyTrade: { version: 1 } } : {}),
+    ...(at.treatyExpandedEnabled ? { treatyExpanded: { version: 1 } } : {}),
     ...(at.treatyBreakEnabled ? { treatyBreak: { version: 1 } } : {}),
     monthlyTick: world.monthlyTick,
   };
@@ -148,20 +152,14 @@ async function resolveTreatyInput(
   const before: WorldState = native
     ? (await loadReplayState(tx, world.id)).state
     : { ...(await loadWorld(tx, world.id)), ...(await loadTreaties(tx, world.id)) };
-  const applied = applyTreatyInput(before, input, { tick, sequence, tradeEnabled: at.treatyTradeEnabled ?? false });
+  const options = {
+    tradeEnabled: at.treatyTradeEnabled ?? false,
+    expandedEnabled: at.treatyExpandedEnabled ?? false,
+  };
+  const applied = applyTreatyInput(before, input, { tick, sequence, ...options });
   const record = complete(applied.ok ? 'APPLIED' : 'REJECTED', applied.result);
   if (applied.ok)
-    await persistApplied(
-      tx,
-      world,
-      input,
-      before,
-      applied.state,
-      applied.result,
-      sequence,
-      at.emit,
-      at.treatyTradeEnabled ?? false,
-    );
+    await persistApplied(tx, world, input, before, applied.state, applied.result, sequence, at.emit, options);
   return record;
 }
 
@@ -173,18 +171,21 @@ async function persistApplied(
   next: WorldState,
   result: TreatyApplied,
   sequence: number,
-  emit?: (signal: RealtimeSignal) => void,
-  tradeEnabled = false,
+  emit: TreatyQueuedContext['emit'],
+  options: TreatyOptions,
 ): Promise<void> {
   const worldId = world.id;
   const id = Number(result.treatyId);
+  const persistWorld = options.expandedEnabled && (result.outcome === 'ACCEPTED' || result.outcome === 'BROKEN');
+  if (persistWorld)
+    await persistEffects(tx, worldId, next, [{ kind: 'world', state: next }], { tick: result.tick, sequence }, before);
   if (result.outcome === 'BROKEN') {
     if (input.kind !== 'treaty.break') throw new Error('파기 결과의 입력 종류를 확인하세요.');
     const stored = await tx.treaty.findUniqueOrThrow({ where: { worldId_id: { worldId, id } } });
     if (stored.status !== 'ACTIVE' || stored.closedSequence !== null) throw new Error('파기할 조약이 변경됐습니다.');
     const { worldId: ignored, ...row } = stored;
     void ignored;
-    validateBrokenTreatyRow({ ...row, status: 'BROKEN', closedSequence: sequence }, { tradeEnabled });
+    validateBrokenTreatyRow({ ...row, status: 'BROKEN', closedSequence: sequence }, options);
     const closed = await tx.treaty.updateMany({
       where: { worldId, id, status: 'ACTIVE', closedSequence: null },
       data: { status: 'BROKEN', closedSequence: sequence },
@@ -193,7 +194,11 @@ async function persistApplied(
     const nationA = Math.min(stored.fromNationId, stored.toNationId);
     const nationB = Math.max(stored.fromNationId, stored.toNationId);
     const pair = before.diplomacies.find((entry) => entry.nationA === nationA && entry.nationB === nationB);
-    if (pair && !next.diplomacies.some((entry) => entry.nationA === nationA && entry.nationB === nationB)) {
+    if (
+      !persistWorld &&
+      pair &&
+      !next.diplomacies.some((entry) => entry.nationA === nationA && entry.nationB === nationB)
+    ) {
       const removed = await tx.diplomacy.deleteMany({ where: { worldId, ...pair } });
       if (removed.count !== 1) throw new Error('파기할 조약의 외교 관계가 변경됐습니다.');
     }
@@ -240,10 +245,10 @@ async function persistApplied(
     emit?.({ kind: 'treaty.new', target: { nationIds: [stored.fromNationId, stored.toNationId] } });
     return;
   }
-  if (result.outcome === 'ACCEPTED') {
+  if (result.outcome === 'ACCEPTED' && !persistWorld) {
     const row = validateTreatyState(
       next.treaties?.find((entry) => entry.id === id),
-      { tradeEnabled },
+      options,
     );
     for (const nationId of [row.fromNationId, row.toNationId]) {
       const oldGold = before.nations[nationId]!.gold;
@@ -288,7 +293,7 @@ async function persistApplied(
     } else {
       const row = validateTreatyState(
         next.treaties?.find((entry) => entry.id === id),
-        { tradeEnabled },
+        options,
       );
       await tx.treaty.create({
         data: {
@@ -302,6 +307,9 @@ async function persistApplied(
       });
     }
     await enqueueTreatyOffer(tx, world, input.payload.toNationId, id, result.tick);
+    const fromNationId = before.generals[input.generalId]?.nationId;
+    if (options.expandedEnabled && fromNationId != null)
+      emit?.({ kind: 'treaty.new', target: { nationIds: [fromNationId, input.payload.toNationId] } });
     return;
   }
   if (result.outcome === 'PROPOSED') throw new Error('조약 응답 결과가 제안으로 기록됐습니다.');
@@ -319,6 +327,11 @@ async function persistApplied(
           },
   });
   if (updated.count !== 1) throw new Error('응답할 조약이 변경됐습니다.');
+  if (options.expandedEnabled) {
+    const treaty = before.treaties?.find((entry) => entry.id === id);
+    if (!treaty) throw new Error('응답한 조약의 두 국가를 확인할 수 없습니다.');
+    emit?.({ kind: 'treaty.new', target: { nationIds: [treaty.fromNationId, treaty.toNationId] } });
+  }
 }
 
 export function treatyBreakMessageId(worldId: string, sequence: number, nationId: number): string {

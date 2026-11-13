@@ -138,6 +138,7 @@ it.each(['empty', 'upgrade'] as const)(
       expect(
         (await client.query('SELECT * FROM "World" ORDER BY id')).rows.map(
           ({
+            officeEffects,
             equipmentState,
             runtimeOptions,
             cityRuinsState,
@@ -147,6 +148,7 @@ it.each(['empty', 'upgrade'] as const)(
             nationResearchState,
             ...row
           }) => {
+            expect(officeEffects).toBeNull();
             expect(equipmentState).toBeNull();
             expect(runtimeOptions).toBeNull();
             expect(cityRuinsState).toBeNull();

@@ -9,10 +9,20 @@ import { displayedAge, GeneralInfo } from './GeneralInfo';
 
 // 장수 정보 칸의 나이가 lineage-v1 월드에서 가문 칸과 같은 연도 기준인지 본다 (T4-95, AC-P2-32).
 // 해가 바뀐 1월에는 저장 나이가 월말 정산 전이라 한 살 적다. 인물·수치는 시험 값이다.
-const mocks = vi.hoisted(() => ({ summary: undefined as unknown }));
+const mocks = vi.hoisted(() => ({
+  summary: undefined as unknown,
+  ranking: { top: [], me: null, at: null } as unknown,
+  rules: { unitSet: { crewTypes: [] } } as unknown,
+}));
 vi.mock('../trpc', () => ({
   useTRPC: () => ({
     world: { summary: { queryOptions: () => ({ queryKey: ['summary'], queryFn: async () => mocks.summary }) } },
+    ranking: {
+      generals: { queryOptions: () => ({ queryKey: ['ranking'], queryFn: async () => mocks.ranking }) },
+    },
+    resources: {
+      worldRules: { queryOptions: () => ({ queryKey: ['rules'], queryFn: async () => mocks.rules }) },
+    },
   }),
 }));
 vi.mock('@tanstack/react-router', async (importOriginal) => ({
@@ -64,6 +74,9 @@ const home = {
     strength: 50,
     intel: 50,
     officerLevel: 0,
+    personality: null,
+    special: null,
+    crewType: 1,
     injury: 0,
     gold: 0,
     rice: 0,
@@ -136,5 +149,38 @@ describe('장수 정보 칸 나이', () => {
     await waitFor(() => expect(client.getQueryData(['summary'])).toBeDefined());
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(ageCell()).toBe('0세');
+  });
+});
+
+// 원작 장수 카드의 병종·성격·특기·승리 (INT-25). 값은 home.get·resources.worldRules·ranking.generals 응답 모양의 시험 값이다.
+describe('장수 정보 칸 원작 정보', () => {
+  const cell = (label: string) => screen.getByText(label, { selector: 'dt' }).nextElementSibling;
+
+  it('병종 이름을 쓰고 누르면 능력치와 100명당 비용을 펼친다', async () => {
+    mocks.summary = summary(192, 1, false);
+    mocks.rules = {
+      unitSet: {
+        crewTypes: [
+          { id: 1, armType: 1, name: '창병', attack: 110, defence: 120, speed: 7, avoid: 10, cost: 11, rice: 9 },
+        ],
+      },
+    };
+    renderCard();
+    await waitFor(() => expect(cell('병종')?.textContent).toContain('창병'));
+    expect(cell('병종')?.textContent).toContain('공격 110 · 방어 120 · 기동 7 · 회피 10 · 100명당 금 11 쌀 9');
+  });
+
+  it('성격·특기가 없으면 —로 쓰고 승리·점령은 순위 응답의 내 줄을 쓴다', async () => {
+    mocks.summary = summary(192, 1, false);
+    mocks.ranking = {
+      top: [],
+      me: { generalId: 11, wins: 3, captures: 2 },
+      at: { tick: 0, year: 191, month: 12 },
+    };
+    renderCard();
+    expect(cell('성격')?.textContent).toBe('—');
+    expect(cell('특기')?.textContent).toBe('—');
+    await waitFor(() => expect(cell('전공')?.textContent).toBe('승리 3 · 점령 2'));
+    expect(cell('전공')?.parentElement?.getAttribute('title')).toBe('191년 12월 정산 기준');
   });
 });

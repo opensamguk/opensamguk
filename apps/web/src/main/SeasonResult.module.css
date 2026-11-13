@@ -37,3 +37,59 @@
   font-size: var(--text-sm);
   color: var(--color-text-muted);
 }
+
+/* 최종 장수 순위와 오호장군 (INT-25) */
+.generals {
+  display: grid;
+  gap: var(--space-2);
+}
+.byRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  align-items: center;
+  font-size: var(--text-sm);
+}
+.byLabel {
+  font-weight: 700;
+}
+.byButton {
+  font: inherit;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+}
+.byButton[aria-pressed='true'] {
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+}
+.tableScroll {
+  overflow-x: auto;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.table th,
+.table td {
+  height: var(--row-height);
+  padding: 0 var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  white-space: nowrap;
+}
+.table th:global(.num),
+.table td:global(.num) {
+  text-align: right;
+}
+
+@media (max-width: 767px) {
+  .byButton {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

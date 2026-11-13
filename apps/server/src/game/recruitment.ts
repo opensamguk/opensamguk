@@ -11,6 +11,7 @@ export function recruitmentAvailability(
   return {
     recruitment: {
       tick: actor.tick ?? 0,
+      ...(context.atCity ? { cityKey: view.generals[actor.generalId]?.cityKey ?? null } : {}),
       byCrewType: Object.fromEntries(
         unitSet.crewTypes
           .filter((unit) => unit.armType > 0)

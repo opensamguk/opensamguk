@@ -41,8 +41,18 @@ export const messageRouter = router({
             take: 21,
           });
           const page = rows.slice(0, 20);
+          const ids = new Set(page.flatMap((row) => [row.senderId, row.recipientId]).filter((id) => id !== null));
+          const portraits = new Map(
+            (ids.size
+              ? await tx.general.findMany({
+                  where: { worldId: input.worldId, id: { in: [...ids] } },
+                  select: { id: true, portraitId: true },
+                })
+              : []
+            ).map(({ id, portraitId }) => [id, portraitId]),
+          );
           return {
-            items: page.map((row) => messageItem(row, general.id)),
+            items: page.map((row) => messageItem(row, general.id, portraits)),
             next: rows.length > 20 ? encodeMessageCursor(page.at(-1)!) : null,
           };
         },
@@ -53,7 +63,7 @@ export const messageRouter = router({
     .input(
       worldInput
         .extend({
-          scope: z.enum(['PRIVATE', 'NATION', 'DIPLOMACY']),
+          scope: messageScope,
           toGeneralId: entityKey.optional(),
           toNationId: entityKey.optional(),
           body: messageBody,
@@ -66,7 +76,8 @@ export const messageRouter = router({
         if (
           (input.scope === 'PRIVATE' && (input.toGeneralId === undefined || input.toNationId !== undefined)) ||
           (input.scope === 'DIPLOMACY' && (input.toNationId === undefined || input.toGeneralId !== undefined)) ||
-          (input.scope === 'NATION' && (input.toNationId !== undefined || input.toGeneralId !== undefined))
+          ((input.scope === 'NATION' || input.scope === 'WORLD') &&
+            (input.toNationId !== undefined || input.toGeneralId !== undefined))
         )
           throw new TRPCError({ code: 'BAD_REQUEST', message: '받는 사람과 메시지 범위를 확인하세요.' });
         visibleMessages(g, input.scope);
@@ -94,7 +105,7 @@ export const messageRouter = router({
         if (
           (input.scope === 'PRIVATE' &&
             (!recipient || recipient.removedAt != null || recipient.activeFromYear === LINEAGE_EXITED_YEAR)) ||
-          (input.scope !== 'PRIVATE' && !nation) ||
+          ((input.scope === 'NATION' || input.scope === 'DIPLOMACY') && !nation) ||
           (input.scope === 'DIPLOMACY' && (!isLeader(g) || nation!.id === g.nationId))
         )
           throw new TRPCError({ code: 'BAD_REQUEST', message: '받는 사람을 찾을 수 없습니다.' });
@@ -118,11 +129,18 @@ export const messageRouter = router({
             senderId: g.id,
             senderNationId: g.nationId,
             recipientId: recipient?.id ?? null,
-            recipientNationId: input.scope === 'PRIVATE' ? null : nation!.id,
-            fromParty: { generalId: g.id, name: g.name, nation: ownNation },
+            recipientNationId: input.scope === 'NATION' || input.scope === 'DIPLOMACY' ? nation!.id : null,
+            fromParty: { generalId: g.id, name: g.name, nation: ownNation, portraitId: g.portraitId },
             toParty: recipient
-              ? { generalId: recipient.id, name: recipient.name, nation: recipient.nation }
-              : { generalId: null, name: nation!.name, nation },
+              ? {
+                  generalId: recipient.id,
+                  name: recipient.name,
+                  nation: recipient.nation,
+                  portraitId: recipient.portraitId,
+                }
+              : input.scope === 'WORLD'
+                ? { generalId: null, name: '전체', nation: null }
+                : { generalId: null, name: nation!.name, nation },
             body: input.body,
             sentAt: now,
             year: date.year,
@@ -138,7 +156,9 @@ export const messageRouter = router({
               ? { generalId: recipient!.id }
               : input.scope === 'NATION'
                 ? { nationId: nation!.id }
-                : { nationIds: [g.nationId!, nation!.id], leadersOnly: true },
+                : input.scope === 'WORLD'
+                  ? 'world'
+                  : { nationIds: [g.nationId!, nation!.id], leadersOnly: true },
         });
         return { item: messageItem(row, g.id) };
       }),
@@ -188,7 +208,7 @@ export const messageRouter = router({
             removedAt: null,
             activeFromYear: { not: LINEAGE_EXITED_YEAR },
           },
-          select: { id: true, name: true, nation: { select: nationTagSelect } },
+          select: { id: true, name: true, portraitId: true, nation: { select: nationTagSelect } },
           orderBy: [{ name: 'asc' }, { id: 'asc' }],
         });
         const nations = await tx.nation.findMany({

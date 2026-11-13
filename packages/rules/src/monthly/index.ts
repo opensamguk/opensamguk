@@ -4,6 +4,7 @@ import { TICKS_PER_MONTH } from '../clock/constants';
 import type { WorldState, WorldView } from '../model/world';
 import { refreshSupply } from '../supply';
 import { readCampaignState } from '../campaign/state';
+import { residentOfficeBonuses, type OfficeBonuses } from '../personnel/residentOffice';
 import { applyCityResourceIncome } from '../cityResourceIncome';
 
 export const MONTHLY_STAGES = ['income', 'population', 'supply', 'diplomacy', 'yearbook'] as const;
@@ -33,30 +34,43 @@ const generalsById = (state: WorldView) =>
     .sort((a, b) => a.id - b.id);
 const nationsById = (state: WorldView) => Object.values(state.nations).sort((a, b) => a.id - b.id);
 
-export function settleIncome(state: WorldView, date: GameDate): WorldState {
+export function estimateTaxIncome(
+  cities: readonly { cityKey: number; commerce: number; agriculture: number; population: number }[],
+  memberCount: number,
+  resource: 'gold' | 'rice',
+  bonuses?: ReturnType<typeof residentOfficeBonuses>,
+) {
+  const gross = Math.round(
+    cities.reduce(
+      (sum, city) =>
+        sum +
+        city[resource === 'gold' ? 'commerce' : 'agriculture'] *
+          (city.population / BALANCE.MONTHLY_POPULATION_UNIT) *
+          BALANCE.MONTHLY_TAX_RATE *
+          (1 + (bonuses?.get(city.cityKey)?.tax?.percent ?? 0) / 100),
+      0,
+    ),
+  );
+  const perGeneral = memberCount ? Math.floor(Math.round(gross * BALANCE.MONTHLY_SALARY_RATE) / memberCount) : 0;
+  const payroll = perGeneral * memberCount;
+  return { gross, perGeneral, payroll, net: gross - payroll };
+}
+
+export function settleIncome(
+  state: WorldView,
+  date: GameDate,
+  bonuses = residentOfficeBonuses(state, date.year),
+): WorldState {
   const next = structuredClone(state) as WorldState;
   const resource = [1, 7].includes(date.month) ? 'gold' : [4, 10].includes(date.month) ? 'rice' : null;
   if (!resource) return next;
   for (const nation of nationsById(next)) {
-    const income = Math.round(
-      citiesById(next)
-        .filter((city) => city.nationId === nation.id && city.kind !== 'PASS')
-        .reduce(
-          (sum, city) =>
-            sum +
-            city[resource === 'gold' ? 'commerce' : 'agriculture'] *
-              (city.population / BALANCE.MONTHLY_POPULATION_UNIT) *
-              BALANCE.MONTHLY_TAX_RATE,
-          0,
-        ),
-    );
+    const cities = citiesById(next).filter((city) => city.nationId === nation.id && city.kind !== 'PASS');
     const members = generalsById(next).filter(
       (general) => general.nationId === nation.id && general.activeFromYear <= date.year,
     );
-    const perGeneral = members.length
-      ? Math.floor(Math.round(income * BALANCE.MONTHLY_SALARY_RATE) / members.length)
-      : 0;
-    next.nations[nation.id]![resource] += income - perGeneral * members.length;
+    const { net, perGeneral } = estimateTaxIncome(cities, members.length, resource, bonuses);
+    next.nations[nation.id]![resource] += net;
     for (const general of members) next.generals[general.id]![resource] += perGeneral;
   }
   return next;
@@ -85,7 +99,7 @@ export function settlePopulation(state: WorldView, taxRate: number = BALANCE.MON
   return next;
 }
 
-export function settleSupply(state: WorldView): WorldState {
+export function settleSupply(state: WorldView, bonuses: OfficeBonuses = new Map()): WorldState {
   const next = structuredClone(state) as WorldState;
   const campaign = state.ruleFeatures?.includes('campaign-v1') ? readCampaignState(next.campaign, next) : undefined;
   if (campaign) next.campaign = campaign;
@@ -94,18 +108,26 @@ export function settleSupply(state: WorldView): WorldState {
     const target = next.cities[city.cityKey]!;
     // 재야 도시에는 보급 단절 페널티를 부과하지 않는다.
     if (city.nationId === null || target.supplied) continue;
+    const loss = (100 - (bonuses.get(city.cityKey)?.supplyLoss?.percent ?? 0)) / 100;
     for (const field of ['agriculture', 'commerce', 'security', 'defence', 'wall'] as const) {
-      target[field] = Math.max(0, Math.round(city[field] * BALANCE.UNSUPPLIED_FACTOR));
+      const factor = loss === 1 ? BALANCE.UNSUPPLIED_FACTOR : 1 - (1 - BALANCE.UNSUPPLIED_FACTOR) * loss;
+      target[field] = Math.max(0, Math.round(city[field] * factor));
     }
     if (campaign) {
       for (const unit of campaign.units.filter((unit) => next.generals[unit.commanderId]!.cityKey === city.cityKey)) {
-        unit.train = Math.max(0, unit.train - BALANCE.UNSUPPLIED_TRAIN_LOSS);
-        unit.atmos = Math.max(0, unit.atmos - BALANCE.UNSUPPLIED_ATMOS_LOSS);
+        unit.train = Math.max(0, unit.train - Math.round(BALANCE.UNSUPPLIED_TRAIN_LOSS * loss));
+        unit.atmos = Math.max(0, unit.atmos - Math.round(BALANCE.UNSUPPLIED_ATMOS_LOSS * loss));
       }
     } else {
       for (const general of generalsById(next).filter((general) => general.cityKey === city.cityKey)) {
-        next.generals[general.id]!.train = Math.max(0, general.train - BALANCE.UNSUPPLIED_TRAIN_LOSS);
-        next.generals[general.id]!.atmos = Math.max(0, general.atmos - BALANCE.UNSUPPLIED_ATMOS_LOSS);
+        next.generals[general.id]!.train = Math.max(
+          0,
+          general.train - Math.round(BALANCE.UNSUPPLIED_TRAIN_LOSS * loss),
+        );
+        next.generals[general.id]!.atmos = Math.max(
+          0,
+          general.atmos - Math.round(BALANCE.UNSUPPLIED_ATMOS_LOSS * loss),
+        );
       }
     }
   }
@@ -166,10 +188,11 @@ export function runMonthly(state: WorldView, tick: number, rng: Rng) {
   const date = monthlyDate(state.startYear, tick);
   // 현 단계는 난수를 소비하지 않는다. 재해·사건을 붙일 때 이 스트림만 쓴다.
   void rng;
-  let next = settleIncome(state, date);
-  if (state.ruleFeatures?.includes('city-resources-v1')) next = applyCityResourceIncome(state, next, date);
+  const bonuses = residentOfficeBonuses(state, date.year);
+  let next = settleIncome(state, date, bonuses);
+  if (state.ruleFeatures?.includes('city-resources-v1')) next = applyCityResourceIncome(state, next, date, bonuses);
   next = settlePopulation(next);
-  next = settleSupply(next);
+  next = settleSupply(next, bonuses);
   next = settleDiplomacy(next, tick);
   // 미등장 장수는 턴을 쌓지 않는다. 등장 연도 1월에는 원래 offset부터 실행한다.
   for (const general of generalsById(next)) {
@@ -180,5 +203,15 @@ export function runMonthly(state: WorldView, tick: number, rng: Rng) {
       );
     }
   }
-  return { state: next, date, stages: [...MONTHLY_STAGES], yearbook: buildYearbook(next, date.year) };
+  const officeTaxLogs: { generalId: number; text: string }[] = [];
+  const field = [1, 7].includes(date.month) ? 'commerce' : [4, 10].includes(date.month) ? 'agriculture' : null;
+  if (field) {
+    for (const [cityKey, { tax }] of bonuses) {
+      if (!tax) continue;
+      const city = state.cities[cityKey]!;
+      if (city[field] > 0 && city.population > 0)
+        officeTaxLogs.push({ generalId: tax.generalId, text: `${city.name} 주재로 세수 ${tax.percent}% 보정` });
+    }
+  }
+  return { state: next, date, officeTaxLogs, stages: [...MONTHLY_STAGES], yearbook: buildYearbook(next, date.year) };
 }

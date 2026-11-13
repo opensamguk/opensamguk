@@ -22,6 +22,7 @@ import { NotificationSettingsPage } from './notifications/NotificationSettingsPa
 import { DevUiPage } from './pages/DevUiPage';
 import { LoginPage } from './pages/LoginPage';
 import { MainPage } from './pages/MainPage';
+import { CampaignPage, GovernancePage, MePage } from './pages/MyPages';
 import { SignupPage } from './pages/SignupPage';
 import { NationTurnsPage } from './personnel/NationTurnsPage';
 import { PersonnelPage } from './personnel/PersonnelPage';
@@ -343,7 +344,8 @@ const nationTurnsRoute = createRoute({
   component: NationTurnsPage,
 });
 
-const RECORD_TABS = ['general', 'nation', 'world', 'timelapse', 'intel'] as const;
+// 장수 동향(activity)·전투 기록(battles)은 INT-25·INT-26에서 더했다. 모르는 값은 내 장수 탭이다.
+const RECORD_TABS = ['general', 'battles', 'nation', 'activity', 'world', 'timelapse', 'intel'] as const;
 type RecordTab = (typeof RECORD_TABS)[number];
 
 const recordsRoute = createRoute({
@@ -404,6 +406,15 @@ const inspectionRoute = createRoute({
   path: 'nation/inspection',
   component: InspectionPage,
 });
+
+// 메인에서 옮긴 전용 화면 (INT-25, D-085). 통치는 nation/$nationId보다 먼저 맞는다(정적 경로 우선).
+const governanceRoute = createRoute({
+  getParentRoute: () => worldRoute,
+  path: 'nation/governance',
+  component: GovernancePage,
+});
+const campaignRoute = createRoute({ getParentRoute: () => worldRoute, path: 'campaign', component: CampaignPage });
+const meRoute = createRoute({ getParentRoute: () => worldRoute, path: 'me', component: MePage });
 
 const createGeneralRoute = createRoute({
   getParentRoute: () => worldRoute,
@@ -489,6 +500,12 @@ const adminWorldsRoute = createRoute({
   component: lazyRouteComponent(() => import('./admin/AdminWorlds'), 'AdminWorlds'),
 });
 
+const adminReleasesRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: 'releases',
+  component: lazyRouteComponent(() => import('./admin/AdminReleases'), 'AdminReleases'),
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   lobbyRoute,
@@ -505,7 +522,14 @@ const routeTree = rootRoute.addChildren([
   helpRoute,
   helpDocRoute,
   sharedTimelapseRoute,
-  adminRoute.addChildren([adminIndexRoute, adminUsersRoute, adminAuditRoute, adminNoticesRoute, adminWorldsRoute]),
+  adminRoute.addChildren([
+    adminIndexRoute,
+    adminUsersRoute,
+    adminAuditRoute,
+    adminNoticesRoute,
+    adminWorldsRoute,
+    adminReleasesRoute,
+  ]),
   worldRoute.addChildren([
     worldIndexRoute,
     mapRoute,
@@ -523,6 +547,9 @@ const routeTree = rootRoute.addChildren([
     operationsRoute,
     operationRoute,
     inspectionRoute,
+    governanceRoute,
+    campaignRoute,
+    meRoute,
     createGeneralRoute,
   ]),
   ...(import.meta.env.DEV ? [devUiRoute] : []),

@@ -23,6 +23,7 @@ import { authzCase } from '../apps/server/src/authz/case';
 import { categories } from '../apps/server/src/authz/coverage';
 import { initializeIntegrationResources } from './integration-resources';
 import { testDatabaseUrl } from './test-database';
+import { recoverTurnAfterCrash, turnCrashPhases } from './turn-process-test';
 import { listenLegalLoopback } from '../e2e/legalFixturePorts';
 
 // AC-P2-12: NPC 두 명의 차례를 원생성에서 고정한 장비 저장·실제 HTTP 검증이다.
@@ -374,6 +375,24 @@ it.each([
   },
 );
 
+it.each(turnCrashPhases)(
+  'AC-P2-12·30 장비 구매 %s에서 프로세스를 종료해도 새 프로세스가 한 번만 저장한다',
+  async (phase) => {
+    const f = await fixture(true, false, 'horses');
+    await execute(f, 'trade_rice', { amount: 1000, buy: false });
+    const commandKey = 'equipment_trade';
+    const tick = await prepare(f, commandKey, { slot: 'horse', itemKey: 'horse_01' });
+    const before = await snapshot(f.id);
+    const stock = before.state.logistics!.cities['3']!;
+    expect(stock.horses).toBeGreaterThanOrEqual(5);
+    const recovered = await recoverTurnAfterCrash(db, url, f.id, f.actorId, tick, commandKey, phase);
+    expect(recovered.state.equipment?.generals[String(f.actorId)]).toEqual({ horse: 'horse_01' });
+    expect(recovered.state.generals[f.actorId]!.gold).toBe(before.state.generals[f.actorId]!.gold - 1000);
+    expect(recovered.state.generals[f.actorId]!.experience).toBe(before.state.generals[f.actorId]!.experience + 10);
+    expect(recovered.state.logistics?.cities['3']).toEqual({ ...stock, horses: stock.horses - 5 });
+  },
+  60_000,
+);
 for (const category of categories) {
   it(
     `equipment.mine ${category}`,

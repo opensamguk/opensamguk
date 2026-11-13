@@ -186,23 +186,35 @@ test('T3-10 정식191년 모바일 명령·방침·탭의 크기와 30번 칸 �
     await page.goto(main);
     const editor = page.getByTestId('turn-editor');
     await expect(editor.locator('tr[data-slot]')).toHaveCount(30);
-    const targets = editor
+    // 768px 미만 메인은 하단 막대로 패널을 하나씩 본다 (INT-25). 예턴·방침은 `예턴`, 지도 배율은 `지도` 패널에 있다.
+    const bar = page.getByRole('tablist', { name: '메인 화면', exact: true });
+    const mainTab = (name: string) => bar.getByRole('tab', { name, exact: true });
+    const editorTargets = editor
       .locator('button,input,select')
-      .or(page.getByTestId('policy-bar').locator('button,select'))
-      .or(page.getByRole('group', { name: '지도 배율', exact: true }).locator('button'));
+      .or(page.getByTestId('policy-bar').locator('button,select'));
+    const mapTargets = page.getByRole('group', { name: '지도 배율', exact: true }).locator('button');
+    const targets = editorTargets.or(mapTargets);
     const measurements = [];
     for (const width of [375, 390, 768, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       await noOverflow(page);
       if (width < 768) {
-        await tapTargets(targets);
+        await tapTargets(bar.getByRole('tab'));
+        await mainTab('예턴').click();
+        await tapTargets(editorTargets);
         await tapTargets(editor.locator('tr[data-slot]'));
         expect(await editor.getByLabel('명령 찾기').evaluate((input) => getComputedStyle(input).fontSize)).toBe('16px');
+        measurements.push({ width, panel: 'commands', targets: await targetSizes(targets) });
+        await page.screenshot({ path: info.outputPath(`formal-controls-${width}-turns.png`), fullPage: true });
+        await mainTab('지도').click();
+        await tapTargets(mapTargets);
       }
       measurements.push({ width, targets: await targetSizes(targets) });
       await page.screenshot({ path: info.outputPath(`formal-controls-${width}.png`), fullPage: true });
     }
     await page.setViewportSize({ width: 375, height: 812 });
+    await mainTab('예턴').click();
+    await expect(page).toHaveURL(`${main}#main-commands`);
     await editor.getByRole('button', { name: '선택 해제', exact: true }).click();
     const last = editor.locator('tr[data-slot="30"]');
     await last.scrollIntoViewIfNeeded();
@@ -230,15 +242,23 @@ test('T3-10 정식191년 모바일 명령·방침·탭의 크기와 30번 칸 �
     await editor.getByRole('button', { name: '선택 해제', exact: true }).click();
     await editor.locator('tr[data-slot="1"]').click();
     await editor.getByRole('button', { name: '1번 칸에 넣기', exact: true }).click();
+    // 새로고침해도 고른 패널(주소 해시)과 저장하지 않은 편집이 남는다.
     await page.reload();
-    await expect(page).toHaveURL(main);
+    await expect(page).toHaveURL(`${main}#main-commands`);
+    await expect(mainTab('예턴')).toHaveAttribute('aria-selected', 'true');
     await expect(editor.getByTestId('draft-state')).toHaveText('저장하지 않은 편집 1건');
     await expect(editor.locator('tr[data-slot="1"]')).toContainText('농지 개간');
+    await mainTab('현황').click();
     await tapTargets(
       page.locator(
-        '[data-main-area="city"] a:not(table a),[data-main-area="city"] button:not(table button),[data-main-area="general"] a,[data-main-area="general"] button,[data-main-area] > header a,[data-main-area] > header button',
+        '[data-main-area="city"] a:not(table a),[data-main-area="city"] button:not(table button),[data-main-area="general"] a,[data-main-area="general"] button,[data-main-area="nation"] > header a,[data-main-area="nation"] > header button',
       ),
     );
+    await mainTab('지도').click();
+    await tapTargets(page.locator('[data-main-area="map"] > header a,[data-main-area="map"] > header button'));
+    await mainTab('메뉴').click();
+    await tapTargets(page.getByRole('navigation', { name: '국가와 내 장수 메뉴', exact: true }).locator('a'));
+    await tapTargets(page.getByRole('navigation', { name: '공통 메뉴', exact: true }).locator('a,button'));
     const remaining = await targetSizes(page.locator('svg [role="button"],table:not([role="grid"]) button'));
     await writeFile(
       info.outputPath('mobile-controls-measurements.json'),
@@ -258,9 +278,10 @@ test('T3-10 정식191년 모바일 명령·방침·탭의 크기와 30번 칸 �
       ['world', '월드 정세'],
       ['timelapse', '영토 재생'],
     ]) {
+      // 좁은 메인의 공통 화면(기록·순위 등)은 하단 막대 `메뉴` 패널에 있다.
+      await mainTab('메뉴').click();
       await page
-        .getByRole('navigation', { name: '게임 메뉴', exact: true })
-        .filter({ visible: true })
+        .getByRole('navigation', { name: '공통 메뉴', exact: true })
         .getByRole('link', { name: '기록', exact: true })
         .click();
       await expect(page.getByRole('navigation', { name: '기록 종류', exact: true })).toBeVisible();
@@ -317,7 +338,7 @@ for (const { edition, sites } of editions) {
       const world = `/w/${worldId}`;
       const routeChecks: Array<[string, string, Locator]> = [
         ['lobby', '/lobby', page.getByTestId('public-map').getByTestId('world-map')],
-        ['main', `${world}?city=40`, page.getByTestId('turn-editor')],
+        ['main', `${world}?city=40#main-commands`, page.getByTestId('turn-editor')],
         ['map', `${world}/map`, page.getByTestId('world-map')],
         ['turns', `${world}/turns`, page.getByTestId('turn-editor')],
         ['city', `${world}/city/40`, page.getByRole('heading', { name: /^도시 정보 · / })],
@@ -344,15 +365,22 @@ for (const { edition, sites } of editions) {
         screens.push({ screen, ...(await measureMobileScreen(page)) });
         await page.screenshot({ path: info.outputPath(`mobile-${screen}-375.png`), fullPage: true });
         if (screen === 'main') {
-          const menu = page.locator('summary').filter({ hasText: /^전체$/ });
-          const close = page.getByRole('button', { name: '메뉴 닫기', exact: true });
-          await expect(close).toBeHidden();
-          await menu.tap();
-          await expect(close).toBeVisible();
-          screens.push({ screen: 'main-open-menu', ...(await measureMobileScreen(page)) });
-          await page.screenshot({ path: info.outputPath('mobile-main-open-menu-375.png') });
-          await close.tap();
-          await expect(close).toBeHidden();
+          // 좁은 메인은 게임 메뉴의 `전체` 대신 하단 막대 하나로 나머지 패널과 메뉴를 연다 (INT-25).
+          await expect(page.locator('summary').filter({ hasText: /^전체$/ })).toBeHidden();
+          const bar = page.getByRole('tablist', { name: '메인 화면', exact: true });
+          for (const [name, panel] of [
+            ['지도', 'map'],
+            ['현황', 'status'],
+            ['기록', 'records'],
+            ['메시지', 'messages'],
+            ['메뉴', 'menu'],
+          ] as const) {
+            await bar.getByRole('tab', { name, exact: true }).tap();
+            await expect(bar.getByRole('tab', { name, exact: true })).toHaveAttribute('aria-selected', 'true');
+            await expect(page.locator('[data-state="loading"]:visible')).toHaveCount(0);
+            screens.push({ screen: `main-${panel}`, ...(await measureMobileScreen(page)) });
+            await page.screenshot({ path: info.outputPath(`mobile-main-${panel}-375.png`), fullPage: true });
+          }
         }
       }
       await page.context().clearCookies();

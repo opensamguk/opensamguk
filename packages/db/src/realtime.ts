@@ -1,9 +1,10 @@
-import type { PrismaClient } from './generated/prisma/client';
+import type { Prisma, PrismaClient } from './generated/prisma/client';
 
 export type RealtimeTarget =
   'world' | { generalId: number } | { nationId: number } | { nationIds: number[]; leadersOnly?: boolean | undefined };
 export interface RealtimeSignal {
-  kind: 'turn.result' | 'message.new' | 'monthly.done' | 'offer.new' | 'treaty.new' | 'notice.updated';
+  kind:
+    'activity.updated' | 'turn.result' | 'message.new' | 'monthly.done' | 'offer.new' | 'treaty.new' | 'notice.updated';
   scope?: 'PRIVATE' | 'NATION' | 'DIPLOMACY' | 'WORLD' | 'nation' | 'world' | undefined;
   target: RealtimeTarget;
 }
@@ -41,4 +42,10 @@ export async function notifyWorld(
 }
 export function notifySessionClosed(db: PrismaClient, sessionId: string, warn: () => void = () => {}) {
   return notify(db, 'sessions_closed', sessionId, warn);
+}
+
+// PostgreSQL delivers this invalidation only if the public record transaction commits.
+export async function notifyActivityOnCommit(tx: Prisma.TransactionClient, worldId: string) {
+  const signal: RealtimeSignal = { kind: 'activity.updated', target: 'world' };
+  await tx.$queryRaw`SELECT pg_notify(${worldChannel(worldId)}, ${JSON.stringify(signal)})::text`;
 }

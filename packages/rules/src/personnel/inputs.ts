@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { commandRegistry } from '../commands/registry';
 import type { DeepReadonly } from '../model/world';
+import { clearLostCityOffices } from './residentOffice';
 import { appointOfficer, dismissOfficer } from './appointments';
 import { closeInvalidOffersInPlace, respondAssignment } from './assignments';
 import { syncOffices, type OfficeRevisions, type OfficeState, type OfficeView } from './offices';
@@ -21,7 +22,12 @@ import {
 const natural = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const positive = natural.min(1);
 const tickResult = { tick: natural };
-const appointPayload = z.strictObject({ generalId: z.number().int().safe(), officerLevel: z.number().int().safe() });
+const appointPayload = z.strictObject({
+  generalId: z.number().int().safe(),
+  officerLevel: z.number().int().safe(),
+  cityKey: positive.optional(),
+  expectedHolderId: positive.nullable().optional(),
+});
 const dismissPayload = z.strictObject({ generalId: z.number().int().safe() });
 const respondPayload = z.strictObject({ offerId: z.string(), accept: z.boolean() });
 const slot = z
@@ -35,7 +41,8 @@ const turnsPayload = z.strictObject({
 const appointResult = z.strictObject({
   ...tickResult,
   generalId: positive,
-  officerLevel: z.number().int().min(5).max(11),
+  officerLevel: z.number().int().min(2).max(11),
+  officerCityKey: positive.optional(),
   title: z.string().min(1),
 });
 const dismissResult = z.strictObject({
@@ -181,7 +188,7 @@ function applyDomain(view: OfficeView, generalId: number, kind: PersonnelInputKi
   switch (kind) {
     case 'personnel.appoint': {
       const args = appointPayload.parse(payload);
-      return appointOfficer(view, generalId, args.generalId, args.officerLevel);
+      return appointOfficer(view, generalId, args.generalId, args.officerLevel, args.cityKey, args.expectedHolderId);
     }
     case 'personnel.dismiss':
       return dismissOfficer(view, generalId, dismissPayload.parse(payload).generalId);
@@ -258,6 +265,7 @@ export function finishPersonnelStep(
   tick: number,
 ): PersonnelStepResult {
   const synced = syncOffices(before, change.state, offices);
+  clearLostCityOffices(before, synced.state);
   const cancelled = closeInvalidOffersInPlace(synced.state, tick);
   const closedOffers = [...change.closedOffers, ...cancelled.closedOffers];
   const remaining = new Set(Object.values(cancelled.state.assignmentOffers ?? {}).map((offer) => offer.id));

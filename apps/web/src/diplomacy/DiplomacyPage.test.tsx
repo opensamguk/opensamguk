@@ -115,10 +115,81 @@ beforeEach(() => {
   on('auth.me', () => ({ user: { id: 'u1' } }));
   on('home.get', () => ({ nation: { id: 1 } }));
   on('world.map', () => ({ cities: [], nations: [nation(1, '조조'), nation(2, '원소'), nation(3, '유표')] }));
+  on('treaty.relations', () => ({ nations: [nation(1, '조조'), nation(2, '원소')], pairs: [] }));
 });
 afterEach(cleanup);
 
 describe('외교실 첫 세 조항 화면', () => {
+  it('확장 조항의 당사국·도시·금액·기간을 견적과 제안에 함께 보낸다', async () => {
+    on('treaty.list', () => ({ ...listPage({ tradeEnabled: true }), expandedEnabled: true }));
+    on('world.map', () => ({
+      cities: [
+        { key: 11, name: '허창', nationId: 1 },
+        { key: 12, name: '복양', nationId: 1 },
+        { key: 21, name: '업', nationId: 2 },
+        { key: 22, name: '남피', nationId: 2 },
+        { key: 31, name: '양양', nationId: 3 },
+        { key: 41, name: '낙양', nationId: null },
+        { key: 42, name: '호로관', nationId: 1, kind: 'PASS' },
+      ],
+      nations: [
+        { ...nation(1, '조조'), capitalCityKey: 11 },
+        { ...nation(2, '원소'), capitalCityKey: 21 },
+        { ...nation(3, '유표'), capitalCityKey: 31 },
+      ],
+    }));
+    on('treaty.quote', () => ({ cost: { mine: 100, theirs: 100 }, problem: null }));
+    on(
+      'treaty.propose',
+      (input) =>
+        ({
+          status: 'applied',
+          requestId: (input as { requestId: string }).requestId,
+          kind: 'treaty.propose',
+          outcome: 'PROPOSED',
+          treatyId: '12',
+          treaty: null,
+        }) satisfies RequestState,
+    );
+    renderPage('write');
+    const form = within(await screen.findByRole('form', { name: '조약서 쓰기' }));
+    fireEvent.change(form.getByLabelText('상대'), { target: { value: '2' } });
+    await waitFor(() => expect((form.getByLabelText('통행 허용') as HTMLInputElement).disabled).toBe(false));
+    fireEvent.click(form.getByLabelText('통행 허용'));
+    fireEvent.change(form.getByLabelText('통행 기간(개월)'), { target: { value: '120' } });
+    const passage = within(form.getByRole('group', { name: '통행 도시' }));
+    expect(passage.queryByRole('checkbox', { name: /양양|낙양|호로관/ })).toBeNull();
+    fireEvent.click(passage.getByRole('checkbox', { name: '업 (원소)' }));
+    fireEvent.click(passage.getByRole('checkbox', { name: '복양 (조조)' }));
+    fireEvent.click(form.getByLabelText('정기 원조'));
+    fireEvent.change(form.getByRole('combobox', { name: '원조를 보내는 국가' }), { target: { value: '2' } });
+    fireEvent.click(form.getByRole('button', { name: /제안 보내기\s*\(사용 불가\)/ }));
+    expect(form.getByRole('note').textContent).toContain('금과 쌀을 각각');
+    fireEvent.change(form.getByLabelText('매달 쌀'), { target: { value: '10000' } });
+    fireEvent.click(form.getByLabelText('도시 이양'));
+    const transfer = form.getByRole('combobox', { name: '이양할 도시' });
+    expect(
+      within(transfer)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['고르세요', '복양 (조조)', '남피 (원소)']);
+    fireEvent.change(transfer, { target: { value: '22' } });
+    const clauses = [
+      { kind: 'passage', cityKeys: [12, 21], months: 120 },
+      { kind: 'tribute', payerNationId: 2, gold: 0, rice: 10_000, months: 12 },
+      { kind: 'cityTransfer', cityKey: 22, giverNationId: 2 },
+    ];
+    await waitFor(() =>
+      expect(callsTo('treaty.quote').at(-1)?.input).toEqual({ worldId: 'w1', toNationId: 2, clauses }),
+    );
+    fireEvent.click(form.getByRole('button', { name: '제안 보내기' }));
+    await screen.findByText(/제안을 보냈습니다/);
+    expect(callsTo('treaty.propose').at(-1)?.input).toMatchObject({ toNationId: 2, clauses });
+    fireEvent.change(form.getByLabelText('상대'), { target: { value: '3' } });
+    expect(form.queryByRole('group', { name: '통행 도시' })).toBeNull();
+    expect(form.queryByRole('combobox', { name: '이양할 도시' })).toBeNull();
+  });
+
   it('교역 기능이 있는 월드의 조항 작성은 실제 견적·제안 입력에 교역 기간을 넣는다', async () => {
     on('treaty.list', () => listPage({ tradeEnabled: true }));
     on('treaty.quote', () => ({ cost: { mine: 100, theirs: 100 }, problem: null }));
@@ -417,23 +488,90 @@ describe('외교실 첫 세 조항 화면', () => {
 });
 
 describe('외교실 국가 탭 (INT-20)', () => {
-  it('이미 받은 상대 목록으로 관계와 이어 볼 곳을 한 줄씩 보이고 새 조회를 하지 않는다', async () => {
-    on('treaty.list', () => listPage({ items: [treaty({})] }));
+  it('상대 목록에 순위 스냅숏의 국력·장수·도시를 nationId로 합치고 관계에 남은 개월을 붙인다', async () => {
+    on('treaty.list', () =>
+      listPage({
+        items: [treaty({})],
+        targets: [
+          { nation: nation(2, '원소'), relation: 'NONE', relationEndAt: null },
+          { nation: nation(3, '유표'), relation: 'NON_AGGRESSION', relationEndAt: { year: 191, month: 9 } },
+          { nation: nation(4, '손견'), relation: 'WAR', relationEndAt: null },
+        ],
+      }),
+    );
+    on('ranking.nations', () => ({
+      items: [
+        { nationId: 3, name: '유표', color: '#336699', cities: 4, generals: 12, power: 3456, rank: 2 },
+        { nationId: 2, name: '원소', color: '#336699', cities: 9, generals: 30, power: 12000, rank: 1 },
+      ],
+      at: { tick: 600, year: 191, month: 2 },
+    }));
+    on('world.summary', () => ({ gameDate: { year: 191, month: 3 } }));
     renderPage('nations');
     const table = await screen.findByTestId('nation-relations');
     expect(
       within(table)
         .getAllByRole('columnheader')
         .map((cell) => cell.textContent),
-    ).toEqual(['국가', '우리와의 관계', '이어 보기']);
-    // 시험의 Link 대역은 aria-label을 넘기지 않으므로 줄 글자로 본다.
+    ).toEqual(['국가', '국력', '장수', '도시', '우리와의 관계', '이어 보기']);
+    await waitFor(() =>
+      expect(screen.getByTestId('nation-stats-note').textContent).toBe('국력·장수·도시는 191년 2월 정산 기준입니다.'),
+    );
+    await waitFor(() => expect(screen.getByTestId('relation-months-left').textContent).toBe(' (6개월 남음)'));
+    // 시험의 Link 대역은 aria-label을 넘기지 않으므로 줄 글자로 본다. 스냅숏에 없는 국가는 —로 둔다.
     expect(
       within(table)
         .getAllByRole('row')
         .slice(1)
         .map((row) => row.textContent),
-    ).toEqual(['원소관계 없음받은 제안 보기', '유표교전조약서 쓰기']);
+    ).toEqual([
+      '원소12,000309관계 없음받은 제안 보기',
+      '유표3,456124불가침 (191년 9월까지) (6개월 남음)조약서 쓰기',
+      '손견———교전조약서 쓰기',
+    ]);
     expect(within(table).getByText('교전').dataset.tone).toBe('danger');
     expect(callsTo('treaty.trust')).toHaveLength(0);
+    expect(callsTo('ranking.nations').map((call) => call.input)).toEqual([{ worldId: 'w1', by: 'power' }]);
+  });
+
+  it('상대 표 아래에 treaty.relations의 국가×국가 외교 현황을 우리 국가 기준으로 그린다', async () => {
+    on('treaty.list', () => listPage({}));
+    on('ranking.nations', () => ({ items: [], at: null }));
+    on('world.summary', () => ({ gameDate: { year: 191, month: 3 } }));
+    on('treaty.relations', () => ({
+      nations: [nation(1, '조조'), nation(2, '원소'), nation(3, '유표')],
+      pairs: [
+        { nationA: 1, nationB: 2, relation: 'NONE', relationEndAt: null },
+        { nationA: 1, nationB: 3, relation: 'WAR', relationEndAt: null },
+        { nationA: 2, nationB: 3, relation: 'DECLARED', relationEndAt: { year: 191, month: 9 } },
+      ],
+    }));
+    renderPage('nations');
+    const grid = await screen.findByTestId('relation-grid');
+    expect(screen.getByRole('heading', { name: '외교 현황' })).toBeTruthy();
+    const rows = within(grid).getAllByRole('row');
+    // 다른 국가끼리의 선포도 보인다. 우리 줄은 home.get의 국가(1)다.
+    expect(within(rows[2]!).getAllByRole('cell')[2]!.textContent).toBe('▲원소·유표 선포 (191년 9월까지)');
+    expect(within(rows[1]!).getByRole('rowheader').dataset.own).toBe('true');
+    expect(callsTo('treaty.relations').map((call) => call.input)).toEqual([{ worldId: 'w1' }]);
+  });
+
+  it('순위 조회가 실패해도 관계 표는 그대로 보이고 수치 칸만 비운다', async () => {
+    on('treaty.list', () => listPage({}));
+    // 클라이언트 오류는 다시 시도하지 않으므로 실패 문장이 바로 보인다.
+    on('ranking.nations', () => {
+      throw serverError('FORBIDDEN', '순위 실패');
+    });
+    on('world.summary', () => ({ gameDate: { year: 191, month: 3 } }));
+    renderPage('nations');
+    await waitFor(() =>
+      expect(screen.getByTestId('nation-stats-note').textContent).toBe('국력·장수·도시를 불러오지 못했습니다.'),
+    );
+    expect(
+      within(screen.getByTestId('nation-relations'))
+        .getAllByRole('row')
+        .slice(1)
+        .map((row) => row.textContent),
+    ).toEqual(['원소———관계 없음조약서 쓰기', '유표———교전조약서 쓰기']);
   });
 });

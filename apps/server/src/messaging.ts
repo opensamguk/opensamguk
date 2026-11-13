@@ -72,6 +72,7 @@ const party = z.strictObject({
   generalId: z.number().int().nullable(),
   name: z.string(),
   nation: nationTag.nullable(),
+  portraitId: z.number().int().nullable().optional(),
 });
 export type Party = z.infer<typeof party>;
 const fromParty = z.union([
@@ -80,14 +81,24 @@ const fromParty = z.union([
     .strictObject({ kind: z.literal('admin'), name: z.literal('운영') })
     .transform((value) => ({ ...value, generalId: null, nation: null })),
 ]);
-export function messageItem(row: Prisma.MessageGetPayload<{ include: { reads: true } }>, generalId: number) {
+export function messageItem(
+  row: Prisma.MessageGetPayload<{ include: { reads: true } }>,
+  generalId: number,
+  portraits?: ReadonlyMap<number, number | null>,
+) {
   const sent = row.senderId === generalId;
+  const from = fromParty.parse(row.fromParty);
+  const to = row.toParty === null ? null : party.parse(row.toParty);
+  const withPortrait = <T extends Party>(value: T): T & { portraitId: number | null } => ({
+    ...value,
+    portraitId: value.portraitId ?? (value.generalId === null ? null : (portraits?.get(value.generalId) ?? null)),
+  });
   return {
     id: row.id,
     scope: row.scope,
     direction: sent ? ('sent' as const) : ('received' as const),
-    from: fromParty.parse(row.fromParty),
-    to: row.toParty === null ? null : party.parse(row.toParty),
+    from: withPortrait(from),
+    to: to === null ? null : withPortrait(to),
     body: row.body,
     sentAt: row.sentAt.toISOString(),
     gameDate: { year: row.year, month: row.month },

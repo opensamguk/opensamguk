@@ -1,5 +1,13 @@
 import type { Prisma } from '@opensamguk/db';
-import { APPOINTABLE_OFFICER_LEVELS, canManagePersonnel, officerTitle } from '@opensamguk/rules';
+import {
+  APPOINTABLE_OFFICER_LEVELS,
+  canManagePersonnel,
+  courtOfficeTitle,
+  isLocalOffice,
+  isOfficeResident,
+  localOfficeTitle,
+  officerTitle,
+} from '@opensamguk/rules';
 import { TRPCError } from '@trpc/server';
 import { requireGeneral } from './queries';
 
@@ -12,9 +20,13 @@ type PersonnelMember = {
   isHuman: boolean;
   city: { cityKey: number; name: string };
   dedication: number;
+  officerCityKey?: number | null;
+  resident?: boolean;
 };
 export type PersonnelBoard = {
   actorId: number;
+  officeEffectsEnabled?: true;
+  officeCities?: { cityKey: number; name: string }[];
   appoint: Allowed;
   levels: { officerLevel: number; title: string; holderId: number | null }[];
   members: PersonnelMember[];
@@ -30,9 +42,20 @@ function titleFor(level: number): string {
 export async function readPersonnelBoard(
   tx: Prisma.TransactionClient,
   input: { worldId: string; userId: string },
+  officeEffectsEnabled = false,
+  courtRankEnabled = false,
 ): Promise<PersonnelBoard> {
   const actor = await requireGeneral(tx, input.worldId, input.userId);
   if (actor.nationId === null) throw new TRPCError({ code: 'FORBIDDEN', message: '국가에 소속되어야 합니다.' });
+  const courtRank = courtRankEnabled
+    ? (
+        await tx.nation.findUniqueOrThrow({
+          where: { worldId_id: { worldId: input.worldId, id: actor.nationId } },
+          select: { level: true },
+        })
+      ).level
+    : null;
+  const courtTitle = (level: number) => (courtRank === null ? null : courtOfficeTitle(courtRank, level));
   const rows = await tx.general.findMany({
     where: { worldId: input.worldId, nationId: actor.nationId },
     orderBy: [{ officerLevel: 'desc' }, { id: 'asc' }],
@@ -42,28 +65,57 @@ export async function readPersonnelBoard(
       officerLevel: true,
       userId: true,
       dedication: true,
-      city: { select: { cityKey: true, name: true } },
+      ...(officeEffectsEnabled ? { officerCityKey: true } : {}),
+      city: { select: { cityKey: true, name: true, ...(officeEffectsEnabled ? { nationId: true } : {}) } },
     },
   });
   const members = rows.map((row) => ({
     generalId: row.id,
     name: row.name,
     officerLevel: row.officerLevel,
-    title: titleFor(row.officerLevel),
+    title:
+      officeEffectsEnabled && isLocalOffice(row.officerLevel)
+        ? localOfficeTitle(row.officerLevel)
+        : (courtTitle(row.officerLevel) ?? titleFor(row.officerLevel)),
     isHuman: row.userId !== null,
-    city: row.city,
+    city: { cityKey: row.city.cityKey, name: row.city.name },
+    ...(officeEffectsEnabled
+      ? {
+          officerCityKey: row.officerCityKey ?? null,
+          resident: isOfficeResident(
+            { ...row, nationId: actor.nationId, cityKey: row.city.cityKey },
+            row.city.nationId ?? null,
+          ),
+        }
+      : {}),
     dedication: row.dedication,
   }));
   return {
     actorId: actor.id,
+    ...(officeEffectsEnabled
+      ? {
+          officeEffectsEnabled: true as const,
+          officeCities: await tx.city.findMany({
+            where: {
+              worldId: input.worldId,
+              nationId: actor.nationId,
+              OR: [{ kind: null }, { kind: { not: 'PASS' } }],
+            },
+            orderBy: { cityKey: 'asc' },
+            select: { cityKey: true, name: true },
+          }),
+        }
+      : {}),
     appoint: canManagePersonnel(actor.officerLevel)
       ? { ok: true }
       : { ok: false, reason: '군주만 임명·해임할 수 있습니다.' },
-    levels: APPOINTABLE_OFFICER_LEVELS.map((officerLevel) => {
+    levels: APPOINTABLE_OFFICER_LEVELS.flatMap((officerLevel) => {
       const holders = members.filter((member) => member.officerLevel === officerLevel);
       if (holders.length > 1)
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: '직책에 장수가 둘 이상 있습니다.' });
-      return { officerLevel, title: titleFor(officerLevel), holderId: holders[0]?.generalId ?? null };
+      const title = courtTitle(officerLevel);
+      if (courtRank !== null && title === null && holders.length === 0) return [];
+      return [{ officerLevel, title: title ?? titleFor(officerLevel), holderId: holders[0]?.generalId ?? null }];
     }),
     members,
   };

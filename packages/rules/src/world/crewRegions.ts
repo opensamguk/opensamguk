@@ -9,6 +9,13 @@ export function legacyCheCityRegions(
   return [...map.cities].sort((left, right) => left.id - right.id).map(({ id, name, region }) => [id, name, region]);
 }
 
+export function unitSetRegionSchemeMatches(unitSet: UnitSetResource, map: MapInput) {
+  return (
+    unitSet.regionScheme === undefined ||
+    ('version' in map && map.version === 3 && unitSet.regionScheme === map.regionScheme)
+  );
+}
+
 export function legacyCheCrewRegionsMatch(unitSet: UnitSetResource, map: MapInput) {
   const requirements = unitSet.crewTypes.flatMap((unit) => unit.requirements ?? []);
   const boundRegions = requirements.flatMap((requirement) =>

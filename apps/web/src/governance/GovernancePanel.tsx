@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import { formatYearMonth, personalLogDate } from '../game/gameDate';
 import { useWorldMap, useWorldSummary } from '../game/queries';
+import { Portrait } from '../portrait/Portrait';
 import { DataTable, type Column } from '../ui/DataTable';
 import { DisabledReason } from '../ui/DisabledReason';
 import { NationBadge } from '../ui/NationBadge';
@@ -348,6 +349,21 @@ function Nation({ view, id }: { view: GovernanceView; id: number | null }) {
   return <NationBadge name={row?.name ?? `국가 ${id}`} color={row?.color ?? null} />;
 }
 
+// 요약 칸의 원형 icon (D-085). 황실 조회에 초상 번호가 오면 얼굴, 아니면 실루엣과 첫 글자다.
+function GeneralFace({ view, id }: { view: GovernanceView; id: number }) {
+  const row = view.generals.find((general) => general.id === id);
+  return (
+    <Portrait
+      id={row?.portraitId ?? null}
+      name={generalName(view, id)}
+      variant="icon"
+      shape="round"
+      size={32}
+      decorative
+    />
+  );
+}
+
 function Meter({ value, at, label }: { value: number; at: number; label: string }) {
   return (
     <div className={styles.meter} role="img" aria-label={`${label} 정통성 ${value} / 100, 즉위 기준 ${at}`}>
@@ -370,10 +386,11 @@ function Hud({ ctx }: { ctx: Ctx }) {
           {view.throne.emperorGeneralId === null ? (
             <Tag tone="muted">공석</Tag>
           ) : (
-            <>
+            <span className={styles.person}>
+              <GeneralFace view={view} id={view.throne.emperorGeneralId} />
               <b>{generalName(view, view.throne.emperorGeneralId)}</b>{' '}
               <Nation view={view} id={view.throne.emperorNationId} />
-            </>
+            </span>
           )}
         </dd>
         <dd className={styles.note}>
@@ -535,10 +552,11 @@ function CourtTab({ ctx }: { ctx: Ctx }) {
               </h4>
               <p>
                 {appointment ? (
-                  <>
+                  <span className={styles.person}>
+                    <GeneralFace view={view} id={appointment.generalId} />
                     <b>{generalName(view, appointment.generalId)}</b>{' '}
                     <span className={styles.note}>{when(appointment.appointedTick)} 임명</span>
-                  </>
+                  </span>
                 ) : (
                   <span className={styles.note}>맡은 장수가 없습니다.</span>
                 )}

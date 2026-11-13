@@ -148,7 +148,7 @@ async function fixture(stack: LegalStack, browser: Browser) {
     await expect.poll(async () => (await orders()).filter((row) => row.status === 'APPLIED').length).toBe(count);
     await expect(panel(page).getByText('요청 처리 대기', { exact: true })).toHaveCount(0);
   };
-  await page.goto(`/w/${worldId}`);
+  await page.goto(`/w/${worldId}/nation/governance`);
   await expect(panel(page)).toBeVisible();
   await expect(panel(page).getByRole('tab', { name: '황위', exact: true })).toBeVisible();
   return {

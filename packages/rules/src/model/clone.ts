@@ -19,6 +19,8 @@ export function cloneWorldWithRegistry(view: WorldView, registry: ExtStateRegist
   for (const key in view.nations) nations[key] = { ...view.nations[key]! };
   for (const key in view.generals) generals[key] = { ...view.generals[key]! };
   return {
+    ...(view.relations ? { relations: structuredClone(view.relations) as NonNullable<WorldState['relations']> } : {}),
+    ...(view.officeEffects ? { officeEffects: structuredClone(view.officeEffects) } : {}),
     ...(view.preparedTurns
       ? { preparedTurns: structuredClone(view.preparedTurns) as NonNullable<WorldState['preparedTurns']> }
       : {}),
@@ -47,6 +49,7 @@ export function cloneWorldWithRegistry(view: WorldView, registry: ExtStateRegist
     ...(view.campaign ? { campaign: structuredClone(view.campaign) as NonNullable<WorldState['campaign']> } : {}),
     ...(ext ? { ext } : {}),
     ...(view.presetRules ? { presetRules: structuredClone(view.presetRules) as PresetRules } : {}),
+    ...(view.recruitmentLocation ? { recruitmentLocation: view.recruitmentLocation } : {}),
     ...(view.ruleFeatures ? { ruleFeatures: [...view.ruleFeatures] } : {}),
     startYear: view.startYear,
     cities,
@@ -57,7 +60,9 @@ export function cloneWorldWithRegistry(view: WorldView, registry: ExtStateRegist
       ? {
           treaties: view.treaties.map((treaty) => ({
             ...treaty,
-            clauses: treaty.clauses.map((clause) => ({ ...clause })),
+            clauses: treaty.clauses.map((clause) =>
+              clause.kind === 'passage' ? { ...clause, cityKeys: [...clause.cityKeys] } : { ...clause },
+            ),
           })),
         }
       : {}),

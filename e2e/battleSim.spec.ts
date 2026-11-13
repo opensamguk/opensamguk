@@ -464,9 +464,10 @@ test('T4-86 AC-P2-26 확장 병종표 월드에서 시뮬레이터와 개인 예
   await editor.locator('tr[data-slot="1"]').click();
   await editor.getByLabel('명령 찾기').fill('모병');
   await editor.getByRole('radio', { name: '모병' }).check();
-  const crew = editor.getByRole('combobox', { name: '병종' });
-  await expect(crew.locator('option:not([value=""])')).toHaveCount(generals.length);
-  await crew.selectOption(String(locked.id));
+  // 병종은 인자 입력 화면의 병종표에서 고른다 (INT-25).
+  const crew = editor.getByRole('radiogroup', { name: '병종', exact: true });
+  await expect(crew.getByRole('radio')).toHaveCount(generals.length);
+  await crew.locator(`input[value="${locked.id}"]`).check();
   await editor.getByRole('spinbutton', { name: '수량' }).fill('100');
   await expect(editor.getByRole('status').filter({ hasText: '사전 검사 경고' })).toBeVisible();
   await editor.getByRole('button', { name: '1번 칸에 넣기', exact: true }).click();

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { fiveStatsSchema } from '../general/fiveStats';
 import { MAX_STARTING_NPC_STAT, startingNpcStatLimit } from './initialNpcStats';
+import { LEGACY_OPENING_CITY_PROFILE } from './openingCityProfile';
 
 const natural = z.number().int().nonnegative();
 const positive = z.number().int().positive();
@@ -56,7 +57,7 @@ const scenarioObjectSchema = scenarioIdentitySchema.extend({
   startYear: natural,
   requiredMap: name.optional(),
   randomizeZeroAffinity: z.literal(true).optional(),
-  openingCityProfile: z.literal('legacy-research-70').optional(),
+  openingCityProfile: z.literal(LEGACY_OPENING_CITY_PROFILE).optional(),
   lastNationRecruitmentLockYear: positive.max(9999).optional(),
   requiredUnitSet: name.optional(),
   requiredStatRules: statRulesValueSchema.strict().optional(),

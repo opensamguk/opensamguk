@@ -1,4 +1,4 @@
-import { createHash, randomInt, randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -202,7 +202,7 @@ beforeAll(() =>
         },
       },
     });
-    address = await app.listen({ host: '127.0.0.1', port: randomInt(20_000, 50_000) });
+    address = await app.listen({ host: '127.0.0.1', port: 0 });
   }),
 );
 afterAll(async () => {
@@ -433,7 +433,7 @@ it('별도 시험 정책의 현재 두 판에 실제 동의한 관리자만 목�
   });
   await withCleanup(
     async () => {
-      const base = await server.listen({ host: '127.0.0.1', port: randomInt(20_000, 50_000) }),
+      const base = await server.listen({ host: '127.0.0.1', port: 0 }),
         actor = await user(),
         { cookie } = await session(actor.id);
       expect((await call('admin.world.list', undefined, cookie, base)).reason).toBe('CONSENT_REQUIRED');

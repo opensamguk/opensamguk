@@ -19,14 +19,16 @@ const base: Board = {
   actorId: 1,
   revision: 1,
   status: 'RUNNING',
-  recipients: [{ id: 2, name: '휘하 장수', isHuman: false }],
-  npcSuperior: { id: 3, name: 'NPC 군주' },
+  recipients: [{ id: 2, portraitId: null, name: '휘하 장수', isHuman: false }],
+  npcSuperior: { id: 3, portraitId: null, name: 'NPC 군주' },
   orders: [
     {
       id: 7,
       issuerId: 3,
+      issuerPortraitId: null,
       issuerName: 'NPC 군주',
       recipientId: 1,
+      recipientPortraitId: null,
       recipientName: '나',
       command: { commandKey: 'farm', args: {} },
       status: 'PENDING',

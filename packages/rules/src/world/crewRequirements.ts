@@ -25,6 +25,12 @@ const provinces = [
   '동이',
   '이민족',
 ];
+export function cityRegionName(region: number, mapKey: string, scheme?: 'province-191'): string | null {
+  if (scheme === 'province-191') return provinces[region] || null;
+  if (mapKey === 'che' || mapKey.startsWith('che@')) return LEGACY_CHE_REGION_NAMES[region] || null;
+  return null;
+}
+
 const researchNames = {
   greatsword: '대검병',
   halberd: '극병',
@@ -37,6 +43,7 @@ const researchNames = {
 export interface CrewContext {
   nation: { id: number; tech: number } | null;
   ownedCities: readonly { cityKey: number; region: number; level: number }[];
+  atCity?: boolean;
   cityNames: Readonly<Record<number, string>>;
   year: number;
   startYear: number;
@@ -67,9 +74,18 @@ export function crewContext(view: WorldView, actor: Pick<Actor, 'generalId' | 't
   )
     throw new Error('병종 조건의 국가 연구·초토화 상태를 확인하세요.');
   const cities = Object.values(view.cities);
+  const city = general ? view.cities[general.cityKey] : undefined;
+  const atCity = view.recruitmentLocation === 'city';
   return {
     nation: nation ? { id: nation.id, tech: nation.tech } : null,
-    ownedCities: nation ? cities.filter((city) => city.nationId === nation.id) : [],
+    ownedCities: nation
+      ? atCity
+        ? city?.nationId === nation.id
+          ? [city]
+          : []
+        : cities.filter((candidate) => candidate.nationId === nation.id)
+      : [],
+    ...(atCity ? { atCity: true } : {}),
     cityNames: Object.fromEntries(cities.map((city) => [city.cityKey, city.name])),
     year: view.startYear + Math.floor((actor.tick ?? 0) / (12 * TICKS_PER_MONTH)),
     startYear: view.startYear,
@@ -101,13 +117,17 @@ export function crewTypeFailure(
             requirement.kind === 'legacyCheRegions'
               ? requirement.regions.map((region) => LEGACY_CHE_REGION_NAMES[region])
               : (requirement.names ?? requirement.regions.map((region) => provinces[region]));
-          reason = `${names.join('·')} 도시가 필요합니다.`;
+          reason = context.atCity
+            ? `${names.join('·')} 도시에서만 모집할 수 있습니다.`
+            : `${names.join('·')} 도시가 필요합니다.`;
         }
         break;
       }
       case 'cities':
         if (!context.ownedCities.some((city) => requirement.cityKeys.includes(city.cityKey)))
-          reason = `${cityNames(requirement.cityKeys)} 거점이 필요합니다.`;
+          reason = context.atCity
+            ? `${cityNames(requirement.cityKeys)}에서만 모집할 수 있습니다.`
+            : `${cityNames(requirement.cityKeys)} 거점이 필요합니다.`;
         break;
       case 'citiesWithLevel':
         if (
@@ -115,7 +135,9 @@ export function crewTypeFailure(
             (city) => requirement.cityKeys.includes(city.cityKey) && city.level >= requirement.level,
           )
         )
-          reason = `규모 ${requirement.level} 이상의 ${cityNames(requirement.cityKeys)} 거점이 필요합니다.`;
+          reason = context.atCity
+            ? `규모 ${requirement.level} 이상의 ${cityNames(requirement.cityKeys)}에서만 모집할 수 있습니다.`
+            : `규모 ${requirement.level} 이상의 ${cityNames(requirement.cityKeys)} 거점이 필요합니다.`;
         break;
       case 'minRelYear':
         if (context.year - context.startYear < requirement.min)

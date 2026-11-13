@@ -68,12 +68,15 @@ test('좁은 메인 명령 칸에서 긴 인자와 긴 대상 도시 이름에�
   await row(page, 1).click();
   await pick(page, '모병');
   await editor(page).getByRole('spinbutton', { name: '수량' }).fill('1000000');
-  await editor(page).getByRole('combobox', { name: '병종' }).selectOption('1100');
+  await page.getByRole('radiogroup', { name: '병종' }).locator('input[value="1100"]').check();
   await editor(page).getByRole('button', { name: '1번 칸에 넣기', exact: true }).click();
   await editor(page).getByRole('button', { name: '선택 해제' }).click();
   await row(page, 2).click();
   await pick(page, '이동');
-  await editor(page).getByRole('combobox', { name: '대상 도시' }).selectOption({ label: longest.name });
+  await page
+    .getByRole('radiogroup', { name: '대상 도시' })
+    .getByRole('radio', { name: new RegExp(`^${longest.name}`) })
+    .click();
   await editor(page).getByRole('button', { name: '2번 칸에 넣기', exact: true }).click();
   await expect(row(page, 1)).toContainText('모병');
   await expect(row(page, 1)).toContainText('수량 1000000');
@@ -83,6 +86,12 @@ test('좁은 메인 명령 칸에서 긴 인자와 긴 대상 도시 이름에�
   // 글꼴이 정착한 뒤 좁은 명령 칸과 메인 배치 전환 양쪽을 잰다. 실패해도 같은 순간의 그림과 폭을 남긴다.
   for (const width of [375, 1100, 1101, 1280, 1440]) {
     await page.setViewportSize({ width, height: 900 });
+    // 768px 미만 메인은 하단 막대로 패널을 바꾼다 (INT-25). 명령 칸은 `예턴` 패널에 있다.
+    if (width < 768)
+      await page
+        .getByRole('tablist', { name: '메인 화면', exact: true })
+        .getByRole('tab', { name: '예턴', exact: true })
+        .click();
     await page.evaluate(() => document.fonts.ready);
     const layouts = [await tagLayout(page, 1), await tagLayout(page, 2)];
     const dimensions = await editor(page)

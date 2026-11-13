@@ -1,3 +1,4 @@
+import { notifyActivityOnCommit } from '../packages/db/src/realtime';
 import { randomUUID } from 'node:crypto';
 import { fork, spawn } from 'node:child_process';
 import { writeFile, mkdtemp, rm } from 'node:fs/promises';
@@ -322,9 +323,30 @@ describe('T2-09 실제 HTTP 메시지·공지 권한 대조', () => {
       WORLD: 0,
     });
   });
+  it('재야도 전체 메시지를 보내고 같은 월드의 다른 장수가 읽는다', async () => {
+    const sent = await call<Outputs['message']['send']>(
+      'message.send',
+      { worldId, scope: 'WORLD', body: '천하에 인사합니다' },
+      3,
+    );
+    expect(sent.status).toBe(200);
+    expect(sent.data?.item).toMatchObject({ direction: 'sent', scope: 'WORLD', from: { nation: null } });
+    const inbox = await call<Outputs['message']['list']>('message.list', { worldId, scope: 'WORLD' }, 2);
+    expect(inbox.data?.items[0]).toMatchObject({
+      id: sent.data?.item.id,
+      direction: 'received',
+      body: '천하에 인사합니다',
+      read: false,
+    });
+    const unread = await call<Outputs['message']['unread']>('message.unread', { worldId }, 2);
+    expect(unread.data?.WORLD).toBe(1);
+    expect((await call('message.send', { worldId, scope: 'WORLD', body: '잘못', toGeneralId: 2 }, 3)).code).toBe(
+      'BAD_REQUEST',
+    );
+  });
   it('입력·수신자·scope와 cursor를 엄격히 검사하고 공개 수신자 목록만 낸다', async () => {
     for (const data of [
-      { scope: 'WORLD', body: '금지' },
+      { scope: 'WORLD', toNationId: 2, body: '잘못' },
       { scope: 'PRIVATE', body: '없음' },
       { scope: 'NATION', toGeneralId: 2, body: '잘못' },
       { scope: 'PRIVATE', toGeneralId: 999, body: '없음' },
@@ -346,7 +368,7 @@ describe('T2-09 실제 HTTP 메시지·공지 권한 대조', () => {
     ).toBe('BAD_REQUEST');
     const recipients = (await call<Outputs['message']['recipients']>('message.recipients', { worldId })).data!;
     expect(recipients.generals.map((g) => g.id)).not.toContain(1);
-    expect(Object.keys(recipients.generals[0]!).sort()).toEqual(['id', 'name', 'nation']);
+    expect(Object.keys(recipients.generals[0]!).sort()).toEqual(['id', 'name', 'nation', 'portraitId']);
     expect(recipients.nations.map((n) => n.id)).toEqual([2]);
   });
   it('같은 시각의 41행을 시간·ID 커서로 빠짐과 중복 없이 읽는다', async () => {
@@ -675,6 +697,20 @@ describe('T2-09 실제 PostgreSQL LISTEN·SSE', () => {
     const s = await stream();
     expect(s.events).toContainEqual({ kind: 'ready' });
     await until(() => s.heartbeats() > 0);
+  });
+  it('공개 활동 알림은 저장 성공 뒤에만 다른 장수에게 전달된다', async () => {
+    const other = await stream(2);
+    await expect(
+      db.$transaction(async (tx) => {
+        await notifyActivityOnCommit(tx, worldId);
+        throw Error('rollback');
+      }),
+    ).rejects.toThrow('rollback');
+    await delay(100);
+    expect(other.events.some((event) => event.kind === 'activity.updated')).toBe(false);
+    await db.$transaction((tx) => notifyActivityOnCommit(tx, worldId));
+    await until(() => other.events.some((event) => event.kind === 'activity.updated'));
+    expect(other.events).toContainEqual({ kind: 'activity.updated' });
   });
   it('개인·국가·외교·월드 신호는 현재 권한에만 가고 본문·ID는 보내지 않는다', async () => {
     const own = await stream(),

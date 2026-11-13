@@ -183,6 +183,22 @@ describe('INT-22 병종 조건의 공통 모집 경계', () => {
     expect(noNation).toMatchObject({ nation: null, ownedCities: [], research: [], scorch: 0, isChief: false });
   });
 
+  it('도시별 모집은 같은 국가의 도시라도 주둔지에 따라 달라진다', () => {
+    const { world } = fixture([]);
+    const first = world.cities[1]!;
+    const second = world.cities[2]!;
+    const general = world.generals[1]!;
+    second.nationId = first.nationId;
+    general.cityKey = first.cityKey;
+    const actor = { generalId: general.id, tick: 0 };
+    const unit = { requirements: [{ kind: 'cities' as const, cityKeys: [second.cityKey] }] };
+    expect(crewTypeFailure(unit, crewContext(world, actor))).toBeNull();
+    world.recruitmentLocation = 'city';
+    expect(crewTypeFailure(unit, crewContext(world, actor))?.message).toContain(second.name);
+    general.cityKey = second.cityKey;
+    expect(crewTypeFailure(unit, crewContext(world, actor))).toBeNull();
+  });
+
   it('빈 조건·효과와 없는 선택 칸은 읽은 기본 병종에 키를 추가하지 않는다', () => {
     const raw = structuredClone(testUnits);
     for (const row of raw.crewTypes) {

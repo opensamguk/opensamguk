@@ -2,7 +2,8 @@ import type { AppRouter } from '@opensamguk/server/router';
 import type { QueryClient, QueryFunction, QueryKey } from '@tanstack/react-query';
 import type { inferRouterOutputs } from '@trpc/server';
 import { trpcClient, type Trpc } from '../trpc';
-import type { CommandInfo } from './CommandPicker';
+import type { CommandInfo, GeneralChoice } from './CommandPicker';
+import type { SlotTargets } from './args';
 import { SLOT_COUNT, type Turn } from './draft';
 
 // 예턴 편집기가 읽고 쓰는 칸 목록. 개인 30칸(turns.*)과 국가 직책 12칸(nationTurns.*, T2-06)이 같은 편집기를 쓴다.
@@ -13,6 +14,8 @@ export interface DisplaySlot {
   commandKey: string;
   args?: unknown;
   name: string;
+  // 인자가 가리키는 도시·국가·장수 이름 (turns.get, INT-26). 국가 칸은 아직 싣지 않는다.
+  targets?: SlotTargets | undefined;
 }
 
 // 개인 칸은 AppRouter의 turns.get 칸 모양이다. 서버가 explicit을 실으면 캐시와 저장 결과에도 그대로 남는다.
@@ -48,17 +51,23 @@ export interface TurnSource<S extends DisplaySlot = DisplaySlot> {
   list: SourceQuery<TurnList<S>>;
   // 저장 뒤 받은 칸을 조회 캐시에 넣는다.
   writeList: (queryClient: QueryClient, list: TurnList<S>) => void;
-  save: (input: { revision: number; slots: SaveSlots }) => Promise<SaveResult<S>>;
+  save: (input: { revision: number; slots: SaveSlots; expectedActorId?: number }) => Promise<SaveResult<S>>;
   commands: SourceQuery<CommandInfo[]>;
   precheck: (turn: Turn) => SourceQuery<Check>;
   // 서버 목록이 바뀌면 이 키 아래 사전 검사를 다시 받는다.
   precheckRoot: QueryKey;
   // 실행 시기를 셀 수 있는 칸인가. 국가 칸은 내 직책 칸만 내 턴에 실행된다.
   timed: boolean;
+  // timed가 아닌 칸(남의 직책 칸)의 주인 장수 다음 턴 시각. 있으면 그 시각 + 칸 번호 × 턴 간격으로 시:분을 적는다.
+  // null은 서버가 시각을 주지 않은 경우(멈춘 월드·가속), undefined는 모르는 경우다 (INT-25).
+  nextTurnAt?: string | null | undefined;
   // 편집할 수 없는 칸이면 서버가 준 이유. null이면 편집할 수 있다.
   readOnly: string | null;
   // 대상 장수 인자(generalId)를 이름으로 고를 장수 목록. 없으면 번호로 넣는다.
-  generals?: Array<{ id: number; name: string }> | undefined;
+  // 소재 도시·유저 여부가 있으면 인자 입력 화면의 후보 줄에 적는다 (INT-25).
+  generals?: GeneralChoice[] | undefined;
+  // 'nation'이면 인자 입력 화면과 편집기 위에 내 금·쌀 대신 국고를 적는다 (국가 예턴, INT-25).
+  walletKind?: 'general' | 'nation' | undefined;
   // 서버가 본 직책과 지금 직책이 다르다고 저장을 거부했을 때(국가 칸). 초안은 편집기가 버린다.
   onOfficeChanged?: (message: string) => void;
 }
@@ -92,7 +101,8 @@ export const personalSource: TurnSourceFactory<PersonalSlot> = ({ trpc, userId, 
     // 조회 값의 actorId는 그대로 두고 저장 결과의 revision·칸만 바꾼다.
     writeList: (queryClient, list) =>
       queryClient.setQueryData(get.queryKey, (old) => old && { ...old, revision: list.revision, slots: list.slots }),
-    save: ({ revision, slots }) => trpcClient.turns.set.mutate({ worldId, revision, slots }),
+    save: ({ revision, slots, expectedActorId }) =>
+      trpcClient.turns.set.mutate({ worldId, revision, slots, expectedUserId: userId, expectedActorId }),
     commands: {
       queryKey: commands.queryKey,
       queryFn: commands.queryFn as QueryFunction<unknown>,

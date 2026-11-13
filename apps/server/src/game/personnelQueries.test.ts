@@ -23,6 +23,7 @@ function general(changes: Partial<General> = {}): General {
     nationId: 1,
     cityKey: 1,
     officerLevel: 12,
+    officerCityKey: null,
     name: '장수',
     affinity: 0,
     portraitId: null,

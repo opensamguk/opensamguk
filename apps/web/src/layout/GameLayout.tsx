@@ -1,7 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, Outlet, useLocation, useParams } from '@tanstack/react-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AdminEntry } from '../auth/AdminEntry';
 import { LogoutButton } from '../auth/LogoutButton';
 import { formatRemaining, useTurnCountdown } from '../game/countdown';
 import { errorCode, isNotFound } from '../game/errors';
@@ -9,6 +8,7 @@ import { useHome, useWorldSummary } from '../game/queries';
 import { MessageButton, MessageDrawer, RealtimeStatusText } from '../messages/MessageDock';
 import { NationNoticePopup } from '../messages/NationNotice';
 import { useWorldEvents } from '../realtime/useWorldEvents';
+import { AccountLinks } from './AccountLinks';
 import { GameNavigation } from './GameNavigation';
 import type { WorldSummary } from '../game/types';
 import { liveRefresh, topbarStatus } from '../game/worldWatch';
@@ -78,21 +78,11 @@ export function GameLayout() {
   const nextText = topbarStatus(data, noGeneral, countdown, formatRemaining);
   // 좁은 화면의 위 띠는 월드·연월·다음 턴·실시간·메시지만 둔다. 계정 조작은 아래 `전체` 메뉴로 옮긴다 (T4-97 U1).
   // 한 곳에만 그려 운영 입구 확인(AC-INT-20)을 두 번 만들지 않는다. 장수 생성 화면은 메뉴가 없으므로 위 띠에 둔다.
+  // 좁은 메인은 게임 메뉴 막대 대신 메인 하단 막대를 쓰므로 계정 조작도 메인 `메뉴` 패널이 그린다 (INT-25).
   const narrow = useNarrowTable();
   const accountInMenu = narrow && !entry;
-  // CSS module의 클래스 값은 string | undefined다. 받은 그대로 각 링크에 넘긴다.
-  const accountLinks = (className: string | undefined) => (
-    <>
-      <AdminEntry className={className} />
-      <Link to="/account" className={className}>
-        내 계정
-      </Link>
-      <Link to="/settings/notifications" className={className}>
-        알림 설정
-      </Link>
-      {accountInMenu ? <LogoutButton className={className} /> : null}
-    </>
-  );
+  const onMain = pathname.replace(/\/$/, '') === `/w/${worldId}`;
+  const accountLinks = (className: string | undefined) => <AccountLinks className={className} logout={accountInMenu} />;
 
   return (
     <div className={styles.shell} data-has-navigation={!entry}>
@@ -128,7 +118,7 @@ export function GameLayout() {
           worldId={worldId}
           campaignEnabled={mine.data?.creationRules.campaignEnabled ?? false}
           officerLevel={home.data?.general.officerLevel ?? 0}
-          accountLinks={accountInMenu ? accountLinks : undefined}
+          accountLinks={accountInMenu && !onMain ? accountLinks : undefined}
         />
       ) : null}
       <main className={styles.content}>
@@ -137,11 +127,7 @@ export function GameLayout() {
       </main>
       {messagesOpen ? <MessageDrawer worldId={worldId} onClose={closeMessages} /> : null}
       <NationNoticePopup worldId={worldId} />
-      <FirstTurnGuide
-        key={worldId}
-        worldId={worldId}
-        show={Boolean(home.data) && pathname.replace(/\/$/, '') === `/w/${worldId}`}
-      />
+      <FirstTurnGuide key={worldId} worldId={worldId} show={Boolean(home.data) && onMain} />
     </div>
   );
 }

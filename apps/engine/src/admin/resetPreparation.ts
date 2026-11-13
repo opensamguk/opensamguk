@@ -1,6 +1,8 @@
 import type { Prisma, PrismaClient, PublishedResource } from '@opensamguk/db';
 import {
   checkReplayOrigin,
+  OFFICE_EFFECTS_FEATURE,
+  officeEffectsSchema,
   parsePreset,
   presetRules,
   statRulesSchema,
@@ -420,6 +422,9 @@ function requestRefs(
       resolution.initialStateHash !== world.initialStateHash
     )
       fail('PROVENANCE_INVALID');
+    const requestedOfficeEffects =
+      request.officeEffects == null ? null : officeEffectsSchema.parse(request.officeEffects);
+    if (!same(requestedOfficeEffects, origin.featureData?.[OFFICE_EFFECTS_FEATURE] ?? null)) fail('PROVENANCE_INVALID');
     if ((intent.featureProfileKey === undefined) !== (resolution.featureProfile === undefined))
       fail('PROVENANCE_INVALID');
     if (resolution.featureProfile !== undefined) {
@@ -449,7 +454,10 @@ function requestRefs(
       if (
         profile.key !== resolution.featureProfile.key ||
         hashState(profile) !== resolution.featureProfile.contentHash ||
-        !same([...profile.ruleFeatures].sort(), origin.initial.ruleFeatures)
+        !same(
+          [...new Set([...profile.ruleFeatures, ...(requestedOfficeEffects ? [OFFICE_EFFECTS_FEATURE] : [])])].sort(),
+          origin.initial.ruleFeatures,
+        )
       )
         fail('PROVENANCE_INVALID');
     }
@@ -501,6 +509,7 @@ function prepared(
       features = options.ruleFeatures ?? [];
     if (request) {
       const intent = worldCreateIntentSchema.parse(request.intent);
+      if (intent.recruitmentLocation !== original.initial.recruitmentLocation) fail('PROVENANCE_INVALID');
       const inferred = [state.unitSet.coefMode === 'multiply' ? ['battle-affinity-v2'] : []];
       // 기존 1판 요청의 기능 합성도 원생성 해시와 함께 확인한다.
       if (Object.values(resources).every((resource) => resource.version === 1))
@@ -512,7 +521,14 @@ function prepared(
       if (
         !inferred.some((presetFeatures) =>
           same(
-            [...new Set([...(state.ruleFeatures ?? []), ...presetFeatures, ...(intent.ruleFeatures ?? [])])].sort(),
+            [
+              ...new Set([
+                ...(state.ruleFeatures ?? []),
+                ...presetFeatures,
+                ...(intent.ruleFeatures ?? []),
+                ...(request.officeEffects != null ? [OFFICE_EFFECTS_FEATURE] : []),
+              ]),
+            ].sort(),
             features,
           ),
         )
@@ -522,6 +538,7 @@ function prepared(
     if (state.generals.some((g) => g.userId !== null) || (state.ruleFeatures ?? []).some((f) => !features.includes(f)))
       fail('RESOURCE_INVALID');
     if (state.ruleFeatures || features.length) state.ruleFeatures = [...features];
+    if (original.initial.recruitmentLocation) state.recruitmentLocation = original.initial.recruitmentLocation;
     if (resourceHashV3({ ...original, initial: state }) !== original.resourceHash) fail('RESOURCE_INVALID');
     return prepareInitialWorld(state, options, sexLedger);
   });

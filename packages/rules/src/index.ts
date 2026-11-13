@@ -9,11 +9,17 @@ export {
   MAX_LEGACY_STARTING_NPC_STAT,
   MAX_STARTING_NPC_STAT,
 } from './world/initialNpcStats';
-export { crewContext, crewTypeFailure } from './world/crewRequirements';
-export { readOperationalMap, attachOperationalKinds, operationalMapDisplay } from './world/map/stored';
+export { cityRegionName, crewContext, crewTypeFailure } from './world/crewRequirements';
+export {
+  readOperationalMap,
+  readOpeningCityProfile,
+  attachOperationalKinds,
+  operationalMapDisplay,
+} from './world/map/stored';
 export { checkOperationalProfile } from './world/map/profile';
 export type { OperationalMapResource } from './world/map/operational';
 export * from './clock/constants';
+export { canDefend } from './battle/defenders';
 export * from './clock/clock';
 export * from './clock/admin';
 export * from './admin/game';
@@ -33,6 +39,7 @@ export * from './balance';
 export * from './commands/types';
 export * from './commands/effects';
 export * from './commands/registry';
+export { commandPlayerDocs } from './commands/playerDoc';
 export { extSliceKeys, restoreExtState } from './commands/ext/state';
 export { INTEL_FEATURE, intelRecordSchema, getIntelSliceSchema } from './commands/ext/intel/record';
 export * from './monthly/index';
@@ -86,6 +93,7 @@ export {
   treatyRespondByTick,
   treatyClauseEndTick,
   type TreatyOptions,
+  treatyOptions,
   applyTreatyInput,
   settleTreaties,
   treatyClosures,
@@ -100,6 +108,7 @@ export {
   type TreatyResponseGuide,
   type TreatyResponseGuideCode,
 } from './diplomacy/treaty';
+export { EXPANDED_TREATY_FEATURE, type TreatyAidFailure } from './diplomacy/treatyClauses';
 export type {
   TreatyClause,
   FirstTreatyClause,
@@ -132,6 +141,7 @@ export {
 } from './personnel/permissions';
 export {
   PERSONNEL_INPUTS,
+  appointOfficer,
   applyPersonnelInput,
   validatePersonnelRecord,
   replayPersonnelInput,
@@ -183,6 +193,8 @@ export {
 } from './modifiers';
 
 export * from './ruleRegistry';
+export { createRelationsData, RELATIONS_FEATURE } from './relations/data';
+export { readStoredRelations } from './relations/origin';
 export { applyPersonnelInputStep } from './personnel/inputStep';
 export { completePersonnelStep } from './personnel/step';
 export type { PersonnelStepPacket } from './personnel/step';
@@ -195,6 +207,7 @@ export { resolverForRuleFeatures } from './ruleCommands';
 
 export * from './campaign/retinue';
 export * from './campaign/state';
+export { campaignDefenders } from './campaign/attack';
 export * from './campaign/relationships';
 export * from './campaign/record';
 export * from './campaign/unitInputs';
@@ -248,6 +261,7 @@ export * from './lineage/preview';
 export * from './lineage/visibility';
 export * from './lineage/history';
 export * from './personnel/assignmentRows';
+export * from './personnel/residentOffice';
 export * from './lineage/control';
 export { reconcileLineage } from './lineage/reconcile';
 export * from './lineage/monthly';
@@ -282,6 +296,8 @@ export {
 } from './stratagemCards/feature';
 export {
   readNationStrategy,
+  strategyMonth,
+  STRATEGY_KEYS,
   initialNationStrategy,
   NATION_STRATEGY_FEATURE,
   type NationStrategyState,
@@ -302,3 +318,5 @@ export {
 } from './nationResearch/state';
 export { readStoredNationResearch } from './nationResearch/origin';
 export { canExecuteResearchNationCommand } from './nationResearch/commands';
+
+export { COURT_RANK_FEATURE, courtOfficeTitle, nationRank } from './personnel/nationRank';

@@ -214,6 +214,7 @@ function BlockView({ block }: { block: Block }): ReactNode {
 
 function Inlines({ inlines }: { inlines: Inline[] }) {
   return inlines.map((inline, i) => {
+    if (inline.kind === 'break') return <br key={i} />;
     if (inline.kind === 'code') return <code key={i}>{inline.text}</code>;
     if (inline.kind === 'strong') return <strong key={i}>{inline.text}</strong>;
     if (inline.kind === 'link') {

@@ -11,6 +11,7 @@ datasource db {
 
 model World {
   reputationEvents     ReputationEvent[]
+  publicNationEvents   PublicNationEvent[]
   monthlyReviews       MonthlyReview[]
   runtimeOptions       Json?
   equipmentState       Json?
@@ -59,6 +60,7 @@ model World {
   personnelFormat      Int?
   replayFormat         Int                  @default(1)
   ruleFeatures         String[]             @default([])
+  officeEffects        Json?
   replayOrigin         Json?
   inputEvents          InputEvent[]
   nationHistory        NationHistory[]
@@ -85,6 +87,18 @@ model World {
   sanctions            Sanction[]
   createRequest        WorldCreateRequest?
   seasonGenerals       SeasonGeneral[]
+}
+
+model PublicNationEvent {
+  id       BigInt @id @default(autoincrement())
+  worldId  String
+  sequence Int
+  tick     Int
+  kind     String
+  text     String
+  world    World  @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@index([worldId, tick, id])
 }
 
 model ReputationEvent {
@@ -174,6 +188,7 @@ model WorldCreateRequest {
   version        Int               @default(1)
   intentHash     String
   intent         Json
+  officeEffects  Json?
   effectiveSeed  String
   plannedWorldId String            @unique
   resolution     Json?
@@ -397,6 +412,7 @@ model City {
   nation           Nation?     @relation("OwnedCities", fields: [worldId, nationId], references: [worldId, id], onDelete: NoAction)
   capitalOf        Nation[]    @relation("Capital")
   generals         General[]
+  appointedOfficers General[] @relation("CityOffice")
   operationTargets Operation[]
 
   @@id([worldId, cityKey])
@@ -421,6 +437,7 @@ model General {
   politics          Int?
   charm             Int?
   officerLevel      Int
+  officerCityKey    Int?
   birthYear         Int
   deathYear         Int
   activeFromYear    Int
@@ -455,6 +472,7 @@ model General {
   world             World             @relation(fields: [worldId], references: [id], onDelete: Cascade)
   nation            Nation?           @relation(fields: [worldId, nationId], references: [worldId, id], onDelete: NoAction)
   city              City              @relation(fields: [worldId, cityKey], references: [worldId, cityKey], onDelete: NoAction)
+  officerCity       City?             @relation("CityOffice", fields: [worldId, officerCityKey], references: [worldId, cityKey], onDelete: NoAction, onUpdate: NoAction, map: "General_officerCityKey_fkey")
 
   @@id([worldId, id])
   @@unique([worldId, userId])
@@ -1067,4 +1085,39 @@ model MapBackground {
   height         Int
   imageCommit    String
   createdAt      DateTime     @default(now())
+}
+
+enum ReleaseOperation {
+  DEPLOY
+  ROLLBACK
+}
+
+enum ReleaseRequestStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  NEEDS_OWNER
+}
+
+model ReleaseControl {
+  id              String   @id
+  currentRevision String
+  candidates      Json
+  seenAt          DateTime
+}
+
+model ReleaseRequest {
+  id               String               @id
+  actorUserId      String
+  operation        ReleaseOperation
+  expectedRevision String
+  targetRevision   String
+  manifestSha256   String
+  status           ReleaseRequestStatus @default(QUEUED)
+  requestedAt      DateTime             @default(now())
+  startedAt        DateTime?
+  finishedAt       DateTime?
+
+  @@index([status, requestedAt])
 }

@@ -2,7 +2,7 @@ import type { Prisma } from '@opensamguk/db';
 import type { RealtimeSignal } from '@opensamguk/db';
 import type { CommandResult, WorldState } from '@opensamguk/rules';
 import { loadWorld } from './worldLoader';
-import { persistRemovedNations, type ActionAt } from './nationArchive';
+import { persistPublicNationEvents, persistRemovedNations, type ActionAt } from './nationArchive';
 import { persistCampaignState, readCampaignArmyTypes } from './campaignState';
 import { persistCityResourcesState } from './cityResourcesState';
 import { persistLogisticsState } from './logisticsState';
@@ -76,7 +76,22 @@ export async function persistCommandState(
     if (JSON.stringify(nation) !== JSON.stringify(before.nations[nation.id]))
       await tx.nation.update({ where: { worldId_id: { worldId, id: nation.id } }, data: nation });
   }
-  for (const general of Object.values(state.generals)) {
+  const generals = Object.values(state.generals);
+  if (before.officeEffects) {
+    for (const general of generals) {
+      const old = before.generals[general.id];
+      if (
+        old?.officerCityKey == null ||
+        (general.officerCityKey === old.officerCityKey && general.officerLevel === old.officerLevel)
+      )
+        continue;
+      await tx.general.update({
+        where: { worldId_id: { worldId, id: general.id } },
+        data: { officerCityKey: null },
+      });
+    }
+  }
+  for (const general of generals) {
     if (JSON.stringify(general) !== JSON.stringify(before.generals[general.id])) {
       // 장수 턴의 nextTurnTick·revision은 TurnLoop의 조건부 갱신만 바꾼다.
       const { nextTurnTick, ...data } = general;
@@ -105,6 +120,7 @@ export async function persistCommandState(
   await persistCommandMeta(tx, worldId, before, state);
   // 새 국가의 FK 대상은 생긴 뒤, 멸망 국가의 직책이 연쇄 삭제되기 전에 후속 상태를 저장한다.
   await beforeNationRemoval?.();
+  await persistPublicNationEvents(tx, worldId, before, state, at);
   await persistRemovedNations(tx, worldId, before, state, at);
 }
 

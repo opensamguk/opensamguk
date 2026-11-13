@@ -8,7 +8,7 @@ import type { WorldView } from '../model/world';
 import { withPrepare } from '../preparedTurns/withPrepare';
 import { NATION_RESEARCH_FEATURE, readNationResearch, type ResearchName } from './state';
 
-const specs = [
+export const nationResearchSpecs = [
   { key: 'nation_research_greatsword', research: 'greatsword', name: '대검병 연구', turns: 12, cost: 50_000 },
   { key: 'nation_research_halberd', research: 'halberd', name: '극병 연구', turns: 24, cost: 100_000 },
   { key: 'nation_research_fire_arrow', research: 'fire_arrow', name: '화시병 연구', turns: 12, cost: 50_000 },
@@ -25,11 +25,11 @@ export function canExecuteResearchNationCommand(view: Pick<WorldView, 'ruleFeatu
     Number.isInteger(level) &&
     level >= 5 &&
     level <= 12 &&
-    specs.some((spec) => spec.key === key)
+    nationResearchSpecs.some((spec) => spec.key === key)
   );
 }
 
-function defineResearch(spec: (typeof specs)[number]): CommandDef {
+function defineResearch(spec: (typeof nationResearchSpecs)[number]): CommandDef {
   const check = (view: WorldView, actor: Actor, raw: unknown): Failure | null => {
     const general = targetGeneral(view, actor.generalId);
     if (!general) return fail('NO_ACTOR', '장수가 없습니다.');
@@ -85,4 +85,4 @@ function defineResearch(spec: (typeof specs)[number]): CommandDef {
   );
 }
 
-export const nationResearchCommands: readonly CommandDef[] = specs.map(defineResearch);
+export const nationResearchCommands: readonly CommandDef[] = nationResearchSpecs.map(defineResearch);

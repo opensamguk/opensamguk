@@ -5,6 +5,10 @@ import {
   effectiveWorldOptions,
   parsePreset,
   nowTick,
+  isLocalOffice,
+  localOfficeTitle,
+  officerTitle,
+  nationRank,
   scenarioIdentitySchema,
   toGameDate,
   parseResourceKey,
@@ -43,6 +47,7 @@ export const lobbyRouter = router({
               preset: true,
               runtimeOptions: true,
               replayFormat: true,
+              ruleFeatures: true,
               scenarioKey: true,
               startYear: true,
               clockMode: true,
@@ -51,15 +56,28 @@ export const lobbyRouter = router({
               turnTermMinutes: true,
               startedAt: true,
               createdAt: true,
-              result: { select: { endedYear: true, endedMonth: true } },
-              _count: { select: { generals: { where: { userId: { not: null } } } } },
+              result: { select: { endedYear: true, endedMonth: true, winnerName: true, winnerColor: true } },
+              _count: { select: { generals: { where: { userId: { not: null }, removedAt: null } } } },
             },
           });
           const ids = worlds.map((world) => world.id);
           const mine = ctx.user
             ? await tx.general.findMany({
                 where: { worldId: { in: ids }, userId: ctx.user.id },
-                select: { worldId: true, id: true, name: true, nation: { select: { name: true } } },
+                select: {
+                  worldId: true,
+                  id: true,
+                  name: true,
+                  portraitId: true,
+                  officerLevel: true,
+                  leadership: true,
+                  strength: true,
+                  intel: true,
+                  politics: true,
+                  charm: true,
+                  nation: { select: { name: true, color: true, level: true } },
+                  city: { select: { name: true } },
+                },
               })
             : [];
           const pending = ctx.user
@@ -102,19 +120,48 @@ export const lobbyRouter = router({
               turnTermMinutes: world.turnTermMinutes,
               startedAt: world.startedAt?.toISOString() ?? null,
               humanGenerals: world._count.generals,
+              winner:
+                world.status === 'ENDED' && world.result?.winnerName != null && world.result.winnerColor != null
+                  ? { name: world.result.winnerName, color: world.result.winnerColor }
+                  : null,
               ...(world.replayFormat === 3 &&
               effectiveWorldOptions(world.preset === null ? null : parsePreset(world.preset), world.runtimeOptions)
                 .entry.npcPlay === 'on'
                 ? { npcPlayEnabled: true as const }
                 : {}),
               myGeneral: general
-                ? { id: general.id, name: general.name, nationName: general.nation?.name ?? null }
+                ? {
+                    id: general.id,
+                    name: general.name,
+                    nationName: general.nation?.name ?? null,
+                    nationColor: general.nation?.color ?? null,
+                    portraitId: general.portraitId,
+                    officerTitle:
+                      world.ruleFeatures.includes('office-effects') && isLocalOffice(general.officerLevel)
+                        ? localOfficeTitle(general.officerLevel)
+                        : (officerTitle(general.officerLevel) ?? (general.nation ? '장수' : '재야')),
+                    courtTitle: general.nation
+                      ? (nationRank(general.nation.level)?.offices.find(
+                          (office) => office.officerLevel === general.officerLevel,
+                        )?.title ?? null)
+                      : null,
+                    cityName: general.city.name,
+                    stats: {
+                      leadership: general.leadership,
+                      strength: general.strength,
+                      intel: general.intel,
+                      ...(world.ruleFeatures.includes('five-stats')
+                        ? { politics: general.politics ?? 0, charm: general.charm ?? 0 }
+                        : {}),
+                    },
+                  }
                 : null,
               createBlockedReason:
                 creationBlock({
                   status: world.status,
                   hasGeneral: general !== undefined,
                   hasPending: pendingWorlds.has(world.id),
+                  humanCount: world._count.generals,
                   entryOpen:
                     effectiveWorldOptions(
                       world.preset === null ? null : parsePreset(world.preset),

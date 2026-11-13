@@ -6,7 +6,10 @@ const operationsIcon = publicImageUrl('apps/web/src/art/icons/operations.png');
 import { errorCode, retryUnlessClientError } from '../game/errors';
 import { formatYearMonth } from '../game/gameDate';
 import { NoGeneral, QueryError } from '../game/QueryState';
+import { displayName } from '../game/names';
 import { useHome, useWorldId, useWorldMap, useWorldSummary } from '../game/queries';
+import { Portrait } from '../portrait/Portrait';
+import { portraitIdOf } from '../portrait/portraitUrl';
 import { serverMessage } from '../turns/apiError';
 import { useTRPC } from '../trpc';
 import { DisabledReason } from '../ui/DisabledReason';
@@ -95,7 +98,17 @@ function OperationTable({ worldId, items }: { worldId: string; items: OperationR
             <td className="num">
               {op.ready} / {op.members}
             </td>
-            <td>{op.createdBy.name}</td>
+            <td>
+              <Portrait
+                id={op.createdBy.portraitId ?? null}
+                name={displayName(op.createdBy.name)}
+                variant="thumb"
+                size={20}
+                decorative
+                className={styles.face}
+              />
+              {displayName(op.createdBy.name)}
+            </td>
             <td>{op.joined ? '참여' : '—'}</td>
           </tr>
         ))}
@@ -240,7 +253,15 @@ function CreateForm({ worldId, nationId }: { worldId: string; nationId: number }
                 })
               }
             />
-            {g.name}
+            <Portrait
+              id={portraitIdOf(g)}
+              name={displayName(g.name)}
+              variant="icon"
+              shape="round"
+              size={24}
+              decorative
+            />
+            {displayName(g.name)}
           </label>
         ))}
       </fieldset>

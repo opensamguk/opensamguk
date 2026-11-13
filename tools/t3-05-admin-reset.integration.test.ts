@@ -1547,8 +1547,10 @@ async function assertFreshCityResetWorld(id: string) {
   checkReplayOrigin(origin);
   if (origin.version !== 3) throw new Error('도시 초기화의 형식3 원생성이 필요합니다.');
   expect(row).toMatchObject({ status: 'PREOPEN', clockTick: 0, clockRevision: 0, startedAt: null, endedAt: null });
-  expect(row.ruleFeatures).toEqual(cityResetFeatures);
-  expect(origin.initial.ruleFeatures).toEqual(cityResetFeatures);
+  const expectedFeatures =
+    row.officeEffects == null ? cityResetFeatures : [...cityResetFeatures, 'office-effects'].sort();
+  expect(row.ruleFeatures).toEqual(expectedFeatures);
+  expect(origin.initial.ruleFeatures).toEqual(expectedFeatures);
   expect(row.initialStateHash).toBe(hashState(origin.initial));
   expect(origin.resourceHash).toBe(resourceHashV3(origin));
   expect(Object.hasOwn(origin.initial, 'cityResources')).toBe(false);

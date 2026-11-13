@@ -2,7 +2,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { z } from 'zod';
 import type { Context } from '../context';
 import { worldInput } from '../game/queries';
-import { listTreaties, listTrust, quoteTreaty } from '../game/treatyReads';
+import { listRelations, listTreaties, listTrust, quoteTreaty } from '../game/treatyReads';
 import { listTradeTargets } from '../game/treatyTrade';
 import { breakInput, trustInput } from '../game/treatyBreakInput';
 import {
@@ -12,7 +12,7 @@ import {
   type TreatyRequestKind,
   type TreatyRequestState,
 } from '../game/treatyRequests';
-import { recordsInput } from '../queries';
+import { recordsInput, worldInput as strictWorldInput } from '../queries';
 import { protectedProcedure, router, worldVerifiedProcedure } from '../trpc';
 
 const listInput = worldInput.extend({ cursor: recordsInput.shape.cursor });
@@ -47,6 +47,11 @@ async function submitAndWait(
 }
 
 export const treatyRouter = router({
+  relations: protectedProcedure
+    .input(strictWorldInput)
+    .query(({ ctx, input }) =>
+      ctx.db.$transaction((tx) => listRelations(tx, input.worldId, ctx.user.id), { isolationLevel: 'RepeatableRead' }),
+    ),
   tradeTargets: protectedProcedure.input(worldInput).query(({ ctx, input }) => {
     const started = performance.now();
     return ctx.db.$transaction(

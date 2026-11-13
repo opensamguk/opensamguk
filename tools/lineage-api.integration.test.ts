@@ -21,8 +21,14 @@ import { exportReplay, replayArchive } from '../apps/engine/src/replay';
 import { buildServer } from '../apps/server/src/server';
 import { newSession } from '../apps/server/src/auth/session';
 import type { AppRouter } from '../apps/server/src/router';
-import { loadInitialWorldFromDb, loadSexLedgers } from '../apps/engine/src/world/resources';
+import {
+  composeInitialWorld,
+  loadInitialWorldFromDb,
+  loadSexLedgers,
+  readInitialResources,
+} from '../apps/engine/src/world/resources';
 import { initializeIntegrationResources } from './integration-resources';
+import { initializeExpandedResources } from './expanded-resources';
 import { authzCase } from '../apps/server/src/authz/case';
 import { categories } from '../apps/server/src/authz/coverage';
 
@@ -161,6 +167,22 @@ async function advance(worldId: string, tick: number, fail = false, connection =
   }
 }
 const snapshot = (worldId: string) => db.$transaction((tx) => loadReplayState(tx, worldId));
+const san10Lineage = {
+  scenario: 'san10-191@2',
+  map: 'san10',
+  unitSet: 'expanded',
+  statRules: 'five-stats',
+  portraitMap: '191-map',
+  features: [
+    'battle-affinity-v2',
+    'city-scale-v1',
+    'five-stats',
+    'lineage-v1',
+    'operational-map',
+    'personnel',
+    'policy',
+  ],
+};
 
 async function stopInputProcess(worldId: string, tick: number, inputId: bigint, phase: 'beforeCommit' | 'committed') {
   const child = spawn(
@@ -205,13 +227,15 @@ it.each([
     features: ['five-stats', 'operational-map', 'personnel', 'policy', 'lineage-v1'],
     count: 5,
   },
+  { ...san10Lineage, count: 5 },
 ])(
-  'AC-P2-32 $count 능력치 실제 491명 생성은 확인된 성별만 재생 원본·DB에 고정한다',
+  'AC-P2-32 $scenario 실제 491명 생성은 확인된 성별만 재생 원본·DB에 고정한다',
   async (profile) => {
     const initial = await loadInitialWorldFromDb(db, {
       scenario: profile.scenario,
       map: profile.map,
       statRules: profile.statRules,
+      ...('unitSet' in profile ? { unitSet: profile.unitSet } : {}),
       portraitMap: profile.count === 5 ? '191-map' : 'rtk14-map',
       seed: `lineage-sex-${profile.count}`,
     });
@@ -270,34 +294,60 @@ it.each([
 it.each([
   { edition: 1, unknownCount: 489, guanSex: 'UNKNOWN' },
   { edition: 2, unknownCount: 477, guanSex: 'MALE' },
+  { edition: 3, unknownCount: 491, guanSex: 'UNKNOWN' },
 ] as const)(
   'AC-P2-32 $edition 판은 실제 491명 저장·월간 재생·HTTP 관리자 초기화 뒤에도 유지된다',
   async ({ edition, unknownCount, guanSex }) => {
-    const initial = await loadInitialWorldFromDb(db, {
-        scenario: '1030',
-        map: 'che',
-        statRules: 'default',
-        portraitMap: 'rtk14-map',
-        seed: 'old-sex-edition-pg',
-      }),
-      ruleFeatures = ['lineage-v1', 'personnel', 'policy'];
+    const { features: ruleFeatures, ...selection } =
+      edition === 3
+        ? san10Lineage
+        : {
+            scenario: '1030',
+            map: 'che',
+            statRules: 'default',
+            portraitMap: 'rtk14-map',
+            features: ['lineage-v1', 'personnel', 'policy'],
+          };
+    const resources = await readInitialResources(db, selection);
+    const initial = composeInitialWorld(resources, 'old-sex-edition-pg');
     initial.ruleFeatures = ruleFeatures;
-    const saved = await db.$transaction((tx) =>
-      savePreparedInitialWorld(
-        tx,
-        prepareInitialWorld(
-          initial,
-          {
-            name: `성별 원장 ${edition}판 보존`,
-            turnTermMinutes: 60,
-            endYear: null,
-            replayFormat: 3,
-            ruleFeatures,
-            featureData: { 'lineage-v1': lineageTestConfig },
-          },
-          loadSexLedgers()[edition - 1],
-        ),
-      ),
+    const saved = await db.$transaction(
+      async (tx) => {
+        const result = await savePreparedInitialWorld(
+          tx,
+          prepareInitialWorld(
+            initial,
+            {
+              name: `성별 원장 ${edition}판 보존`,
+              turnTermMinutes: 60,
+              endYear: null,
+              replayFormat: 3,
+              ruleFeatures,
+              featureData: { 'lineage-v1': lineageTestConfig },
+            },
+            loadSexLedgers()[edition - 1],
+          ),
+        );
+        if (edition === 3) {
+          await tx.auditLog.create({
+            data: {
+              actorKind: 'CLI',
+              action: 'world.create.applied',
+              targetType: 'World',
+              targetId: result.worldId,
+              worldId: result.worldId,
+              payload: {
+                stateHash: result.stateHash,
+                resources: Object.values(resources)
+                  .map(({ kind, name, version, contentHash }) => ({ kind, name, version, contentHash }))
+                  .sort((a, b) => a.kind.localeCompare(b.kind)),
+              },
+            },
+          });
+        }
+        return result;
+      },
+      { timeout: 30_000 },
     );
     const id = saved.worldId;
     worldIds.push(id);
@@ -337,7 +387,7 @@ it.each([
     expect(admitted.data?.status).toBe('PENDING');
     await advance(id, 10000);
     const receipt = await rpc('admin.world.resetRequest', binding, administrator);
-    expect(receipt.data?.status).toBe('APPLIED');
+    expect(receipt.data?.status, JSON.stringify(receipt.data?.result)).toBe('APPLIED');
     const newId = receipt.data!.plannedNewWorldId;
     worldIds.push(newId);
     expect(newId).not.toBe(id);
@@ -454,6 +504,7 @@ async function send(worldId: string, player: User, generalId: number, payload: L
 }
 beforeAll(async () => {
   await initializeIntegrationResources(db);
+  await initializeExpandedResources(db);
   base = await app.listen({ host: '127.0.0.1', port: 0 });
 });
 afterAll(async () => {

@@ -2,7 +2,9 @@ import type { AppRouter } from '@opensamguk/server/router';
 import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
+import { displayName } from '../game/names';
 import { useWorldUnits } from '../game/queries';
+import { Portrait } from '../portrait/Portrait';
 import { useTRPC } from '../trpc';
 import { errorCode, serverMessage } from '../turns/apiError';
 import { CommandPicker } from '../turns/CommandPicker';
@@ -241,7 +243,7 @@ function OrdersBoard({ worldId, userId, accountNotice }: { worldId: string; user
             <option value={0}>장수 선택</option>
             {data.recipients.map((person) => (
               <option key={person.id} value={person.id}>
-                {person.name} ({person.isHuman ? '사람' : 'NPC'})
+                {displayName(person.name)} ({person.isHuman ? '사람' : 'NPC'})
               </option>
             ))}
           </select>
@@ -301,7 +303,15 @@ function OrdersBoard({ worldId, userId, accountNotice }: { worldId: string; user
               })
             }
           >
-            {data.npcSuperior.name}에게 지시 요청
+            <Portrait
+              id={data.npcSuperior.portraitId}
+              name={displayName(data.npcSuperior.name)}
+              variant="icon"
+              shape="round"
+              size={24}
+              decorative
+            />{' '}
+            {displayName(data.npcSuperior.name)}에게 지시 요청
           </button>
           <p>받은 지시는 본인이 수락해야 실행합니다.</p>
         </div>
@@ -312,7 +322,24 @@ function OrdersBoard({ worldId, userId, accountNotice }: { worldId: string; user
         {data.orders.map((item) => (
           <li key={item.id}>
             <p>
-              {item.issuerName} → {item.recipientName}: {name(item.command.commandKey)}{' '}
+              <Portrait
+                id={item.issuerPortraitId}
+                name={displayName(item.issuerName)}
+                variant="icon"
+                shape="round"
+                size={24}
+                decorative
+              />{' '}
+              {displayName(item.issuerName)} →{' '}
+              <Portrait
+                id={item.recipientPortraitId}
+                name={displayName(item.recipientName)}
+                variant="icon"
+                shape="round"
+                size={24}
+                decorative
+              />{' '}
+              {displayName(item.recipientName)}: {name(item.command.commandKey)}{' '}
               {args(item.command.args as Record<string, unknown>)}
             </p>
             <p>

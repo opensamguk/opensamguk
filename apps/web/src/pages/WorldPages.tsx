@@ -2,13 +2,29 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { QueryError } from '../game/QueryState';
 import { useHome, useWorldId, useWorldMap, useWorldSummary } from '../game/queries';
-import { isMemberNation } from '../game/types';
 import { IntelRecordsTab } from '../intel/IntelRecordsTab';
 import { CityInfo } from '../main/CityInfo';
-import { NationSummaryGrid, NationTables, useNation } from '../main/NationInfo';
+import {
+  capitalNameOf,
+  NationExtras,
+  NationFinanceGrid,
+  NationSummaryGrid,
+  NationTables,
+  useNation,
+  useNationPower,
+} from '../main/NationInfo';
 import { Panel } from '../main/Panel';
-import { RECORD_LABELS, RecordList, type RecordKind } from '../main/Records';
+import {
+  ActivityFeed,
+  BattleList,
+  RECORD_LABELS,
+  RecordList,
+  WorldFeed,
+  type FeedKind,
+  type RecordKind,
+} from '../main/Records';
 import { MapLegend, WorldMap } from '../main/WorldMap';
+import { MonthlyReview } from '../review/MonthlyReview';
 import { TimelapsePanel } from '../timelapse/TimelapsePanel';
 import { NationBadge } from '../ui/NationBadge';
 import { EmptyState, LoadingState } from '../ui/States';
@@ -47,6 +63,7 @@ export function MapPage() {
                 myCityKey={myCityKey}
                 selectedKey={cityKey}
                 onSelect={setSelected}
+                generals={map.data.generals}
               />
               <MapLegend cities={map.data.cities} nations={map.data.nations} />
             </div>
@@ -70,6 +87,7 @@ export function MapPage() {
 export function CityPage({ cityKeyParam }: { cityKeyParam: string }) {
   const worldId = useWorldId();
   const map = useWorldMap(worldId);
+  const summary = useWorldSummary(worldId);
   const navigate = useNavigate();
   const cityKey = /^[1-9][0-9]{0,9}$/.test(cityKeyParam) ? Number(cityKeyParam) : null;
   const name = cityKey === null ? undefined : map.data?.cities.find((city) => city.key === cityKey)?.name;
@@ -87,6 +105,7 @@ export function CityPage({ cityKeyParam }: { cityKeyParam: string }) {
             worldId={worldId}
             cityKey={cityKey}
             nations={map.data?.nations ?? []}
+            logisticsEnabled={summary.data?.logisticsEnabled === true}
             onSelectCity={(key) =>
               void navigate({ to: '/w/$worldId/city/$cityKey', params: { worldId, cityKey: String(key) } })
             }
@@ -103,8 +122,9 @@ export function NationPage({ nationIdParam }: { nationIdParam: string }) {
   const map = useWorldMap(worldId);
   const nationId = /^[1-9][0-9]{0,9}$/.test(nationIdParam) ? Number(nationIdParam) : null;
   const nation = useNation(worldId, nationId ?? 1, nationId !== null);
-  const capitalKey = nation.data && isMemberNation(nation.data) ? nation.data.capitalCityKey : null;
-  const capital = map.data?.cities.find((city) => city.key === capitalKey)?.name;
+  const power = useNationPower(worldId, nationId);
+  // 수도는 지도 응답에 모든 국가 것이 있다 (원작 세력일람의 [수도]).
+  const capital = nationId === null ? undefined : capitalNameOf(map.data, nationId);
   return (
     <section className={styles.page}>
       <header className={styles.header}>
@@ -119,7 +139,15 @@ export function NationPage({ nationIdParam }: { nationIdParam: string }) {
             <div className={styles.nationHead}>
               <NationBadge name={nation.data.name} color={nation.data.color} />
             </div>
-            <NationSummaryGrid nation={nation.data} capitalName={capital} />
+            <NationSummaryGrid
+              nation={nation.data}
+              capitalName={capital}
+              generals={nation.data.generals}
+              power={power}
+            />
+            {/* 소속국은 다음 세금·세곡과 봉급·순수입 예상을 함께 본다 (INT-26). */}
+            <NationFinanceGrid nation={nation.data} />
+            <NationExtras worldId={worldId} nation={nation.data} />
           </Panel>
           <Panel title="소유 도시·소속 장수">
             <NationTables worldId={worldId} nationId={nationId} />
@@ -134,17 +162,21 @@ export function NationPage({ nationIdParam }: { nationIdParam: string }) {
   );
 }
 
-type RecordTab = RecordKind | 'timelapse' | 'intel';
+type RecordTab = RecordKind | FeedKind | 'timelapse' | 'intel';
 
 const RECORD_TABS: Array<{ kind: RecordTab; label: string }> = [
   { kind: 'general', label: '내 장수' },
+  { kind: 'battles', label: '전투 기록' },
   { kind: 'nation', label: '국가 역사' },
+  { kind: 'activity', label: '장수 동향' },
   { kind: 'world', label: '월드 정세' },
   { kind: 'timelapse', label: '영토 재생' },
   { kind: 'intel', label: '첩보 기록' },
 ];
 
 // /w/:worldId/records?tab=: 기록을 넓게 이어 본다. 메인 아래 기록 칸과 같은 목록이다.
+// 국가 역사(월별 국가 수치)는 메인 기록 줄에서 빠진 뒤로 여기서 본다 (D-085).
+// 장수 동향·전투 기록은 서버 사건 조회(records.activity·records.battles)를 30개씩 이어 받는다 (INT-26).
 // 영토 재생 탭은 월간 영토 기록을 오래된 달부터 지도로 다시 본다 (T4-36).
 export function RecordsPage({ tab, city }: { tab: RecordTab; city?: number }) {
   const worldId = useWorldId();
@@ -152,6 +184,8 @@ export function RecordsPage({ tab, city }: { tab: RecordTab; city?: number }) {
   const map = useWorldMap(worldId);
   const home = useHome(worldId);
   const label = RECORD_TABS.find((entry) => entry.kind === tab)!.label;
+  const nations = map.data?.nations ?? [];
+  const cities = map.data?.cities ?? [];
   return (
     <section className={styles.page}>
       <header className={styles.header}>
@@ -178,8 +212,41 @@ export function RecordsPage({ tab, city }: { tab: RecordTab; city?: number }) {
         </Panel>
       ) : tab === 'intel' ? (
         <Panel title="첩보 기록">
-          <IntelRecordsTab key={worldId} worldId={worldId} cities={map.data?.cities ?? []} />
+          <IntelRecordsTab key={worldId} worldId={worldId} cities={cities} />
         </Panel>
+      ) : tab === 'activity' ? (
+        <Panel title={RECORD_LABELS.activity}>
+          <ActivityFeed key={worldId} worldId={worldId} />
+        </Panel>
+      ) : tab === 'battles' ? (
+        <Panel title={RECORD_LABELS.battles}>
+          <BattleList key={worldId} worldId={worldId} />
+        </Panel>
+      ) : tab === 'world' ? (
+        <>
+          <Panel title={RECORD_LABELS.world}>
+            <MonthlyReview key={worldId} worldId={worldId} />
+            <WorldFeed
+              key={`feed-${worldId}`}
+              worldId={worldId}
+              clock={summary.data}
+              nations={nations}
+              cities={cities}
+            />
+          </Panel>
+          {/* 달마다 세력 크기. 사건 글줄은 위 중원 정세에 있어 여기서는 쓰지 않는다. */}
+          <Panel title="월별 세력">
+            <RecordList
+              key={tab}
+              kind="world"
+              worldId={worldId}
+              clock={summary.data}
+              nations={nations}
+              cities={cities}
+              worldLines={false}
+            />
+          </Panel>
+        </>
       ) : (
         <Panel title={RECORD_LABELS[tab]}>
           <RecordList
@@ -187,7 +254,8 @@ export function RecordsPage({ tab, city }: { tab: RecordTab; city?: number }) {
             kind={tab}
             worldId={worldId}
             clock={summary.data}
-            nations={map.data?.nations ?? []}
+            nations={nations}
+            cities={cities}
             hasNation={home.data ? home.data.nation !== null : true}
           />
         </Panel>

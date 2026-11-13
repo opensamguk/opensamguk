@@ -4,7 +4,9 @@ import { useId, useMemo, useState } from 'react';
 import { errorCode, retryUnlessClientError } from '../game/errors';
 import { formatYearMonth } from '../game/gameDate';
 import { QueryError } from '../game/QueryState';
+import { displayName } from '../game/names';
 import { useWorldId, useWorldMap, useWorldUnits } from '../game/queries';
+import { Portrait } from '../portrait/Portrait';
 import { useTRPC } from '../trpc';
 import { serverMessage } from '../turns/apiError';
 import type { ArgNames } from '../turns/args';
@@ -244,6 +246,7 @@ export function MemberRow({
   const next = member.cells[0];
   const nextText = next ? (next.at !== null ? formatTime(new Date(next.at), new Date()) : shortDate(next.date)) : null;
   const short = (key: 'crew' | 'train' | 'atmos') => member.expected[key] < min[key];
+  const name = displayName(member.name);
   return (
     <tr
       className={member.isMe ? styles.me : undefined}
@@ -251,7 +254,15 @@ export function MemberRow({
       data-verdict={member.verdict}
     >
       <th scope="row">
-        {member.name}
+        <Portrait
+          id={member.portraitId ?? null}
+          name={name}
+          variant="thumb"
+          size={20}
+          decorative
+          className={styles.face}
+        />
+        {name}
         {member.isMe ? <span className={styles.muted}> (나)</span> : null}
         <span className={styles.sub}>
           {member.cityName}
@@ -262,13 +273,13 @@ export function MemberRow({
           className={styles.slotToggle}
           aria-expanded={allSlots}
           aria-controls={allSlots ? listId : undefined}
-          aria-label={`${member.name}의 예턴 ${member.cells.length}칸 ${allSlots ? '접기' : '모두 보기'}`}
+          aria-label={`${name}의 예턴 ${member.cells.length}칸 ${allSlots ? '접기' : '모두 보기'}`}
           onClick={() => setAllSlots((v) => !v)}
         >
           {allSlots ? '칸 접기' : `${member.cells.length}칸 모두 보기`}
         </button>
         {allSlots ? (
-          <ol id={listId} className={styles.allSlots} aria-label={`${member.name}의 예턴 ${member.cells.length}칸`}>
+          <ol id={listId} className={styles.allSlots} aria-label={`${name}의 예턴 ${member.cells.length}칸`}>
             {member.cells.map((cell) => {
               const label = slotLabel(cell.turn, names);
               return (

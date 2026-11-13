@@ -1,5 +1,12 @@
+import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { retryUnlessClientError } from '../game/errors';
+import { displayName } from '../game/names';
+import { useWorldId } from '../game/queries';
 import type { WorldSummary } from '../game/types';
+import { useTRPC } from '../trpc';
 import { NationBadge } from '../ui/NationBadge';
+import { EmptyState, LoadingState } from '../ui/States';
 import styles from './SeasonResult.module.css';
 
 export const END_REASON_TEXT = { UNIFIED: '천하통일', END_YEAR: '종료 연도 도달' } as const;
@@ -44,6 +51,114 @@ export function SeasonResult({ result }: { result: WorldSummary['result'] }) {
         </div>
       </dl>
       <p className={styles.lead}>지도와 기록은 그대로 볼 수 있고 예턴은 더 바꿀 수 없습니다.</p>
+      <SeasonGenerals winnerNationId={result.winner?.nationId ?? null} />
     </section>
+  );
+}
+
+const SEASON_BY = [
+  { key: 'dedication', label: '공헌' },
+  { key: 'experience', label: '경험' },
+  { key: 'merit', label: '전공' },
+] as const;
+type SeasonBy = (typeof SEASON_BY)[number]['key'];
+type SeasonRow = { name: string; nation: { id: number } | null; wins: number };
+
+// 오호장군 (원작 왕조 상세). 승자 국가 장수 가운데 승리가 많은 다섯 명이다. 승리가 없는 장수는 넣지 않는다.
+export function fiveTigers(rows: readonly SeasonRow[], winnerNationId: number | null): string[] {
+  if (winnerNationId === null) return [];
+  return rows
+    .filter((row) => row.nation?.id === winnerNationId && row.wins > 0)
+    .sort((a, b) => b.wins - a.wins)
+    .slice(0, 5)
+    .map((row) => `${displayName(row.name)}(${row.wins})`);
+}
+
+// 끝난 기수의 장수 최종 순위 (원작 명예의 전당·왕조 상세). records.season이 기준별 전원 순위를 준다. 위 10명만 보인다.
+function SeasonGenerals({ winnerNationId }: { winnerNationId: number | null }) {
+  const worldId = useWorldId();
+  const trpc = useTRPC();
+  const [by, setBy] = useState<SeasonBy>('dedication');
+  const query = useQuery({ ...trpc.records.season.queryOptions({ worldId, by }), retry: retryUnlessClientError });
+  const merit = useQuery({
+    ...trpc.records.season.queryOptions({ worldId, by: 'merit' }),
+    retry: retryUnlessClientError,
+  });
+  const tigers = merit.data ? fiveTigers(merit.data.generals, winnerNationId) : [];
+  const n = (value: number) => value.toLocaleString('ko-KR');
+  return (
+    <div className={styles.generals} data-testid="season-generals">
+      {tigers.length > 0 ? (
+        <p className={styles.lead} data-testid="season-tigers">
+          오호장군: {tigers.join(' · ')}
+        </p>
+      ) : null}
+      <div className={styles.byRow} role="group" aria-label="최종 순위 기준">
+        <span className={styles.byLabel}>최종 장수 순위</span>
+        {SEASON_BY.map((entry) => (
+          <button
+            key={entry.key}
+            type="button"
+            className={styles.byButton}
+            aria-pressed={entry.key === by}
+            onClick={() => setBy(entry.key)}
+          >
+            {entry.label}
+          </button>
+        ))}
+      </div>
+      {query.isPending ? (
+        <LoadingState />
+      ) : query.isError ? (
+        <p className={styles.lead}>최종 순위를 불러오지 못했습니다.</p>
+      ) : query.data.generals.length === 0 ? (
+        <EmptyState title="남은 장수 기록이 없습니다" />
+      ) : (
+        <div className={styles.tableScroll}>
+          <table className={styles.table} aria-label="최종 장수 순위">
+            <thead>
+              <tr>
+                <th scope="col" className="num">
+                  순위
+                </th>
+                <th scope="col">장수</th>
+                <th scope="col">소속</th>
+                <th scope="col" className="num">
+                  공헌
+                </th>
+                <th scope="col" className="num">
+                  경험
+                </th>
+                <th scope="col" className="num">
+                  승리
+                </th>
+                <th scope="col" className="num">
+                  점령
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {query.data.generals.slice(0, 10).map((row) => (
+                <tr key={row.generalId}>
+                  <td className="num">{row.rank}</td>
+                  <td>{displayName(row.name)}</td>
+                  <td>
+                    {row.nation ? (
+                      <NationBadge name={row.nation.name} color={row.nation.color} />
+                    ) : (
+                      <NationBadge name="재야" color={null} />
+                    )}
+                  </td>
+                  <td className="num">{n(row.dedication)}</td>
+                  <td className="num">{n(row.experience)}</td>
+                  <td className="num">{n(row.wins)}</td>
+                  <td className="num">{n(row.captures)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }

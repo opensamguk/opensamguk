@@ -7,7 +7,17 @@ import { createGeneralByApi, e2eWorld, query } from './game';
 // T2-04 · AC-M2-02: 로비에서 월드 목록을 보고 참가한다. 실제 서버·DB·엔진으로 돈다.
 // D-025(가오픈 생성·총정원)는 승인 전이라 승인 전 모습만 시험한다.
 
-type LobbyWorld = { id: string; name: string; status: string; startedAt: string | null };
+type LobbyWorld = {
+  id: string;
+  name: string;
+  status: string;
+  startedAt: string | null;
+  scenarioTitle: string;
+  startYear: number;
+  gameDate: { year: number; month: number };
+  turnTermMinutes: number;
+  humanGenerals: number;
+};
 
 function run(args: string[]): string {
   e2eDatabaseUrl();
@@ -40,6 +50,23 @@ const card = (page: Page, name: string) => page.getByRole('article', { name, exa
 // 상태 배지는 글자가 정확히 같은 칸 하나다. 부분 일치로 찾으면 상태 글자가 든 월드 이름(h3)까지 잡는다.
 const badge = (scope: Page | Locator, text: string) => scope.getByText(text, { exact: true });
 
+// Vite can serve the app before its API process is ready to accept requests.
+test.beforeAll(async ({ request }) => {
+  await expect
+    .poll(
+      async () => {
+        try {
+          const response = await request.get('/trpc/auth.me', { timeout: 2_000 });
+          return response.ok() && (await response.json()).result?.data?.user === null;
+        } catch {
+          return false;
+        }
+      },
+      { timeout: 25_000 },
+    )
+    .toBe(true);
+});
+
 async function login(page: Page, email: string) {
   await page.getByLabel('이메일').fill(email);
   await page.getByLabel('비밀번호', { exact: true }).fill(TEST_PASSWORD);
@@ -50,14 +77,33 @@ test('로그인 → 로비 → 장수 만들기 → 메인 → 로비로 돌아�
   test.setTimeout(120_000);
   const email = await createAccount(page);
   const world = await e2eWorld(page);
-  const worlds = await query<LobbyWorld[]>(page, 'lobby.worlds', {});
-  const name = worlds.find((w) => w.id === world)!.name;
   await page.context().clearCookies();
 
   await page.goto('/login');
-  await login(page, email);
+  // Compare with the response rendered by the lobby. The live world can advance during login.
+  const routes = (url: string) => new URL(url).pathname.split('/').at(-1)?.split(',') ?? [];
+  const [response] = await Promise.all([
+    page.waitForResponse((value) => value.ok() && routes(value.url()).includes('lobby.worlds')),
+    login(page, email),
+  ]);
+  const replies = (await response.json()) as { result: { data: LobbyWorld[] } }[];
+  const worlds = replies[routes(response.url()).indexOf('lobby.worlds')]!.result.data;
+  const listed = worlds.find((w) => w.id === world)!;
+  expect(listed.startedAt).not.toBeNull();
   await expect(page).toHaveURL('/lobby');
-  const target = card(page, name);
+  const target = card(page, listed.name);
+  const startDate = await page.evaluate((date) => {
+    const local = new Date(date);
+    return `${local.getMonth() + 1}/${local.getDate()}`;
+  }, listed.startedAt!);
+  const metadata = [
+    `${listed.scenarioTitle}(${listed.startYear})`,
+    `${listed.gameDate.year}년 ${listed.gameDate.month}월`,
+    `턴 ${listed.turnTermMinutes}분`,
+    `장수 ${listed.humanGenerals}`,
+    `시작 ${startDate}`,
+  ].join(' · ');
+  await expect(target.getByText(metadata, { exact: true })).toBeVisible();
   await expect(badge(target, '진행 중')).toBeVisible();
   await expect(badge(target, '진행 중')).toHaveAttribute('data-tone', 'accent');
   await expect(target.getByText('내 장수 없음')).toBeVisible();
@@ -70,7 +116,10 @@ test('로그인 → 로비 → 장수 만들기 → 메인 → 로비로 돌아�
   await expect(page.getByRole('heading', { level: 1, name: '군략도' })).toBeVisible();
   await page.getByRole('link', { name: '로비', exact: true }).click();
   await expect(page).toHaveURL('/lobby');
-  await expect(target.getByText(`내 장수: ${general.name} (재야)`)).toBeVisible();
+  // 로비 카드의 내 장수 칸은 얼굴·이름·소속을 함께 보인다 (INT-25).
+  const mine = target.getByRole('group', { name: '내 장수', exact: true });
+  await expect(mine).toContainText(general.name);
+  await expect(mine).toContainText('재야');
   await target.getByRole('link', { name: '들어가기' }).click();
   await expect(page).toHaveURL(`/w/${world}`);
 });
@@ -91,7 +140,7 @@ test('가오픈 월드는 승인 전이라 막힌 장수 만들기와 이유, �
   await expect(target.getByRole('note')).toHaveText('아직 열리지 않은 월드입니다');
 });
 
-test('상태 글자와 색: 진행 중·가오픈·멈춤, 끝난 월드는 기본으로 숨긴다', async ({ page }) => {
+test('상태 글자와 색: 진행 중·가오픈·멈춤, 끝난 월드는 카드 대신 지난 기수 줄로 보인다', async ({ page }) => {
   test.setTimeout(180_000);
   await createAccount(page);
   await e2eWorld(page);
@@ -114,9 +163,18 @@ test('상태 글자와 색: 진행 중·가오픈·멈춤, 끝난 월드는 기�
   await expect(badge(target, '멈춤')).toHaveAttribute('data-tone', 'warning');
   await target.getByRole('button', { name: /^장수 만들기\s*\(사용 불가\)$/ }).click();
   await expect(target.getByRole('note')).toHaveText('멈춘 월드입니다');
-  // 목록이 그려진 뒤에 본다. 화면은 includeEnded를 보내지 않으므로 서버 기본값대로 끝난 월드가 빠진다.
+  // 목록이 그려진 뒤에 본다. 화면은 includeEnded로 끝난 월드까지 받아 월드 카드에서 빼고 지난 기수 줄로 옮긴다 (INT-26).
   await expect(card(page, ended)).toHaveCount(0);
   await expect(page.getByText('끝남', { exact: true })).toHaveCount(0);
+  const past = page.getByRole('region', { name: '지난 기수', exact: true });
+  const row = past.getByTestId('past-season').filter({ hasText: ended });
+  await expect(row).toHaveCount(1);
+  // DB 상태만 바꾼 fixture라 WorldResult가 없다. 승자 칸은 통일 국가 없음이다.
+  await expect(row).toContainText('통일 국가 없음');
+  await expect(row.getByRole('link', { name: `${ended} 영토 재생 보기`, exact: true })).toHaveAttribute(
+    'href',
+    `/share/timelapse/${endedId}`,
+  );
   await page.screenshot({ path: 'test-results/t2-04-lobby.png', fullPage: true });
 });
 

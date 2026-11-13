@@ -12,7 +12,8 @@ import { updateResidenceAnchors } from './personnel/residence';
 import { recordedLineageSuccession } from './lineage/control';
 import { recordedPossession } from './entry/possess';
 import { completePersonnelStep, type PersonnelStepPacket } from './personnel/step';
-import { applyTreatyInput, settleTreaties, validateTreatyRecord } from './diplomacy/treaty';
+import { applyTreatyInput, settleMonthlyTreaties, treatyOptions, validateTreatyRecord } from './diplomacy/treaty';
+import { EXPANDED_TREATY_FEATURE } from './diplomacy/treatyClauses';
 import { validatePolicyInput } from './replayInputs';
 import { trade } from './commands/trade';
 import { checkOperationalProfile } from './world/map/profile';
@@ -248,6 +249,7 @@ export const treatyFeature: RuleFeatureDefinition = {
       const validated = validateTreatyRecord(record, {
         treaty: { version: 1 },
         ...(origin.initial.ruleFeatures?.includes('treaty-trade') ? { treatyTrade: { version: 1 } } : {}),
+        ...(origin.initial.ruleFeatures?.includes(EXPANDED_TREATY_FEATURE) ? { treatyExpanded: { version: 1 } } : {}),
         monthlyTick: 0,
         ...(end && input.sequence > end.sequence ? { endTick: end.tick } : {}),
       });
@@ -255,7 +257,8 @@ export const treatyFeature: RuleFeatureDefinition = {
     }
   },
   settleMonthly({ settled, tick }) {
-    return { replay: { ...settled, state: settleTreaties(settled.state, tick) }, effects: null };
+    const { state, aidFailures } = settleMonthlyTreaties(settled.state, tick);
+    return { replay: { ...settled, state }, effects: aidFailures };
   },
 };
 
@@ -275,6 +278,7 @@ export const treatyBreakFeature: RuleFeatureDefinition = {
         treaty: { version: 1 },
         treatyBreak: { version: 1 },
         ...(origin.initial.ruleFeatures?.includes('treaty-trade') ? { treatyTrade: { version: 1 } } : {}),
+        ...(origin.initial.ruleFeatures?.includes(EXPANDED_TREATY_FEATURE) ? { treatyExpanded: { version: 1 } } : {}),
         monthlyTick: 0,
         ...(end && input.sequence > end.sequence ? { endTick: end.tick } : {}),
       });
@@ -293,12 +297,24 @@ export const treatyTradeFeature: RuleFeatureDefinition = {
   },
 };
 
+export const treatyExpandedFeature: RuleFeatureDefinition = {
+  key: EXPANDED_TREATY_FEATURE,
+  requires: ['treaty', 'treaty-break', 'treaty-trade'],
+  conflicts: [],
+  checkOrigin({ data }) {
+    if (data !== undefined) throw new Error('확장 조약 기능의 초기 자료를 확인하세요.');
+  },
+};
+
 function applyTreaty(replay: ReplayState, input: RecordedInput): ReplayState {
   const { tick, ...record } = input;
   const context = {
     treaty: { version: 1 as const },
     ...(replay.state.ruleFeatures?.includes('treaty-break') ? { treatyBreak: { version: 1 as const } } : {}),
     ...(replay.state.ruleFeatures?.includes('treaty-trade') ? { treatyTrade: { version: 1 as const } } : {}),
+    ...(replay.state.ruleFeatures?.includes(EXPANDED_TREATY_FEATURE)
+      ? { treatyExpanded: { version: 1 as const } }
+      : {}),
     monthlyTick: replay.monthlyTick,
   };
   const validated = validateTreatyRecord(record, context);
@@ -306,7 +322,7 @@ function applyTreaty(replay: ReplayState, input: RecordedInput): ReplayState {
   const result = applyTreatyInput(replay.state, validated, {
     tick: tickSchema.parse(tick),
     sequence: validated.sequence,
-    tradeEnabled: replay.state.ruleFeatures?.includes('treaty-trade') ?? false,
+    ...treatyOptions(replay.state.ruleFeatures ?? []),
   });
   if (!result.ok) throw new Error('조약 적용 기록을 재현하지 못했습니다.');
   const recomputed = validateTreatyRecord({ ...validated, result: result.result }, context);

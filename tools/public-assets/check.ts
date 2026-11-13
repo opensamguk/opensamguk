@@ -46,13 +46,24 @@ export class PublicAssetsError extends Error {
   }
 }
 
+// 초상 정책은 둘 중 하나다. D-031: 공개 빌드는 실루엣만 쓴다. D-087: 공개 빌드도 승인한 base의 초상을 쓴다.
+// D-087이면 remoteImageBases가 그 base 목록이다. 개별 주소 규칙은 portraitBaseFailures가 본다.
+function portraitPolicyValid(value: Record<string, unknown>): boolean {
+  if (!stringArray(value.remoteImageBases)) return false;
+  if (value.decision === 'D-031' && value.portraitPolicy === 'fallback-only')
+    return value.remoteImageBases.length === 0;
+  return (
+    value.decision === 'D-087' &&
+    value.portraitPolicy === 'remote' &&
+    value.remoteImageBases.length > 0 &&
+    new Set(value.remoteImageBases).size === value.remoteImageBases.length
+  );
+}
+
 function manifestFrom(value: unknown): Manifest {
   if (
     !record(value) ||
-    value.decision !== 'D-031' ||
-    value.portraitPolicy !== 'fallback-only' ||
-    !stringArray(value.remoteImageBases) ||
-    value.remoteImageBases.length !== 0 ||
+    !portraitPolicyValid(value) ||
     !stringArray(value.externalAssetOrigins) ||
     value.externalAssetOrigins.length !== 0 ||
     !stringArray(value.portraitVariants) ||
@@ -75,7 +86,7 @@ function manifestFrom(value: unknown): Manifest {
         )))
   ) {
     throw new PublicAssetsError([
-      'manifest/public-assets.json: decision-policy: D-031의 기본 SVG 승인 목록이 아닙니다.',
+      'manifest/public-assets.json: decision-policy: D-031·D-087의 공개 이미지 승인 목록이 아닙니다.',
     ]);
   }
   return value as unknown as Manifest;
@@ -91,12 +102,15 @@ function safeRelative(value: string): boolean {
   );
 }
 
-function metadataFrom(value: unknown): Metadata {
+// 실루엣만 쓰는 정책이면 imageBaseUrl은 빈 값, D-087이면 manifest의 remoteImageBases 중 하나다.
+function metadataFrom(value: unknown, imageBases: readonly string[] = []): Metadata {
+  const allowedBases = imageBases.length ? imageBases : [''];
   if (
     !record(value) ||
     value.schema !== 1 ||
     value.mode !== 'public' ||
-    value.imageBaseUrl !== '' ||
+    typeof value.imageBaseUrl !== 'string' ||
+    !allowedBases.includes(value.imageBaseUrl) ||
     !Array.isArray(value.images) ||
     !value.images.every(
       (x) =>
@@ -218,7 +232,10 @@ export function inspectAssetText(
     if (approvedUrls.has(value)) return;
     if (/data\s*:\s*image\//i.test(value)) fail('inline-image', value);
     if (/opensamguk-images|\/?portraits\//i.test(value)) {
-      const remainder = [...approvedUrls].reduce((text, url) => text.replaceAll(url, ''), value);
+      // 경로 틀 조각('/portraits/')은 값 전체가 같을 때만 승인이다. 다른 문자열 안에서 지우지 않는다.
+      const remainder = [...approvedUrls]
+        .filter((url) => /^https?:\/\//i.test(url))
+        .reduce((text, url) => text.replaceAll(url, ''), value);
       if (/opensamguk-images|\/?portraits\//i.test(remainder)) fail('portrait-path', value);
     }
     if (resource && /^(?:data|blob|javascript|file|ftp):/i.test(value.trim())) fail('resource-scheme', value);
@@ -318,6 +335,35 @@ export function inspectAssetText(
   return [...failures];
 }
 
+// D-087 초상 base. https·고정 주소만 받고 CSP img-src에 그 origin이 있어야 한다.
+// opensamguk-images 원본이면 움직이는 브랜치 대신 전체 커밋 SHA로 고정해야 한다.
+const githubRawPortraitBase = /^https:\/\/raw\.githubusercontent\.com\/opensamguk\/opensamguk-images\/[0-9a-f]{40}$/;
+export function portraitBaseFailures(bases: readonly string[], imageSources: readonly string[]): string[] {
+  const failures: string[] = [];
+  for (const base of bases) {
+    let url: URL | undefined;
+    try {
+      url = new URL(base);
+    } catch {
+      url = undefined;
+    }
+    if (
+      !url ||
+      url.protocol !== 'https:' ||
+      url.search !== '' ||
+      url.hash !== '' ||
+      url.username !== '' ||
+      url.password !== '' ||
+      base.endsWith('/') ||
+      (url.hostname === 'raw.githubusercontent.com' && !githubRawPortraitBase.test(base))
+    )
+      failures.push(`manifest/public-assets.json: portrait-base: 고정한 https 초상 주소가 아닙니다: ${base}`);
+    else if (!imageSources.includes(url.origin))
+      failures.push(`deploy/security.caddy: portrait-csp: 초상 출처가 img-src에 없습니다: ${url.origin}`);
+  }
+  return failures;
+}
+
 async function checkExternalAssets(root: string, dist: string, raw: Record<string, unknown>) {
   const manifest = manifestFrom(raw);
   const failures: string[] = [];
@@ -347,10 +393,18 @@ async function checkExternalAssets(root: string, dist: string, raw: Record<strin
   if (!record(metadata) || metadata.schema !== 2 || JSON.stringify(metadata.remoteImages) !== JSON.stringify(expected))
     failures.push('public-build.json: remote-images: 빌드의 원격 이미지 목록이 다릅니다.');
   if (!record(metadata)) throw new PublicAssetsError(failures);
-  const meta = metadataFrom({ ...metadata, schema: 1 });
+  const portraitBases = manifest.portraitPolicy === 'remote' ? manifest.remoteImageBases : [];
+  if (portraitBases.length && !portraitBases.includes(String(metadata.imageBaseUrl)))
+    throw new PublicAssetsError([
+      ...failures,
+      'public-build.json: metadata: 빌드에 쓴 VITE_IMAGE_BASE_URL이 manifest의 remoteImageBases에 없습니다.',
+    ]);
+  const meta = metadataFrom({ ...metadata, schema: 1 }, portraitBases);
   if (meta.images.length) failures.push('public-build.json: image-set: 이미지 바이트는 게임 배포에 넣지 않습니다.');
   const decisions = await readFile(resolve(root, 'docs/product/decisions.md'), 'utf8');
   if (!/^## D-060[. ]/m.test(decisions)) failures.push('docs/product/decisions.md: missing-decision: D-060');
+  if (manifest.decision === 'D-087' && !/^## D-087[. ]/m.test(decisions))
+    failures.push('docs/product/decisions.md: missing-decision: D-087');
   const csp = await readFile(resolve(root, 'deploy/security.caddy'), 'utf8');
   const imageSources = [...csp.matchAll(/img-src\s+([^;"\r\n]+)/g)];
   if (
@@ -358,11 +412,17 @@ async function checkExternalAssets(root: string, dist: string, raw: Record<strin
     imageSources[0]![1]!.trim() !== "'self' https://raw.githubusercontent.com https://rawcdn.githack.com"
   )
     failures.push('deploy/security.caddy: image-csp: 승인한 이미지 출처 하나만 허용합니다.');
+  failures.push(...portraitBaseFailures(portraitBases, imageSources[0]?.[1]?.trim().split(/\s+/) ?? []));
   const actual = (await fileNames(dist)).filter((name) => name !== metadataName);
   if (JSON.stringify(Object.keys(meta.files).sort()) !== JSON.stringify(actual))
     failures.push('public-build.json: file-set: 배포 파일 목록이 다릅니다.');
   if (!actual.includes('index.html')) failures.push('index.html: missing-entry: 공개 화면이 없습니다.');
-  const urls = new Set(expected.map((image) => image.url));
+  // D-087이면 초상 base와 경로 틀의 '/portraits/' 조각만 더 허용한다. 완성된 초상 주소 문자열은 여전히 거부한다.
+  const urls = new Set([
+    ...expected.map((image) => image.url),
+    ...portraitBases,
+    ...(portraitBases.length ? ['/portraits/'] : []),
+  ]);
   for (const file of actual) {
     const bytes = await readFile(resolve(dist, file));
     if (imageExtension.test(file)) failures.push(`${file}: image-set: 로컬 이미지를 배포할 수 없습니다.`);
@@ -372,7 +432,13 @@ async function checkExternalAssets(root: string, dist: string, raw: Record<strin
       failures.push(...inspectAssetText(bytes.toString('utf8'), file, new Set(actual), urls));
   }
   if (failures.length) throw new PublicAssetsError([...new Set(failures)]);
-  return { files: actual.length, images: 0, remoteImages: expected.length, decision: manifest.decision };
+  return {
+    files: actual.length,
+    images: 0,
+    remoteImages: expected.length,
+    portraitBases: portraitBases.length,
+    decision: manifest.decision,
+  };
 }
 
 export async function checkPublicAssets(options: { root?: string; dist?: string } = {}) {
@@ -382,6 +448,11 @@ export async function checkPublicAssets(options: { root?: string; dist?: string 
   const rawManifest = await readJson(resolve(root, 'manifest/public-assets.json'));
   if (record(rawManifest) && rawManifest.delivery === 'external') return checkExternalAssets(root, dist, rawManifest);
   const manifest = manifestFrom(rawManifest);
+  // 이미지를 번들에 넣는 옛 방식은 img-src가 self뿐이라 원격 초상을 쓸 수 없다.
+  if (manifest.portraitPolicy !== 'fallback-only')
+    throw new PublicAssetsError([
+      'manifest/public-assets.json: decision-policy: 원격 초상(D-087)은 외부 이미지 배포에서만 씁니다.',
+    ]);
   const metadata = metadataFrom(await readJson(resolve(dist, metadataName)));
   const failures: string[] = [];
   const decisions = await readFile(resolve(root, 'docs/product/decisions.md'), 'utf8');
@@ -444,8 +515,9 @@ async function main() {
   try {
     const { values } = parseArgs({ options: { dist: { type: 'string' } } });
     const result = await checkPublicAssets(values.dist ? { dist: resolve(values.dist) } : {});
+    const portraitBases = 'portraitBases' in result ? result.portraitBases : 0;
     console.log(
-      `공개 자산 검사 통과: ${result.decision}, 파일 ${result.files}개, 승인 이미지 ${result.images}개, 외부 초상 0개`,
+      `공개 자산 검사 통과: ${result.decision}, 파일 ${result.files}개, 승인 이미지 ${result.images}개, 초상 base ${portraitBases}개`,
     );
   } catch (error) {
     console.error(

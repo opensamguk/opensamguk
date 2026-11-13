@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util';
 import type { Prisma } from '@opensamguk/db';
 import { assertSlotSet, isPolicyMode, type Effect, type WorldState } from '@opensamguk/rules';
 import { persistCommandState } from './commandPersistence';
@@ -69,18 +70,19 @@ export async function shiftTurns(
       ? world.ruleFeatures.includes('policy')
       : isPolicyMode({ fromSequence: world.policyFromSequence ?? null, actionSequence: world.actionSequence });
   if (modern) assertSlotSet(slots);
-  await tx.generalTurn.deleteMany({ where: { worldId, generalId } });
-  await tx.generalTurn.createMany({
-    data: Array.from({ length: 30 }, (_, slot) => {
-      const previous = slots.find((entry) => entry.slot === slot + 1);
-      return {
-        worldId,
-        generalId,
-        slot,
-        commandKey: previous?.commandKey ?? 'rest',
-        args: (previous?.args ?? {}) as Prisma.InputJsonValue,
-        explicit: modern ? (previous?.explicit ?? false) : true,
-      };
-    }),
+  const next = Array.from({ length: 30 }, (_, slot) => {
+    const previous = slots.find((entry) => entry.slot === slot + 1);
+    return {
+      worldId,
+      generalId,
+      slot,
+      commandKey: previous?.commandKey ?? 'rest',
+      args: (previous?.args ?? {}) as Prisma.InputJsonValue,
+      explicit: modern ? (previous?.explicit ?? false) : true,
+    };
   });
+  // 빈 예턴처럼 이동 전후가 같은 칸은 보존한다. TurnLoop가 별도로 revision을 갱신한다.
+  if (slots.length === next.length && slots.every((slot, index) => isDeepStrictEqual(slot, next[index]))) return;
+  await tx.generalTurn.deleteMany({ where: { worldId, generalId } });
+  await tx.generalTurn.createMany({ data: next });
 }

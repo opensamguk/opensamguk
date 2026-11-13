@@ -381,3 +381,8 @@
   gap: var(--space-1);
   min-height: 44px;
 }
+
+/* 표 행의 장수 얼굴 (D-085). 이름과 띄우는 칸은 글자 대신 여백으로 둔다. */
+.face {
+  margin-right: var(--space-1);
+}

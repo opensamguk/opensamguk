@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from '@tanstack/react-router';
 import { useMemo } from 'react';
-import { worldUnits, type WorldUnits } from '../battleSim/unitChoices';
+import { worldUnits } from '../battleSim/unitChoices';
 import { useTRPC } from '../trpc';
 import { retryUnlessClientError } from './errors';
 import { summaryPollMs } from './worldWatch';
@@ -49,7 +49,7 @@ export function useWorldRules(worldId: string) {
 }
 
 // 명령 병종 칸과 예턴 표의 병종 이름 (T4-86). 불러오는 중·오류면 빈 목록과 이유다. 병종 없는 명령·표·저장은 막지 않는다.
-export function useWorldUnits(worldId: string): { units: WorldUnits; note: string | null } {
+export function useWorldUnits(worldId: string) {
   const rules = useWorldRules(worldId);
   const unitSet = rules.data?.unitSet;
   const units = useMemo(() => worldUnits(unitSet), [unitSet]);
@@ -58,5 +58,5 @@ export function useWorldUnits(worldId: string): { units: WorldUnits; note: strin
     : rules.isError
       ? '이 월드의 병종표를 불러오지 못했습니다. 병종 없는 명령은 그대로 넣을 수 있습니다.'
       : '병종표를 불러오는 중입니다.';
-  return { units, note };
+  return { units, note, recruitment: rules.data && 'recruitment' in rules.data ? rules.data.recruitment : undefined };
 }

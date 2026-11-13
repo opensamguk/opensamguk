@@ -1,6 +1,6 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { createAccount, withE2eDb } from './account';
-import { createGeneralByApi, e2eFeatureWorld, mutate, query, stubPortraits } from './game';
+import { createGeneralByApi, e2eFeatureWorld, mutate, query, stubPortraits, turns, waitTurnWindow } from './game';
 
 // T2-08 · AC-M2-06, AC-M2-14 화면: 외교실 조약서와 예턴 편집의 교역 대상.
 // T2-07이 main에 병합됐으므로 실제 API·엔진으로 실행한다.
@@ -257,6 +257,23 @@ test.describe('외교실', () => {
     await expect(a.page.getByTestId('treaty-requests').locator('[data-result="applied"]')).toContainText(
       '신의 기록에 남았습니다',
     );
+    // 끝남 탭의 카드는 조약 번호와 파기한 국가를 적는다 (INT-25 p4-nation-29·31).
+    await a.page.goto(`/w/${world}/diplomacy?tab=ended`);
+    const broken = a.page.getByTestId('treaty-card').filter({ has: a.page.getByTestId('treaty-broken-by') });
+    await expect(broken.first().getByTestId('treaty-broken-by')).toHaveText(`파기: ${x!.name}`);
+    await expect(broken.first().getByTestId('treaty-number')).toHaveText(/^조약 #\d+$/);
+    // 국가 탭은 순위 스냅숏의 국력·장수·도시 열을 함께 보인다 (INT-25 p4-nation-14).
+    await a.page.goto(`/w/${world}/diplomacy?tab=nations`);
+    const relations = a.page.getByTestId('nation-relations');
+    for (const name of ['국가', '국력', '장수', '도시', '우리와의 관계', '이어 보기'])
+      await expect(relations.getByRole('columnheader', { name, exact: true })).toBeVisible();
+    // 그 아래 외교 현황 표는 treaty.relations의 모든 국가 쌍을 기호로 보이고 우리 줄에 「우리」를 붙인다 (INT-26 p4-nation-8).
+    const grid = a.page.getByTestId('relation-grid');
+    await expect(grid.getByRole('rowheader')).toHaveCount(map.nations.length);
+    await expect(grid.getByRole('rowheader', { name: `${x!.name} 우리`, exact: true })).toHaveAttribute(
+      'data-own',
+      'true',
+    );
 
     await c.page.goto(`/w/${world}/diplomacy?tab=trust`);
     await expect(c.page.getByTestId('trust-table').getByRole('row', { name: new RegExp(x!.name) })).toContainText(
@@ -289,6 +306,8 @@ test.describe('예턴 편집의 교역 대상', () => {
     await proposeByApi(a.page, world, away.nationId!, [{ kind: 'trade', months: 12 }]);
     await acceptByApi(b.page, world);
 
+    // 1분 턴이 시험 도중에 실행되면 예턴이 한 칸 당겨져 5번 칸과 저장 revision이 어긋난다. 여유가 있을 때 시작한다.
+    await waitTurnWindow(a.page, world, 45_000);
     const editor = a.page.getByTestId('turn-editor');
     await a.page.goto(`/w/${world}`);
     await editor.locator('tr[data-slot="3"]').click();
@@ -298,13 +317,45 @@ test.describe('예턴 편집의 교역 대상', () => {
     await editor.locator('tr[data-slot="5"]').click();
     await editor.getByLabel('명령 찾기').fill('교역');
     await editor.getByRole('radio', { name: '교역' }).check();
-    await expect(editor.getByRole('combobox', { name: /대상 도시/ })).toContainText(away.name);
+    await expect(a.page.getByRole('radiogroup', { name: '대상 도시' })).toContainText(away.name);
+    await a.page.getByRole('button', { name: '명령 취소', exact: true }).click();
 
     // 외교실에 갔다 돌아와도 저장하지 않은 편집과 고른 칸이 그대로다.
     await a.page.goto(`/w/${world}/diplomacy`);
     await a.page.goBack();
     await expect(editor.getByTestId('draft-state')).toHaveText('저장하지 않은 편집 1건');
     await expect(editor.getByTestId('selection')).toContainText('3, 5번 칸');
+
+    // 선택을 5번 칸 하나로 줄이고, 기본 빈 값 대신 실제 후보 도시를 이름으로 골라 넣고 저장한다.
+    await editor.getByRole('button', { name: '선택 해제', exact: true }).click();
+    await editor.locator('tr[data-slot="5"]').click();
+    await expect(editor.getByTestId('selection')).toContainText('5번 칸');
+    await expect(editor.getByTestId('selection')).not.toContainText('3, 5번 칸');
+    await editor.getByLabel('명령 찾기').fill('교역');
+    await editor.getByRole('radio', { name: '교역' }).check();
+    const target = editor.getByRole('radiogroup', { name: '대상 도시', exact: true });
+    const city = target.locator(`[data-value="${away.key}"]`);
+    await city.click();
+    await expect(city).toHaveAttribute('aria-checked', 'true');
+    await editor.getByRole('button', { name: '5번 칸에 넣기', exact: true }).click();
+    await expect(editor.locator('tr[data-slot="5"]')).toContainText('교역');
+    await expect(editor.locator('tr[data-slot="5"]')).toContainText(away.name);
+    const before = await turns(a.page, world);
+    await editor.getByRole('button', { name: '저장', exact: true }).click();
+    await expect(editor.getByText('저장했습니다.', { exact: true })).toBeVisible();
+
+    const saved = await turns(a.page, world);
+    expect(saved.revision).toBeGreaterThan(before.revision);
+    expect(saved.slots[4]).toMatchObject({ commandKey: 'trade', args: { cityKey: away.key } });
+    expect(typeof saved.slots[4]!.args.cityKey).toBe('number');
+    expect(saved.slots[2]!.commandKey).not.toBe('rest');
+
+    // 새로 고쳐도 같은 이름·예약이 보이고 API 값도 그대로다.
+    await a.page.reload();
+    await expect(editor.locator('tr[data-slot="5"]')).toContainText('교역');
+    await expect(editor.locator('tr[data-slot="5"]')).toContainText(away.name);
+    await expect(editor.locator('tr[data-slot="3"]')).toContainText('훈련');
+    expect(await turns(a.page, world)).toEqual(saved);
   });
 
   test('교역 조약이 없으면 대상 도시 칸에 서버가 준 이유가 보인다', async ({ browser, page }) => {
@@ -322,7 +373,7 @@ test.describe('예턴 편집의 교역 대상', () => {
     });
     expect(targets.items).toEqual([]);
     expect(targets.blocked).toBeTruthy();
-    await expect(editor.getByRole('note')).toHaveText(targets.blocked!);
-    await expect(editor.getByRole('combobox', { name: /대상 도시/ }).locator('option')).toHaveCount(1);
+    await expect(a.page.getByTestId('command-args-screen').getByRole('note').first()).toHaveText(targets.blocked!);
+    await expect(a.page.getByRole('radiogroup', { name: '대상 도시' }).getByRole('radio')).toHaveCount(0);
   });
 });

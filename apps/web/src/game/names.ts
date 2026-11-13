@@ -42,11 +42,19 @@ const COMMAND_NAMES: Record<string, string> = {
 
 export const commandName = (key: string) => COMMAND_NAMES[key] ?? key;
 
-// 직책. 규칙의 군주(12)·일반(1)·재야(0)만 이름을 붙이고 나머지는 단계로 보여 준다.
-// 시나리오 장수는 소속이 있어도 0으로 시작하므로, 소속이 있으면 0도 일반으로 본다.
+// 직책. 규칙의 직책 표(packages/rules/src/personnel/permissions.ts)를 따른다: 12 군주, 11 참모, 5~10 수뇌, 1 일반, 0 재야.
+// 시나리오 장수는 소속이 있어도 0으로 시작하므로, 소속이 있으면 0도 일반으로 본다. 표에 없는 2~4는 단계로 보여 준다.
 export function officerName(level: number, hasNation = level !== 0): string {
   if (level === 12) return '군주';
+  if (level === 11) return '참모';
+  if (level >= 5 && level <= 10) return '수뇌';
   if (level === 1 || (level === 0 && hasNation)) return '일반';
   if (level === 0) return '재야';
   return `관직 ${level}단계`;
+}
+
+// 장수 이름 표시 (D-085). 괄호와 그 안을 뺀다. 조조(曹操) → 조조, 유도(145년생) → 유도.
+export function displayName(name: string): string {
+  const stripped = name.replace(/\s*[（(][^()（）]*[)）]\s*/g, '').trim();
+  return stripped === '' ? name : stripped;
 }

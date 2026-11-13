@@ -7,6 +7,8 @@ import {
   canExecuteCityNationCommand,
   canExecuteResearchNationCommand,
   officerTitle,
+  COURT_RANK_FEATURE,
+  nationRank,
   type QueuedTurn,
 } from '@opensamguk/rules';
 import { TRPCError } from '@trpc/server';
@@ -77,10 +79,15 @@ export async function readNationOfficeTabs(tx: Prisma.TransactionClient, worldId
   requirePersonnelWorld(world);
   const actor = await requireGeneral(tx, worldId, userId);
   const nationId = requireOfficeActor(actor);
+  const nation = await tx.nation.findUniqueOrThrow({
+    where: { worldId_id: { worldId, id: nationId } },
+    select: { level: true },
+  });
+  const rank = nationRank(nation.level);
   const offices = await tx.nationOffice.findMany({ where: { worldId, nationId } });
   const holders = await tx.general.findMany({
     where: { worldId, nationId },
-    select: { id: true, name: true, officerLevel: true },
+    select: { id: true, name: true, officerLevel: true, portraitId: true, userId: true },
   });
   const tabs = [];
   for (const officerLevel of [12, ...APPOINTABLE_OFFICER_LEVELS]) {
@@ -88,11 +95,16 @@ export async function readNationOfficeTabs(tx: Prisma.TransactionClient, worldId
     const occupied = holders.filter((general) => general.officerLevel === officerLevel);
     if (occupied.length > 1) throw new Error('한 직책에 장수가 둘 이상 있습니다.');
     const holder = occupied[0];
+    const courtTitle = rank?.offices.find((office) => office.officerLevel === officerLevel)?.title ?? null;
+    if (!holder && courtTitle === null && world.ruleFeatures.includes(COURT_RANK_FEATURE)) continue;
     tabs.push({
       office: { nationId, officerLevel, tenure: row?.tenure ?? 0 },
       officerLevel,
       title: officerTitle(officerLevel)!,
-      holder: holder ? { generalId: holder.id, name: holder.name } : null,
+      courtTitle,
+      holder: holder
+        ? { generalId: holder.id, name: holder.name, portraitId: holder.portraitId, isHuman: holder.userId !== null }
+        : null,
       edit:
         actor.officerLevel === officerLevel
           ? { ok: true as const }
@@ -107,13 +119,21 @@ export async function readNationOfficeTabs(tx: Prisma.TransactionClient, worldId
 // caller의 동일 tx에서 World·장수·직책을 잠근 뒤 칸·기록·활동을 함께 저장한다.
 export async function saveNationOfficeTurns(
   tx: Prisma.TransactionClient,
-  input: { worldId: string; userId: string; office: OfficeIdentity; revision: number },
+  input: {
+    worldId: string;
+    userId: string;
+    office: OfficeIdentity;
+    revision: number;
+    expectedActorId?: number | undefined;
+  },
   change: (old: QueuedTurn[], world: World, officerLevel: number) => QueuedTurn[],
 ) {
   const world = await requireWorld(tx, input.worldId, true);
   requirePersonnelWorld(world);
   if (world.status === 'ENDED') throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '종료된 월드입니다.' });
   const actor = await requireGeneral(tx, world.id, input.userId, true);
+  if (input.expectedActorId !== undefined && input.expectedActorId !== actor.id)
+    throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '장수가 바뀌었습니다. 국가 예턴을 다시 확인하세요.' });
   const nationId = requireOfficeActor(actor);
   await tx.$queryRaw`SELECT "nationId" FROM "NationOffice" WHERE "worldId" = ${world.id} AND "nationId" = ${nationId} AND "officerLevel" = ${actor.officerLevel} FOR UPDATE`;
   const where = { worldId: world.id, nationId, officerLevel: actor.officerLevel };

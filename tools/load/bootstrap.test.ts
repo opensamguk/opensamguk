@@ -10,9 +10,22 @@ import {
   parseBootstrapDiagnostic,
   BUILD_BUDGET,
   requireDispatch,
+  workerAncestor,
 } from './bootstrap.mjs';
 
 const GiB = 1024 ** 3;
+
+it('follows an unreadable intermediary but requires a kernel-reported Runner.Worker executable', async () => {
+  const readStat = async (path: string) =>
+    path === '/proc/42/stat' ? '42 (systemd-run) S 24 0' : '24 (Runner.Worker) S 1 0';
+  const readExecutable = async (path: string) => {
+    if (path === '/proc/42/exe') throw Object.assign(new Error(), { code: 'EACCES' });
+    return '/opt/actions-runner/bin/Runner.Worker';
+  };
+  expect(await workerAncestor(42, { readStat, readExecutable })).toBe(true);
+  expect(await workerAncestor(42, { readStat, readExecutable: () => readExecutable('/proc/42/exe') })).toBe(false);
+});
+
 const group = { memoryAvailable: 14 * GiB, cpuCapacity: 4, pressureSome: 0, pressureFull: 0 };
 const sample: AdmissionSample = {
   at: 100000,

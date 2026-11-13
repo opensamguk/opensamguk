@@ -27,7 +27,9 @@ function transaction() {
     nationTurn: { deleteMany: write('nationTurn.deleteMany'), createMany: write('nationTurn.createMany') },
     world: { update: write('world.update') },
     removedNation: { create: write('removedNation.create') },
+    publicNationEvent: { createMany: write('publicNationEvent.createMany') },
     $executeRaw: write('$executeRaw'),
+    $queryRaw: write('$queryRaw'),
   };
   return { tx: tx as unknown as Prisma.TransactionClient, calls };
 }
@@ -71,6 +73,24 @@ it('같은 트랜잭션의 이전 상태를 넘기면 재조회 없이 기존과
           removedSequence: 7,
           removedTick: 100,
         },
+      },
+    ],
+  });
+  expect(supplied.calls).toContainEqual({
+    method: 'publicNationEvent.createMany',
+    args: [
+      {
+        data: expect.arrayContaining([
+          { worldId, ...at, kind: 'fall', text: `${before.nations[2]!.name} 멸망` },
+          ...Object.values(before.cities)
+            .filter((city) => city.nationId === 2)
+            .map((city) => ({
+              worldId,
+              ...at,
+              kind: 'capture',
+              text: `${before.nations[1]!.name}의 ${city.name} 점령`,
+            })),
+        ]),
       },
     ],
   });

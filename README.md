@@ -26,12 +26,12 @@ v1의 필요한 규칙과 데이터를 TypeScript 엔진·API·React에 연결�
 | 관문 | 완료 조건 | 상태 |
 | --- | --- | --- |
 | M1 혼자와 NPC로 한 판 완주 | [AC-M1 22개](docs/product/acceptance-criteria.md#m1) 통과 | 진행 중 (✅ 21 · 🟨 1 · ⬜ 0) | <!-- lint-text-ignore C-5 -->
-| M2 독립 에이전트 참가 시험 | [AC-M2 20개](docs/product/acceptance-criteria.md#m2) 통과 | 진행 중 (✅ 6 · 🟨 2 · ⬜ 12) | <!-- lint-text-ignore C-5 -->
+| M2 독립 에이전트 참가 시험 | [AC-M2 20개](docs/product/acceptance-criteria.md#m2) 통과 | 진행 중 (✅ 7 · 🟨 2 · ⬜ 11) | <!-- lint-text-ignore C-5 -->
 | M3 기존 전체 인수 | [AC-M3 16개](docs/product/acceptance-criteria.md#m3) 통과 | 진행 중 (✅ 5 · 🟨 0 · ⬜ 11) | <!-- lint-text-ignore C-5 -->
 
 이번 공개의 M3 필수 조건은 [D-039](docs/product/decisions.md#d-039-공개-준비에서도-v01의-후속-게임-기능을-보존한다-2026-10-29)에 따라 AC-M3-01~11과16의12개입니다. AC-M3-12~15는 후속 미완료로 보존합니다. 도시 금·쌀·수비병과 부곡 배속은 [D-040](docs/product/decisions.md#d-040-도시가-금쌀수비병을-보유하고-권한자가-부곡에-배속한다-2026-10-29)의 추가 범위이며 기존 월드의 자원과 재생을 바꾸지 않습니다.
 
-과거 전체 명령의 미완료 목록은 [명령 대응표](docs/product/command-coverage.json)에 남깁니다. `node tools/command-coverage.mjs`의 현재 원작 비교 분모 90개, 정본 분모 92개, 전 단계 완료 2개입니다(모두 D-056의 승인된 해당 없음). D-038에 따라 이 전체 명령 분모를 이번 통합판의 완료 분모로 쓰지 않습니다.
+과거 전체 명령의 미완료 목록은 [명령 대응표](docs/product/command-coverage.json)에 남깁니다. `node tools/command-coverage.mjs`의 현재 원작 비교 분모 90개, 정본 분모 94개, 전 단계 완료 2개입니다(모두 D-056의 승인된 해당 없음). D-038에 따라 이 전체 명령 분모를 이번 통합판의 완료 분모로 쓰지 않습니다.
 
 ## 실행 화면
 

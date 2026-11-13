@@ -1,3 +1,4 @@
+import { hashState } from '@opensamguk/shared/node';
 import { TRPCError } from '@trpc/server';
 import { isDeepStrictEqual } from 'node:util';
 import { readWorldExtRows, type Prisma } from '@opensamguk/db';
@@ -7,6 +8,7 @@ import {
   restoreExtState,
   selectWorldCapabilities,
   projectTreatyRows,
+  treatyOptions,
   validateBrokenTreatyRow,
   validateClosedTreatyRow,
   type WorldInit,
@@ -29,7 +31,10 @@ import {
   readStoredPreparedTurns,
   readStoredNationResearch,
   readStoredNationLifecycle,
+  readStoredRelations,
   assertNationLifecycle,
+  OFFICE_EFFECTS_FEATURE,
+  officeEffectsSchema,
 } from '@opensamguk/rules';
 import { z } from 'zod';
 import { worldResolver } from './resolver';
@@ -54,7 +59,7 @@ export async function requireGeneral(tx: Prisma.TransactionClient, worldId: stri
 export async function readView(tx: Prisma.TransactionClient, worldId: string) {
   const world = await requireWorld(tx, worldId);
   const { preset, commands } = worldResolver(world);
-  const rules = effectiveWorldOptions(preset, world.runtimeOptions).presetRules;
+  const { presetRules: rules, recruitmentLocation } = effectiveWorldOptions(preset, world.runtimeOptions);
   const capabilities = world.replayFormat === 3 ? null : selectWorldCapabilities(world);
   const treatyRows = await tx.treaty.findMany({
     where: { worldId },
@@ -80,14 +85,13 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
       : capabilities?.kind === 'caps' && 'treaty' in capabilities.selection;
   if (!treatyEnabled && treatyRows.length) throw new Error('조약을 끈 월드에 조약 저장 행이 있습니다.');
   const breakEnabled = world.replayFormat === 3 && world.ruleFeatures.includes('treaty-break');
-  const treatyOptions = { tradeEnabled: world.replayFormat === 3 && world.ruleFeatures.includes('treaty-trade') };
+  const clauses = treatyOptions(world.replayFormat === 3 ? world.ruleFeatures : []);
   if (world.replayFormat === 3)
     for (const row of treatyRows)
-      if (!['PROPOSED', 'ACTIVE', 'BROKEN'].includes(row.status)) validateClosedTreatyRow(row, treatyOptions);
-  if (breakEnabled)
-    for (const row of treatyRows) if (row.status === 'BROKEN') validateBrokenTreatyRow(row, treatyOptions);
+      if (!['PROPOSED', 'ACTIVE', 'BROKEN'].includes(row.status)) validateClosedTreatyRow(row, clauses);
+  if (breakEnabled) for (const row of treatyRows) if (row.status === 'BROKEN') validateBrokenTreatyRow(row, clauses);
   const treaties = treatyEnabled
-    ? projectTreatyRows(breakEnabled ? treatyRows.filter((row) => row.status !== 'BROKEN') : treatyRows, treatyOptions)
+    ? projectTreatyRows(breakEnabled ? treatyRows.filter((row) => row.status !== 'BROKEN') : treatyRows, clauses)
     : undefined;
   const ext = restoreExtState(commands, await readWorldExtRows(tx, worldId), world.ruleFeatures);
   const cities = await tx.city.findMany({ where: { worldId } });
@@ -99,6 +103,7 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
   const diplomacies = await tx.diplomacy.findMany({ where: { worldId } });
   const state = toWorldState({
     ...(rules ? { presetRules: rules } : {}),
+    ...(recruitmentLocation === 'city' ? { recruitmentLocation } : {}),
     ...(world.ruleFeatures?.length ? { ruleFeatures: [...world.ruleFeatures] } : {}),
     ...(ext ? { ext } : {}),
     startYear: world.startYear,
@@ -113,6 +118,9 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
     diplomacies,
     ...(world.commandMeta ? { commandMeta: world.commandMeta } : {}),
   } as unknown as WorldInit);
+  if (world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE)) {
+    state.officeEffects = officeEffectsSchema.parse(world.officeEffects);
+  }
   if (world.ruleFeatures.includes('campaign-v1')) {
     if (Object.values(state.generals).some((general) => general.crew !== 0))
       throw new Error('부곡 월드에 중복 병력이 있습니다.');
@@ -141,6 +149,8 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
   if (preparedTurns) state.preparedTurns = preparedTurns;
   const nationResearch = readStoredNationResearch(world);
   if (nationResearch) state.nationResearch = nationResearch;
+  const relations = readStoredRelations(world, hashState);
+  if (relations) state.relations = relations;
   const nationLifecycle = readStoredNationLifecycle(world);
   if (nationLifecycle) state.nationLifecycle = nationLifecycle;
   assertNationLifecycle(state);

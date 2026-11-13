@@ -6,6 +6,7 @@ import {
   initialReplayState,
   initialReplayStateWithRegistry,
   checkReplayOrigin,
+  replayResourceHashInput,
   readStoredNationStrategy,
   readStoredPreparedTurns,
   readStoredNationResearch,
@@ -115,28 +116,11 @@ export interface ReplayArchiveV3 extends Omit<ReplayArchiveV2, 'version' | 'orig
 }
 type Archive = ReplayArchive | ReplayArchiveV2 | ReplayArchiveV3 | ReplayArchiveV5;
 export function resourceHash(initial: WorldInit) {
-  return hashState({
-    scenarioKey: initial.scenarioKey,
-    mapKey: initial.mapKey,
-    unitSetKey: initial.unitSetKey,
-    statRules: initial.statRules,
-    unitSet: initial.unitSet,
-    ...(initial.operationalMap ? { operationalMap: initial.operationalMap } : {}),
-  });
+  return hashState(replayResourceHashInput(initial));
 }
 
 export function resourceHashV3(origin: ReplayOriginV3) {
-  if (!origin.featureData) return resourceHash(origin.initial);
-  const initial = origin.initial;
-  return hashState({
-    scenarioKey: initial.scenarioKey,
-    mapKey: initial.mapKey,
-    unitSetKey: initial.unitSetKey,
-    statRules: initial.statRules,
-    unitSet: initial.unitSet,
-    ...(initial.operationalMap ? { operationalMap: initial.operationalMap } : {}),
-    featureData: origin.featureData,
-  });
+  return hashState(replayResourceHashInput(origin.initial, origin.featureData));
 }
 
 export async function exportReplay(

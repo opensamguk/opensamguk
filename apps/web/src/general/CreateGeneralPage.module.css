@@ -24,6 +24,36 @@
   color: var(--color-text-muted);
 }
 
+/* 서버 정보 한 줄과 접어 두는 세력 지도 (INT-25 단계 3). */
+.worldStatus {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.glance {
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+/* 펼침 표시를 지키려고 list-item 그대로 두고 높이를 44px로 맞춘다. */
+.glance > summary {
+  padding: var(--space-3);
+  line-height: 20px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.glanceMap {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: 0 var(--space-3) var(--space-3);
+}
+
 /* 꾸밈 현판. 제목이 아니라 글자 띠다. */
 .plaque {
   display: inline-flex;
@@ -492,4 +522,34 @@
     grid-column: 1;
     grid-row: 1 / span 8;
   }
+}
+
+/* NPC 무장 맡기 후보 줄 (INT-26). 선택 칸·원형 얼굴·이름과 능력치를 한 줄에 두고 좁은 화면에서는 글만 접는다. */
+.npcList {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0;
+}
+
+.npcRow {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.npcInfo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.npcStats {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
 }

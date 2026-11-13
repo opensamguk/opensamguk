@@ -2,6 +2,7 @@ import type { Prisma, PrismaClient } from '@opensamguk/db';
 import { TRPCError } from '@trpc/server';
 import {
   nowTick,
+  RELATIONS_FEATURE,
   TICKS_PER_MONTH,
   toGameDate,
   effectiveWorldOptions,
@@ -26,6 +27,7 @@ export const recordsInput = worldInput
 const worldSelect = {
   id: true,
   name: true,
+  scenarioKey: true,
   status: true,
   clockMode: true,
   endYear: true,
@@ -39,7 +41,7 @@ const worldSelect = {
   runtimeOptions: true,
 } as const satisfies Prisma.WorldSelect;
 type ReadWorld = Prisma.WorldGetPayload<{ select: typeof worldSelect }>;
-type ClockWorld = Pick<
+export type ClockWorld = Pick<
   ReadWorld,
   'status' | 'clockMode' | 'clockTick' | 'clockAnchorAt' | 'turnTermMinutes' | 'preset' | 'runtimeOptions'
 >;
@@ -80,6 +82,10 @@ export async function readWorld<T>(
   );
 }
 
+export function countHumanGenerals(tx: Prisma.TransactionClient, worldId: string) {
+  return tx.general.count({ where: { worldId, userId: { not: null }, removedAt: null } });
+}
+
 export async function viewerGeneral(db: Prisma.TransactionClient, worldId: string, userId: string) {
   return db.general.findUnique({ where: { worldId_userId: { worldId, userId } } });
 }
@@ -106,7 +112,7 @@ export function seasonResultInfo(world: Pick<ReadWorld, 'status' | 'result'>) {
     : null;
 }
 
-export function worldSummary(world: ReadWorld, now: number) {
+export function worldSummary(world: Omit<ReadWorld, 'scenarioKey'>, now: number) {
   const clock = worldClock(world);
   const tick = nowTick(clock, now);
   const result = seasonResultInfo(world);
@@ -126,6 +132,7 @@ export function worldSummary(world: ReadWorld, now: number) {
     ...(world.ruleFeatures.includes('logistics-v1') ? { logisticsEnabled: true as const } : {}),
     ...(world.ruleFeatures.includes('governance-v1') ? { governanceEnabled: true as const } : {}),
     ...(world.ruleFeatures.includes('lineage-v1') ? { lineageEnabled: true as const } : {}),
+    ...(world.ruleFeatures.includes(RELATIONS_FEATURE) ? { relationsEnabled: true as const } : {}),
     ...(world.ruleFeatures.includes('equipment-v1') ? { equipmentEnabled: true as const } : {}),
   };
 }
@@ -138,11 +145,11 @@ function scheduledAt(clock: Clock, tick: number): string | null {
     throw error;
   }
 }
-export function nextTurnAt(world: ReadWorld, tick: number): string | null {
+export function nextTurnAt(world: ClockWorld, tick: number): string | null {
   if (world.status !== 'RUNNING' || world.clockMode === 'ACCELERATED' || world.clockAnchorAt === null) return null;
   return scheduledAt(worldClock(world), tick);
 }
-export function turnSchedule(world: ReadWorld, tick: number): Array<string | null> | null {
+export function turnSchedule(world: ClockWorld, tick: number): Array<string | null> | null {
   if (world.status !== 'RUNNING' || world.clockMode === 'ACCELERATED' || world.clockAnchorAt === null) return null;
   const clock = worldClock(world);
   return Array.from({ length: 30 }, (_, slot) => scheduledAt(clock, tick + slot * TICKS_PER_MONTH));

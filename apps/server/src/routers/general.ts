@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { TRPCError } from '@trpc/server';
 import {
+  POSSESSION_KIND,
   CREATION_ERRORS,
   creationBlock,
   effectiveWorldOptions,
@@ -17,6 +18,7 @@ import {
 import { z } from 'zod';
 import { router, protectedProcedure, worldVerifiedProcedure } from '../trpc';
 import { requireGeneral, requireWorld, worldInput } from '../game/queries';
+import { countHumanGenerals } from '../queries';
 import { ownGeneral } from '../game/projection';
 import { readPolicy, requirePolicyReady } from '../game/policy';
 import { PLAYER_PORTRAIT_MIN_ID } from '@opensamguk/shared';
@@ -141,13 +143,16 @@ export const generalRouter = router({
       const world = await requireWorld(tx, worldId, true);
       const existing = await tx.general.findUnique({ where: { worldId_userId: { worldId, userId: ctx.user.id } } });
       const pending = await tx.inputEvent.findFirst({
-        where: { worldId, userId: ctx.user.id, kind: 'general.create', status: 'PENDING' },
+        where: { worldId, userId: ctx.user.id, kind: { in: ['general.create', POSSESSION_KIND] }, status: 'PENDING' },
         orderBy: { id: 'asc' },
       });
+      if (pending?.kind === POSSESSION_KIND)
+        throw new TRPCError({ code: 'CONFLICT', message: 'NPC 무장 맡기 요청을 처리하고 있습니다.' });
       const block = creationBlock({
         status: world.status,
         hasGeneral: existing !== null,
         hasPending: pending !== null,
+        humanCount: await countHumanGenerals(tx, worldId),
         entryOpen:
           effectiveWorldOptions(world.preset === null ? null : parsePreset(world.preset), world.runtimeOptions).entry
             .generalCreation === 'open',

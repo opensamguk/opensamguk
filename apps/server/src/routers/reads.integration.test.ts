@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { arch, cpus, platform, release } from 'node:os';
 import { performance } from 'node:perf_hooks';
+import { readFile } from 'node:fs/promises';
 import type { inferRouterOutputs } from '@trpc/server';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb } from '@opensamguk/db';
+import { cityRegionName, REPUTATION_POINTS } from '@opensamguk/rules';
 import { readFixture } from '../../test/readFixture';
 import { buildServer } from '../server';
 import type { AppRouter } from '../router';
@@ -16,7 +18,11 @@ type Results = {
   'home.get': Out['home']['get'];
   'city.get': Out['city']['get'];
   'nation.get': Out['nation']['get'];
+  'treaty.relations': Out['treaty']['relations'];
+  'commands.recruitCandidates': Out['commands']['recruitCandidates'];
   'records.general': Out['records']['general'];
+  'records.battles': Out['records']['battles'];
+  'records.activity': Out['records']['activity'];
   'records.nation': Out['records']['nation'];
   'records.world': Out['records']['world'];
 };
@@ -26,7 +32,10 @@ const routes = [
   'home.get',
   'city.get',
   'nation.get',
+  'treaty.relations',
+  'commands.recruitCandidates',
   'records.general',
+  'records.activity',
   'records.nation',
   'records.world',
 ] as const;
@@ -205,6 +214,157 @@ afterAll(async () => {
 });
 
 describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
+  it('AC-INT-26 외교 관계표는 모든 국가 쌍과 공개 외교 상태만 반환한다', async () => {
+    const world = await fixtureWorld('relations');
+    await db.nation.create({
+      data: { ...state.nations[0]!, worldId: world, id: 3, name: '제삼국', capitalCityKey: null },
+    });
+    await db.diplomacy.create({
+      data: { worldId: world, nationA: 1, nationB: 2, state: 'NON_AGGRESSION', untilTick: 0 },
+    });
+    const result = await query('treaty.relations', { worldId: world });
+    expect(result.status).toBe(200);
+    expect(result.data.nations).toEqual([
+      ...state.nations.map(({ id, name, color }) => ({ id, name, color })),
+      { id: 3, name: '제삼국', color: state.nations[0]!.color },
+    ]);
+    expect(result.data.pairs).toEqual([
+      { nationA: 1, nationB: 2, relation: 'NON_AGGRESSION', relationEndAt: { year: state.startYear, month: 1 } },
+      { nationA: 1, nationB: 3, relation: 'NONE', relationEndAt: null },
+      { nationA: 2, nationB: 3, relation: 'NONE', relationEndAt: null },
+    ]);
+    for (const user of users.slice(2)) {
+      const publicView = await query('treaty.relations', { worldId: world }, user.cookie);
+      expect(publicView.data.pairs).toEqual(
+        result.data.pairs.map((pair) => ({ ...pair, relation: 'NONE', relationEndAt: null })),
+      );
+    }
+    const other = await query('treaty.relations', { worldId: otherWorldId });
+    expect(other.data.pairs).toEqual([{ nationA: 1, nationB: 2, relation: 'NONE', relationEndAt: null }]);
+  });
+  it('AC-INT-26 군주 등용 후보는 실제 명령 사전 검사와 같다', async () => {
+    const world = await fixtureWorld('recruit');
+    await db.general.update({
+      where: { worldId_id: { worldId: world, id: 1 } },
+      data: { officerLevel: 12 },
+    });
+    const candidate = state.generals[3]!;
+    const result = await query('commands.recruitCandidates', { worldId: world });
+    expect(result.status).toBe(200);
+    expect(result.data).toEqual([
+      {
+        id: candidate.id,
+        name: candidate.name,
+        portraitId: candidate.portraitId ?? null,
+        isHuman: true,
+        cityKey: candidate.cityKey,
+        cityName: state.cities[0]!.name,
+      },
+    ]);
+    expect((await query('commands.recruitCandidates', { worldId: world }, users[2]!.cookie)).data).toEqual([]);
+    expect((await query('commands.recruitCandidates', { worldId: world }, users[3]!.cookie)).status).toBe(404);
+  });
+  it('AC-INT-26 장수 동향은 공개 평판 스냅샷을 같은 tick의 끝까지 조회한다', async () => {
+    const world = await fixtureWorld('activity');
+    await db.general.update({ where: { worldId_id: { worldId: world, id: 1 } }, data: { portraitId: 101 } });
+    await db.reputationEvent.createMany({
+      data: Array.from({ length: 31 }, (_, index) => ({
+        worldId: world,
+        generalId: index + 1,
+        year: state.startYear,
+        month: 1,
+        kind: 'domestic',
+        score: REPUTATION_POINTS.domestic,
+        tick: 1,
+        generalName: `공개 장수 ${index + 1}`,
+      })),
+    });
+    await db.publicNationEvent.create({
+      data: { worldId: world, sequence: 1, tick: 1, kind: 'found', text: '공개 국가 건국' },
+    });
+    const first = await query('records.activity', { worldId: world }, users[3]!.cookie);
+    expect(first.status).toBe(200);
+    expect(first.data.items.map((item) => (item.source === 'reputation' ? item.generalId : null))).toEqual(
+      Array.from({ length: 30 }, (_, index) => 31 - index),
+    );
+    expect(first.data.items[0]).toEqual({
+      id: expect.any(String),
+      source: 'reputation',
+      generalId: 31,
+      portraitId: null,
+      year: state.startYear,
+      month: 1,
+      kind: 'domestic',
+      score: REPUTATION_POINTS.domestic,
+      tick: 1,
+      data: { name: '공개 장수 31', nation: null, city: null },
+    });
+    const next = await query('records.activity', { worldId: world, cursor: first.data.nextCursor });
+    expect(next.data.items).toEqual([
+      expect.objectContaining({ source: 'reputation', generalId: 1, portraitId: 101 }),
+      expect.objectContaining({ source: 'nation', kind: 'found', text: '공개 국가 건국', portraitId: null }),
+    ]);
+    expect(next.data.nextCursor).toBeNull();
+    const news = await query('records.activity', { worldId: world, scope: 'world' });
+    expect(news.data.items).toEqual([expect.objectContaining({ source: 'nation', kind: 'found' })]);
+    expect((await query('records.activity', { worldId: otherWorldId })).data.items).toEqual([]);
+    expect((await query('records.activity', { worldId: world, cursor: '?' })).status).toBe(400);
+  });
+  it('AC-INT-26 지도 장수 초상은 도시 주둔 공개 범위를 따른다', async () => {
+    const world = await fixtureWorld('map-generals');
+    await db.general.update({
+      where: { worldId_id: { worldId: world, id: 1 } },
+      data: { portraitId: 10001 },
+    });
+    const input = { worldId: world };
+    const open = await query('world.map', input, users[3]!.cookie);
+    expect(open.data.generals[0]).toEqual({
+      id: 1,
+      name: state.generals[0]!.name,
+      cityKey: state.cities[0]!.cityKey,
+      nationId: 1,
+      portraitId: 10001,
+      isHuman: true,
+    });
+    expect(open.data.generals[1]).toHaveProperty('isHuman', false);
+    await db.world.update({ where: { id: world }, data: { ruleFeatures: { push: 'intel-v1' } } });
+    const foreign = await query('world.map', input, users[3]!.cookie);
+    expect(foreign.status).toBe(200);
+    expect(foreign.data.generals).toEqual([]);
+    expect((await query('world.map', input)).data.generals).toEqual(open.data.generals);
+  });
+  it('AC-INT-26 종사 임지에서 초상·사람 여부와 주재 상태를 읽는다', async () => {
+    const world = await fixtureWorld('secretary');
+    const cityKey = state.cities[0]!.cityKey;
+    await db.world.update({
+      where: { id: world },
+      data: {
+        ruleFeatures: { push: 'office-effects' },
+        officeEffects: {
+          version: 1,
+          secretary: true,
+          minimumAbility: 65,
+          tax: { 3: 10, 4: 10, 11: 5 },
+          supplyLoss: { 5: 10, 6: 10, 7: 10, 8: 10, 9: 10, 10: 10 },
+        },
+      },
+    });
+    await db.general.update({
+      where: { worldId_id: { worldId: world, id: 1 } },
+      data: { officerLevel: 2, officerCityKey: cityKey, portraitId: 10001, activeFromYear: state.startYear },
+    });
+    const result = await query('city.get', { worldId: world, cityKey });
+    expect(result.status).toBe(200);
+    expect(result.data.secretaryEnabled).toBe(true);
+    expect(result.data.officers).toContainEqual({
+      generalId: 1,
+      name: state.generals[0]!.name,
+      officerLevel: 2,
+      portraitId: 10001,
+      isHuman: true,
+      resident: true,
+    });
+  });
   it('summary는 서버 시계와 공개 기수 설정을 반환한다', async () => {
     expect(await query('world.summary', { worldId })).toEqual({
       status: 200,
@@ -221,8 +381,43 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
         msPerTick: 6,
         turnTermMinutes: 1,
         truce: null,
+        quota: { humans: 3, max: 500 },
+        npcCount: 1,
+        scenarioType: 'historical',
+        serverTime: new Date(now).toISOString(),
+        engine: null,
+        engineStale: true,
+        protection: { war: null, founding: null },
       },
     });
+  });
+
+  it('AC-INT-26 실제 엔진 신호와 초반 보호가 끝나는 날짜를 공개한다', async () => {
+    const world = await fixtureWorld('progress');
+    const preset = JSON.parse(
+      await readFile(new URL('../../../../resources/preset/regular.json', import.meta.url), 'utf8'),
+    );
+    await db.world.update({
+      where: { id: world },
+      data: { preset: { ...preset, protection: { ...preset.protection, foundUntilMonths: 1, peaceMonths: 13 } } },
+    });
+    const heartbeatAt = new Date(now - 2_000);
+    await db.engineHeartbeat.create({
+      data: { worldId: world, at: heartbeatAt, lastTick: 150, lagMs: 500, lastError: '내부 상세' },
+    });
+    const active = await query('world.summary', { worldId: world });
+    expect(active.status).toBe(200);
+    expect(active.data.engine).toEqual({ heartbeatAt: heartbeatAt.toISOString(), lastTick: 150, lagMs: 500 });
+    expect(active.data.engineStale).toBe(false);
+    expect(active.data.protection).toEqual({
+      founding: { remainingMonths: 1, endsAt: { year: state.startYear, month: 2 } },
+      war: { remainingMonths: 13, endsAt: { year: state.startYear + 1, month: 2 } },
+    });
+    await db.world.update({ where: { id: world }, data: { clockTick: 10_000 } });
+    await db.engineHeartbeat.update({ where: { worldId: world }, data: { lagMs: 300_001 } });
+    const advanced = (await query('world.summary', { worldId: world })).data;
+    expect(advanced.protection.founding).toBeNull();
+    expect(advanced.engineStale).toBe(true);
   });
 
   it('다른 계정과 장수 없는 계정도 같은 공개 시작 연도를 읽는다', async () => {
@@ -275,6 +470,13 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
         msPerTick: 6,
         turnTermMinutes: 1,
         truce: null,
+        quota: { humans: 3, max: 500 },
+        npcCount: 1,
+        scenarioType: 'historical',
+        serverTime: new Date(now).toISOString(),
+        engine: null,
+        engineStale: null,
+        protection: { war: null, founding: null },
       };
       for (const user of users) {
         const result = await query('world.summary', { worldId: endedWorldId }, user.cookie);
@@ -288,7 +490,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     }
   });
 
-  it('94도시 지도는 정렬한 공개 필드·연결·보급과 국가 색·수도만 반환한다', async () => {
+  it('94도시 지도는 정렬한 공개 도시·국가·장수 정보만 반환한다', async () => {
     const result = await query('world.map', { worldId });
     expect(result.status).toBe(200);
     expect(result.data).toEqual({
@@ -296,6 +498,8 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       cities: state.cities.map((city) => ({
         key: city.cityKey,
         name: city.name,
+        region: city.region,
+        regionName: cityRegionName(city.region, 'che'),
         level: city.level,
         x: city.x,
         y: city.y,
@@ -304,6 +508,14 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
         links: city.connections,
       })),
       nations: state.nations.map(({ id, name, color, capitalCityKey }) => ({ id, name, color, capitalCityKey })),
+      generals: state.generals.map(({ id, name, cityKey, nationId, portraitId }, index) => ({
+        id,
+        name,
+        cityKey,
+        nationId,
+        portraitId: portraitId ?? null,
+        isHuman: index !== 1,
+      })),
     });
     expect(result.data.cities).toHaveLength(94);
     for (const city of result.data.cities)
@@ -361,33 +573,67 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     const input = { worldId, cityKey: state.cities[0]!.cityKey };
     const ally = (await query('city.get', input)).data;
     expect(ally).toMatchObject({ population: state.cities[0]!.population, wall: state.cities[0]!.wall });
+    expect(ally.defense).toEqual({
+      minimumTraining: 20,
+      minimumMorale: 20,
+      troops: 26003,
+      generals: [
+        { generalId: 1, troops: 13001 },
+        { generalId: 2, troops: 13002 },
+      ],
+    });
+    expect((await query('home.get', { worldId })).data.general.defense).toMatchObject({
+      participating: true,
+      troops: 13001,
+    });
     expect(ally.generals.slice(0, 2)).toMatchObject([
       { id: 1, gold: 11001 },
       { id: 2, gold: 11002 },
     ]);
-    expect(ally.generals.slice(2)).toEqual(
-      state.generals.slice(2).map(({ id, name, nationId }) => ({ id, name, nationId })),
+    expect(ally.generals.slice(2)).toMatchObject(
+      state.generals.slice(2).map(({ id, name, nationId, leadership, strength, intel, crew }) => ({
+        id,
+        name,
+        nationId,
+        isHuman: id !== 2,
+        leadership,
+        strength,
+        intel,
+        crew,
+      })),
     );
+    expect(ally.enemyCrew).toBe(state.generals[2]!.crew);
+    expect(ally.generals[2]).not.toHaveProperty('gold');
+    expect(ally.generals[2]).not.toHaveProperty('train');
     const resident = (await query('city.get', input, users[1]!.cookie)).data;
+    expect(resident.defense).toBeUndefined();
     expect(resident).toHaveProperty('population');
-    expect(resident.generals[0]).toEqual({ id: 1, name: state.generals[0]!.name, nationId: 1 });
+    expect(resident.generals[0]).toMatchObject({
+      id: 1,
+      name: state.generals[0]!.name,
+      nationId: 1,
+      isHuman: true,
+      leadership: state.generals[0]!.leadership,
+      crew: state.generals[0]!.crew,
+    });
+    expect(resident.generals[0]).not.toHaveProperty('gold');
     for (const user of users) {
       const unseen = (await query('city.get', { worldId, cityKey: state.cities[2]!.cityKey }, user.cookie)).data;
-      for (const field of [
-        'population',
-        'populationMax',
-        'agriculture',
-        'commerce',
-        'security',
-        'defence',
-        'wall',
-        'trust',
-      ])
+      expect(unseen).toMatchObject({
+        populationMax: state.cities[2]!.populationMax,
+        defence: state.cities[2]!.defence,
+        wall: state.cities[2]!.wall,
+      });
+      for (const field of ['population', 'agriculture', 'commerce', 'security', 'trust'])
         expect(unseen).not.toHaveProperty(field);
     }
     const spectator = (await query('city.get', input, users[3]!.cookie)).data;
     expect(spectator).not.toHaveProperty('population');
-    expect(spectator.generals).toEqual(state.generals.map(({ id, name, nationId }) => ({ id, name, nationId })));
+    expect(spectator.regionName).toBe(cityRegionName(state.cities[0]!.region, 'che'));
+    expect(spectator.region).toBe(state.cities[0]!.region);
+    expect(spectator.generals).toEqual(
+      state.generals.map(({ id, name, nationId }) => ({ id, name, nationId, isHuman: id !== 2 })),
+    );
   });
 
   it('적 국가·재야·미생성 계정은 국고·군량·세율·장수 상세를 받지 않는다', async () => {
@@ -400,21 +646,70 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       'generals',
       'id',
       'name',
+      'philosophy',
+      'population',
+      'populationMax',
+      'rank',
     ]);
-    expect(enemy.generals).toEqual([{ id: 3, name: state.generals[2]!.name, nationId: 2 }]);
+    expect(enemy).toMatchObject({
+      philosophy: state.nations[1]!.philosophy,
+      population: state.cities[1]!.population,
+    });
+    expect(enemy.generals).toMatchObject([
+      {
+        id: 3,
+        name: state.generals[2]!.name,
+        nationId: 2,
+        isHuman: true,
+        leadership: state.generals[2]!.leadership,
+        age: state.generals[2]!.age,
+      },
+    ]);
+    expect(enemy.generals[0]).not.toHaveProperty('crew');
+    expect(enemy.cities[0]).toHaveProperty('wallMax', state.cities[1]!.wallMax);
+    expect(enemy.cities[0]).not.toHaveProperty('wall');
     expect(enemy.cities).toHaveLength(1);
     for (const user of users.slice(1)) {
       const nation = (await query('nation.get', { worldId, nationId: 1 }, user.cookie)).data;
-      for (const field of ['gold', 'rice', 'taxRate', 'tech', 'capitalCityKey'])
+      for (const field of ['gold', 'rice', 'taxRate', 'tech', 'capitalCityKey', 'financeEstimate', 'salaryRate'])
         expect(nation).not.toHaveProperty(field);
-      expect(nation.generals).toEqual(
-        state.generals.slice(0, 2).map(({ id, name, nationId }) => ({ id, name, nationId })),
+      expect(nation.generals).toMatchObject(
+        state.generals.slice(0, 2).map(({ id, name, nationId, leadership }) => ({
+          id,
+          name,
+          nationId,
+          isHuman: id !== 2,
+          leadership,
+        })),
       );
+      for (const general of nation.generals) {
+        expect(general).not.toHaveProperty('crew');
+        expect(general).not.toHaveProperty('gold');
+      }
     }
     const own = (await query('nation.get', { worldId, nationId: 1 })).data;
     expect(own).toMatchObject({ gold: state.nations[0]!.gold, rice: state.nations[0]!.rice, taxRate: 0.2 });
+    expect(own).toHaveProperty('financeEstimate.gold.month', 1);
+    expect(own).toHaveProperty('financeEstimate.rice.month', 4);
+    expect(own).toHaveProperty('financeEstimate.destination', 'nation');
     expect(own.generals[1]).toMatchObject({ id: 2, gold: 11002, crew: 13002 });
-    expect(own.cities[0]).not.toHaveProperty('population');
+    expect(own.cities[0]).toHaveProperty('population', state.cities[0]!.population);
+    expect(own.cities[0]).toHaveProperty('populationMax', state.cities[0]!.populationMax);
+    expect(own).toHaveProperty('salaryRate', 0.5);
+    expect(own.cities[0]).toHaveProperty('incomeEstimate.gold', own.financeEstimate?.gold.gross);
+    expect(own.cities[0]).toHaveProperty('incomeEstimate.rice', own.financeEstimate?.rice.gross);
+    expect(enemy.cities[0]).not.toHaveProperty('incomeEstimate');
+    const home = (await query('home.get', { worldId })).data;
+    expect(home.nation).toMatchObject({
+      population: own.population,
+      populationMax: own.populationMax,
+      salaryRate: own.salaryRate,
+      financeEstimate: own.financeEstimate,
+    });
+    expect(home.general.salaryEstimate).toEqual({
+      gold: own.financeEstimate?.gold.perGeneral,
+      rice: own.financeEstimate?.rice.perGeneral,
+    });
   });
 
   it('AC-M1-19 소유 도시를 자국에서만 지역과 규모 기준으로 정렬한다', async () => {
@@ -443,7 +738,8 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       const foreign = (await query('nation.get', input, users[1]!.cookie)).data.cities;
       expect(own.map((city) => city.key)).toEqual([third, fourth, second, first]);
       expect(foreign.map((city) => city.key)).toEqual(keys);
-      for (const city of [...own, ...foreign]) expect(city).not.toHaveProperty('region');
+      expect(own.map((city) => ('region' in city ? city.region : null))).toEqual([1, 1, 1, 2]);
+      for (const city of foreign) expect(city).not.toHaveProperty('region');
     } finally {
       await db.world.delete({ where: { id } });
     }
@@ -452,6 +748,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
   it('재야 home은 국가 null·본인 상세만 반환하고 없는 예턴을 휴식5개로 채운다', async () => {
     const { data } = await query('home.get', { worldId }, users[2]!.cookie);
     expect(data.nation).toBeNull();
+    expect(data.general).not.toHaveProperty('salaryEstimate');
     expect(data.general).toMatchObject({ id: 4, nationId: null, gold: 11004 });
     expect(data.turnsPreview).toEqual(
       Array.from({ length: 5 }, (_, slot) => ({ slot, commandKey: 'rest', args: {}, name: '휴식', explicit: false })),
@@ -555,6 +852,43 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     expect(JSON.stringify(publicRecords)).not.toMatch(/gold|rice|power|stateHash|private/);
     const home = (await query('home.get', { worldId })).data;
     expect(home.recentLogs).toEqual((await query('records.general', { worldId })).data.items.slice(0, 10));
+    const first = home.recentLogs[0]!;
+    const stored = await db.generalLog.findUniqueOrThrow({ where: { id: BigInt(first.id) } });
+    expect(first.createdAt).toBe(stored.createdAt.toISOString());
+  });
+
+  it('전투 기록은 세션 장수의 보고서만 같은 턴에서도 빠짐없이 이어 읽는다', async () => {
+    const ownReports = Array.from({ length: 31 }, (_, index) => ({
+      worldId,
+      tick: 10000,
+      attackerId: index + 1,
+      generalId: 1,
+      text: `내 전투 ${index + 1}`,
+    }));
+    await db.battleLog.createMany({
+      data: [
+        ...ownReports,
+        { worldId, tick: 10000, attackerId: 1, generalId: 3, text: '다른 장수 보고서' },
+        { worldId: otherWorldId, tick: 10000, attackerId: 1, generalId: 1, text: '다른 월드 보고서' },
+      ],
+    });
+    try {
+      const first = (await query('records.battles', { worldId })).data;
+      expect(first.items.map((row) => row.attackerId)).toEqual(
+        ownReports
+          .slice(1)
+          .reverse()
+          .map((row) => row.attackerId),
+      );
+      expect(first.nextCursor).toBeTruthy();
+      const second = (await query('records.battles', { worldId, cursor: first.nextCursor })).data;
+      expect(second.items).toMatchObject([{ attackerId: 1, text: '내 전투 1' }]);
+      expect(second.nextCursor).toBeNull();
+      expect((await query('records.battles', { worldId, generalId: 3 })).status).toBe(400);
+      expect((await query('records.battles', { worldId }, users[3]!.cookie)).status).toBe(404);
+    } finally {
+      await db.battleLog.deleteMany({ where: { worldId: { in: [worldId, otherWorldId] }, tick: 10000 } });
+    }
   });
 
   it('무인증·위조·만료 세션은 모든 조회에서 401이다', async () => {

@@ -2,6 +2,7 @@ import { publicGeographySchema } from '@opensamguk/shared';
 import type { Prisma } from '@opensamguk/db';
 import {
   BALANCE,
+  nationRank,
   TICKS_PER_MONTH,
   toGameDate,
   type CampaignUnitState,
@@ -23,6 +24,7 @@ type General = Omit<
   | 'charm'
   | 'sex'
   | 'removedAt'
+  | 'officerCityKey'
 > & { politics?: number | null; charm?: number | null };
 type City = Omit<Prisma.CityGetPayload<true>, 'kind'> & { kind?: string | null };
 type Nation = Omit<
@@ -93,11 +95,13 @@ export function mapCity(city: City) {
   };
 }
 
+function generalIdentity(general: Pick<General, 'id' | 'name' | 'nationId' | 'userId'>) {
+  return { id: general.id, name: general.name, nationId: general.nationId, isHuman: general.userId !== null };
+}
+
 export function ownGeneralInfo(general: General) {
   return {
-    id: general.id,
-    name: general.name,
-    nationId: general.nationId,
+    ...generalIdentity(general),
     portraitId: general.portraitId,
     cityKey: general.cityKey,
     leadership: general.leadership,
@@ -125,14 +129,44 @@ export function ownGeneralInfo(general: General) {
 }
 
 export function generalInfo(general: General, viewer: Viewer) {
-  return visibility(viewer).general(general)
-    ? ownGeneralInfo(general)
-    : { id: general.id, name: general.name, nationId: general.nationId };
+  return visibility(viewer).general(general) ? ownGeneralInfo(general) : generalIdentity(general);
+}
+
+export function publicGeneralStats(general: General) {
+  const { leadership, strength, intel, politics, charm, portraitId, officerLevel, injury } = general;
+  return {
+    leadership,
+    strength,
+    intel,
+    ...(politics != null && charm != null ? { politics, charm } : {}),
+    portraitId,
+    officerLevel,
+    injury,
+  };
+}
+
+export function commandedTroops(general: Pick<General, 'id' | 'crew'>, units?: readonly CampaignUnitState[]) {
+  return units === undefined
+    ? general.crew
+    : units.reduce((total, unit) => total + (unit.commanderId === general.id ? unit.troops : 0), 0);
 }
 
 // 병력은 부곡에만 저장한다. 주둔 표는 실제 지휘관별 병력과 병력 가중 평균을 읽는다.
-export function garrisonGeneralInfo(general: General, viewer: Viewer, units?: readonly CampaignUnitState[]) {
-  if (!visibility(viewer).general(general)) return { id: general.id, name: general.name, nationId: general.nationId };
+export function garrisonGeneralInfo(
+  general: General,
+  viewer: Viewer,
+  units?: readonly CampaignUnitState[],
+  disclosure?: { stats: boolean; troops?: boolean; biography?: boolean },
+) {
+  if (!visibility(viewer).general(general))
+    return {
+      ...generalIdentity(general),
+      ...(disclosure?.stats ? publicGeneralStats(general) : {}),
+      ...(disclosure?.biography
+        ? { age: general.age, personality: general.personality, special: general.special }
+        : {}),
+      ...(disclosure?.troops ? { crew: commandedTroops(general, units) } : {}),
+    };
   const detail = ownGeneralInfo(general);
   if (units === undefined) return detail;
   let troops = 0,
@@ -154,30 +188,42 @@ export function garrisonGeneralInfo(general: General, viewer: Viewer, units?: re
   };
 }
 
-export function cityInfo(city: City, viewer: Viewer) {
-  const publicInfo = mapCity(city);
-  if (!visibility(viewer).city(city)) return publicInfo;
+export function cityCapacity(city: City) {
+  return {
+    populationMax: city.populationMax,
+    agricultureMax: city.agricultureMax,
+    commerceMax: city.commerceMax,
+    securityMax: city.securityMax,
+    defenceMax: city.defenceMax,
+    wallMax: city.wallMax,
+  };
+}
+
+export function cityInfo(city: City, viewer: Viewer, alliedResidence = false) {
+  const publicInfo = { ...mapCity(city), ...cityCapacity(city) };
+  if (!alliedResidence && !visibility(viewer).city(city))
+    return city.nationId === null ? { ...publicInfo, defence: city.defence, wall: city.wall } : publicInfo;
   return {
     ...publicInfo,
     region: city.region,
     population: city.population,
-    populationMax: city.populationMax,
     agriculture: city.agriculture,
-    agricultureMax: city.agricultureMax,
     commerce: city.commerce,
-    commerceMax: city.commerceMax,
     security: city.security,
-    securityMax: city.securityMax,
     defence: city.defence,
-    defenceMax: city.defenceMax,
     wall: city.wall,
-    wallMax: city.wallMax,
     trust: city.trust,
   };
 }
 
 export function nationInfo(nation: Nation, counts: { cityCount: number; generalCount: number }, viewer: Viewer) {
-  const publicInfo = { id: nation.id, name: nation.name, color: nation.color, ...counts };
+  const publicInfo = {
+    id: nation.id,
+    name: nation.name,
+    color: nation.color,
+    rank: nationRank(nation.level),
+    ...counts,
+  };
   if (!visibility(viewer).nation(nation)) return publicInfo;
   return {
     ...publicInfo,
@@ -198,9 +244,17 @@ export const logSelect = {
   commandKey: true,
   kind: true,
   text: true,
+  createdAt: true,
 } as const satisfies Prisma.GeneralLogSelect;
 export function logInfo(log: Prisma.GeneralLogGetPayload<{ select: typeof logSelect }>) {
-  return { id: log.id.toString(), tick: log.tick, commandKey: log.commandKey, kind: log.kind, text: log.text };
+  return {
+    id: log.id.toString(),
+    tick: log.tick,
+    commandKey: log.commandKey,
+    kind: log.kind,
+    text: log.text,
+    createdAt: log.createdAt.toISOString(),
+  };
 }
 
 // 월간 JSON은 저장 형태를 그대로 반환하지 않는다. 공개 허용 필드만 파싱한다.
@@ -242,6 +296,7 @@ export function publicTimelapseCityInfo(city: Prisma.CityGetPayload<{ select: ty
 }
 
 const publicMapData = z.object({
+  capitalAndSupply: z.unknown().optional(),
   operationalMap: publicGeographySchema.optional(),
   cities: z.array(
     z.object({
@@ -257,13 +312,40 @@ const publicMapData = z.object({
       y: z.number(),
       nationId: z.number().int().nullable(),
       links: z.array(z.string()),
+      supplied: z.unknown().optional(),
     }),
   ),
-  nations: z.array(z.object({ id: z.number().int(), name: z.string(), color: z.string() })),
+  nations: z.array(
+    z.object({
+      id: z.number().int(),
+      name: z.string(),
+      color: z.string(),
+      capitalCityKey: z.unknown().optional(),
+    }),
+  ),
 });
 
 // 오염되거나 형식이 깨진 사본은 현재 상태로 대체하지 않는다.
 export function publicMapInfo(data: Prisma.JsonValue) {
   const result = publicMapData.safeParse(data);
-  return result.success ? result.data : null;
+  if (!result.success) return null;
+  const { capitalAndSupply, cities, nations, ...geography } = result.data;
+  const cityOwners = new Map(cities.map((city) => [city.key, city.nationId]));
+  return {
+    ...geography,
+    cities: cities.map(({ supplied, ...city }) =>
+      capitalAndSupply === true && typeof supplied === 'boolean' && city.nationId !== null
+        ? { ...city, supplied }
+        : city,
+    ),
+    nations: nations.map(({ capitalCityKey, ...nation }) =>
+      capitalAndSupply === true &&
+      (capitalCityKey === null ||
+        (typeof capitalCityKey === 'number' &&
+          Number.isSafeInteger(capitalCityKey) &&
+          cityOwners.get(String(capitalCityKey)) === nation.id))
+        ? { ...nation, capitalCityKey }
+        : nation,
+    ),
+  };
 }

@@ -38,8 +38,13 @@ test('T4-97 메인 HUD 계정 메뉴·예턴 상태·도시에서 명령 고르�
     await expect(turnShortcut).toHaveAttribute('data-turn-status', 'saved');
     await expect(turnStatus).toHaveText('저장된 목록');
     await expect(shortcuts.getByRole('button')).toHaveCount(6);
+    // 768px 미만 메인은 위 바로가기 띠와 게임 메뉴 막대 대신 하단 막대 하나를 쓴다 (INT-25). 예턴 탭이 같은 상태를 단다.
+    await page.setViewportSize({ width: 375, height: 812 });
+    const bar = page.getByRole('tablist', { name: '메인 화면', exact: true });
+    const turnTab = bar.getByRole('tab', { name: '예턴', exact: true });
+    await expect(turnTab).toHaveAttribute('data-status', 'saved');
 
-    // U1: 375px 위 띠에는 계정 링크가 없고 `전체` 메뉴의 계정 줄에 있다. 1440px은 위 띠에 그대로 둔다.
+    // U1: 375px 위 띠에는 계정 링크가 없고 메인 `메뉴` 패널의 계정 줄에 있다. 1440px은 위 띠에 그대로 둔다.
     const banner = page.getByRole('banner');
     for (const colorScheme of ['light', 'dark'] as const) {
       await page.emulateMedia({ colorScheme });
@@ -53,7 +58,8 @@ test('T4-97 메인 HUD 계정 메뉴·예턴 상태·도시에서 명령 고르�
           if (width < 768) {
             await expect(banner.getByRole('button', { name: '로그아웃', exact: true })).toHaveCount(0);
             await expect(banner.getByRole('link', { name: '내 계정', exact: true })).toHaveCount(0);
-            await expect(gameNav.locator('summary')).toBeVisible();
+            await expect(gameNav).toHaveCount(0);
+            await expect(bar).toBeVisible();
           } else {
             await expect(banner.getByRole('button', { name: '로그아웃', exact: true })).toBeVisible();
             await expect(banner.getByRole('link', { name: '내 계정', exact: true })).toBeVisible();
@@ -63,11 +69,13 @@ test('T4-97 메인 HUD 계정 메뉴·예턴 상태·도시에서 명령 고르�
           await lastControl.focus();
           await expect(lastControl).toBeFocused();
           await page.keyboard.press('Tab');
-          await expect(gameNav.getByRole('link', { name: '군략도', exact: true })).toBeFocused();
+          if (width >= 768) await expect(gameNav.getByRole('link', { name: '군략도', exact: true })).toBeFocused();
+          else expect(await page.evaluate(() => Boolean(document.activeElement?.closest('main')))).toBe(true);
           if (width < 768) {
-            const summary = gameNav.locator('summary');
-            await summary.click();
-            const account = gameNav.getByRole('group', { name: '계정', exact: true });
+            await bar.getByRole('tab', { name: '메뉴', exact: true }).click();
+            const account = page
+              .getByRole('navigation', { name: '공통 메뉴', exact: true })
+              .getByRole('group', { name: '계정', exact: true });
             for (const name of ['내 계정', '알림 설정']) {
               const box = (await account.getByRole('link', { name, exact: true }).boundingBox())!;
               expect(box.width).toBeGreaterThanOrEqual(44);
@@ -79,12 +87,9 @@ test('T4-97 메인 HUD 계정 메뉴·예턴 상태·도시에서 명령 고르�
             expect(logoutBox.width).toBeGreaterThanOrEqual(44);
             expect(logoutBox.height).toBeGreaterThanOrEqual(44);
             await page.screenshot({ path: info.outputPath(`t4-97-menu-${colorScheme}-${width}.png`) });
-            await page.keyboard.press('Escape');
-            await expect(summary).toBeFocused();
-            await expect(gameNav.locator('details')).not.toHaveAttribute('open');
           }
           expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-          const badgeBox = (await turnShortcut.boundingBox())!;
+          const badgeBox = (await (width < 768 ? turnTab : turnShortcut).boundingBox())!;
           expect(badgeBox.width).toBeGreaterThanOrEqual(44);
           expect(badgeBox.height).toBeGreaterThanOrEqual(44);
           await page.screenshot({ path: info.outputPath(`t4-97-main-${colorScheme}-${width}.png`) });
@@ -116,7 +121,9 @@ test('T4-97 메인 HUD 계정 메뉴·예턴 상태·도시에서 명령 고르�
     await expect(editor.getByRole('searchbox')).toBeFocused();
     await expect(turnShortcut).toHaveAttribute('data-turn-status', 'saved');
     await editor.getByRole('radio', { name: move.name, exact: true }).check();
-    await expect(editor.getByRole('combobox', { name: '대상 도시' })).toHaveValue(String(target.key));
+    await expect(
+      page.getByRole('radiogroup', { name: '대상 도시' }).getByRole('radio', { name: new RegExp(`^${target.name}`) }),
+    ).toHaveAttribute('aria-checked', 'true');
     const slot = Number(await editor.locator('tr[aria-selected="true"]').getAttribute('data-slot'));
     await editor.getByRole('button', { name: `${slot}번 칸에 넣기`, exact: true }).click();
     await expect(turnShortcut).toHaveAttribute('data-turn-status', 'unsaved');
@@ -140,14 +147,18 @@ test('T4-97 메인 HUD 계정 메뉴·예턴 상태·도시에서 명령 고르�
       await other.setViewportSize({ width: 375, height: 900 });
       await other.goto(`/w/${worldId}`);
       const late = other.getByTestId('turn-editor');
+      // 375px은 하단 막대의 `예턴` 탭이 바로가기 띠 대신 예턴 상태를 단다.
       const lateShortcut = other
-        .getByRole('navigation', { name: '메인 영역 바로가기', exact: true })
-        .getByRole('button', { name: '예턴으로 이동', exact: true });
+        .getByRole('tablist', { name: '메인 화면', exact: true })
+        .getByRole('tab', { name: '예턴', exact: true });
+      await lateShortcut.click();
+      await expect(lateShortcut).toHaveAttribute('aria-selected', 'true');
       await late.getByRole('button', { name: '선택 해제', exact: true }).click();
       await late.locator('tr[data-slot="29"]').click();
       await late.getByRole('radio', { name: '농지 개간', exact: true }).check();
       await late.getByRole('button', { name: '29번 칸에 넣기', exact: true }).click();
-      await expect(lateShortcut).toHaveAttribute('data-turn-status', 'unsaved');
+      await expect(lateShortcut).toHaveAttribute('data-status', 'unsaved');
+      await expect(lateShortcut.locator('[aria-hidden="true"]')).toHaveText('1');
       await editor.getByRole('button', { name: '선택 해제', exact: true }).click();
       await editor.locator('tr[data-slot="30"]').click();
       await editor.getByRole('radio', { name: '농지 개간', exact: true }).check();
@@ -156,13 +167,14 @@ test('T4-97 메인 HUD 계정 메뉴·예턴 상태·도시에서 명령 고르�
       await expect(editor.getByText('저장했습니다.', { exact: true })).toBeVisible();
       await late.getByRole('button', { name: '저장', exact: true }).click();
       await expect(late.getByTestId('stale-alert')).toBeVisible();
-      await expect(lateShortcut).toHaveAttribute('data-turn-status', 'conflict');
+      await expect(lateShortcut).toHaveAttribute('data-status', 'conflict');
+      await expect(lateShortcut.locator('[aria-hidden="true"]')).toHaveText('!');
       await expect(other.getByTestId('main-turn-status')).toHaveText('충돌 확인 필요 · 보관한 편집 1건');
       await other.screenshot({ path: info.outputPath('t4-97-conflict-375.png') });
       await late.getByTestId('stale-alert').getByRole('button', { name: '내 편집 다시 적용' }).click();
       await late.getByRole('button', { name: '저장', exact: true }).click();
       await expect(late.getByText('저장했습니다.', { exact: true })).toBeVisible();
-      await expect(lateShortcut).toHaveAttribute('data-turn-status', 'saved');
+      await expect(lateShortcut).toHaveAttribute('data-status', 'saved');
       stored = await hold.db.generalTurn.findMany({ where: { worldId, generalId }, orderBy: { slot: 'asc' } });
       expect(stored[28]!.commandKey).toBe('farm');
       expect(stored[29]!.commandKey).toBe('farm');
@@ -171,9 +183,9 @@ test('T4-97 메인 HUD 계정 메뉴·예턴 상태·도시에서 명령 고르�
       await other.close();
     }
     await page.setViewportSize({ width: 375, height: 900 });
-    const gameNav = page.getByRole('navigation', { name: '게임 메뉴', exact: true }).filter({ visible: true });
-    await gameNav.locator('summary').click();
-    await gameNav
+    await bar.getByRole('tab', { name: '메뉴', exact: true }).click();
+    await page
+      .getByRole('navigation', { name: '공통 메뉴', exact: true })
       .getByRole('group', { name: '계정', exact: true })
       .getByRole('button', { name: '로그아웃', exact: true })
       .click();
