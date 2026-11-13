@@ -77,6 +77,7 @@ import { relationsFeature } from './relations/data';
 import { cleanTroops, gatherBinding, TROOP_FEATURE } from './commands/ext/troop/state';
 import { TROOP_ACTION_KIND } from './commands/ext/troop/actions';
 import { applyTroopInput } from './commands/ext/troop/replay';
+import { troopExpel } from './commands/ext/troop/expel';
 import { troopGather } from './commands/ext/troop/gather';
 import { INTEL_FEATURE, spyBinding } from './commands/ext/intel/record';
 import { spy } from './commands/ext/intel/spy';
@@ -231,7 +232,10 @@ export const ruleRegistry: RuleRegistry = {
       key: TROOP_FEATURE,
       requires: ['policy'],
       conflicts: [],
-      commandBindings: [{ definition: troopGather, sliceKeys: gatherBinding.sliceKeys }],
+      commandBindings: [
+        { definition: troopGather, sliceKeys: gatherBinding.sliceKeys },
+        { definition: troopExpel, sliceKeys: gatherBinding.sliceKeys },
+      ],
       checkOrigin({ initial, data }) {
         if (Object.hasOwn(initial, 'ext') || data !== undefined) throw new Error('부대는 빈 상태에서 시작합니다.');
       },

@@ -72,6 +72,10 @@
     "target": "nation"
   },
   {
+    "key": "nation_troop_expel",
+    "target": "nation"
+  },
+  {
     "key": "plunder",
     "target": "general"
   },

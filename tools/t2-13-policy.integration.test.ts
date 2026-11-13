@@ -22,6 +22,7 @@ import { renewLeaseDuringTest } from '../apps/engine/test/leaseHeartbeat';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
+import { controlClock } from '../apps/engine/src/world/clock';
 import { exportReplay, replayArchive } from '../apps/engine/src/replay';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { buildServer } from '../apps/server/src/server';
@@ -944,7 +945,7 @@ it('부대 창설·가입·집합·추방을 실제 DB와 월말 재생에서 �
   const initial = commandInitial();
   initial.generals = initial.generals.slice(0, 3).map((general, index) => ({
     ...general,
-    userId: [alice.id, bob.id, outsider.id][index]!,
+    userId: null,
     nationId: index === 1 ? 1 : general.nationId,
     cityKey: index === 1 ? 4 : general.cityKey,
     officerLevel: index === 1 ? 1 : general.officerLevel,
@@ -955,14 +956,46 @@ it('부대 창설·가입·집합·추방을 실제 DB와 월말 재생에서 �
     turnTermMinutes: 30,
     endYear: null,
     replayFormat: 3,
-    ruleFeatures: ['policy', TROOP_FEATURE],
+    ruleFeatures: ['personnel', 'policy', TROOP_FEATURE],
   });
   worlds.push(worldId);
-  await db.world.update({ where: { id: worldId }, data: { status: 'RUNNING', clockAnchorAt: new Date(now) } });
   const lease = await acquireLease(db, worldId);
   if (!lease) throw new Error('시험 실행권이 없습니다.');
   leases.push(lease);
   const loop = new TurnLoop(db, lease);
+  const operator = await user();
+  await db.user.update({ where: { id: operator.id }, data: { role: 'ADMIN' } });
+  expect(
+    (
+      await rpc(
+        'admin.world.requestSetting',
+        {
+          worldId,
+          expectedUserId: operator.id,
+          idempotencyKey: randomUUID(),
+          reason: '부대 시험에서 NPC 맡기를 허용합니다.',
+          setting: { kind: 'admin.world.setOption', key: 'entry.npcPlay', value: 'on' },
+        },
+        operator.cookie,
+        true,
+      )
+    ).status,
+  ).toBe(200);
+  await loop.advanceTo(0);
+  for (const [index, actor] of [alice, bob, outsider].entries()) {
+    const generalId = index + 1;
+    const idempotencyKey = randomUUID();
+    const request = rpc(
+      'entry.possess',
+      { worldId, generalId, expectedUserId: actor.id, idempotencyKey },
+      actor.cookie,
+      true,
+    );
+    await expect.poll(() => db.inputEvent.count({ where: { worldId, idempotencyKey, status: 'PENDING' } })).toBe(1);
+    await loop.advanceTo(0);
+    expect((await request).data).toEqual({ status: 'possessed', generalId });
+  }
+  await controlClock(db, worldId, 'start', now);
   const update = (cookie: string, change: object) =>
     rpc(
       'troop.update',
@@ -999,7 +1032,7 @@ it('부대 창설·가입·집합·추방을 실제 DB와 월말 재생에서 �
   await loop.advanceTo(0);
   expect((await list(bob.cookie)).data).toMatchObject({ myTroop: 1, troops: [{ members: [{ id: 2, cityKey: 4 }] }] });
   const slots = Array.from({ length: 30 }, (_, slot) => (slot === 0 ? { commandKey: 'troop_gather', args: {} } : null));
-  expect((await rpc('turns.set', { worldId, revision: 0, slots }, alice.cookie, true)).data).toMatchObject({
+  expect((await rpc('turns.set', { worldId, revision: 1, slots }, alice.cookie, true)).data).toMatchObject({
     ok: true,
   });
   expect((await list(bob.cookie)).data).toMatchObject({
@@ -1010,9 +1043,37 @@ it('부대 창설·가입·집합·추방을 실제 DB와 월말 재생에서 �
   expect((await update(alice.cookie, { action: 'kick', memberId: 2 })).data).toMatchObject({ status: 'pending' });
   await loop.advanceTo(100);
   expect((await list(bob.cookie)).data).toMatchObject({ myTroop: null, troops: [{ members: [] }] });
-  await loop.advanceTo(10000);
+  expect((await update(bob.cookie, join)).data).toMatchObject({ status: 'pending' });
+  await loop.advanceTo(100);
+  const tabs = await rpc<{ tabs: Array<{ officerLevel: number; office: object; revision: number }> }>(
+    'nationTurns.get',
+    { worldId },
+    alice.cookie,
+  );
+  const office = tabs.data!.tabs.find((tab) => tab.officerLevel === 12)!;
+  const nationalSlots = Array.from({ length: 12 }, (_, slot) =>
+    slot === 0 ? { commandKey: 'nation_troop_expel', args: { generalId: 2 } } : null,
+  );
+  expect(
+    (
+      await rpc(
+        'nationTurns.set',
+        {
+          worldId,
+          office: office.office,
+          revision: office.revision,
+          slots: nationalSlots,
+        },
+        alice.cookie,
+        true,
+      )
+    ).data,
+  ).toMatchObject({ ok: true });
+  await loop.advanceTo(10100);
+  expect((await list(bob.cookie)).data).toMatchObject({ myTroop: null, troops: [{ members: [] }] });
+  await loop.advanceTo(20000);
   const archive = await exportReplay(db, worldId);
-  expect(replayArchive(archive, 1)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
+  expect(replayArchive(archive, 2)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
 });
 
 for (const path of ['troop.list', 'troop.update'] as const) {
