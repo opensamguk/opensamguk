@@ -56,6 +56,17 @@ describe('AC-INT-15 새 판의 명령 능력치', () => {
     expect(() => domesticStatScore(state, general, 'farm', 'intel')).toThrow();
   });
 
+  it('장수 상태 기능이 켜진 월드에서만 부상과 군주 통솔 보너스를 적용한다', () => {
+    const state = world();
+    const general = state.generals[1]!;
+    Object.assign(general, { nationId: 1, officerLevel: 12, injury: 50, leadership: 90, intel: 51 });
+    state.nations[1]!.level = 5;
+    expect(domesticStatScore(state, general, 'research', 'intel')).toBe(51);
+    state.ruleFeatures!.push('general-condition-v1');
+    expect(domesticStatScore(state, general, 'research', 'intel')).toBe(26);
+    expect(domesticStatScore(state, general, 'defence', 'leadership')).toBe(54);
+  });
+
   it.each([
     [0, 125],
     [50, 100],

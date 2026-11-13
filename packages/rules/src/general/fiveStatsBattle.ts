@@ -15,15 +15,20 @@ export function commanderBattleModifiers(
 ): Required<BattleModifiers> {
   const parsed = commanderStatsSchema.parse(stats);
   const equipment = bonus === undefined ? null : commanderBonusSchema.parse(bonus);
+  return battleModifiersForEffectiveStats({
+    strength: parsed.strength + (equipment?.strength ?? 0),
+    leadership: parsed.leadership + (equipment?.leadership ?? 0),
+  });
+}
+
+export function battleModifiersForEffectiveStats(stats: CommanderBattleStats): Required<BattleModifiers> {
   return {
-    dealt: [
-      { source: 'five_stats:strength', op: 'mul', value: 0.9 + (parsed.strength + (equipment?.strength ?? 0)) / 500 },
-    ],
+    dealt: [{ source: 'five_stats:strength', op: 'mul', value: 0.9 + stats.strength / 500 }],
     taken: [
       {
         source: 'five_stats:leadership',
         op: 'mul',
-        value: 1.1 - (parsed.leadership + (equipment?.leadership ?? 0)) / 500,
+        value: 1.1 - stats.leadership / 500,
       },
     ],
   };

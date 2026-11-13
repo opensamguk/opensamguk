@@ -1,7 +1,13 @@
 import { protectedProcedure, router } from '../trpc';
 import { nextTurnAt, turnSchedule, readWorld, requireGeneral, worldClock, worldInput } from '../queries';
 import { cityInfo, ownGeneralInfo, logInfo, logSelect, nationInfo } from '../visibility';
-import { nowTick, OFFICE_EFFECTS_FEATURE, policyOptions } from '@opensamguk/rules';
+import {
+  GENERAL_CONDITION_FEATURE,
+  generalCondition,
+  nowTick,
+  OFFICE_EFFECTS_FEATURE,
+  policyOptions,
+} from '@opensamguk/rules';
 import { displaySlots, readSlots } from '../game/slots';
 import { readCityScaleProjection } from '../game/cityScale';
 import { nationPopulation, projectNationFinance, salaryRate } from '../game/nationFinance';
@@ -60,6 +66,9 @@ export const homeRouter = router({
       return {
         general: {
           ...ownGeneralInfo(general),
+          ...(world.ruleFeatures.includes(GENERAL_CONDITION_FEATURE)
+            ? { condition: generalCondition(general, nation?.level ?? 0) }
+            : {}),
           defense: {
             participating: defendingTroops > 0,
             troops: defendingTroops,

@@ -183,6 +183,7 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
   { key: 'nation-strategy-v1' },
   { key: 'prepared-turns-v1' },
   { key: 'nation-research-v1' },
+  { key: 'general-condition-v1' },
   { key: RELATIONS_FEATURE },
   { key: 'city-scale-v1' },
   {

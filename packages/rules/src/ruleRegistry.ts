@@ -23,6 +23,7 @@ import {
   treatyBreakInputKind,
 } from './ruleFeatures';
 import { checkStatProfile } from './general/fiveStats';
+import { GENERAL_CONDITION_FEATURE } from './general/condition';
 import { checkOperationalProfile } from './world/map/profile';
 import type { RecordedInput, ReplayState } from './replay';
 import { campaignFeature, campaignInputKinds } from './campaign/feature';
@@ -153,6 +154,7 @@ export const ruleRegistry: RuleRegistry = {
     treatyTradeFeature,
     treatyExpandedFeature,
     fiveStatsFeature,
+    { key: GENERAL_CONDITION_FEATURE, requires: ['five-stats'], conflicts: [] },
     operationalMapFeature,
     basicStratagemFeature,
     battleAffinityFeature,

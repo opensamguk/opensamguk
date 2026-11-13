@@ -9,7 +9,8 @@ import type { CityField, Effect } from '../../effects';
 import { fail, ownCity, positive, relation } from '../../support';
 import type { Actor, CommandResult, Failure } from '../../types';
 import { fiveStatsSchema } from '../../../general/fiveStats';
-import { equipmentBonus, withEquipmentBonus } from '../../../equipment/stats';
+import { equipmentBonus } from '../../../equipment/stats';
+import { commandConditionStats, GENERAL_CONDITION_FEATURE, generalCondition } from '../../../general/condition';
 
 // S1: 연도와 무관하게 금·쌀 각 100. S2: 부상으로 능력치를 줄이지 않는다.
 // S3: 부상 80 이상은 유지. S4: 불탐 표시·성공 횟수·별도 능력치 경험은 생략한다.
@@ -47,7 +48,7 @@ export function effectiveStat(general: Pick<InitialGeneral, Stat>, stat: Stat): 
 export function stratagemAttackScore(general: InitialGeneral, commandKey: string, view?: WorldView): number {
   const { leadership, strength, intel, politics, charm } = general;
   const base = fiveStatsSchema.parse({ leadership, strength, intel, politics, charm });
-  const stats = view ? withEquipmentBonus(view, general.id, base) : base;
+  const stats = view ? commandConditionStats(view, general, base) : base;
   if (commandKey === 'fire_attack' || commandKey === 'sabotage') return stats.intel;
   if (commandKey !== 'plunder' && commandKey !== 'incite') throw new Error('기본 계략의 명령 키를 확인하세요.');
   const primary = commandKey === 'plunder' ? stats.strength : stats.charm;
@@ -90,13 +91,18 @@ export function stratagemProbability(
   const year = toGameDate(view.startYear, actor.tick ?? 0).year;
   const defenders = stratagemDefenders(view, cityKey, year);
   const modern = view.ruleFeatures?.includes('stratagem-basic') ?? false;
+  const conditionEnabled = view.ruleFeatures?.includes(GENERAL_CONDITION_FEATURE) ?? false;
   const attack =
     (modern ? stratagemAttackScore(general, commandKey ?? '', view) : effectiveStat(general, stat)) /
     STRATAGEM.STAT_COEFFICIENT;
   const defence =
     Math.max(
       0,
-      ...defenders.map((g) => (modern ? g.intel + equipmentBonus(view, g.id).intel : effectiveStat(g, stat))),
+      ...defenders.map((g) => {
+        if (!modern) return effectiveStat(g, stat);
+        const intel = conditionEnabled ? generalCondition(g, 0).injuredStats.intel : g.intel;
+        return intel + equipmentBonus(view, g.id).intel;
+      }),
     ) /
       STRATAGEM.STAT_COEFFICIENT +
     (Math.log2(defenders.length + 1) - 1.25) * 0.04 +

@@ -68,6 +68,19 @@ const registered: RuleRegistry = {
   ],
 };
 describe('AC-M3-04 원생성 설정 조회', () => {
+  it('INT-26 장수 상태 규칙을 새 프로필에서 켠다', () => {
+    const previous = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v7.json'));
+    const data = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v8.json'));
+    expect(data).toEqual({
+      ...previous,
+      key: 'expanded-191-v8',
+      ruleFeatures: [...previous.ruleFeatures, 'general-condition-v1'].sort(),
+    });
+    expect(
+      expandedCreationProfile(expandedRows, allPresets, data, ruleRegistry, 'san10-191-general-condition'),
+    ).toMatchObject({ available: true, featureProfileKey: data.key, ruleFeatures: data.ruleFeatures });
+  });
+
   it('AC-M1-14 새 선택에서만 기존 연구판과 접경귀환을 함께 고정한다', () => {
     const previous = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v6.json'));
     const data = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v7.json'));
