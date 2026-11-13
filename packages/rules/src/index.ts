@@ -95,6 +95,8 @@ export {
   treatyClauseEndTick,
   type TreatyOptions,
   treatyOptions,
+  RANKED_AID_FEATURE,
+  rankedAidLimit,
   applyTreatyInput,
   settleTreaties,
   treatyClosures,

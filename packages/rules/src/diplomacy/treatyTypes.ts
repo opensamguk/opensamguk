@@ -113,6 +113,7 @@ export interface TreatyRecordContext {
   treatyBreak?: { version: number } | null;
   treatyTrade?: { version: number } | null;
   treatyExpanded?: { version: number } | null;
+  rankedAidEnabled?: boolean;
   monthlyTick: number;
   endTick?: number;
 }

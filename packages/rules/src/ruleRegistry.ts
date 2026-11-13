@@ -24,6 +24,8 @@ import {
 } from './ruleFeatures';
 import { checkStatProfile } from './general/fiveStats';
 import { GENERAL_CONDITION_FEATURE } from './general/condition';
+import { RANKED_AID_FEATURE } from './diplomacy/treaty';
+import { EXPANDED_TREATY_FEATURE } from './diplomacy/treatyClauses';
 import { checkOperationalProfile } from './world/map/profile';
 import type { RecordedInput, ReplayState } from './replay';
 import { campaignFeature, campaignInputKinds } from './campaign/feature';
@@ -153,6 +155,7 @@ export const ruleRegistry: RuleRegistry = {
     treatyBreakFeature,
     treatyTradeFeature,
     treatyExpandedFeature,
+    { key: RANKED_AID_FEATURE, requires: [EXPANDED_TREATY_FEATURE], conflicts: [] },
     fiveStatsFeature,
     { key: GENERAL_CONDITION_FEATURE, requires: ['five-stats'], conflicts: [] },
     operationalMapFeature,

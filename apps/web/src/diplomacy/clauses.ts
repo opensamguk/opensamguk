@@ -49,9 +49,9 @@ const positiveInt = (raw: string) => {
   const n = Number(raw.trim());
   return raw.trim() !== '' && Number.isInteger(n) && n >= 1 ? n : null;
 };
-const boundedAmount = (raw: string) => {
+const boundedAmount = (raw: string, max: number) => {
   const n = Number(raw.trim());
-  return raw.trim() !== '' && Number.isInteger(n) && n >= 0 && n <= TRIBUTE_MAX_AMOUNT ? n : null;
+  return raw.trim() !== '' && Number.isInteger(n) && n >= 0 && n <= max ? n : null;
 };
 
 export type ClauseCity = Pick<MapCity, 'key' | 'name' | 'nationId' | 'kind'>;
@@ -84,7 +84,7 @@ export interface BuiltClauses {
 export function buildClauses(
   state: ComposeState,
   relation: Relation | undefined,
-  options?: { parties: readonly ClauseNation[]; cities: ReturnType<typeof clauseCities> },
+  options?: { parties: readonly ClauseNation[]; cities: ReturnType<typeof clauseCities>; tributeLimit?: number },
 ): BuiltClauses {
   const clauses: Clause[] = [];
   const problems: string[] = [];
@@ -116,13 +116,14 @@ export function buildClauses(
   if (options && state.tribute.on) {
     const { payerNationId } = state.tribute;
     const months = positiveInt(state.tribute.months);
-    const gold = boundedAmount(state.tribute.gold);
-    const rice = boundedAmount(state.tribute.rice);
+    const limit = options.tributeLimit ?? TRIBUTE_MAX_AMOUNT;
+    const gold = boundedAmount(state.tribute.gold, limit);
+    const rice = boundedAmount(state.tribute.rice, limit);
     if (payerNationId === null || !options.parties.some((nation) => nation.id === payerNationId))
       problems.push('원조를 보내는 국가를 고르세요.');
     else if (months === null || months > TREATY_MAX_MONTHS) problems.push('정기 원조 기간은 1~120개월입니다.');
     else if (gold === null || rice === null || gold + rice === 0)
-      problems.push('금과 쌀을 각각 0~10,000으로 입력하고 하나 이상을 보내세요.');
+      problems.push(`금과 쌀을 각각 0~${limit.toLocaleString('ko-KR')}으로 입력하고 하나 이상을 보내세요.`);
     else clauses.push({ kind: 'tribute', payerNationId, gold, rice, months });
   }
   if (options && state.cityTransfer.on) {

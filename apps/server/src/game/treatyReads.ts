@@ -4,6 +4,7 @@ import {
   decodeTreatyRecord,
   guideTreatyResponse,
   quoteTreatyProposal,
+  rankedAidLimit,
   toGameDate,
   TREATY_INPUTS,
   validateNationTrustState,
@@ -70,6 +71,7 @@ export type TreatyListPage = {
   breakEnabled?: true;
   tradeEnabled?: true;
   expandedEnabled?: true;
+  rankedAid?: { limits: { nationId: number; amount: number }[] };
   canPropose: TreatyAllowed;
   targets: TreatyTarget[];
   items: TreatyListItem[];
@@ -252,7 +254,7 @@ export async function listTreaties(
 
   const nations = await tx.nation.findMany({
     where: { worldId: input.worldId },
-    select: { id: true, name: true, color: true },
+    select: { id: true, name: true, color: true, ...(worldTreatyOptions(world).rankedAidEnabled ? { level: true } : {}) },
     orderBy: { id: 'asc' },
   });
   const refs = new Map(nations.map((n) => [n.id, publicNation(n)]));
@@ -497,6 +499,9 @@ export async function listTreaties(
     ...(worldTreatyOptions(world).expandedEnabled ? { expandedEnabled: true } : {}),
     canPropose,
     targets,
+    ...(worldTreatyOptions(world).rankedAidEnabled
+      ? { rankedAid: { limits: nations.map(({ id, level }) => ({ nationId: id, amount: rankedAidLimit(level) })) } }
+      : {}),
     items,
     nextCursor: page.length > 30 ? String(checked.at(-1)!.id) : null,
     pending,
@@ -559,6 +564,7 @@ export async function quoteTreaty(
   if (!('clauses' in payload)) invalid();
   if (world.status === 'ENDED') throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '종료된 월드입니다.' });
   const actor = await requireGeneral(tx, input.worldId, input.userId);
+  const options = worldTreatyOptions(world);
   if (actor.nationId === null || !canExecuteNationCommand(actor.officerLevel, 'nation_pact'))
     throw new TRPCError({ code: 'FORBIDDEN', message: '조약을 처리할 권한이 없습니다.' });
   const target =
@@ -596,8 +602,20 @@ export async function quoteTreaty(
       clauses: payload.clauses,
       fromCityCount,
       target: targetValue,
+      ...(options.rankedAidEnabled && payload.clauses.some((clause) => clause.kind === 'tribute')
+        ? {
+            tributeLimits: new Map(
+              (
+                await tx.nation.findMany({
+                  where: { worldId: input.worldId, id: { in: [actor.nationId, payload.toNationId] } },
+                  select: { id: true, level: true },
+                })
+              ).map(({ id, level }) => [id, rankedAidLimit(level)]),
+            ),
+          }
+        : {}),
     },
-    worldTreatyOptions(world),
+    options,
   );
   return {
     cost: result.cost === null ? null : { mine: result.cost.from, theirs: result.cost.to },
