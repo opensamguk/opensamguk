@@ -322,6 +322,7 @@ model WorldResult {
   winnerColor      String?
   winnerSummary    Json?
   traitDistribution Json?
+  finalNations      Json?
   endedYear        Int
   endedMonth       Int
   endedTick        Int
@@ -1029,6 +1030,7 @@ model RemovedNation {
   color           String
   removedSequence Int
   removedTick     Int
+  finalSummary    Json?
   world           World  @relation(fields: [worldId], references: [id], onDelete: Cascade)
 
   @@id([worldId, nationId])
@@ -1041,6 +1043,7 @@ model YearbookNation {
   name     String
   color    String
   power    Int?
+  troops   Int?
   snapshot YearbookSnapshot @relation(fields: [worldId, tick], references: [worldId, tick], onDelete: Cascade)
 
   @@id([worldId, tick, nationId])

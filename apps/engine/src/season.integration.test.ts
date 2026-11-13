@@ -50,6 +50,19 @@ async function checkEnd(worldId: string, reason: 'END_YEAR' | 'UNIFIED') {
     orderBy: { id: 'asc' },
     include: { nation: true },
   });
+  expect(result.finalNations).toMatchObject(
+    (await db.nation.findMany({ where: { worldId }, orderBy: { id: 'asc' } })).map(
+      ({ id, philosophy, level, tech }) => ({
+        nationId: id,
+        philosophy,
+        level,
+        tech,
+        roster: finished
+          .filter(({ nationId }) => nationId === id)
+          .map(({ id, name, portraitId }) => ({ generalId: id, name, portraitId })),
+      }),
+    ),
+  );
   expect(value.archive).toEqual(
     finished.map((general) => ({
       worldId,

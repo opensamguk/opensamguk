@@ -411,7 +411,7 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
     const entry = { worldId_tick_nationId: { worldId: endedWorldId, tick: 10000, nationId: nation.id } };
     const archivedNation = await db.yearbookNation.findUniqueOrThrow({ where: entry });
     try {
-      await db.yearbookNation.update({ where: entry, data: { power: 87 } });
+      await db.yearbookNation.update({ where: entry, data: { power: 87, troops: 250 } });
       await db.yearbookSnapshot.update({
         where,
         data: {
@@ -430,6 +430,8 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
               nationId: nation.id,
               peakCities: 1,
               peakPower: 87,
+              peakTroops: 250,
+              final: null,
               recordedAtTick: 10000,
               cities: [{ cityKey: city.cityKey, name: city.name }],
             }),
@@ -437,7 +439,10 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
         },
       });
     } finally {
-      await db.yearbookNation.update({ where: entry, data: { power: archivedNation.power } });
+      await db.yearbookNation.update({
+        where: entry,
+        data: { power: archivedNation.power, troops: archivedNation.troops },
+      });
       await db.yearbookSnapshot.update({ where, data: { data: original.data as object } });
     }
   });

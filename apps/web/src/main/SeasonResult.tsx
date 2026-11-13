@@ -128,10 +128,22 @@ function SeasonGenerals({ winnerNationId }: { winnerNationId: number | null }) {
             {query.data.nations.map((nation) => (
               <li key={nation.nationId}>
                 <NationBadge name={nation.name} color={nation.color} />
-                {' · '}종료 장수 {n(nation.finalGenerals)}
+                {' · '}
+                {nation.removedTick === null ? '종료' : '멸망 전'} 장수 {n(nation.finalGenerals)}
+                {nation.final
+                  ? ` · ${nation.final.philosophy} · ${nation.final.title ?? nation.final.level} · 기술력 ${n(nation.final.tech)}`
+                  : ''}
+                {nation.recordedAt ? ` · ${nation.recordedAt.year}년 ${nation.recordedAt.month}월` : ''}
+                {nation.peakTroops === null ? '' : ` · 기록상 최대 병력 ${n(nation.peakTroops)}`}
                 {nation.peakCities === null ? '' : ` · 월간 최대 영토 ${n(nation.peakCities)}`}
                 {nation.peakPower === null ? '' : ` · 월간 최고 국력 ${n(nation.peakPower)}`}
                 {nation.cities.length ? <p>{nation.cities.map(({ name }) => name).join(' · ')}</p> : null}
+                {nation.final?.roster.length ? (
+                  <details>
+                    <summary>최종 장수 명단</summary>
+                    <p>{nation.final.roster.map(({ name }) => displayName(name)).join(' · ')}</p>
+                  </details>
+                ) : null}
               </li>
             ))}
           </ul>

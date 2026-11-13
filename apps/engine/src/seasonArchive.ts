@@ -1,10 +1,51 @@
 import type { Prisma } from '@opensamguk/db';
-import { publicNationPower, type WorldState } from '@opensamguk/rules';
+import { publicNationPower, readCampaignState, type WorldState } from '@opensamguk/rules';
 
 export function activeSeasonGenerals(state: WorldState, year: number) {
   return Object.values(state.generals).filter(
     (general) => general.removedAt === undefined && general.activeFromYear <= year,
   );
+}
+
+export function nationTroopTotals(state: WorldState, year: number) {
+  const totals = new Map<number, number>();
+  const active = new Map(activeSeasonGenerals(state, year).map((general) => [general.id, general]));
+  const campaign = state.ruleFeatures?.includes('campaign-v1') ? readCampaignState(state.campaign, state) : undefined;
+  const add = (nationId: number | null | undefined, troops: number) => {
+    if (nationId != null) totals.set(nationId, (totals.get(nationId) ?? 0) + troops);
+  };
+  if (campaign) {
+    for (const unit of campaign.units) {
+      if (active.has(unit.commanderId)) add(active.get(unit.ownerId)?.nationId, unit.troops);
+    }
+  } else {
+    for (const general of active.values()) add(general.nationId, general.crew);
+  }
+  return totals;
+}
+
+export function finalNationSummaries(state: WorldState, year: number, nationIds: readonly number[]) {
+  const troops = nationTroopTotals(state, year);
+  const members = new Map<number, { generalId: number; name: string; portraitId: number | null }[]>();
+  for (const general of activeSeasonGenerals(state, year)) {
+    if (general.nationId === null) continue;
+    const roster = members.get(general.nationId) ?? [];
+    roster.push({ generalId: general.id, name: general.name, portraitId: general.portraitId });
+    members.set(general.nationId, roster);
+  }
+  return nationIds.map((nationId) => {
+    const { name, color, philosophy, level, tech } = state.nations[nationId]!;
+    return {
+      nationId,
+      name,
+      color,
+      philosophy,
+      level,
+      tech,
+      troops: troops.get(nationId) ?? 0,
+      roster: (members.get(nationId) ?? []).sort((a, b) => a.generalId - b.generalId),
+    };
+  });
 }
 
 export function seasonTraitDistribution(state: WorldState, year: number) {
