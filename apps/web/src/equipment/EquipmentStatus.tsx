@@ -26,10 +26,26 @@ export function EquipmentStatus({ read }: { read: EquipmentRead }) {
     <section aria-label="장착 장비">
       <h3>장착 장비</h3>
       <InfoGrid
-        items={EQUIPMENT_SLOTS.map((slot) => ({
-          label: slot.label,
-          value: <EquippedItem item={read.data.items.find((item) => item.key === read.data.slots[slot.key])} />,
-        }))}
+        items={[
+          ...EQUIPMENT_SLOTS.map((slot) => ({
+            label: slot.label,
+            value: <EquippedItem item={read.data.items.find((item) => item.key === read.data.slots[slot.key])} />,
+          })),
+          ...(read.data.tool
+            ? [
+                {
+                  label: '도구',
+                  value: read.data.tool.remainingCharges ? (
+                    <span title={read.data.tool.description}>
+                      {read.data.tool.name} · {read.data.tool.remainingCharges}회
+                    </span>
+                  ) : (
+                    '미장착'
+                  ),
+                },
+              ]
+            : []),
+        ]}
       />
     </section>
   );

@@ -19,6 +19,7 @@ import { canExecuteCityNationCommand } from '../cityResources/commands';
 import { takeCampaignOrder, finishCampaignOrder } from '../campaign/orders';
 import { canExecuteResearchNationCommand } from '../nationResearch/commands';
 import { trackNationTurn } from '../preparedTurns/withPrepare';
+import { applyPreTurnTreatment } from '../equipment/treatment';
 import { RICE_MARKET_FEATURE } from '../world/riceMarket';
 
 export type PersonnelTurnInput = Readonly<{ offices: DeepReadonly<OfficeRevisions> }>;
@@ -55,7 +56,11 @@ export function runGeneralTurn(
   nation: { commandKey: string; result: CommandResult | Failure; nationId: number } | undefined;
   commandKey: string;
   personnel?: PersonnelTurnChange;
+  treatment?: true;
 } {
+  const treated = applyPreTurnTreatment(state, actor.generalId);
+  const treatment = treated === state ? {} : { treatment: true as const };
+  state = treated;
   if (state.ruleFeatures?.includes(RICE_MARKET_FEATURE)) actor = { ...actor, worldSeed: seed };
   if (personnel !== undefined) {
     if (Object.hasOwn(state, 'nationTurns'))
@@ -193,6 +198,7 @@ export function runGeneralTurn(
       result: policy.result,
       nation,
       commandKey: policy.commandKey,
+      ...treatment,
       ...(personnelChange === undefined ? {} : { personnel: personnelChange }),
     };
   }
@@ -237,6 +243,7 @@ export function runGeneralTurn(
     result,
     nation,
     commandKey: selected.commandKey,
+    ...treatment,
     ...(personnelChange === undefined ? {} : { personnel: personnelChange }),
   };
 }

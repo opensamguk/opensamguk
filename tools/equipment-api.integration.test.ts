@@ -89,7 +89,7 @@ async function advance(id: string, tick: number, fail = false) {
   }
 }
 const snapshot = (id: string) => db.$transaction((tx) => loadReplayState(tx, id));
-async function fixture(enabled = true, lineage = false, specialty: 'iron' | 'horses' = 'iron') {
+async function fixture(enabled = true, lineage = false, specialty: 'iron' | 'horses' = 'iron', treatmentTool = false) {
   const input = operationalInput();
   const template = input.map.sites.find((site) => site.kind === 'CITY')!;
   if (template.kind !== 'CITY') throw Error('시험 도시가 없습니다.');
@@ -148,7 +148,13 @@ async function fixture(enabled = true, lineage = false, specialty: 'iron' | 'hor
     ruleFeatures: features,
     featureData: {
       'logistics-v1': logistics,
-      ...(enabled ? { 'equipment-v1': STANDARD_EQUIPMENT_CONFIG } : {}),
+      ...(enabled
+        ? {
+            'equipment-v1': treatmentTool
+              ? { ...STANDARD_EQUIPMENT_CONFIG, treatmentTool: true }
+              : STANDARD_EQUIPMENT_CONFIG,
+          }
+        : {}),
       ...(lineage ? { 'lineage-v1': family } : {}),
     },
   });
@@ -294,6 +300,30 @@ afterAll(async () => {
   } finally {
     await db.$disconnect();
   }
+});
+
+it('INT-26 환약 구매와 판매를 예턴·PostgreSQL·재생에서 처리한다', async () => {
+  const f = await fixture(true, false, 'iron', true);
+  expect((await rpc('equipment.mine', { worldId: f.id }, f.player)).data?.tool).toMatchObject({
+    remainingCharges: 0,
+    cost: 200,
+  });
+  await execute(f, 'trade_rice', { amount: 1000, buy: false });
+  await execute(f, 'equipment_trade', { slot: 'tool', itemKey: 'tool_01' });
+  expect((await rpc('equipment.mine', { worldId: f.id }, f.player)).data?.tool).toMatchObject({
+    remainingCharges: 3,
+    sale: { proceeds: 100 },
+  });
+  await execute(f, 'equipment_trade', { slot: 'tool', itemKey: 'none' });
+  expect((await rpc('equipment.mine', { worldId: f.id }, f.player)).data?.tool).toMatchObject({
+    remainingCharges: 0,
+    sale: { proceeds: 0 },
+  });
+  const archive = await exportReplay(db, f.id);
+  expect(archive.months.length).toBeGreaterThan(0);
+  expect(replayArchive(archive, archive.months.length).map(({ stateHash }) => stateHash)).toEqual(
+    archive.months.map(({ stateHash }) => stateHash),
+  );
 });
 
 it.each([

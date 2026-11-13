@@ -9,7 +9,7 @@ export const equipmentUiSchema = {
   type: 'object',
   required: ['slot', 'itemKey'],
   properties: {
-    slot: { type: 'string', enum: ['horse', 'weapon', 'book'] },
+    slot: { type: 'string', enum: ['horse', 'weapon', 'book', 'tool'] },
     itemKey: { type: 'string', maxLength: 9 },
   },
 };
@@ -32,14 +32,18 @@ export function EquipmentTradeFields({
   // 실패·불러오는 중은 공통 상태 부품을 쓴다. 다시 시도 단추가 모든 폭에서 44px이다 (AC-P2-34).
   if (read?.kind === 'error') return <ErrorState title="장비 정보를 불러오지 못했습니다." onRetry={read.retry} />;
   if (read?.kind !== 'ready') return <LoadingState>장비 정보를 불러오는 중입니다.</LoadingState>;
-  const board = read.data,
-    slot = EQUIPMENT_SLOTS.find((row) => row.key === values.slot)?.key ?? 'horse';
+  const board = read.data;
+  const slot =
+    values.slot === 'tool' && board.tool
+      ? 'tool'
+      : (EQUIPMENT_SLOTS.find((row) => row.key === values.slot)?.key ?? 'horse');
+  const tool = slot === 'tool' ? board.tool : undefined;
   // 지금 살 수 있는 장비를 앞에 둔다. 못 사는 장비도 예약할 수 있어 목록에 남기고 (불가)를 붙인다 (INT-25).
   const items = board.items
     .filter((item) => item.slot === slot)
     .sort((a, b) => Number(a.failure !== null) - Number(b.failure !== null));
   const item = items.find((row) => row.key === values.itemKey);
-  const sale = board.sales.find((row) => row.slot === slot)!;
+  const sale = tool?.sale ?? board.sales.find((row) => row.slot === slot)!;
   const selling = values.itemKey === 'none';
   const held = board.items.find((row) => row.key === board.slots[slot]);
   const materials = item
@@ -51,7 +55,7 @@ export function EquipmentTradeFields({
         .filter(Boolean)
         .join(' · ')
     : '';
-  const failure = selling ? sale.failure : item?.failure;
+  const failure = selling ? sale.failure : (item?.failure ?? (values.itemKey ? tool?.failure : undefined));
   return (
     <div className={tradeStyles.trade}>
       <div className={tradeStyles.fields}>
@@ -69,12 +73,13 @@ export function EquipmentTradeFields({
                 {row.label}
               </option>
             ))}
+            {board.tool ? <option value="tool">도구</option> : null}
           </select>
         </label>
         <label className={styles.argLabel}>
           <span>매매할 장비</span>
           <select
-            value={item || selling ? values.itemKey : ''}
+            value={item || selling || tool?.key === values.itemKey ? values.itemKey : ''}
             onChange={(event) => onChange({ slot, itemKey: event.target.value })}
           >
             <option value="">장비 선택</option>
@@ -84,11 +89,20 @@ export function EquipmentTradeFields({
                 {row.failure ? ' (불가)' : ''}
               </option>
             ))}
+            {tool ? (
+              <option value={tool.key}>
+                {tool.name} · 금 {n(tool.cost)}
+                {tool.failure ? ' (불가)' : ''}
+              </option>
+            ) : null}
             <option value="none">현재 장비 판매{sale.failure ? ' (불가)' : ''}</option>
           </select>
         </label>
       </div>
-      <p className={styles.muted}>현재 장착: {held?.name ?? '미장착'}</p>
+      <p className={styles.muted}>
+        현재 장착: {tool?.remainingCharges ? `${tool.name} · ${tool.remainingCharges}회` : (held?.name ?? '미장착')}
+      </p>
+      {tool && values.itemKey === tool.key ? <p>{tool.description}</p> : null}
       {item ? (
         <p>
           <strong>

@@ -68,6 +68,15 @@ const registered: RuleRegistry = {
   ],
 };
 describe('AC-M3-04 원생성 설정 조회', () => {
+  it('INT-26 환약이 있는 새 원생성 프로필을 조회한다', () => {
+    const data = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v9.json'));
+    expect(data).toHaveProperty('featureData.equipment-v1.treatmentTool', true);
+    expect(expandedCreationProfile(expandedRows, allPresets, data, ruleRegistry, 'san10-191-treatment')).toMatchObject({
+      available: true,
+      featureProfileKey: data.key,
+    });
+  });
+
   it('INT-26 장수 상태 규칙을 새 프로필에서 켠다', () => {
     const previous = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v7.json'));
     const data = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v8.json'));
