@@ -4,6 +4,7 @@ import { cityInfo, ownGeneralInfo, logInfo, logSelect, nationInfo } from '../vis
 import {
   GENERAL_CONDITION_FEATURE,
   TROOP_FEATURE,
+  HERITAGE_BENEFITS_FEATURE,
   readTroops,
   troopOf,
   combatSpecialty,
@@ -140,6 +141,7 @@ export const homeRouter = router({
               orderBy: [{ name: 'asc' }, { id: 'asc' }],
             });
       return {
+        heritageBenefitsEnabled: world.ruleFeatures.includes(HERITAGE_BENEFITS_FEATURE),
         general: {
           ...ownGeneralInfo(general),
 

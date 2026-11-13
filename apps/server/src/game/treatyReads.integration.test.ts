@@ -99,6 +99,7 @@ function general(patch: Partial<General> = {}): General {
     nationJoinedTick: null,
     defenseThreshold: null,
     proficiency: null,
+    heritageBenefits: null,
     removedAt: null,
     sex: null,
     politics: null,

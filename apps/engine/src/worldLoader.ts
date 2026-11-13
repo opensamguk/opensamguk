@@ -18,6 +18,8 @@ import {
   storedCitySeasonalEvent,
   storedDefenseStance,
   storedGeneralProficiency,
+  storedHeritageBenefits,
+  HERITAGE_BENEFITS_FEATURE,
   GENERAL_PROFICIENCY_FEATURE,
   storedNpcNationPolicy,
   storedNationRestrictions,
@@ -139,6 +141,7 @@ export async function loadWorldAfterCapabilityCheck(
           officerCityKey,
           defenseThreshold,
           proficiency,
+          heritageBenefits,
           ...general
         }) => {
           void turnRevision;
@@ -155,6 +158,7 @@ export async function loadWorldAfterCapabilityCheck(
                   {
                     ...stripWorldId(general),
                     ...(officerCityKey == null ? {} : { officerCityKey }),
+                    ...storedHeritageBenefits(world.ruleFeatures.includes(HERITAGE_BENEFITS_FEATURE), heritageBenefits),
                     ...storedGeneralProficiency(world.ruleFeatures.includes(GENERAL_PROFICIENCY_FEATURE), proficiency),
                     ...storedDefenseStance(world.ruleFeatures.includes(DEFENSE_STANCE_FEATURE), defenseThreshold),
                   },

@@ -80,6 +80,7 @@ export interface InitialGeneral {
   officerLevel: number;
   officerCityKey?: number | null;
   defenseThreshold?: number;
+  heritageBenefits?: import('../heritage/benefits').HeritageBenefits;
   proficiency?: import('../general/proficiency').GeneralProficiency;
   birthYear: number;
   deathYear: number;

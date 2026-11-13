@@ -205,3 +205,7 @@ core2026 커밋 df6c9269fa1e2862418ba9da481c8dd2d758d6c5의 MIT © 2025 devsam �
 ### INT-26 NPC 명령 우선순위
 
 모집 인구 제한과 국고 예비금, 포상 금액 한도, 활성 명령 순서는 core2026 `c81d304`의 `app/game-frontend/src/views/NpcControlView.vue`와 대응 정책을 참고했다. OpenSamguk에서 실행할 수 있는 명령을 대상으로 한다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+### INT-26 유산 혜택 구매
+
+내정 성공·실패와 전투 회피 확률 보정은 core2026 `c81d304`의 `packages/logic/src/inheritance/inheritBuff.ts`를 참고했다. 포인트 가격은 OpenSamguk의 기수당 최대 5점과 양립하도록 단계별 누적 1·3·6·10·15점을 적용한다. 원저작자 devsam의 위 MIT 고지를 유지한다.

@@ -9,7 +9,7 @@ import type { inferRouterOutputs } from '@trpc/server';
 import { createDb, type Prisma } from '../packages/db/src/index';
 import { commandInitial } from '../packages/rules/test/commandFixture';
 import { lineageTestConfig } from '../packages/rules/src/lineage/testFixture';
-import { TICKS_PER_MONTH, type LineageInput } from '../packages/rules/src/index';
+import { HERITAGE_BENEFITS_FEATURE, TICKS_PER_MONTH, type LineageInput } from '../packages/rules/src/index';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { initializeIntegrationResources } from './integration-resources';
 import { hashState } from '../packages/shared/src/node/hashState';
@@ -20,7 +20,7 @@ import { processAdminReset } from '../apps/engine/src/admin/reset';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { PgHeritageRepository } from '../apps/engine/src/heritage/repository';
 import { creditHeritageSeason, refundHeritageCreations } from '../apps/engine/src/heritage/service';
-import { exportReplay, replayToEnd } from '../apps/engine/src/replay';
+import { exportReplay, replayToEnd, replayArchive } from '../apps/engine/src/replay';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { buildServer } from '../apps/server/src/server';
 import { newSession } from '../apps/server/src/auth/session';
@@ -28,6 +28,7 @@ import { hashPassword } from '../apps/server/src/auth/password';
 import { withdrawAccount } from '../apps/server/src/auth/withdrawalStore';
 import type { AppRouter } from '../apps/server/src/router';
 import { initializeResources } from './init-resources';
+import { authzCase } from '../apps/server/src/authz/case';
 import { testDatabaseUrl } from './test-database';
 import { confirmDisconnectedDatabase } from './test-db-close';
 
@@ -67,6 +68,8 @@ type Replies = {
   'general.create': Out['general']['create'];
   'general.mine': Out['general']['mine'];
   'heritage.mine': Out['heritage']['mine'];
+  'heritage.benefits': Out['heritage']['benefits'];
+  'heritage.purchase': Out['heritage']['purchase'];
   'lineage.get': Out['lineage']['get'];
   'lineage.submit': Out['lineage']['submit'];
   'lineage.request': Out['lineage']['request'];
@@ -80,6 +83,7 @@ async function rpc<R extends keyof Replies>(route: R, input: unknown, user?: Use
   const mutation =
       route === 'general.create' ||
       route === 'turns.set' ||
+      route === 'heritage.purchase' ||
       route === 'nationTurns.set' ||
       route === 'lineage.submit' ||
       route === 'admin.world.requestReset',
@@ -119,6 +123,7 @@ async function world(
     winner?: User;
     actor?: User;
     enabled?: boolean;
+    benefits?: boolean;
     endYear?: number | null;
     personnel?: boolean;
     maxGenerals?: number;
@@ -167,6 +172,7 @@ async function world(
     endYear: options.endYear ?? null,
     ruleFeatures: [
       ...(enabled ? ['heritage-v1'] : []),
+      ...(options.benefits ? [HERITAGE_BENEFITS_FEATURE] : []),
       'policy',
       ...(options.personnel || withLineage ? ['personnel'] : []),
       ...(withLineage ? ['lineage-v1'] : []),
@@ -1438,3 +1444,65 @@ it.each(Array.from({ length: 20 }, (_, index) => index))(
   },
   120000,
 );
+
+it('유산 혜택은 확인한 가격으로 한 번만 결제하고 단계와 월말 재생을 보존한다', async () => {
+  const player = await user();
+  const other = await user();
+  await earnWins(player, 2);
+  const worldId = await world({ actor: player, benefits: true });
+  const input = { worldId, expectedGeneralId: 1, expectedCost: 3, benefit: 'domesticSuccess', level: 2 };
+  await authzCase('heritage.benefits', 'success', async () => {
+    expect((await rpc('heritage.benefits', { worldId }, player)).data).toMatchObject({ enabled: true, balance: 4 });
+  })();
+  await authzCase('heritage.benefits', 'otherUser', async () => {
+    expect((await rpc('heritage.benefits', { worldId }, other)).status).toBe(404);
+  })();
+  await authzCase('heritage.purchase', 'otherUser', async () => {
+    expect((await rpc('heritage.purchase', input, other)).status).toBe(404);
+  })();
+  expect((await rpc('heritage.purchase', { ...input, expectedCost: 2 }, player)).status).toBe(409);
+  await authzCase('heritage.purchase', 'success', async () => {
+    const first = await rpc('heritage.purchase', input, player);
+    expect(first.data).toMatchObject({ status: 'pending' });
+    expect((await rpc('heritage.purchase', input, player)).data).toEqual(first.data);
+  })();
+  expect((await rpc('heritage.benefits', { worldId }, player)).data).toMatchObject({
+    balance: 4,
+    latest: { status: 'PENDING' },
+  });
+  await advance(worldId, 0);
+  expect((await rpc('heritage.benefits', { worldId }, player)).data).toMatchObject({
+    balance: 1,
+    options: expect.arrayContaining([expect.objectContaining({ benefit: 'domesticSuccess', level: 2 })]),
+    latest: { status: 'APPLIED' },
+  });
+  expect(
+    (await rpc('heritage.mine', undefined, player)).data?.entries.filter(({ kind }) => kind === 'BENEFIT_SPEND'),
+  ).toMatchObject([{ worldId, delta: -3 }]);
+  expect((await rpc('heritage.purchase', input, player)).status).toBe(409);
+  await advance(worldId, TICKS_PER_MONTH);
+  const archive = await exportReplay(db, worldId);
+  expect(replayArchive(archive, 1)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
+});
+
+for (const path of ['heritage.benefits', 'heritage.purchase'] as const) {
+  for (const category of ['unauthenticated', 'sanctioned', 'invalidInput'] as const) {
+    it(
+      `유산 혜택 접근 경계 ${path} ${category}`,
+      authzCase(path, category, async () => {
+        const player = await user();
+        if (category === 'sanctioned')
+          await db.user.update({ where: { id: player.id }, data: { status: 'SANCTIONED' } });
+        const worldId = await world({ actor: player, benefits: true });
+        const input = {
+          worldId: category === 'invalidInput' ? 1 : worldId,
+          ...(path === 'heritage.purchase'
+            ? { expectedGeneralId: 1, expectedCost: 1, benefit: 'evasion', level: 1 }
+            : {}),
+        };
+        const result = await rpc(path, input, category === 'unauthenticated' ? undefined : player);
+        expect(result.error?.data.code).toBe(category === 'invalidInput' ? 'BAD_REQUEST' : 'UNAUTHORIZED');
+      }),
+    );
+  }
+}

@@ -132,6 +132,8 @@ export function prepareInitialWorld(
       (featureData === null || typeof featureData !== 'object' || Array.isArray(featureData))
     )
       throw new Error('규칙 기능 자료를 확인하세요.');
+    if (features.includes('heritage-benefits-v1') && featureData?.['heritage-v1'] === undefined)
+      featureData = { ...featureData, 'heritage-v1': { version: 1 } };
     if (features.includes(OFFICE_EFFECTS_FEATURE) && featureData?.[OFFICE_EFFECTS_FEATURE] === undefined)
       featureData = { ...featureData, [OFFICE_EFFECTS_FEATURE]: defaultOfficeEffects };
     if (features.includes('policy')) {
@@ -485,6 +487,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
           nationJoinedTick: true,
           defenseThreshold: true,
           proficiency: true,
+          heritageBenefits: true,
         },
       });
       const diplomacies = await tx.diplomacy.findMany({
