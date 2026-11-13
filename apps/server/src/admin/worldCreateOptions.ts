@@ -5,6 +5,7 @@ import { z } from 'zod';
 import type { PublishedResource } from '@opensamguk/db';
 import {
   checkRuleFeatures,
+  DIPLOMATIC_COOLDOWN_FEATURE,
   GENERAL_CONDITION_FEATURE,
   RANKED_AID_FEATURE,
   RICE_MARKET_FEATURE,
@@ -475,6 +476,7 @@ async function artifactCreationProfiles(
         'treaty-break',
         'treaty-expanded',
         'treaty-trade',
+        DIPLOMATIC_COOLDOWN_FEATURE,
         RANKED_AID_FEATURE,
         RICE_MARKET_FEATURE,
       ].sort(),

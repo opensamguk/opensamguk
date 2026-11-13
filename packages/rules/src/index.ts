@@ -307,6 +307,7 @@ export {
   type NationStrategyState,
 } from './nationStrategy/state';
 export { readStoredNationStrategy } from './nationStrategy/origin';
+export { DIPLOMATIC_COOLDOWN_FEATURE, diplomaticAidMonths } from './diplomacy/cooldown';
 export {
   readPreparedTurns,
   initialPreparedTurns,

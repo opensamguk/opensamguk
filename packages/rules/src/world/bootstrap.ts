@@ -57,6 +57,7 @@ export interface InitialNation {
   level: number;
   capitalCityKey: number | null;
   isNpc: boolean;
+  diplomaticAidUntilMonth?: number;
 }
 
 export interface InitialGeneral {

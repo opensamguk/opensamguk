@@ -11,6 +11,7 @@ import {
   validTreatyTargets,
   type TreatyAidFailure,
 } from './treatyClauses';
+import { DIPLOMATIC_COOLDOWN_FEATURE, diplomaticAidMonths } from './cooldown';
 import type {
   BrokenTreatyRow,
   ClosedTreatyRow,
@@ -154,6 +155,7 @@ function clauseOrder(clause: TreatyClause): number {
 }
 
 const proposeRejectCodes = [
+  'DIPLOMATIC_COOLDOWN',
   'GENERAL_REMOVED',
   'WORLD_CLOSED',
   'ACTOR_INACTIVE',
@@ -178,6 +180,7 @@ const respondRejectCodes = [
   'TREATY_RELATION',
   'INSUFFICIENT_GOLD',
   'COUNTERPART_UNAVAILABLE',
+  'DIPLOMATIC_COOLDOWN',
 ] as const;
 const breakRejectCodes = [
   'GENERAL_REMOVED',
@@ -536,6 +539,7 @@ const rejectionMessages: Record<TreatyRejectCode, string> = {
   TREATY_RELATION: '현재 외교 관계에서 맺을 수 없는 조항입니다.',
   INSUFFICIENT_GOLD: '국고의 금이 부족합니다.',
   COUNTERPART_UNAVAILABLE: '상대 국가의 사정으로 수락하지 못했습니다.',
+  DIPLOMATIC_COOLDOWN: '원조 당사국의 외교 제한 기간이 남아 있습니다.',
 };
 
 function domainClauses(clauses: readonly TreatyClause[], options: TreatyOptions): TreatyRejectCode | null {
@@ -825,6 +829,15 @@ export function applyTreatyInput(
     return reject('TREATY_RELATION');
   if (!validTreatyTargets(state, treaty.fromNationId, treaty.toNationId, treaty.clauses)) return reject('BAD_TARGET');
   if (exceedsRankedAid(state, treaty.clauses, options)) return reject('BAD_INPUT');
+  const aid = treaty.clauses.find((clause) => clause.kind === 'tribute');
+  const currentMonth = Math.floor(tick / TICKS_PER_MONTH);
+  const aidCooldown = state.ruleFeatures?.includes(DIPLOMATIC_COOLDOWN_FEATURE);
+  if (
+    aidCooldown &&
+    aid &&
+    [treaty.fromNationId, treaty.toNationId].some((id) => diplomaticAidMonths(state.nations[id]!, currentMonth) > 0)
+  )
+    return reject('DIPLOMATIC_COOLDOWN');
   if (input.kind === 'treaty.propose' && !npc) {
     const next = structuredClone(state) as TreatyWorldState;
     putTreaties(next, [...(next.treaties ?? []), treaty]);
@@ -866,6 +879,7 @@ export function applyTreatyInput(
   const next = structuredClone(state) as TreatyWorldState;
   next.nations[treaty.fromNationId]!.gold = fees.gold.from;
   next.nations[treaty.toNationId]!.gold = fees.gold.to;
+  if (aidCooldown && aid) next.nations[aid.payerNationId]!.diplomaticAidUntilMonth = currentMonth + 12;
   treaty.status = 'ACTIVE';
   treaty.startTick = tick;
   treaty.endTick = months === null ? null : checkedTickAdd(tick, months);

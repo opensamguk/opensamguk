@@ -50,6 +50,23 @@ function accepted(state: WorldState, clauses: TreatyClause[]) {
 }
 
 describe('AC-M2-06 확장 조약', () => {
+  it('원조 수락 뒤 지급국은 12개월 대기하며 당사국에 남은 대기를 검사한다', () => {
+    const state = world();
+    state.ruleFeatures!.push('ranked-aid-v1', 'diplomatic-cooldown-v1');
+    state.nations[2]!.level = 1;
+    const clause: TreatyClause = { kind: 'tribute', payerNationId: 2, gold: 900, rice: 10, months: 2 };
+    const applied = accepted(state, [clause]);
+    expect(applied.state.nations[2]!.diplomaticAidUntilMonth).toBe(13);
+    expect(applied.state.nations[1]!.diplomaticAidUntilMonth).toBeUndefined();
+    const retry = (tick: number) =>
+      applyTreatyInput(
+        applied.state,
+        { kind: 'treaty.propose', generalId: 1, payload: { toNationId: 2, clauses: [clause] } },
+        { tick, sequence: 12 },
+      );
+    expect(retry(129999)).toMatchObject({ ok: false, result: { code: 'DIPLOMATIC_COOLDOWN' } });
+    expect(retry(130000)).toMatchObject({ ok: true });
+  });
   it('INT-26 정기 원조는 새 월드의 지급국 작위 한도를 따른다', () => {
     const state = world();
     state.nations[2]!.level = 3;

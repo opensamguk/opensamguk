@@ -355,6 +355,7 @@ enum DiplomacyState {
 }
 
 model Nation {
+  diplomaticAidUntilMonth Int?
   worldId         String
   id              Int
   name            String

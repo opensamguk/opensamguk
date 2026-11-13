@@ -56,16 +56,17 @@ it.each(['만료', '파기'] as const)(
     const initial = await monthlyFixture();
     initial.ruleFeatures = [
       ...(personnel ? ['personnel'] : []),
+      ...(personnel ? ['diplomatic-cooldown-v1', 'ranked-aid-v1'] : []),
       'treaty',
       'treaty-break',
       'treaty-expanded',
       'treaty-trade',
-    ];
+    ].sort();
     initial.nations.forEach((nation) => {
       nation.isNpc = false;
     });
     initial.nations[0]!.rice = 8;
-    Object.assign(initial.nations[0]!, { capitalCityKey: 1, gold: 10000 });
+    Object.assign(initial.nations[0]!, { capitalCityKey: 1, gold: 10000, ...(personnel ? { level: 1 } : {}) });
     Object.assign(initial.nations[1]!, { capitalCityKey: 2, gold: 10000, rice: 10000 });
     Object.assign(initial.generals[0]!, {
       userId: personnel ? null : rulerA.id,
@@ -199,6 +200,8 @@ it.each(['만료', '파기'] as const)(
       });
       const acceptedA = await nation(1),
         acceptedB = await nation(2);
+      expect(acceptedA.diplomaticAidUntilMonth).toBe(personnel ? 12 : null);
+      expect(acceptedB.diplomaticAidUntilMonth).toBeNull();
       await loop.advanceTo(10000);
       expect(await nation(1)).toMatchObject({ gold: acceptedA.gold - 100, rice: 8 });
       expect(await nation(2)).toMatchObject({ gold: acceptedB.gold + 100, rice: acceptedB.rice });

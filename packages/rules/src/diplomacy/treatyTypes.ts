@@ -94,6 +94,7 @@ export type TreatyRejectCode =
   | 'EXPIRED'
   | 'TREATY_RELATION'
   | 'INSUFFICIENT_GOLD'
+  | 'DIPLOMATIC_COOLDOWN'
   | 'COUNTERPART_UNAVAILABLE';
 
 export interface TreatyRejected {

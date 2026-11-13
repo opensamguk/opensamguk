@@ -79,6 +79,7 @@ export function NationSummaryGrid({
   // 성향은 모든 국가에 공개된다 (nation.get philosophy, INT-26). 홈 응답처럼 값이 없으면 소속국만 보인다.
   const philosophy = 'philosophy' in nation ? nation.philosophy : undefined;
   const strategy = 'strategyStatus' in nation ? nation.strategyStatus : undefined;
+  const aid = 'diplomaticAid' in nation ? nation.diplomaticAid : undefined;
   // 총 주민은 nation.get이 모든 국가에 준다 (소유 도시 주민 합계 / 최대, INT-26).
   const population =
     'populationMax' in nation && typeof nation.population === 'number' && typeof nation.populationMax === 'number'
@@ -113,6 +114,9 @@ export function NationSummaryGrid({
         member ? { label: '군량', value: n(nation.rice) } : { label: '군량', ...hidden },
         member ? { label: '세율', value: `${Math.round(nation.taxRate * 100)}%` } : { label: '세율', ...hidden },
         member ? { label: '기술', value: techText(nation.tech) } : { label: '기술', ...hidden },
+        ...(aid
+          ? [{ label: '외교 원조', value: aid.remainingMonths ? `${aid.remainingMonths}개월 대기` : '대기 없음' }]
+          : []),
         ...(strategy
           ? [
               {
