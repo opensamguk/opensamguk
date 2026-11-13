@@ -54,6 +54,7 @@ const paths = [
   'city.get',
   'nation.get',
   'records.general',
+  'records.battles',
   'records.nation',
   'records.world',
   'records.season',

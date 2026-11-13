@@ -17,6 +17,7 @@ type Results = {
   'city.get': Out['city']['get'];
   'nation.get': Out['nation']['get'];
   'records.general': Out['records']['general'];
+  'records.battles': Out['records']['battles'];
   'records.nation': Out['records']['nation'];
   'records.world': Out['records']['world'];
 };
@@ -557,6 +558,40 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     expect(JSON.stringify(publicRecords)).not.toMatch(/gold|rice|power|stateHash|private/);
     const home = (await query('home.get', { worldId })).data;
     expect(home.recentLogs).toEqual((await query('records.general', { worldId })).data.items.slice(0, 10));
+  });
+
+  it('전투 기록은 세션 장수의 보고서만 같은 턴에서도 빠짐없이 이어 읽는다', async () => {
+    const ownReports = Array.from({ length: 31 }, (_, index) => ({
+      worldId,
+      tick: 10000,
+      attackerId: index + 1,
+      generalId: 1,
+      text: `내 전투 ${index + 1}`,
+    }));
+    await db.battleLog.createMany({
+      data: [
+        ...ownReports,
+        { worldId, tick: 10000, attackerId: 1, generalId: 3, text: '다른 장수 보고서' },
+        { worldId: otherWorldId, tick: 10000, attackerId: 1, generalId: 1, text: '다른 월드 보고서' },
+      ],
+    });
+    try {
+      const first = (await query('records.battles', { worldId })).data;
+      expect(first.items.map((row) => row.attackerId)).toEqual(
+        ownReports
+          .slice(1)
+          .reverse()
+          .map((row) => row.attackerId),
+      );
+      expect(first.nextCursor).toBeTruthy();
+      const second = (await query('records.battles', { worldId, cursor: first.nextCursor })).data;
+      expect(second.items).toMatchObject([{ attackerId: 1, text: '내 전투 1' }]);
+      expect(second.nextCursor).toBeNull();
+      expect((await query('records.battles', { worldId, generalId: 3 })).status).toBe(400);
+      expect((await query('records.battles', { worldId }, users[3]!.cookie)).status).toBe(404);
+    } finally {
+      await db.battleLog.deleteMany({ where: { worldId: { in: [worldId, otherWorldId] }, tick: 10000 } });
+    }
   });
 
   it('무인증·위조·만료 세션은 모든 조회에서 401이다', async () => {
