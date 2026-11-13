@@ -10,6 +10,7 @@ import {
   TICKS_PER_MONTH,
   WANDERING_MONTH_LIMIT,
   diplomaticAidMonths,
+  effectiveWorldOptions,
   generalTurnCandidates,
   nationTurnCandidates,
   nowTick,
@@ -90,7 +91,9 @@ export const nationRouter = router({
               npcPolicy: {
                 ...NPC_DEFAULT_POLICY,
                 ...npcOrders,
-                aggression: world.preset === null ? 1 : parsePreset(world.preset).npc.aggression,
+                aggression:
+                  effectiveWorldOptions(world.preset === null ? null : parsePreset(world.preset), world.runtimeOptions)
+                    .presetRules?.npc.aggression ?? 1,
               },
             }
           : {}),

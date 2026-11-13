@@ -480,11 +480,19 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
   });
   it('군주만 소속국의 NPC 국가 명령 후보와 점수를 본다', async () => {
     const id = await fixtureWorld('npc-nation-orders');
+    const preset = JSON.parse(
+      await readFile(new URL('../../../../resources/preset/regular.json', import.meta.url), 'utf8'),
+    );
+    await db.world.update({
+      where: { id },
+      data: { preset, runtimeOptions: { rules: { npc: { aggression: 0.5 } } } },
+    });
     await db.general.update({
       where: { worldId_id: { worldId: id, id: 1 } },
       data: { officerLevel: 12 },
     });
     const ruler = (await query('nation.get', { worldId: id, nationId: 1 })).data;
+    expect(ruler.npcPolicy?.aggression).toBe(0.5);
     expect(ruler.npcPolicy?.nationOrders).toEqual(
       expect.arrayContaining([expect.objectContaining({ key: 'nation_rest', score: 0 })]),
     );
