@@ -565,7 +565,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
                       world.ruleFeatures.includes(HERITAGE_SPECIALTY_FEATURE),
                       heritageSpecialty,
                     ),
-                    ...(heritageSpecialty === null ? {} : { combatSpecial }),
+                    ...(heritageSpecialty == null ? {} : { combatSpecial }),
                   },
                   world.ruleFeatures.includes('lineage-v1'),
                 ),

@@ -88,8 +88,19 @@ export function readExtensionRegistryKeys(root) {
     'enum',
     'literal',
     'array',
+    'union',
   ]);
-  const zodMethods = new Set(['int', 'positive', 'nonnegative', 'min', 'max', 'length', 'optional', 'nullable']);
+  const zodMethods = new Set([
+    'int',
+    'positive',
+    'nonnegative',
+    'min',
+    'max',
+    'length',
+    'optional',
+    'nullable',
+    'regex',
+  ]);
   const numericLiteral = (node) =>
     ts.isNumericLiteral(node) ||
     (ts.isPrefixUnaryExpression(node) &&
@@ -239,7 +250,7 @@ export function readExtensionRegistryKeys(root) {
     if (!ts.isCallExpression(node) || !ts.isPropertyAccessExpression(node.expression)) return null;
     const receiver = zodValue(file, node.expression.expression);
     const methods = receiver?.zodRoot ? zodConstructors : receiver?.zodSchema ? zodMethods : null;
-    const refinement = receiver?.zodSchema && node.expression.name.text === 'refine';
+    const refinement = receiver?.zodSchema && ['refine', 'superRefine'].includes(node.expression.name.text);
     if (
       (!refinement && !methods?.has(node.expression.name.text)) ||
       node.questionDotToken ||
@@ -282,6 +293,7 @@ export function readExtensionRegistryKeys(root) {
       ts.isStringLiteral(node) ||
       numericLiteral(node) ||
       ts.isBigIntLiteral(node) ||
+      ts.isRegularExpressionLiteral(node) ||
       ts.isNoSubstitutionTemplateLiteral(node) ||
       [ts.SyntaxKind.TrueKeyword, ts.SyntaxKind.FalseKeyword, ts.SyntaxKind.NullKeyword].includes(node.kind)
     )
@@ -497,6 +509,7 @@ export function readExtensionRegistryKeys(root) {
       ts.isStringLiteral(node) ||
       numericLiteral(node) ||
       ts.isBigIntLiteral(node) ||
+      ts.isRegularExpressionLiteral(node) ||
       ts.isNoSubstitutionTemplateLiteral(node) ||
       ts.isArrowFunction(node) ||
       ts.isFunctionExpression(node) ||
@@ -543,7 +556,7 @@ export function readExtensionRegistryKeys(root) {
       node.arguments[0].elements.every((element) => ts.isStringLiteral(element))
     )
       return;
-    fail(file, `지원하지 않는 모듈 초기값 ${ts.SyntaxKind[node.kind]}`);
+    fail(file, `지원하지 않는 모듈 초기값 ${ts.SyntaxKind[node.kind]} (${node.getText().slice(0, 160)})`);
   };
   const object = (file, node, defaultTarget) => {
     const fields = new Map();

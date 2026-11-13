@@ -178,7 +178,7 @@ export async function loadWorldAfterCapabilityCheck(
                       world.ruleFeatures.includes(HERITAGE_SPECIALTY_FEATURE),
                       heritageSpecialty,
                     ),
-                    ...(heritageSpecialty === null ? {} : { combatSpecial }),
+                    ...(heritageSpecialty == null ? {} : { combatSpecial }),
                     ...storedHeritageBenefits(world.ruleFeatures.includes(HERITAGE_BENEFITS_FEATURE), heritageBenefits),
                     ...storedGeneralProficiency(world.ruleFeatures.includes(GENERAL_PROFICIENCY_FEATURE), proficiency),
                     ...storedStatExperience(statExperience),

@@ -165,7 +165,7 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
               ...general,
               ...storedDefenseStance(world.ruleFeatures.includes(DEFENSE_STANCE_FEATURE), defenseThreshold),
               ...storedHeritageSpecialty(world.ruleFeatures.includes(HERITAGE_SPECIALTY_FEATURE), heritageSpecialty),
-              ...(heritageSpecialty === null ? {} : { combatSpecial }),
+              ...(heritageSpecialty == null ? {} : { combatSpecial }),
               ...storedHeritageBenefits(world.ruleFeatures.includes(HERITAGE_BENEFITS_FEATURE), heritageBenefits),
               ...storedGeneralProficiency(world.ruleFeatures.includes(GENERAL_PROFICIENCY_FEATURE), proficiency),
               ...storedStatExperience(statExperience),

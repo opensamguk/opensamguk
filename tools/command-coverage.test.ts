@@ -175,6 +175,7 @@ describe('T4-02 등록된 확장 명령 대조', () => {
         '../general/fiveStats.ts',
         '../general/domesticSpecialty.ts',
         '../equipment/stats.ts',
+        '../equipment/config.ts',
         '../general/condition.ts',
         '../personnel/nationPhilosophy.ts',
       ].map((file) => [

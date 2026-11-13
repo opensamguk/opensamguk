@@ -21,8 +21,8 @@ export const MORALE_TOOL = {
   requiredSecurity: 1_000,
   morale: 30,
 } as const;
-export const equipmentTools = { [TREATMENT_TOOL.key]: TREATMENT_TOOL, [MORALE_TOOL.key]: MORALE_TOOL };
-export const equipmentToolKeySchema = z.enum([TREATMENT_TOOL.key, MORALE_TOOL.key]);
+export const equipmentTools = { tool_01: TREATMENT_TOOL, tool_02: MORALE_TOOL };
+export const equipmentToolKeySchema = z.enum(['tool_01', 'tool_02']);
 export const equipmentSlotSchema = z.enum(['horse', 'weapon', 'book']);
 export const equipmentKeySchema = z.string().regex(/^(horse|weapon|book)_0[1-6]$/);
 export const rareEquipmentKeySchema = z.string().regex(/^(horse|weapon|book)_15$/);
@@ -63,26 +63,20 @@ const baseEquipmentConfigSchema = z.strictObject({
   items: z.array(itemSchema).min(1).max(18),
   sellRateBp: quantity.max(10_000),
   tradeExperience: quantity,
+  treatmentTool: z.literal(true).optional(),
+  moraleTool: z.literal(true).optional(),
+  rareEquipment: z.literal(true).optional(),
 });
-const moraleEquipmentConfigSchema = baseEquipmentConfigSchema.extend({
-  treatmentTool: z.literal(true),
-  moraleTool: z.literal(true),
+export const equipmentConfigSchema = baseEquipmentConfigSchema.superRefine((config, context) => {
+  if ((config.moraleTool && !config.treatmentTool) || (config.rareEquipment && !config.moraleTool))
+    context.addIssue({ code: 'custom', path: ['moraleTool'], message: '도구와 명품 사용 조건이 맞지 않습니다.' });
+  const keys = new Set<string>();
+  for (const [index, item] of config.items.entries()) {
+    if (keys.has(item.key))
+      context.addIssue({ code: 'custom', path: ['items', index, 'key'], message: '장비 번호가 겹칩니다.' });
+    keys.add(item.key);
+  }
 });
-export const equipmentConfigSchema = z
-  .union([
-    baseEquipmentConfigSchema,
-    baseEquipmentConfigSchema.extend({ treatmentTool: z.literal(true) }),
-    moraleEquipmentConfigSchema,
-    moraleEquipmentConfigSchema.extend({ rareEquipment: z.literal(true) }),
-  ])
-  .superRefine((config, context) => {
-    const keys = new Set<string>();
-    for (const [index, item] of config.items.entries()) {
-      if (keys.has(item.key))
-        context.addIssue({ code: 'custom', path: ['items', index, 'key'], message: '장비 번호가 겹칩니다.' });
-      keys.add(item.key);
-    }
-  });
 
 export type EquipmentSlot = z.infer<typeof equipmentSlotSchema>;
 export type EquipmentConfig = z.infer<typeof equipmentConfigSchema>;
