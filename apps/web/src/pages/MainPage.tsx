@@ -9,7 +9,7 @@ import { GeneralInfo } from '../main/GeneralInfo';
 import { useEquipment } from '../equipment/useEquipment';
 import { NationInfo } from '../main/NationInfo';
 import { Panel } from '../main/Panel';
-import { RECORD_LABELS, RecordList } from '../main/Records';
+import { MainRecords } from '../main/MainRecords';
 import { SeasonResult } from '../main/SeasonResult';
 import { MapLegend, WorldMap } from '../main/WorldMap';
 import { PolicyBar } from '../policy/PolicyBar';
@@ -278,24 +278,14 @@ export function MainPage() {
           ))}
         </Panel>
 
-        <div className={styles.records}>
-          <Panel title={RECORD_LABELS.general} area="general-records" headingId="main-general-records">
-            <RecordList kind="general" worldId={worldId} clock={summary.data} nations={nations} compact />
-          </Panel>
-          <Panel title={RECORD_LABELS.nation} area="nation-records">
-            <RecordList
-              kind="nation"
-              worldId={worldId}
-              clock={summary.data}
-              nations={nations}
-              hasNation={homeData ? homeData.nation !== null : !noGeneral}
-              compact
-            />
-          </Panel>
-          <Panel title={RECORD_LABELS.world} area="world-records">
-            <RecordList kind="world" worldId={worldId} clock={summary.data} nations={nations} compact />
-          </Panel>
-        </div>
+        <MainRecords
+          className={styles.records}
+          worldId={worldId}
+          clock={summary.data}
+          nations={nations}
+          cities={cities}
+          hasNation={homeData ? homeData.nation !== null : !noGeneral}
+        />
       </div>
     </section>
   );

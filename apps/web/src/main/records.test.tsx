@@ -2,7 +2,7 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { WorldSummary } from '../game/types';
-import { GeneralLogList } from './Records';
+import { GeneralLogList, WorldHistoryList } from './Records';
 
 afterEach(cleanup);
 
@@ -67,5 +67,52 @@ describe('개인 기록 연월 (T1-27 종료 뒤)', () => {
     expect(shownDate()).toBe('—');
     rerender(<GeneralLogList items={items} clock={{ ...ended(), msPerTick: 0 }} />);
     expect(shownDate()).toBe('—');
+  });
+});
+
+// 중원 정세는 원작처럼 사건 글줄이다 (INT-25). 연감 두 달을 견주어 글줄을 만들고 월단평 머리글을 앞에 둔다.
+describe('중원 정세 글줄', () => {
+  const nations = [
+    { id: 1, name: '위', color: '#000080', capitalCityKey: 1 },
+    { id: 2, name: '촉', color: '#008000', capitalCityKey: 2 },
+  ];
+  const cities = [
+    { key: 1, name: '허창' },
+    { key: 2, name: '성도' },
+  ];
+  const month = (tick: number, m: number, owner2: number | null, headline?: string) => ({
+    tick,
+    year: 191,
+    month: m,
+    nations: [
+      { nationId: 1, cities: owner2 === 1 ? 2 : 1, generals: 3 },
+      { nationId: 2, cities: owner2 === 2 ? 1 : 0, generals: 2 },
+    ],
+    cities: [
+      { cityKey: 1, nationId: 1 },
+      { cityKey: 2, nationId: owner2 },
+    ],
+    ...(headline ? { review: { headline } } : {}),
+  });
+
+  it('메인은 변화가 있는 달만 글줄로 쓴다', () => {
+    const items = [month(30, 4, 1, '조조가 성도를 얻다'), month(20, 3, 2), month(10, 2, 2)];
+    render(<WorldHistoryList items={items} nations={nations} cities={cities} compact />);
+    const rows = screen.getAllByRole('listitem');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.textContent).toBe('191년 4월월단평: 조조가 성도를 얻다위가 성도를 차지했습니다.');
+  });
+
+  it('불러온 달에 변화가 없으면 가장 최근 달의 세력 수를 한 줄로 쓴다', () => {
+    render(<WorldHistoryList items={[month(20, 3, 2), month(10, 2, 2)]} nations={nations} cities={cities} compact />);
+    expect(screen.getByRole('listitem').textContent).toBe('191년 3월영토 변화 없음 · 세력 2곳 · 공백지 0성');
+  });
+
+  it('기록 화면은 달마다 세력 크기를 함께 쓴다', () => {
+    render(<WorldHistoryList items={[month(20, 3, null), month(10, 2, 2)]} nations={nations} cities={cities} />);
+    const rows = screen.getAllByRole('listitem');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]!.textContent).toContain('성도가 공백지가 되었습니다.');
+    expect(rows[0]!.textContent).toContain('공백지 1성');
   });
 });
