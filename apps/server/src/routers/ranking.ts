@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { rankGenerals, rankNations } from '@opensamguk/rules';
+import { LINEAGE_EXITED_YEAR, rankGenerals, rankNations, toGameDate } from '@opensamguk/rules';
 import { protectedProcedure, router } from '../trpc';
 import { readWorld, worldInput } from '../queries';
 
@@ -97,6 +97,25 @@ export const rankingRouter = router({
         return { top, me, at: snapshotAt(snapshot) };
       }),
     ),
+  freeGenerals: protectedProcedure.input(worldInput).query(({ ctx, input }) =>
+    readWorld(ctx.db, input.worldId, async (tx, world) => {
+      const year = toGameDate(world.startYear, world.clockTick).year;
+      const items = await tx.general.findMany({
+        where: {
+          worldId: world.id,
+          nationId: null,
+          removedAt: null,
+          activeFromYear: { lte: year, not: LINEAGE_EXITED_YEAR },
+        },
+        select: { id: true, name: true, portraitId: true, userId: true },
+        orderBy: [{ name: 'asc' }, { id: 'asc' }],
+      });
+      return {
+        count: items.length,
+        items: items.map(({ userId, ...general }) => ({ ...general, isHuman: userId !== null })),
+      };
+    }),
+  ),
   nations: protectedProcedure
     .input(
       worldInput
