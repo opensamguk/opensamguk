@@ -22,6 +22,7 @@ const myGeneral: NonNullable<LobbyWorld['myGeneral']> = {
   portraitId: 5,
   nationColor: '#112233',
   officerTitle: '장수',
+  courtTitle: null,
   cityName: '북평',
   stats: { leadership: 90, strength: 97, intel: 75, politics: 60, charm: 80 },
 };
