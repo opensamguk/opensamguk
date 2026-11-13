@@ -358,3 +358,5 @@ export {
 } from './personnel/nationRestrictions';
 
 export { INACTIVE_REMOVAL_FEATURE, inactiveRemovalTick } from './policy/inactiveRemoval';
+
+export { GENERAL_PERSONALITY_FEATURE, personalityEffects } from './general/personality';

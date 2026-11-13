@@ -1,3 +1,4 @@
+import { personalityEffects } from '../general/personality';
 import { BALANCE } from '../balance';
 import { FIVE_STAT_KEYS, fiveStatsSchema, type FiveStats } from '../general/fiveStats';
 import type { WorldView } from '../model/world';
@@ -47,8 +48,13 @@ export function recruitCost(
   forced: boolean,
 ): number {
   const stats = commandFiveStats(view, general);
-  if (forced) return Math.ceil(amount * unitCost * BALANCE.CONSCRIPT_COST_FACTOR);
-  return stats ? Math.ceil((amount * unitCost * (250 - stats.charm)) / 200) : Math.ceil(amount * unitCost);
+  const rate = personalityEffects(view, general.personality)?.recruitPercent;
+  if (rate === undefined) {
+    if (forced) return Math.ceil(amount * unitCost * BALANCE.CONSCRIPT_COST_FACTOR);
+    return stats ? Math.ceil((amount * unitCost * (250 - stats.charm)) / 200) : Math.ceil(amount * unitCost);
+  }
+  const factor = forced ? BALANCE.CONSCRIPT_COST_FACTOR : stats ? (250 - stats.charm) / 200 : 1;
+  return Math.ceil((amount * unitCost * factor * rate) / 100);
 }
 
 export function drillGain(view: WorldView, general: General, morale: boolean): number {

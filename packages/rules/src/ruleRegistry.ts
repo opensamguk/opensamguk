@@ -6,6 +6,7 @@ import {
   applyNationRestrictions,
 } from './personnel/nationRestrictions';
 import { inactiveRemovalFeature, INACTIVE_REMOVAL_FEATURE } from './policy/inactiveRemoval';
+import { GENERAL_PERSONALITY_FEATURE } from './general/personality';
 import { RESEARCH_ERA_FEATURE } from './nationResearch/era';
 import { NATION_PHILOSOPHY_FEATURE } from './personnel/nationPhilosophy';
 import { COURT_PROMOTION_FEATURE, COURT_RANK_FEATURE } from './personnel/nationRank';
@@ -181,6 +182,7 @@ export const ruleRegistry: RuleRegistry = {
     { key: RANKED_AID_FEATURE, requires: [EXPANDED_TREATY_FEATURE], conflicts: [] },
     { key: DIPLOMATIC_COOLDOWN_FEATURE, requires: [RANKED_AID_FEATURE], conflicts: [] },
     fiveStatsFeature,
+    { key: GENERAL_PERSONALITY_FEATURE, requires: [], conflicts: [] },
     { key: GENERAL_CONDITION_FEATURE, requires: ['five-stats'], conflicts: [] },
     { key: RICE_MARKET_FEATURE, requires: [], conflicts: [] },
     operationalMapFeature,

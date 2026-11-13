@@ -19,6 +19,8 @@ export type BattleInput = {
   attackerModifiers?: BattleModifiers;
   defenderModifiers?: BattleModifiers;
   recordPhases?: boolean;
+  attackerReadiness?: { train?: number; morale?: number } | undefined;
+  defenderReadiness?: { train?: number; morale?: number } | undefined;
 };
 
 type Unit = DeepReadonly<UnitSetResource['crewTypes'][number]>;
@@ -40,6 +42,9 @@ function damage(a: BattleForce, b: BattleForce, input: BattleInput, rng: Rng, at
   const multiply = input.coefMode === 'multiply';
   const tech = attackingSide ? input.attackerTech : input.defenderTech;
   const defence = attackingSide ? (input.defence ?? 0) : 0;
+  const readiness = attackingSide ? input.attackerReadiness : input.defenderReadiness;
+  const train = readiness?.train === undefined ? a.train : Math.max(0, a.train + readiness.train);
+  const morale = readiness?.morale === undefined ? a.atmos : Math.max(0, a.atmos + readiness.morale);
   const attackPower =
     a.crew *
     (attacking.attack / Math.max(1, defending.defence + defence)) *
@@ -47,8 +52,8 @@ function damage(a: BattleForce, b: BattleForce, input: BattleInput, rng: Rng, at
   const defenceCoef = coefficient(defending.defenceCoef, attacking, multiply);
   let power =
     (multiply ? attackPower * defenceCoef : attackPower / Math.max(0.01, defenceCoef)) *
-    ((50 + a.train) / 150) *
-    ((50 + a.atmos) / 150) *
+    ((50 + train) / 150) *
+    ((50 + morale) / 150) *
     (1 + tech / BALANCE.MAX_TECH) *
     BALANCE.DAMAGE_FACTOR *
     (0.9 + rng.next() * 0.2);
