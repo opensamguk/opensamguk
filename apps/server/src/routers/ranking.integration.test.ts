@@ -300,6 +300,39 @@ describe('T2-22 / AC-M2-19 실제 TCP HTTP·PostgreSQL 순위', () => {
     expect((await query('ranking.generals', { worldId, by: 'dedication' })).data.me?.generalId).toBe(105);
   });
 
+  it('국가 병력 추정은 현재 출사 장수만 집계하고 개인 활동 시각을 반환하지 않는다', async () => {
+    const id = await fixtureWorld('force-estimate', true);
+    await db.world.update({ where: { id }, data: { turnTermMinutes: 20_000 } });
+    await db.general.updateMany({ where: { worldId: id }, data: { nationId: null } });
+    for (const [generalId, leadership, lastActiveTick, activeFromYear] of [
+      [1, 90, 19_000, 190],
+      [105, 80, 0, 190],
+      [2, 50, 0, 190],
+      [3, 39, 0, 190],
+      [4, 100, 0, 200],
+    ] as const) {
+      await db.general.update({
+        where: { worldId_id: { worldId: id, id: generalId } },
+        data: { nationId: 1, leadership, lastActiveTick, activeFromYear },
+      });
+    }
+    const result = await query(
+      'ranking.nations',
+      { worldId: id, by: 'power', includeForceEstimate: true },
+      users[2]!.cookie,
+    );
+    expect(result.status).toBe(200);
+    expect(result.data.items.find((nation) => nation.nationId === 1)?.forceEstimate).toEqual({
+      totalGeneralCount: 4,
+      userCombatGeneralCount: 1,
+      userTroops: 9000,
+      npcCombatGeneralCount: 1,
+      npcTroops: 5000,
+      inactiveGeneralCount: 1,
+    });
+    expect(JSON.stringify(result.data)).not.toMatch(/lastActiveTick|userId|leadership/);
+  });
+
   it('정산 전 월드는 빈 순위와 null 시점을 반환하며 조회로 스냅샷을 만들지 않는다', async () => {
     for (const by of ['dedication', 'experience', 'merit'])
       expect((await query('ranking.generals', { worldId: emptyWorldId, by })).data).toEqual({

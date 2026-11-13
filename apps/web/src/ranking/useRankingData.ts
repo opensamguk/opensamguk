@@ -21,9 +21,12 @@ export function useRankingData(worldId: string, search: RankingSearch): RankingD
     ),
   );
   const nations = useQuery(
-    trpc.ranking.nations.queryOptions(search.tab === 'nations' ? { worldId, by: search.by } : skipToken, {
-      placeholderData: keepPreviousData,
-    }),
+    trpc.ranking.nations.queryOptions(
+      search.tab === 'nations' ? { worldId, by: search.by, includeForceEstimate: true } : skipToken,
+      {
+        placeholderData: keepPreviousData,
+      },
+    ),
   );
   const query = search.tab === 'generals' ? generals : nations;
   if (query.isError) return { state: 'error', retry: () => void query.refetch() };

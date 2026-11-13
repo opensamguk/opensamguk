@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { LINEAGE_EXITED_YEAR, rankGenerals, rankNations, toGameDate } from '@opensamguk/rules';
+import { isInactive, LINEAGE_EXITED_YEAR, nowTick, rankGenerals, rankNations, toGameDate } from '@opensamguk/rules';
 import { protectedProcedure, router } from '../trpc';
-import { readWorld, worldInput } from '../queries';
+import { readWorld, worldClock, worldInput } from '../queries';
 
 const nationIdentity = z.object({ id: z.number().int(), name: z.string(), color: z.string() });
 // 캐시에 내부 항목이 추가돼도 공개 허용 필드만 반환한다.
@@ -38,6 +38,14 @@ const snapshotAt = (snapshot: { tick: number; year: number; month: number }) => 
   tick: snapshot.tick,
   year: snapshot.year,
   month: snapshot.month,
+});
+const emptyForce = () => ({
+  totalGeneralCount: 0,
+  userCombatGeneralCount: 0,
+  userTroops: 0,
+  npcCombatGeneralCount: 0,
+  npcTroops: 0,
+  inactiveGeneralCount: 0,
 });
 
 export const rankingRouter = router({
@@ -121,11 +129,12 @@ export const rankingRouter = router({
       worldInput
         .extend({
           by: z.enum(['cities', 'generals', 'power']),
+          includeForceEstimate: z.boolean().optional(),
         })
         .strict(),
     )
     .query(({ ctx, input }) =>
-      readWorld(ctx.db, input.worldId, async (tx) => {
+      readWorld(ctx.db, input.worldId, async (tx, world) => {
         const snapshot = await tx.rankingSnapshot.findUnique({
           where: { worldId: input.worldId },
           select: { tick: true, year: true, month: true, nations: true },
@@ -141,10 +150,48 @@ export const rankingRouter = router({
           : [];
         const philosophy = new Map(liveNations.map((nation) => [nation.id, nation.philosophy]));
         for (const nation of nations) if (nation.philosophy !== undefined) philosophy.set(nation.id, nation.philosophy);
+        const forceByNation = new Map<number, ReturnType<typeof emptyForce>>();
+        if (input.includeForceEstimate && world.status !== 'ENDED') {
+          const tick = nowTick(worldClock(world), ctx.now);
+          const { year } = toGameDate(world.startYear, tick);
+          const generals = await tx.general.findMany({
+            where: {
+              worldId: input.worldId,
+              nationId: { in: nations.map(({ id }) => id) },
+              removedAt: null,
+              activeFromYear: { lte: year, not: LINEAGE_EXITED_YEAR },
+            },
+            select: { nationId: true, userId: true, leadership: true, lastActiveTick: true },
+          });
+          for (const { id } of nations) forceByNation.set(id, emptyForce());
+          for (const general of generals) {
+            const force = forceByNation.get(general.nationId!)!;
+            force.totalGeneralCount++;
+            const human = general.userId !== null;
+            if (
+              human &&
+              general.lastActiveTick !== null &&
+              isInactive(general.lastActiveTick, tick, world.turnTermMinutes)
+            ) {
+              force.inactiveGeneralCount++;
+              continue;
+            }
+            // core2026 c81d304, world/directory.ts. The combat groups share the leadership cutoff.
+            if (general.leadership < 40) continue;
+            if (human) {
+              force.userCombatGeneralCount++;
+              force.userTroops += general.leadership * 100;
+            } else {
+              force.npcCombatGeneralCount++;
+              force.npcTroops += general.leadership * 100;
+            }
+          }
+        }
         return {
           items: rankNations(nations, input.by).map(({ id, ...row }) => ({
             nationId: id,
             philosophy: philosophy.get(id) ?? null,
+            ...(forceByNation.has(id) ? { forceEstimate: forceByNation.get(id)! } : {}),
             ...row,
           })),
           at: snapshotAt(snapshot),
