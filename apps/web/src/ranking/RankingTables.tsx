@@ -88,6 +88,14 @@ function SortHeader<K extends string>({
   );
 }
 
+function generalValue(row: RankedGeneral, key: GeneralSortKey) {
+  if (key === 'stratagem') return number(row.stratagemSuccesses);
+  if (key === 'dedication' || key === 'experience' || key === 'merit') return number(row[key]);
+  const value = row.battleStats?.[key];
+  if (value === undefined) return '—';
+  return key === 'winRate' || key === 'killRate' ? `${(value * 100).toFixed(1)}%` : number(value);
+}
+
 function GeneralRow({
   row,
   me,
@@ -121,7 +129,7 @@ function GeneralRow({
             {GENERAL_COLUMNS.map((column) => (
               <div key={column.key}>
                 <dt>{column.label}</dt>
-                <dd>{number(column.key === 'stratagem' ? row.stratagemSuccesses : row[column.key])}</dd>
+                <dd>{generalValue(row, column.key)}</dd>
               </div>
             ))}
             {MERIT_PARTS.map((part) => (
@@ -142,10 +150,11 @@ function GeneralRow({
       </td>
       {narrow ? null : (
         <>
-          <td className="num">{number(row.dedication)}</td>
-          <td className="num">{number(row.experience)}</td>
-          <td className="num">{number(row.merit)}</td>
-          <td className="num">{number(row.stratagemSuccesses)}</td>
+          {GENERAL_COLUMNS.map(({ key }) => (
+            <td key={key} className="num">
+              {generalValue(row, key)}
+            </td>
+          ))}
           <td className="num">{number(row.wins)}</td>
           <td className="num">{number(row.captures)}</td>
         </>

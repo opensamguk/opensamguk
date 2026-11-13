@@ -13,6 +13,8 @@ export async function persistRanking(
     select: { id: true, battleWins: true, captures: true, stratagemSuccesses: true },
   });
   const byId = new Map(counters.map((general) => [general.id, general]));
+  const battles = await tx.generalBattleStats.findMany({ where: { worldId } });
+  const battlesById = new Map(battles.map((row) => [row.generalId, row]));
   const active = Object.values(state.generals).filter(
     (general) => general.removedAt === undefined && general.activeFromYear <= at.year,
   );
@@ -31,6 +33,17 @@ export async function persistRanking(
       wins: byId.get(general.id)!.battleWins,
       captures: byId.get(general.id)!.captures,
       stratagemSuccesses: byId.get(general.id)!.stratagemSuccesses,
+      battleStats: (() => {
+        const battle = battlesById.get(general.id);
+        return battle
+          ? {
+              engagements: battle.engagements,
+              winRate: battle.wins / battle.engagements,
+              kills: Number(battle.kills),
+              killRate: Number(battle.kills) / Math.max(1, Number(battle.casualties)),
+            }
+          : null;
+      })(),
     }));
   const nations = Object.values(state.nations)
     .sort((a, b) => a.id - b.id)
