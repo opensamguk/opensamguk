@@ -53,6 +53,7 @@ export function createCompute(rawUnitSet: unknown): (message: unknown) => Battle
       unitSetId: unitSet.id,
       attacker: result.attacker,
       defender: result.defender,
+      ...(result.phases ? { phases: result.phases } : {}),
     };
   };
 }
