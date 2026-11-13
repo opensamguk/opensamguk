@@ -34,6 +34,14 @@ export function proficiencyGrade(value: number) {
   };
 }
 
+export function proficiencyByArmType(armTypes: Record<string, string>, proficiency?: GeneralProficiency) {
+  return Object.entries(armTypes)
+    .map(([armType, name]) => ({ armType: Number(armType), name }))
+    .filter(({ armType }) => armType > 0)
+    .sort((a, b) => a.armType - b.armType)
+    .map(({ armType, name }) => ({ armType, name, ...proficiencyGrade(proficiency?.[armType] ?? 0) }));
+}
+
 export function storedGeneralProficiency(enabled: boolean, raw: unknown) {
   if (raw == null) return {};
   if (!enabled) throw new Error('병종 숙련을 끈 월드에 저장된 숙련이 있습니다.');

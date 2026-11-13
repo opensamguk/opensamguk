@@ -15,7 +15,7 @@ import {
   personalityEffects,
   domesticSpecialty,
   GENERAL_PROFICIENCY_FEATURE,
-  proficiencyGrade,
+  proficiencyByArmType,
   storedGeneralProficiency,
   unitSetSchema,
   INACTIVE_REMOVAL_FEATURE,
@@ -183,11 +183,7 @@ export const homeRouter = router({
               : null,
           ...(unitSet
             ? {
-                proficiency: Object.entries(unitSet.armTypes)
-                  .map(([armType, name]) => ({ armType: Number(armType), name }))
-                  .filter(({ armType }) => armType > 0)
-                  .sort((a, b) => a.armType - b.armType)
-                  .map(({ armType, name }) => ({ armType, name, ...proficiencyGrade(proficiency?.[armType] ?? 0) })),
+                proficiency: proficiencyByArmType(unitSet.armTypes, proficiency),
               }
             : {}),
           battleStats:
