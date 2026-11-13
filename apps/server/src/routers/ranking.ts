@@ -11,6 +11,7 @@ import {
 } from '@opensamguk/rules';
 import { protectedProcedure, router } from '../trpc';
 import { readWorld, worldClock, worldInput } from '../queries';
+import { possessedGenerals } from '../game/possessedGenerals';
 
 const nationIdentity = z.object({ id: z.number().int(), name: z.string(), color: z.string() });
 // 캐시에 내부 항목이 추가돼도 공개 허용 필드만 반환한다.
@@ -142,6 +143,11 @@ export const rankingRouter = router({
           ).map(({ id, portraitId, userId }) => [id, { portraitId, isHuman: userId !== null }]),
         );
         const kind = input.kind;
+        const possessed = await possessedGenerals(
+          tx,
+          input.worldId,
+          [...identity].filter(([, general]) => general.isHuman).map(([id]) => id),
+        );
         const candidates =
           kind === 'all' ? generals : generals.filter(({ id }) => identity.get(id)?.isHuman === (kind === 'human'));
         const byId = new Map(generals.map((row) => [row.id, row]));
@@ -177,6 +183,7 @@ export const rankingRouter = router({
           ...(proficiencyEnabled ? { proficiency: byId.get(id)!.proficiency ?? {} } : {}),
           portraitId: identity.get(id)?.portraitId ?? null,
           isHuman: identity.get(id)?.isHuman ?? null,
+          possessedNpc: possessed.has(id),
           ...(!base ? { value: Math.max(0, value(id)) } : {}),
         }));
         const viewer = await tx.general.findUnique({

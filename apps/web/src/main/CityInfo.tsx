@@ -476,10 +476,12 @@ export function GeneralNameCell({
   general,
   injury = true,
   npc = false,
+  possessedNpc = false,
 }: {
   general: GeneralView;
   injury?: boolean;
   npc?: boolean;
+  possessedNpc?: boolean;
 }) {
   const name = displayName(general.name);
   const isNpc = npc || general.isHuman === false;
@@ -498,6 +500,8 @@ export function GeneralNameCell({
         <Tag tone="muted" title="사람이 맡지 않은 장수입니다">
           NPC
         </Tag>
+      ) : possessedNpc ? (
+        <Tag tone="muted">맡은 NPC</Tag>
       ) : null}
     </span>
   );

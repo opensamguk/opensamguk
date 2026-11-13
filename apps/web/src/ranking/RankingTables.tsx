@@ -136,6 +136,7 @@ function GeneralRow({
           {displayName(row.name)}
         </span>
         {row.isHuman === false ? <span className={styles.name}> NPC</span> : null}
+        {row.possessedNpc ? <span className={styles.name}> 맡은 NPC</span> : null}
         {me ? <span className={styles.meChip}>나</span> : null}
         {narrow ? (
           <dl className={styles.details}>
