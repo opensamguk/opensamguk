@@ -1,3 +1,4 @@
+import type { HeritageBenefits } from '../heritage/benefits';
 import type { CombatSpecialty } from '../general/combatSpecialty';
 import type { Rng } from '@opensamguk/shared';
 import { proficiencyDamageFactor, type GeneralProficiency } from '../general/proficiency';
@@ -27,6 +28,8 @@ export type BattleInput = {
   defenderProficiency?: Readonly<GeneralProficiency> | undefined;
   attackerSpecialty?: CombatSpecialty | undefined;
   defenderSpecialty?: CombatSpecialty | undefined;
+  attackerHeritage?: HeritageBenefits | undefined;
+  defenderHeritage?: HeritageBenefits | undefined;
 };
 
 type Unit = DeepReadonly<UnitSetResource['crewTypes'][number]>;
@@ -160,12 +163,16 @@ export function simulateBattle(input: BattleInput, rng: Rng): BattleResult {
     const defenderAvoidBonus = input.defenderSpecialty?.avoid ?? 0;
     const attackerCanAvoid = aUnit.effects?.includes('avoid');
     const defenderCanAvoid = bUnit.effects?.includes('avoid');
+    const attackerHeritageAvoid =
+      ((input.attackerHeritage?.evasion ?? 0) - (input.defenderHeritage?.opponentEvasion ?? 0)) / 100;
+    const defenderHeritageAvoid =
+      ((input.defenderHeritage?.evasion ?? 0) - (input.attackerHeritage?.opponentEvasion ?? 0)) / 100;
     const avoidAttacker =
-      (attackerCanAvoid || attackerAvoidBonus > 0) &&
-      rng.next() < (attackerCanAvoid ? aUnit.avoid / 100 : 0) + attackerAvoidBonus;
+      (attackerCanAvoid || attackerAvoidBonus + attackerHeritageAvoid > 0) &&
+      rng.next() < (attackerCanAvoid ? aUnit.avoid / 100 : 0) + attackerAvoidBonus + attackerHeritageAvoid;
     const avoidDefender =
-      (defenderCanAvoid || defenderAvoidBonus > 0) &&
-      rng.next() < (defenderCanAvoid ? bUnit.avoid / 100 : 0) + defenderAvoidBonus;
+      (defenderCanAvoid || defenderAvoidBonus + defenderHeritageAvoid > 0) &&
+      rng.next() < (defenderCanAvoid ? bUnit.avoid / 100 : 0) + defenderAvoidBonus + defenderHeritageAvoid;
     // 양쪽 피해는 같은 페이즈 시작 상태로 계산하고 동시에 적용한다.
     const toDefender = damage(attacker, defender, input, rng, true, avoidDefender ? 1 / 6 : 1),
       toAttacker = damage(defender, attacker, input, rng, false, avoidAttacker ? 1 / 6 : 1);

@@ -9,6 +9,7 @@ import { RelationList } from '../relations/RelationList';
 import { NationBadge } from '../ui/NationBadge';
 import { Tag } from '../ui/Tag';
 import { useTRPC } from '../trpc';
+import { HeritageBenefits } from './HeritageBenefits';
 import { meritText } from './infoView';
 import { InfoGrid } from './Panel';
 import { UnitName } from './UnitName';
@@ -283,6 +284,7 @@ export function GeneralInfo({
       )}
       {/* 장착 장비는 원작 장수 칸처럼 여기 둔다. 가문(T4-95)은 내 정보 화면(/me)으로 옮겼다 (INT-25). */}
       {equipment ? <EquipmentStatus read={equipment} /> : null}
+      {home.heritageBenefitsEnabled ? <HeritageBenefits worldId={worldId} /> : null}
       {summary && 'relationsEnabled' in summary ? <RelationList worldId={worldId} generalId={g.id} /> : null}
       <p className={styles.links}>
         <Link to="/w/$worldId/me" params={{ worldId }}>

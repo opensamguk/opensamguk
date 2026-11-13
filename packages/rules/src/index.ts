@@ -48,6 +48,15 @@ export * from './commands/types';
 export * from './commands/effects';
 export * from './commands/registry';
 export { commandPlayerDocs } from './commands/playerDoc';
+export {
+  HERITAGE_BENEFITS_FEATURE,
+  HERITAGE_BENEFIT_KIND,
+  heritageBenefitInput,
+  heritageBenefitNames,
+  heritageBenefitCosts,
+  heritagePurchase,
+  storedHeritageBenefits,
+} from './heritage/benefits';
 export { TROOP_FEATURE, readTroops } from './commands/ext/troop/state';
 export { TROOP_ACTION_KIND, troopActionSchema, changeTroop, troopOf } from './commands/ext/troop/actions';
 export { extSliceKeys, restoreExtState } from './commands/ext/state';

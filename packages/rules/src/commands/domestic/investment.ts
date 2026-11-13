@@ -128,8 +128,11 @@ function makeInvestmentWithCollector(spec: Spec, collect: typeof collectModifier
         ((domesticStatScore(view, general, spec.key, spec.stat) * city.trust) / 100) * (0.8 + rng.next() * 0.4);
       const trait = domesticSpecialtyFor(view, general, spec.key);
       const critical = rng.next();
-      if (critical < 0.1 + (trait?.successBonus ?? 0)) score *= 2.2 + rng.next() * 0.8;
-      else if (critical < 0.2 + (trait?.successBonus ?? 0)) score *= 0.2 + rng.next() * 0.2;
+      const success = 0.1 + (trait?.successBonus ?? 0) + (general.heritageBenefits?.domesticSuccess ?? 0) / 100;
+      const failureChance = 0.1 - (general.heritageBenefits?.domesticFailure ?? 0) / 100;
+      if (critical < success) score *= 2.2 + rng.next() * 0.8;
+      else if (critical < (general.heritageBenefits ? success + failureChance : 0.2 + (trait?.successBonus ?? 0)))
+        score *= 0.2 + rng.next() * 0.2;
       if (trait) score *= trait.score;
       if (isFront(view, city.cityKey)) score *= BALANCE.FRONT_FACTOR;
       score = applyModifiers(score, collect(view, general.id, { stage: 'domestic.score', commandKey: spec.key }), {

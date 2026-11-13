@@ -460,6 +460,7 @@ model General {
   personality       String?
   defenseThreshold  Int?
   proficiency       Json?
+  heritageBenefits  Json?
   special           String?
   gold              Int
   rice              Int

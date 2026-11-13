@@ -38,6 +38,8 @@ import {
   storedCitySeasonalEvent,
   storedDefenseStance,
   storedGeneralProficiency,
+  storedHeritageBenefits,
+  HERITAGE_BENEFITS_FEATURE,
   GENERAL_PROFICIENCY_FEATURE,
   storedNpcNationPolicy,
   storedNationRestrictions,
@@ -135,12 +137,13 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
       ...storedNationRestrictions(world.ruleFeatures.includes(NATION_RESTRICTIONS_FEATURE), restrictions),
       ...(diplomaticAidUntilMonth != null ? { diplomaticAidUntilMonth } : {}),
     })),
-    generals: generals.map(({ defenseThreshold, proficiency, ...general }) =>
+    generals: generals.map(({ defenseThreshold, proficiency, heritageBenefits, ...general }) =>
       storedGeneralRemoval(
         storedGeneralSex(
           {
             ...general,
             ...storedDefenseStance(world.ruleFeatures.includes(DEFENSE_STANCE_FEATURE), defenseThreshold),
+            ...storedHeritageBenefits(world.ruleFeatures.includes(HERITAGE_BENEFITS_FEATURE), heritageBenefits),
             ...storedGeneralProficiency(world.ruleFeatures.includes(GENERAL_PROFICIENCY_FEATURE), proficiency),
           },
           world.ruleFeatures.includes('lineage-v1'),

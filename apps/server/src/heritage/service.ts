@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { HERITAGE_V1 } from '@opensamguk/rules';
 import type { HeritageBalanceStore, HeritageIdentity, HeritageReadStore } from './ports';
 
-const kindSchema = z.enum(['SEASON_CREDIT', 'CREATION_SPEND', 'CREATION_REFUND', 'FORFEIT']);
+const kindSchema = z.enum(['SEASON_CREDIT', 'CREATION_SPEND', 'CREATION_REFUND', 'BENEFIT_SPEND', 'FORFEIT']);
 const refundDetail = z.object({ reason: z.enum(['ADMIN_END', 'ADMIN_RESET']) });
 const creditDetail = z.object({
   activityMonths: z.number().int().nonnegative(),

@@ -1,3 +1,4 @@
+import { applyHeritagePurchase, HERITAGE_BENEFIT_KIND, HERITAGE_BENEFITS_FEATURE } from './heritage/benefits';
 import { applyDefenseStance, DEFENSE_STANCE_FEATURE, DEFENSE_STANCE_KIND } from './battle/defenders';
 import { NPC_NATION_POLICY_FEATURE, NPC_NATION_POLICY_KIND, applyNpcNationPolicy } from './npc/policy';
 import {
@@ -146,6 +147,7 @@ export interface RuleRegistry {
 }
 export const ruleRegistry: RuleRegistry = {
   features: [
+    { key: HERITAGE_BENEFITS_FEATURE, requires: ['heritage-v1'], conflicts: [] },
     preparedTurnsFeature,
     nationResearchFeature,
     relationsFeature,
@@ -267,6 +269,7 @@ export const ruleRegistry: RuleRegistry = {
     TROOP_FEATURE,
   ],
   inputKinds: [
+    { kind: HERITAGE_BENEFIT_KIND, feature: HERITAGE_BENEFITS_FEATURE, route: 'queued', apply: applyHeritagePurchase },
     { kind: TROOP_ACTION_KIND, feature: TROOP_FEATURE, route: 'queued', apply: applyTroopInput },
     ...ADMIN_SETTING_KINDS.map((kind) => ({
       kind,

@@ -8,6 +8,8 @@ import {
   COMBAT_SPECIALTY_FEATURE,
   TROOP_FEATURE,
   TROOP_ACTION_KIND,
+  HERITAGE_BENEFIT_KIND,
+  HERITAGE_BENEFITS_FEATURE,
   DOMESTIC_SPECIALTY_FEATURE,
   GENERAL_PROFICIENCY_FEATURE,
   NPC_NATION_POLICY_FEATURE,
@@ -48,6 +50,7 @@ import {
   type NationLifecycleEffects,
 } from '@opensamguk/rules';
 import type { EngineFeature, QueuedInputHandler } from './features';
+import { processHeritagePurchase } from './heritagePurchase';
 import { processTroopInput } from './troopInput';
 import { loadReplayState } from './monthly';
 import { loadWorld } from './worldLoader';
@@ -327,6 +330,7 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
   { key: 'general-condition-v1' },
   { key: GENERAL_PERSONALITY_FEATURE },
   { key: COMBAT_SPECIALTY_FEATURE },
+  { key: HERITAGE_BENEFITS_FEATURE, queuedInputs: { [HERITAGE_BENEFIT_KIND]: processHeritagePurchase } },
   { key: TROOP_FEATURE, queuedInputs: { [TROOP_ACTION_KIND]: processTroopInput } },
   { key: DOMESTIC_SPECIALTY_FEATURE },
   { key: GENERAL_PROFICIENCY_FEATURE },
