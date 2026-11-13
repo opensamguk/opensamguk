@@ -37,7 +37,14 @@ const LABELS: Record<string, string> = {
   itemKey: '매매할 장비',
 };
 
-const ENUM_LABELS: Record<string, string> = { gold: '금', rice: '쌀', horse: '명마', weapon: '무기', book: '서적' };
+const ENUM_LABELS: Record<string, string> = {
+  gold: '금',
+  rice: '쌀',
+  horse: '명마',
+  weapon: '무기',
+  book: '서적',
+  tool: '도구',
+};
 
 interface JsonProperty {
   type?: string;

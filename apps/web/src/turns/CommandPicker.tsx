@@ -110,8 +110,11 @@ interface Props {
 // 장비매매 품목 키 → 이름. 장비 정보를 아직 못 받았으면 없다.
 export function equipmentName(read: EquipmentRead | undefined): ((itemKey: string) => string | undefined) | undefined {
   if (read?.kind !== 'ready') return undefined;
-  const items = read.data.items;
-  return (itemKey) => items.find((item) => item.key === itemKey)?.name;
+  const { items, tools, tool } = read.data;
+  return (itemKey) =>
+    items.find((item) => item.key === itemKey)?.name ??
+    tools?.find((item) => item.key === itemKey)?.name ??
+    (tool?.key === itemKey ? tool.name : undefined);
 }
 
 // 서버가 준 명령을 카드로 고른다. 카드 선택과 실제 명령/패 소비는 별개다.
