@@ -29,8 +29,13 @@
 .text {
   min-width: 0;
 }
+.headline {
+  flex: 1 0 100%;
+  font-size: var(--text-sm);
+}
 .yearbook {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
   align-items: baseline;
   padding: var(--space-1) 0;

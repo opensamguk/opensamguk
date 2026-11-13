@@ -1,0 +1,95 @@
+/* 기록 화면의 월단평 (T3-08). 순위 표는 줄 단위 격자라 375px에서도 가로 스크롤이 없다. */
+.panel {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 2px solid var(--color-ink);
+  font-size: var(--text-sm);
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--text-md);
+}
+
+.choose {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.select {
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: var(--frame);
+  border-radius: var(--radius);
+}
+
+.list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 3em minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: baseline;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.rank {
+  font-weight: 600;
+}
+
+.body {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.nation {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+.line {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.score {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.muted {
+  margin: 0;
+  color: var(--color-text-muted);
+}

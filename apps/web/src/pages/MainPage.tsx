@@ -1,6 +1,7 @@
 import { useLocation, useNavigate, useSearch } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { AdvicePanel } from '../advice/AdvicePanel';
 import { errorCode } from '../game/errors';
 import { NoGeneral, QueryError } from '../game/QueryState';
 import { useHome, useWorldId, useWorldMap, useWorldSummary } from '../game/queries';
@@ -249,7 +250,12 @@ export function MainPage() {
             도시 선택·재조회 때 다시 만들지 않는다. 그래서 저장하지 않은 편집과 고른 칸이 유지된다. */}
         <Panel title="명령 목록" area="commands" headingId="main-commands">
           <PolicyBar worldId={worldId} />
-          <TurnEditor worldId={worldId} selectedCityKey={selected ?? null} onStatus={setTurnStatus} />
+          <TurnEditor
+            worldId={worldId}
+            selectedCityKey={selected ?? null}
+            onStatus={setTurnStatus}
+            renderTop={(draft) => <AdvicePanel key={worldId} worldId={worldId} draft={draft} />}
+          />
         </Panel>
 
         <Panel title="국가 정보" area="nation" headingId="main-nation">

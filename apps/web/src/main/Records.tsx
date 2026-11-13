@@ -1,4 +1,6 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
+import type { AppRouter } from '@opensamguk/server/router';
+import type { inferRouterOutputs } from '@trpc/server';
 import { retryUnlessClientError, errorCode } from '../game/errors';
 import { formatYearMonth, personalLogDate, tickDate } from '../game/gameDate';
 import { NoGeneral, QueryError } from '../game/QueryState';
@@ -134,13 +136,7 @@ interface NationItem {
   gold: number;
   rice: number;
 }
-interface WorldItem {
-  tick: number;
-  year: number;
-  month: number;
-  nations: Array<{ nationId: number; cities: number; generals: number }>;
-  cities: Array<{ cityKey: number; nationId: number | null }>;
-}
+type WorldItem = inferRouterOutputs<AppRouter>['records']['world']['items'][number];
 
 export function GeneralLogList({ items, clock }: { items: readonly GeneralItem[]; clock: Clock }) {
   return (
@@ -230,6 +226,11 @@ function WorldHistoryList({ items, nations }: { items: readonly WorldItem[]; nat
               })}
               <span className={styles.nationEntry}>공백지 {empty}성</span>
             </span>
+            {item.review ? (
+              <span className={styles.headline} data-testid="world-review-headline">
+                {item.review.headline}
+              </span>
+            ) : null}
           </li>
         );
       })}
