@@ -1,8 +1,12 @@
 import type { PublicGeography } from '@opensamguk/shared';
+import { useRef, useState } from 'react';
 import { OperationalWorldMap } from './OperationalWorldMap';
 import { CAPITAL_MARK, isCapital, levelName, type DrawnNation } from './siteMarkers';
 import { readableTextColor } from '../ui/color';
 import type { MapCity } from '../game/types';
+import { MapGenerals } from './MapGenerals';
+import { generalsByCity, generalsText, type MapGeneral } from './mapGeneralList';
+import tooltipStyles from './OperationalWorldMap.module.css';
 import styles from './WorldMap.module.css';
 
 // 지도 좌표계. che 지도의 도시 좌표(25~680, 20~480)를 그대로 쓴다.
@@ -42,6 +46,8 @@ export const cityRadius = (level: number) => 4 + Math.max(1, Math.min(8, level))
 export function cityLabel(city: DrawnCity, nation: DrawnNation | undefined, mine: boolean): string {
   return [
     city.name,
+    // 지역 이름 (world.map regionName, INT-26). 공개 지도처럼 받지 않으면 뺀다.
+    city.regionName ?? null,
     nation ? nation.name : '공백지',
     isCapital(city, nation) ? '수도' : null,
     isCut(city) ? '보급 끊김' : null,
@@ -64,9 +70,12 @@ export function WorldMap({
   operationalMap,
   fill = false,
   focusKey = null,
+  generals,
 }: {
   cities: readonly DrawnCity[];
   nations: readonly DrawnNation[];
+  // 거점별 장수 (world.map generals, INT-26). 풍선에 얼굴·이름을 쓴다. 공개 지도·영토 재생은 주지 않는다.
+  generals?: readonly MapGeneral[] | undefined;
   myCityKey?: number | null;
   // 운영 지도의 거점 고르기를 본국·타국·공백지로 묶을 때 쓰는 내 국가 (INT-25). 안 주면 묶지 않는다.
   myNationId?: number | null | undefined;
@@ -77,6 +86,9 @@ export function WorldMap({
   // 운영 지도에서 처음 열 때 가운데 둘 거점 (인자 입력 화면, INT-25).
   focusKey?: number | null;
 }) {
+  // 장수를 받은 고전 지도는 마우스를 올린 도시의 풍선을 띄운다 (운영 지도 풍선과 같은 모양, INT-26).
+  const [hover, setHover] = useState<{ key: number; x: number; y: number } | null>(null);
+  const frame = useRef<HTMLDivElement>(null);
   if (operationalMap)
     return (
       <OperationalWorldMap
@@ -89,11 +101,14 @@ export function WorldMap({
         map={operationalMap}
         fill={fill}
         focusKey={focusKey}
+        generals={generals}
       />
     );
   if (cities.some((city) => city.kind !== undefined)) return <p role="alert">운영 지도 자료를 다시 불러오세요.</p>;
   const nationById = new Map(nations.map((nation) => [nation.id, nation]));
-  return (
+  const generalsAt = generalsByCity(generals);
+  const balloon = generals !== undefined;
+  const svg = (
     <svg
       className={styles.map}
       viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
@@ -116,6 +131,7 @@ export function WorldMap({
         const name = `${isCapital(city, nation) ? CAPITAL_MARK : ''}${city.name}${city.ruin ? ' (폐허)' : ''}`;
         const labelWidth = Array.from(name).length * 10 + 6;
         const select = onSelect ? () => onSelect(city.key) : undefined;
+        const here = generalsText(generalsAt.get(city.key) ?? []);
         return (
           <g
             key={city.key}
@@ -130,6 +146,16 @@ export function WorldMap({
             data-supplied={city.supplied}
             data-cut={isCut(city) || undefined}
             data-mine={mine || undefined}
+            onPointerMove={
+              balloon
+                ? (event) => {
+                    if (event.pointerType !== 'mouse') return;
+                    const box = frame.current?.getBoundingClientRect();
+                    if (box) setHover({ key: city.key, x: event.clientX - box.left, y: event.clientY - box.top });
+                  }
+                : undefined
+            }
+            onPointerLeave={balloon ? () => setHover((old) => (old?.key === city.key ? null : old)) : undefined}
             onClick={select}
             onKeyDown={
               select &&
@@ -144,6 +170,7 @@ export function WorldMap({
             <title>
               {cityLabel(city, nation, mine)}
               {levelName(city.level) ? ` · ${levelName(city.level)}` : ''}
+              {here ? ` · ${here}` : ''}
             </title>
             {mine ? <circle className={styles.mine} cx={city.x} cy={city.y} r={r + 5} /> : null}
             {selected ? <circle className={styles.selected} cx={city.x} cy={city.y} r={r + 3} /> : null}
@@ -186,6 +213,88 @@ export function WorldMap({
         );
       })}
     </svg>
+  );
+  if (!balloon) return svg;
+  const hovered = hover ? cities.find((city) => city.key === hover.key) : undefined;
+  return (
+    <div ref={frame} className={styles.frame}>
+      {svg}
+      {hover && hovered ? (
+        <ClassicBalloon
+          city={hovered}
+          nation={hovered.nationId === null ? undefined : nationById.get(hovered.nationId)}
+          mine={hovered.key === myCityKey}
+          generals={generalsAt.get(hovered.key) ?? []}
+          x={hover.x}
+          y={hover.y}
+          width={frame.current?.clientWidth ?? 0}
+          height={frame.current?.clientHeight ?? 0}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+// 고전 지도의 풍선. 내용은 도시 읽기 이름(cityLabel)·SVG title과 같고 장수 얼굴만 더한다. 화면 낭독기는 title을 읽는다.
+function ClassicBalloon({
+  city,
+  nation,
+  mine,
+  generals,
+  x,
+  y,
+  width,
+  height,
+}: {
+  city: DrawnCity;
+  nation: DrawnNation | undefined;
+  mine: boolean;
+  generals: readonly MapGeneral[];
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}) {
+  const grade = levelName(city.level);
+  const notes = [
+    isCapital(city, nation) ? '수도' : null,
+    mine ? '내 위치' : null,
+    city.ruin ? `폐허 복구 ${city.ruin.percent}%` : null,
+    isCut(city) ? '보급 끊김' : null,
+  ].filter((note): note is string => note !== null);
+  // 커서 오른쪽 아래에 띄우되 지도 밖으로 나가면 왼쪽·위로 넘긴다.
+  const right = x > width - 200;
+  const below = y < 120;
+  return (
+    <div
+      className={tooltipStyles.tooltip}
+      data-testid="map-tooltip"
+      aria-hidden="true"
+      style={{
+        left: right ? undefined : x + 14,
+        right: right ? Math.max(0, width - x + 14) : undefined,
+        top: below ? y + 18 : undefined,
+        bottom: below ? undefined : Math.max(0, height - y + 10),
+      }}
+    >
+      <p className={tooltipStyles.tooltipTitle}>
+        <span>{city.name}</span>
+        <span className={tooltipStyles.tooltipGrade}>
+          {city.regionName ? `${city.regionName} · ` : ''}
+          {grade ?? `규모 ${city.level}`}
+        </span>
+      </p>
+      <p className={tooltipStyles.tooltipOwner}>
+        <span className={tooltipStyles.tooltipSwatch} style={{ background: nation?.color ?? NEUTRAL }} />
+        {nation?.name ?? '공백지'}
+      </p>
+      {notes.map((note) => (
+        <p key={note} className={tooltipStyles.tooltipNote}>
+          {note}
+        </p>
+      ))}
+      <MapGenerals generals={generals} />
+    </div>
   );
 }
 

@@ -268,7 +268,8 @@ test('T3-10 정식191년 도시·국가·월간 순위 표의 모든 값·정렬
           'nation',
           new Map(nation.cities.map((c) => [c.key, c.name])),
         );
-        expect(await cities.locator('tbody tr td:first-child').allTextContents()).toEqual(
+        // 좁은 화면은 지역·주민을 이름 칸 아래에 접어 두므로 이름 링크 글자만 읽는다 (INT-26).
+        expect(await cities.locator('tbody tr td:first-child > a').allTextContents()).toEqual(
           nation.cities.map((c) => c.name),
         );
         const select = generals.locator('..').getByRole('combobox');
