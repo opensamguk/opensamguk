@@ -147,6 +147,12 @@ export async function persistCommandReports(
   attackerId: number,
   result: CommandResult,
 ) {
+  if (result.stratagemSucceeded) {
+    await tx.general.update({
+      where: { worldId_id: { worldId, id: attackerId } },
+      data: { stratagemSuccesses: { increment: 1 } },
+    });
+  }
   for (const award of result.battleAwards ?? []) {
     await tx.general.update({
       where: { worldId_id: { worldId, id: award.generalId } },

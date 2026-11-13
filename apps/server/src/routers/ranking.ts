@@ -14,6 +14,7 @@ const generalRows = z.array(
     experience: z.number().int(),
     wins: z.number().int().nonnegative(),
     captures: z.number().int().nonnegative(),
+    stratagemSuccesses: z.number().int().nonnegative().default(0),
   }),
 );
 const nationRows = z.array(
@@ -35,7 +36,7 @@ export const rankingRouter = router({
     .input(
       worldInput
         .extend({
-          by: z.enum(['dedication', 'experience', 'merit']),
+          by: z.enum(['dedication', 'experience', 'merit', 'stratagem']),
         })
         .strict(),
     )
@@ -46,9 +47,16 @@ export const rankingRouter = router({
           select: { tick: true, year: true, month: true, generals: true },
         });
         if (!snapshot) return { top: [], me: null, at: null };
-        const rows = rankGenerals(generalRows.parse(snapshot.generals), input.by).map(({ id, ...row }) => ({
-          generalId: id,
+        const generals = generalRows.parse(snapshot.generals);
+        const successes = new Map(generals.map(({ id, stratagemSuccesses }) => [id, stratagemSuccesses]));
+        const ranked = rankGenerals(generals, input.by === 'stratagem' ? 'merit' : input.by);
+        if (input.by === 'stratagem') ranked.sort((a, b) => successes.get(b.id)! - successes.get(a.id)! || a.id - b.id);
+        const rows = ranked.map(({ id, ...row }, index) => ({
           ...row,
+          generalId: id,
+          rank: index + 1,
+          stratagemSuccesses: successes.get(id)!,
+          ...(input.by === 'stratagem' ? { value: successes.get(id)! } : {}),
         }));
         const viewer = await tx.general.findUnique({
           where: { worldId_userId: { worldId: input.worldId, userId: ctx.user.id } },

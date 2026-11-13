@@ -343,6 +343,7 @@ model SeasonGeneral {
 
   @@id([worldId, generalId])
   @@index([userId])
+  stratagemSuccesses Int @default(0)
 }
 
 enum DiplomacyState {
@@ -452,6 +453,7 @@ model General {
   atmos             Int
   experience        Int
   dedication        Int
+  stratagemSuccesses Int @default(0)
   battleWins        Int               @default(0)
   captures          Int               @default(0)
   age               Int

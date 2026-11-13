@@ -10,7 +10,7 @@ export async function persistRanking(
 ) {
   const counters = await tx.general.findMany({
     where: { worldId },
-    select: { id: true, battleWins: true, captures: true },
+    select: { id: true, battleWins: true, captures: true, stratagemSuccesses: true },
   });
   const byId = new Map(counters.map((general) => [general.id, general]));
   const active = Object.values(state.generals).filter(
@@ -30,6 +30,7 @@ export async function persistRanking(
       experience: general.experience,
       wins: byId.get(general.id)!.battleWins,
       captures: byId.get(general.id)!.captures,
+      stratagemSuccesses: byId.get(general.id)!.stratagemSuccesses,
     }));
   const nations = Object.values(state.nations)
     .sort((a, b) => a.id - b.id)

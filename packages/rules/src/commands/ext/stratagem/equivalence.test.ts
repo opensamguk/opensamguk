@@ -85,7 +85,9 @@ function capture() {
         const fresh = createRng(seed);
         expect(next).toStrictEqual([fresh.next(), fresh.next(), fresh.next()]);
       }
-      return { key: def.key, scenario, seed, result, check, precheck, executeError, trace, next };
+      const { stratagemSucceeded, ...unchanged } = result as typeof result & { stratagemSucceeded?: true };
+      expect(stratagemSucceeded).toBe(scenario === 'success' ? true : undefined);
+      return { key: def.key, scenario, seed, result: unchanged, check, precheck, executeError, trace, next };
     }),
   );
   const record = { baseSha, caseCount: cases.length, cases };

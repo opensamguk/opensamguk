@@ -20,6 +20,7 @@ export const GENERAL_COLUMNS: ReadonlyArray<{ key: GeneralSortKey; label: string
   { key: 'dedication', label: '공헌' },
   { key: 'experience', label: '경험' },
   { key: 'merit', label: '전공' },
+  { key: 'stratagem', label: '계략 성공' },
 ];
 
 export const NATION_COLUMNS: ReadonlyArray<{ key: NationSortKey; label: string }> = [
