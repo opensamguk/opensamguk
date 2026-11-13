@@ -78,6 +78,7 @@ describe('장수 동향 문장', () => {
       text: '조조가 내정 목표를 채웠다.',
       nation: { name: '위', color: '#000080' },
     });
+    expect(activityLine(reputation('9', 30, 'conquest', { city: '허창' })).cityName).toBe('허창');
     expect(activityLine(reputation('9', 30, 'domestic', { nation: null })).nation).toBeNull();
     expect(activityLine(nationEvent('4', 20, '위의 성도 점령'))).toEqual({
       key: 'nation:4',

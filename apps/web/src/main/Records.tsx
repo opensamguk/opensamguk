@@ -256,6 +256,38 @@ interface NationItem {
   rice: number;
 }
 
+function outcomeText(text: string) {
+  return text.split(/(성공|실패)(?=[ :.,·]|$)/u).map((part, index) =>
+    index % 2 === 0 ? (
+      part
+    ) : (
+      <strong key={index} className={part === '실패' ? styles.failedOutcome : styles.successfulOutcome}>
+        {part}
+      </strong>
+    ),
+  );
+}
+
+function activityText(text: string, name: string, cityName?: string) {
+  if (!text.startsWith(name)) return text;
+  const rest = text.slice(name.length);
+  const cityIndex = cityName ? rest.indexOf(cityName) : -1;
+  return (
+    <>
+      <strong>{name}</strong>
+      {cityName && cityIndex >= 0 ? (
+        <>
+          {rest.slice(0, cityIndex)}
+          <strong className={styles.recordCity}>{cityName}</strong>
+          {rest.slice(cityIndex + cityName.length)}
+        </>
+      ) : (
+        rest
+      )}
+    </>
+  );
+}
+
 export function GeneralLogList({ items, clock }: { items: readonly GeneralItem[]; clock: Clock }) {
   return (
     <ol className={styles.lines}>
@@ -263,7 +295,7 @@ export function GeneralLogList({ items, clock }: { items: readonly GeneralItem[]
         <li key={item.id} className={styles.line} data-log-kind={item.kind}>
           <span className={`num ${styles.date}`}>{logDateOf(item.tick, clock)}</span>
           {item.kind === 'failure' ? <Tag tone="danger">실패</Tag> : null}
-          <span className={styles.text}>{item.text}</span>
+          <span className={styles.text}>{outcomeText(item.text)}</span>
           {item.createdAt && Number.isFinite(Date.parse(item.createdAt)) ? (
             <time className={styles.executionTime} dateTime={item.createdAt} title="실행 시각 (한국 표준시)">
               {executionTime.format(new Date(item.createdAt))}
@@ -441,7 +473,7 @@ function FeedList({ months, testId }: { months: readonly FeedMonth[]; testId: st
                 ) : null}
                 {line.nation ? <NationBadge name={line.nation.name} color={line.nation.color} /> : null}
                 {line.nation ? ' ' : null}
-                {line.text}
+                {line.portrait ? activityText(line.text, line.portrait.name, line.cityName) : line.text}
               </span>
             ))}
           </span>
