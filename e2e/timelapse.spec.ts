@@ -121,7 +121,9 @@ test('E1 위쪽 메뉴 기록에서 영토 재생 탭으로 가고 새로고침 
 
   for (const [label, title] of [
     ['내 장수', '개인 기록'],
+    ['전투 기록', '전투 기록'],
     ['국가 역사', '국가 기록'],
+    ['장수 동향', '장수 동향'],
     ['월드 정세', '중원 정세'],
   ] as const) {
     await recordTab(page, label).click();
