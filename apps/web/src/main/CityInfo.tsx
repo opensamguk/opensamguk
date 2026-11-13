@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
+import { useMemo } from 'react';
 import { retryUnlessClientError } from '../game/errors';
 import { displayName, officerName } from '../game/names';
-import { useWorldRules } from '../game/queries';
+import { useHome, useWorldMap, useWorldRules, useWorldUnits } from '../game/queries';
 import { QueryError } from '../game/QueryState';
 import {
   isDetailedCity,
@@ -17,12 +18,23 @@ import { CityOfficeResidences } from '../personnel/OfficeResidence';
 import { useTRPC } from '../trpc';
 import { DataTable, type Column } from '../ui/DataTable';
 import { NationBadge } from '../ui/NationBadge';
+import { OFFICER_MIN_LEVEL, type InspectionRow } from '../operations/contract';
+import { EMPTY_SLOT_TITLE, slotLabel } from '../operations/timeline';
+import type { ArgNames } from '../turns/args';
 import { LoadingState } from '../ui/States';
-import { StatTable, type StatRow } from '../ui/StatTable';
+import statStyles from '../ui/StatTable.module.css';
 import { Tag } from '../ui/Tag';
 import styles from './CityInfo.module.css';
 import { CityResourcesPanel } from './CityResourcesPanel';
-import { cityLevelText, garrisonSummary, nearMax, populationRate } from './infoView';
+import {
+  BAND_LABEL,
+  cityLevelText,
+  garrisonSummary,
+  nearMax,
+  populationRate,
+  statBand,
+  type StatBand,
+} from './infoView';
 import { unitNameOf } from './UnitName';
 import { LogisticsPanel } from '../city/LogisticsPanel';
 
@@ -30,6 +42,8 @@ const HIDDEN_CITY = '다른 국가의 도시입니다';
 // 서버는 나 자신과 같은 국가 장수의 능력치만 준다(visibility.general). 재야끼리도 서로 보이지 않는다.
 const HIDDEN_GENERAL = '능력치는 같은 국가 장수만 보입니다';
 const GARRISON_HIDDEN = '주둔 장수는 보이지 않습니다';
+// 예턴은 감찰 자료(inspection.members)로 채운다. 서버가 직책자(직책 5 이상)에게만 준다.
+export const TURNS_OFFICER_ONLY = '예턴은 직책자에게 같은 국가 장수만 보입니다';
 const n = (value: number) => value.toLocaleString('ko-KR');
 
 export function useCity(worldId: string, cityKey: number | null) {
@@ -74,7 +88,12 @@ export function CityInfo({
   const detailed = isDetailedCity(data);
   const intel = !detailed && data.fog?.intel ? data.fog.intel : null;
   const garrisonHidden = data.fog?.garrisonHidden === true;
-  const stat = (label: string, value: number | undefined, max: number | undefined, reason = HIDDEN_CITY): StatRow => ({
+  const stat = (
+    label: string,
+    value: number | undefined,
+    max: number | undefined,
+    reason = HIDDEN_CITY,
+  ): CityStatRow => ({
     label,
     value: value ?? null,
     ...(max === undefined ? {} : { max }),
@@ -82,7 +101,7 @@ export function CityInfo({
   });
   const domestic = intel?.domestic;
   const domesticReason = intel ? missingReason(intel, 'domestic') : HIDDEN_CITY;
-  const rows: StatRow[] = detailed
+  const rows: CityStatRow[] = detailed
     ? [
         stat('주민', data.population, data.populationMax),
         stat('농업', data.agriculture, data.agricultureMax),
@@ -134,7 +153,7 @@ export function CityInfo({
           {HIDDEN_CITY}. 수치는 자기 국가 도시나 내 장수가 있는 도시에서만 보입니다.
         </p>
       )}
-      <StatTable rows={rows} />
+      <CityStats rows={rows} />
       {data.nationId !== null && data.kind !== 'PASS' && data.officeEffectsEnabled && data.officers ? (
         <CityOfficeResidences officers={data.officers} secretaryEnabled={data.secretaryEnabled === true} />
       ) : null}
@@ -219,6 +238,135 @@ function NeighborLink({
   );
 }
 
+export interface CityStatRow {
+  label: string;
+  value: number | null; // null = 공개 범위 밖
+  max?: number;
+  hiddenReason?: string;
+}
+
+const BAND_FILL: Record<StatBand, string | undefined> = {
+  low: styles.fillLow,
+  mid: styles.fillMid,
+  high: styles.fillHigh,
+};
+const BAND_TEXT: Record<StatBand, string | undefined> = {
+  low: styles.bandLow,
+  mid: styles.bandMid,
+  high: styles.bandHigh,
+};
+
+// 개발 정도 글자 딱지. 색과 함께 낮음·보통·높음 글자를 쓴다 (색만으로 뜻을 전하지 않는다).
+export function BandText({ band, label }: { band: StatBand; label?: string }) {
+  return (
+    <span className={`${styles.band} ${BAND_TEXT[band] ?? ''}`} data-band={band}>
+      {label ? `${label} ` : ''}
+      {BAND_LABEL[band]}
+    </span>
+  );
+}
+
+// 도시 수치 표. 공용 수치 표(ui/StatTable)와 같은 모양에 개발 정도 구간(낮음·보통·높음)을 막대 색과 글자로 더한다 (INT-25).
+export function CityStats({ rows }: { rows: readonly CityStatRow[] }) {
+  return (
+    <table className={`${statStyles.table} ${styles.stats}`} data-testid="city-stats">
+      <tbody>
+        {rows.map((row) => {
+          const band = row.value !== null && row.max !== undefined ? statBand(row.value, row.max) : null;
+          return (
+            <tr key={row.label} data-band={band ?? undefined}>
+              <th scope="row" className={statStyles.label}>
+                {row.label}
+              </th>
+              <td className="num" title={row.value === null ? row.hiddenReason : undefined}>
+                {row.value === null ? '—' : row.value.toLocaleString('ko-KR')}
+              </td>
+              <td className={`num ${statStyles.max}`}>
+                {row.max === undefined ? '' : `/ ${row.max.toLocaleString('ko-KR')}`}
+              </td>
+              <td className={statStyles.barCell}>
+                {row.max !== undefined && row.value !== null ? (
+                  <span
+                    className={statStyles.bar}
+                    role="meter"
+                    aria-label={`${row.label} ${row.value} / ${row.max}`}
+                    aria-valuenow={row.value}
+                    aria-valuemin={0}
+                    aria-valuemax={row.max}
+                  >
+                    <span
+                      className={`${statStyles.fill} ${band ? (BAND_FILL[band] ?? '') : ''}`}
+                      style={{ width: `${Math.min(100, (row.value / Math.max(row.max, 1)) * 100)}%` }}
+                    />
+                  </span>
+                ) : null}
+              </td>
+              <td className={styles.bandCell}>{band ? <BandText band={band} /> : null}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+// 감찰 자료. 내가 직책자이고 (nationId를 주면) 그 국가 소속일 때만 조회한다. 일반 장수는 null이라 예턴 칸이 없다.
+export function useInspectionRows(worldId: string, nationId?: number | null): Map<number, InspectionRow> | null {
+  const trpc = useTRPC();
+  const me = useHome(worldId).data?.general;
+  const officer =
+    me !== undefined &&
+    me.nationId !== null &&
+    me.officerLevel >= OFFICER_MIN_LEVEL &&
+    (nationId === undefined || nationId === me.nationId);
+  const query = useQuery({
+    ...trpc.inspection.members.queryOptions({ worldId }),
+    enabled: officer,
+    retry: retryUnlessClientError,
+    staleTime: 30_000,
+  });
+  const items = query.data?.items;
+  return useMemo(() => (officer && items ? new Map(items.map((row) => [row.generalId, row])) : null), [officer, items]);
+}
+
+// 예턴 인자에 붙일 도시·국가·병종 이름.
+export function useArgNames(worldId: string): ArgNames {
+  const map = useWorldMap(worldId).data;
+  const { units } = useWorldUnits(worldId);
+  return useMemo(() => {
+    const cities = map?.cities ?? [];
+    const nations = map?.nations ?? [];
+    return {
+      city: (key) => cities.find((c) => c.key === key)?.name,
+      nation: (id) => nations.find((nation) => nation.id === id)?.name,
+      unit: units.name,
+    };
+  }, [map, units]);
+}
+
+// 예턴 앞 5칸. 감찰 화면과 같이 비워 둔 칸은 방침 명령을 짐작하지 않고 `빈 칸`으로 적는다.
+export function TurnFive({ turns, names }: { turns: InspectionRow['turns']; names: ArgNames }) {
+  return (
+    <ol className={styles.turnFive} data-testid="turn-five">
+      {turns.map((turn, i) => {
+        const label = slotLabel(turn, names);
+        return (
+          <li key={i} data-kind={label.kind}>
+            <span className={styles.slotNo}>{i + 1}</span>{' '}
+            {label.kind === 'empty' ? (
+              <span className={styles.meta} title={EMPTY_SLOT_TITLE}>
+                {label.text}
+              </span>
+            ) : (
+              label.text
+            )}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 // 인구율과 최대치에 가까운 내정 (원작 세력 도시의 남은 양 표시). 수치를 받은 도시만 쓴다.
 function CityFacts({ city }: { city: CityDetailFields }) {
   const near = nearMax([
@@ -264,7 +412,16 @@ export function GarrisonLine({ generals, campaign }: { generals: readonly Genera
 
 // 장수 이름 칸. 같은 국가 장수는 얼굴(thumb을 20×28로)과 부상을 함께 쓴다. 얼굴은 이름과 겹치므로 읽기 이름에서 뺀다.
 // 국가 표는 관리 칸에 부상을 따로 적으므로 injury={false}로 뺀다.
-export function GeneralNameCell({ general, injury = true }: { general: GeneralView; injury?: boolean }) {
+// npc는 감찰 자료(직책자만 받는다)의 사람 여부다. 모르면 딱지를 달지 않는다.
+export function GeneralNameCell({
+  general,
+  injury = true,
+  npc = false,
+}: {
+  general: GeneralView;
+  injury?: boolean;
+  npc?: boolean;
+}) {
   const name = displayName(general.name);
   return (
     <span className={styles.who}>
@@ -276,6 +433,11 @@ export function GeneralNameCell({ general, injury = true }: { general: GeneralVi
       <span data-general-name="">{name}</span>
       {injury && isDetailedGeneral(general) && general.injury > 0 ? (
         <Tag tone="warning">부상 {general.injury}</Tag>
+      ) : null}
+      {npc ? (
+        <Tag tone="muted" title="사람이 맡지 않은 장수입니다">
+          NPC
+        </Tag>
       ) : null}
     </span>
   );
@@ -295,6 +457,9 @@ function Garrison({
   fiveStats: boolean;
 }) {
   const crewTypes = useWorldRules(worldId).data?.unitSet.crewTypes;
+  // 직책자만 감찰 자료로 같은 국가 장수의 예턴 앞 5칸을 본다 (원작 현재 도시의 명령 열). 일반 장수는 열이 없다.
+  const inspection = useInspectionRows(worldId);
+  const names = useArgNames(worldId);
   if (generals.length === 0) return <p className={styles.meta}>주둔 장수가 없습니다.</p>;
   const hidden = (g: GeneralView) => (isDetailedGeneral(g) ? undefined : HIDDEN_GENERAL);
   const num = (pick: (g: Extract<GeneralView, { leadership: number }>) => number | undefined) => ({
@@ -308,7 +473,7 @@ function Garrison({
       key: 'name',
       label: '장수',
       sortValue: (g) => displayName(g.name),
-      render: (g) => <GeneralNameCell general={g} />,
+      render: (g) => <GeneralNameCell general={g} npc={inspection?.get(g.id)?.isHuman === false} />,
     },
     {
       key: 'nation',
@@ -367,6 +532,21 @@ function Garrison({
       label: campaign ? '평균 사기' : '사기',
       ...num((g) => (campaign ? ('commandedArmy' in g ? g.commandedArmy.atmos : undefined) : g.atmos)),
     },
+    ...(inspection
+      ? [
+          {
+            key: 'turns',
+            label: '예턴',
+            render: (g: GeneralView) => {
+              const row = inspection.get(g.id);
+              return row ? <TurnFive turns={row.turns} names={names} /> : '—';
+            },
+            // 다른 국가 장수는 다른 칸과 같은 이유를 써서 좁은 화면에서 이유를 한 번만 적게 한다.
+            title: (g: GeneralView) =>
+              !isDetailedGeneral(g) ? HIDDEN_GENERAL : inspection.has(g.id) ? undefined : TURNS_OFFICER_ONLY,
+          },
+        ]
+      : []),
   ];
   return (
     <DataTable
@@ -374,7 +554,18 @@ function Garrison({
       rows={generals}
       columns={columns}
       rowKey={(g) => g.id}
-      mobileDetails={['officer', 'leadership', 'strength', 'intel', 'politics', 'charm', 'crewType', 'train', 'atmos']}
+      mobileDetails={[
+        'officer',
+        'leadership',
+        'strength',
+        'intel',
+        'politics',
+        'charm',
+        'crewType',
+        'train',
+        'atmos',
+        'turns',
+      ]}
     />
   );
 }

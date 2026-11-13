@@ -236,6 +236,8 @@ test('T4-24 장비 카드 예약·실제 매매·100 초과 표시와 세 화면
     // SSE가 실제 저장 결과를 다시 조회해야 한다. 새로고침으로 갱신 누락을 숨기지 않는다.
     const equipment = page.getByRole('region', { name: '장착 장비', exact: true });
     await expect(equipment.getByText('단도', { exact: true })).toBeVisible();
+    // 이름 옆에 장비 효과를 적는다 (INT-25 p3-generals-20).
+    await expect(equipment.getByTestId('equipment-effect')).toHaveText('(무력 +1)');
     const generalPanel = page.locator('[data-general-id]');
     await expect(generalPanel.getByText('101', { exact: true })).toBeVisible();
     await expect(generalPanel.getByText('기본 100 + 장비 1', { exact: true })).toBeVisible();

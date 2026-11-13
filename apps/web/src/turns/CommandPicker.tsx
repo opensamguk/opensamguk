@@ -94,6 +94,15 @@ interface Props {
   argContext?: ArgContext | undefined;
   // 인자 입력 화면이 국가·장수 대상을 열 때 알린다. 편집기는 그때부터 순위·외교·국가 장수 조회를 받는다.
   onNeed?: ((kind: 'nations' | 'generals') => void) | undefined;
+  // 최근 넣은 명령 줄 (원작 최근 실행). 편집기가 만들어 넘기며 명령 찾기 위에 그린다. 없으면 그리지 않는다.
+  recent?: ReactNode;
+}
+
+// 장비매매 품목 키 → 이름. 장비 정보를 아직 못 받았으면 없다.
+export function equipmentName(read: EquipmentRead | undefined): ((itemKey: string) => string | undefined) | undefined {
+  if (read?.kind !== 'ready') return undefined;
+  const items = read.data.items;
+  return (itemKey) => items.find((item) => item.key === itemKey)?.name;
 }
 
 // 서버가 준 명령을 카드로 고른다. 카드 선택과 실제 명령/패 소비는 별개다.
@@ -119,6 +128,7 @@ export function CommandPicker({
   precheck,
   argContext = { here: null, ownNationId: null },
   onNeed,
+  recent,
 }: Props) {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<string>('all');
@@ -313,6 +323,7 @@ export function CommandPicker({
           nation: (id) => nations.find((n) => n.id === id)?.name,
           general: screenGenerals ? (id) => screenGenerals.find((g) => g.id === id)?.name : undefined,
           unit: (id) => units.name(id),
+          equipment: equipmentName(equipment),
         }),
       ]
         .filter(Boolean)
@@ -399,6 +410,7 @@ export function CommandPicker({
 
   return (
     <section className={styles.picker} aria-label="명령 고르기">
+      {recent}
       <div className={styles.pickerHead}>
         <label className={styles.search}>
           <span>명령 찾기</span>

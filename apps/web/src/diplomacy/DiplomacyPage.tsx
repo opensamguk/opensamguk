@@ -3,10 +3,10 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Link, useRouterState } from '@tanstack/react-router';
 import { useMemo } from 'react';
 import { errorCode, retryUnlessClientError } from '../game/errors';
-import { formatYearMonth } from '../game/gameDate';
+import { formatYearMonth, type YearMonth } from '../game/gameDate';
 import { NoGeneral, QueryError } from '../game/QueryState';
 import { displayName } from '../game/names';
-import { useHome, useWorldId, useWorldMap } from '../game/queries';
+import { useHome, useWorldId, useWorldMap, useWorldSummary } from '../game/queries';
 import { useTRPC } from '../trpc';
 import { serverMessage } from '../turns/apiError';
 import { NationBadge } from '../ui/NationBadge';
@@ -422,8 +422,32 @@ function TreatyList({
   );
 }
 
-// 국가 탭: 다른 국가마다 우리와의 관계와 이어 볼 곳을 한 줄에 둔다 (INT-20 외교실 시안).
-// 이미 받은 treaty.list의 상대 목록과 조약만 쓴다. 마지막 파기는 신의 탭이 따로 조회하므로 여기에는 없다.
+// 남은 개월 수. 끝나는 연월에서 지금 연월(world.summary의 gameDate)을 뺀다.
+export const monthsLeft = (end: YearMonth, now: YearMonth) => end.year * 12 + end.month - (now.year * 12 + now.month);
+
+// 관계 칸 꼬리 (원작 내무부의 외교 기간). 지금 연월을 모르면 적지 않는다.
+export function monthsLeftText(end: YearMonth | null, now: YearMonth | undefined): string | null {
+  if (end === null || now === undefined) return null;
+  const left = monthsLeft(end, now);
+  return left > 0 ? `(${left}개월 남음)` : '(이번 달 끝남)';
+}
+
+export type NationStats = { power: number; generals: number; cities: number };
+
+// 순위 스냅숏(ranking.nations)의 줄을 nationId로 찾는다. 스냅숏에 없는 국가는 null이다.
+export function statsByNation(
+  rows: ReadonlyArray<{ nationId: number } & NationStats> | undefined,
+): Map<number, NationStats> {
+  return new Map(
+    (rows ?? []).map((row) => [row.nationId, { power: row.power, generals: row.generals, cities: row.cities }]),
+  );
+}
+
+const count = (value: number | undefined) => (value === undefined ? '—' : value.toLocaleString('ko-KR'));
+
+// 국가 탭: 다른 국가마다 국력·장수·도시, 우리와의 관계, 이어 볼 곳을 한 줄에 둔다 (INT-20 외교실 시안, 원작 내무부 외교관계 표).
+// 관계는 이미 받은 treaty.list의 상대 목록과 조약을 쓴다. 국력·장수·도시는 순위 화면과 같은 ranking.nations 스냅숏을 nationId로 합친다.
+// 마지막 파기는 신의 탭이 따로 조회하므로 여기에는 없다.
 function NationTable({
   worldId,
   targets,
@@ -435,14 +459,43 @@ function NationTable({
   items: readonly TreatyItem[];
   canPropose: boolean;
 }) {
+  const trpc = useTRPC();
+  const ranking = useQuery({
+    ...trpc.ranking.nations.queryOptions({ worldId, by: 'power' }),
+    retry: retryUnlessClientError,
+    staleTime: 60_000,
+  });
+  const summary = useWorldSummary(worldId);
+  const now = summary.data?.gameDate;
+  const stats = statsByNation(ranking.data?.items);
   if (targets.length === 0) return <EmptyState title="다른 국가가 없습니다" />;
   const withNation = (id: number) => items.filter((t) => t.fromNationId === id || t.toNationId === id);
+  const at = ranking.data?.at;
+  const caption = ranking.isError
+    ? '국력·장수·도시를 불러오지 못했습니다.'
+    : !ranking.data
+      ? '국력·장수·도시를 불러오는 중입니다.'
+      : at
+        ? `국력·장수·도시는 ${at.year}년 ${at.month}월 정산 기준입니다.`
+        : '국력·장수·도시는 아직 정산 전입니다.';
   return (
     <div className={styles.sheet}>
       <table className={styles.table} data-testid="nation-relations">
+        <caption className={styles.caption} data-testid="nation-stats-note">
+          {caption}
+        </caption>
         <thead>
           <tr>
             <th scope="col">국가</th>
+            <th scope="col" className={styles.num}>
+              국력
+            </th>
+            <th scope="col" className={styles.num}>
+              장수
+            </th>
+            <th scope="col" className={styles.num}>
+              도시
+            </th>
             <th scope="col">우리와의 관계</th>
             <th scope="col">이어 보기</th>
           </tr>
@@ -459,13 +512,24 @@ function NationTable({
                 : canPropose
                   ? { tab: 'write', text: '조약서 쓰기' }
                   : null;
+            const row = stats.get(target.nation.id);
+            const left = monthsLeftText(target.relationEndAt, now);
             return (
               <tr key={target.nation.id}>
                 <td>
                   <NationBadge name={target.nation.name} color={target.nation.color} />
                 </td>
+                <td className={`num ${styles.num}`}>{count(row?.power)}</td>
+                <td className={`num ${styles.num}`}>{count(row?.generals)}</td>
+                <td className={`num ${styles.num}`}>{count(row?.cities)}</td>
                 <td>
                   <RelationTag target={target} />
+                  {left ? (
+                    <span className={styles.muted} data-testid="relation-months-left">
+                      {' '}
+                      {left}
+                    </span>
+                  ) : null}
                 </td>
                 <td>
                   {next ? (

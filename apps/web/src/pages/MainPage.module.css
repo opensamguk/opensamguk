@@ -22,6 +22,23 @@
   color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
 }
+/* 연월 옆 계절 글자 (원작 지도 제목의 계절). */
+.season {
+  margin-left: var(--space-1);
+  color: var(--color-text);
+  font-weight: 600;
+}
+/* 줄 끝의 시나리오 이름과 켜진 서버 설정. 누르는 칸이 아니고, 긴 시나리오 이름은 줄을 넘겨 375px에서도 넘치지 않는다. */
+.progressTag {
+  padding: 0 6px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 0;
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  font-size: var(--text-xs);
+  line-height: 18px;
+  overflow-wrap: anywhere;
+}
 .sections {
   position: sticky;
   top: 0;
@@ -220,7 +237,13 @@
   background: var(--color-surface);
   border: var(--frame);
   box-shadow: var(--frame-inset), var(--shadow-step);
+}
+.menuStack {
   grid-area: menu;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
 }
 .menuRow {
   display: grid;

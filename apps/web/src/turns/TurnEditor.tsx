@@ -23,7 +23,7 @@ import { describeArgs, type ArgNames } from './args';
 import { useWorldRules, useWorldUnits } from '../game/queries';
 import { isDetailedCity, isDetailedGeneral, isMemberNation } from '../game/types';
 import type { ArgContext } from './CommandArgsScreen';
-import { CommandPicker, type CommandInfo } from './CommandPicker';
+import { CommandPicker, equipmentName, type CommandInfo } from './CommandPicker';
 import { useEquipment } from '../equipment/useEquipment';
 import {
   describeSelection,
@@ -36,6 +36,7 @@ import {
   type QuickSelect,
   type Turn,
 } from './draft';
+import { recentCommandsKey, useRecentCommands, type RecentCommand } from './recentCommands';
 import { slotTimes, type SlotTime } from './schedule';
 import { personalSource, type Check, type DisplaySlot, type TurnSource, type TurnSourceFactory } from './source';
 import { relationLabel } from './targets';
@@ -129,6 +130,7 @@ function SourceEditor<S extends DisplaySlot>({
     <Editor
       key={made.storageKey}
       worldId={worldId}
+      recentKey={recentCommandsKey(userId ?? '', worldId)}
       selectedCityKey={selectedCityKey}
       source={made}
       renderTop={renderTop}
@@ -153,12 +155,15 @@ type PrecheckResult = Check | { ok: 'error'; message: string } | undefined;
 
 function Editor<S extends DisplaySlot>({
   worldId,
+  recentKey,
   selectedCityKey,
   source,
   renderTop,
   report,
 }: {
   worldId: string;
+  // 최근 넣은 명령을 두는 localStorage 키(계정·월드).
+  recentKey: string;
   selectedCityKey: number | null;
   source: TurnSource<S>;
   renderTop?: TurnEditorProps['renderTop'];
@@ -204,6 +209,7 @@ function Editor<S extends DisplaySlot>({
   const rowRefs = useRef<Array<HTMLTableRowElement | null>>([]);
   const searchRef = useRef<HTMLInputElement | null>(null);
   const helpId = useId();
+  const [recent, rememberRecent] = useRecentCommands(recentKey);
 
   // 서버 목록이 바뀌면(저장·턴 실행) 사전 검사도 새로 받는다. 장수 상태가 바뀌었을 수 있다.
   const revision = server.data?.revision;
@@ -351,8 +357,9 @@ function Editor<S extends DisplaySlot>({
       nation: (id: number) => nations.find((n) => n.id === id)?.name,
       general: generals ? (id: number) => generals.find((g) => g.id === id)?.name : undefined,
       unit: units.name,
+      equipment: equipmentName(equipment),
     }),
-    [cities, nations, generals, units],
+    [cities, nations, generals, units, equipment],
   );
 
   // 같은 명령·인자는 사전 검사를 한 번만 묻는다. 휴식은 묻지 않는다.
@@ -387,9 +394,12 @@ function Editor<S extends DisplaySlot>({
       });
   });
 
+  // 남의 직책 칸은 그 직책자의 다음 턴 시각(감찰 조회)을 받았을 때만 시:분을 센다. 연월은 세지 않는다 (INT-25).
   const times30: SlotTime[] = source.timed
     ? slotTimes(slotCount, summary.data, home.data?.general.nextTurnTick, home.data?.nextTurnAt)
-    : Array.from({ length: slotCount }, () => ({ date: null, time: null, iso: null }));
+    : source.nextTurnAt !== undefined
+      ? slotTimes(slotCount, summary.data, undefined, source.nextTurnAt)
+      : Array.from({ length: slotCount }, () => ({ date: null, time: null, iso: null }));
 
   const focusRow = (i: number) => {
     const next = Math.max(0, Math.min(slotCount - 1, i));
@@ -464,6 +474,7 @@ function Editor<S extends DisplaySlot>({
     const edit = { put: { indices: [...selected].sort((a, b) => a - b), turn } };
     if (save) state.editAndSave(edit);
     else state.edit(edit);
+    rememberRecent(turn);
     rowRefs.current[focus]?.focus();
   };
   const onClear = () => onPut(EMPTY);
@@ -521,9 +532,12 @@ function Editor<S extends DisplaySlot>({
   if (readOnly !== null)
     return (
       <div className={styles.editor} data-testid="turn-editor" data-readonly="true">
-        <p className={styles.saveState} data-testid="readonly-reason">
-          읽기 전용: {readOnly}
-        </p>
+        <div className={styles.saveBar}>
+          <p className={styles.saveState} data-testid="readonly-reason">
+            읽기 전용: {readOnly}
+          </p>
+          <NowClock />
+        </div>
         <ReadOnlySlots label={source.gridLabel} slots={server.data?.slots ?? []} times={times30} names={names} />
       </div>
     );
@@ -541,6 +555,7 @@ function Editor<S extends DisplaySlot>({
         <p className={styles.saveState} data-testid="draft-state">
           {editCount > 0 ? `저장하지 않은 편집 ${editCount}건` : '저장된 목록'}
         </p>
+        <NowClock />
         {draft && !state.saving && !ended ? (
           <button type="button" className={styles.primary} onClick={state.submit}>
             저장
@@ -749,6 +764,16 @@ function Editor<S extends DisplaySlot>({
           precheck={source.precheck}
           argContext={argContext}
           onNeed={onNeed}
+          recent={
+            <RecentRow
+              recent={recent}
+              commands={commandList}
+              commandName={commandName}
+              names={names}
+              blockedReason={putBlocked}
+              onPut={onPut}
+            />
+          }
         />
       )}
 
@@ -861,7 +886,8 @@ function ReadOnlySlots({
               <tr key={i} className={styles.row} data-slot={i + 1}>
                 <td className="num">{i + 1}</td>
                 <td className={styles.when}>
-                  <span>{time?.date ?? '—'}</span>
+                  {time?.date || !time?.time ? <span>{time?.date ?? '—'}</span> : null}
+                  {time?.time ? <time dateTime={time.iso ?? undefined}>{time.time}</time> : null}
                 </td>
                 <td>
                   <span className={styles.command}>{slot.name}</span>
@@ -872,6 +898,77 @@ function ReadOnlySlots({
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// 예턴 표 머리의 지금 시각 시:분:초 (원작 예턴 편집기의 시계). 칸의 실행 시각과 같은 기준(이 기기 시계)으로 적는다.
+// 1초마다 이 부품만 다시 그린다. 화면 낭독기가 매초 읽지 않도록 알림 영역으로 두지 않는다.
+function NowClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return (
+    <span
+      className={styles.clock}
+      data-testid="turn-clock"
+      title="이 기기의 지금 시각입니다. 칸의 실행 시각과 같은 기준입니다."
+    >
+      현재{' '}
+      <time dateTime={now.toISOString()}>
+        {pad(now.getHours())}:{pad(now.getMinutes())}:{pad(now.getSeconds())}
+      </time>
+    </span>
+  );
+}
+
+// 최근 넣은 명령 줄 (원작 최근 실행, INT-25). 지금 명령 목록에 있는 것만 보이고, 누르면 고른 칸에 같은 넣기 경로로 넣는다.
+// 한 줄로 두고 넘치면 줄 안에서 옆으로 민다. 예턴 칸 아래 명령 고르기 안에 있어 첫 화면 칸 수를 줄이지 않는다.
+function RecentRow({
+  recent,
+  commands,
+  commandName,
+  names,
+  blockedReason,
+  onPut,
+}: {
+  recent: readonly RecentCommand[];
+  commands: readonly CommandInfo[];
+  commandName: (key: string) => string;
+  names: ArgNames;
+  blockedReason: string | null;
+  onPut: (turn: Turn) => void;
+}) {
+  const shown = recent.filter((item) => commands.some((command) => command.key === item.commandKey));
+  if (shown.length === 0) return null;
+  return (
+    <div className={styles.recent} role="group" aria-label="최근 넣은 명령">
+      <span className={styles.recentLabel}>최근</span>
+      <div className={styles.recentList}>
+        {shown.map((item) => {
+          const summary = [commandName(item.commandKey), describeArgs(item.args, names)].filter(Boolean).join(' · ');
+          const key = turnKey({ ...item, explicit: true });
+          return blockedReason ? (
+            <DisabledReason key={key} reason={blockedReason}>
+              <span className={styles.recentText}>{summary}</span>
+            </DisabledReason>
+          ) : (
+            <button
+              key={key}
+              type="button"
+              className={`${styles.chip} ${styles.recentItem}`}
+              aria-label={`${summary} 다시 넣기`}
+              title={summary}
+              onClick={() => onPut({ commandKey: item.commandKey, args: { ...item.args }, explicit: true })}
+            >
+              <span className={styles.recentText}>{summary}</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

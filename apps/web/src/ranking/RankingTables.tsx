@@ -113,7 +113,7 @@ function GeneralRow({
           decorative
           className={styles.face}
         />
-        <span className={styles.name} data-testid="ranked-general-name">
+        <span className={styles.name} data-testid="ranked-general-name" data-general-name>
           {displayName(row.name)}
         </span>
         {me ? <span className={styles.meChip}>나</span> : null}

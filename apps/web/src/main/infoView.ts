@@ -126,6 +126,51 @@ export function nearMax(rows: ReadonlyArray<{ label: string; value: number; max:
   });
 }
 
+// 개발 정도 구간 (원작 세력 도시의 비율별 글자색). 최대치에 대한 비율로 낮음·보통·높음을 나눈다.
+// 경계(40%·80%)는 화면 표시 기준이고 규칙 값이 아니다. 색만으로 뜻을 전하지 않도록 글자 딱지를 함께 쓴다.
+export type StatBand = 'low' | 'mid' | 'high';
+export const BAND_LABEL: Record<StatBand, string> = { low: '낮음', mid: '보통', high: '높음' };
+export const BAND_LOW_BELOW = 0.4;
+export const BAND_HIGH_FROM = 0.8;
+export function statBand(value: number, max: number): StatBand | null {
+  if (!(max > 0) || !Number.isFinite(value)) return null;
+  const ratio = value / max;
+  if (ratio < BAND_LOW_BELOW) return 'low';
+  if (ratio < BAND_HIGH_FROM) return 'mid';
+  return 'high';
+}
+
+// 도시 수치 일곱 줄(주민·내정 다섯·민심)의 구간. city.get 상세를 받은 도시만 쓴다.
+export function cityBands(city: {
+  population: number;
+  populationMax: number;
+  agriculture: number;
+  agricultureMax: number;
+  commerce: number;
+  commerceMax: number;
+  security: number;
+  securityMax: number;
+  defence: number;
+  defenceMax: number;
+  wall: number;
+  wallMax: number;
+  trust: number;
+}) {
+  const rows = [
+    { label: '주민', value: city.population, max: city.populationMax },
+    { label: '농업', value: city.agriculture, max: city.agricultureMax },
+    { label: '상업', value: city.commerce, max: city.commerceMax },
+    { label: '치안', value: city.security, max: city.securityMax },
+    { label: '수비', value: city.defence, max: city.defenceMax },
+    { label: '성벽', value: city.wall, max: city.wallMax },
+    { label: '민심', value: Math.floor(city.trust), max: 100 },
+  ];
+  return rows.flatMap((row) => {
+    const band = statBand(row.value, row.max);
+    return band === null ? [] : [{ ...row, band }];
+  });
+}
+
 // 중원 정세 글줄. 연감의 달별 도시 소유를 바로 앞 달과 견주어 건국·멸망·영토 변화를 만든다.
 // 서버 연감은 국가 번호·도시 수·도시 소유만 주므로(records.world) 사건 종류(점령·양도 등)는 가르지 않는다.
 export interface YearbookFrame {

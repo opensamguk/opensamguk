@@ -191,3 +191,16 @@
   margin-left: var(--space-1);
   font-size: var(--text-xs);
 }
+/* 직책 탭의 다음 턴 시각 (INT-25). */
+.tabTime {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 767px) {
+  .tab {
+    min-height: 44px;
+  }
+}

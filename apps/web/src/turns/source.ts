@@ -55,6 +55,9 @@ export interface TurnSource<S extends DisplaySlot = DisplaySlot> {
   precheckRoot: QueryKey;
   // 실행 시기를 셀 수 있는 칸인가. 국가 칸은 내 직책 칸만 내 턴에 실행된다.
   timed: boolean;
+  // timed가 아닌 칸(남의 직책 칸)의 주인 장수 다음 턴 시각. 있으면 그 시각 + 칸 번호 × 턴 간격으로 시:분을 적는다.
+  // null은 서버가 시각을 주지 않은 경우(멈춘 월드·가속), undefined는 모르는 경우다 (INT-25).
+  nextTurnAt?: string | null | undefined;
   // 편집할 수 없는 칸이면 서버가 준 이유. null이면 편집할 수 있다.
   readOnly: string | null;
   // 대상 장수 인자(generalId)를 이름으로 고를 장수 목록. 없으면 번호로 넣는다.
