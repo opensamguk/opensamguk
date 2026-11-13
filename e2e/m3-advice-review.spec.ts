@@ -30,7 +30,7 @@ test('AC-M3-13 공지 지시를 우선 표시하고 조언을 누르면 첫 예�
   expect(expected.items[0]).toMatchObject({ source: 'notice', reason, commandKey: 'farm' });
   const { page } = member;
   await page.setViewportSize({ width: 375, height: 812 });
-  await page.goto(`/w/${worldId}`);
+  await page.goto(`/w/${worldId}#main-commands`);
   await page.getByRole('dialog').getByRole('button', { name: '확인', exact: true }).click();
   const advice = page.getByTestId('military-advice');
   await advice.getByRole('button', { name: '펼치기', exact: true }).click();
@@ -126,7 +126,7 @@ test('AC-M3-13 공지 지시를 우선 표시하고 조언을 누르면 첫 예�
   const recommendations = await apiQuery<Output['advice']['get']>(ronin, 'advice.get', { worldId });
   const nation = recommendations.items.find((item) => item.nation !== null)?.nation;
   expect(nation).toBeDefined();
-  await ronin.page.goto(`/w/${worldId}`);
+  await ronin.page.goto(`/w/${worldId}#main-commands`);
   const roninAdvice = ronin.page.getByTestId('military-advice');
   await roninAdvice.getByRole('button', { name: '펼치기', exact: true }).click();
   await expect(roninAdvice.getByText(nation!.name, { exact: true }).first()).toBeVisible();
@@ -234,7 +234,7 @@ test('AC-M3-15 실제 월간 정산이 기록 화면에 순위와 한 줄 평을
     const records = await query<Output['records']['world']>(page, 'records.world', { worldId });
     const headline = records.items[0]?.review?.headline;
     expect(headline).toBeTruthy();
-    await expect(page.getByText(headline!, { exact: true })).toBeVisible();
+    await expect(page.getByTestId('world-review-headline').filter({ hasText: headline! })).toBeVisible();
     await engine.advanceTo(2 * TICKS_PER_MONTH);
     await expect(panel).toContainText(/평판에 오른 장수가 없/);
     const month = panel.getByRole('combobox');
@@ -252,7 +252,7 @@ test('AC-M3-15 실제 월간 정산이 기록 화면에 순위와 한 줄 평을
     await engine.advanceTo(3 * TICKS_PER_MONTH);
     await expect(panel.getByRole('heading')).toHaveText(`${first.year}년 3월 월단평`);
     await expect(month.locator('option:checked')).toHaveText(`${first.year}년 3월`);
-    await page.goto(`/w/${worldId}`);
+    await page.goto(`/w/${worldId}#main-records`);
     await expect(page.getByTestId('world-review-headline').filter({ hasText: headline! })).toBeVisible();
   } finally {
     await page.close();

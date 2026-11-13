@@ -394,8 +394,9 @@ test('정식191년 메인·예턴 메뉴 이동·초점·375~1440px·30초 재�
     expect(saved[29]).toMatchObject({ slot: 29, commandKey: 'farm' });
 
     // 실제 조회 실패와 장수 없음은 구분하고, 복구한 뒤 같은 막대를 쓸 수 있다.
+    let failMap = true;
     await page.route('**/trpc/**', async (route) => {
-      if (route.request().url().includes('world.map')) await route.abort('failed');
+      if (failMap && route.request().url().includes('world.map')) await route.abort('failed');
       else await route.continue();
     });
     await page.reload();
@@ -404,9 +405,12 @@ test('정식191년 메인·예턴 메뉴 이동·초점·375~1440px·30초 재�
     await expect(mapPanel).toBeVisible();
     await expect(page).toHaveURL(base);
     await expect(mapPanel.getByRole('alert')).toContainText('불러오지 못했습니다', { timeout: 20_000 });
-    await page.unroute('**/trpc/**');
-    await mapPanel.getByRole('button', { name: '다시 시도', exact: true }).click();
+    const retry = mapPanel.getByRole('button', { name: '다시 시도', exact: true });
+    await expect(retry).toBeVisible();
+    failMap = false;
+    await retry.click();
     await expect(page.getByTestId('operational-world-map')).toBeVisible();
+    await page.unroute('**/trpc/**');
     // 같은 HTTP 배치의 다른 조회도 중단될 수 있다. 새 문서에서 저장한 목록과 선택 도시를 다시 확인한다.
     await page.reload();
     await tab('예턴').click();
