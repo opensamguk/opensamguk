@@ -1,0 +1,101 @@
+import { z } from 'zod';
+import { combatSpecialty, combatSpecialtyKey, combatSpecialtyNames } from '../general/combatSpecialty';
+import type { WorldState, WorldView } from '../model/world';
+import type { RecordedInput, ReplayState } from '../replay';
+
+export const HERITAGE_SPECIALTY_FEATURE = 'heritage-specialty-v1';
+export const HERITAGE_SPECIALTY_KIND = 'heritage.combatSpecialty';
+export const heritageSpecialtyCost = 4_000;
+const maxPoints = 2_147_483_647;
+const specialty = z.enum(combatSpecialtyNames);
+export const heritageSpecialtyInput = z.discriminatedUnion('action', [
+  z.strictObject({ action: z.literal('reserve'), specialty }),
+  z.strictObject({ action: z.literal('reset') }),
+]);
+export const heritageSpecialtyState = z.strictObject({
+  next: specialty.nullable(),
+  resets: z.number().int().min(0).max(40),
+});
+export type HeritageSpecialtyState = z.infer<typeof heritageSpecialtyState>;
+export type HeritageSpecialtyInput = z.infer<typeof heritageSpecialtyInput>;
+
+export function storedHeritageSpecialty(enabled: boolean, value: unknown) {
+  if (value == null) return {};
+  if (!enabled) throw new Error('전투 특기 유산을 끈 월드에 저장 상태가 있습니다.');
+  return { heritageSpecialty: heritageSpecialtyState.parse(value) };
+}
+
+export function heritageSpecialtyResetCost(resets: number) {
+  const costs = [1_000, 1_000, 2_000, 3_000];
+  while (costs.length <= resets) costs.push(costs.at(-1)! + costs.at(-2)!);
+  const cost = costs[resets]!;
+  return cost <= maxPoints ? cost : null;
+}
+
+export function heritageSpecialtyPurchase(
+  view: Pick<WorldView, 'ruleFeatures'>,
+  general: { special: string | null; combatSpecial?: string | null; heritageSpecialty?: HeritageSpecialtyState },
+  input: HeritageSpecialtyInput,
+) {
+  const state = general.heritageSpecialty ?? { next: null, resets: 0 };
+  const current = combatSpecialty(view, combatSpecialtyKey(general));
+  if (input.action === 'reserve') {
+    if (state.next || current?.name === input.specialty) return null;
+    return {
+      cost: heritageSpecialtyCost,
+      combatSpecial: combatSpecialtyKey(general),
+      heritageSpecialty: { ...state, next: input.specialty },
+    };
+  }
+  const cost = heritageSpecialtyResetCost(state.resets);
+  if (!current || !cost) return null;
+  return { cost, combatSpecial: null, heritageSpecialty: { ...state, resets: state.resets + 1 } };
+}
+
+export function applyHeritageSpecialtyPurchase(replay: ReplayState, input: RecordedInput): ReplayState {
+  const actor = input.generalId === null ? undefined : replay.state.generals[input.generalId];
+  if (!actor || actor.userId === null || actor.removedAt !== undefined)
+    throw new Error('전투 특기 구매 장수가 없습니다.');
+  const purchase = heritageSpecialtyPurchase(replay.state, actor, heritageSpecialtyInput.parse(input.payload));
+  const result = z
+    .strictObject({
+      cost: z.number().int().positive(),
+      combatSpecial: z.string().nullable(),
+      heritageSpecialty: heritageSpecialtyState,
+    })
+    .parse(input.result);
+  if (
+    !purchase ||
+    result.cost !== purchase.cost ||
+    result.combatSpecial !== purchase.combatSpecial ||
+    result.heritageSpecialty.next !== purchase.heritageSpecialty.next ||
+    result.heritageSpecialty.resets !== purchase.heritageSpecialty.resets
+  )
+    throw new Error('전투 특기 구매 결과가 다릅니다.');
+  return {
+    ...replay,
+    state: {
+      ...replay.state,
+      generals: {
+        ...replay.state.generals,
+        [actor.id]: { ...actor, combatSpecial: result.combatSpecial, heritageSpecialty: result.heritageSpecialty },
+      },
+    },
+  };
+}
+
+export function settleHeritageSpecialties(state: WorldState, year: number) {
+  if (!state.ruleFeatures?.includes(HERITAGE_SPECIALTY_FEATURE)) return;
+  for (const general of Object.values(state.generals)) {
+    const next = general.heritageSpecialty?.next;
+    if (
+      !next ||
+      general.removedAt !== undefined ||
+      general.activeFromYear > year ||
+      combatSpecialty(state, combatSpecialtyKey(general))
+    )
+      continue;
+    general.combatSpecial = next;
+    general.heritageSpecialty = { ...general.heritageSpecialty!, next: null };
+  }
+}

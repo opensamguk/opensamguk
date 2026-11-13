@@ -84,6 +84,8 @@ export interface InitialGeneral {
   officerLevel: number;
   officerCityKey?: number | null;
   defenseThreshold?: number;
+  combatSpecial?: string | null;
+  heritageSpecialty?: import('../heritage/specialty').HeritageSpecialtyState;
   heritageBenefits?: import('../heritage/benefits').HeritageBenefits;
   proficiency?: import('../general/proficiency').GeneralProficiency;
   statExperience?: import('../general/statGrowth').StatExperience;

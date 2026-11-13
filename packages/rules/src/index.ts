@@ -294,6 +294,7 @@ export * from './lineage/history';
 export * from './personnel/assignmentRows';
 export * from './personnel/residentOffice';
 export * from './personnel/cityOfficeVolunteers';
+export * from './heritage/specialty';
 export * from './lineage/control';
 export { reconcileLineage } from './lineage/reconcile';
 export * from './lineage/monthly';
@@ -397,5 +398,10 @@ export {
 } from './general/proficiency';
 
 export { BATTLE_TACTICS_FEATURE } from './battle/tactics';
-export { COMBAT_SPECIALTY_FEATURE, combatSpecialty } from './general/combatSpecialty';
+export {
+  COMBAT_SPECIALTY_FEATURE,
+  combatSpecialty,
+  combatSpecialtyKey,
+  combatSpecialtyNames,
+} from './general/combatSpecialty';
 export { DOMESTIC_SPECIALTY_FEATURE, domesticSpecialty } from './general/domesticSpecialty';

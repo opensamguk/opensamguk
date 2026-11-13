@@ -472,6 +472,8 @@ model General {
   proficiency       Json?
   statExperience    Json?
   heritageBenefits  Json?
+  heritageSpecialty Json?
+  combatSpecial     String?
   special           String?
   gold              Int
   rice              Int

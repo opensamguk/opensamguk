@@ -1,4 +1,4 @@
-import { combatSpecialty } from '../general/combatSpecialty';
+import { combatSpecialty, combatSpecialtyKey } from '../general/combatSpecialty';
 import type { Rng } from '@opensamguk/shared';
 import { personalityEffects } from '../general/personality';
 import { BALANCE } from '../balance';
@@ -216,7 +216,7 @@ export function generalTurnCandidates(view: WorldView, general: General, context
       const amount =
         stats ||
         personalityEffects(view, general.personality)?.recruitPercent !== undefined ||
-        combatSpecialty(view, general.special)?.armType === unit.armType
+        combatSpecialty(view, combatSpecialtyKey(general))?.armType === unit.armType
           ? affordableRecruits(view, general, unit.cost, limit, unit.armType)
           : Math.min(limit, Math.floor(general.gold / unit.cost));
       if (amount > 0)

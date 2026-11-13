@@ -1,5 +1,5 @@
 import { battleTacticsStats } from '../battle/tactics';
-import { combatSpecialty } from '../general/combatSpecialty';
+import { combatSpecialty, combatSpecialtyKey } from '../general/combatSpecialty';
 import type { Rng } from '@opensamguk/shared';
 import { personalityEffects } from '../general/personality';
 import { BALANCE } from '../balance';
@@ -86,13 +86,13 @@ export function fightCampaignUnits(
       attacker: force(attacker),
       attackerReadiness: personalityEffects(state, state.generals[attacker.commanderId]!.personality),
       attackerProficiency: state.generals[attacker.commanderId]!.proficiency,
-      attackerSpecialty: combatSpecialty(state, state.generals[attacker.commanderId]!.special),
+      attackerSpecialty: combatSpecialty(state, combatSpecialtyKey(state.generals[attacker.commanderId]!)),
       attackerHeritage: state.generals[attacker.commanderId]!.heritageBenefits,
       attackerTactics: battleTacticsStats(state, state.generals[attacker.commanderId]!),
       defender: force(defender),
       defenderReadiness: personalityEffects(state, state.generals[defender.commanderId]!.personality),
       defenderProficiency: state.generals[defender.commanderId]!.proficiency,
-      defenderSpecialty: combatSpecialty(state, state.generals[defender.commanderId]!.special),
+      defenderSpecialty: combatSpecialty(state, combatSpecialtyKey(state.generals[defender.commanderId]!)),
       defenderHeritage: state.generals[defender.commanderId]!.heritageBenefits,
       defenderTactics: battleTacticsStats(state, state.generals[defender.commanderId]!),
       attackerTech: state.nations[aNation]!.tech,
@@ -138,7 +138,7 @@ export function fightCampaignWall(
       attacker: force(attacker),
       attackerReadiness: personalityEffects(state, state.generals[attacker.commanderId]!.personality),
       attackerProficiency: state.generals[attacker.commanderId]!.proficiency,
-      attackerSpecialty: combatSpecialty(state, state.generals[attacker.commanderId]!.special),
+      attackerSpecialty: combatSpecialty(state, combatSpecialtyKey(state.generals[attacker.commanderId]!)),
       attackerHeritage: state.generals[attacker.commanderId]!.heritageBenefits,
       attackerTactics: battleTacticsStats(state, state.generals[attacker.commanderId]!),
       defender: { crew: city.wall, crewType: 1000, train: 100, atmos: 100 },
@@ -206,7 +206,7 @@ export function fightCampaignCityGarrison(
       attacker: force(attacker),
       attackerReadiness: personalityEffects(state, state.generals[attacker.commanderId]!.personality),
       attackerProficiency: state.generals[attacker.commanderId]!.proficiency,
-      attackerSpecialty: combatSpecialty(state, state.generals[attacker.commanderId]!.special),
+      attackerSpecialty: combatSpecialty(state, combatSpecialtyKey(state.generals[attacker.commanderId]!)),
       attackerHeritage: state.generals[attacker.commanderId]!.heritageBenefits,
       attackerTactics: battleTacticsStats(state, state.generals[attacker.commanderId]!),
       defender: { crew: defender.troops, crewType: defender.crewType, train: defender.train, atmos: defender.atmos },

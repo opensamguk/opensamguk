@@ -1,5 +1,5 @@
 import { battleTacticsStats } from '../battle/tactics';
-import { combatSpecialty } from '../general/combatSpecialty';
+import { combatSpecialty, combatSpecialtyKey } from '../general/combatSpecialty';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import { z } from 'zod';
 import { nationRestrictions } from '../personnel/nationRestrictions';
@@ -104,7 +104,7 @@ function makeAttack(collect: typeof collectModifiers) {
             attacker: g,
             attackerReadiness: personalityEffects(state, g.personality),
             attackerProficiency: g.proficiency,
-            attackerSpecialty: combatSpecialty(state, g.special),
+            attackerSpecialty: combatSpecialty(state, combatSpecialtyKey(g)),
             attackerHeritage: g.heritageBenefits,
             attackerTactics: battleTacticsStats(state, g),
             defender: wall,
@@ -145,13 +145,13 @@ function makeAttack(collect: typeof collectModifiers) {
             attacker: g,
             attackerReadiness: personalityEffects(state, g.personality),
             attackerProficiency: g.proficiency,
-            attackerSpecialty: combatSpecialty(state, g.special),
+            attackerSpecialty: combatSpecialty(state, combatSpecialtyKey(g)),
             attackerHeritage: g.heritageBenefits,
             attackerTactics: battleTacticsStats(state, g),
             defender,
             defenderReadiness: personalityEffects(state, defender.personality),
             defenderProficiency: defender.proficiency,
-            defenderSpecialty: combatSpecialty(state, defender.special),
+            defenderSpecialty: combatSpecialty(state, combatSpecialtyKey(defender)),
             defenderHeritage: defender.heritageBenefits,
             defenderTactics: battleTacticsStats(state, defender),
             recordPhases: actor.recordBattleStats === true,

@@ -15,6 +15,7 @@ import {
   validatePossessionRecord,
   availableNpc,
   combatSpecialty,
+  combatSpecialtyKey,
   domesticSpecialty,
   classifyRole,
   nationRecommendations,
@@ -200,7 +201,7 @@ export const entryRouter = router({
             const nation = general.nationId === null ? null : view.nations[general.nationId]!;
             const suggested = general.nationId === null ? recommend(general.id)[0] : undefined;
             const domestic = domesticSpecialty(world, general.special);
-            const combat = combatSpecialty(world, general.special);
+            const combat = combatSpecialty(world, combatSpecialtyKey(general));
             roles[classifyRole(general)].push({
               generalId: general.id,
               name: general.name,

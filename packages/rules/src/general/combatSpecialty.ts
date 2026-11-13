@@ -41,6 +41,11 @@ const specialties: Readonly<Record<string, Specialty>> = {
   },
 };
 
+export const combatSpecialtyNames = Object.keys(specialties);
+export function combatSpecialtyKey(general: { special: string | null; combatSpecial?: string | null }) {
+  return general.combatSpecial === undefined ? general.special : general.combatSpecial;
+}
+
 export function combatSpecialty(view: Pick<WorldView, 'ruleFeatures'>, key: string | null | undefined) {
   const name = key?.replace(/^che_/, '');
   if (!view.ruleFeatures?.includes(COMBAT_SPECIALTY_FEATURE) || !name || !Object.hasOwn(specialties, name))

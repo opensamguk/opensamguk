@@ -5,6 +5,8 @@ import {
   OFFICE_EFFECTS_FEATURE,
   officeEffectsSchema,
   readCityOfficeVolunteers,
+  HERITAGE_SPECIALTY_FEATURE,
+  storedHeritageSpecialty,
   readOperationalMap,
   attachOperationalKinds,
   readStoredGovernance,
@@ -154,6 +156,8 @@ export async function loadWorldAfterCapabilityCheck(
           proficiency,
           statExperience,
           heritageBenefits,
+          heritageSpecialty,
+          combatSpecial,
           ...general
         }) => {
           void turnRevision;
@@ -170,6 +174,11 @@ export async function loadWorldAfterCapabilityCheck(
                   {
                     ...stripWorldId(general),
                     ...(officerCityKey == null ? {} : { officerCityKey }),
+                    ...storedHeritageSpecialty(
+                      world.ruleFeatures.includes(HERITAGE_SPECIALTY_FEATURE),
+                      heritageSpecialty,
+                    ),
+                    ...(heritageSpecialty === null ? {} : { combatSpecial }),
                     ...storedHeritageBenefits(world.ruleFeatures.includes(HERITAGE_BENEFITS_FEATURE), heritageBenefits),
                     ...storedGeneralProficiency(world.ruleFeatures.includes(GENERAL_PROFICIENCY_FEATURE), proficiency),
                     ...storedStatExperience(statExperience),

@@ -26,6 +26,8 @@ function general(changes: Partial<General> = {}): General {
     proficiency: null,
     statExperience: null,
     heritageBenefits: null,
+    heritageSpecialty: null,
+    combatSpecial: null,
     cityKey: 1,
     officerLevel: 12,
     officerCityKey: null,
