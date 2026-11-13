@@ -274,6 +274,35 @@ export function NationRankingTable({
               <RankCell rank={row.rank} />
               <td>
                 <NationBadge name={row.name} color={row.color} />
+                {row.forceEstimate ? (
+                  <details>
+                    <summary>현재 병력 추정</summary>
+                    <dl className={styles.details}>
+                      <div>
+                        <dt>소속 장수</dt>
+                        <dd>{number(row.forceEstimate.totalGeneralCount)}명</dd>
+                      </div>
+                      <div>
+                        <dt>사람 전투장</dt>
+                        <dd>
+                          {number(row.forceEstimate.userCombatGeneralCount)}명 · 약{' '}
+                          {number(row.forceEstimate.userTroops)}명
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>NPC 전투장</dt>
+                        <dd>
+                          {number(row.forceEstimate.npcCombatGeneralCount)}명 · 약 {number(row.forceEstimate.npcTroops)}
+                          명
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>장기 미활동 장수</dt>
+                        <dd>{number(row.forceEstimate.inactiveGeneralCount)}명</dd>
+                      </div>
+                    </dl>
+                  </details>
+                ) : null}
                 {narrow ? (
                   <dl className={styles.details}>
                     {NATION_COLUMNS.map((column) => (

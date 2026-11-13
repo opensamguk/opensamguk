@@ -175,6 +175,14 @@ describe('국가 순위 표', () => {
         generals: 30,
         power: 4321,
         value: 12,
+        forceEstimate: {
+          totalGeneralCount: 30,
+          userCombatGeneralCount: 1,
+          userTroops: 9000,
+          npcCombatGeneralCount: 2,
+          npcTroops: 15000,
+          inactiveGeneralCount: 3,
+        },
       },
     ];
     render(<NationRankingTable ranking={{ items, at }} by="cities" onSort={() => {}} />);
@@ -182,6 +190,9 @@ describe('국가 순위 표', () => {
     expect(headers).toEqual(['순위', '국가', '도시▼', '장수', '국력']);
     expect(screen.queryByText(/국고|군량|금|쌀/)).toBeNull();
     expect(screen.getByText('4,321')).toBeTruthy();
+    fireEvent.click(screen.getByText('현재 병력 추정'));
+    expect(screen.getByText('1명 · 약 9,000명')).toBeTruthy();
+    expect(screen.getByText('2명 · 약 15,000명')).toBeTruthy();
   });
 });
 
