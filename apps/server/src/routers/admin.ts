@@ -59,7 +59,15 @@ import {
   noticeHideInput,
 } from '../admin/notices';
 
+import { getReleaseStatus, releaseRequestInput, releaseStatusInput, requestRelease } from '../admin/releases';
+
 export const adminRouter = router({
+  release: router({
+    status: adminProcedure
+      .input(releaseStatusInput)
+      .query(({ ctx, input }) => getReleaseStatus(ctx, input.expectedUserId)),
+    request: adminProcedure.input(releaseRequestInput).mutation(({ ctx, input }) => requestRelease(ctx, input)),
+  }),
   game: router({
     editor: adminProcedure.input(adminEditorInput).query(({ ctx, input }) => readAdminEditor(ctx, input)),
     general: adminProcedure.input(adminGeneralInput).query(({ ctx, input }) => readAdminGeneral(ctx, input)),

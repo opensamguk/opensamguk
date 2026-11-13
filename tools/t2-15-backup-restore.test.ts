@@ -871,6 +871,18 @@ describe('T2-15 B1 백업·복구 경계', () => {
       expect(await f.calls()).toBe('');
     },
   );
+  it('운영 복원 준비는 승인 원본·영수증이 필요하며 리허설에 승인 인자를 받지 않는다', async () => {
+    const f = await fixture();
+    const rehearsal = await f.restoreInput();
+    const staged = [...rehearsal.slice(0, -1), 'opensamguk_restore_20261112t120000z_aaaaaaaa'];
+    const unassigned = await f.run('restore', staged);
+    expect(unassigned.code).not.toBe(0);
+    expect(unassigned.stderr).toContain('OPERATIONAL_RESTORE_UNASSIGNED');
+    const mismatched = await f.run('restore', [...rehearsal, '--approved-source-db', 'source_fixture']);
+    expect(mismatched.code).not.toBe(0);
+    expect(mismatched.stderr).toContain('STAGE_APPROVAL');
+    expect(await f.calls()).toBe('');
+  });
   it.each(['target-exists', 'list-fail', 'old-restore'])(
     'restore 사전 거부 %s는 CREATE·복원·DROP 0회다',
     async (flag) => {

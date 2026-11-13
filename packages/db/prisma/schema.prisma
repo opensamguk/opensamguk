@@ -1068,3 +1068,38 @@ model MapBackground {
   imageCommit    String
   createdAt      DateTime     @default(now())
 }
+
+enum ReleaseOperation {
+  DEPLOY
+  ROLLBACK
+}
+
+enum ReleaseRequestStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  NEEDS_OWNER
+}
+
+model ReleaseControl {
+  id              String   @id
+  currentRevision String
+  candidates      Json
+  seenAt          DateTime
+}
+
+model ReleaseRequest {
+  id               String               @id
+  actorUserId      String
+  operation        ReleaseOperation
+  expectedRevision String
+  targetRevision   String
+  manifestSha256   String
+  status           ReleaseRequestStatus @default(QUEUED)
+  requestedAt      DateTime             @default(now())
+  startedAt        DateTime?
+  finishedAt       DateTime?
+
+  @@index([status, requestedAt])
+}
