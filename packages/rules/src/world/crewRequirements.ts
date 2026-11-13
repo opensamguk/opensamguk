@@ -25,6 +25,12 @@ const provinces = [
   '동이',
   '이민족',
 ];
+export function cityRegionName(region: number, mapKey: string, scheme?: 'province-191'): string | null {
+  if (scheme === 'province-191') return provinces[region] || null;
+  if (mapKey === 'che' || mapKey.startsWith('che@')) return LEGACY_CHE_REGION_NAMES[region] || null;
+  return null;
+}
+
 const researchNames = {
   greatsword: '대검병',
   halberd: '극병',

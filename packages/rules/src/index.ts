@@ -9,7 +9,7 @@ export {
   MAX_LEGACY_STARTING_NPC_STAT,
   MAX_STARTING_NPC_STAT,
 } from './world/initialNpcStats';
-export { crewContext, crewTypeFailure } from './world/crewRequirements';
+export { cityRegionName, crewContext, crewTypeFailure } from './world/crewRequirements';
 export { readOperationalMap, attachOperationalKinds, operationalMapDisplay } from './world/map/stored';
 export { checkOperationalProfile } from './world/map/profile';
 export type { OperationalMapResource } from './world/map/operational';
