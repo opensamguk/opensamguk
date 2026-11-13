@@ -3,12 +3,25 @@
 
 export type BattleForce = { crew: number; crewType: number; train: number; atmos: number };
 export type CommanderStats = { leadership: number; strength: number };
+export type BattleEquipment = {
+  extraPhases?: number;
+  damageFactor?: number;
+  riceFactor?: number;
+  evasionLeadership?: number;
+  protectsFromBattleInjury?: true;
+  tacticsTrial?: number;
+  opposingTacticsSuccess?: number;
+  tacticsDamageFactor?: number;
+  counterTactics?: number;
+  snipe?: { chance: number; morale: number; injury: readonly [number, number] };
+};
 export type AttackerTraits = {
   personality?: string;
   specialty?: string;
   proficiency?: Record<string, number>;
   tactics?: CommanderStats & { intel: number };
   heritage?: Partial<Record<(typeof combatHeritageKeys)[number], number>>;
+  equipment?: BattleEquipment;
 };
 export type BattleCommanders = { attacker: CommanderStats; defender?: CommanderStats };
 
@@ -39,6 +52,8 @@ export type BattlePhase = {
   defenderCritical?: boolean;
   attackerTactic?: { name: string; success: boolean };
   defenderTactic?: { name: string; success: boolean };
+  attackerSniped?: boolean;
+  defenderSniped?: boolean;
 };
 
 export type BattleRunResult = {
@@ -108,6 +123,48 @@ const combatHeritageKeys = [
   'opponentTactics',
 ] as const;
 const FORCE_KEYS = ['crew', 'crewType', 'train', 'atmos'] as const;
+const equipmentRanges: Readonly<Record<string, readonly [number, number]>> = {
+  extraPhases: [-1, 1],
+  damageFactor: [1, 2],
+  riceFactor: [1, 2],
+  evasionLeadership: [1, 255],
+  tacticsTrial: [0, 1],
+  opposingTacticsSuccess: [-1, 0],
+  tacticsDamageFactor: [1, 2],
+  counterTactics: [0, 1],
+};
+
+function validBattleEquipment(value: unknown): value is BattleEquipment {
+  if (!isRecord(value)) return false;
+  for (const [key, stat] of Object.entries(value)) {
+    if (key === 'protectsFromBattleInjury' && stat === true) continue;
+    if (
+      key === 'snipe' &&
+      isRecord(stat) &&
+      Object.keys(stat).length === 3 &&
+      typeof stat.chance === 'number' &&
+      stat.chance >= 0 &&
+      stat.chance <= 1 &&
+      !intProblem(stat.morale, 0, 100) &&
+      Array.isArray(stat.injury) &&
+      stat.injury.length === 2 &&
+      !intProblem(stat.injury[0], 0, 80) &&
+      !intProblem(stat.injury[1], stat.injury[0], 80)
+    )
+      continue;
+    const range = Object.hasOwn(equipmentRanges, key) ? equipmentRanges[key] : undefined;
+    if (
+      !range ||
+      typeof stat !== 'number' ||
+      !Number.isFinite(stat) ||
+      stat < range[0] ||
+      stat > range[1] ||
+      (key === 'extraPhases' && !Number.isInteger(stat))
+    )
+      return false;
+  }
+  return true;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -163,6 +220,8 @@ export function requestProblems(message: unknown, units: readonly UnitChoice[]):
               add(`attackerTraits.heritage.${benefit}`, intProblem(level, 1, 5));
             else add(`attackerTraits.heritage.${benefit}`, { problem: 'unexpected' });
           }
+        } else if (key === 'equipment' && validBattleEquipment(value)) {
+          continue;
         } else if (key === 'proficiency' && isRecord(value)) {
           for (const [armType, points] of Object.entries(value)) {
             if (!units.some((unit) => unit.armType > 0 && String(unit.armType) === armType))
@@ -286,13 +345,14 @@ export function checkRequest(message: unknown, units: readonly UnitChoice[]): Ch
   if (m.recordPhases) request.recordPhases = true;
   if (m.coefMode) request.coefMode = m.coefMode;
   if (m.attackerTraits) {
-    const { personality, specialty, proficiency, tactics, heritage } = m.attackerTraits;
+    const { personality, specialty, proficiency, tactics, heritage, equipment } = m.attackerTraits;
     request.attackerTraits = {
       ...(personality === undefined ? {} : { personality }),
       ...(specialty === undefined ? {} : { specialty }),
       ...(proficiency === undefined ? {} : { proficiency: { ...proficiency } }),
       ...(tactics === undefined ? {} : { tactics: { ...tactics } }),
       ...(heritage === undefined ? {} : { heritage: { ...heritage } }),
+      ...(equipment === undefined ? {} : { equipment: structuredClone(equipment) }),
     };
   }
   if (m.commanders) {

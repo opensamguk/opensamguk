@@ -124,6 +124,9 @@ function BattleSimForm({
       ...(general.personalityEffects ? { personality: general.personalityEffects.name } : {}),
       ...(general.combatSpecialty ? { specialty: general.combatSpecialty.name } : {}),
       ...(general.battleTactics ? { tactics: general.battleTactics } : {}),
+      ...(general.battleEquipment && Object.keys(general.battleEquipment).length
+        ? { equipment: general.battleEquipment }
+        : {}),
       ...(Object.keys(battleHeritage).length ? { heritage: battleHeritage } : {}),
       ...(general.proficiency?.length
         ? { proficiency: Object.fromEntries(general.proficiency.map(({ armType, value }) => [armType, value])) }
@@ -216,6 +219,7 @@ function BattleSimForm({
                     form.attackerTraits.proficiency && '병종 숙련',
                     form.attackerTraits.tactics && '전투계략',
                     form.attackerTraits.heritage && '유산 혜택',
+                    form.attackerTraits.equipment && '장비 전투 효과',
                   ]
                     .filter(Boolean)
                     .join(' · ')}
@@ -628,6 +632,8 @@ function ResultPanel({
                     {phase.defenderEvaded ? ' · 수비 측 회피' : ''}
                     {phase.attackerCritical ? ' · 공격 측 필살' : ''}
                     {phase.defenderCritical ? ' · 수비 측 필살' : ''}
+                    {phase.attackerSniped ? ' · 공격 측 저격' : ''}
+                    {phase.defenderSniped ? ' · 수비 측 저격' : ''}
                     {phase.attackerTactic
                       ? ` · 공격 측 ${phase.attackerTactic.name} ${phase.attackerTactic.success ? '성공' : '실패'}`
                       : ''}

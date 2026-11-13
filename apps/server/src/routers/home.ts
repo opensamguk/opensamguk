@@ -16,6 +16,7 @@ import {
   storedStatExperience,
   personalityEffects,
   domesticSpecialty,
+  equipmentBattleEffects,
   GENERAL_PROFICIENCY_FEATURE,
   proficiencyByArmType,
   storedGeneralProficiency,
@@ -88,6 +89,7 @@ export const homeRouter = router({
           ? await readView(tx, input.worldId)
           : undefined;
       const troops = state ? readTroops(state) : undefined;
+      const battleEquipment = state ? equipmentBattleEffects(state, general.id) : undefined;
       const troop = troops ? troopOf(troops, general.id) : undefined;
       const troopLeader = troop ? state?.generals[troop.leaderId] : undefined;
       const finance =
@@ -191,6 +193,7 @@ export const homeRouter = router({
           ...(world.ruleFeatures.includes(BATTLE_TACTICS_FEATURE)
             ? { battleTactics: { leadership: general.leadership, strength: general.strength, intel: general.intel } }
             : {}),
+          ...(battleEquipment ? { battleEquipment } : {}),
           ...(world.ruleFeatures.includes(HERITAGE_BENEFITS_FEATURE)
             ? { heritageBenefits: storedHeritageBenefits(true, general.heritageBenefits).heritageBenefits ?? null }
             : {}),

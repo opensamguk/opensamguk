@@ -112,6 +112,27 @@ describe('AC-INT-11 통합판의 단일 교전', () => {
     });
   });
 
+  it('INT-26 가져온 장비 효과로 교전을 계산하고 범위를 벗어난 입력을 거절한다', () => {
+    const equipment = {
+      damageFactor: 1.2,
+      extraPhases: -1,
+      snipe: { chance: 1, morale: 20, injury: [20, 40] as const },
+    };
+    const message = general({ recordPhases: true, attackerTraits: { equipment } });
+    expect(compute(message)).toMatchObject({
+      type: 'result',
+      phases: [{ attackerSniped: true }, ...Array.from({ length: 8 }, () => expect.any(Object))],
+    });
+    expect(simulateBattle).toHaveBeenLastCalledWith(
+      expect.objectContaining({ attackerEquipment: equipment }),
+      expect.anything(),
+    );
+    expect(compute(general({ attackerTraits: { equipment: { extraPhases: 4 } } }))).toMatchObject({
+      type: 'error',
+      field: 'attackerTraits.equipment',
+    });
+  });
+
   it('월드의 병종 상성 규칙을 그대로 적용한다', () => {
     expect(compute(general({ coefMode: 'multiply' }))).toMatchObject({
       type: 'result',

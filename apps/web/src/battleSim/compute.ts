@@ -57,6 +57,7 @@ export function createCompute(rawUnitSet: unknown): (message: unknown) => Battle
               attackerProficiency: attackerTraits.proficiency,
               ...(attackerTraits.tactics ? { attackerTactics: attackerTraits.tactics } : {}),
               ...(attackerTraits.heritage ? { attackerHeritage: attackerTraits.heritage } : {}),
+              ...(attackerTraits.equipment ? { attackerEquipment: attackerTraits.equipment } : {}),
             }
           : {}),
         ...(commanders
