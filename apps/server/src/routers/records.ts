@@ -1,3 +1,4 @@
+import type { Prisma } from '@opensamguk/db';
 import { TRPCError } from '@trpc/server';
 import { rankGenerals, reputationEventSchema, toGameDate } from '@opensamguk/rules';
 import { protectedProcedure, router, worldVerifiedProcedure } from '../trpc';
@@ -22,6 +23,15 @@ const activityCursor = z.tuple([recordTick, z.enum(['reputation', 'nation']), re
 const nationEventKind = z.enum(['found', 'fall', 'declare', 'capture']);
 const battleCursor = z.tuple([recordTick, entityKey]);
 
+async function recordPortraits(tx: Prisma.TransactionClient, worldId: string, ids: number[]) {
+  if (!ids.length) return new Map<number, number | null>();
+  const generals = await tx.general.findMany({
+    where: { worldId, id: { in: ids } },
+    select: { id: true, portraitId: true },
+  });
+  return new Map(generals.map(({ id, portraitId }) => [id, portraitId]));
+}
+
 const seasonInput = worldInput.extend({ by: z.enum(['dedication', 'experience', 'merit']).default('dedication') });
 
 export const recordsRouter = router({
@@ -39,9 +49,16 @@ export const recordsRouter = router({
         take: 31,
         select: { tick: true, attackerId: true, text: true },
       });
-      const items = rows.slice(0, 30).map((row) => ({
+      const page = rows.slice(0, 30);
+      const portraits = await recordPortraits(
+        tx,
+        input.worldId,
+        page.map(({ attackerId }) => attackerId),
+      );
+      const items = page.map((row) => ({
         tick: row.tick,
         attackerId: row.attackerId,
+        portraitId: portraits.get(row.attackerId) ?? null,
         text: row.text,
         gameDate: toGameDate(world.startYear, row.tick),
       }));
@@ -115,7 +132,16 @@ export const recordsRouter = router({
       }));
       // 각 원장은 이미 같은 tick에서 id 내림차순이다. 같은 tick은 평판 원장을 먼저 읽는다.
       const sorted = [...reputation, ...nation].sort((a, b) => b.tick - a.tick);
-      const items = sorted.slice(0, 30);
+      const page = sorted.slice(0, 30);
+      const portraits = await recordPortraits(
+        tx,
+        input.worldId,
+        page.flatMap((item) => (item.source === 'reputation' ? [item.generalId] : [])),
+      );
+      const items = page.map((item) => ({
+        ...item,
+        portraitId: item.source === 'reputation' ? (portraits.get(item.generalId) ?? null) : null,
+      }));
       const last = items.at(-1);
       return {
         items,
