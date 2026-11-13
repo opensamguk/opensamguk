@@ -1,5 +1,6 @@
 import { TICKS_PER_MONTH } from '../clock/constants';
 import { z } from 'zod';
+import { nationRestrictions } from '../personnel/nationRestrictions';
 import { BALANCE } from '../balance';
 import { simulateBattle, type BattlePhase } from '../battle/simulate';
 import { canDefend, DEFENSE_STANCE_FEATURE } from '../battle/defenders';
@@ -31,6 +32,8 @@ function makeAttack(collect: typeof collectModifiers) {
         return fail('PROTECTED', '초반 보호 기간에는 출병할 수 없습니다.');
       const g = view.generals[actor.generalId]!;
       if (g.nationId === null) return fail('NOT_NATION', '국가에 소속되어야 합니다.');
+      if (nationRestrictions(view, view.nations[g.nationId]).warBlocked)
+        return fail('PROTECTED', '국가가 출병을 금지했습니다.');
       const from = view.cities[g.cityKey],
         target = view.cities[args.cityKey];
       if (!target || target.nationId === g.nationId)

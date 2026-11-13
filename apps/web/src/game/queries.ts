@@ -33,7 +33,7 @@ export function useHome(worldId: string, watchPresence = false) {
     ...trpc.home.get.queryOptions({ worldId }),
     retry: retryUnlessClientError,
     refetchInterval: (query) => {
-      if (query.state.data?.general.defense?.stance?.pendingThreshold != null) return 1_000;
+      if (query.state.data?.general?.defense?.stance?.pendingThreshold != null) return 1_000;
       return watchPresence && query.state.data ? 60_000 : false;
     },
   });

@@ -346,3 +346,13 @@ export {
   npcPolicyLimits,
   storedNpcNationPolicy,
 } from './npc/policy';
+
+export {
+  NATION_RESTRICTIONS_FEATURE,
+  NATION_RESTRICTIONS_KIND,
+  NATION_RESTRICTIONS_MIN_OFFICE,
+  nationRestrictions,
+  nationRestrictionsInput,
+  storedNationRestrictions,
+  changeNationRestrictions,
+} from './personnel/nationRestrictions';

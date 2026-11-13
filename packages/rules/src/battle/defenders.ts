@@ -30,8 +30,8 @@ export function canDefend(
   return limits.enabled && troops > 0 && training >= limits.minimumTraining && morale >= limits.minimumMorale;
 }
 
-export function storedDefenseStance(enabled: boolean, value: number | null) {
-  if (value === null) return {};
+export function storedDefenseStance(enabled: boolean, value: number | null | undefined) {
+  if (value == null) return {};
   if (!enabled) throw new Error('수비 설정을 끈 월드에 저장된 기준이 있습니다.');
   return { defenseThreshold: stanceSchema.parse(value) };
 }

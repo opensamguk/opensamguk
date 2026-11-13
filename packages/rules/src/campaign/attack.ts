@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { Rng } from '@opensamguk/shared';
+import { nationRestrictions } from '../personnel/nationRestrictions';
 import { BALANCE } from '../balance';
 import { canDefend, DEFENSE_STANCE_FEATURE } from '../battle/defenders';
 import type { BattlePhase } from '../battle/simulate';
@@ -62,6 +63,8 @@ function check(view: WorldView, actor: Actor, raw: unknown) {
   if (Math.floor((actor.tick ?? 0) / TICKS_PER_MONTH) < (view.presetRules?.protection.peaceMonths ?? 0))
     return fail('PROTECTED', '초반 보호 기간에는 출병할 수 없습니다.');
   if (owner.nationId === null) return fail('NOT_NATION', '국가에 소속되어야 합니다.');
+  if (nationRestrictions(view, view.nations[owner.nationId]).warBlocked)
+    return fail('PROTECTED', '국가가 출병을 금지했습니다.');
   const from = view.cities[owner.cityKey],
     target = view.cities[parsed.data.cityKey];
   if (!target || target.nationId === owner.nationId)

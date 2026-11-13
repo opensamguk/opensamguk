@@ -33,6 +33,7 @@ const VERIFIED_MUTATIONS = [
   'message.retract',
   'message.send',
   'nation.setNpcPolicy',
+  'nation.setRestrictions',
   'nationTurns.edit',
   'nationTurns.set',
   'notice.nation.markSeen',
@@ -79,7 +80,7 @@ describe('T3-02 AC-M3-01 이메일 인증 경계', () => {
       { _def: { type: string; meta?: ProcedureMeta } }
     >;
     const mutations = Object.entries(procedures).filter(([, procedure]) => procedure._def.type === 'mutation');
-    expect(mutations).toHaveLength(63);
+    expect(mutations).toHaveLength(64);
     expect(
       mutations
         .filter(([, procedure]) => procedure._def.meta?.accountAccess === 'verified')

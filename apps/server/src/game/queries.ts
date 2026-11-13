@@ -38,6 +38,8 @@ import {
   storedCitySeasonalEvent,
   storedDefenseStance,
   storedNpcNationPolicy,
+  storedNationRestrictions,
+  NATION_RESTRICTIONS_FEATURE,
   NPC_NATION_POLICY_FEATURE,
   DEFENSE_STANCE_FEATURE,
 } from '@opensamguk/rules';
@@ -125,9 +127,10 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
       cities.map(({ seasonalEvent, ...city }) => ({ ...city, ...storedCitySeasonalEvent(seasonalEvent) })),
       readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin),
     ),
-    nations: nations.map(({ diplomaticAidUntilMonth, npcSettings, ...nation }) => ({
+    nations: nations.map(({ diplomaticAidUntilMonth, npcSettings, restrictions, ...nation }) => ({
       ...nation,
       ...storedNpcNationPolicy(world.ruleFeatures.includes(NPC_NATION_POLICY_FEATURE), npcSettings),
+      ...storedNationRestrictions(world.ruleFeatures.includes(NATION_RESTRICTIONS_FEATURE), restrictions),
       ...(diplomaticAidUntilMonth != null ? { diplomaticAidUntilMonth } : {}),
     })),
     generals: generals.map(({ defenseThreshold, ...general }) =>

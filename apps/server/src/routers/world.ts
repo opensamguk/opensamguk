@@ -8,6 +8,9 @@ import {
   cityRegionName,
   HUMAN_GENERAL_LIMIT,
   INTEL_FEATURE,
+  NATION_RESTRICTIONS_FEATURE,
+  nationRestrictions,
+  storedNationRestrictions,
   LINEAGE_EXITED_YEAR,
   RESEARCH_ERA_FEATURE,
   researchEra,
@@ -143,7 +146,15 @@ export const worldRouter = router({
       const nations = await tx.nation.findMany({
         where: { worldId: input.worldId },
         orderBy: { id: 'asc' },
-        select: { id: true, name: true, color: true, capitalCityKey: true, description: true, recruitmentNotice: true },
+        select: {
+          id: true,
+          name: true,
+          color: true,
+          capitalCityKey: true,
+          description: true,
+          recruitmentNotice: true,
+          restrictions: true,
+        },
       });
       const world = await tx.world.findUniqueOrThrow({
         where: { id: input.worldId },
@@ -190,8 +201,14 @@ export const worldRouter = router({
             ...(ruins ? { ruin: ruins.get(city.cityKey) ?? null } : {}),
           };
         }),
-        nations: nations.map(({ recruitmentNotice, ...nation }) => ({
+        nations: nations.map(({ recruitmentNotice, restrictions, ...nation }) => ({
           ...nation,
+          ...(world.ruleFeatures.includes(NATION_RESTRICTIONS_FEATURE)
+            ? {
+                recruitmentBlocked: nationRestrictions(world, storedNationRestrictions(true, restrictions))
+                  .recruitmentBlocked,
+              }
+            : {}),
           ...(recruitmentNotice ? { recruitmentNotice } : {}),
         })),
         generals: generals.map(({ userId, ...general }) => ({ ...general, isHuman: userId !== null })),

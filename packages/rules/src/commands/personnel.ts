@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { BALANCE } from '../balance';
 import { LINEAGE_EXITED_YEAR } from '../lineage/config';
 import { NATION_PHILOSOPHY_FEATURE, nationPhilosophyNames } from '../personnel/nationPhilosophy';
+import { NATION_RESTRICTIONS_FEATURE, nationRestrictions } from '../personnel/nationRestrictions';
 import { refreshSupply } from '../supply';
 import { DIPLOMATIC_COOLDOWN_FEATURE } from '../diplomacy/cooldown';
 import type { WorldView } from '../model/world';
@@ -48,6 +49,14 @@ const establish = (uprising: boolean) =>
         level: 0,
         capitalCityKey: general.cityKey,
         isNpc: general.userId === null,
+        ...(state.ruleFeatures?.includes(NATION_RESTRICTIONS_FEATURE)
+          ? {
+              restrictions: {
+                ...nationRestrictions({}, undefined),
+                warMonth: Math.floor((actor.tick ?? 0) / TICKS_PER_MONTH),
+              },
+            }
+          : {}),
         ...(uprising && state.ruleFeatures?.includes(DIPLOMATIC_COOLDOWN_FEATURE)
           ? { diplomaticAidUntilMonth: Math.floor((actor.tick ?? 0) / TICKS_PER_MONTH) + 72 }
           : {}),
@@ -71,6 +80,7 @@ function recruitmentCandidates(view: WorldView) {
   return Object.values(view.nations).filter(
     (nation) =>
       nation.id !== blocked &&
+      !nationRestrictions(view, nation).recruitmentBlocked &&
       nation.capitalCityKey !== null &&
       view.cities[nation.capitalCityKey]?.nationId === nation.id,
   );
@@ -89,6 +99,12 @@ const join = (random: boolean) =>
       if (random ? candidates.length > 0 : candidates.some((nation) => nation.id === args.nationId)) return null;
       const blocked = blockedRecruitmentNation(view);
       if (blocked !== undefined && (random ? view.nations[blocked] : blocked === args.nationId))
+        return fail('PROTECTED', '이 국가에는 임관할 수 없습니다.');
+      if (
+        !random &&
+        args.nationId !== undefined &&
+        nationRestrictions(view, view.nations[args.nationId]).recruitmentBlocked
+      )
         return fail('PROTECTED', '이 국가에는 임관할 수 없습니다.');
       return fail('BAD_TARGET', '임관할 국가가 없습니다.');
     },
@@ -157,6 +173,8 @@ export const personnelCommands = [
       if (id !== undefined && id === blockedRecruitmentNation(view))
         return fail('PROTECTED', '이 국가에는 임관할 수 없습니다.');
       const nation = id === undefined ? undefined : view.nations[id];
+      if (nationRestrictions(view, nation).recruitmentBlocked)
+        return fail('PROTECTED', '이 국가에는 임관할 수 없습니다.');
       return nation && nation.capitalCityKey !== null && view.cities[nation.capitalCityKey]?.nationId === nation.id
         ? null
         : fail('NO_OFFER', '수락할 등용 제안이 없습니다.');
