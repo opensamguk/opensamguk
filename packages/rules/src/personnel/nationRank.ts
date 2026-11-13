@@ -25,6 +25,13 @@ export function nationRank(level: number) {
 
 export const COURT_RANK_FEATURE = 'court-rank-v1';
 export const COURT_PROMOTION_FEATURE = 'court-promotion-v1';
+export const COURT_ABILITY_FEATURE = 'court-ability-v1';
+
+// core2026 c81d304, app/game-engine/src/turn/worldCommandHandler.ts (MIT).
+export function courtAbilityRequirement(level: number) {
+  if (level < 5 || level > 10) return null;
+  return { stat: level % 2 === 0 ? ('strength' as const) : ('intel' as const), minimum: 70 };
+}
 
 // core2026 c81d304, app/game-engine/src/turn/monthlyNationLevelAction.ts (MIT).
 const citiesRequired = [0, 1, 2, 5, 8, 11, 16, 21];

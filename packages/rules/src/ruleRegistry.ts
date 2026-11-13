@@ -25,7 +25,7 @@ import { DOMESTIC_SPECIALTY_FEATURE } from './general/domesticSpecialty';
 import { GENERAL_PERSONALITY_FEATURE } from './general/personality';
 import { RESEARCH_ERA_FEATURE } from './nationResearch/era';
 import { NATION_PHILOSOPHY_FEATURE } from './personnel/nationPhilosophy';
-import { COURT_PROMOTION_FEATURE, COURT_RANK_FEATURE } from './personnel/nationRank';
+import { COURT_ABILITY_FEATURE, COURT_PROMOTION_FEATURE, COURT_RANK_FEATURE } from './personnel/nationRank';
 import type { JsonValue, WorldView } from './model/world';
 import type { WorldInit } from './world/bootstrap';
 import { checkInitialNpcStatLimits } from './world/initialNpcStats';
@@ -206,6 +206,7 @@ export const ruleRegistry: RuleRegistry = {
     { key: NATION_PHILOSOPHY_FEATURE, requires: [], conflicts: [] },
     { key: RESEARCH_ERA_FEATURE, requires: [], conflicts: [] },
     { key: COURT_PROMOTION_FEATURE, requires: [COURT_RANK_FEATURE], conflicts: [] },
+    { key: COURT_ABILITY_FEATURE, requires: [COURT_RANK_FEATURE], conflicts: [] },
     treatyFeature,
     treatyBreakFeature,
     treatyTradeFeature,
