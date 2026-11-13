@@ -16,6 +16,7 @@ import {
   readStoredRelations,
   assertNationLifecycle,
   storedCitySeasonalEvent,
+  storedCityConflict,
   storedDefenseStance,
   storedGeneralProficiency,
   storedHeritageBenefits,
@@ -112,9 +113,10 @@ export async function loadWorldAfterCapabilityCheck(
     startYear: world.startYear,
     cities: Object.fromEntries(
       attachOperationalKinds(
-        cities.map(({ seasonalEvent, warCasualties, ...city }) => ({
+        cities.map(({ seasonalEvent, warCasualties, conflict, ...city }) => ({
           ...stripWorldId(city),
           ...storedCitySeasonalEvent(seasonalEvent),
+          ...storedCityConflict(conflict),
           ...(warCasualties === null ? {} : { warCasualties }),
         })),
         operationalMap,

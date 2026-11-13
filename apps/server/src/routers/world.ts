@@ -6,6 +6,8 @@ import { mapCity, publicMapInfo } from '../visibility';
 import { cityEvents } from '../game/cityEvents';
 import {
   cityRegionName,
+  CITY_CONFLICT_FEATURE,
+  publicCityConflict,
   HUMAN_GENERAL_LIMIT,
   INTEL_FEATURE,
   NATION_RESTRICTIONS_FEATURE,
@@ -188,8 +190,18 @@ export const worldRouter = router({
       });
       const ruins = await readCityScaleProjection(tx, input.worldId, world.ruleFeatures, cities);
       const backgrounds = await readMapBackgrounds(tx, [world.mapKey]);
+      const nationNames = new Map(nations.map((nation) => [nation.id, nation]));
       return {
         background: backgrounds.get(world.mapKey) ?? null,
+        ...(world.ruleFeatures.includes(CITY_CONFLICT_FEATURE)
+          ? {
+              conflicts: cities.flatMap((city) => {
+                if (fogEnabled && city.nationId !== null && city.nationId !== ownNation) return [];
+                const shares = publicCityConflict(city.conflict, nationNames);
+                return shares.length ? [{ cityKey: city.cityKey, cityName: city.name, shares }] : [];
+              }),
+            }
+          : {}),
         cities: cities.map((city) => {
           const events =
             !fogEnabled || city.nationId === null || city.nationId === ownNation ? cityEvents(city, tick) : [];

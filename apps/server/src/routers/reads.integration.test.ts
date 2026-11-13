@@ -636,6 +636,26 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     expect(foreign.data.generals).toEqual([]);
     expect((await query('world.map', input)).data.generals).toEqual(open.data.generals);
   });
+  it('분쟁 도시는 여러 현존 국가의 공략 비율을 보여 준다', async () => {
+    const world = await fixtureWorld('siege-shares');
+    const cityKey = state.cities[0]!.cityKey;
+    await db.world.update({ where: { id: world }, data: { ruleFeatures: { push: 'city-conflict-v1' } } });
+    await db.city.update({
+      where: { worldId_cityKey: { worldId: world, cityKey } },
+      data: { conflict: { 1: 3, 2: 1, 999: 100 } },
+    });
+    expect((await query('world.map', { worldId: world })).data).toMatchObject({
+      conflicts: [
+        {
+          cityKey,
+          shares: [
+            { id: 1, percent: 75 },
+            { id: 2, percent: 25 },
+          ],
+        },
+      ],
+    });
+  });
   it('AC-INT-26 종사 임지에서 초상·사람 여부와 주재 상태를 읽는다', async () => {
     const world = await fixtureWorld('secretary');
     const cityKey = state.cities[0]!.cityKey;

@@ -14,6 +14,7 @@ import { refreshSupply } from '../supply';
 import { defineCommand, fail, positive, relation, removeNation, success } from './support';
 import { collectModifiers, collectModifiersWith, type ModifierProvider } from '../modifiers';
 import { recordWarCasualties } from '../monthly/warIncome';
+import { recordSiegeContribution } from '../battle/cityConflict';
 
 type Force = Pick<InitialGeneral, 'crew' | 'crewType' | 'train' | 'atmos' | 'rice'>;
 function feed(force: Force) {
@@ -126,8 +127,10 @@ function makeAttack(collect: typeof collectModifiers) {
         attackerFirstVolleyUsed ||= battle.attackerFirstVolleyFired === true;
         recordWarCasualties(state, g.cityKey, city.cityKey, g.crew - battle.attacker.crew);
         Object.assign(g, battle.attacker);
-        addGeneralProficiency(state, g, 5, city.wall - battle.defender.crew);
+        const wallDamage = city.wall - battle.defender.crew;
+        addGeneralProficiency(state, g, 5, wallDamage);
         city.wall = battle.defender.crew;
+        recordSiegeContribution(state, city, attackingNation, wallDamage);
         const name = openingSkirmish ? '성벽 선제 교전' : '성벽 교전';
         for (const phase of battle.phases ?? []) attackPhases.push({ ...phase, opponent: '성벽' });
         rounds.push(`${name}: 공격 ${g.crew}명, 성벽 ${city.wall}`);
@@ -213,6 +216,7 @@ function makeAttack(collect: typeof collectModifiers) {
       if (captured) {
         battleAwards.push({ generalId: g.id, wins: 0, captures: 1 });
         city.nationId = attackingNation;
+        if (city.conflict) city.conflict = {};
         city.defence = 0;
         city.security = Math.round(city.security * BALANCE.CAPTURE_SECURITY_FACTOR);
         city.trust = Math.max(0, city.trust - BALANCE.CAPTURE_TRUST_LOSS);

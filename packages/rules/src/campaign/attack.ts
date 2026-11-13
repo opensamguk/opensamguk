@@ -17,6 +17,7 @@ import { readCampaignState, type CampaignUnitState } from './state';
 import { readCityResourcesState } from '../cityResources/state';
 import { disbandCityGarrison } from '../cityResources/ownership';
 import { recordWarCasualties } from '../monthly/warIncome';
+import { recordSiegeContribution } from '../battle/cityConflict';
 
 const argsSchema = z.strictObject({ cityKey: positive });
 const year = (view: WorldView, tick: number) => view.startYear + Math.floor(tick / (12 * TICKS_PER_MONTH));
@@ -131,7 +132,10 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
       attackerFirstVolleyUsed ||= outcome.attackerFirstVolleyFired === true;
       const unit = get(attackerId);
       recordWarCasualties(state, sourceCityKey, cityKey, priorTroops - unit.troops);
-      addGeneralProficiency(state, state.generals[unit.commanderId]!, 5, priorWall - state.cities[cityKey]!.wall);
+      const city = state.cities[cityKey]!;
+      const wallDamage = priorWall - city.wall;
+      addGeneralProficiency(state, state.generals[unit.commanderId]!, 5, wallDamage);
+      recordSiegeContribution(state, city, nationId, wallDamage);
       const name = openingSkirmish ? '성벽 선제 교전' : '성벽 교전';
       for (const phase of outcome.phases ?? []) attackPhases.push({ ...phase, opponent: '성벽' });
       rounds.push(`부곡${attackerId} ${name}: 공격 ${get(attackerId).troops}명, 성벽 ${state.cities[cityKey]!.wall}`);
@@ -257,6 +261,7 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
     battleAwards.push({ generalId: ownerId, wins: 0, captures: 1 });
     const city = state.cities[cityKey]!;
     city.nationId = nationId;
+    if (city.conflict) city.conflict = {};
     city.defence = 0;
     city.security = Math.round(city.security * BALANCE.CAPTURE_SECURITY_FACTOR);
     city.trust = Math.max(0, city.trust - BALANCE.CAPTURE_TRUST_LOSS);
