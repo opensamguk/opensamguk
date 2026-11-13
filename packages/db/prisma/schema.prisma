@@ -391,6 +391,7 @@ model Nation {
 }
 
 model City {
+  seasonalEvent    String?
   worldId          String
   cityKey          Int
   kind             String?

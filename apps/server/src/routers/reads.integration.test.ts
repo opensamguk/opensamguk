@@ -223,6 +223,28 @@ afterAll(async () => {
 });
 
 describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
+  it('도시 계절 사건은 소속 도시와 공백지에 이름과 종류를 표시한다', async () => {
+    const id = await fixtureWorld('seasonal-event');
+    const cityKey = state.cities.find(({ nationId }) => nationId === 1)!.cityKey;
+    await db.city.update({ where: { worldId_cityKey: { worldId: id, cityKey } }, data: { seasonalEvent: 'boom' } });
+    expect((await query('city.get', { worldId: id, cityKey })).data.seasonalEvent).toEqual({
+      kind: 'boom',
+      name: '호황',
+      favorable: true,
+    });
+    expect((await query('city.get', { worldId: id, cityKey }, users[3]!.cookie)).data.seasonalEvent).toBeUndefined();
+    const neutralCity = state.cities.find(({ nationId }) => nationId === null);
+    if (neutralCity) {
+      await db.city.update({
+        where: { worldId_cityKey: { worldId: id, cityKey: neutralCity.cityKey } },
+        data: { seasonalEvent: 'flood' },
+      });
+      expect(
+        (await query('city.get', { worldId: id, cityKey: neutralCity.cityKey }, users[3]!.cookie)).data.seasonalEvent,
+      ).toEqual({ kind: 'flood', name: '홍수', favorable: false });
+    }
+  });
+
   it('유산 순위는 현재 월드의 사용·획득만 세고 통일 전에는 장수와 국가를 가린다', async () => {
     const id = await fixtureWorld('heritage-ranking');
     try {

@@ -72,6 +72,7 @@ export * from './ranking';
 export * from './npc';
 export * from './advice/general';
 export * from './policy';
+export * from './monthly/citySeasonalEvents';
 export * from './policy/replay';
 export * from './operation/calendar';
 export * from './operation/timeline';

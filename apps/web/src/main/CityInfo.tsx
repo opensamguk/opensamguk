@@ -143,6 +143,9 @@ export function CityInfo({
           </span>
         )}
         {data.ruin ? <Tag tone="danger">폐허 복구 {data.ruin.percent}%</Tag> : null}
+        {data.seasonalEvent ? (
+          <Tag tone={data.seasonalEvent.favorable ? 'info' : 'danger'}>{data.seasonalEvent.name}</Tag>
+        ) : null}
         {owner ? (
           <Link to="/w/$worldId/nation/$nationId" params={{ worldId, nationId: String(owner.id) }}>
             <NationBadge name={owner.name} color={owner.color} />

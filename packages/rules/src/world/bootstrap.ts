@@ -20,6 +20,7 @@ import { CITY_SCALE_FEATURE, resolveCityScale, type CityScaleRecord, type ScaleA
 import { appliesOperationalOpening, LEGACY_OPENING_CITY_PROFILE, legacyOpeningCityValues } from './openingCityProfile';
 
 export interface InitialCity {
+  seasonalEvent?: string | null;
   kind?: 'CITY' | 'PASS';
   cityKey: number;
   name: string;

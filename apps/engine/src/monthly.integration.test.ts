@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb, nextActionSequence, type Prisma } from '@opensamguk/db';
-import { emptyTurns, type WorldInit } from '@opensamguk/rules';
+import { CITY_SEASONAL_EVENTS_FEATURE, emptyTurns, type WorldInit } from '@opensamguk/rules';
+import { rngFor } from '@opensamguk/shared';
 import { hashState } from '@opensamguk/shared/node';
 import { monthlyFixture } from '../test/monthlyFixture';
 import { TurnLoop } from './turnLoop';
@@ -84,6 +85,40 @@ async function setTurns(worldId: string, commandKey: string, idempotencyKey: str
 }
 
 describe('AC-M1-12 실제 PostgreSQL 월 경계', () => {
+  it('분기 도시 사건과 수치가 월 경계에 저장되고 이후 해제되며 재생 결과와 일치한다', async () => {
+    const initial = structuredClone(template);
+    initial.ruleFeatures = [CITY_SEASONAL_EVENTS_FEATURE];
+    const year = initial.startYear + 3;
+    for (let seed = 0; ; seed++) {
+      initial.seed = `city-seasonal-${seed}`;
+      const rng = rngFor(initial.seed, 'monthly', year, 1);
+      rng.next();
+      if (rng.next() < 0.01) break;
+    }
+    for (const general of initial.generals) general.activeFromYear = year + 1;
+    const { worldId } = await saveInitialWorld(db, initial, { name: '계절 도시', turnTermMinutes: 60, endYear: null });
+    await controlClock(db, worldId, 'start');
+    const lease = (await acquireLease(db, worldId))!;
+    const loop = new TurnLoop(db, lease);
+    for (let month = 1; month <= 37; month++) {
+      if (month % 6 === 0) await renewLease(db, lease);
+      await loop.advanceTo(month * 10_000);
+    }
+    const cities = () => db.city.findMany({ where: { worldId }, orderBy: { cityKey: 'asc' } });
+    expect((await cities())[0]?.seasonalEvent).toMatch(/epidemic|earthquake|cold|rebellion/);
+    for (let month = 38; month <= 40; month++) await loop.advanceTo(month * 10_000);
+    expect(
+      (await cities()).every(
+        ({ seasonalEvent }) =>
+          seasonalEvent === null || ['boom', 'flood', 'earthquake', 'typhoon'].includes(seasonalEvent),
+      ),
+    ).toBe(true);
+    const archive = await exportReplay(db, worldId);
+    expect(replayArchive(archive, 40).map(({ stateHash }) => stateHash)).toEqual(
+      archive.months.map(({ stateHash }) => stateHash),
+    );
+  });
+
   it('앞선 턴 → 정산 → 같은 tick 턴, 국가 기록·소유권·해시를 한 번만 저장한다', async () => {
     const { worldId, loop } = await create(true);
     expect(await loop.advanceTo(10000)).toEqual([

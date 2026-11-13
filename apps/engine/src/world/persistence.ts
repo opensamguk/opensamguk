@@ -493,7 +493,13 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
         startYear: world.startYear,
         statRules: statRulesSchema.parse({ stat: world.statRules }).stat,
         unitSet: unitSetSchema.parse(world.unitSet),
-        cities: attachOperationalKinds(cities.map(stripWorldId), operationalMap),
+        cities: attachOperationalKinds(
+          cities.map(({ seasonalEvent, ...city }) => {
+            void seasonalEvent;
+            return stripWorldId(city);
+          }),
+          operationalMap,
+        ),
         nations: nations.map(({ diplomaticAidUntilMonth, ...nation }) => {
           void diplomaticAidUntilMonth;
           return { ...stripWorldId(nation), capitalCityKey: nation.capitalCityKey };

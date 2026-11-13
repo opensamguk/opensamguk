@@ -6,6 +6,7 @@ import { refreshSupply } from '../supply';
 import { readCampaignState } from '../campaign/state';
 import { residentOfficeBonuses, type OfficeBonuses } from '../personnel/residentOffice';
 import { applyCityResourceIncome } from '../cityResourceIncome';
+import { CITY_SEASONAL_EVENTS_FEATURE, settleCitySeasonalEvents } from './citySeasonalEvents';
 
 export const MONTHLY_STAGES = ['income', 'population', 'supply', 'diplomacy', 'yearbook'] as const;
 export interface NationSummary {
@@ -186,14 +187,15 @@ export function buildYearbook(state: WorldView, year: number): Yearbook {
 
 export function runMonthly(state: WorldView, tick: number, rng: Rng) {
   const date = monthlyDate(state.startYear, tick);
-  // 현 단계는 난수를 소비하지 않는다. 재해·사건을 붙일 때 이 스트림만 쓴다.
-  void rng;
   const bonuses = residentOfficeBonuses(state, date.year);
   let next = settleIncome(state, date, bonuses);
   if (state.ruleFeatures?.includes('city-resources-v1')) next = applyCityResourceIncome(state, next, date, bonuses);
   next = settlePopulation(next);
   next = settleSupply(next, bonuses);
   next = settleDiplomacy(next, tick);
+  const seasonalEventLogs = state.ruleFeatures?.includes(CITY_SEASONAL_EVENTS_FEATURE)
+    ? settleCitySeasonalEvents(next, date, rng)
+    : [];
   // 미등장 장수는 턴을 쌓지 않는다. 등장 연도 1월에는 원래 offset부터 실행한다.
   for (const general of generalsById(next)) {
     if (general.activeFromYear > date.year) {
@@ -213,5 +215,12 @@ export function runMonthly(state: WorldView, tick: number, rng: Rng) {
         officeTaxLogs.push({ generalId: tax.generalId, text: `${city.name} 주재로 세수 ${tax.percent}% 보정` });
     }
   }
-  return { state: next, date, officeTaxLogs, stages: [...MONTHLY_STAGES], yearbook: buildYearbook(next, date.year) };
+  return {
+    state: next,
+    date,
+    officeTaxLogs,
+    seasonalEventLogs,
+    stages: [...MONTHLY_STAGES],
+    yearbook: buildYearbook(next, date.year),
+  };
 }

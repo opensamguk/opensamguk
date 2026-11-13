@@ -15,6 +15,7 @@ import {
   readStoredNationLifecycle,
   readStoredRelations,
   assertNationLifecycle,
+  storedCitySeasonalEvent,
   type WorldState,
 } from '@opensamguk/rules';
 import { engineFeatures } from './features';
@@ -91,7 +92,13 @@ export async function loadWorldAfterCapabilityCheck(
     ...(ext ? { ext } : {}),
     startYear: world.startYear,
     cities: Object.fromEntries(
-      attachOperationalKinds(cities.map(stripWorldId), operationalMap).map((city) => [city.cityKey, city]),
+      attachOperationalKinds(
+        cities.map(({ seasonalEvent, ...city }) => ({
+          ...stripWorldId(city),
+          ...storedCitySeasonalEvent(seasonalEvent),
+        })),
+        operationalMap,
+      ).map((city) => [city.cityKey, city]),
     ),
     nations: Object.fromEntries(
       nations.map(({ diplomaticAidUntilMonth, ...nation }) => {
