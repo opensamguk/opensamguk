@@ -55,6 +55,7 @@ export const rankingRouter = router({
         .extend({
           by: z.enum(['dedication', 'experience', 'merit', 'stratagem', 'engagements', 'winRate', 'kills', 'killRate']),
           kind: z.enum(['all', 'human', 'npc']).default('all'),
+          page: z.number().int().min(1).max(10_000).default(1),
         })
         .strict(),
     )
@@ -100,9 +101,11 @@ export const rankingRouter = router({
           where: { worldId_userId: { worldId: input.worldId, userId: ctx.user.id } },
           select: { id: true },
         });
-        const top = rows.slice(0, 100);
+        const pageCount = Math.max(1, Math.ceil(rows.length / 100));
+        const page = Math.min(input.page, pageCount);
+        const top = rows.slice((page - 1) * 100, page * 100);
         const me = viewer ? (rows.find((row) => row.generalId === viewer.id) ?? null) : null;
-        return { top, me, at: snapshotAt(snapshot) };
+        return { top, me, at: snapshotAt(snapshot), ...(pageCount > 1 ? { pagination: { page, pageCount } } : {}) };
       }),
     ),
   freeGenerals: protectedProcedure.input(worldInput).query(({ ctx, input }) =>

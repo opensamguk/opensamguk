@@ -243,4 +243,31 @@ describe('화면 상태', () => {
     expect(screen.getByText('193년 4월 정산 기준')).toBeTruthy();
     expect(screen.getByRole('table', { name: '장수 순위' })).toBeTruthy();
   });
+
+  it('100위 이후의 순위와 페이지 이동을 표시한다', () => {
+    const onPage = vi.fn();
+    render(
+      <RankingView
+        search={parseRankingSearch({ tab: 'generals', page: 2 })}
+        data={{
+          state: 'ready',
+          tab: 'generals',
+          ranking: {
+            top: [general(101, 101, '장비')],
+            me: null,
+            at,
+            pagination: { page: 2, pageCount: 2 },
+          },
+        }}
+        onSort={() => {}}
+        onPage={onPage}
+        renderTab={tab}
+      />,
+    );
+    const nav = within(screen.getByRole('navigation', { name: '장수 순위 페이지' }));
+    expect(nav.getByText('2 / 2')).toBeTruthy();
+    expect((nav.getByRole('button', { name: '다음' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(nav.getByRole('button', { name: '이전' }));
+    expect(onPage).toHaveBeenCalledWith(1);
+  });
 });
