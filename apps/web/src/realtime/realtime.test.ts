@@ -105,6 +105,8 @@ describe('SSE 알림 해석', () => {
       trpc.personnel.officers.queryKey({ worldId: WORLD }),
     ]);
     expect(invalidationTargets({ kind: 'monthly.done' }, WORLD, trpc)).toEqual([
+      trpc.city.get.queryKey({ worldId: WORLD }),
+      trpc.personnel.officers.queryKey({ worldId: WORLD }),
       trpc.equipment.mine.queryKey({ worldId: WORLD }),
       trpc.world.summary.queryKey({ worldId: WORLD }),
       trpc.home.get.queryKey({ worldId: WORLD }),

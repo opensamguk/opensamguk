@@ -17,7 +17,6 @@ import {
   assertNationLifecycle,
   type WorldState,
 } from '@opensamguk/rules';
-import { hashState } from '@opensamguk/shared/node';
 import { engineFeatures } from './features';
 import { loadCommandState } from './commandPersistence';
 import { engineResolver, loadExt } from './extState';
