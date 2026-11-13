@@ -135,7 +135,7 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
         ...city,
         ...storedCitySeasonalEvent(seasonalEvent),
         ...storedCityConflict(conflict),
-        ...(warCasualties === null ? {} : { warCasualties }),
+        ...(warCasualties == null ? {} : { warCasualties }),
       })),
       readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin),
     ),

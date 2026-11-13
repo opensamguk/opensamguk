@@ -118,7 +118,7 @@ export async function loadWorldAfterCapabilityCheck(
           ...stripWorldId(city),
           ...storedCitySeasonalEvent(seasonalEvent),
           ...storedCityConflict(conflict),
-          ...(warCasualties === null ? {} : { warCasualties }),
+          ...(warCasualties == null ? {} : { warCasualties }),
         })),
         operationalMap,
       ).map((city) => [city.cityKey, city]),
