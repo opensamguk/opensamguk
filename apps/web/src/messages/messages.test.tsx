@@ -225,6 +225,30 @@ describe('메시지 패널', () => {
     expect(screen.getByText('더 이전 메시지가 없습니다.')).toBeTruthy();
   });
 
+  // INT-26: message.list의 보낸·받은 장수에 portraitId가 오면 원형 icon이 실제 얼굴이 된다.
+  it('보낸 장수의 portraitId로 얼굴을 그리고 번호가 없으면 실루엣이다', async () => {
+    on('message.list', () => ({
+      items: [
+        item('a', {
+          from: {
+            portraitId: 10001,
+            generalId: 2,
+            name: '하후돈(夏侯惇)',
+            nation: { id: 1, name: '위', color: '#000080' },
+          },
+        }),
+      ],
+      next: null,
+    }));
+    on('message.markRead', () => ({ updated: 0, unread: { PRIVATE: 0, NATION: null, DIPLOMACY: null, WORLD: 0 } }));
+    renderWith(<MessagePanel worldId={WORLD} />);
+    const name = await screen.findByText('하후돈', {}, { timeout: 5_000 });
+    const party = name.parentElement!;
+    expect(party.querySelector('[data-variant="icon"]')!.getAttribute('data-state')).toBe('image');
+    const other = screen.getByText('조조').parentElement!;
+    expect(other.querySelector('[data-variant="icon"]')!.getAttribute('data-state')).toBe('fallback');
+  });
+
   it('보내기 실패는 입력을 지우지 않고 서버 문장을 입력칸 설명으로 붙인다', async () => {
     let sends = 0;
     on('message.send', () => {

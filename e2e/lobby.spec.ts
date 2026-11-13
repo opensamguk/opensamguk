@@ -140,7 +140,7 @@ test('가오픈 월드는 승인 전이라 막힌 장수 만들기와 이유, �
   await expect(target.getByRole('note')).toHaveText('아직 열리지 않은 월드입니다');
 });
 
-test('상태 글자와 색: 진행 중·가오픈·멈춤, 끝난 월드는 기본으로 숨긴다', async ({ page }) => {
+test('상태 글자와 색: 진행 중·가오픈·멈춤, 끝난 월드는 카드 대신 지난 기수 줄로 보인다', async ({ page }) => {
   test.setTimeout(180_000);
   await createAccount(page);
   await e2eWorld(page);
@@ -163,9 +163,18 @@ test('상태 글자와 색: 진행 중·가오픈·멈춤, 끝난 월드는 기�
   await expect(badge(target, '멈춤')).toHaveAttribute('data-tone', 'warning');
   await target.getByRole('button', { name: /^장수 만들기\s*\(사용 불가\)$/ }).click();
   await expect(target.getByRole('note')).toHaveText('멈춘 월드입니다');
-  // 목록이 그려진 뒤에 본다. 화면은 includeEnded를 보내지 않으므로 서버 기본값대로 끝난 월드가 빠진다.
+  // 목록이 그려진 뒤에 본다. 화면은 includeEnded로 끝난 월드까지 받아 월드 카드에서 빼고 지난 기수 줄로 옮긴다 (INT-26).
   await expect(card(page, ended)).toHaveCount(0);
   await expect(page.getByText('끝남', { exact: true })).toHaveCount(0);
+  const past = page.getByRole('region', { name: '지난 기수', exact: true });
+  const row = past.getByTestId('past-season').filter({ hasText: ended });
+  await expect(row).toHaveCount(1);
+  // DB 상태만 바꾼 fixture라 WorldResult가 없다. 승자 칸은 통일 국가 없음이다.
+  await expect(row).toContainText('통일 국가 없음');
+  await expect(row.getByRole('link', { name: `${ended} 영토 재생 보기`, exact: true })).toHaveAttribute(
+    'href',
+    `/share/timelapse/${endedId}`,
+  );
   await page.screenshot({ path: 'test-results/t2-04-lobby.png', fullPage: true });
 });
 

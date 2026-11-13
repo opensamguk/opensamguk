@@ -1,0 +1,15 @@
+/* 인물 관계 줄. 원형 얼굴 옆에 이름과 관계를 둔다. */
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-1) 0;
+  overflow-wrap: anywhere;
+}

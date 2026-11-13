@@ -1,7 +1,6 @@
 import { useRef } from 'react';
 import { displayName } from '../game/names';
 import { Portrait } from '../portrait/Portrait';
-import { portraitIdOf } from '../portrait/portraitUrl';
 import { NationBadge } from '../ui/NationBadge';
 import { useNarrowTable } from '../ui/useNarrowTable';
 import styles from './Ranking.module.css';
@@ -106,7 +105,7 @@ function GeneralRow({
       <td>
         {/* 28px 표 행은 thumb을 20×28로 줄여 쓴다 (D-085). 순위 응답에 초상 번호가 오면 얼굴, 아니면 실루엣. */}
         <Portrait
-          id={portraitIdOf(row)}
+          id={row.portraitId ?? null}
           name={displayName(row.name)}
           variant="thumb"
           size={20}

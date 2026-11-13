@@ -10,8 +10,17 @@ import {
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { LobbyNotice, LobbyWorld } from './contract';
-import { NoticeBoard, WorldList } from './LobbyPage';
-import { generalsText, lobbyAction, metaText, myGeneralText, startedText, STATUS_LABEL } from './lobbyView';
+import { NoticeBoard, PastSeasons, WorldList } from './LobbyPage';
+import {
+  endedText,
+  generalsText,
+  lobbyAction,
+  metaText,
+  myGeneralText,
+  splitWorlds,
+  startedText,
+  STATUS_LABEL,
+} from './lobbyView';
 
 afterEach(cleanup);
 
@@ -207,6 +216,49 @@ describe('월드 카드', { timeout: 30_000 }, () => {
       <WorldList loggedIn worlds={[world({ status: 'ENDED', createBlockedReason: '끝난 월드입니다' })]} />,
     );
     expect(screen.getByText('끝남').getAttribute('data-tone')).toBe('muted');
+  });
+});
+
+// 지난 기수 (INT-26, p7-records-20). lobby.worlds({ includeEnded: true })의 끝난 월드 행을 한 줄씩 그린다.
+describe('지난 기수', { timeout: 30_000 }, () => {
+  const ended = (extra: Partial<LobbyWorld>) =>
+    world({ status: 'ENDED', createBlockedReason: '끝난 월드입니다', gameDate: { year: 230, month: 7 }, ...extra });
+
+  it('끝난 월드만 따로 모으고 각 묶음은 서버 순서를 지킨다', () => {
+    const a = world({ id: 'a' });
+    const b = ended({ id: 'b' });
+    const c = world({ id: 'c', status: 'PAUSED' });
+    const d = ended({ id: 'd' });
+    expect(splitWorlds([a, b, c, d])).toEqual({ live: [a, c], ended: [b, d] });
+    expect(endedText(b)).toBe('230년 7월 끝남');
+  });
+
+  it('줄마다 기수 이름, 통일 국가 이름·색, 끝난 연월, 영토 재생 링크를 둔다. 내 장수가 있으면 기록 보기도 둔다', async () => {
+    await renderInRouter(
+      <PastSeasons
+        worlds={[
+          ended({
+            id: '00000000-0000-4000-8000-000000000003',
+            name: '3기',
+            winner: { name: '위', color: '#336699' },
+            myGeneral,
+          }),
+          ended({ id: '00000000-0000-4000-8000-000000000004', name: '4기', winner: null }),
+        ]}
+      />,
+    );
+    expect(screen.getByRole('heading', { name: '지난 기수' })).toBeTruthy();
+    const [third, fourth] = screen.getAllByTestId('past-season');
+    expect(third!.textContent).toBe('3기통일위230년 7월 끝남영토 재생기록 보기');
+    expect(within(third!).getByText('위').getAttribute('style')).toContain('background: rgb(51, 102, 153)');
+    expect(within(third!).getByRole('link', { name: '3기 영토 재생 보기' }).getAttribute('href')).toBe(
+      '/share/timelapse/00000000-0000-4000-8000-000000000003',
+    );
+    expect(within(third!).getByRole('link', { name: '3기 기록 보기' }).getAttribute('href')).toBe(
+      '/w/00000000-0000-4000-8000-000000000003',
+    );
+    expect(fourth!.textContent).toBe('4기통일 국가 없음230년 7월 끝남영토 재생');
+    expect(within(fourth!).getAllByRole('link')).toHaveLength(1);
   });
 });
 
