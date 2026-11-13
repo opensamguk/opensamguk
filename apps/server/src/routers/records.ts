@@ -292,7 +292,8 @@ export const recordsRouter = router({
         where: { worldId: input.worldId },
         orderBy: { tick: 'asc' },
         select: {
-          nations: { orderBy: { nationId: 'asc' }, select: { nationId: true, name: true } },
+          nations: { orderBy: { nationId: 'asc' }, select: { nationId: true, name: true, color: true, power: true } },
+          tick: true,
           data: true,
           activeGenerals: true,
         },
@@ -300,20 +301,84 @@ export const recordsRouter = router({
       const removed = await tx.removedNation.findMany({
         where: { worldId: input.worldId },
         orderBy: { nationId: 'asc' },
-        select: { nationId: true, name: true },
+        select: { nationId: true, name: true, color: true, removedTick: true },
       });
       const nationNames = new Map(removed.map(({ nationId, name }) => [nationId, name]));
       for (const month of history) for (const nation of month.nations) nationNames.set(nation.nationId, nation.name);
       for (const row of rows)
         if (row.nationId !== null && row.nationName) nationNames.set(row.nationId, row.nationName);
+      const cityNames = new Map(
+        (
+          await tx.city.findMany({
+            where: { worldId: input.worldId, OR: [{ kind: null }, { kind: { not: 'PASS' } }] },
+            select: { cityKey: true, name: true },
+          })
+        ).map(({ cityKey, name }) => [cityKey, name]),
+      );
+      type NationArchive = {
+        nationId: number;
+        name: string;
+        color: string | null;
+        removedTick: number | null;
+        peakCities: number | null;
+        peakPower: number | null;
+        recordedAtTick: number | null;
+        cities: { cityKey: number; name: string }[];
+        finalGenerals: number;
+      };
+      const nationArchive = new Map<number, NationArchive>();
+      for (const [nationId, name] of nationNames)
+        nationArchive.set(nationId, {
+          nationId,
+          name,
+          color: null,
+          removedTick: null,
+          peakCities: null,
+          peakPower: null,
+          recordedAtTick: null,
+          cities: [],
+          finalGenerals: 0,
+        });
+      for (const row of removed) {
+        const nation = nationArchive.get(row.nationId)!;
+        nation.color = row.color;
+        nation.removedTick = row.removedTick;
+      }
+      for (const row of rows) {
+        if (row.nationId === null || !row.nationName) continue;
+        const nation = nationArchive.get(row.nationId)!;
+        nation.color = row.nationColor;
+        nation.finalGenerals++;
+      }
       const final = { nations: result.remainingNations, generals: rows.length };
       const peak = { nations: final.nations, affiliatedGenerals: rows.filter((row) => row.nationId !== null).length };
       let peakGenerals: number | undefined;
       for (const month of history) {
         if (month.activeGenerals !== null)
           peakGenerals = Math.max(peakGenerals ?? final.generals, month.activeGenerals);
+        for (const row of month.nations) {
+          const nation = nationArchive.get(row.nationId)!;
+          nation.color ??= row.color;
+          nation.recordedAtTick = month.tick;
+          if (row.power !== null) nation.peakPower = Math.max(nation.peakPower ?? 0, row.power);
+        }
         if (typeof month.data !== 'object' || month.data === null || !('nations' in month.data)) continue;
-        const nations = worldRecordInfo(month.data).nations;
+        const { nations, cities } = worldRecordInfo(month.data);
+        const citiesByNation = new Map<number, number[]>();
+        for (const { nationId, cityKey } of cities) {
+          if (nationId === null || !cityNames.has(cityKey)) continue;
+          const keys = citiesByNation.get(nationId) ?? [];
+          keys.push(cityKey);
+          citiesByNation.set(nationId, keys);
+        }
+        for (const row of nations) {
+          const nation = nationArchive.get(row.nationId);
+          if (!nation || (nation.peakCities !== null && row.cities <= nation.peakCities)) continue;
+          nation.peakCities = row.cities;
+          nation.cities = (citiesByNation.get(row.nationId) ?? [])
+            .sort((a, b) => a - b)
+            .map((cityKey) => ({ cityKey, name: cityNames.get(cityKey)! }));
+        }
         peak.nations = Math.max(peak.nations, nations.filter(({ cities }) => cities > 0).length);
         peak.affiliatedGenerals = Math.max(
           peak.affiliatedGenerals,
@@ -327,6 +392,7 @@ export const recordsRouter = router({
         generals,
         winnerSummary,
         topStratagem,
+        nations: [...nationArchive.values()].sort((a, b) => a.nationId - b.nationId),
         statistics: {
           final,
           peak: {

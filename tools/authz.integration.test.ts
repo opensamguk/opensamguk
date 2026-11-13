@@ -403,6 +403,44 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
       await db.general.update({ where, data: general });
     }
   });
+  it('AC-INT-26 기수의 국가 기록은 월간 공개 국력과 최대 영토를 모은다', async () => {
+    const city = state.cities[0]!;
+    const nation = state.nations[0]!;
+    const where = { worldId_tick: { worldId: endedWorldId, tick: 10000 } };
+    const original = await db.yearbookSnapshot.findUniqueOrThrow({ where });
+    const entry = { worldId_tick_nationId: { worldId: endedWorldId, tick: 10000, nationId: nation.id } };
+    const archivedNation = await db.yearbookNation.findUniqueOrThrow({ where: entry });
+    try {
+      await db.yearbookNation.update({ where: entry, data: { power: 87 } });
+      await db.yearbookSnapshot.update({
+        where,
+        data: {
+          data: {
+            cities: [{ cityKey: city.cityKey, nationId: nation.id }],
+            nations: [{ nationId: nation.id, cities: 1, generals: 2 }],
+          },
+        },
+      });
+      const result = await request('records.season', { worldId: endedWorldId }, await session());
+      expect(result).toMatchObject({
+        status: 200,
+        data: {
+          nations: expect.arrayContaining([
+            expect.objectContaining({
+              nationId: nation.id,
+              peakCities: 1,
+              peakPower: 87,
+              recordedAtTick: 10000,
+              cities: [{ cityKey: city.cityKey, name: city.name }],
+            }),
+          ]),
+        },
+      });
+    } finally {
+      await db.yearbookNation.update({ where: entry, data: { power: archivedNation.power } });
+      await db.yearbookSnapshot.update({ where, data: { data: original.data as object } });
+    }
+  });
   it('AC-INT-26 통일국의 건안칠자는 종료 당시의 계략 성공 횟수를 쓴다', async () => {
     const row = await db.seasonGeneral.findFirstOrThrow({
       where: { worldId: endedWorldId, nationId: { not: null } },
