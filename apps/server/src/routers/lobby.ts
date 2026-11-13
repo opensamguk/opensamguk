@@ -179,9 +179,24 @@ export const lobbyRouter = router({
       z.strictObject({
         by: z.enum(['dedication', 'experience', 'merit']).default('merit'),
         worldId: z.string().min(1).max(64).optional(),
+        scenarioTitle: z.string().trim().min(1).max(160).optional(),
       }),
     )
     .query(async ({ ctx, input }) => {
+      const scenarioKeys = input.scenarioTitle
+        ? (
+            await ctx.db.world.findMany({
+              where: { status: 'ENDED', ...(input.worldId ? { id: input.worldId } : {}) },
+              distinct: ['scenarioKey'],
+              select: { scenarioKey: true },
+            })
+          ).map(({ scenarioKey }) => scenarioKey)
+        : [];
+      const titles = new Map(
+        await Promise.all(scenarioKeys.map(async (key) => [key, await scenarioTitle(key, ctx.db)] as const)),
+      );
+      const filter = input.scenarioTitle ? scenarioKeys.filter((key) => titles.get(key) === input.scenarioTitle) : null;
+      if (filter?.length === 0) return [];
       const rows = await ctx.db.$queryRaw<
         {
           generalId: number;
@@ -207,15 +222,14 @@ export const lobbyRouter = router({
         JOIN "World" w ON w.id = g."worldId" AND w.status = 'ENDED'
         JOIN "WorldResult" r ON r."worldId" = w.id
         WHERE (${input.worldId ?? null}::text IS NULL OR w.id = ${input.worldId ?? null})
+          AND (${filter === null} OR w."scenarioKey" = ANY(${filter ?? []}::text[]))
         ORDER BY value DESC, r."endedAt" DESC, w.id ASC, g."generalId" ASC
         LIMIT 20
       `;
-      const titles = new Map(
-        await Promise.all(
-          [...new Set(rows.map((row) => row.scenarioKey))].map(
-            async (key) => [key, await scenarioTitle(key, ctx.db)] as const,
-          ),
-        ),
+      await Promise.all(
+        [...new Set(rows.map((row) => row.scenarioKey))]
+          .filter((key) => !titles.has(key))
+          .map(async (key) => titles.set(key, await scenarioTitle(key, ctx.db))),
       );
       return rows.map(({ scenarioKey, startedAt, endedAt, value, ...row }, index) => ({
         ...row,

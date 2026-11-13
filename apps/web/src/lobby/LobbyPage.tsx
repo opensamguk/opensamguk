@@ -100,14 +100,20 @@ export function LobbyPage() {
   );
 }
 
-// 공지는 서버 순서 그대로 두고 첫 줄만 펼친다. 한 번에 하나만 연다.
 function HallOfFame({ worlds }: { worlds: LobbyWorld[] }) {
   const trpc = useTRPC();
   const [open, setOpen] = useState(false);
   const [worldId, setWorldId] = useState('');
+  const [scenarioTitle, setScenarioTitle] = useState('');
+  const scenarios = [...new Set(worlds.map((world) => world.scenarioTitle))];
+  const seasons = scenarioTitle ? worlds.filter((world) => world.scenarioTitle === scenarioTitle) : worlds;
   const [by, setBy] = useState<'dedication' | 'experience' | 'merit'>('merit');
   const ranking = useQuery({
-    ...trpc.lobby.hallOfFame.queryOptions({ by, worldId: worldId || undefined }),
+    ...trpc.lobby.hallOfFame.queryOptions({
+      by,
+      worldId: worldId || undefined,
+      scenarioTitle: scenarioTitle || undefined,
+    }),
     enabled: open,
   });
   return (
@@ -116,10 +122,25 @@ function HallOfFame({ worlds }: { worlds: LobbyWorld[] }) {
       {open ? (
         <>
           <label>
+            시나리오{' '}
+            <select
+              value={scenarioTitle}
+              onChange={(event) => {
+                setScenarioTitle(event.target.value);
+                setWorldId('');
+              }}
+            >
+              <option value="">전체 시나리오</option>
+              {scenarios.map((title) => (
+                <option key={title}>{title}</option>
+              ))}
+            </select>
+          </label>{' '}
+          <label>
             기수{' '}
             <select value={worldId} onChange={(event) => setWorldId(event.currentTarget.value)}>
               <option value="">전체 기수</option>
-              {worlds.map((world) => (
+              {seasons.map((world) => (
                 <option key={world.id} value={world.id}>
                   {world.name} · {world.scenarioTitle}
                 </option>
@@ -153,6 +174,14 @@ function HallOfFame({ worlds }: { worlds: LobbyWorld[] }) {
                   {' · '}
                   {row.worldName} · {row.scenarioTitle}
                   {row.winnerName ? ` · 통일 ${row.winnerName}` : ''}
+                  {' · '}
+                  {row.startedAt ? (
+                    <>
+                      <time dateTime={row.startedAt}>{shortDate(row.startedAt)}</time>
+                      {' ~ '}
+                    </>
+                  ) : null}
+                  <time dateTime={row.endedAt}>{shortDate(row.endedAt)}</time>
                 </li>
               ))}
             </ol>
@@ -163,6 +192,7 @@ function HallOfFame({ worlds }: { worlds: LobbyWorld[] }) {
   );
 }
 
+// 공지는 서버 순서 그대로 두고 첫 줄만 펼친다. 한 번에 하나만 연다.
 export function NoticeBoard({ notices }: { notices: LobbyNotice[] }) {
   const [openId, setOpenId] = useState<string | null>(notices[0]?.id ?? null);
   const id = useId();
