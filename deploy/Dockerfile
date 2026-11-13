@@ -24,7 +24,8 @@ USER 10001:10001
 ENTRYPOINT ["/app/deploy/entrypoint.sh"]
 
 FROM dependencies AS public-build
-RUN pnpm build:public
+ARG SOURCE_REVISION
+RUN VITE_SOURCE_REVISION="$SOURCE_REVISION" pnpm build:public
 
 # 정적 화면은 실제 공개 빌드와 자산 검사를 통과한 파일만 내보낸다.
 FROM scratch AS web

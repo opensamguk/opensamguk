@@ -75,6 +75,9 @@ function turnStatusBadge(status: TurnEditorStatus): string | null {
 // 지도에서 도시를 고르면 주소의 ?city만 바꾼다. 같은 화면이 유지되므로 다른 칸의 상태(예턴 편집 초안 등)는 그대로다.
 // 768px 미만은 하단 막대(지도·예턴·현황·기록·메시지·메뉴)로 패널을 하나씩 바꿔 본다 (INT-25). 고른 패널은 주소 해시에 두고,
 // 숨긴 패널도 그대로 붙여 두므로 예턴 편집 초안과 고른 칸, 지도 선택이 패널을 오가도 남는다.
+const buildRevision = import.meta.env.VITE_SOURCE_REVISION;
+const releaseRevision = /^[a-f0-9]{40}$/.test(buildRevision ?? '') ? buildRevision : undefined;
+
 const serverClock = new Intl.DateTimeFormat('ko-KR', {
   month: 'numeric',
   day: 'numeric',
@@ -245,6 +248,11 @@ export function MainPage() {
             {lobbyWorld ? (
               <span className={styles.progressTag} data-testid="main-scenario">
                 {lobbyWorld.scenarioTitle}
+              </span>
+            ) : null}
+            {releaseRevision ? (
+              <span title={releaseRevision}>
+                빌드 <code>{releaseRevision.slice(0, 8)}</code>
               </span>
             ) : null}
             {settings.map((tag) => (
