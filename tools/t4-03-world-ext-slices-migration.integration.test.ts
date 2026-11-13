@@ -511,6 +511,7 @@ it.each(['empty', 'legacy'] as const)(
         HeritageAccount: [],
         HeritageEntry: [],
         ReputationEvent: [],
+        PublicNationEvent: [],
         MonthlyReview: [],
         MapBackground: [],
         SeasonGeneral: [],
