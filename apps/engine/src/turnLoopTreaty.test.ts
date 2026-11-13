@@ -192,7 +192,10 @@ it.each([false, true])(
     const args = run.mock.calls[0]!;
     expect(args).toHaveLength(6);
     // AC-INT-19B: 저장 지시의 예약 변경 번호 대조에 쓰는 현재 turnRevision을 함께 넘긴다.
-    expect(args[4]).toEqual({ ...(modern ? { policy: 'none' } : {}), turnRevision: 0 });
+    expect(args[4]).toEqual({
+      ...(modern ? { policy: 'none', activity: { lastActiveTick: 0, turnTermMinutes: 30 } } : {}),
+      turnRevision: 0,
+    });
     expect([...args[5]!.list('general'), ...args[5]!.list('nation')]).toHaveLength(37);
     expect(f.tx.treaty.updateMany).not.toHaveBeenCalled();
     expect(f.world.actionSequence).toBe(1);

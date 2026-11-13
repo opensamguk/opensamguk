@@ -1,6 +1,11 @@
 import type { Prisma } from '@opensamguk/db';
 import {
   assertSlotSet,
+  CITY_SEASONAL_EVENTS_FEATURE,
+  COURT_PROMOTION_FEATURE,
+  DIPLOMATIC_COOLDOWN_FEATURE,
+  NATION_PHILOSOPHY_FEATURE,
+  PLAYER_AUTOPLAY_FEATURE,
   isPolicyKey,
   activityPayloadSchema,
   applyPersonnelInputStep,
@@ -184,6 +189,10 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
   { key: 'prepared-turns-v1' },
   { key: 'nation-research-v1' },
   { key: 'court-rank-v1' },
+  { key: COURT_PROMOTION_FEATURE },
+  { key: CITY_SEASONAL_EVENTS_FEATURE },
+  { key: NATION_PHILOSOPHY_FEATURE },
+  { key: PLAYER_AUTOPLAY_FEATURE },
   { key: 'general-condition-v1' },
   { key: 'rice-market-v1' },
   { key: RELATIONS_FEATURE },
@@ -354,6 +363,7 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
   { key: 'treaty-trade' },
   { key: EXPANDED_TREATY_FEATURE },
   { key: 'ranked-aid-v1' },
+  { key: DIPLOMATIC_COOLDOWN_FEATURE },
   {
     key: 'reputation-v1',
     async loadReplayState(tx, worldId, replay) {

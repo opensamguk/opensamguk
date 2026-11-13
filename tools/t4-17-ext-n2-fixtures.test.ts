@@ -116,7 +116,9 @@ for (const key of keys)
       expect(turn.commandKey).toBe(key);
       expect(turn.nation).toBeUndefined();
       expect(turn.result).toEqual(
-        name === 'success' ? { ...value.expected.result, stratagemSucceeded: true } : value.expected.result,
+        name === 'success'
+          ? { ...value.expected.result, stratagemSucceeded: true, stratagemCityKey: value.command.args.cityKey }
+          : value.expected.result,
       );
       expect(turn.state).toEqual(value.expected.afterRuleTurnState);
       expect(Object.hasOwn(turn.state, 'ext')).toBe(false);
