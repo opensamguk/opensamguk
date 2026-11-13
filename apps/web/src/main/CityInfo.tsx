@@ -535,7 +535,7 @@ function Garrison({
     {
       key: 'crew',
       label: campaign ? '지휘 병력' : '병력',
-      ...num((g) => (campaign ? ('commandedArmy' in g ? g.commandedArmy.troops : undefined) : g.crew)),
+      ...num((g) => (campaign && 'commandedArmy' in g ? g.commandedArmy.troops : g.crew)),
     },
     {
       key: 'train',

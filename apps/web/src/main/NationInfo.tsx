@@ -459,8 +459,9 @@ export function NationTables({
     {
       key: 'city',
       label: '위치',
-      sortValue: (g) => (isDetailedGeneral(g) ? (cityName.get(g.cityKey) ?? String(g.cityKey)) : null),
-      render: (g) => (isDetailedGeneral(g) ? (cityName.get(g.cityKey) ?? g.cityKey) : '—'),
+      sortValue: (g) =>
+        isDetailedGeneral(g) && g.cityKey != null ? (cityName.get(g.cityKey) ?? String(g.cityKey)) : null,
+      render: (g) => (isDetailedGeneral(g) && g.cityKey != null ? (cityName.get(g.cityKey) ?? g.cityKey) : '—'),
     },
     { key: 'leadership', label: '통솔', ...num((g) => g.leadership) },
     { key: 'strength', label: '무력', ...num((g) => g.strength) },
@@ -508,7 +509,7 @@ export function NationTables({
     <div className={styles.tables}>
       {member ? null : (
         <p className={styles.note} role="note">
-          {HIDDEN_NATION}라 장수 수치와 국고는 보이지 않습니다.
+          타국 국고와 장수의 비공개 항목은 —로 표시합니다.
         </p>
       )}
       <div id="cities">

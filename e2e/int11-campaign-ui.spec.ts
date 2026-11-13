@@ -327,7 +327,7 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
     await expect(nationRow.getByRole('cell').nth(11)).toContainText('사기 부족');
     const previousCommanderRow = nationTable
       .getByRole('row')
-      .filter({ has: owner.page.getByRole('cell', { name: npc!.name, exact: true }) });
+      .filter({ has: owner.page.getByText(npc!.name, { exact: true }).and(owner.page.locator('[data-general-name]')) });
     await expect(previousCommanderRow.getByRole('cell').nth(8)).toHaveText(npcTroops.toLocaleString('ko-KR'));
     if (npcTroops === 0) await expect(previousCommanderRow.getByRole('cell').nth(11)).not.toContainText('훈련 부족');
     await owner.page.screenshot({ path: 'test-results/int11-formal-nation-commanded-army.png', fullPage: true });
@@ -402,6 +402,7 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
     await owner.page.setViewportSize({ width: 375, height: 812 });
     await owner.page.screenshot({ path: 'test-results/int11-formal-campaign-mobile.png', fullPage: true });
     await owner.page.goto(`/w/${worldId}`);
+    await owner.page.getByRole('tab', { name: '예턴', exact: true }).click();
     await expect(editor.locator('tr[data-slot="30"]')).toContainText('농지 개간');
   } finally {
     await releaseHold(hold);
