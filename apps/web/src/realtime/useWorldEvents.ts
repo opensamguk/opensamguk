@@ -27,6 +27,9 @@ export function invalidationTargets(event: WorldEvent, worldId: string, trpc: Tr
         trpc.home.get.queryKey({ worldId }),
         trpc.turns.get.queryKey({ worldId }),
         trpc.records.general.pathKey(),
+        // 내 턴의 교전 보고와 그 턴이 남긴 공개 사건(장수 동향·중원 정세 두 scope 모두).
+        trpc.records.battles.queryKey({ worldId }),
+        trpc.records.activity.queryKey({ worldId }),
         trpc.city.get.queryKey({ worldId }),
         trpc.personnel.officers.queryKey({ worldId }),
       ];
@@ -48,6 +51,8 @@ export function invalidationTargets(event: WorldEvent, worldId: string, trpc: Tr
         trpc.review.latest.queryKey({ worldId }),
         trpc.review.months.queryKey({ worldId }),
         trpc.records.world.queryKey({ worldId }),
+        // 정산 중 생긴 국가 사건(멸망 등)과 평판 사건. 다른 장수의 턴은 알림이 없어 정산 때 함께 다시 읽는다.
+        trpc.records.activity.queryKey({ worldId }),
       ];
     // 발령 상자(T2-06 offers·personnel)와 외교실(T2-08 treaty)의 경로 키다. 그 라우터가 없으면 맞는 query가 없어 아무 일도 없다.
     case 'offer.new':
