@@ -3,13 +3,13 @@ import { useEffect, useRef, type Ref } from 'react';
 import type { RealtimeStatus } from '../realtime/useWorldEvents';
 import { useAuthority, useAuthorityWatch } from './authority';
 import { MessagePanel } from './MessagePanel';
-import { unreadTotal } from './merge';
+import { unreadBadges } from './merge';
 import { useUnread } from './queries';
 import styles from './MessageDock.module.css';
 
 export const DRAWER_ID = 'message-drawer';
 
-// 위쪽 띠의 메시지 단추. 안 읽음 배지는 볼 수 있는 범위의 안 읽음 수를 더한 값이다.
+// 위쪽 띠의 메시지 단추. 안 읽음 배지는 `개인 N`·`외교 N`·`기타 N`(국가·전체)으로 나눠 쓰고 외교는 금색으로 구분한다 (INT-25).
 // GameLayout에 늘 붙어 있으므로 메시지·공지 권한 감시(authority.ts)도 여기서 한 번만 돌린다.
 export function MessageButton({
   worldId,
@@ -25,7 +25,12 @@ export function MessageButton({
   useAuthorityWatch(worldId);
   const authority = useAuthority(worldId);
   const unread = useUnread(worldId);
-  const total = unreadTotal(authority.ready ? unread.data : undefined);
+  const counts = unreadBadges(authority.ready ? unread.data : undefined);
+  const badges = [
+    { key: 'private', label: '개인', count: counts.private, className: styles.badge },
+    { key: 'diplomacy', label: '외교', count: counts.diplomacy, className: `${styles.badge} ${styles.diplomacy}` },
+    { key: 'other', label: '기타', count: counts.other, className: `${styles.badge} ${styles.other}` },
+  ].filter((badge) => badge.count > 0);
   return (
     <button
       ref={ref}
@@ -33,16 +38,20 @@ export function MessageButton({
       className={styles.button}
       aria-expanded={open}
       aria-controls={DRAWER_ID}
-      aria-label={total > 0 ? `메시지, 안 읽음 ${total}건` : '메시지'}
+      aria-label={
+        badges.length > 0
+          ? `메시지, 안 읽음 ${badges.map((badge) => `${badge.label} ${badge.count}건`).join(', ')}`
+          : '메시지'
+      }
       data-testid="message-button"
       onClick={onToggle}
     >
       메시지
-      {total > 0 ? (
-        <span className={styles.badge} data-testid="unread-badge">
-          {total > 99 ? '99+' : total}
+      {badges.map((badge) => (
+        <span key={badge.key} className={badge.className} data-testid={`unread-badge-${badge.key}`}>
+          {badge.label} {badge.count > 99 ? '99+' : badge.count}
         </span>
-      ) : null}
+      ))}
     </button>
   );
 }

@@ -1,7 +1,7 @@
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { errorCode } from '../game/errors';
+import { errorCode, retryUnlessClientError } from '../game/errors';
 import { NoGeneral, QueryError } from '../game/QueryState';
 import { useHome, useWorldId, useWorldMap, useWorldSummary } from '../game/queries';
 import { AccountLinks } from '../layout/AccountLinks';
@@ -16,6 +16,7 @@ import { MobileMainBar, MobileTabPanel, panelOfArea, useMainPanel, type MobilePa
 import { NationInfo } from '../main/NationInfo';
 import { Panel } from '../main/Panel';
 import { MainRecords } from '../main/MainRecords';
+import { seasonOf, settingTags } from '../main/mainProgress';
 import { SeasonResult } from '../main/SeasonResult';
 import { MapLegend, WorldMap } from '../main/WorldMap';
 import { PolicyBar } from '../policy/PolicyBar';
@@ -107,6 +108,20 @@ export function MainPage() {
   const home = useHome(worldId);
   const trpc = useTRPC();
   const mine = useQuery(trpc.general.mine.queryOptions({ worldId }));
+  // 사람 장수 수와 시나리오 이름은 world.summary에 없어 로비 목록(로비·장수 생성 화면과 같은 캐시)에서 읽는다.
+  // 로비 목록은 기본으로 끝난 월드를 빼므로 끝난 판이면 함께 달라고 한다.
+  const lobbyWorlds = useQuery({
+    ...trpc.lobby.worlds.queryOptions(summary.data?.status === 'ENDED' ? { includeEnded: true } : undefined),
+    enabled: summary.data !== undefined,
+    retry: retryUnlessClientError,
+  });
+  const lobbyWorld = lobbyWorlds.data?.find((world) => world.id === worldId);
+  const season = summary.data ? seasonOf(summary.data.gameDate.month) : null;
+  const settings = settingTags({
+    truce: summary.data?.truce,
+    generalCreationEnabled: mine.data?.creationRules.generalCreationEnabled,
+    npcPlayEnabled: mine.data?.creationRules.npcPlayEnabled,
+  });
   const equipment = useEquipment(worldId, summary.data?.equipmentEnabled === true, home.data?.general.id);
   const map = useWorldMap(worldId);
   const [turnStatus, setTurnStatus] = useState<TurnEditorStatus | null>(null);
@@ -180,15 +195,31 @@ export function MainPage() {
       <header className={styles.header}>
         <h1 className={styles.h1}>군략도</h1>
         {summary.data ? (
-          <p className={styles.progress} aria-label="게임 진행 정보">
+          <p className={styles.progress} aria-label="게임 진행 정보" data-testid="main-progress">
             <span>
               현재 {summary.data.gameDate.year}년 {summary.data.gameDate.month}월
+              {season ? (
+                <span className={styles.season} data-testid="main-season">
+                  {season}
+                </span>
+              ) : null}
             </span>
             <span>턴 {summary.data.turnTermMinutes}분</span>
             <span>국가 {nations.length}</span>
             <span>
               {map.data?.operationalMap ? '거점' : '도시'} {cities.length}
             </span>
+            {lobbyWorld ? <span>사람 장수 {lobbyWorld.humanGenerals.toLocaleString('ko-KR')}</span> : null}
+            {lobbyWorld ? (
+              <span className={styles.progressTag} data-testid="main-scenario">
+                {lobbyWorld.scenarioTitle}
+              </span>
+            ) : null}
+            {settings.map((tag) => (
+              <span key={tag} className={styles.progressTag} data-testid="main-setting">
+                {tag}
+              </span>
+            ))}
           </p>
         ) : null}
       </header>
@@ -267,6 +298,7 @@ export function MainPage() {
                   cities={cities}
                   nations={nations}
                   myCityKey={myCityKey}
+                  myNationId={homeData ? homeData.general.nationId : undefined}
                   selectedKey={cityKey}
                   onSelect={selectCity}
                 />

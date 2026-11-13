@@ -7,7 +7,7 @@ import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { bodyLength, type MessageItem, type MessageScope, type NationNotice, type UnreadResponse } from './api';
 import { clearDrafts, readDraft } from './drafts';
-import { mergeMessages, prependSent, unreadReceivedIds, unreadTotal, visibleScopes } from './merge';
+import { mergeMessages, prependSent, unreadBadges, unreadReceivedIds, unreadTotal, visibleScopes } from './merge';
 
 // 화면은 실제 AppRouter 타입의 tRPC 클라이언트로 부른다. 여기서는 네트워크 대신 마지막 link만 바꿔
 // 실제로 나가는 path·input·AbortSignal을 기록하고 path별 처리기의 값을 돌려준다.
@@ -45,6 +45,7 @@ const { TRPCProvider, trpc, trpcClient } = await import('../trpc');
 const { useAuthorityWatch } = await import('./authority');
 const { MessagePanel, MessageRow, pickerName } = await import('./MessagePanel');
 const { NationNoticeBox, NationNoticePopup } = await import('./NationNotice');
+const { MessageButton } = await import('./MessageDock');
 
 const WORLD = 'w1';
 const keys = {
@@ -175,6 +176,18 @@ describe('메시지 목록 합치기', () => {
     ]);
     expect(unreadTotal({ PRIVATE: 0, NATION: 1, DIPLOMACY: 2, WORLD: 0 })).toBe(3);
     expect(unreadTotal(undefined)).toBe(0);
+    // 위 띠 배지는 개인·외교를 따로, 국가·전체를 기타로 센다 (INT-25 AC-INT-25).
+    expect(unreadBadges({ PRIVATE: 2, NATION: 1, DIPLOMACY: 3, WORLD: 4 })).toEqual({
+      private: 2,
+      diplomacy: 3,
+      other: 5,
+    });
+    expect(unreadBadges({ PRIVATE: 1, NATION: null, DIPLOMACY: null, WORLD: 0 })).toEqual({
+      private: 1,
+      diplomacy: 0,
+      other: 0,
+    });
+    expect(unreadBadges(undefined)).toEqual({ private: 0, diplomacy: 0, other: 0 });
     expect(unreadReceivedIds([item('a', { read: false }), item('b', { read: false, direction: 'sent' })])).toEqual([
       'a',
     ]);
@@ -804,5 +817,31 @@ describe('INT-25 메시지의 장수 얼굴과 이름', () => {
     const all = [{ name: '유도(145년생)' }, { name: '유도(170년생)' }, { name: '조조(曹操)' }];
     expect(pickerName('조조(曹操)', all)).toBe('조조');
     expect(pickerName('유도(145년생)', all)).toBe('유도(145년생)');
+  });
+});
+
+describe('INT-25 AC-INT-25 위 띠 메시지 단추', () => {
+  it('안 읽음 배지를 개인·외교·기타로 나누고 외교는 다른 색으로 쓴다', async () => {
+    on('message.unread', () => ({ PRIVATE: 2, NATION: 1, DIPLOMACY: 3, WORLD: 0 }));
+    renderWith(<MessageButton worldId={WORLD} open={false} onToggle={() => {}} />);
+    const button = await screen.findByRole(
+      'button',
+      { name: '메시지, 안 읽음 개인 2건, 외교 3건, 기타 1건' },
+      { timeout: 5_000 },
+    );
+    expect(within(button).getByTestId('unread-badge-private').textContent).toBe('개인 2');
+    const diplomacy = within(button).getByTestId('unread-badge-diplomacy');
+    expect(diplomacy.textContent).toBe('외교 3');
+    expect(diplomacy.className).not.toBe(within(button).getByTestId('unread-badge-private').className);
+    expect(within(button).getByTestId('unread-badge-other').textContent).toBe('기타 1');
+  });
+
+  it('안 읽은 메시지가 없으면 배지 없이 메시지만 쓴다', async () => {
+    on('message.unread', () => ({ PRIVATE: 0, NATION: null, DIPLOMACY: null, WORLD: 0 }));
+    renderWith(<MessageButton worldId={WORLD} open={false} onToggle={() => {}} />);
+    await waitFor(() => expect(callsTo('message.unread').length).toBeGreaterThan(0));
+    await settle();
+    const button = screen.getByRole('button', { name: '메시지' });
+    expect(within(button).queryByTestId(/^unread-badge/)).toBeNull();
   });
 });
