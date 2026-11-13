@@ -42,6 +42,7 @@ type Nation = Omit<
   | 'noticeUpdatedAt'
   | 'noticeUpdatedBy'
   | 'diplomaticAidUntilMonth'
+  | 'npcSettings'
 >;
 export type Viewer = Pick<General, 'id' | 'nationId' | 'cityKey'> | null;
 

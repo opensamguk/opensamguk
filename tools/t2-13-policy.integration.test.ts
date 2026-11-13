@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import { DEFENSE_STANCE_FEATURE, DEFENSE_STANCE_KIND } from '../packages/rules/src/battle/defenders';
+import { NPC_NATION_POLICY_FEATURE, NPC_NATION_POLICY_KIND } from '../packages/rules/src/npc/policy';
 import type { PolicyKey, PolicySlot } from '../packages/rules/src/policy';
 import { commandInitial } from '../packages/rules/test/commandFixture';
 import { renewLeaseDuringTest } from '../apps/engine/test/leaseHeartbeat';
@@ -45,7 +46,7 @@ async function user(status: 'ACTIVE' | 'SANCTIONED' = 'ACTIVE') {
   await db.session.create({ data: { id: session.id, userId: row.id, expiresAt: session.expiresAt } });
   return { id: row.id, email, cookie: `sid=${session.token}`, sessionId: session.id };
 }
-async function fixture(options: { farmMax?: boolean; npc?: boolean; defense?: boolean } = {}) {
+async function fixture(options: { farmMax?: boolean; npc?: boolean; defense?: boolean; npcPolicy?: boolean } = {}) {
   const alice = await user(),
     bob = await user();
   const initial = commandInitial();
@@ -60,8 +61,11 @@ async function fixture(options: { farmMax?: boolean; npc?: boolean; defense?: bo
     turnTermMinutes: 30,
     endYear: null,
     // 이 회귀 시험은 archive 5와 기존 전환 표지 계약을 검증한다.
-    ...(options.defense
-      ? { replayFormat: 3, ruleFeatures: [DEFENSE_STANCE_FEATURE, 'policy'] }
+    ...(options.defense || options.npcPolicy
+      ? {
+          replayFormat: 3,
+          ruleFeatures: [options.defense ? DEFENSE_STANCE_FEATURE : NPC_NATION_POLICY_FEATURE, 'policy'],
+        }
       : { replayFormat: 'policy' }),
   });
   worlds.push(worldId);
@@ -561,6 +565,59 @@ for (const category of ['unauthenticated', 'otherUser', 'sanctioned', 'invalidIn
         }[category],
       );
       expect(await db.inputEvent.count({ where: { worldId: f.worldId, kind: DEFENSE_STANCE_KIND } })).toBe(0);
+    }),
+  );
+}
+
+const editedNpcPolicy = { recruitTarget: 4000, trainingTarget: 85, moraleTarget: 75, rewardGoldTarget: 12000 };
+
+it(
+  '군주의 NPC 운영 기준을 다음 엔진 처리에 적용하고 재생한다',
+  authzCase(NPC_NATION_POLICY_KIND, 'success', async () => {
+    const f = await fixture({ npcPolicy: true });
+    const input = { worldId: f.worldId, nationId: 1, policy: editedNpcPolicy };
+    const query = () => rpc('nation.get', { worldId: f.worldId, nationId: 1 }, f.alice.cookie);
+    expect((await query()).data).toMatchObject({ npcPolicy: { recruitTarget: 2000, editor: { pending: null } } });
+    const request = () => rpc(NPC_NATION_POLICY_KIND, input, f.alice.cookie, true);
+    expect((await request()).data).toEqual({ status: 'pending' });
+    expect((await request()).data).toEqual({ status: 'pending' });
+    expect(await db.inputEvent.count({ where: { worldId: f.worldId, kind: NPC_NATION_POLICY_KIND } })).toBe(1);
+    expect((await query()).data).toMatchObject({
+      npcPolicy: { recruitTarget: 2000, editor: { pending: editedNpcPolicy } },
+    });
+    await f.loop.advanceTo(0);
+    expect((await query()).data).toMatchObject({ npcPolicy: { ...editedNpcPolicy, editor: { pending: null } } });
+    await f.loop.advanceTo(10000);
+    const archive = await exportReplay(db, f.worldId);
+    expect(replayArchive(archive, 1)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
+  }),
+);
+
+for (const category of ['unauthenticated', 'otherUser', 'sanctioned', 'invalidInput'] as const) {
+  it(
+    `NPC 운영 기준 권한 ${category}`,
+    authzCase(NPC_NATION_POLICY_KIND, category, async () => {
+      const f = await fixture({ npcPolicy: true });
+      const actor = category === 'otherUser' ? f.bob : category === 'sanctioned' ? await user('SANCTIONED') : f.alice;
+      const result = await rpc(
+        NPC_NATION_POLICY_KIND,
+        {
+          worldId: f.worldId,
+          nationId: 1,
+          policy: { ...editedNpcPolicy, trainingTarget: category === 'invalidInput' ? 101 : 85 },
+        },
+        category === 'unauthenticated' ? undefined : actor.cookie,
+        true,
+      );
+      expect(result.error).toBe(
+        {
+          unauthenticated: 'UNAUTHORIZED',
+          otherUser: 'FORBIDDEN',
+          sanctioned: 'UNAUTHORIZED',
+          invalidInput: 'BAD_REQUEST',
+        }[category],
+      );
+      expect(await db.inputEvent.count({ where: { worldId: f.worldId, kind: NPC_NATION_POLICY_KIND } })).toBe(0);
     }),
   );
 }

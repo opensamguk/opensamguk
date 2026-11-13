@@ -336,3 +336,13 @@ export { canExecuteResearchNationCommand } from './nationResearch/commands';
 export { NATION_PHILOSOPHY_FEATURE, nationPhilosophy, nationPhilosophyEffects } from './personnel/nationPhilosophy';
 export { RESEARCH_ERA_FEATURE, researchEra } from './nationResearch/era';
 export { COURT_RANK_FEATURE, COURT_PROMOTION_FEATURE, courtOfficeTitle, nationRank } from './personnel/nationRank';
+
+export {
+  NPC_NATION_POLICY_FEATURE,
+  NPC_NATION_POLICY_KIND,
+  npcNationPolicy,
+  npcNationPolicyInput,
+  npcNationPolicySchema,
+  npcPolicyLimits,
+  storedNpcNationPolicy,
+} from './npc/policy';

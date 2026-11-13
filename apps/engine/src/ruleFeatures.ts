@@ -3,6 +3,10 @@ import {
   assertSlotSet,
   CITY_SEASONAL_EVENTS_FEATURE,
   DEFENSE_STANCE_FEATURE,
+  NPC_NATION_POLICY_FEATURE,
+  NPC_NATION_POLICY_KIND,
+  npcNationPolicyInput,
+  BALANCE,
   DEFENSE_STANCE_KIND,
   defenseStanceInput,
   COURT_PROMOTION_FEATURE,
@@ -117,6 +121,35 @@ export async function persistPersonnelPacket(
   await persistResidenceAnchors(tx, worldId, before.residenceAnchors!, anchors);
 }
 
+const processNpcNationPolicy: QueuedInputHandler = async (tx, world, event) => {
+  const reject = (code: string, message: string) => ({ status: 'REJECTED' as const, result: { code, message } });
+  if (world.status === 'ENDED') return reject('WORLD_CLOSED', '종료된 월드입니다.');
+  const input = npcNationPolicyInput.safeParse(event.payload);
+  if (!input.success) return reject('BAD_NPC_POLICY', 'NPC 운영 기준을 확인하세요.');
+  await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${event.userId} FOR SHARE`;
+  const user = await tx.user.findUnique({ where: { id: event.userId }, select: { status: true } });
+  if (user?.status !== 'ACTIVE') return reject('ACTOR_INACTIVE', '활성 계정이 아닙니다.');
+  const actor =
+    event.generalId === null
+      ? null
+      : await tx.general.findUnique({
+          where: { worldId_id: { worldId: world.id, id: event.generalId } },
+          select: { userId: true, officerLevel: true, nationId: true },
+        });
+  if (
+    !actor ||
+    actor.userId !== event.userId ||
+    actor.officerLevel !== BALANCE.RULER_LEVEL ||
+    actor.nationId !== input.data.nationId
+  )
+    return reject('FORBIDDEN', '현재 군주만 NPC 운영 기준을 변경할 수 있습니다.');
+  await tx.nation.update({
+    where: { worldId_id: { worldId: world.id, id: input.data.nationId } },
+    data: { npcSettings: input.data.policy },
+  });
+  return { status: 'APPLIED', result: input.data };
+};
+
 const processDefenseStance: QueuedInputHandler = async (tx, world, event) => {
   const reject = (code: string, message: string) => ({ status: 'REJECTED' as const, result: { code, message } });
   if (world.status === 'ENDED') return reject('WORLD_CLOSED', '종료된 월드입니다.');
@@ -212,6 +245,7 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
   { key: 'court-rank-v1' },
   { key: COURT_PROMOTION_FEATURE },
   { key: CITY_SEASONAL_EVENTS_FEATURE },
+  { key: NPC_NATION_POLICY_FEATURE, queuedInputs: { [NPC_NATION_POLICY_KIND]: processNpcNationPolicy } },
   { key: DEFENSE_STANCE_FEATURE, queuedInputs: { [DEFENSE_STANCE_KIND]: processDefenseStance } },
   { key: NATION_PHILOSOPHY_FEATURE },
   { key: PLAYER_AUTOPLAY_FEATURE },

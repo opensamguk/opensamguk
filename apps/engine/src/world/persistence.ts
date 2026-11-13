@@ -462,6 +462,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
         omit: {
           notice: true,
           recruitmentNotice: true,
+          npcSettings: true,
           noticeDirective: true,
           noticeRevision: true,
           noticeUpdatedAt: true,

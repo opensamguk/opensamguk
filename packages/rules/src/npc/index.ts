@@ -12,7 +12,7 @@ import type { CommandResolver } from '../commands/resolve';
 import { readCampaignState } from '../campaign/state';
 import { cityNpcAllocations, cityNpcPreparation } from '../cityResources/npc';
 import { frontier } from './frontier';
-import { NPC_DEFAULT_POLICY } from './policy';
+import { npcNationPolicy } from './policy';
 export { NPC_DEFAULT_POLICY } from './policy';
 import { crewContext, crewTypeFailure } from '../world/crewRequirements';
 import { nationStrategyNpcCandidates } from '../nationStrategy/npc';
@@ -162,6 +162,7 @@ export function generalTurnCandidates(view: WorldView, general: General, context
       '후방에서 자기 영토를 따라 가까운 전선으로 한 칸 이동한다.',
     );
   if (front && city.nationId === general.nationId) {
+    const policy = npcNationPolicy(view, view.nations[general.nationId]);
     const campaign = view.ruleFeatures?.includes('campaign-v1') ? readCampaignState(view.campaign, view) : undefined;
     const owned = campaign?.units.filter((unit) => unit.ownerId === general.id).sort((a, b) => a.id - b.id);
     const army = owned?.[0];
@@ -174,7 +175,7 @@ export function generalTurnCandidates(view: WorldView, general: General, context
       ? campaign.units.filter((unit) => unit.commanderId === commander.id).reduce((sum, unit) => sum + unit.troops, 0)
       : general.crew;
     const capacity = commander.leadership * BALANCE.CREW_PER_LEADERSHIP;
-    const minimum = Math.min(capacity, NPC_DEFAULT_POLICY.recruitTarget);
+    const minimum = Math.min(capacity, policy.recruitTarget);
     const requirements = crewContext(view, { generalId: general.id, tick: context.tick ?? 0 });
     const preferred = context.unitSet?.crewTypes.find((u) => u.id === crewType && u.armType > 0);
     const unit =
@@ -201,14 +202,14 @@ export function generalTurnCandidates(view: WorldView, general: General, context
           '전선에서 부족한 병력을 모은다.',
         );
     }
-    if (!cityResources && train < NPC_DEFAULT_POLICY.trainingTarget)
+    if (!cityResources && train < policy.trainingTarget)
       choice.add(
         'train',
         army ? { unitId: army.id } : {},
         100 + (stats ? (drillGain(view, commander, false) - 10) * 10 : 0),
         '출병 전에 병력을 훈련한다.',
       );
-    if (!cityResources && atmos < NPC_DEFAULT_POLICY.moraleTarget)
+    if (!cityResources && atmos < policy.moraleTarget)
       choice.add(
         'morale',
         army ? { unitId: army.id } : {},
@@ -281,7 +282,7 @@ export function nationTurnCandidates(view: WorldView, ruler: General, context: N
         choice.add('nation_declare', { nationId: id }, 100, '교전국이 없어 접경 국가에 선전포고한다.');
     }
   }
-  const rewardGoldTarget = NPC_DEFAULT_POLICY.rewardGoldTarget;
+  const rewardGoldTarget = npcNationPolicy(view, nation).rewardGoldTarget;
   if (nation.gold >= rewardGoldTarget) {
     const members = Object.values(view.generals).filter(
       (g) =>

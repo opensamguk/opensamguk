@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useEffect, useId, useRef, useState } from 'react';
 import { retryUnlessClientError } from '../game/errors';
@@ -151,12 +151,15 @@ export function NationSummaryGrid({
   );
 }
 
-export function NationNpcPolicy({ nation }: { nation: NationView }) {
+export function NationNpcPolicy({ worldId, nation }: { worldId: string; nation: NationView }) {
   const policy = nation.npcPolicy;
   if (!policy) return null;
   return (
     <details>
       <summary>NPC 운영 기준</summary>
+      {policy.editor ? (
+        <NationNpcPolicyEditor key={`${worldId}:${nation.id}`} worldId={worldId} nationId={nation.id} policy={policy} />
+      ) : null}
       <InfoGrid
         items={[
           { label: '전선 모집 목표', value: `${n(policy.recruitTarget)}명` },
@@ -184,6 +187,84 @@ export function NationNpcPolicy({ nation }: { nation: NationView }) {
         ) : null,
       )}
     </details>
+  );
+}
+
+type NationNpcSettings = NonNullable<NonNullable<NationView['npcPolicy']>['editor']>['limits'];
+const npcPolicyLabels = {
+  recruitTarget: '전선 모집 목표',
+  trainingTarget: '훈련 목표',
+  moraleTarget: '사기 목표',
+  rewardGoldTarget: '포상 기준 금',
+} satisfies Record<keyof NationNpcSettings, string>;
+
+function NationNpcPolicyEditor({
+  worldId,
+  nationId,
+  policy,
+}: {
+  worldId: string;
+  nationId: number;
+  policy: NonNullable<NationView['npcPolicy']>;
+}) {
+  const trpc = useTRPC();
+  const client = useQueryClient();
+  const [draft, setDraft] = useState<Partial<Record<keyof NationNpcSettings, string>>>({});
+  const save = useMutation(
+    trpc.nation.setNpcPolicy.mutationOptions({
+      onSuccess: async () => {
+        await client.invalidateQueries({ queryKey: trpc.nation.get.queryKey({ worldId, nationId }) });
+        setDraft({});
+      },
+    }),
+  );
+  const editor = policy.editor;
+  if (!editor) return null;
+  const fields = Object.keys(npcPolicyLabels) as Array<keyof NationNpcSettings>;
+  const value = (field: keyof NationNpcSettings) => draft[field] ?? String(editor.pending?.[field] ?? policy[field]);
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (editor.pending) return;
+        save.mutate({
+          worldId,
+          nationId,
+          policy: {
+            recruitTarget: Number(value('recruitTarget')),
+            trainingTarget: Number(value('trainingTarget')),
+            moraleTarget: Number(value('moraleTarget')),
+            rewardGoldTarget: Number(value('rewardGoldTarget')),
+          },
+        });
+      }}
+    >
+      <fieldset disabled={save.isPending || editor.pending !== null}>
+        <legend>NPC 운영 기준 편집</legend>
+        {fields.map((field) => (
+          <label key={field}>
+            {npcPolicyLabels[field]}{' '}
+            <input
+              type="number"
+              min={editor.limits[field].min}
+              max={editor.limits[field].max}
+              step={1}
+              required
+              value={value(field)}
+              onChange={(event) => {
+                const next = event.currentTarget.value;
+                setDraft((previous) => ({ ...previous, [field]: next }));
+              }}
+            />
+          </label>
+        ))}
+        <button type="submit" disabled={Object.keys(draft).length === 0}>
+          저장
+        </button>
+      </fieldset>
+      {editor.pending ? <p role="status">NPC 운영 기준 변경을 처리하고 있습니다.</p> : null}
+      {save.isError ? <p role="alert">{save.error.message}</p> : null}
+    </form>
   );
 }
 
@@ -226,7 +307,12 @@ export function NationFinanceGrid({ nation }: { nation: NationSummary }) {
 
 export function useNation(worldId: string, nationId: number, enabled = true) {
   const trpc = useTRPC();
-  return useQuery({ ...trpc.nation.get.queryOptions({ worldId, nationId }), enabled, retry: retryUnlessClientError });
+  return useQuery({
+    ...trpc.nation.get.queryOptions({ worldId, nationId }),
+    enabled,
+    retry: retryUnlessClientError,
+    refetchInterval: (query) => (query.state.data?.npcPolicy?.editor?.pending ? 1000 : false),
+  });
 }
 
 // 공개 국력과 그 순위. 순위 화면과 같은 조회(ranking.nations, 국력 기준)에서 이 국가 줄을 읽는다.

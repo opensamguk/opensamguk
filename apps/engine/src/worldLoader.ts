@@ -17,6 +17,8 @@ import {
   assertNationLifecycle,
   storedCitySeasonalEvent,
   storedDefenseStance,
+  storedNpcNationPolicy,
+  NPC_NATION_POLICY_FEATURE,
   DEFENSE_STANCE_FEATURE,
   type WorldState,
 } from '@opensamguk/rules';
@@ -110,10 +112,14 @@ export async function loadWorldAfterCapabilityCheck(
       ).map((city) => [city.cityKey, city]),
     ),
     nations: Object.fromEntries(
-      nations.map(({ diplomaticAidUntilMonth, ...nation }) => {
+      nations.map(({ diplomaticAidUntilMonth, npcSettings, ...nation }) => {
         return [
           nation.id,
-          { ...stripWorldId(nation), ...(diplomaticAidUntilMonth != null ? { diplomaticAidUntilMonth } : {}) },
+          {
+            ...stripWorldId(nation),
+            ...(diplomaticAidUntilMonth != null ? { diplomaticAidUntilMonth } : {}),
+            ...storedNpcNationPolicy(world.ruleFeatures.includes(NPC_NATION_POLICY_FEATURE), npcSettings),
+          },
         ];
       }),
     ),

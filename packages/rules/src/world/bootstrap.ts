@@ -59,6 +59,7 @@ export interface InitialNation {
   capitalCityKey: number | null;
   isNpc: boolean;
   diplomaticAidUntilMonth?: number;
+  npcSettings?: import('../npc/policy').NpcNationPolicy;
 }
 
 export interface InitialGeneral {

@@ -104,7 +104,7 @@ describe('T2-07 / AC-M2-06 실제 PostgreSQL 조약 저장 component', () => {
     const { worldId, userIds } = await fixture();
     const nation = await db.nation.findUniqueOrThrow({
       where: { worldId_id: { worldId, id: 1 } },
-      omit: { noticeDirective: true },
+      omit: { noticeDirective: true, npcSettings: true },
     });
     const otherNation = await db.nation.create({ data: { ...nation, id: 3, name: '보존 국가' } });
     const otherPair = await db.diplomacy.create({

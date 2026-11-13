@@ -1,4 +1,5 @@
 import { applyDefenseStance, DEFENSE_STANCE_FEATURE, DEFENSE_STANCE_KIND } from './battle/defenders';
+import { NPC_NATION_POLICY_FEATURE, NPC_NATION_POLICY_KIND, applyNpcNationPolicy } from './npc/policy';
 import { RESEARCH_ERA_FEATURE } from './nationResearch/era';
 import { NATION_PHILOSOPHY_FEATURE } from './personnel/nationPhilosophy';
 import { COURT_PROMOTION_FEATURE, COURT_RANK_FEATURE } from './personnel/nationRank';
@@ -158,6 +159,7 @@ export const ruleRegistry: RuleRegistry = {
       },
     },
     policyFeature,
+    { key: NPC_NATION_POLICY_FEATURE, requires: [], conflicts: [] },
     { key: DEFENSE_STANCE_FEATURE, requires: [], conflicts: [] },
     { key: PLAYER_AUTOPLAY_FEATURE, requires: ['policy'], conflicts: [] },
     { key: CITY_SEASONAL_EVENTS_FEATURE, requires: [], conflicts: [] },
@@ -247,6 +249,7 @@ export const ruleRegistry: RuleRegistry = {
     { kind: 'turns.set', feature: null, route: 'direct', apply: applyTurnsInput },
     { kind: 'general.create', feature: null, route: 'queued', apply: applyCreationInput },
     { kind: POSSESSION_KIND, feature: null, route: 'queued', apply: applyPossessionInput },
+    { kind: NPC_NATION_POLICY_KIND, feature: NPC_NATION_POLICY_FEATURE, route: 'queued', apply: applyNpcNationPolicy },
     { kind: DEFENSE_STANCE_KIND, feature: DEFENSE_STANCE_FEATURE, route: 'queued', apply: applyDefenseStance },
     { kind: 'general.setPolicy', feature: 'policy', route: 'queued', apply: applyPolicyInput },
     { kind: 'general.active', feature: 'policy', route: 'queued', apply: applyPolicyInput },
@@ -326,6 +329,8 @@ export function checkReplayOrigin(
     throw new Error('초기 장수에는 도시 관직을 배정할 수 없습니다.');
   if (origin.initial.generals.some((general) => Object.hasOwn(general, 'defenseThreshold')))
     throw new Error('초기 장수에는 개별 수비 기준을 지정할 수 없습니다.');
+  if (origin.initial.nations.some((nation) => Object.hasOwn(nation, 'npcSettings')))
+    throw new Error('초기 국가에는 개별 NPC 운영 기준을 지정할 수 없습니다.');
   checkStatProfile(origin.initial);
   checkInitialNpcStatLimits(origin.initial, origin.version === 3 ? 'current' : 'legacy');
   checkCityScaleInitial(origin.initial);
