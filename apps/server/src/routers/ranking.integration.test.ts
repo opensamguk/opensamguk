@@ -310,7 +310,7 @@ describe('T2-22 / AC-M2-19 실제 TCP HTTP·PostgreSQL 순위', () => {
     expect(new Set([...first.data.top, ...second.data.top].map(({ generalId }) => generalId)).size).toBe(105);
     const filtered = await query('ranking.generals', { ...input, page: 2, kind: 'human' });
     expect(filtered.data.top.map(({ rank }) => rank)).toEqual([1, 2]);
-    expect(filtered.data.pagination).toBeUndefined();
+    expect(filtered.data.pagination).toBeNull();
   });
 
   it('국가 병력 추정은 현재 출사 장수만 집계하고 개인 활동 시각을 반환하지 않는다', async () => {
@@ -352,6 +352,7 @@ describe('T2-22 / AC-M2-19 실제 TCP HTTP·PostgreSQL 순위', () => {
         top: [],
         me: null,
         at: null,
+        pagination: null,
       });
     for (const by of ['cities', 'generals', 'power'])
       expect((await query('ranking.nations', { worldId: emptyWorldId, by })).data).toEqual({ items: [], at: null });

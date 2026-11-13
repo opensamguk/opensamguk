@@ -65,7 +65,7 @@ export const rankingRouter = router({
           where: { worldId: input.worldId },
           select: { tick: true, year: true, month: true, generals: true },
         });
-        if (!snapshot) return { top: [], me: null, at: null, pagination: undefined };
+        if (!snapshot) return { top: [], me: null, at: null, pagination: null };
         const generals = generalRows.parse(snapshot.generals);
         const identity = new Map(
           (
@@ -105,7 +105,7 @@ export const rankingRouter = router({
         const page = Math.min(input.page, pageCount);
         const top = rows.slice((page - 1) * 100, page * 100);
         const me = viewer ? (rows.find((row) => row.generalId === viewer.id) ?? null) : null;
-        return { top, me, at: snapshotAt(snapshot), ...(pageCount > 1 ? { pagination: { page, pageCount } } : {}) };
+        return { top, me, at: snapshotAt(snapshot), pagination: pageCount > 1 ? { page, pageCount } : null };
       }),
     ),
   freeGenerals: protectedProcedure.input(worldInput).query(({ ctx, input }) =>
