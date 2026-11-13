@@ -215,7 +215,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     await db.diplomacy.create({
       data: { worldId: world, nationA: 1, nationB: 2, state: 'NON_AGGRESSION', untilTick: 0 },
     });
-    const result = await query('treaty.relations', { worldId: world }, users[3]!.cookie);
+    const result = await query('treaty.relations', { worldId: world });
     expect(result.status).toBe(200);
     expect(result.data.nations).toEqual([
       ...state.nations.map(({ id, name, color }) => ({ id, name, color })),
@@ -226,6 +226,12 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       { nationA: 1, nationB: 3, relation: 'NONE', relationEndAt: null },
       { nationA: 2, nationB: 3, relation: 'NONE', relationEndAt: null },
     ]);
+    for (const user of users.slice(2)) {
+      const publicView = await query('treaty.relations', { worldId: world }, user.cookie);
+      expect(publicView.data.pairs).toEqual(
+        result.data.pairs.map((pair) => ({ ...pair, relation: 'NONE', relationEndAt: null })),
+      );
+    }
     const other = await query('treaty.relations', { worldId: otherWorldId });
     expect(other.data.pairs).toEqual([{ nationA: 1, nationB: 2, relation: 'NONE', relationEndAt: null }]);
   });

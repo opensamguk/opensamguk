@@ -50,7 +50,7 @@ export const treatyRouter = router({
   relations: protectedProcedure
     .input(worldInput)
     .query(({ ctx, input }) =>
-      ctx.db.$transaction((tx) => listRelations(tx, input.worldId), { isolationLevel: 'RepeatableRead' }),
+      ctx.db.$transaction((tx) => listRelations(tx, input.worldId, ctx.user.id), { isolationLevel: 'RepeatableRead' }),
     ),
   tradeTargets: protectedProcedure.input(worldInput).query(({ ctx, input }) => {
     const started = performance.now();

@@ -111,9 +111,9 @@ function publicRelation(startYear: number, diplomacy?: { state: Exclude<TreatyRe
         : null,
   };
 }
-export async function listRelations(tx: Prisma.TransactionClient, worldId: string) {
+export async function listRelations(tx: Prisma.TransactionClient, worldId: string, userId: string) {
   const { startYear } = await requireWorld(tx, worldId);
-  const [nations, diplomacies] = await Promise.all([
+  const [nations, diplomacies, viewer] = await Promise.all([
     tx.nation.findMany({
       where: { worldId },
       select: { id: true, name: true, color: true },
@@ -123,8 +123,20 @@ export async function listRelations(tx: Prisma.TransactionClient, worldId: strin
       where: { worldId },
       select: { nationA: true, nationB: true, state: true, untilTick: true },
     }),
+    tx.general.findUnique({
+      where: { worldId_userId: { worldId, userId } },
+      select: { nationId: true, removedAt: true },
+    }),
   ]);
-  const byPair = new Map(diplomacies.map((entry) => [`${entry.nationA}:${entry.nationB}`, entry]));
+  const viewerNation = viewer?.removedAt === null ? viewer.nationId : null;
+  const byPair = new Map(
+    diplomacies
+      .filter(
+        ({ state, nationA, nationB }) =>
+          state !== 'NON_AGGRESSION' || viewerNation === nationA || viewerNation === nationB,
+      )
+      .map((entry) => [`${entry.nationA}:${entry.nationB}`, entry]),
+  );
   const pairs = nations.flatMap((nationA, index) =>
     nations.slice(index + 1).map((nationB) => ({
       nationA: nationA.id,
