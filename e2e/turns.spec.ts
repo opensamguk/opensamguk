@@ -3,6 +3,7 @@ import { newEmail, createAccount, TEST_PASSWORD } from './account';
 import {
   ApiError,
   createGeneralByApi,
+  e2eFeatureWorld,
   e2eWorld,
   idleWorld,
   mine,
@@ -36,9 +37,9 @@ async function login(page: Page, email: string) {
 }
 
 // 새 계정과 장수를 만들고 예턴 화면을 연다. 30칸은 모두 휴식으로 시작한다.
-async function openEditor(page: Page) {
+async function openEditor(page: Page, targetWorld?: string) {
   const email = await createAccount(page);
-  const world = await e2eWorld(page);
+  const world = targetWorld ?? (await e2eWorld(page));
   await createGeneralByApi(page, world);
   await waitTurnWindow(page, world);
   await page.goto(`/w/${world}/turns`);
@@ -254,6 +255,49 @@ test.describe('장수 생성', () => {
 });
 
 test.describe('예턴 편집', () => {
+  test('AC-M1-14 내정 8종과 휴식을 고르고 한 번 저장하면 다시 열어도 유지된다', async ({ page }) => {
+    const world = await e2eFeatureWorld([], { turnTermMinutes: 60 });
+    await openEditor(page, world);
+    const initial = await turns(page, world);
+    const domestic = [
+      ['farm', '농지 개간'],
+      ['commerce', '상업 투자'],
+      ['security', '치안 강화'],
+      ['settle', '정착 장려'],
+      ['goodwill', '주민 선정'],
+      ['defence', '수비 강화'],
+      ['wall', '성벽 보수'],
+      ['research', '기술 연구'],
+    ] as const;
+
+    for (const [index, [, name]] of domestic.entries()) {
+      const slot = index + 1;
+      await row(page, slot).click();
+      await pick(page, name);
+      await editor(page)
+        .getByRole('button', { name: `${slot}번 칸에 넣기`, exact: true })
+        .click();
+      await expect(row(page, slot)).toContainText(name);
+      await expect(row(page, slot)).toContainText('경고: 국가에 소속되어야 합니다.');
+      await row(page, slot).click();
+    }
+    await expect(editor(page).getByTestId('draft-state')).toHaveText('저장하지 않은 편집 8건');
+
+    await row(page, 9).click();
+    await pick(page, '휴식');
+    await editor(page).getByRole('button', { name: '9번 칸에 저장', exact: true }).click();
+    await expect(editor(page).getByText('저장했습니다.')).toBeVisible();
+    const saved = await turns(page, world);
+    expect(saved.revision).toBe(initial.revision + 1);
+    expect(saved.slots.slice(0, 9)).toMatchObject(
+      [...domestic.map(([commandKey]) => commandKey), 'rest'].map((commandKey) => ({ commandKey, explicit: true })),
+    );
+
+    await page.reload();
+    for (const [index, [, name]] of domestic.entries()) await expect(row(page, index + 1)).toContainText(name);
+    await expect(row(page, 9)).toContainText('휴식');
+  });
+
   test('2~5칸 선택 → 농지 개간 → 경고가 있어도 저장 → 새로고침 후 유지', async ({ page }) => {
     const { world } = await openEditor(page);
     await row(page, 2).click();
