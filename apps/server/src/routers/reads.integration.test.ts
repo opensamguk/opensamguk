@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { arch, cpus, platform, release } from 'node:os';
 import { performance } from 'node:perf_hooks';
+import { readFile } from 'node:fs/promises';
 import type { inferRouterOutputs } from '@trpc/server';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb } from '@opensamguk/db';
@@ -379,8 +380,42 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
         turnTermMinutes: 1,
         truce: null,
         quota: { humans: 3, max: null },
+        npcCount: 1,
+        scenarioType: 'historical',
+        serverTime: new Date(now).toISOString(),
+        engine: null,
+        engineStale: true,
+        protection: { war: null, founding: null },
       },
     });
+  });
+
+  it('AC-INT-26 실제 엔진 신호와 초반 보호가 끝나는 날짜를 공개한다', async () => {
+    const world = await fixtureWorld('progress');
+    const preset = JSON.parse(
+      await readFile(new URL('../../../../resources/preset/regular.json', import.meta.url), 'utf8'),
+    );
+    await db.world.update({
+      where: { id: world },
+      data: { preset: { ...preset, protection: { ...preset.protection, foundUntilMonths: 1, peaceMonths: 13 } } },
+    });
+    const heartbeatAt = new Date(now - 2_000);
+    await db.engineHeartbeat.create({
+      data: { worldId: world, at: heartbeatAt, lastTick: 150, lagMs: 500, lastError: '내부 상세' },
+    });
+    const active = await query('world.summary', { worldId: world });
+    expect(active.status).toBe(200);
+    expect(active.data.engine).toEqual({ heartbeatAt: heartbeatAt.toISOString(), lastTick: 150, lagMs: 500 });
+    expect(active.data.engineStale).toBe(false);
+    expect(active.data.protection).toEqual({
+      founding: { remainingMonths: 1, endsAt: { year: state.startYear, month: 2 } },
+      war: { remainingMonths: 13, endsAt: { year: state.startYear + 1, month: 2 } },
+    });
+    await db.world.update({ where: { id: world }, data: { clockTick: 10_000 } });
+    await db.engineHeartbeat.update({ where: { worldId: world }, data: { lagMs: 300_001 } });
+    const advanced = (await query('world.summary', { worldId: world })).data;
+    expect(advanced.protection.founding).toBeNull();
+    expect(advanced.engineStale).toBe(true);
   });
 
   it('다른 계정과 장수 없는 계정도 같은 공개 시작 연도를 읽는다', async () => {
@@ -434,6 +469,12 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
         turnTermMinutes: 1,
         truce: null,
         quota: { humans: 3, max: null },
+        npcCount: 1,
+        scenarioType: 'historical',
+        serverTime: new Date(now).toISOString(),
+        engine: null,
+        engineStale: null,
+        protection: { war: null, founding: null },
       };
       for (const user of users) {
         const result = await query('world.summary', { worldId: endedWorldId }, user.cookie);

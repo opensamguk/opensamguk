@@ -42,6 +42,12 @@ const summary = (status: WorldSummary['status']): WorldSummary => ({
   turnTermMinutes: 60,
   truce: null,
   quota: { humans: 0, max: null },
+  npcCount: 0,
+  scenarioType: null,
+  serverTime: '2026-01-01T00:00:00.000Z',
+  engine: null,
+  engineStale: null,
+  protection: { war: null, founding: null },
 });
 
 function fakeClient(status: WorldSummary['status']) {

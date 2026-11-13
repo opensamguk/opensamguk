@@ -9,9 +9,19 @@ import {
   LINEAGE_EXITED_YEAR,
   readOperationalMap,
   operationalMapDisplay,
+  effectiveWorldOptions,
+  parsePreset,
+  parseResourceKey,
+  resourceKeySchema,
+  scenarioIdentitySchema,
+  TICKS_PER_MONTH,
+  toGameDate,
 } from '@opensamguk/rules';
 import { readCityScaleProjection } from '../game/cityScale';
 import { readMapBackgrounds } from '../resourceAdmin/mapBackground';
+import { countEngineHealth } from '../ops/health';
+
+const scenarioProgress = scenarioIdentitySchema.extend({ fiction: z.union([z.literal(0), z.literal(1)]).optional() });
 
 export const worldRouter = router({
   publicMaps: publicProcedure.input(z.void()).query(async ({ ctx }) => {
@@ -70,15 +80,55 @@ export const worldRouter = router({
     return { worlds };
   }),
   summary: protectedProcedure.input(worldInput).query(({ ctx, input }) =>
-    readWorld(ctx.db, input.worldId, async (tx, world) => ({
-      ...worldSummary(world, ctx.now),
-      quota: {
-        humans: await tx.general.count({
-          where: { worldId: input.worldId, userId: { not: null }, removedAt: null },
+    readWorld(ctx.db, input.worldId, async (tx, world) => {
+      const summary = worldSummary(world, ctx.now);
+      const scenarioKey = resourceKeySchema.safeParse(world.scenarioKey);
+      const scenarioRef = scenarioKey.success ? parseResourceKey(scenarioKey.data) : null;
+      const [humans, npcCount, heartbeat, resource] = await Promise.all([
+        tx.general.count({
+          where: { worldId: world.id, removedAt: null, userId: { not: null } },
         }),
-        max: null,
-      },
-    })),
+        tx.general.count({
+          where: { worldId: world.id, removedAt: null, userId: null },
+        }),
+        tx.engineHeartbeat.findUnique({
+          where: { worldId: world.id },
+          select: { at: true, lastTick: true, lagMs: true },
+        }),
+        scenarioRef
+          ? tx.gameResource.findUnique({
+              where: { kind_name_version: { kind: 'SCENARIO', ...scenarioRef }, status: 'PUBLISHED' },
+              select: { content: true },
+            })
+          : null,
+      ]);
+      const scenario = scenarioProgress.safeParse(resource?.content).data;
+      const preset = world.preset === null ? null : parsePreset(world.preset);
+      const protection = effectiveWorldOptions(preset, world.runtimeOptions).presetRules?.protection;
+      const currentMonth = Math.floor(summary.nowTick / TICKS_PER_MONTH);
+      const remaining = (months: number) =>
+        world.status === 'ENDED' || months <= currentMonth
+          ? null
+          : { remainingMonths: months - currentMonth, endsAt: toGameDate(world.startYear, months * TICKS_PER_MONTH) };
+      const engineActive = world.status === 'RUNNING' || world.status === 'PAUSED';
+      const health = engineActive ? countEngineHealth(ctx.now, [{ engineHeartbeat: heartbeat }]) : null;
+      return {
+        ...summary,
+        quota: { humans, max: null },
+        npcCount,
+        scenarioType:
+          scenario?.fiction === 0 ? ('historical' as const) : scenario?.fiction === 1 ? ('fictional' as const) : null,
+        serverTime: new Date(ctx.now).toISOString(),
+        engine: heartbeat
+          ? { heartbeatAt: heartbeat.at.toISOString(), lastTick: heartbeat.lastTick, lagMs: heartbeat.lagMs }
+          : null,
+        engineStale: health === null ? null : health.stale > 0,
+        protection: {
+          war: remaining(protection?.peaceMonths ?? 0),
+          founding: remaining(protection?.foundUntilMonths ?? 0),
+        },
+      };
+    }),
   ),
   map: protectedProcedure.input(worldInput).query(({ ctx, input }) =>
     readWorld(ctx.db, input.worldId, async (tx, worldInfo) => {

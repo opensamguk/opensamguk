@@ -27,6 +27,7 @@ export const recordsInput = worldInput
 const worldSelect = {
   id: true,
   name: true,
+  scenarioKey: true,
   status: true,
   clockMode: true,
   endYear: true,
@@ -40,7 +41,7 @@ const worldSelect = {
   runtimeOptions: true,
 } as const satisfies Prisma.WorldSelect;
 type ReadWorld = Prisma.WorldGetPayload<{ select: typeof worldSelect }>;
-type ClockWorld = Pick<
+export type ClockWorld = Pick<
   ReadWorld,
   'status' | 'clockMode' | 'clockTick' | 'clockAnchorAt' | 'turnTermMinutes' | 'preset' | 'runtimeOptions'
 >;
@@ -107,7 +108,7 @@ export function seasonResultInfo(world: Pick<ReadWorld, 'status' | 'result'>) {
     : null;
 }
 
-export function worldSummary(world: ReadWorld, now: number) {
+export function worldSummary(world: Omit<ReadWorld, 'scenarioKey'>, now: number) {
   const clock = worldClock(world);
   const tick = nowTick(clock, now);
   const result = seasonResultInfo(world);
@@ -140,11 +141,11 @@ function scheduledAt(clock: Clock, tick: number): string | null {
     throw error;
   }
 }
-export function nextTurnAt(world: ReadWorld, tick: number): string | null {
+export function nextTurnAt(world: ClockWorld, tick: number): string | null {
   if (world.status !== 'RUNNING' || world.clockMode === 'ACCELERATED' || world.clockAnchorAt === null) return null;
   return scheduledAt(worldClock(world), tick);
 }
-export function turnSchedule(world: ReadWorld, tick: number): Array<string | null> | null {
+export function turnSchedule(world: ClockWorld, tick: number): Array<string | null> | null {
   if (world.status !== 'RUNNING' || world.clockMode === 'ACCELERATED' || world.clockAnchorAt === null) return null;
   const clock = worldClock(world);
   return Array.from({ length: 30 }, (_, slot) => scheduledAt(clock, tick + slot * TICKS_PER_MONTH));
