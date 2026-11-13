@@ -51,7 +51,7 @@ const summary = (status: WorldSummary['status']): WorldSummary => ({
   protection: { war: null, founding: null },
 });
 
-function fakeClient(status: WorldSummary['status']) {
+function fakeClient(status: WorldSummary['status'], home?: unknown) {
   const link: TRPCLink<AppRouter> =
     () =>
     ({ op }) =>
@@ -61,7 +61,9 @@ function fakeClient(status: WorldSummary['status']) {
             ? { user: { id: 'u1', username: 'tester' } }
             : op.path === 'world.summary'
               ? summary(status)
-              : notFound();
+              : op.path === 'home.get' && home !== undefined
+                ? home
+                : notFound();
         if (result instanceof Error) observer.error(TRPCClientError.from(result));
         else {
           observer.next({ result: { type: 'data', data: result } });
@@ -100,9 +102,10 @@ async function open(
   source: TurnSourceFactory,
   status: WorldSummary['status'],
   onStatus: (s: TurnEditorStatus | null) => void,
+  home?: unknown,
 ) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const client = fakeClient(status);
+  const client = fakeClient(status, home);
   const root = createRootRoute({
     component: () => (
       <QueryClientProvider client={queryClient}>
@@ -303,4 +306,28 @@ it('INT-26 AC-INT-26 예턴 표는 서버 칸이 실은 대상 이름을 번호 
   fireEvent.click(screen.getByRole('button', { name: '밀기' }));
   await waitFor(() => expect(row(2)).toContain('서서'));
   expect(row(3)).toContain('신야');
+});
+
+it('자율 행동 기간에 포함된 개인 예턴의 빈 칸에만 기한을 표시한다', async () => {
+  const stored = [{ ...slots[0]!, explicit: false }, { ...slots[1]!, explicit: true }, ...slots.slice(2)];
+  const source: TurnSourceFactory = (input) => ({
+    ...makeSource(null)(input),
+    timed: true,
+    list: {
+      queryKey: ['autoplay'],
+      queryFn: async () => ({ revision: 1, slots: stored }),
+      select: (d) => d as TurnList,
+    },
+  });
+  await open(source, 'RUNNING', vi.fn(), {
+    general: {
+      id: 1,
+      nextTurnTick: 100,
+      autoplay: { slots: [0, 1], expiresOn: { year: 191, month: 2 }, expiresAt: null },
+    },
+  });
+  const marker = await screen.findByText('(자율 행동)');
+  expect(marker.title).toBe('자율 행동 종료 191년 2월');
+  expect(marker.closest('tr')?.dataset.slot).toBe('1');
+  expect(document.querySelectorAll('tr[data-autoplay="true"]')).toHaveLength(1);
 });
