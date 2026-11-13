@@ -34,6 +34,8 @@ import { normalizeTreatyRequestPayload, type TreatyRequestKind } from './treatyR
 
 type GameDate = { year: number; month: number };
 type NationRef = { id: number; name: string; color: string };
+type TreatySigner = { name: string; portraitId: number | null };
+type Signatories = { proposer?: TreatySigner; approver?: TreatySigner };
 export type TrustRow = { nation: NationRef; brokenTreaties: number; lastBrokenAt: GameDate | null };
 export type TreatyDenyCode =
   'NO_PERMISSION' | 'WORLD_CLOSED' | 'IN_PROGRESS' | 'BAD_TARGET' | 'BAD_INPUT' | TreatyResponseGuideCode;
@@ -50,6 +52,7 @@ export type TreatyListItem = TreatyDetail & {
   canReject: TreatyAllowed | null;
   canBreak?: TreatyAllowed;
   brokenBy?: NationRef;
+  signatories?: Signatories;
 };
 type TreatyTarget = { nation: NationRef; relation: TreatyRelation; relationEndAt: GameDate | null };
 type PendingAction = {
@@ -217,6 +220,40 @@ async function recentActions(
       reason: record.status === 'REJECTED' ? record.result.message : null,
     };
   });
+}
+
+async function treatySignatories(tx: Prisma.TransactionClient, worldId: string, ids: number[]) {
+  if (!ids.length) return new Map<number, Signatories>();
+  const rows = await tx.inputEvent.findMany({
+    where: {
+      worldId,
+      status: 'APPLIED',
+      kind: { in: ['treaty.propose', 'treaty.respond'] },
+      OR: ids.map((id) => ({ result: { path: ['treatyId'], equals: String(id) } })),
+    },
+    select: { generalId: true, kind: true, result: true },
+  });
+  if (!rows.length) return new Map<number, Signatories>();
+  const signature = z.object({ treatyId: z.string(), outcome: z.enum(['PROPOSED', 'ACCEPTED', 'DECLINED']) });
+  const generals = await tx.general.findMany({
+    where: { worldId, id: { in: rows.flatMap(({ generalId }) => (generalId === null ? [] : [generalId])) } },
+    select: { id: true, name: true, portraitId: true },
+  });
+  const byId = new Map(generals.map(({ id, ...general }) => [id, general]));
+  const signers = new Map<number, Signatories>();
+  for (const row of rows) {
+    const result = signature.safeParse(row.result);
+    if (!result.success || row.generalId === null) continue;
+    const id = Number(result.data.treatyId);
+    const signer = byId.get(row.generalId);
+    if (!signer || !ids.includes(id)) continue;
+    const entry = signers.get(id) ?? {};
+    if (row.kind === 'treaty.propose') entry.proposer = signer;
+    else if (result.data.outcome === 'ACCEPTED') entry.approver = signer;
+    else continue;
+    signers.set(id, entry);
+  }
+  return signers;
 }
 
 // 세션의 userId를 받는다. 호출자는 인증 뒤 RepeatableRead 트랜잭션 하나를 넘긴다.
@@ -503,6 +540,15 @@ export async function listTreaties(
         : {}),
       ...(row.status === 'BROKEN' ? { brokenBy: brokenBy.get(row.id)! } : {}),
     });
+  }
+  const signatories = await treatySignatories(
+    tx,
+    input.worldId,
+    checked.map(({ id }) => id),
+  );
+  for (const item of items) {
+    const signers = signatories.get(Number(item.id));
+    if (signers) item.signatories = signers;
   }
   const targets = nations
     .filter((n) => n.id !== nationId)
