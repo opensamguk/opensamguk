@@ -242,11 +242,24 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
               expect(owner.code).toBeUndefined();
               expect(result.status).toBe(200);
               expect(result.code).toBeUndefined();
-              expect(result.data).toEqual(owner.data);
+              const stripAvailability = (rows: unknown) =>
+                (rows as Array<Record<string, unknown>>).map(({ key, name, category, argsSchema }) => ({
+                  key,
+                  name,
+                  category,
+                  argsSchema,
+                }));
+              expect(stripAvailability(result.data)).toEqual(stripAvailability(owner.data));
               expect(result.data).toEqual(
                 expect.arrayContaining([
-                  expect.objectContaining({ key: 'rest' }),
-                  expect.objectContaining({ key: 'farm' }),
+                  expect.objectContaining({ key: 'rest', available: false, reason: '이 월드에 내 장수가 없습니다.' }),
+                  expect.objectContaining({ key: 'farm', available: false }),
+                ]),
+              );
+              expect(owner.data).toEqual(
+                expect.arrayContaining([
+                  expect.objectContaining({ key: 'rest', available: true, reason: null }),
+                  expect.objectContaining({ key: 'invite', available: null, reason: expect.any(String) }),
                 ]),
               );
             } else if (path === 'heritage.mine') {
@@ -318,6 +331,21 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
     expect((await request('auth.me', undefined, b)).data).toHaveProperty('user.id', users[1]!.id);
     await request('auth.logout', undefined, a);
     expect((await request('auth.me', undefined, b)).data).toHaveProperty('user.id', users[1]!.id);
+  });
+  it('AC-INT-26 예약 칸은 같은 월드의 대상 이름을 반환한다', async () => {
+    const cookie = await session();
+    const city = state.cities[0]!;
+    const before = await request('turns.get', { worldId }, cookie);
+    const { revision } = before.data as { revision: number };
+    const result = await request(
+      'turns.edit',
+      { worldId, revision, op: { put: { from: 0, to: 0, commandKey: 'move', args: { cityKey: city.cityKey } } } },
+      cookie,
+    );
+    expect(result.data).toMatchObject({ ok: true });
+    const turn = await request('turns.get', { worldId }, cookie);
+    expect(turn.status).toBe(200);
+    expect(turn.data).toHaveProperty('slots.0.targets.city', city.name);
   });
   it('AC-P2-22 종료 장수 순위는 저장 당시 값과 공개 항목만 돌려준다', async () => {
     const input = { worldId: endedWorldId, by: 'merit' };
