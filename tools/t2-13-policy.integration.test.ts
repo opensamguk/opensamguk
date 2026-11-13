@@ -1306,6 +1306,14 @@ it('부대 창설·가입·집합·추방을 실제 DB와 월말 재생에서 �
   expect((await list(bob.cookie)).data).toMatchObject({ myTroop: null, troops: [{ members: [] }] });
   expect((await update(bob.cookie, join)).data).toMatchObject({ status: 'pending' });
   await loop.advanceTo(100);
+  const expelCommand = async () =>
+    (await rpc<Array<{ key: string }>>('nationCommands.list', { worldId }, alice.cookie)).data?.find(
+      (command) => command.key === 'nation_troop_expel',
+    );
+  expect(await expelCommand()).toMatchObject({
+    available: null,
+    troopTargets: [{ generalId: 2, troopName: '청주병' }],
+  });
   const tabs = await rpc<{ tabs: Array<{ officerLevel: number; office: object; revision: number }> }>(
     'nationTurns.get',
     { worldId },
@@ -1332,6 +1340,7 @@ it('부대 창설·가입·집합·추방을 실제 DB와 월말 재생에서 �
   ).toMatchObject({ ok: true });
   await loop.advanceTo(10100);
   expect((await list(bob.cookie)).data).toMatchObject({ myTroop: null, troops: [{ members: [] }] });
+  expect(await expelCommand()).toMatchObject({ available: false, troopTargets: [] });
   await loop.advanceTo(20000);
   expect((await rpc('ranking.generals', { worldId, by: 'dedication' }, alice.cookie)).data).toMatchObject({
     top: expect.arrayContaining([expect.objectContaining({ generalId: 1, isHuman: true, possessedNpc: true })]),

@@ -31,6 +31,7 @@ import styles from './CommandArgsScreen.module.css';
 export interface TargetGeneral extends GeneralFacts {
   portraitId?: number | null | undefined;
   cityName?: string | undefined;
+  troopName?: string | undefined;
 }
 
 // 인자 입력 화면이 열릴 때 편집기에 받아 달라고 알리는 조회. 국가 대상은 순위·외교, 장수 대상은 국가 장수 상세, 등용은 등용 후보다.
@@ -515,6 +516,7 @@ export function GeneralTargetPicker({
           </span>
           <div className={styles.pickedText}>
             <strong>{title(selected)}</strong>
+            {selected.troopName ? <span>부대 {selected.troopName}</span> : null}
             {[statLine(selected), troopLine(selected), purseLine(selected)].map((line, i) =>
               line ? <span key={i}>{line}</span> : null,
             )}
@@ -542,7 +544,11 @@ export function GeneralTargetPicker({
         ) : null}
         {rows.map((general) => {
           const stats = statLine(general);
-          const second = [order ? purseLine(general) : troopLine(general)].filter(Boolean).join('');
+          const second = general.troopName
+            ? `부대 ${general.troopName}`
+            : order
+              ? purseLine(general)
+              : troopLine(general);
           return (
             <button
               key={general.id}
