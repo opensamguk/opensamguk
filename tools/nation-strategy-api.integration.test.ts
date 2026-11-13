@@ -228,7 +228,10 @@ it('직책별 목록·사전 검사·저장은 세션과 기능을 검사하고 
   const f = await fixture();
   expect((await rpc('nationCommands.list', { worldId: f.worldId })).status).toBe(401);
   const staff = (await rpc('nationCommands.list', { worldId: f.worldId }, f.staff)).data!;
-  expect(staff.map((row) => row.key)).toContain('nation_mobilize');
+  expect(staff.find((row) => row.key === 'nation_mobilize')).toMatchObject({
+    category: 'strategy',
+    cooldown: { remainingMonths: 0, availableAt: null },
+  });
   expect(staff.map((row) => row.key)).not.toContain('nation_rivalry');
   const adviser = (await rpc('nationCommands.list', { worldId: f.worldId }, f.adviser)).data!;
   expect(adviser.map((row) => row.key)).toEqual(
@@ -264,6 +267,13 @@ it('수뇌의 백성동원은 실제 차례에 패·수비·대기를 함께 저
   const after = await snapshot(f.worldId);
   expect(after.state.cities[1]!.defence).toBe(800);
   expect(after.state.nationStrategy!.nations[1]).toEqual({ strategicUntil: 9, commands: { nation_mobilize: 63 } });
+  const commands = (await rpc('nationCommands.list', { worldId: f.worldId }, f.adviser)).data!;
+  expect(commands.find((row) => row.key === 'nation_mobilize')).toMatchObject({
+    cooldown: { remainingMonths: 63, availableAt: { year: after.state.startYear + 5, month: 4 } },
+  });
+  expect(commands.find((row) => row.key === 'nation_raid')).toMatchObject({
+    cooldown: { remainingMonths: 9, availableAt: { year: after.state.startYear, month: 10 } },
+  });
   expect(after.state.stratagemCards!.nations[1]!.hand).toEqual([]);
   expect(after.state.generals[3]!.dedication).toBe(before.state.generals[3]!.dedication + 5);
   await expect(
