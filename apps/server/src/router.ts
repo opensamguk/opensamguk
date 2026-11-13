@@ -16,6 +16,7 @@ import { commandsRouter } from './routers/commands';
 import { homeRouter } from './routers/home';
 import { cityRouter } from './routers/city';
 import { nationRouter } from './routers/nation';
+import { nationBoardRouter } from './routers/nationBoard';
 import { recordsRouter } from './routers/records';
 import { reviewRouter } from './routers/review';
 import { rankingRouter } from './routers/ranking';
@@ -61,6 +62,7 @@ export const appRouter = router({
   home: homeRouter,
   city: cityRouter,
   nation: nationRouter,
+  nationBoard: nationBoardRouter,
   records: recordsRouter,
   review: reviewRouter,
   ranking: rankingRouter,

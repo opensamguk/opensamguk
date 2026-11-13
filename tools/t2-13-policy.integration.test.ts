@@ -613,6 +613,70 @@ const editedNpcPolicy = {
   nationPriority: ['nation_reward'],
 };
 
+it('국가 게시판과 기밀실을 현재 소속·직책으로 분리한다', async () => {
+  const f = await fixture();
+  const member = await user();
+  await db.general.update({
+    where: { worldId_id: { worldId: f.worldId, id: 2 } },
+    data: { userId: member.id, nationId: 1, officerLevel: 1 },
+  });
+  await db.general.create({
+    data: { ...commandInitial().generals[2]!, worldId: f.worldId, id: 3, userId: f.bob.id, nationId: 2 },
+  });
+  const board = { worldId: f.worldId, nationId: 1, confidential: false };
+  const secret = { ...board, confidential: true };
+  const content = { type: 'post', title: '군량 회의', body: '이번 달 보급 계획' };
+  const write = (input: unknown, cookie?: string) => rpc<{ id: string }>('nationBoard.write', input, cookie, true);
+  const list = (input: unknown, cookie?: string) => rpc('nationBoard.list', input, cookie);
+  let postId = '';
+  await authzCase('nationBoard.write', 'success', async () => {
+    const created = await write({ ...board, content }, f.alice.cookie);
+    expect(created.status).toBe(200);
+    postId = created.data!.id;
+    expect(
+      (await write({ ...board, content: { type: 'reply', postId, body: '알겠습니다' } }, member.cookie)).status,
+    ).toBe(200);
+    expect((await write({ ...secret, content: { ...content, title: '기밀 작전' } }, f.alice.cookie)).status).toBe(200);
+  })();
+  await authzCase('nationBoard.list', 'success', async () => {
+    expect((await list(board, member.cookie)).data).toMatchObject({
+      canReadConfidential: false,
+      items: [
+        { id: postId, title: content.title, authorName: '장수1', replyCount: 1, replies: [{ body: '알겠습니다' }] },
+      ],
+    });
+    expect((await list(secret, f.alice.cookie)).data).toMatchObject({ items: [{ title: '기밀 작전' }] });
+  })();
+  await authzCase('nationBoard.list', 'otherUser', async () => {
+    expect((await list(secret, member.cookie)).error).toBe('FORBIDDEN');
+    expect((await list(board, f.bob.cookie)).error).toBe('FORBIDDEN');
+  })();
+  await authzCase('nationBoard.write', 'otherUser', async () => {
+    expect((await write({ ...secret, content }, member.cookie)).error).toBe('FORBIDDEN');
+    expect(
+      (await write({ ...secret, content: { type: 'reply', postId, body: '다른 범위' } }, f.alice.cookie)).error,
+    ).toBe('NOT_FOUND');
+    expect((await write({ ...board, content }, f.bob.cookie)).error).toBe('FORBIDDEN');
+  })();
+  const sanctioned = await user('SANCTIONED');
+  for (const path of ['nationBoard.list', 'nationBoard.write'] as const) {
+    const call = path === 'nationBoard.list' ? list : write;
+    await authzCase(path, 'unauthenticated', async () => {
+      expect((await call({ ...board, ...(path === 'nationBoard.write' ? { content } : {}) })).error).toBe(
+        'UNAUTHORIZED',
+      );
+    })();
+    await authzCase(path, 'sanctioned', async () => {
+      expect(
+        (await call({ ...board, ...(path === 'nationBoard.write' ? { content } : {}) }, sanctioned.cookie)).error,
+      ).toBe('UNAUTHORIZED');
+    })();
+    await authzCase(path, 'invalidInput', async () => {
+      expect((await call({ ...board, confidential: 'false' }, f.alice.cookie)).error).toBe('BAD_REQUEST');
+    })();
+  }
+});
+
 it(
   '군주의 NPC 운영 기준을 다음 엔진 처리에 적용하고 재생한다',
   authzCase(NPC_NATION_POLICY_KIND, 'success', async () => {

@@ -1,0 +1,108 @@
+import type { Prisma } from '@opensamguk/db';
+import { canUseNationTurns } from '@opensamguk/rules';
+import { TRPCError } from '@trpc/server';
+import { z } from 'zod';
+import type { Context } from '../context';
+import { messageBody, messagingActor } from '../messaging';
+import { entityKey, worldInput } from '../queries';
+import { protectedProcedure, router, worldVerifiedProcedure } from '../trpc';
+
+const boardInput = worldInput.extend({ nationId: entityKey, confidential: z.boolean() });
+const authorSelect = { id: true, authorName: true, portraitId: true, body: true, sentAt: true } as const;
+const newest = [{ sentAt: 'desc' }, { id: 'desc' }] as const;
+
+async function boardActor(tx: Prisma.TransactionClient, ctx: Context, input: z.infer<typeof boardInput>, lock = false) {
+  const actor = await messagingActor(tx, ctx, input.worldId, lock);
+  if (actor.nationId !== input.nationId || (input.confidential && !canUseNationTurns(actor.officerLevel)))
+    throw new TRPCError({ code: 'FORBIDDEN', message: '이 게시판을 이용할 권한이 없습니다.' });
+  if (lock) {
+    const world = await tx.world.findUniqueOrThrow({ where: { id: input.worldId }, select: { status: true } });
+    if (world.status === 'ENDED') throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '종료된 월드입니다.' });
+  }
+  return { nationId: actor.nationId, name: actor.name, portraitId: actor.portraitId, officerLevel: actor.officerLevel };
+}
+
+export const nationBoardRouter = router({
+  list: protectedProcedure.input(boardInput.extend({ cursor: z.uuid().optional() }).strict()).query(({ ctx, input }) =>
+    ctx.db.$transaction(
+      async (tx) => {
+        const actor = await boardActor(tx, ctx, input);
+        const where = { worldId: input.worldId, nationId: actor.nationId, confidential: input.confidential };
+        const after = input.cursor
+          ? await tx.nationBoardPost.findFirst({
+              where: { ...where, id: input.cursor },
+              select: { id: true, sentAt: true },
+            })
+          : null;
+        if (input.cursor && !after) throw new TRPCError({ code: 'NOT_FOUND', message: '게시물을 찾을 수 없습니다.' });
+        const posts = await tx.nationBoardPost.findMany({
+          where: {
+            ...where,
+            ...(after
+              ? { OR: [{ sentAt: { lt: after.sentAt } }, { sentAt: after.sentAt, id: { lt: after.id } }] }
+              : {}),
+          },
+          orderBy: [...newest],
+          take: 21,
+          select: {
+            ...authorSelect,
+            title: true,
+            _count: { select: { replies: true } },
+            replies: { orderBy: [...newest], take: 20, select: authorSelect },
+          },
+        });
+        const page = posts.slice(0, 20);
+        return {
+          canReadConfidential: canUseNationTurns(actor.officerLevel),
+          items: page.map(({ _count, replies, sentAt, ...post }) => ({
+            ...post,
+            sentAt: sentAt.toISOString(),
+            replyCount: _count.replies,
+            replies: replies.reverse().map((reply) => ({ ...reply, sentAt: reply.sentAt.toISOString() })),
+          })),
+          next: posts.length > page.length ? page.at(-1)!.id : null,
+        };
+      },
+      { isolationLevel: 'RepeatableRead' },
+    ),
+  ),
+  write: worldVerifiedProcedure
+    .input(
+      boardInput
+        .extend({
+          content: z.discriminatedUnion('type', [
+            z.strictObject({ type: z.literal('post'), title: z.string().trim().min(1).max(80), body: messageBody }),
+            z.strictObject({ type: z.literal('reply'), postId: z.uuid(), body: messageBody }),
+          ]),
+        })
+        .strict(),
+    )
+    .mutation(({ ctx, input }) =>
+      ctx.db.$transaction(async (tx) => {
+        const actor = await boardActor(tx, ctx, input, true);
+        const { content, worldId, confidential } = input;
+        const author = { authorName: actor.name, portraitId: actor.portraitId };
+        if (content.type === 'post')
+          return tx.nationBoardPost.create({
+            data: {
+              ...author,
+              worldId,
+              nationId: actor.nationId,
+              confidential,
+              title: content.title,
+              body: content.body,
+            },
+            select: { id: true },
+          });
+        const post = await tx.nationBoardPost.findFirst({
+          where: { id: content.postId, worldId, nationId: actor.nationId, confidential },
+          select: { id: true },
+        });
+        if (!post) throw new TRPCError({ code: 'NOT_FOUND', message: '게시물을 찾을 수 없습니다.' });
+        return tx.nationBoardReply.create({
+          data: { ...author, postId: post.id, body: content.body },
+          select: { id: true },
+        });
+      }),
+    ),
+});
