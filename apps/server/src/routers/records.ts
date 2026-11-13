@@ -1,5 +1,5 @@
 import { TRPCError } from '@trpc/server';
-import { rankGenerals, toGameDate } from '@opensamguk/rules';
+import { rankGenerals, reputationEventSchema, toGameDate } from '@opensamguk/rules';
 import { protectedProcedure, router, worldVerifiedProcedure } from '../trpc';
 import {
   beforeCursor,
@@ -13,10 +13,13 @@ import {
 } from '../queries';
 import { logInfo, logSelect, nationRecordInfo, worldRecordInfo } from '../visibility';
 import { z } from 'zod';
-import { decodeRecordCursor, encodeRecordCursor, generalLogCursor, recordTick } from '../recordCursor';
+import { decodeRecordCursor, encodeRecordCursor, generalLogCursor, recordId, recordTick } from '../recordCursor';
 import { monthlyReviewSelect, readMonthlyReview } from '../review';
 
 const generalInput = worldInput.extend({ cursor: z.string().min(1).max(256).optional() }).strict();
+const activityInput = generalInput.extend({ scope: z.enum(['all', 'world']).default('all') });
+const activityCursor = z.tuple([recordTick, z.enum(['reputation', 'nation']), recordId]);
+const nationEventKind = z.enum(['found', 'fall', 'declare', 'capture']);
 const battleCursor = z.tuple([recordTick, entityKey]);
 
 const seasonInput = worldInput.extend({ by: z.enum(['dedication', 'experience', 'merit']).default('dedication') });
@@ -44,6 +47,80 @@ export const recordsRouter = router({
       }));
       const last = items.at(-1);
       return { items, nextCursor: rows.length > 30 && last ? encodeRecordCursor([last.tick, last.attackerId]) : null };
+    }),
+  ),
+  activity: protectedProcedure.input(activityInput).query(({ ctx, input }) =>
+    readWorld(ctx.db, input.worldId, async (tx, world) => {
+      const cursor = input.cursor === undefined ? null : decodeRecordCursor(input.cursor, activityCursor);
+      const before = (source: 'reputation' | 'nation') => {
+        if (!cursor) return {};
+        const [tick, cursorSource, id] = cursor;
+        if (source !== cursorSource) return { tick: source === 'nation' ? { lte: tick } : { lt: tick } };
+        return { OR: [{ tick: { lt: tick } }, { tick, id: { lt: BigInt(id) } }] };
+      };
+      const rows =
+        input.scope === 'world'
+          ? []
+          : await tx.reputationEvent.findMany({
+              where: {
+                worldId: input.worldId,
+                ...before('reputation'),
+              },
+              orderBy: [{ tick: 'desc' }, { id: 'desc' }],
+              take: 31,
+              select: {
+                id: true,
+                generalId: true,
+                year: true,
+                month: true,
+                kind: true,
+                score: true,
+                tick: true,
+                generalName: true,
+                nationId: true,
+                nationName: true,
+                nationColor: true,
+                cityKey: true,
+                cityName: true,
+              },
+            });
+      const news = await tx.publicNationEvent.findMany({
+        where: { worldId: input.worldId, ...before('nation') },
+        orderBy: [{ tick: 'desc' }, { id: 'desc' }],
+        take: 31,
+        select: { id: true, tick: true, kind: true, text: true },
+      });
+      const reputation = rows.map((row) => {
+        const { id, generalName, nationId, nationName, nationColor, cityKey, cityName, ...event } = row;
+        return {
+          id: id.toString(),
+          source: 'reputation' as const,
+          ...reputationEventSchema.parse({
+            ...event,
+            data: {
+              name: generalName,
+              nation: nationId === null ? null : { id: nationId, name: nationName, color: nationColor },
+              city: cityKey === null ? null : { cityKey, name: cityName },
+            },
+          }),
+        };
+      });
+      const nation = news.map(({ id, tick, kind, text }) => ({
+        source: 'nation' as const,
+        id: id.toString(),
+        tick,
+        ...toGameDate(world.startYear, tick),
+        kind: nationEventKind.parse(kind),
+        text,
+      }));
+      // 각 원장은 이미 같은 tick에서 id 내림차순이다. 같은 tick은 평판 원장을 먼저 읽는다.
+      const sorted = [...reputation, ...nation].sort((a, b) => b.tick - a.tick);
+      const items = sorted.slice(0, 30);
+      const last = items.at(-1);
+      return {
+        items,
+        nextCursor: sorted.length > 30 && last ? encodeRecordCursor([last.tick, last.source, last.id]) : null,
+      };
     }),
   ),
   season: worldVerifiedProcedure.input(seasonInput).query(({ ctx, input }) =>

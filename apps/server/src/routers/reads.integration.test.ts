@@ -4,7 +4,7 @@ import { performance } from 'node:perf_hooks';
 import type { inferRouterOutputs } from '@trpc/server';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb } from '@opensamguk/db';
-import { cityRegionName } from '@opensamguk/rules';
+import { cityRegionName, REPUTATION_POINTS } from '@opensamguk/rules';
 import { readFixture } from '../../test/readFixture';
 import { buildServer } from '../server';
 import type { AppRouter } from '../router';
@@ -21,6 +21,7 @@ type Results = {
   'commands.recruitCandidates': Out['commands']['recruitCandidates'];
   'records.general': Out['records']['general'];
   'records.battles': Out['records']['battles'];
+  'records.activity': Out['records']['activity'];
   'records.nation': Out['records']['nation'];
   'records.world': Out['records']['world'];
 };
@@ -33,6 +34,7 @@ const routes = [
   'treaty.relations',
   'commands.recruitCandidates',
   'records.general',
+  'records.activity',
   'records.nation',
   'records.world',
 ] as const;
@@ -260,6 +262,50 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     ]);
     expect((await query('commands.recruitCandidates', { worldId: world }, users[2]!.cookie)).data).toEqual([]);
     expect((await query('commands.recruitCandidates', { worldId: world }, users[3]!.cookie)).status).toBe(404);
+  });
+  it('AC-INT-26 장수 동향은 공개 평판 스냅샷을 같은 tick의 끝까지 조회한다', async () => {
+    const world = await fixtureWorld('activity');
+    await db.reputationEvent.createMany({
+      data: Array.from({ length: 31 }, (_, index) => ({
+        worldId: world,
+        generalId: index + 1,
+        year: state.startYear,
+        month: 1,
+        kind: 'domestic',
+        score: REPUTATION_POINTS.domestic,
+        tick: 1,
+        generalName: `공개 장수 ${index + 1}`,
+      })),
+    });
+    await db.publicNationEvent.create({
+      data: { worldId: world, sequence: 1, tick: 1, kind: 'found', text: '공개 국가 건국' },
+    });
+    const first = await query('records.activity', { worldId: world }, users[3]!.cookie);
+    expect(first.status).toBe(200);
+    expect(first.data.items.map((item) => (item.source === 'reputation' ? item.generalId : null))).toEqual(
+      Array.from({ length: 30 }, (_, index) => 31 - index),
+    );
+    expect(first.data.items[0]).toEqual({
+      id: expect.any(String),
+      source: 'reputation',
+      generalId: 31,
+      year: state.startYear,
+      month: 1,
+      kind: 'domestic',
+      score: REPUTATION_POINTS.domestic,
+      tick: 1,
+      data: { name: '공개 장수 31', nation: null, city: null },
+    });
+    const next = await query('records.activity', { worldId: world, cursor: first.data.nextCursor });
+    expect(next.data.items).toEqual([
+      expect.objectContaining({ source: 'reputation', generalId: 1 }),
+      expect.objectContaining({ source: 'nation', kind: 'found', text: '공개 국가 건국' }),
+    ]);
+    expect(next.data.nextCursor).toBeNull();
+    const news = await query('records.activity', { worldId: world, scope: 'world' });
+    expect(news.data.items).toEqual([expect.objectContaining({ source: 'nation', kind: 'found' })]);
+    expect((await query('records.activity', { worldId: otherWorldId })).data.items).toEqual([]);
+    expect((await query('records.activity', { worldId: world, cursor: '?' })).status).toBe(400);
   });
   it('summary는 서버 시계와 공개 기수 설정을 반환한다', async () => {
     expect(await query('world.summary', { worldId })).toEqual({

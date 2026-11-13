@@ -57,6 +57,7 @@ const paths = [
   'treaty.relations',
   'records.general',
   'records.battles',
+  'records.activity',
   'records.nation',
   'records.world',
   'records.season',
@@ -235,7 +236,7 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
               : path === 'auth.login' && category === 'sanctioned'
                 ? { email: users[2]!.email, password }
                 : input(path);
-          const publicWorldRead = path === 'commands.list' || path === 'treaty.relations';
+          const publicWorldRead = path === 'commands.list' || path === 'treaty.relations' || path === 'records.activity';
           const ownerCookie = publicWorldRead && category === 'otherUser' ? await session() : undefined;
           const before = await snapshot();
           const result = await request(path, data, cookie);
@@ -253,7 +254,7 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
                   expect.objectContaining({ key: 'farm' }),
                 ]),
               );
-            } else if (path === 'treaty.relations') {
+            } else if (path === 'treaty.relations' || path === 'records.activity') {
               const owner = await request(path, data, ownerCookie);
               expect(owner.status).toBe(200);
               expect(result).toEqual(owner);
