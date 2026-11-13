@@ -16,6 +16,7 @@ export const personnelRouter = router({
         { worldId: input.worldId, userId: ctx.user.id },
         ready.officeEffectsEnabled === true,
         ready.courtRankEnabled === true,
+        ready.localOfficeMinimum,
       )),
       ...(ready.secretaryEnabled ? { secretaryEnabled: true as const } : {}),
     })),

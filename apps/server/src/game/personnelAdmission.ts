@@ -39,15 +39,16 @@ export function requirePersonnelWorld(world: {
 }): PersonnelReady {
   if (world.replayFormat !== 3 || !world.ruleFeatures.includes('personnel'))
     throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '이 월드에서 인사 기능을 사용할 수 없습니다.' });
+  const officeEffects = world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE)
+    ? officeEffectsSchema.safeParse(world.officeEffects).data
+    : undefined;
   return {
     worldId: world.id,
     personnel: 'ready',
     ...(world.ruleFeatures.includes(COURT_RANK_FEATURE) ? { courtRankEnabled: true as const } : {}),
     ...(world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE) ? { officeEffectsEnabled: true as const } : {}),
-    ...(world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE) &&
-    hasCitySecretary(officeEffectsSchema.safeParse(world.officeEffects).data)
-      ? { secretaryEnabled: true as const }
-      : {}),
+    ...(officeEffects ? { localOfficeMinimum: officeEffects.minimumAbility } : {}),
+    ...(hasCitySecretary(officeEffects) ? { secretaryEnabled: true as const } : {}),
   };
 }
 

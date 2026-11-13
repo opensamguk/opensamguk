@@ -122,7 +122,12 @@ export function LocalOffices({ board, candidates, busyTarget, busyLabel, onAppoi
                 title={title}
                 cityName={city.name}
                 holder={holder}
-                candidates={candidates}
+                candidates={candidates.filter((member) => member.eligibleLocalOffices?.includes(level) ?? true)}
+                qualification={
+                  board.localOfficeMinimum !== undefined && level !== 2
+                    ? `직책이 없는 소속 장수 중 ${level === 4 ? '무력' : '지력'} ${board.localOfficeMinimum} 이상`
+                    : '직책이 없는 소속 장수'
+                }
                 busy={busyTarget !== null}
                 busyLabel={busyTarget === localOfficeTarget(city.cityKey, level) ? busyLabel : undefined}
                 onAppoint={(generalId) => onAppoint(generalId, level, city.cityKey)}
@@ -141,6 +146,7 @@ function LocalOfficeSlot({
   cityName,
   holder,
   candidates,
+  qualification,
   busy,
   busyLabel,
   onAppoint,
@@ -150,6 +156,7 @@ function LocalOfficeSlot({
   cityName: string;
   holder: PersonnelMember | undefined;
   candidates: PersonnelMember[];
+  qualification: string;
   busy: boolean;
   busyLabel: string | undefined;
   onAppoint: (generalId: number) => void;
@@ -166,6 +173,7 @@ function LocalOfficeSlot({
       <p className={styles.officeNote}>
         {holder ? `${holder.name} · ${presence(holder.resident === true)}` : '빈 자리'}
       </p>
+      <p className={styles.officeNote}>{qualification}</p>
       <label className={styles.officeField}>
         임명할 장수
         <select

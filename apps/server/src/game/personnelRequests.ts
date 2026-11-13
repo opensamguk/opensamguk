@@ -25,6 +25,7 @@ export type PersonnelReady = Readonly<{
   personnel: 'ready';
   courtRankEnabled?: true;
   officeEffectsEnabled?: true;
+  localOfficeMinimum?: number;
   secretaryEnabled?: true;
 }>;
 type EventRow = Pick<
