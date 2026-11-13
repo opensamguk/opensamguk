@@ -40,6 +40,9 @@ const generalRows = Array.from({ length: 105 }, (_, index) => {
 const publicGeneral = ({ id, ...row }: (typeof generalRows)[number]) => ({
   generalId: id,
   portraitId: id === 105 ? 10001 : null,
+  isHuman: id === 1 || id === 105,
+  stratagemSuccesses: 0,
+  battleStats: null,
   ...row,
 });
 const nationRows = [
@@ -188,6 +191,20 @@ describe('T2-22 / AC-M2-19 실제 TCP HTTP·PostgreSQL 순위', () => {
     },
   );
 
+  it('사람·NPC 순위는 100명 제한 전에 분리하고 순번을 다시 붙인다', async () => {
+    const human = (await query('ranking.generals', { worldId, by: 'dedication', kind: 'human' })).data;
+    expect(human.top.map(({ generalId, rank, isHuman }) => ({ generalId, rank, isHuman }))).toEqual([
+      { generalId: 1, rank: 1, isHuman: true },
+      { generalId: 105, rank: 2, isHuman: true },
+    ]);
+    expect(human.me?.rank).toBe(2);
+    const npc = (await query('ranking.generals', { worldId, by: 'dedication', kind: 'npc' })).data;
+    expect(npc.top).toHaveLength(100);
+    expect(npc.top.every((row) => row.isHuman === false)).toBe(true);
+    expect(npc.top[0]?.rank).toBe(1);
+    expect(npc.me).toBeNull();
+  });
+
   it('상위 100명 밖 내 순위도 반환하고 세션마다 본인 장수만 고른다', async () => {
     const input = { worldId, by: 'dedication' };
     const own = (await query('ranking.generals', input)).data;
@@ -306,6 +323,9 @@ describe('T2-22 / AC-M2-19 실제 TCP HTTP·PostgreSQL 순위', () => {
       'name',
       'nation',
       'portraitId',
+      'isHuman',
+      'stratagemSuccesses',
+      'battleStats',
       'dedication',
       'experience',
       'wins',
