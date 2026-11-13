@@ -9,6 +9,7 @@ import { readCampaignState } from '../campaign/state';
 import { residentOfficeBonuses, type OfficeBonuses } from '../personnel/residentOffice';
 import { applyCityResourceIncome } from '../cityResourceIncome';
 import { CITY_SEASONAL_EVENTS_FEATURE, settleCitySeasonalEvents } from './citySeasonalEvents';
+import { financeRates } from '../personnel/financeRates';
 
 export const MONTHLY_STAGES = ['income', 'population', 'supply', 'diplomacy', 'yearbook'] as const;
 export interface NationSummary {
@@ -43,6 +44,8 @@ export function estimateTaxIncome(
   resource: 'gold' | 'rice',
   bonuses?: ReturnType<typeof residentOfficeBonuses>,
   incomeMultiplier = 1,
+  rates = financeRates(),
+  reserves = 0,
 ) {
   const gross = Math.round(
     incomeMultiplier *
@@ -51,12 +54,13 @@ export function estimateTaxIncome(
           sum +
           city[resource === 'gold' ? 'commerce' : 'agriculture'] *
             (city.population / BALANCE.MONTHLY_POPULATION_UNIT) *
-            BALANCE.MONTHLY_TAX_RATE *
+            rates.taxRate *
             (1 + (bonuses?.get(city.cityKey)?.tax?.percent ?? 0) / 100),
         0,
       ),
   );
-  const perGeneral = memberCount ? Math.floor(Math.round(gross * BALANCE.MONTHLY_SALARY_RATE) / memberCount) : 0;
+  const payrollBudget = Math.min(gross + reserves, Math.round(gross * rates.salaryRate));
+  const perGeneral = memberCount ? Math.floor(payrollBudget / memberCount) : 0;
   const payroll = perGeneral * memberCount;
   return { gross, perGeneral, payroll, net: gross - payroll };
 }
@@ -75,7 +79,15 @@ export function settleIncome(
       (general) => general.nationId === nation.id && general.activeFromYear <= date.year,
     );
     const multiplier = nationPhilosophy(next, nation.philosophy)?.[resource];
-    const { net, perGeneral } = estimateTaxIncome(cities, members.length, resource, bonuses, multiplier);
+    const { net, perGeneral } = estimateTaxIncome(
+      cities,
+      members.length,
+      resource,
+      bonuses,
+      multiplier,
+      financeRates(nation.financeRates),
+      next.ruleFeatures?.includes('city-resources-v1') ? 0 : nation[resource],
+    );
     next.nations[nation.id]![resource] += net;
     for (const general of members) next.generals[general.id]![resource] += perGeneral;
   }
@@ -100,7 +112,12 @@ export function settlePopulation(state: WorldView, taxRate: number = BALANCE.MON
       0,
       Math.min(
         BALANCE.MAX_TRUST,
-        Math.round(city.trust + (BALANCE.MONTHLY_TRUST_BASE - taxRate) * BALANCE.MONTHLY_TRUST_FACTOR),
+        Math.round(
+          city.trust +
+            (BALANCE.MONTHLY_TRUST_BASE -
+              (nation?.financeRates ? financeRates(nation.financeRates).taxRate : taxRate)) *
+              BALANCE.MONTHLY_TRUST_FACTOR,
+        ),
       ),
     );
   }

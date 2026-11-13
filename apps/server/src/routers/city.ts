@@ -3,8 +3,9 @@ import { protectedProcedure, router } from '../trpc';
 import { entityKey, readWorld, viewerGeneral, worldClock, worldInput } from '../queries';
 import { cityInfo, commandedTroops, garrisonGeneralInfo, visibility } from '../visibility';
 import { readView } from '../game/queries';
-import { NATION_PHILOSOPHY_FEATURE } from '@opensamguk/rules';
 import {
+  NATION_FINANCE_FEATURE,
+  NATION_PHILOSOPHY_FEATURE,
   cityRegionName,
   DEFENSE_STANCE_FEATURE,
   INTEL_FEATURE,
@@ -77,14 +78,16 @@ export const cityRouter = router({
           ? await tx.world.findUniqueOrThrow({ where: { id: world.id }, select: { seed: true, monthlyTick: true } })
           : null;
       const showIncome = full && city.nationId !== null && city.kind !== 'PASS' && world.status !== 'ENDED';
-      const cityPhilosophy =
-        showIncome && city.nationId !== null && world.ruleFeatures.includes(NATION_PHILOSOPHY_FEATURE)
-          ? (
-              await tx.nation.findUnique({
-                where: { worldId_id: { worldId: input.worldId, id: city.nationId } },
-                select: { philosophy: true },
-              })
-            )?.philosophy
+      const financeNation =
+        showIncome &&
+        city.nationId !== null &&
+        world.ruleFeatures.some(
+          (feature) => feature === NATION_PHILOSOPHY_FEATURE || feature === NATION_FINANCE_FEATURE,
+        )
+          ? await tx.nation.findUnique({
+              where: { worldId_id: { worldId: input.worldId, id: city.nationId } },
+              select: { philosophy: true, financeRates: true },
+            })
           : undefined;
       const officeEffectsEnabled = world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE);
       const view =
@@ -153,7 +156,7 @@ export const cityRouter = router({
             }
           : {}),
         ...cityInfo(city, activeViewer, alliedResidence),
-        ...(showIncome ? { incomeEstimate: projectCityIncome(world, ctx.now, city, view, cityPhilosophy) } : {}),
+        ...(showIncome ? { incomeEstimate: projectCityIncome(world, ctx.now, city, view, financeNation) } : {}),
         ...(events.length
           ? {
               events,

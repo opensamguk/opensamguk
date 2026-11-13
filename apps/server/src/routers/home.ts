@@ -33,7 +33,7 @@ import {
 } from '@opensamguk/rules';
 import { displaySlots, readSlots } from '../game/slots';
 import { readCityScaleProjection } from '../game/cityScale';
-import { nationPopulation, projectNationFinance, salaryRate } from '../game/nationFinance';
+import { effectiveFinanceRates, nationPopulation, projectNationFinance } from '../game/nationFinance';
 import { readView } from '../game/queries';
 import { cityDefense } from '../game/defenseRead';
 
@@ -69,7 +69,7 @@ export const homeRouter = router({
       const troopLeader = troop ? state?.generals[troop.leaderId] : undefined;
       const finance =
         nation && world.status !== 'ENDED'
-          ? projectNationFinance(world, ctx.now, nation.cities, nation.generals, state, nation.philosophy)
+          ? projectNationFinance(world, ctx.now, nation.cities, nation.generals, state, nation)
           : undefined;
       const turns = displaySlots(await readSlots(tx, input.worldId, general.id));
       const tick = nowTick(worldClock(world), ctx.now);
@@ -141,7 +141,7 @@ export const homeRouter = router({
               orderBy: [{ name: 'asc' }, { id: 'asc' }],
             });
       return {
-        heritageBenefitsEnabled: world.ruleFeatures.includes(HERITAGE_BENEFITS_FEATURE),
+        ...(world.ruleFeatures.includes(HERITAGE_BENEFITS_FEATURE) ? { heritageBenefitsEnabled: true as const } : {}),
         general: {
           ...ownGeneralInfo(general),
 
@@ -254,7 +254,7 @@ export const homeRouter = router({
                   general,
                 ),
                 ...nationPopulation(nation.cities),
-                salaryRate,
+                ...effectiveFinanceRates(world, nation),
                 ...(finance ? { financeEstimate: finance.financeEstimate } : {}),
               },
         nextTurnAt: nextTurnAt(world, general.nextTurnTick),

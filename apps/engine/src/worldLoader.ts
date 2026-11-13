@@ -22,6 +22,8 @@ import {
   HERITAGE_BENEFITS_FEATURE,
   GENERAL_PROFICIENCY_FEATURE,
   storedNpcNationPolicy,
+  storedFinanceRates,
+  NATION_FINANCE_FEATURE,
   storedNationRestrictions,
   NATION_RESTRICTIONS_FEATURE,
   NPC_NATION_POLICY_FEATURE,
@@ -118,13 +120,17 @@ export async function loadWorldAfterCapabilityCheck(
       ).map((city) => [city.cityKey, city]),
     ),
     nations: Object.fromEntries(
-      nations.map(({ diplomaticAidUntilMonth, npcSettings, restrictions, ...nation }) => {
+      nations.map(({ diplomaticAidUntilMonth, npcSettings, restrictions, financeRates, ...nation }) => {
+        const rates = world.ruleFeatures.includes(NATION_FINANCE_FEATURE)
+          ? storedFinanceRates(financeRates)
+          : undefined;
         return [
           nation.id,
           {
             ...stripWorldId(nation),
             ...(diplomaticAidUntilMonth != null ? { diplomaticAidUntilMonth } : {}),
             ...storedNpcNationPolicy(world.ruleFeatures.includes(NPC_NATION_POLICY_FEATURE), npcSettings),
+            ...(rates === undefined ? {} : { financeRates: rates }),
             ...storedNationRestrictions(world.ruleFeatures.includes(NATION_RESTRICTIONS_FEATURE), restrictions),
           },
         ];
