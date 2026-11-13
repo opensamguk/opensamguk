@@ -5,6 +5,7 @@ import { lineageActive } from '../lineage/eligibility';
 import type { WorldView } from '../model/world';
 import type { RecordedInput, ReplayState } from '../replay';
 
+export const NPC_ENTRY_DRAFT_FEATURE = 'npc-entry-draft-v1';
 export const POSSESSION_KIND = 'general.possess';
 const integer = z.number().int().min(0).max(2_147_483_647);
 const id = integer.min(1);

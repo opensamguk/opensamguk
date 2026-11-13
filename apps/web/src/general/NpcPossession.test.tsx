@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import type { AppRouter } from '@opensamguk/server/router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { TRPCLink } from '@trpc/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -82,6 +82,27 @@ beforeEach(() => {
   wire.handlers.set('auth.me', () => ({ user: { id: 'u1' } }));
 });
 afterEach(cleanup);
+
+it('후보를 뽑고 보관할 장수와 현재 추첨 번호를 다시 뽑기 요청에 보낸다', async () => {
+  const npc = candidate(2, '조조', [95, 70, 90]);
+  const draft = {
+    nonce: '00000000-0000-4000-8000-000000000001',
+    validUntil: new Date(Date.now() + 90000).toISOString(),
+    redrawAt: new Date(Date.now() - 1000).toISOString(),
+    cards: [{ generalId: 2, keepCount: 3 }],
+  };
+  wire.handlers.set('entry.roles', () => ({ ...roles([]), draft: null }));
+  const mutation = vi.fn(() => ({ ...roles([npc]), draft }));
+  wire.handlers.set('entry.draw', mutation);
+  renderEntry();
+  fireEvent.click(await screen.findByRole('button', { name: 'NPC 무장 맡기' }));
+  fireEvent.click(await screen.findByRole('button', { name: '장수 후보 뽑기' }));
+  fireEvent.click(await screen.findByRole('checkbox', { name: '조조 보관 (3회)' }));
+  fireEvent.click(screen.getByRole('button', { name: '다른 장수 보기' }));
+  await waitFor(() =>
+    expect(mutation).toHaveBeenLastCalledWith({ worldId: 'w1', redraw: { nonce: draft.nonce, keepIds: [2] } }),
+  );
+});
 
 describe('NPC 무장 맡기 후보 줄', () => {
   it('5능력치 월드는 다섯 칸과 합을 붙이고 합이 큰 순으로 둔다. 이름은 괄호를 빼고 얼굴은 원형 icon이다', async () => {

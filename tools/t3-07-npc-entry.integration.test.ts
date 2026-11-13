@@ -22,6 +22,7 @@ import { exportReplay, readArchive, replayArchive } from '../apps/engine/src/rep
 import { commandInitial } from '../packages/rules/test/commandFixture';
 import {
   POSSESSION_KIND,
+  NPC_ENTRY_DRAFT_FEATURE,
   STANDARD_EQUIPMENT_CONFIG,
   availableNpc,
   initialReplayStateWithRegistry,
@@ -81,9 +82,13 @@ async function user(role: 'ADMIN' | 'USER' = 'USER', status: 'ACTIVE' | 'SANCTIO
   return { id: row.id, cookie: 'sid=' + session.token, sessionId: session.id };
 }
 async function call<T = unknown>(path: string, input: unknown, cookie?: string) {
-  const mutation = ['admin.world.requestSetting', 'admin.game.request', 'general.create', 'entry.possess'].includes(
-    path,
-  );
+  const mutation = [
+    'admin.world.requestSetting',
+    'admin.game.request',
+    'general.create',
+    'entry.possess',
+    'entry.draw',
+  ].includes(path);
   const encoded = JSON.stringify({ 0: input });
   const response = await fetch(
     address + '/trpc/' + path + '?batch=1' + (mutation ? '' : '&input=' + encodeURIComponent(encoded)),
@@ -386,6 +391,85 @@ it('AC-M3-14·AC-INT-24 기본 off PREOPEN을 실제 감독이 운영 API로 열
   ).toBe(412);
   await expectReplayed(worldId);
 });
+
+async function draftWorld() {
+  const initial = commandInitial();
+  initial.ruleFeatures = ['personnel', 'policy', NPC_ENTRY_DRAFT_FEATURE].sort();
+  for (let id = 5; id <= 12; id++) initial.generals.push({ ...initial.generals[3]!, id, name: `후보${id}` });
+  const { worldId } = await saveInitialWorld(db, initial, {
+    name: '추첨 입장 검증',
+    turnTermMinutes: 60,
+    endYear: 231,
+    replayFormat: 3,
+  });
+  await enable(worldId);
+  return worldId;
+}
+type Draft = { nonce: string; validUntil: string; redrawAt: string; cards: { generalId: number; keepCount: number }[] };
+type DrawReply = { draft: Draft | null; roles: Record<string, { generalId: number }[]> };
+const draw = (worldId: string, actor: Actor, redraw?: { nonce: string; keepIds: number[] }) =>
+  call<DrawReply>('entry.draw', { worldId, ...(redraw ? { redraw } : {}) }, actor.cookie);
+
+it(
+  '후보 추첨과 보관을 실제 DB에 저장하고 만료된 후보로 입장할 수 없다',
+  authzCase('entry.draw', 'success', async () => {
+    const worldId = await draftWorld();
+    expect((await call<DrawReply>('entry.roles', { worldId }, ordinary.cookie)).data?.draft).toBeNull();
+    const first = (await draw(worldId, ordinary)).data!.draft!;
+    expect(first.cards).toHaveLength(5);
+    expect((await draw(worldId, ordinary)).data?.draft).toEqual(first);
+    const kept = first.cards[0]!;
+    const second = (await draw(worldId, ordinary, { nonce: first.nonce, keepIds: [kept.generalId] })).data!.draft!;
+    expect(second.cards).toContainEqual({ generalId: kept.generalId, keepCount: 2 });
+    expect(second.nonce).not.toBe(first.nonce);
+    expect((await draw(worldId, ordinary, { nonce: second.nonce, keepIds: [] })).status).toBe(412);
+    expect((await draw(worldId, ordinary, { nonce: first.nonce, keepIds: [] })).data?.draft).toEqual(second);
+    requestNow = new Date(second.validUntil).getTime();
+    expect((await call('entry.possess', claim(worldId, kept.generalId), ordinary.cookie)).data).toMatchObject({
+      status: 'rejected',
+      rejectCode: 'NOT_ELIGIBLE',
+    });
+    expect((await draw(worldId, ordinary)).data!.draft!.nonce).not.toBe(second.nonce);
+  }),
+);
+
+it(
+  '두 계정은 같은 후보를 동시에 예약하거나 상대 후보로 입장할 수 없다',
+  authzCase('entry.draw', 'otherUser', async () => {
+    const worldId = await draftWorld();
+    const [first, second] = await Promise.all([draw(worldId, ordinary), draw(worldId, other)]);
+    const a = first.data!.draft!.cards.map(({ generalId }) => generalId);
+    const b = second.data!.draft!.cards.map(({ generalId }) => generalId);
+    expect(a).toHaveLength(5);
+    expect(b).toHaveLength(5);
+    expect(b.some((id) => a.includes(id))).toBe(false);
+    expect((await call('entry.possess', claim(worldId, a[0]!, other), other.cookie)).data).toMatchObject({
+      status: 'rejected',
+      rejectCode: 'NOT_ELIGIBLE',
+    });
+    expect((await applyClaim(claim(worldId, a[0]!))).data).toEqual({ status: 'possessed', generalId: a[0] });
+    await expectReplayed(worldId);
+  }),
+);
+
+it(
+  'entry.draw 무인증',
+  authzCase('entry.draw', 'unauthenticated', async () => {
+    expect((await call('entry.draw', { worldId: randomUUID() })).status).toBe(401);
+  }),
+);
+it(
+  'entry.draw 제재 계정',
+  authzCase('entry.draw', 'sanctioned', async () => {
+    expect((await draw(randomUUID(), sanctioned)).status).toBe(401);
+  }),
+);
+it(
+  'entry.draw 타인 ID 주입',
+  authzCase('entry.draw', 'invalidInput', async () => {
+    expect((await call('entry.draw', { worldId: randomUUID(), userId: other.id }, ordinary.cookie)).status).toBe(400);
+  }),
+);
 
 for (const path of ['entry.roles', 'entry.possess', 'entry.possessStatus'] as const) {
   it(
