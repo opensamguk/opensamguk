@@ -356,7 +356,7 @@ test('T3-10 정식191년 도시·국가·월간 순위 표의 모든 값·정렬
                 by: key,
               });
               await expect(table.locator('tbody').first().locator('tr')).toHaveCount(data.top.length);
-              await expect(table.locator('tbody').first().locator('tr td:nth-child(2) > span:first-child')).toHaveText(
+              await expect(table.locator('tbody').first().getByTestId('ranked-general-name')).toHaveText(
                 data.top.map((r) => displayName(r.name)),
               );
               // 전공 다음에 승리·점령을 따로 접어 둔다 (INT-25).

@@ -176,6 +176,9 @@
   .tabPanel[data-active='false'] {
     display: none;
   }
+  .tabPanel > .menu {
+    grid-area: auto;
+  }
   /* 인자 입력 화면은 모달 dialog다. 연 채로 폭이 좁아져도 감춘 패널 안에서 보이지 않는 채 화면을 막지 않게 그 패널은 그린다. */
   .tabPanel[data-active='false']:has(dialog[open]) {
     display: grid;
