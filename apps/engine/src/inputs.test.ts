@@ -51,6 +51,7 @@ function world(changes: Partial<World> = {}): World {
     actionSequence: 0,
     clockTick: 600,
     monthlyTick: 0,
+    ruleFeatures: [],
     turnTermMinutes: 30,
     startYear: legacy.origin.initial.startYear,
     endYear: null,

@@ -4,12 +4,13 @@ import { z } from 'zod';
 import type { Context } from '../context';
 import { nationCommandsRouter } from '../routers/nationCommands';
 import { parseOfficeTurn } from './nationOfficeSlots';
-import { requireWorld, requireGeneral } from './queries';
+import { readView, requireWorld, requireGeneral } from './queries';
 
 vi.mock('./queries', async (original) => ({
   ...(await original<typeof import('./queries')>()),
   requireWorld: vi.fn(),
   requireGeneral: vi.fn(),
+  readView: vi.fn(),
 }));
 vi.mock('./personnelApi', () => ({
   withPersonnel: async (_ctx: unknown, _id: string, read: (tx: unknown) => unknown) => read({}),
@@ -18,7 +19,7 @@ vi.mock('./resolver', () => ({
   worldResolver: () => ({
     resolver: {
       list: () => [
-        { key: 'nation_rest', name: '휴식', target: 'nation', args: z.strictObject({}) },
+        { key: 'nation_rest', name: '휴식', target: 'nation', args: z.strictObject({}), precheck: () => null },
         { key: 'nation_city_allocate', name: '도시 병력 배속', target: 'nation', args: cityResourceInputSchema },
       ],
       get: (key: string) =>
@@ -37,7 +38,8 @@ function fixture(enabled = true, level = 5) {
     ruleFeatures: enabled ? ['city-resources-v1'] : [],
   } as unknown as Awaited<ReturnType<typeof requireWorld>>;
   vi.mocked(requireWorld).mockResolvedValue(world);
-  vi.mocked(requireGeneral).mockResolvedValue({ id: 1, nationId: 1, officerLevel: level } as Awaited<
+  vi.mocked(readView).mockResolvedValue({} as Awaited<ReturnType<typeof readView>>);
+  vi.mocked(requireGeneral).mockResolvedValue({ id: 1, nationId: 1, officerLevel: level, nextTurnTick: 0 } as Awaited<
     ReturnType<typeof requireGeneral>
   >);
   const caller = nationCommandsRouter.createCaller({ user: { id: '10000000-0000-4000-8000-000000000002' } } as Context);
