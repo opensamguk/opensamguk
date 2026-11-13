@@ -3,6 +3,7 @@ import {
   assertSlotSet,
   CITY_SEASONAL_EVENTS_FEATURE,
   DEFENSE_STANCE_FEATURE,
+  INACTIVE_REMOVAL_FEATURE,
   NPC_NATION_POLICY_FEATURE,
   NATION_RESTRICTIONS_FEATURE,
   NATION_RESTRICTIONS_KIND,
@@ -283,6 +284,34 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
   { key: 'court-rank-v1' },
   { key: COURT_PROMOTION_FEATURE },
   { key: CITY_SEASONAL_EVENTS_FEATURE },
+  {
+    key: INACTIVE_REMOVAL_FEATURE,
+    async persistMonthly(tx, worldId, _before, _next, effects, { tick, sequence }) {
+      const ids = z.array(z.number().int().positive()).parse(effects);
+      if (!ids.length) return;
+      await tx.general.updateMany({
+        where: { worldId, id: { in: ids } },
+        data: { lastActiveTick: null, lastActiveAt: null },
+      });
+      const last = await tx.generalLog.findFirst({
+        where: { worldId, sequence },
+        orderBy: { ordinal: 'desc' },
+        select: { ordinal: true },
+      });
+      await tx.generalLog.createMany({
+        data: ids.map((generalId, index) => ({
+          worldId,
+          generalId,
+          tick,
+          sequence,
+          ordinal: (last?.ordinal ?? -1) + index + 1,
+          commandKey: 'general.inactive-removal',
+          kind: 'success',
+          text: '장기 미접속으로 장수가 퇴장했습니다.',
+        })),
+      });
+    },
+  },
   { key: NATION_RESTRICTIONS_FEATURE, queuedInputs: { [NATION_RESTRICTIONS_KIND]: processNationRestrictions } },
   { key: NPC_NATION_POLICY_FEATURE, queuedInputs: { [NPC_NATION_POLICY_KIND]: processNpcNationPolicy } },
   { key: DEFENSE_STANCE_FEATURE, queuedInputs: { [DEFENSE_STANCE_KIND]: processDefenseStance } },

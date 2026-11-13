@@ -5,6 +5,7 @@ import {
   NATION_RESTRICTIONS_KIND,
   applyNationRestrictions,
 } from './personnel/nationRestrictions';
+import { inactiveRemovalFeature, INACTIVE_REMOVAL_FEATURE } from './policy/inactiveRemoval';
 import { RESEARCH_ERA_FEATURE } from './nationResearch/era';
 import { NATION_PHILOSOPHY_FEATURE } from './personnel/nationPhilosophy';
 import { COURT_PROMOTION_FEATURE, COURT_RANK_FEATURE } from './personnel/nationRank';
@@ -164,6 +165,7 @@ export const ruleRegistry: RuleRegistry = {
       },
     },
     policyFeature,
+    inactiveRemovalFeature,
     { key: NATION_RESTRICTIONS_FEATURE, requires: [], conflicts: [] },
     { key: NPC_NATION_POLICY_FEATURE, requires: [], conflicts: [] },
     { key: DEFENSE_STANCE_FEATURE, requires: [], conflicts: [] },
@@ -217,6 +219,7 @@ export const ruleRegistry: RuleRegistry = {
     },
   ],
   monthlyOrder: [
+    INACTIVE_REMOVAL_FEATURE,
     'treaty',
     'lineage-v1',
     'nation-lifecycle-v1',
