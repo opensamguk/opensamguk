@@ -323,6 +323,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
         msPerTick: 6,
         turnTermMinutes: 1,
         truce: null,
+        quota: { humans: 3, max: null },
       },
     });
   });
@@ -508,12 +509,19 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       'generals',
       'id',
       'name',
+      'philosophy',
+      'population',
+      'populationMax',
     ]);
+    expect(enemy).toMatchObject({
+      philosophy: state.nations[1]!.philosophy,
+      population: state.cities[1]!.population,
+    });
     expect(enemy.generals).toEqual([{ id: 3, name: state.generals[2]!.name, nationId: 2, isHuman: true }]);
     expect(enemy.cities).toHaveLength(1);
     for (const user of users.slice(1)) {
       const nation = (await query('nation.get', { worldId, nationId: 1 }, user.cookie)).data;
-      for (const field of ['gold', 'rice', 'taxRate', 'tech', 'capitalCityKey'])
+      for (const field of ['gold', 'rice', 'taxRate', 'tech', 'capitalCityKey', 'financeEstimate', 'salaryRate'])
         expect(nation).not.toHaveProperty(field);
       expect(nation.generals).toEqual(
         state.generals.slice(0, 2).map(({ id, name, nationId }) => ({ id, name, nationId, isHuman: id !== 2 })),
@@ -521,8 +529,13 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     }
     const own = (await query('nation.get', { worldId, nationId: 1 })).data;
     expect(own).toMatchObject({ gold: state.nations[0]!.gold, rice: state.nations[0]!.rice, taxRate: 0.2 });
+    expect(own).toHaveProperty('financeEstimate.gold.month', 1);
+    expect(own).toHaveProperty('financeEstimate.rice.month', 4);
+    expect(own).toHaveProperty('financeEstimate.destination', 'nation');
     expect(own.generals[1]).toMatchObject({ id: 2, gold: 11002, crew: 13002 });
-    expect(own.cities[0]).not.toHaveProperty('population');
+    expect(own.cities[0]).toHaveProperty('population', state.cities[0]!.population);
+    expect(own.cities[0]).toHaveProperty('populationMax', state.cities[0]!.populationMax);
+    expect(own).toHaveProperty('salaryRate', 0.5);
   });
 
   it('AC-M1-19 소유 도시를 자국에서만 지역과 규모 기준으로 정렬한다', async () => {

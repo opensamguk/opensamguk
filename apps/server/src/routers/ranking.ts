@@ -18,6 +18,7 @@ const generalRows = z.array(
 );
 const nationRows = z.array(
   nationIdentity.extend({
+    philosophy: z.string().optional(),
     cities: z.number().int().nonnegative(),
     generals: z.number().int().nonnegative(),
     power: z.number().int().nonnegative(),
@@ -91,9 +92,20 @@ export const rankingRouter = router({
           select: { tick: true, year: true, month: true, nations: true },
         });
         if (!snapshot) return { items: [], at: null };
+        const nations = nationRows.parse(snapshot.nations);
+        const missingPhilosophy = nations.filter((nation) => nation.philosophy === undefined).map(({ id }) => id);
+        const liveNations = missingPhilosophy.length
+          ? await tx.nation.findMany({
+              where: { worldId: input.worldId, id: { in: missingPhilosophy } },
+              select: { id: true, philosophy: true },
+            })
+          : [];
+        const philosophy = new Map(liveNations.map((nation) => [nation.id, nation.philosophy]));
+        for (const nation of nations) if (nation.philosophy !== undefined) philosophy.set(nation.id, nation.philosophy);
         return {
-          items: rankNations(nationRows.parse(snapshot.nations), input.by).map(({ id, ...row }) => ({
+          items: rankNations(nations, input.by).map(({ id, ...row }) => ({
             nationId: id,
+            philosophy: philosophy.get(id) ?? null,
             ...row,
           })),
           at: snapshotAt(snapshot),
