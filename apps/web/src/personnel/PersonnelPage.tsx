@@ -161,7 +161,9 @@ export function PersonnelPage() {
       ) : (
         <LoadingState />
       )}
-      {roster.nation ? <DiplomaticDelegates key={`${roster.nation.id}:${board.data?.actorId ?? ''}`} worldId={worldId} /> : null}
+      {roster.nation ? (
+        <DiplomaticDelegates key={`${roster.nation.id}:${board.data?.actorId ?? ''}`} worldId={worldId} />
+      ) : null}
     </section>
   );
 }

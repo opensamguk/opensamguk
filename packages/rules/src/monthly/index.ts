@@ -1,4 +1,5 @@
 import type { GameDate, Rng } from '@opensamguk/shared';
+import { nationPhilosophy } from '../personnel/nationPhilosophy';
 import { BALANCE } from '../balance';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import type { WorldState, WorldView } from '../model/world';
@@ -40,17 +41,19 @@ export function estimateTaxIncome(
   memberCount: number,
   resource: 'gold' | 'rice',
   bonuses?: ReturnType<typeof residentOfficeBonuses>,
+  incomeMultiplier = 1,
 ) {
   const gross = Math.round(
-    cities.reduce(
-      (sum, city) =>
-        sum +
-        city[resource === 'gold' ? 'commerce' : 'agriculture'] *
-          (city.population / BALANCE.MONTHLY_POPULATION_UNIT) *
-          BALANCE.MONTHLY_TAX_RATE *
-          (1 + (bonuses?.get(city.cityKey)?.tax?.percent ?? 0) / 100),
-      0,
-    ),
+    incomeMultiplier *
+      cities.reduce(
+        (sum, city) =>
+          sum +
+          city[resource === 'gold' ? 'commerce' : 'agriculture'] *
+            (city.population / BALANCE.MONTHLY_POPULATION_UNIT) *
+            BALANCE.MONTHLY_TAX_RATE *
+            (1 + (bonuses?.get(city.cityKey)?.tax?.percent ?? 0) / 100),
+        0,
+      ),
   );
   const perGeneral = memberCount ? Math.floor(Math.round(gross * BALANCE.MONTHLY_SALARY_RATE) / memberCount) : 0;
   const payroll = perGeneral * memberCount;
@@ -70,7 +73,8 @@ export function settleIncome(
     const members = generalsById(next).filter(
       (general) => general.nationId === nation.id && general.activeFromYear <= date.year,
     );
-    const { net, perGeneral } = estimateTaxIncome(cities, members.length, resource, bonuses);
+    const multiplier = nationPhilosophy(next, nation.philosophy)?.[resource];
+    const { net, perGeneral } = estimateTaxIncome(cities, members.length, resource, bonuses, multiplier);
     next.nations[nation.id]![resource] += net;
     for (const general of members) next.generals[general.id]![resource] += perGeneral;
   }
@@ -82,11 +86,13 @@ export function settlePopulation(state: WorldView, taxRate: number = BALANCE.MON
   for (const city of citiesById(next)) {
     if (city.kind === 'PASS') continue;
     const target = next.cities[city.cityKey]!;
+    const nation = city.nationId === null ? undefined : state.nations[city.nationId];
+    const growth = nationPhilosophy(state, nation?.philosophy)?.population ?? 1;
     target.population = Math.max(
       0,
       Math.min(
         city.populationMax,
-        Math.round(city.population + BALANCE.MONTHLY_SETTLEMENT_RATE * (city.populationMax - city.population)),
+        Math.round(city.population + BALANCE.MONTHLY_SETTLEMENT_RATE * (city.populationMax - city.population) * growth),
       ),
     );
     target.trust = Math.max(

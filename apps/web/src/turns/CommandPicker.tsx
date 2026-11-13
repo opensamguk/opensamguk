@@ -238,7 +238,7 @@ export function CommandPicker({
           [own, fallback].find((v) => field.options.some((o) => o.value === v)) ?? field.options[0]?.value ?? '';
       }
       if (field.kind === 'boolean') initial[field.key] = 'true';
-      if (field.kind === 'enum') initial[field.key] = field.options[0]?.value ?? '';
+      if (field.kind === 'enum' && !field.philosophyEffects) initial[field.key] = field.options[0]?.value ?? '';
       if (field.kind === 'color') initial[field.key] = '#8a5a2b';
     }
     setValues(initial);
@@ -766,8 +766,9 @@ function ArgInput({
         {/* 병종표를 늦게 받아 고른 값이 없으면 첫 병종이 고른 것처럼 보이지 않게 빈 선택을 둔다. */}
         {field.kind === 'city' ||
         field.kind === 'nation' ||
+        (field.kind === 'enum' && field.philosophyEffects) ||
         (field.kind === 'unit' && !field.options.some((option) => option.value === value)) ? (
-          <option value="">고르세요</option>
+          <option value="">{field.kind === 'enum' && field.philosophyEffects ? '중립' : '고르세요'}</option>
         ) : null}
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -822,6 +823,19 @@ function ArgInput({
         <p className={styles.muted} role="note">
           {note}
         </p>
+      ) : null}
+      {field.kind === 'enum' && field.philosophyEffects ? (
+        <details>
+          <summary>국가 성향 장단점</summary>
+          <ul>
+            {field.options.map((option) => {
+              const effects = field.philosophyEffects?.[option.value];
+              if (!effects) return null;
+              const text = `${option.label} · 장점 ${effects.benefits.join(', ') || '없음'} · 단점 ${effects.drawbacks.join(', ') || '없음'}`;
+              return <li key={option.value}>{option.value === value ? <strong>{text}</strong> : text}</li>;
+            })}
+          </ul>
+        </details>
       ) : null}
       {after}
     </div>

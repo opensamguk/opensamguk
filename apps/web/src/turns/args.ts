@@ -9,7 +9,13 @@ export type ArgField =
   | { key: string; kind: 'integer'; label: string; min: number; max: number }
   | { key: string; kind: 'unit'; label: string; options: Array<{ value: string; label: string }> }
   | { key: string; kind: 'boolean'; label: string; options: [string, string] }
-  | { key: string; kind: 'enum'; label: string; options: Array<{ value: string; label: string }> }
+  | {
+      key: string;
+      kind: 'enum';
+      label: string;
+      options: Array<{ value: string; label: string }>;
+      philosophyEffects?: Record<string, { benefits: string[]; drawbacks: string[] }>;
+    }
   | { key: string; kind: 'color'; label: string }
   | { key: string; kind: 'text'; label: string; maxLength: number };
 
@@ -24,6 +30,7 @@ const LABELS: Record<string, string> = {
   resource: '자원',
   name: '나라 이름',
   color: '나라 색',
+  philosophy: '국가 성향',
   slot: '장비 칸',
   itemKey: '매매할 장비',
 };
@@ -33,6 +40,7 @@ const ENUM_LABELS: Record<string, string> = { gold: '금', rice: '쌀', horse: '
 interface JsonProperty {
   type?: string;
   enum?: unknown[];
+  'x-philosophy-effects'?: Record<string, { benefits: string[]; drawbacks: string[] }>;
   pattern?: string;
   maximum?: number;
   exclusiveMinimum?: number;
@@ -83,6 +91,7 @@ export function argFields(schema: unknown, units: readonly UnitInfo[]): ArgField
         key,
         kind: 'enum',
         label,
+        ...(prop['x-philosophy-effects'] ? { philosophyEffects: prop['x-philosophy-effects'] } : {}),
         options: prop.enum.map((value) => ({
           value: String(value),
           label: ENUM_LABELS[String(value)] ?? String(value),

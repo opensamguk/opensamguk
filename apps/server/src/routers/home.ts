@@ -47,7 +47,7 @@ export const homeRouter = router({
           : undefined;
       const finance =
         nation && world.status !== 'ENDED'
-          ? projectNationFinance(world, ctx.now, nation.cities, nation.generals, state)
+          ? projectNationFinance(world, ctx.now, nation.cities, nation.generals, state, nation.philosophy)
           : undefined;
       const turns = displaySlots(await readSlots(tx, input.worldId, general.id));
       const tick = nowTick(worldClock(world), ctx.now);
