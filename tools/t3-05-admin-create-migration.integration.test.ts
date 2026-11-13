@@ -50,6 +50,11 @@ let oid: string | undefined,
   address = '',
   ownerId = '',
   passwordHash = '';
+const officeMigration = new URL(
+  '../packages/db/prisma/migrations/20261215000000_resident_city_offices/migration.sql',
+  import.meta.url,
+);
+const officeRequestColumn = 'ALTER TABLE "WorldCreateRequest" ADD COLUMN "officeEffects" JSONB;';
 const migration = '20261110000000_world_create_requests',
   origin = 'http://127.0.0.1:5173';
 function track<T>(work: () => Promise<T>) {
@@ -235,6 +240,10 @@ beforeAll(
             gate.query(await checked(async () => readFile(new URL(item + '/migration.sql', directory), 'utf8'))),
           );
         }
+        const officeSql = await checked(async () => readFile(officeMigration, 'utf8'));
+        expect(officeSql).toContain(officeRequestColumn);
+        // The current Prisma client reads the new World and General columns while preparing the legacy fixture.
+        await checked(async () => gate.query(officeSql.replace(officeRequestColumn, '')));
         await checked(async () =>
           initializeResources(
             db,
@@ -409,12 +418,7 @@ it('AC-M3-04 새 생성 요청 migration은 기존 모든 표·값·sequence를 
   expect(await rowsHash(beforeTables)).toBe(beforeHash);
   expect(await sequences()).toEqual(beforeSequences);
   expect((await gate.query('SELECT * FROM "WorldCreateRequest"')).rows).toEqual([]);
-  await gate.query(
-    await readFile(
-      new URL('../packages/db/prisma/migrations/20261215000000_resident_city_offices/migration.sql', import.meta.url),
-      'utf8',
-    ),
-  );
+  await gate.query(officeRequestColumn);
 });
 async function transaction(work: () => Promise<void>) {
   operationSignals.getStore()?.throwIfAborted();
@@ -586,12 +590,6 @@ it('AC-M3-04 결과 월드·행위자 삭제는 NO ACTION이며 기존 모든 �
   });
   expect(await rowsHash(beforeTables)).toBe(beforeHash);
   expect((await gate.query('SELECT * FROM "WorldCreateRequest"')).rows).toEqual([]);
-  await gate.query(
-    await readFile(
-      new URL('../packages/db/prisma/migrations/20261215000000_resident_city_offices/migration.sql', import.meta.url),
-      'utf8',
-    ),
-  );
 });
 afterAll(
   () =>
