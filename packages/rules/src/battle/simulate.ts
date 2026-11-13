@@ -18,6 +18,7 @@ export type BattleInput = {
   coefMode?: 'divide' | 'multiply';
   attackerModifiers?: BattleModifiers;
   defenderModifiers?: BattleModifiers;
+  recordPhases?: boolean;
 };
 
 type Unit = DeepReadonly<UnitSetResource['crewTypes'][number]>;
@@ -71,14 +72,26 @@ function copyForce(force: Readonly<BattleForce>): BattleForce {
   return { crew: force.crew, crewType: force.crewType, train: force.train, atmos: force.atmos };
 }
 
-type BattleResult = { attacker: BattleForce; defender: BattleForce; attackerFirstVolleyFired?: true };
+export type BattlePhase = {
+  kind: 'volley' | 'hold' | 'exchange';
+  attackerLoss: number;
+  defenderLoss: number;
+  attackerEvaded?: boolean;
+  defenderEvaded?: boolean;
+};
+type BattleResult = {
+  attacker: BattleForce;
+  defender: BattleForce;
+  attackerFirstVolleyFired?: true;
+  phases?: BattlePhase[];
+};
 
 export function simulateBattle(input: BattleInput, rng: Rng): BattleResult {
   const { unitSet } = input;
   const attacker = copyForce(input.attacker),
     defender = copyForce(input.defender);
   const canFight = () => attacker.crew > 0 && defender.crew > 0 && attacker.atmos > 0 && defender.atmos > 0;
-  const result: BattleResult = { attacker, defender };
+  const result: BattleResult = { attacker, defender, ...(input.recordPhases ? { phases: [] } : {}) };
   if (!canFight()) return result;
   const aUnit = unit(unitSet, attacker.crewType),
     bUnit = unit(unitSet, defender.crewType);
@@ -90,6 +103,7 @@ export function simulateBattle(input: BattleInput, rng: Rng): BattleResult {
       toAttacker = defenderFires ? damage(defender, attacker, input, rng, false, 2 / 3) : 0;
     attacker.crew -= toAttacker;
     defender.crew -= toDefender;
+    result.phases?.push({ kind: 'volley', attackerLoss: toAttacker, defenderLoss: toDefender });
     if (sortieVolley && attackerFires) result.attackerFirstVolleyFired = true;
     if (input.openingSkirmish) return result;
   }
@@ -98,6 +112,7 @@ export function simulateBattle(input: BattleInput, rng: Rng): BattleResult {
   for (let phase = 0; phase < phases && canFight(); phase++) {
     if (bUnit.effects?.includes('hold') && !held && rng.next() < (defender.train + defender.atmos) / 400) {
       held = true;
+      result.phases?.push({ kind: 'hold', attackerLoss: 0, defenderLoss: 0 });
       continue;
     }
     const avoidAttacker = aUnit.effects?.includes('avoid') && rng.next() < aUnit.avoid / 100;
@@ -107,6 +122,13 @@ export function simulateBattle(input: BattleInput, rng: Rng): BattleResult {
       toAttacker = damage(defender, attacker, input, rng, false, avoidAttacker ? 1 / 6 : 1);
     attacker.crew -= toAttacker;
     defender.crew -= toDefender;
+    result.phases?.push({
+      kind: 'exchange',
+      attackerLoss: toAttacker,
+      defenderLoss: toDefender,
+      ...(avoidAttacker ? { attackerEvaded: true } : {}),
+      ...(avoidDefender ? { defenderEvaded: true } : {}),
+    });
     attacker.atmos = Math.max(0, attacker.atmos - BALANCE.BATTLE_ATMOS_LOSS);
     defender.atmos = Math.max(0, defender.atmos - BALANCE.BATTLE_ATMOS_LOSS);
   }

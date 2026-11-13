@@ -990,6 +990,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       attackerId: index + 1,
       generalId: 1,
       text: `내 전투 ${index + 1}`,
+      ...(index === 30 ? { phases: [{ kind: 'volley', attackerLoss: 0, defenderLoss: 18 }] } : {}),
     }));
     await db.battleLog.createMany({
       data: [
@@ -1000,6 +1001,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     });
     try {
       const first = (await query('records.battles', { worldId })).data;
+      expect(first.items[0]?.phases).toEqual([{ kind: 'volley', attackerLoss: 0, defenderLoss: 18 }]);
       expect(first.items.map((row) => row.attackerId)).toEqual(
         ownReports
           .slice(1)

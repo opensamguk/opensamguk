@@ -130,7 +130,15 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
         defenderCommander = get(defenderId).commanderId;
       const attackerTroops = get(attackerId).troops;
       const defenderTroops = get(defenderId).troops;
-      const outcome = fightCampaignUnits(state, attackerId, defenderId, actor.unitSet!, rng, attackerFirstVolleyUsed);
+      const outcome = fightCampaignUnits(
+        state,
+        attackerId,
+        defenderId,
+        actor.unitSet!,
+        rng,
+        attackerFirstVolleyUsed,
+        actor.recordBattleStats === true,
+      );
       state = outcome.state;
       attackerFirstVolleyUsed ||= outcome.attackerFirstVolleyFired === true;
       const a = get(attackerId),
@@ -153,8 +161,15 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
       rounds.push(text);
       // BattleLog의 (worldId,tick,attackerId,generalId) 키당 한 행으로 저장한다.
       const report = reports.find((row) => row.generalId === defenderCommander);
-      if (report) report.text += `; ${text}`;
-      else reports.push({ generalId: defenderCommander, text });
+      if (report) {
+        report.text += `; ${text}`;
+        if (outcome.phases?.length) (report.phases ??= []).push(...outcome.phases);
+      } else
+        reports.push({
+          generalId: defenderCommander,
+          text,
+          ...(outcome.phases?.length ? { phases: outcome.phases } : {}),
+        });
       if (alive(d)) break;
     }
     if (defendingIds.some((id) => alive(get(id)))) continue;

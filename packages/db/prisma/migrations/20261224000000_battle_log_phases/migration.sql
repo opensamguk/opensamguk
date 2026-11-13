@@ -1,0 +1,1 @@
+ALTER TABLE "BattleLog" ADD COLUMN "phases" JSONB;
