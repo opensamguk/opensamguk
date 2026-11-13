@@ -81,6 +81,7 @@ model World {
   ranking              RankingSnapshot?
   publicMaps           PublicMapSnapshot[]
   messages             Message[]
+  nationBoardPosts     NationBoardPost[]
   notices              Notice[]
   operations           Operation[]
   extSlices            WorldExtSlice[]
@@ -1088,6 +1089,34 @@ model Message {
   @@unique([worldId, id])
   @@index([worldId, scope, sentAt, id])
   @@index([worldId, senderId, sentAt])
+}
+
+model NationBoardPost {
+  id         String   @id @default(uuid())
+  worldId    String
+  nationId   Int
+  confidential Boolean
+  authorName String
+  portraitId Int?
+  title      String
+  body       String
+  sentAt     DateTime @default(now())
+  world      World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  replies    NationBoardReply[]
+
+  @@index([worldId, nationId, confidential, sentAt, id])
+}
+
+model NationBoardReply {
+  id         String   @id @default(uuid())
+  postId     String
+  authorName String
+  portraitId Int?
+  body       String
+  sentAt     DateTime @default(now())
+  post       NationBoardPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId, sentAt, id])
 }
 
 model MessageRead {
