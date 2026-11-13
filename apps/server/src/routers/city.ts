@@ -22,6 +22,7 @@ import { readCityScaleProjection } from '../game/cityScale';
 import { readCityIntel } from '../game/fog';
 import { cityDefense } from '../game/defenseRead';
 import { cityEvents } from '../game/cityEvents';
+import { projectCityIncome } from '../game/nationFinance';
 
 export const cityRouter = router({
   get: protectedProcedure.input(worldInput.extend({ cityKey: entityKey }).strict()).query(({ ctx, input }) =>
@@ -71,14 +72,18 @@ export const cityRouter = router({
         world.ruleFeatures.includes(RICE_MARKET_FEATURE) && (full || adjacent)
           ? await tx.world.findUniqueOrThrow({ where: { id: world.id }, select: { seed: true, monthlyTick: true } })
           : null;
-      const view = campaignEnabled && !garrisonHidden ? await readView(tx, input.worldId) : undefined;
+      const showIncome = full && city.nationId !== null && city.kind !== 'PASS' && world.status !== 'ENDED';
+      const officeEffectsEnabled = world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE);
+      const view =
+        (campaignEnabled && !garrisonHidden) || (showIncome && officeEffectsEnabled)
+          ? await readView(tx, input.worldId)
+          : undefined;
       const units = view?.campaign?.units;
       const ruins = await readCityScaleProjection(tx, input.worldId, world.ruleFeatures);
       const intel =
         fogEnabled && viewer?.nationId != null && !visibility(viewer).city(city)
           ? await readCityIntel(tx, world, viewer.nationId, city.cityKey, ctx)
           : null;
-      const officeEffectsEnabled = world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE);
       const secretaryEnabled =
         officeEffectsEnabled &&
         hasCitySecretary(
@@ -130,6 +135,7 @@ export const cityRouter = router({
             }
           : {}),
         ...cityInfo(city, activeViewer, alliedResidence),
+        ...(showIncome ? { incomeEstimate: projectCityIncome(world, ctx.now, city, view) } : {}),
         ...(events.length
           ? {
               events,
