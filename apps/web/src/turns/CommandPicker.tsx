@@ -35,6 +35,7 @@ export type CommandInfo = {
   name: string;
   category: string;
   argsSchema: unknown;
+  troopTargets?: readonly { generalId: number; troopName: string }[];
 } & Partial<Pick<ServerCommand, 'description' | 'cost' | 'requirements' | 'turns' | 'available' | 'reason'>>;
 
 // 예턴 연결이 넘기는 대상 장수. 국가 칸은 인사부 조회의 소재 도시·유저 여부를 함께 싣는다.
@@ -166,11 +167,22 @@ export function CommandPicker({
   const generalsFor = (key: string | undefined): TargetGeneral[] | undefined => {
     if (key === RECRUIT_COMMAND && recruits) return [...recruits.list];
     const byId = new Map((members ?? []).map((member) => [member.id, member]));
-    if (generals)
-      return generals.map((general) => {
-        const detail = byId.get(general.id);
-        return { ...detail, ...general, cityName: general.cityName ?? detail?.cityName };
-      });
+    if (generals) {
+      const troopTargets = commands.find((command) => command.key === key)?.troopTargets;
+      const troopNames =
+        troopTargets && new Map(troopTargets.map(({ generalId, troopName }) => [generalId, troopName]));
+      return generals
+        .filter(({ id }) => !troopNames || troopNames.has(id))
+        .map((general) => {
+          const detail = byId.get(general.id);
+          return {
+            ...detail,
+            ...general,
+            cityName: general.cityName ?? detail?.cityName,
+            troopName: troopNames?.get(general.id),
+          };
+        });
+    }
     if (key && SAME_NATION_TARGET.has(key) && members) return members.filter((member) => member.id !== myId);
     return undefined;
   };
@@ -680,6 +692,7 @@ export function CommandPicker({
                         {...(command.key === RECRUIT_COMMAND && recruits
                           ? { note: recruits.note, empty: '등용할 수 있는 재야 장수가 없습니다' }
                           : {})}
+                        {...(command.troopTargets ? { empty: '탈퇴를 지시할 부대원이 없습니다' } : {})}
                       />
                     );
                   }

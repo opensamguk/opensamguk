@@ -3,6 +3,7 @@ import {
   canExecuteCityNationCommand,
   canExecuteResearchNationCommand,
   canUseNationTurns,
+  readTroops,
   STRATEGY_KEYS,
   strategyMonth,
   TICKS_PER_MONTH,
@@ -62,9 +63,21 @@ export const nationCommandsRouter = router({
       };
       const cooldown = view?.nationStrategy?.nations[actor.nationId!];
       const current = strategyMonth(commandActor.tick);
+      const troops = view ? readTroops(view) : undefined;
       return commands.map((def) => {
         const key = STRATEGY_KEYS.find((key) => key === def.key);
         const availableMonth = key ? Math.max(cooldown?.strategicUntil ?? 0, cooldown?.commands[key] ?? 0) : 0;
+        const troopTargets =
+          def.key === 'nation_troop_expel'
+            ? Object.values(troops?.troops ?? {})
+                .filter((troop) => troop.nationId === actor.nationId)
+                .flatMap((troop) =>
+                  troop.members
+                    .filter((generalId) => generalId !== actor.id)
+                    .map((generalId) => ({ generalId, troopName: troop.name })),
+                )
+            : undefined;
+        const availability = commandAvailability(def, view, commandActor, ended);
         return {
           ...describeCommand(def),
           group:
@@ -80,7 +93,15 @@ export const nationCommandsRouter = router({
                 },
               }
             : {}),
-          ...commandAvailability(def, view, commandActor, ended),
+          ...availability,
+          ...(troopTargets === undefined
+            ? {}
+            : {
+                troopTargets,
+                ...(availability.available !== false && troopTargets.length === 0
+                  ? { available: false, reason: '탈퇴를 지시할 부대원이 없습니다.' }
+                  : {}),
+              }),
         };
       });
     }),
