@@ -4,6 +4,19 @@ import type { RecordedInput, ReplayState } from '../replay';
 
 export const NATION_FINANCE_FEATURE = 'nation-finance-v1';
 export const NATION_FINANCE_KIND = 'nation.setFinanceRates';
+export const RANKED_PAYROLL_FEATURE = 'ranked-payroll-v1';
+
+// core2026 c81d304, packages/logic/src/economy/nationIncome.ts. MIT (c) 2025 devsam.
+export function salaryByDedication(dedication: number) {
+  return 400 + Math.min(30, Math.ceil(Math.sqrt(Math.max(0, dedication)) / 10)) * 200;
+}
+
+export function rankedPayroll(members: readonly { dedication: number }[], salaryRate: number, resources: number) {
+  const bases = members.map(({ dedication }) => salaryByDedication(dedication));
+  const baseTotal = bases.reduce((sum, base) => sum + base, 0);
+  const budget = Math.min(Math.round(baseTotal * salaryRate), resources);
+  return bases.map((base) => Math.floor((base * budget) / baseTotal));
+}
 export const financeRatesSchema = z.strictObject({
   taxPercent: z.number().int().min(5).max(30),
   salaryPercent: z.number().int().min(20).max(200),

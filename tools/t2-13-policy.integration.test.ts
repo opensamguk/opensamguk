@@ -11,7 +11,11 @@ import {
   NATION_RESTRICTIONS_KIND,
 } from '../packages/rules/src/personnel/nationRestrictions';
 import { NPC_NATION_POLICY_FEATURE, NPC_NATION_POLICY_KIND } from '../packages/rules/src/npc/policy';
-import { NATION_FINANCE_FEATURE, NATION_FINANCE_KIND } from '../packages/rules/src/personnel/financeRates';
+import {
+  NATION_FINANCE_FEATURE,
+  NATION_FINANCE_KIND,
+  RANKED_PAYROLL_FEATURE,
+} from '../packages/rules/src/personnel/financeRates';
 import type { PolicyKey, PolicySlot } from '../packages/rules/src/policy';
 import { GENERAL_PROFICIENCY_FEATURE } from '../packages/rules/src/general/proficiency';
 import { DOMESTIC_SPECIALTY_FEATURE } from '../packages/rules/src/general/domesticSpecialty';
@@ -69,6 +73,7 @@ async function fixture(
     npcPolicy?: boolean;
     restrictions?: boolean;
     finance?: boolean;
+    rankedPayroll?: boolean;
   } = {},
 ) {
   const alice = await user(),
@@ -78,6 +83,9 @@ async function fixture(
   initial.generals = initial.generals.slice(0, 2).map((general, i) => ({
     ...general,
     userId: i ? (options.npc ? null : bob.id) : alice.id,
+    ...(options.rankedPayroll
+      ? { nationId: 1, officerLevel: i ? 1 : general.officerLevel, dedication: i ? 0 : 10000 }
+      : {}),
     nextTurnTick: i ? 5000 : 100,
   }));
   const { worldId } = await saveInitialWorld(db, initial, {
@@ -97,6 +105,7 @@ async function fixture(
                   ? NATION_FINANCE_FEATURE
                   : NATION_RESTRICTIONS_FEATURE,
             'policy',
+            ...(options.rankedPayroll ? [RANKED_PAYROLL_FEATURE] : []),
           ],
         }
       : { replayFormat: 'policy' }),
@@ -668,6 +677,22 @@ it('국가 세율·지급률을 예산 예상과 실제 월말 정산에 적용�
     const archive = await exportReplay(db, f.worldId);
     expect(replayArchive(archive, 1)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
   })();
+});
+
+it('공헌도별 지급액을 장수에게 예고하고 같은 금액을 월말에 지급한다', async () => {
+  const f = await fixture({ finance: true, rankedPayroll: true });
+  const home = async (cookie: string) =>
+    (await rpc<{ general: { salaryEstimate: { gold: number } } }>('home.get', { worldId: f.worldId }, cookie)).data!
+      .general.salaryEstimate.gold;
+  await f.loop.advanceTo(9999);
+  const estimates = await Promise.all([home(f.alice.cookie), home(f.bob.cookie)]);
+  expect(estimates[0]).toBeGreaterThan(estimates[1]!);
+  const generals = () => db.general.findMany({ where: { worldId: f.worldId }, orderBy: { id: 'asc' } });
+  const before = await generals();
+  await f.loop.advanceTo(10000);
+  expect((await generals()).map((general, index) => general.gold - before[index]!.gold)).toEqual(estimates);
+  const archive = await exportReplay(db, f.worldId);
+  expect(replayArchive(archive, 1)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
 });
 
 it('국가 게시판과 기밀실을 현재 소속·직책으로 분리한다', async () => {

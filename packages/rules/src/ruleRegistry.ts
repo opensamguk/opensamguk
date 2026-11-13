@@ -1,5 +1,10 @@
 import { BATTLE_TACTICS_FEATURE } from './battle/tactics';
-import { applyFinanceRates, NATION_FINANCE_FEATURE, NATION_FINANCE_KIND } from './personnel/financeRates';
+import {
+  applyFinanceRates,
+  NATION_FINANCE_FEATURE,
+  NATION_FINANCE_KIND,
+  RANKED_PAYROLL_FEATURE,
+} from './personnel/financeRates';
 import { applyHeritagePurchase, HERITAGE_BENEFIT_KIND, HERITAGE_BENEFITS_FEATURE } from './heritage/benefits';
 import { applyDefenseStance, DEFENSE_STANCE_FEATURE, DEFENSE_STANCE_KIND } from './battle/defenders';
 import { NPC_NATION_POLICY_FEATURE, NPC_NATION_POLICY_KIND, applyNpcNationPolicy } from './npc/policy';
@@ -184,6 +189,7 @@ export const ruleRegistry: RuleRegistry = {
     { key: NATION_RESTRICTIONS_FEATURE, requires: [], conflicts: [] },
     { key: NPC_NATION_POLICY_FEATURE, requires: [], conflicts: [] },
     { key: NATION_FINANCE_FEATURE, requires: [], conflicts: [] },
+    { key: RANKED_PAYROLL_FEATURE, requires: [NATION_FINANCE_FEATURE], conflicts: [] },
     { key: DEFENSE_STANCE_FEATURE, requires: [], conflicts: [] },
     { key: PLAYER_AUTOPLAY_FEATURE, requires: ['policy'], conflicts: [] },
     { key: CITY_SEASONAL_EVENTS_FEATURE, requires: [], conflicts: [] },
