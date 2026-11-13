@@ -173,6 +173,26 @@ describe('국가 성향·총 주민·정산 예상', () => {
     expect(value('성향')).toBe('왕도');
     expect(value('총 주민')).toBe('120,000 / 300,000');
     expect(value('국고')).toBe('—');
+    expect(screen.queryByText('전략', { selector: 'dt' })).toBeNull();
+  });
+
+  it('전략 공통 대기와 각 명령의 실행 가능 연월을 표시한다', () => {
+    const nation = {
+      id: 1,
+      name: '위',
+      cityCount: 2,
+      generalCount: 3,
+      strategyStatus: {
+        remainingMonths: 2,
+        availableAt: { year: 191, month: 7 },
+        commands: [
+          { key: 'nation_mobilize', name: '백성동원', remainingMonths: 4, availableAt: { year: 191, month: 9 } },
+        ],
+      },
+    } as unknown as NationView;
+    render(<NationSummaryGrid nation={nation} />);
+    expect(screen.getByText('2개월 대기')).toBeTruthy();
+    expect(screen.getByText('백성동원 · 4개월 대기 (191년 9월)')).toBeTruthy();
   });
 
   it('소속국은 다음 세금·세곡·봉급·순수입을 글자와 숫자로 쓴다', () => {

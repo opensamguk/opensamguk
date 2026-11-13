@@ -11,6 +11,7 @@ const n = (value: number) => value.toLocaleString('ko-KR');
 export function CandidatePicker({
   id,
   title,
+  qualification,
   candidates,
   chosen,
   detailsState,
@@ -18,6 +19,7 @@ export function CandidatePicker({
 }: {
   id: string;
   title: string;
+  qualification?: string | undefined;
   candidates: readonly Candidate[];
   chosen: number | null;
   // 능력치(nation.get)를 받는 중이면 'loading', 못 받았으면 'error'. 카드는 이름·도시·직책만으로도 고를 수 있다.
@@ -44,6 +46,7 @@ export function CandidatePicker({
           후보 {n(shown.length)}명
         </span>
       </div>
+      {qualification ? <p className={styles.note}>{qualification}</p> : null}
       {detailsState === 'ready' ? null : (
         <p className={styles.note} role="note">
           {detailsState === 'loading' ? '능력치를 불러오는 중입니다.' : '능력치를 불러오지 못했습니다.'}
@@ -108,6 +111,7 @@ function CandidateCard({
         </span>
         <span className={styles.meta}>
           {member.city.name} · {member.title}
+          {member.tenureYears === undefined ? '' : ` · 임관 ${n(member.tenureYears)}년`}
         </span>
         {detail ? (
           <>

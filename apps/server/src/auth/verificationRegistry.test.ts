@@ -19,23 +19,39 @@ const VERIFIED_MUTATIONS = [
   'campaign.relationship',
   'campaign.unit',
   'cityResources.allocate',
+  'diplomaticDocuments.respond',
+  'diplomaticDocuments.send',
+  'diplomaticDocuments.setDelegate',
+  'entry.draw',
   'entry.possess',
   'general.create',
+  'general.setDefenseStance',
   'general.setPolicy',
   'governance.submit',
+  'heritage.purchase',
+  'heritage.specialty',
+  'heritage.statReset',
+  'heritage.turnTime',
   'lineage.submit',
   'logistics.submit',
   'message.markRead',
+  'message.retract',
   'message.send',
+  'nation.setFinanceRates',
+  'nation.setNpcPolicy',
+  'nation.setRestrictions',
+  'nationBoard.write',
   'nationTurns.edit',
   'nationTurns.set',
   'notice.nation.markSeen',
   'notice.nation.set',
+  'notice.nation.setRecruitment',
   'offers.respond',
   'operation.close',
   'operation.create',
   'personnel.appoint',
   'personnel.dismiss',
+  'personnel.volunteer',
   'resourceAdmin.clone',
   'resourceAdmin.discard',
   'resourceAdmin.publish',
@@ -44,6 +60,7 @@ const VERIFIED_MUTATIONS = [
   'treaty.break',
   'treaty.propose',
   'treaty.respond',
+  'troop.update',
   'turns.edit',
   'turns.set',
 ] as const;
@@ -72,7 +89,7 @@ describe('T3-02 AC-M3-01 이메일 인증 경계', () => {
       { _def: { type: string; meta?: ProcedureMeta } }
     >;
     const mutations = Object.entries(procedures).filter(([, procedure]) => procedure._def.type === 'mutation');
-    expect(mutations).toHaveLength(56);
+    expect(mutations).toHaveLength(73);
     expect(
       mutations
         .filter(([, procedure]) => procedure._def.meta?.accountAccess === 'verified')

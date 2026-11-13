@@ -590,7 +590,13 @@ it('INT-25 AC-INT-25 대상 국가 카드는 수도·국력·도시·장수와 �
       ...targetMap.cities,
       { key: 4, name: '건업', level: 8, nationId: 3, links: [], x: 0, y: 0, supplied: true },
     ],
-    nations: [...targetMap.nations, { id: 3, name: '오', color: '#339933', capitalCityKey: 4 }],
+    nations: [
+      ...targetMap.nations.map((nation) => ({
+        ...nation,
+        description: nation.id === 2 ? '함께 한실을 일으킵시다.' : '',
+      })),
+      { id: 3, name: '오', color: '#339933', capitalCityKey: 4 },
+    ],
   };
   const context = {
     here: 1,
@@ -609,6 +615,7 @@ it('INT-25 AC-INT-25 대상 국가 카드는 수도·국력·도시·장수와 �
       value="2"
       options={map.nations.filter((n) => n.id !== 1)}
       onChange={vi.fn()}
+      showIntroductions
       checks={
         new Map([
           [2, { ok: true as const }],
@@ -621,6 +628,7 @@ it('INT-25 AC-INT-25 대상 국가 카드는 수도·국력·도시·장수와 �
   expect(rows.map((row) => row.getAttribute('data-value'))).toEqual(['2', '3']);
   expect(rows[0]!.textContent).toContain('수도 진류 · 국력 900 · 도시 5 · 장수 20');
   expect(rows[0]!.textContent).toContain('선포 · 12개월 남음');
+  expect(rows[0]!.textContent).toContain('함께 한실을 일으킵시다.');
   expect(rows[0]!.textContent).toContain('가능');
   expect(rows[1]!.textContent).toContain('불가');
   expect(rows[1]!.textContent).toContain('인접 국가가 아닙니다.');

@@ -1,4 +1,5 @@
-import type { DeepReadonly } from '../model/world';
+import type { DeepReadonly, WorldState } from '../model/world';
+import { settleCityOfficeVolunteers } from './cityOfficeVolunteers';
 import { expirePersonnelMonth } from './month';
 import { runNpcPersonnelMonth, type NpcPersonnelHistory, type ResidenceAnchors } from './npcMonth';
 import type { OfficeRevisions, OfficeView } from './offices';
@@ -22,6 +23,7 @@ export type PersonnelMonthResult = Readonly<{
 export function runPersonnelMonth(input: PersonnelMonthInput): PersonnelMonthResult {
   const { before, startOffices, settled, anchors, tick } = input;
   const raw = expirePersonnelMonth(settled, startOffices, tick);
+  if (raw.state.cityOfficeVolunteers) settleCityOfficeVolunteers(raw.state as WorldState, tick);
   const npc = runNpcPersonnelMonth({ before, raw, anchors, tick });
   const packet = completePersonnelStep(before, startOffices, npc.raw, tick);
   const nextAnchors = updateResidenceAnchors({ before, after: packet.state, anchors, tick, createdHumanId: null });

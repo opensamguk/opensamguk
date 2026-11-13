@@ -62,6 +62,14 @@ const items = [{ id: 'log-1', tick: 119_999, commandKey: 'farm', kind: 'success'
 const shownDate = () => screen.getByRole('listitem').firstElementChild?.textContent;
 
 describe('개인 기록 연월 (T1-27 종료 뒤)', () => {
+  it('보관된 실행 시각을 한국 표준시로 표시한다', () => {
+    const createdAt = '2026-11-13T20:10:00.000Z';
+    const { container } = render(<GeneralLogList items={[{ ...items[0]!, createdAt }]} clock={running} />);
+    const time = container.querySelector('time')!;
+    expect(time.getAttribute('datetime')).toBe(createdAt);
+    expect(time.textContent).toBe('05:10');
+  });
+
   it('종료 직전, 종료 직후, 재조회 뒤 같은 로그를 모두 300년 12월로 쓴다', () => {
     const { rerender } = render(<GeneralLogList items={items} clock={running} />);
     expect(shownDate()).toBe('300년 12월');
@@ -87,8 +95,8 @@ describe('개인 기록 연월 (T1-27 종료 뒤)', () => {
 // 중원 정세는 원작처럼 사건 글줄이다 (INT-25). 연감 두 달을 견주어 글줄을 만들고 월단평 머리글을 앞에 둔다.
 describe('중원 정세 글줄', () => {
   const nations = [
-    { id: 1, name: '위', color: '#000080', capitalCityKey: 1 },
-    { id: 2, name: '촉', color: '#008000', capitalCityKey: 2 },
+    { id: 1, name: '위', color: '#000080', capitalCityKey: 1, description: '' },
+    { id: 2, name: '촉', color: '#008000', capitalCityKey: 2, description: '' },
   ];
   const cities = [
     { key: 1, name: '허창' },
@@ -99,7 +107,7 @@ describe('중원 정세 글줄', () => {
     year: 191,
     month: m,
     nations: [
-      { nationId: 1, cities: owner2 === 1 ? 2 : 1, generals: 3 },
+      { nationId: 1, cities: owner2 === 1 ? 2 : 1, generals: 3, ...(tick === 20 && !headline ? { power: 1234 } : {}) },
       { nationId: 2, cities: owner2 === 2 ? 1 : 0, generals: 2 },
     ],
     cities: [
@@ -128,6 +136,7 @@ describe('중원 정세 글줄', () => {
     expect(rows).toHaveLength(2);
     expect(rows[0]!.textContent).toContain('성도가 공백지가 되었습니다.');
     expect(rows[0]!.textContent).toContain('공백지 1성');
+    expect(rows[0]!.textContent).toContain('국력 1,234');
   });
 
   // 기록 화면 월별 세력 (INT-25, D-085). 사건 글줄과 월단평은 서버 사건을 쓰는 중원 정세 칸에만 있다.

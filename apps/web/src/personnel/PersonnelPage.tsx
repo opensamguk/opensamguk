@@ -28,6 +28,9 @@ import { Notices } from './OfferBox';
 import { cityOfficeHolder, LocalOffices, localOfficeTarget, MemberResidence } from './OfficeResidence';
 import styles from './Personnel.module.css';
 import pageStyles from './PersonnelPage.module.css';
+import { TroopBoard } from './TroopBoard';
+import { CityOfficeVolunteers } from './CityOfficeVolunteers';
+import { DiplomaticDelegates } from './DiplomaticDelegates';
 import { usePersonnelAction } from './usePersonnelAction';
 
 const KINDS = ['personnel.appoint', 'personnel.dismiss'] as const;
@@ -160,6 +163,11 @@ export function PersonnelPage() {
       ) : (
         <LoadingState />
       )}
+      {board.data?.volunteersEnabled ? <CityOfficeVolunteers worldId={worldId} /> : null}
+      {roster.nation ? <TroopBoard key={board.data?.actorId} worldId={worldId} /> : null}
+      {roster.nation ? (
+        <DiplomaticDelegates key={`${roster.nation.id}:${board.data?.actorId ?? ''}`} worldId={worldId} />
+      ) : null}
     </section>
   );
 }
@@ -204,6 +212,30 @@ export function PersonnelBoardView({
   );
   return (
     <>
+      {board.topVictories?.length ? (
+        <section className={styles.section} aria-labelledby="victory-leaders">
+          <h2 id="victory-leaders">오호장군</h2>
+          <ol>
+            {board.topVictories.map((member) => (
+              <li key={member.generalId}>
+                {member.name} · 승전 {member.wins}회
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
+      {board.topStratagem?.length ? (
+        <section className={styles.section} aria-labelledby="stratagem-leaders">
+          <h2 id="stratagem-leaders">건안칠자</h2>
+          <ol>
+            {board.topStratagem.map((member) => (
+              <li key={member.generalId}>
+                {member.name} · 계략 성공 {member.successes}회
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
       <section className={styles.section} aria-labelledby="levels-title">
         <h2 id="levels-title">직책 바꾸기</h2>
         <table className={`${styles.levels} ${pageStyles.levels}`}>
@@ -223,7 +255,11 @@ export function PersonnelBoardView({
                 holderLabel={level.holderId === null ? '' : (labels.get(level.holderId) ?? `장수 ${level.holderId}`)}
                 holderDetail={level.holderId === null ? undefined : details?.get(level.holderId)}
                 appoint={board.appoint}
-                candidates={candidates}
+                candidates={
+                  level.eligibleIds
+                    ? candidates.filter(({ member }) => level.eligibleIds!.includes(member.generalId))
+                    : candidates
+                }
                 detailsState={detailsState}
                 open={openLevel === level.officerLevel}
                 onOpen={(open) => setOpenLevel(open ? level.officerLevel : null)}
@@ -305,6 +341,13 @@ function memberColumns(
       ),
     },
     { key: 'title', label: '직책', sortValue: (m) => m.officerLevel, render: (m) => m.title },
+    {
+      key: 'tenureYears',
+      label: '임관',
+      numeric: true,
+      sortValue: (m) => m.tenureYears ?? null,
+      render: (m) => (m.tenureYears === undefined ? '—' : `${m.tenureYears}년`),
+    },
     {
       key: 'city',
       label: '도시',
@@ -412,7 +455,12 @@ function LevelRows({
               </span>
               <span className={pageStyles.holderText}>
                 <span>{holderLabel}</span>
-                {typeof holder === 'object' ? <span className={pageStyles.holderCity}>{holder.city.name}</span> : null}
+                {typeof holder === 'object' ? (
+                  <span className={pageStyles.holderCity}>
+                    {holder.tenureYears === undefined ? '' : `${holder.tenureYears}년 · `}
+                    {holder.city.name}
+                  </span>
+                ) : null}
               </span>
             </span>
           )}
@@ -487,6 +535,7 @@ function LevelRows({
             <CandidatePicker
               id={pickerId}
               title={level.title}
+              qualification={level.qualification}
               candidates={candidates}
               chosen={picked ? picked.member.generalId : null}
               detailsState={detailsState}

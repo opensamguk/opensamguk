@@ -45,6 +45,21 @@ export const commandPlayerDocs: Readonly<Record<string, PlayerDoc>> = {
       ];
     }),
   ),
+  nation_troop_expel: {
+    summary: '자국 장수에게 소속 부대 탈퇴를 지시합니다.',
+    requires: ['국가 수뇌 이상', '부대장이 아닌 다른 부대원'],
+    cost: null,
+  },
+  troop_gather: {
+    summary: '부대원의 위치를 부대장이 있는 도시로 옮깁니다.',
+    requires: [ownCity, '부대장이며 부대원이 있음'],
+    cost: null,
+  },
+  convert_proficiency: {
+    summary: '병종 숙련의 40%를 빼고 그중 90%를 다른 계열에 옮깁니다.',
+    requires: [ownCity, '숙련을 가진 병종과 서로 다른 대상 병종'],
+    cost: `금 ${BALANCE.DEVEL_COST}, 쌀 ${BALANCE.DEVEL_COST}`,
+  },
   rest: { summary: '이번 장수 턴에 쉽니다.', requires: [], cost: null },
   recruit: { summary: '병사를 모집합니다.', requires: recruit, cost: recruitCost },
   conscript: {

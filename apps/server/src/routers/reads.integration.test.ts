@@ -10,6 +10,7 @@ import { readFixture } from '../../test/readFixture';
 import { buildServer } from '../server';
 import type { AppRouter } from '../router';
 import { newSession } from '../auth/session';
+import { authzCase } from '../authz/case';
 
 type Out = inferRouterOutputs<AppRouter>;
 type Results = {
@@ -19,12 +20,21 @@ type Results = {
   'city.get': Out['city']['get'];
   'nation.get': Out['nation']['get'];
   'treaty.relations': Out['treaty']['relations'];
+  'message.recipients': Out['message']['recipients'];
+  'ranking.heritage': Out['ranking']['heritage'];
+  'diplomaticDocuments.list': Out['diplomaticDocuments']['list'];
+  'diplomaticDocuments.send': Out['diplomaticDocuments']['send'];
+  'diplomaticDocuments.respond': Out['diplomaticDocuments']['respond'];
+  'diplomaticDocuments.delegates': Out['diplomaticDocuments']['delegates'];
+  'diplomaticDocuments.setDelegate': Out['diplomaticDocuments']['setDelegate'];
   'commands.recruitCandidates': Out['commands']['recruitCandidates'];
   'records.general': Out['records']['general'];
   'records.battles': Out['records']['battles'];
   'records.activity': Out['records']['activity'];
   'records.nation': Out['records']['nation'];
+  'records.nationEvents': Out['records']['nationEvents'];
   'records.world': Out['records']['world'];
+  'records.season': Out['records']['season'];
 };
 const routes = [
   'world.summary',
@@ -214,6 +224,233 @@ afterAll(async () => {
 });
 
 describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
+  it('도시 계절 사건은 소속 도시와 공백지에 이름과 종류를 표시한다', async () => {
+    const id = await fixtureWorld('seasonal-event');
+    const cityKey = state.cities.find(({ nationId }) => nationId === 1)!.cityKey;
+    await db.city.update({
+      where: { worldId_cityKey: { worldId: id, cityKey } },
+      data: { seasonalEvent: 'boom', conflictTick: 100, stratagemTick: 100 },
+    });
+    expect((await query('city.get', { worldId: id, cityKey })).data.seasonalEvent).toEqual({
+      kind: 'boom',
+      name: '호황',
+      favorable: true,
+    });
+    expect((await query('city.get', { worldId: id, cityKey }, users[3]!.cookie)).data.seasonalEvent).toBeUndefined();
+    const marker = (monthsRemaining: number) => ({ kind: 'conflict', name: '교전', favorable: false, monthsRemaining });
+    const mapEvents = async () =>
+      (await query('world.map', { worldId: id })).data.cities.find(({ key }) => key === cityKey)?.events;
+    expect(await mapEvents()).toMatchObject([marker(3), { kind: 'stratagem', monthsRemaining: 2 }, { kind: 'boom' }]);
+    await db.world.update({ where: { id }, data: { clockTick: 20_000, clockAnchorAt: new Date(now) } });
+    expect(await mapEvents()).toMatchObject([marker(1), { kind: 'boom' }]);
+    await db.world.update({ where: { id }, data: { clockTick: 30_000 } });
+    expect(await mapEvents()).toMatchObject([{ kind: 'boom' }]);
+    const neutralCity = state.cities.find(({ nationId }) => nationId === null);
+    if (neutralCity) {
+      await db.city.update({
+        where: { worldId_cityKey: { worldId: id, cityKey: neutralCity.cityKey } },
+        data: { seasonalEvent: 'flood' },
+      });
+      expect(
+        (await query('city.get', { worldId: id, cityKey: neutralCity.cityKey }, users[3]!.cookie)).data.seasonalEvent,
+      ).toEqual({ kind: 'flood', name: '홍수', favorable: false });
+    }
+  });
+
+  it('유산 순위는 현재 월드의 사용·획득만 세고 통일 전에는 장수와 국가를 가린다', async () => {
+    const id = await fixtureWorld('heritage-ranking');
+    try {
+      await db.heritageEntry.createMany({
+        data: [
+          { worldId: id, kind: 'CREATION_SPEND', delta: -3 },
+          { worldId: id, kind: 'BENEFIT_SPEND', delta: -4 },
+          { worldId: id, kind: 'SEASON_CREDIT', delta: 2 },
+          { worldId: id, kind: 'CREATION_REFUND', delta: 3 },
+          { worldId: otherWorldId, kind: 'SEASON_CREDIT', delta: 5 },
+        ].map((row) => ({ ...row, userId: users[0]!.id, key: randomUUID(), detail: {} })),
+      });
+      const entry = (points: number, name: string | null, nationName: string | null) => ({
+        rank: 1,
+        points,
+        name,
+        nationName,
+      });
+      const anonymous = { identitiesVisible: false, spent: [entry(7, null, null)], earned: [entry(2, null, null)] };
+      await authzCase('ranking.heritage', 'success', async () => {
+        expect(await query('ranking.heritage', { worldId: id })).toMatchObject({ status: 200, data: anonymous });
+      })();
+      await authzCase('ranking.heritage', 'otherUser', async () => {
+        expect(await query('ranking.heritage', { worldId: id }, users[3]!.cookie)).toMatchObject({
+          status: 200,
+          data: anonymous,
+        });
+      })();
+      await db.seasonGeneral.create({
+        data: {
+          worldId: id,
+          generalId: 1,
+          userId: users[0]!.id,
+          name: '최종 장수',
+          nationId: 1,
+          nationName: '통일 국가',
+          officerLevel: 12,
+          dedication: 0,
+          experience: 0,
+          wins: 0,
+          captures: 0,
+        },
+      });
+      await db.world.update({ where: { id }, data: { status: 'ENDED' } });
+      const result = await db.worldResult.create({
+        data: {
+          worldId: id,
+          reason: 'END_YEAR',
+          endedYear: state.startYear,
+          endedMonth: 12,
+          endedTick: 120000,
+          endedSequence: 1,
+          remainingNations: 2,
+          finalStateHash: 'fixture',
+          endedAt: new Date(now),
+        },
+      });
+      expect((await query('ranking.heritage', { worldId: id })).data.identitiesVisible).toBe(false);
+      await db.worldResult.update({
+        where: { worldId: result.worldId },
+        data: { reason: 'UNIFIED', winnerNationId: 1 },
+      });
+      expect((await query('ranking.heritage', { worldId: id }, users[3]!.cookie)).data).toEqual({
+        identitiesVisible: true,
+        spent: [entry(7, '최종 장수', '통일 국가')],
+        earned: [entry(2, '최종 장수', '통일 국가')],
+      });
+    } finally {
+      await db.$transaction(async (tx) => {
+        await tx.$executeRaw`ALTER TABLE "HeritageEntry" DISABLE TRIGGER "HeritageEntry_immutable"`;
+        await tx.heritageEntry.deleteMany({ where: { worldId: { in: [id, otherWorldId] }, userId: users[0]!.id } });
+        await tx.$executeRaw`ALTER TABLE "HeritageEntry" ENABLE TRIGGER "HeritageEntry_immutable"`;
+      });
+      await db.world.delete({ where: { id } });
+    }
+  });
+
+  it('외교 문서는 당사국에만 보이고 승인된 후속 문서가 기존 합의를 대체한다', async () => {
+    const world = await fixtureWorld('diplomatic-documents');
+    const changeOfficer = (index: number, nationId: number, officerLevel: number) =>
+      db.general.update({
+        where: { worldId_userId: { worldId: world, userId: users[index]!.id } },
+        data: { nationId, officerLevel },
+      });
+    await db.nation.create({
+      data: { ...state.nations[0]!, worldId: world, id: 3, capitalCityKey: null, name: '제삼국' },
+    });
+    await changeOfficer(0, 1, 12);
+    await changeOfficer(1, 2, 12);
+    await changeOfficer(2, 3, 12);
+    const payload = {
+      worldId: world,
+      requestId: randomUUID(),
+      toNationId: 2,
+      brief: '공동 방어 협의',
+      detail: '양국 외교부만 볼 본문',
+    };
+    const send = (input: typeof payload & { previousId?: number } = payload) =>
+      query('diplomaticDocuments.send', input, users[0]!.cookie, 'POST');
+    const list = (index: number) => query('diplomaticDocuments.list', { worldId: world }, users[index]!.cookie);
+    const delegate = (index: number, generalId: number, role: 'ADVISER' | 'AMBASSADOR' | null) =>
+      query('diplomaticDocuments.setDelegate', { worldId: world, generalId, role }, users[index]!.cookie, 'POST');
+    const respond = (id: number, action: 'accept' | 'decline' | 'withdraw', index = 1) =>
+      query('diplomaticDocuments.respond', { worldId: world, id, action }, users[index]!.cookie, 'POST');
+    const [sent, retry] = await Promise.all([send(), send()]);
+    await authzCase('diplomaticDocuments.send', 'success', async () => expect(sent.status).toBe(200))();
+    expect(retry.data).toEqual(sent.data);
+    expect((await send({ ...payload, brief: '다른 내용' })).status).toBe(409);
+    await authzCase('diplomaticDocuments.list', 'otherUser', async () =>
+      expect((await list(2)).data.items).toEqual([]),
+    )();
+    await authzCase('diplomaticDocuments.respond', 'otherUser', async () => {
+      expect((await respond(sent.data.id, 'accept', 2)).status).toBe(404);
+    })();
+    await changeOfficer(1, 2, 1);
+    expect((await list(1)).data.items).toMatchObject([{ brief: payload.brief, detail: null }]);
+    expect((await respond(sent.data.id, 'accept')).status).toBe(403);
+    const actingGeneral = await changeOfficer(2, 2, 12);
+    const recipientGeneral = await changeOfficer(1, 2, 1);
+    await authzCase('diplomaticDocuments.setDelegate', 'otherUser', async () => {
+      expect((await delegate(0, recipientGeneral.id, 'ADVISER')).status).toBe(404);
+    })();
+    await authzCase('diplomaticDocuments.setDelegate', 'success', async () => {
+      expect((await delegate(2, recipientGeneral.id, 'ADVISER')).status).toBe(200);
+    })();
+    expect((await list(1)).data.items).toMatchObject([{ detail: payload.detail }]);
+    expect((await respond(sent.data.id, 'accept')).status).toBe(403);
+    expect((await delegate(1, recipientGeneral.id, 'AMBASSADOR')).status).toBe(403);
+    expect((await delegate(2, recipientGeneral.id, 'AMBASSADOR')).status).toBe(200);
+    expect((await query('message.recipients', { worldId: world })).data.generals).toContainEqual(
+      expect.objectContaining({ id: recipientGeneral.id, isAmbassador: true }),
+    );
+    await authzCase('diplomaticDocuments.respond', 'success', async () => {
+      expect((await respond(sent.data.id, 'accept')).data.status).toBe('ACTIVE');
+    })();
+    const successor = { ...payload, previousId: sent.data.id, brief: '후속 문서' };
+    const rejected = await send({ ...successor, requestId: randomUUID() });
+    expect((await respond(rejected.data.id, 'decline')).data.status).toBe('CANCELLED');
+    expect((await list(1)).data.items.map(({ status }) => status)).toEqual(['CANCELLED', 'ACTIVE']);
+    const next = await send({ ...successor, requestId: randomUUID() });
+    expect(next.status).toBe(200);
+    expect((await send({ ...successor, requestId: randomUUID() })).status).toBe(409);
+    expect((await respond(next.data.id, 'accept')).data.status).toBe('ACTIVE');
+    await authzCase('diplomaticDocuments.list', 'success', async () => {
+      expect((await list(0)).data.items.map(({ status }) => status)).toEqual(['ACTIVE', 'CANCELLED', 'REPLACED']);
+    })();
+    await authzCase('diplomaticDocuments.delegates', 'success', async () => {
+      expect((await query('diplomaticDocuments.delegates', { worldId: world }, users[1]!.cookie)).data).toMatchObject({
+        canAppoint: false,
+        members: [{ id: recipientGeneral.id, role: 'AMBASSADOR' }],
+      });
+    })();
+    await authzCase('diplomaticDocuments.delegates', 'otherUser', async () => {
+      expect((await query('diplomaticDocuments.delegates', { worldId: world })).data.members).not.toContainEqual(
+        expect.objectContaining({ id: recipientGeneral.id }),
+      );
+    })();
+    await authzCase('diplomaticDocuments.send', 'otherUser', async () => {
+      expect((await query('diplomaticDocuments.send', payload, users[2]!.cookie, 'POST')).status).toBe(409);
+    })();
+    await changeOfficer(1, 3, 1);
+    await changeOfficer(1, 2, 1);
+    expect((await list(1)).data.items[0]?.detail).toBeNull();
+    expect(await db.diplomaticDelegate.count({ where: { worldId: world, generalId: recipientGeneral.id } })).toBe(0);
+    expect((await query('message.recipients', { worldId: world })).data.generals).toContainEqual(
+      expect.objectContaining({ id: recipientGeneral.id, isAmbassador: false }),
+    );
+    expect((await delegate(2, actingGeneral.id, 'ADVISER')).status).toBe(400);
+  });
+  const additionalAccess = [
+    ['diplomaticDocuments.list', 'GET', {}],
+    ['diplomaticDocuments.delegates', 'GET', {}],
+    ['diplomaticDocuments.send', 'POST', { requestId: randomUUID(), toNationId: 2, brief: '문서', detail: '' }],
+    ['diplomaticDocuments.respond', 'POST', { id: 1, action: 'accept' }],
+    ['diplomaticDocuments.setDelegate', 'POST', { generalId: 1, role: 'ADVISER' }],
+    ['records.nationEvents', 'GET', {}],
+    ['ranking.heritage', 'GET', {}],
+  ] as const;
+  for (const [route, method, fields] of additionalAccess) {
+    it.each(['unauthenticated', 'invalidInput', 'sanctioned'] as const)(`${route} %s`, async (category) => {
+      await authzCase(route, category, async () => {
+        const input = { ...fields, worldId: category === 'invalidInput' ? '' : worldId };
+        if (category === 'sanctioned')
+          await db.user.update({ where: { id: users[0]!.id }, data: { status: 'SANCTIONED' } });
+        try {
+          const result = await query(route, input, category === 'unauthenticated' ? null : users[0]!.cookie, method);
+          expect(result.status).toBe(category === 'invalidInput' ? 400 : 401);
+        } finally {
+          if (category === 'sanctioned')
+            await db.user.update({ where: { id: users[0]!.id }, data: { status: 'ACTIVE' } });
+        }
+      })();
+    });
+  }
   it('AC-INT-26 외교 관계표는 모든 국가 쌍과 공개 외교 상태만 반환한다', async () => {
     const world = await fixtureWorld('relations');
     await db.nation.create({
@@ -242,6 +479,30 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     const other = await query('treaty.relations', { worldId: otherWorldId });
     expect(other.data.pairs).toEqual([{ nationA: 1, nationB: 2, relation: 'NONE', relationEndAt: null }]);
   });
+  it('군주만 소속국의 NPC 국가 명령 후보와 점수를 본다', async () => {
+    const id = await fixtureWorld('npc-nation-orders');
+    const preset = JSON.parse(
+      await readFile(new URL('../../../../resources/preset/regular.json', import.meta.url), 'utf8'),
+    );
+    await db.world.update({
+      where: { id },
+      data: { preset, runtimeOptions: { rules: { npc: { aggression: 0.5 } } } },
+    });
+    await db.general.update({
+      where: { worldId_id: { worldId: id, id: 1 } },
+      data: { officerLevel: 12 },
+    });
+    const ruler = (await query('nation.get', { worldId: id, nationId: 1 })).data;
+    expect(ruler.npcPolicy?.aggression).toBe(0.5);
+    expect(ruler.npcPolicy?.nationOrders).toEqual(
+      expect.arrayContaining([expect.objectContaining({ key: 'nation_rest', score: 0 })]),
+    );
+    expect(ruler.npcPolicy?.generalOrders).toEqual(
+      expect.arrayContaining([expect.objectContaining({ key: 'rest', score: 0 })]),
+    );
+    expect((await query('nation.get', { worldId: id, nationId: 2 })).data).not.toHaveProperty('npcPolicy');
+  });
+
   it('AC-INT-26 군주 등용 후보는 실제 명령 사전 검사와 같다', async () => {
     const world = await fixtureWorld('recruit');
     await db.general.update({
@@ -307,8 +568,51 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     expect(next.data.nextCursor).toBeNull();
     const news = await query('records.activity', { worldId: world, scope: 'world' });
     expect(news.data.items).toEqual([expect.objectContaining({ source: 'nation', kind: 'found' })]);
+    await db.publicNationEvent.create({
+      data: { worldId: world, tick: 3, sequence: 2, kind: 'enlist', text: '공개 장수 1 공개 국가 임관' },
+    });
+    const activity = await query('records.activity', { worldId: world }, users[3]!.cookie);
+    expect(activity.data.items[0]).toMatchObject({ kind: 'enlist', text: '공개 장수 1 공개 국가 임관' });
+    expect(
+      (await query('records.activity', { worldId: world, period: { year: state.startYear, month: 1 } })).data,
+    ).toEqual(activity.data);
+    expect(
+      (await query('records.activity', { worldId: world, period: { year: state.startYear, month: 2 } })).data,
+    ).toEqual({ items: [], nextCursor: null });
+    expect((await query('records.activity', { worldId: world, scope: 'world' })).data.items).toEqual(news.data.items);
     expect((await query('records.activity', { worldId: otherWorldId })).data.items).toEqual([]);
     expect((await query('records.activity', { worldId: world, cursor: '?' })).status).toBe(400);
+    await db.reputationEvent.createMany({
+      data: [1, 2].map((generalId) => ({
+        worldId: world,
+        generalId,
+        year: state.startYear,
+        month: 1,
+        kind: 'victory',
+        score: REPUTATION_POINTS.victory,
+        tick: 2,
+        generalName: `공개 장수 ${generalId}`,
+        cityKey: state.cities[0]!.cityKey,
+        cityName: state.cities[0]!.name,
+      })),
+    });
+    await db.generalLog.createMany({
+      data: [
+        { generalId: 1, commandKey: 'join', kind: 'success', text: '국가 임관' },
+        { generalId: 1, commandKey: 'personnel.appoint', kind: 'success', text: '참모 임명' },
+        { generalId: 1, commandKey: 'join', kind: 'failure', text: '실패한 임관' },
+        { generalId: 2, commandKey: 'personnel.appoint', kind: 'success', text: '다른 장수 임명' },
+      ].map((row, index) => ({ ...row, worldId: world, tick: 3 + index })),
+    });
+    const biography = await query('records.activity', { worldId: world, scope: 'biography' });
+    expect(biography.data.items).toEqual([
+      expect.objectContaining({ source: 'milestone', kind: 'personnel.appoint', text: '참모 임명' }),
+      expect.objectContaining({ source: 'milestone', kind: 'join', text: '국가 임관' }),
+      expect.objectContaining({ source: 'reputation', kind: 'victory', generalId: 1, portraitId: 101 }),
+    ]);
+    expect((await query('records.activity', { worldId: world, scope: 'biography' }, users[3]!.cookie)).status).toBe(
+      404,
+    );
   });
   it('AC-INT-26 지도 장수 초상은 도시 주둔 공개 범위를 따른다', async () => {
     const world = await fixtureWorld('map-generals');
@@ -333,6 +637,26 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     expect(foreign.data.generals).toEqual([]);
     expect((await query('world.map', input)).data.generals).toEqual(open.data.generals);
   });
+  it('분쟁 도시는 여러 현존 국가의 공략 비율을 보여 준다', async () => {
+    const world = await fixtureWorld('siege-shares');
+    const cityKey = state.cities[0]!.cityKey;
+    await db.world.update({ where: { id: world }, data: { ruleFeatures: { push: 'city-conflict-v1' } } });
+    await db.city.update({
+      where: { worldId_cityKey: { worldId: world, cityKey } },
+      data: { conflict: { 1: 3, 2: 1, 999: 100 } },
+    });
+    expect((await query('world.map', { worldId: world })).data).toMatchObject({
+      conflicts: [
+        {
+          cityKey,
+          shares: [
+            { id: 1, percent: 75 },
+            { id: 2, percent: 25 },
+          ],
+        },
+      ],
+    });
+  });
   it('AC-INT-26 종사 임지에서 초상·사람 여부와 주재 상태를 읽는다', async () => {
     const world = await fixtureWorld('secretary');
     const cityKey = state.cities[0]!.cityKey;
@@ -351,7 +675,13 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     });
     await db.general.update({
       where: { worldId_id: { worldId: world, id: 1 } },
-      data: { officerLevel: 2, officerCityKey: cityKey, portraitId: 10001, activeFromYear: state.startYear },
+      data: {
+        officerLevel: 2,
+        officerCityKey: cityKey,
+        portraitId: 10001,
+        activeFromYear: state.startYear,
+        nationJoinedTick: 0,
+      },
     });
     const result = await query('city.get', { worldId: world, cityKey });
     expect(result.status).toBe(200);
@@ -363,6 +693,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       portraitId: 10001,
       isHuman: true,
       resident: true,
+      tenureYears: 1,
     });
   });
   it('summary는 서버 시계와 공개 기수 설정을 반환한다', async () => {
@@ -482,11 +813,151 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
         const result = await query('world.summary', { worldId: endedWorldId }, user.cookie);
         expect(result).toEqual({ status: 200, error: undefined, data: expected });
       }
+      await db.removedNation.create({
+        data: {
+          worldId: endedWorldId,
+          nationId: 80,
+          name: '소멸국',
+          color: '#000000',
+          removedSequence: 1,
+          removedTick: 1,
+        },
+      });
+      await db.yearbookNation.create({
+        data: { worldId: endedWorldId, tick: 10000, nationId: 1, name: '월간 기록 국가', color: '#000000' },
+      });
+      await db.seasonGeneral.create({
+        data: {
+          worldId: endedWorldId,
+          generalId: 80,
+          name: '재야 장수',
+          officerLevel: 0,
+          dedication: 0,
+          experience: 0,
+          wins: 0,
+          captures: 0,
+        },
+      });
+      const season = await query('records.season', { worldId: endedWorldId });
+      expect(season.status).toBe(200);
+      expect(season.data.statistics).toEqual({
+        final: { nations: state.nations.length, generals: 1 },
+        peak: { nations: state.nations.length, affiliatedGenerals: state.nations.length + 1 },
+        nationNames: ['소멸국', '월간 기록 국가'],
+      });
       expect(await db.world.findUniqueOrThrow({ where: { id: endedWorldId }, include: { result: true } })).toEqual(
         before,
       );
+      await db.yearbookSnapshot.update({
+        where: { worldId_tick: { worldId: endedWorldId, tick: 10000 } },
+        data: { activeGenerals: 12 },
+      });
+      const traits = {
+        philosophies: [{ name: '법가', count: 1 }],
+        personalities: [{ name: '의리', count: 2 }],
+        specialties: [{ name: '농업', count: 1 }],
+      };
+      await db.worldResult.update({ where: { worldId: endedWorldId }, data: { traitDistribution: traits } });
+      expect((await query('records.season', { worldId: endedWorldId })).data.statistics).toMatchObject({
+        peak: { generals: 12 },
+        traits,
+      });
     } finally {
       await db.world.delete({ where: { id: endedWorldId } });
+    }
+  });
+
+  it('종료 기수의 국가열전은 해당 국가의 공개 사건만 같은 tick에서 이어 읽는다', async () => {
+    const world = await fixtureWorld('season-chronicle');
+    const input = { worldId: world, scope: 'world', nationId: 1 } as const;
+    try {
+      expect((await query('records.activity', input)).status).toBe(404);
+      expect((await query('records.activity', { ...input, scope: 'all' })).status).toBe(400);
+      await db.world.update({ where: { id: world }, data: { status: 'ENDED' } });
+      await db.worldResult.create({
+        data: {
+          worldId: world,
+          reason: 'END_YEAR',
+          endedYear: state.startYear,
+          endedMonth: 12,
+          endedTick: 120000,
+          endedSequence: 40,
+          remainingNations: state.nations.length,
+          finalStateHash: 'season-chronicle-fixture',
+          endedAt: new Date(now),
+        },
+      });
+      await db.publicNationEvent.createMany({
+        data: [
+          ...Array.from({ length: 31 }, (_, index) => ({
+            worldId: world,
+            tick: 1,
+            sequence: index + 1,
+            kind: 'enlist',
+            text: `국가 1 공개 임관 ${index + 1}`,
+            nationIds: [1],
+          })),
+          { worldId: world, tick: 2, sequence: 32, kind: 'declare', text: '공개 선전포고', nationIds: [1, 2] },
+          { worldId: world, tick: 3, sequence: 33, kind: 'fall', text: '다른 국가 멸망', nationIds: [2] },
+          { worldId: world, tick: 4, sequence: 34, kind: 'found', text: '이전 공개 사건' },
+        ],
+      });
+      const first = await query('records.activity', input, users[3]!.cookie);
+      expect(first.status).toBe(200);
+      expect(first.data.items).toHaveLength(30);
+      expect(first.data.items[0]).toMatchObject({ kind: 'declare', text: '공개 선전포고' });
+      const last = await query('records.activity', { ...input, cursor: first.data.nextCursor });
+      expect(last.data.items).toMatchObject([
+        { kind: 'enlist', text: '국가 1 공개 임관 2' },
+        { kind: 'enlist', text: '국가 1 공개 임관 1' },
+      ]);
+      expect(last.data.nextCursor).toBeNull();
+      const other = await query('records.activity', { ...input, nationId: 2 });
+      expect(other.data.items).toMatchObject([{ kind: 'fall' }, { kind: 'declare' }]);
+    } finally {
+      await db.world.delete({ where: { id: world } });
+    }
+  });
+
+  it('전략 대기는 소속국에서만 공통·명령별 가능 연월을 반환한다', async () => {
+    const id = await fixtureWorld('strategy-status');
+    const ruleFeatures = ['nation-strategy-v1', 'personnel'];
+    try {
+      await db.world.update({
+        where: { id },
+        data: {
+          status: 'PAUSED',
+          clockTick: 20000,
+          ruleFeatures,
+          replayFormat: 3,
+          replayOrigin: JSON.parse(
+            JSON.stringify({
+              version: 3,
+              initial: { ...state, ruleFeatures },
+              initialStateHash: 'checked',
+              resourceHash: 'checked',
+            }),
+          ),
+          nationStrategyState: {
+            version: 1,
+            nations: { '1': { strategicUntil: 4, commands: { nation_mobilize: 6 } } },
+          },
+        },
+      });
+      const own = await query('nation.get', { worldId: id, nationId: 1 });
+      expect(own.status).toBe(200);
+      expect(own.data.strategyStatus).toMatchObject({
+        remainingMonths: 2,
+        availableAt: { year: 191, month: 5 },
+        commands: expect.arrayContaining([
+          { key: 'nation_mobilize', name: '백성동원', remainingMonths: 4, availableAt: { year: 191, month: 7 } },
+        ]),
+      });
+      const foreign = await query('nation.get', { worldId: id, nationId: 1 }, users[2]!.cookie);
+      expect(foreign.status).toBe(200);
+      expect(foreign.data).not.toHaveProperty('strategyStatus');
+    } finally {
+      await db.world.delete({ where: { id } });
     }
   });
 
@@ -507,7 +978,13 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
         supplied: city.supplied,
         links: city.connections,
       })),
-      nations: state.nations.map(({ id, name, color, capitalCityKey }) => ({ id, name, color, capitalCityKey })),
+      nations: state.nations.map(({ id, name, color, capitalCityKey, description }) => ({
+        id,
+        name,
+        color,
+        capitalCityKey,
+        description,
+      })),
       generals: state.generals.map(({ id, name, cityKey, nationId, portraitId }, index) => ({
         id,
         name,
@@ -534,11 +1011,14 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       'general',
       'nation',
       'nextTurnAt',
+      'presence',
       'recentLogs',
       'turnSchedule',
       'turnsPreview',
     ]);
     expect(data.general).toMatchObject({ id: 1, gold: 11001, rice: 12001, crew: 13001, train: 41, atmos: 51 });
+    expect(data.general.battleStats).toBeNull();
+    expect(data.presence).toEqual({ nationIds: [], allies: [] });
     expect(data.city).toMatchObject({ population: state.cities[0]!.population });
     expect(data.nation).toMatchObject({
       id: 1,
@@ -671,7 +1151,16 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     expect(enemy.cities).toHaveLength(1);
     for (const user of users.slice(1)) {
       const nation = (await query('nation.get', { worldId, nationId: 1 }, user.cookie)).data;
-      for (const field of ['gold', 'rice', 'taxRate', 'tech', 'capitalCityKey', 'financeEstimate', 'salaryRate'])
+      for (const field of [
+        'gold',
+        'rice',
+        'taxRate',
+        'tech',
+        'capitalCityKey',
+        'financeEstimate',
+        'salaryRate',
+        'npcPolicy',
+      ])
         expect(nation).not.toHaveProperty(field);
       expect(nation.generals).toMatchObject(
         state.generals.slice(0, 2).map(({ id, name, nationId, leadership }) => ({
@@ -695,10 +1184,23 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     expect(own.generals[1]).toMatchObject({ id: 2, gold: 11002, crew: 13002 });
     expect(own.cities[0]).toHaveProperty('population', state.cities[0]!.population);
     expect(own.cities[0]).toHaveProperty('populationMax', state.cities[0]!.populationMax);
+    expect(own.npcPolicy).toMatchObject({
+      recruitTarget: 2000,
+      trainingTarget: 60,
+      moraleTarget: 70,
+      rewardGoldTarget: 10000,
+    });
+    expect(own.npcPolicy).not.toHaveProperty('nationOrders');
     expect(own).toHaveProperty('salaryRate', 0.5);
     expect(own.cities[0]).toHaveProperty('incomeEstimate.gold', own.financeEstimate?.gold.gross);
     expect(own.cities[0]).toHaveProperty('incomeEstimate.rice', own.financeEstimate?.rice.gross);
     expect(enemy.cities[0]).not.toHaveProperty('incomeEstimate');
+    const cityKey = own.cities[0]!.key;
+    expect((await query('city.get', { worldId, cityKey })).data.incomeEstimate).toMatchObject({
+      gold: { month: 1, amount: own.financeEstimate?.gold.gross },
+      rice: { month: 4, amount: own.financeEstimate?.rice.gross },
+    });
+    expect((await query('city.get', { worldId, cityKey }, users[3]!.cookie)).data.incomeEstimate).toBeUndefined();
     const home = (await query('home.get', { worldId })).data;
     expect(home.nation).toMatchObject({
       population: own.population,
@@ -720,6 +1222,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       .sort((a, b) => a - b);
     const [first, second, third, fourth] = keys;
     try {
+      await db.world.update({ where: { id }, data: { ruleFeatures: { push: 'rice-market-v1' } } });
       await db.$transaction(
         [
           { region: 2, level: 9 },
@@ -729,7 +1232,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
         ].map((data, index) =>
           db.city.update({
             where: { worldId_cityKey: { worldId: id, cityKey: keys[index]! } },
-            data: { ...data, nationId: 1 },
+            data: { ...data, nationId: 1, supplied: true },
           }),
         ),
       );
@@ -739,7 +1242,11 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       expect(own.map((city) => city.key)).toEqual([third, fourth, second, first]);
       expect(foreign.map((city) => city.key)).toEqual(keys);
       expect(own.map((city) => ('region' in city ? city.region : null))).toEqual([1, 1, 1, 2]);
-      for (const city of foreign) expect(city).not.toHaveProperty('region');
+      expect(own.find((city) => city.key === first)).toHaveProperty('riceMarket.rate', expect.any(Number));
+      for (const city of foreign) {
+        expect(city).not.toHaveProperty('region');
+        expect(city).not.toHaveProperty('riceMarket');
+      }
     } finally {
       await db.world.delete({ where: { id } });
     }
@@ -824,6 +1331,31 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     }
   });
 
+  it('국가 사건은 같은 국가 문장만 반환하고 빈 행을 건너뛴다', async () => {
+    await db.nationHistory.create({ data: { worldId, nationId: 1, tick: 500000, data: { events: [], gold: 999999 } } });
+    try {
+      const first = await query('records.nationEvents', { worldId });
+      await authzCase('records.nationEvents', 'success', async () => {
+        expect(first.status).toBe(200);
+        expect(first.data.items).toHaveLength(30);
+        expect(first.data.items[0]).toEqual({ tick: 400039, events: ['primary-nation-1-event-400039'] });
+      })();
+      const second = await query('records.nationEvents', { worldId, cursor: first.data.nextCursor });
+      expect(second.data.items[0]?.tick).toBe(400009);
+      await authzCase('records.nationEvents', 'otherUser', async () => {
+        const other = await query('records.nationEvents', { worldId }, users[1]!.cookie);
+        expect(other.data.items[0]?.events).toEqual(['primary-nation-2-event-400039']);
+        expect(other.data.items.flatMap(({ events }) => events)).not.toContain('primary-nation-1-event-400039');
+      })();
+      expect((await query('records.nationEvents', { worldId }, users[2]!.cookie)).data).toEqual({
+        items: [],
+        nextCursor: null,
+      });
+    } finally {
+      await db.nationHistory.delete({ where: { worldId_tick_nationId: { worldId, tick: 500000, nationId: 1 } } });
+    }
+  });
+
   it('로그는 세션 장수·국가·월드 경계를 지키고 공개 연감은 국력·자원·해시를 빼낸다', async () => {
     for (const [index, id] of [
       [0, 1],
@@ -864,6 +1396,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       attackerId: index + 1,
       generalId: 1,
       text: `내 전투 ${index + 1}`,
+      ...(index === 30 ? { phases: [{ kind: 'volley', attackerLoss: 0, defenderLoss: 18 }] } : {}),
     }));
     await db.battleLog.createMany({
       data: [
@@ -874,6 +1407,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     });
     try {
       const first = (await query('records.battles', { worldId })).data;
+      expect(first.items[0]?.phases).toEqual([{ kind: 'volley', attackerLoss: 0, defenderLoss: 18 }]);
       expect(first.items.map((row) => row.attackerId)).toEqual(
         ownReports
           .slice(1)

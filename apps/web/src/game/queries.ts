@@ -27,9 +27,16 @@ export function useWorldEnded(worldId: string): boolean {
   return useWorldSummary(worldId).data?.status === 'ENDED';
 }
 
-export function useHome(worldId: string) {
+export function useHome(worldId: string, watchPresence = false) {
   const trpc = useTRPC();
-  return useQuery({ ...trpc.home.get.queryOptions({ worldId }), retry: retryUnlessClientError });
+  return useQuery({
+    ...trpc.home.get.queryOptions({ worldId }),
+    retry: retryUnlessClientError,
+    refetchInterval: (query) => {
+      if (query.state.data?.general?.defense?.stance?.pendingThreshold != null) return 1_000;
+      return watchPresence && query.state.data ? 60_000 : false;
+    },
+  });
 }
 
 export function useWorldMap(worldId: string) {

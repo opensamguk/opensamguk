@@ -23,6 +23,7 @@ export type OfficeTurns = Record<number, Record<number, { commandKey: string; ar
 export type OfficeRevisions = Record<number, Record<number, { revision: number; tenure: number }>>;
 export interface WorldState {
   relations?: import('../relations/data').RelationsData;
+  cityOfficeVolunteers?: import('../personnel/cityOfficeVolunteers').CityOfficeVolunteerState;
   officeEffects?: import('../personnel/residentOffice').OfficeEffects;
   preparedTurns?: import('../preparedTurns/state').PreparedTurnsState;
   nationResearch?: import('../nationResearch/state').NationResearchState;

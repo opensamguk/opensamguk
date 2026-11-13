@@ -5,6 +5,44 @@ import { z } from 'zod';
 import type { PublishedResource } from '@opensamguk/db';
 import {
   checkRuleFeatures,
+  hasTreatmentTool,
+  hasMoraleTool,
+  hasRareEquipment,
+  CITY_OFFICE_VOLUNTEER_FEATURE,
+  DIPLOMATIC_COOLDOWN_FEATURE,
+  PLAYER_AUTOPLAY_FEATURE,
+  CITY_SEASONAL_EVENTS_FEATURE,
+  NATION_PHILOSOPHY_FEATURE,
+  COURT_PROMOTION_FEATURE,
+  COURT_RANK_FEATURE,
+  COURT_ABILITY_FEATURE,
+  NATION_FINANCE_FEATURE,
+  RANKED_PAYROLL_FEATURE,
+  WALL_INCOME_FEATURE,
+  WAR_INCOME_FEATURE,
+  CITY_CONFLICT_FEATURE,
+  CITY_CONFLICT_AWARD_FEATURE,
+  STAT_GROWTH_FEATURE,
+  MILITARY_STAT_GROWTH_FEATURE,
+  RESEARCH_ERA_FEATURE,
+  GENERAL_CONDITION_FEATURE,
+  GENERAL_PERSONALITY_FEATURE,
+  HERITAGE_BIRTH_FEATURE,
+  COMBAT_SPECIALTY_FEATURE,
+  NPC_ENTRY_DRAFT_FEATURE,
+  BATTLE_TACTICS_FEATURE,
+  TROOP_FEATURE,
+  HERITAGE_BENEFITS_FEATURE,
+  HERITAGE_SPECIALTY_FEATURE,
+  SPECIALTY_GROWTH_FEATURE,
+  DOMESTIC_SPECIALTY_FEATURE,
+  GENERAL_PROFICIENCY_FEATURE,
+  DEFENSE_STANCE_FEATURE,
+  NPC_NATION_POLICY_FEATURE,
+  NATION_RESTRICTIONS_FEATURE,
+  INACTIVE_REMOVAL_FEATURE,
+  RANKED_AID_FEATURE,
+  RICE_MARKET_FEATURE,
   parsePreset,
   ruleRegistry,
   scenarioSchema,
@@ -127,6 +165,66 @@ const contracts = {
     presets: presetKeys,
     suggestedEndYear: 231,
   },
+  'san10-191-general-condition': {
+    id: 'san10-191-general-condition',
+    label: 'SAN10 확장 · 장수 부상과 관직 효과',
+    selection: { ...san10Selection, scenarioKey: 'san10-191@2' },
+    startYear: 191,
+    nations: 21,
+    counts: { cities: 147, gates: 8, ports: 0, fields: 0, anchors: 155 },
+    presets: presetKeys,
+    suggestedEndYear: 231,
+  },
+  'san10-191-treatment': {
+    id: 'san10-191-treatment',
+    label: 'SAN10 확장 · 도구와 환약',
+    selection: { ...san10Selection, scenarioKey: 'san10-191@2' },
+    startYear: 191,
+    nations: 21,
+    counts: { cities: 147, gates: 8, ports: 0, fields: 0, anchors: 155 },
+    presets: presetKeys,
+    suggestedEndYear: 231,
+  },
+  'san10-191-city-office': {
+    id: 'san10-191-city-office',
+    label: 'SAN10 확장 · 도시 관직 자원',
+    selection: { ...san10Selection, scenarioKey: 'san10-191@2' },
+    startYear: 191,
+    nations: 21,
+    counts: { cities: 147, gates: 8, ports: 0, fields: 0, anchors: 155 },
+    presets: presetKeys,
+    suggestedEndYear: 231,
+  },
+  'san10-191-combat-tools': {
+    id: 'san10-191-combat-tools',
+    label: 'SAN10 확장 · 전투 도구와 유산 특기',
+    selection: { ...san10Selection, scenarioKey: 'san10-191@2' },
+    startYear: 191,
+    nations: 21,
+    counts: { cities: 147, gates: 8, ports: 0, fields: 0, anchors: 155 },
+    presets: presetKeys,
+    suggestedEndYear: 231,
+  },
+  'san10-191-rare-equipment': {
+    id: 'san10-191-rare-equipment',
+    label: 'SAN10 확장 · 명품 발견',
+    selection: { ...san10Selection, scenarioKey: 'san10-191@2' },
+    startYear: 191,
+    nations: 21,
+    counts: { cities: 147, gates: 8, ports: 0, fields: 0, anchors: 155 },
+    presets: presetKeys,
+    suggestedEndYear: 231,
+  },
+  'san10-191-rare-catalog': {
+    id: 'san10-191-rare-catalog',
+    label: 'SAN10 확장 · 명품 60종',
+    selection: { ...san10Selection, scenarioKey: 'san10-191@2' },
+    startYear: 191,
+    nations: 21,
+    counts: { cities: 147, gates: 8, ports: 0, fields: 0, anchors: 155 },
+    presets: presetKeys,
+    suggestedEndYear: 231,
+  },
 } as const;
 const expandedProfiles = [
   ['integration-v01', 'expanded-191-v3'],
@@ -134,6 +232,12 @@ const expandedProfiles = [
   ['san10-191-lifecycle', 'expanded-191-v5'],
   ['san10-191-research', 'expanded-191-v6'],
   ['san10-191-border-return', 'expanded-191-v7'],
+  ['san10-191-general-condition', 'expanded-191-v8'],
+  ['san10-191-treatment', 'expanded-191-v9'],
+  ['san10-191-city-office', 'expanded-191-v10'],
+  ['san10-191-combat-tools', 'expanded-191-v11'],
+  ['san10-191-rare-equipment', 'expanded-191-v12'],
+  ['san10-191-rare-catalog', 'expanded-191-v13'],
 ] as const satisfies readonly (readonly [ProfileId, string])[];
 function profileRefs(id: ProfileId) {
   const selection = contracts[id].selection;
@@ -343,6 +447,18 @@ export function expandedCreationProfile(
       (profileId === 'san10-191-research' && !profile.ruleFeatures.includes('nation-research-v1')) ||
       (profileId === 'san10-191-border-return' &&
         (!profile.ruleFeatures.includes('border-return-v1') || !profile.ruleFeatures.includes('nation-research-v1'))) ||
+      (profileId === 'san10-191-general-condition' && !profile.ruleFeatures.includes(GENERAL_CONDITION_FEATURE)) ||
+      (profileId === 'san10-191-city-office' && !profile.ruleFeatures.includes(CITY_OFFICE_VOLUNTEER_FEATURE)) ||
+      (profileId === 'san10-191-rare-catalog' &&
+        (profile.version !== 3 || !('fullRareEquipment' in profile.featureData['equipment-v1']))) ||
+      (profileId === 'san10-191-rare-equipment' &&
+        (profile.version !== 3 || !hasRareEquipment(profile.featureData['equipment-v1']))) ||
+      (profileId === 'san10-191-combat-tools' &&
+        (profile.version !== 3 ||
+          !hasMoraleTool(profile.featureData['equipment-v1']) ||
+          !profile.ruleFeatures.includes(HERITAGE_SPECIALTY_FEATURE))) ||
+      (profileId === 'san10-191-treatment' &&
+        (profile.version !== 3 || !hasTreatmentTool(profile.featureData['equipment-v1']))) ||
       profile.scenarioKey !== contracts[profileId].selection.scenarioKey ||
       profile.mapKey !== contracts[profileId].selection.mapKey ||
       (profileId !== 'integration-v01' &&
@@ -430,6 +546,49 @@ async function artifactCreationProfiles(
     version: row.version,
     contentHash: row.contentHash,
   }));
+  const ruleFeatures = checkRuleFeatures(
+    [
+      ...creationFeatures,
+      'treaty-break',
+      'treaty-expanded',
+      'treaty-trade',
+      DIPLOMATIC_COOLDOWN_FEATURE,
+      PLAYER_AUTOPLAY_FEATURE,
+      DEFENSE_STANCE_FEATURE,
+      NPC_NATION_POLICY_FEATURE,
+      NATION_RESTRICTIONS_FEATURE,
+      INACTIVE_REMOVAL_FEATURE,
+      GENERAL_PERSONALITY_FEATURE,
+      HERITAGE_BIRTH_FEATURE,
+      COMBAT_SPECIALTY_FEATURE,
+      BATTLE_TACTICS_FEATURE,
+      NPC_ENTRY_DRAFT_FEATURE,
+      TROOP_FEATURE,
+      'heritage-v1',
+      HERITAGE_BENEFITS_FEATURE,
+      HERITAGE_SPECIALTY_FEATURE,
+      SPECIALTY_GROWTH_FEATURE,
+      DOMESTIC_SPECIALTY_FEATURE,
+      GENERAL_PROFICIENCY_FEATURE,
+      CITY_SEASONAL_EVENTS_FEATURE,
+      NATION_PHILOSOPHY_FEATURE,
+      COURT_PROMOTION_FEATURE,
+      GENERAL_CONDITION_FEATURE,
+      COURT_RANK_FEATURE,
+      COURT_ABILITY_FEATURE,
+      NATION_FINANCE_FEATURE,
+      RANKED_PAYROLL_FEATURE,
+      WALL_INCOME_FEATURE,
+      WAR_INCOME_FEATURE,
+      CITY_CONFLICT_FEATURE,
+      CITY_CONFLICT_AWARD_FEATURE,
+      STAT_GROWTH_FEATURE,
+      MILITARY_STAT_GROWTH_FEATURE,
+      RESEARCH_ERA_FEATURE,
+      RANKED_AID_FEATURE,
+      RICE_MARKET_FEATURE,
+    ].sort(),
+  );
   return entries.map((entry) => {
     const scenarioCategory = categories[entry.name]!;
     const isEmpty = scenarioCategory === 'empty';
@@ -455,7 +614,7 @@ async function artifactCreationProfiles(
         nations: entry.nations,
       },
       resources: [...resources, { kind: 'SCENARIO', key: entry.name, version: 1, contentHash: entry.contentHash }],
-      ruleFeatures: [...creationFeatures, 'treaty-break', 'treaty-expanded', 'treaty-trade'],
+      ruleFeatures: [...ruleFeatures],
       presets: [
         {
           key: isEmpty ? 'empty' : 'regular',

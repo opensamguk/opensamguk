@@ -1,3 +1,5 @@
+import type { WorldState } from '../model/world';
+
 // core2026 df6c926, app/game-frontend/src/utils/nationFormat.ts. MIT (c) 2025 devsam.
 const titles = ['방랑군', '호족', '군벌', '주자사', '주목', '공', '왕', '황제'];
 const courtTitles: readonly (readonly string[])[] = [
@@ -22,6 +24,33 @@ export function nationRank(level: number) {
 }
 
 export const COURT_RANK_FEATURE = 'court-rank-v1';
+export const COURT_PROMOTION_FEATURE = 'court-promotion-v1';
+export const COURT_ABILITY_FEATURE = 'court-ability-v1';
+
+// core2026 c81d304, app/game-engine/src/turn/worldCommandHandler.ts (MIT).
+export function courtAbilityRequirement(level: number) {
+  if (level < 5 || level > 10) return null;
+  return { stat: level % 2 === 0 ? ('strength' as const) : ('intel' as const), minimum: 70 };
+}
+
+// core2026 c81d304, app/game-engine/src/turn/monthlyNationLevelAction.ts (MIT).
+const citiesRequired = [0, 1, 2, 5, 8, 11, 16, 21];
+
+export function promoteNationCourts(state: WorldState) {
+  const cities = new Map<number, number>();
+  for (const city of Object.values(state.cities)) {
+    if (city.nationId !== null && city.kind !== 'PASS' && city.level >= 4)
+      cities.set(city.nationId, (cities.get(city.nationId) ?? 0) + 1);
+  }
+  for (const nation of Object.values(state.nations)) {
+    const count = cities.get(nation.id) ?? 0;
+    const rank = citiesRequired.findLastIndex((required) => count >= required);
+    if (rank <= nation.level) continue;
+    nation.level = rank;
+    nation.gold += rank * 1000;
+    nation.rice += rank * 1000;
+  }
+}
 
 export function courtOfficeTitle(nationLevel: number, officerLevel: number) {
   return courtTitles[nationLevel]?.[12 - officerLevel] ?? null;

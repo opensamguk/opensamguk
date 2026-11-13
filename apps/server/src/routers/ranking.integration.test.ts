@@ -2,13 +2,19 @@ import { randomUUID } from 'node:crypto';
 import type { inferRouterOutputs } from '@trpc/server';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb } from '@opensamguk/db';
+import { nationRank } from '@opensamguk/rules';
 import { readFixture } from '../../test/readFixture';
 import { newSession } from '../auth/session';
+import { authzCase } from '../authz/case';
 import type { AppRouter } from '../router';
 import { buildServer } from '../server';
 
 type Out = inferRouterOutputs<AppRouter>['ranking'];
-type Results = { 'ranking.generals': Out['generals']; 'ranking.nations': Out['nations'] };
+type Results = {
+  'ranking.generals': Out['generals'];
+  'ranking.nations': Out['nations'];
+  'ranking.freeGenerals': Out['freeGenerals'];
+};
 const routes = ['ranking.generals', 'ranking.nations'] as const;
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
@@ -40,10 +46,14 @@ const generalRows = Array.from({ length: 105 }, (_, index) => {
 const publicGeneral = ({ id, ...row }: (typeof generalRows)[number]) => ({
   generalId: id,
   portraitId: id === 105 ? 10001 : null,
+  isHuman: id === 1 || id === 105,
+  possessedNpc: false,
+  stratagemSuccesses: 0,
+  battleStats: null,
   ...row,
 });
 const nationRows = [
-  { id: 3, name: '셋째 국가', color: '#333333', philosophy: '법가', cities: 1, generals: 12, power: 19 },
+  { id: 3, name: '셋째 국가', color: '#333333', philosophy: '법가', level: 7, cities: 1, generals: 12, power: 19 },
   { id: 2, name: '둘째 국가', color: '#222222', cities: 3, generals: 2, power: 19 },
   { ...nationIdentity, cities: 3, generals: 7, power: 24 },
 ];
@@ -188,6 +198,65 @@ describe('T2-22 / AC-M2-19 실제 TCP HTTP·PostgreSQL 순위', () => {
     },
   );
 
+  it('사람·NPC 순위는 100명 제한 전에 분리하고 순번을 다시 붙인다', async () => {
+    const human = (await query('ranking.generals', { worldId, by: 'dedication', kind: 'human' })).data;
+    expect(human.top.map(({ generalId, rank, isHuman }) => ({ generalId, rank, isHuman }))).toEqual([
+      { generalId: 1, rank: 1, isHuman: true },
+      { generalId: 105, rank: 2, isHuman: true },
+    ]);
+    expect(human.me?.rank).toBe(2);
+    const npc = (await query('ranking.generals', { worldId, by: 'dedication', kind: 'npc' })).data;
+    expect(npc.top).toHaveLength(100);
+    expect(npc.top.every((row) => row.isHuman === false)).toBe(true);
+    expect(npc.top[0]?.rank).toBe(1);
+    expect(npc.me).toBeNull();
+  });
+
+  it('재야 목록은 순위 정산 없이 현재 월드의 등장한 무소속 장수만 공개한다', async () => {
+    await db.general.createMany({
+      data: [106, 107].map((id) => ({
+        ...state.generals[0]!,
+        worldId: emptyWorldId,
+        id,
+        name: `재야 장수 ${id}`,
+        nationId: null,
+        userId: null,
+        activeFromYear: id === 106 ? 190 : 9999,
+      })),
+    });
+    try {
+      const input = { worldId: emptyWorldId };
+      const result = await query('ranking.freeGenerals', input);
+      await authzCase('ranking.freeGenerals', 'success', async () => {
+        expect(result.status).toBe(200);
+        expect(result.data).toMatchObject({ count: 1, items: [{ id: 106, name: '재야 장수 106', isHuman: false }] });
+        expect(JSON.stringify(result.data)).not.toContain('userId');
+      })();
+      await authzCase('ranking.freeGenerals', 'otherUser', async () => {
+        expect(await query('ranking.freeGenerals', input, users[2]!.cookie)).toEqual(result);
+      })();
+      await authzCase('ranking.freeGenerals', 'unauthenticated', async () => {
+        expect((await query('ranking.freeGenerals', input, null)).status).toBe(401);
+      })();
+      await authzCase('ranking.freeGenerals', 'invalidInput', async () => {
+        expect((await query('ranking.freeGenerals', { worldId: '' })).status).toBe(400);
+      })();
+    } finally {
+      await db.general.deleteMany({ where: { worldId: emptyWorldId, id: { in: [106, 107] } } });
+    }
+  });
+  it(
+    '재야 목록은 제재된 계정의 세션을 거부한다',
+    authzCase('ranking.freeGenerals', 'sanctioned', async () => {
+      await db.user.update({ where: { id: users[0]!.id }, data: { status: 'SANCTIONED' } });
+      try {
+        expect((await query('ranking.freeGenerals', { worldId })).status).toBe(401);
+      } finally {
+        await db.user.update({ where: { id: users[0]!.id }, data: { status: 'ACTIVE' } });
+      }
+    }),
+  );
+
   it('상위 100명 밖 내 순위도 반환하고 세션마다 본인 장수만 고른다', async () => {
     const input = { worldId, by: 'dedication' };
     const own = (await query('ranking.generals', input)).data;
@@ -235,8 +304,12 @@ describe('T2-22 / AC-M2-19 실제 TCP HTTP·PostgreSQL 순위', () => {
       items: ids.map((id, index) => ({
         nationId: id,
         philosophy: id === 3 ? '법가' : (state.nations.find((nation) => nation.id === id)?.philosophy ?? null),
+        rankTitle:
+          nationRank(id === 3 ? 7 : (state.nations.find((nation) => nation.id === id)?.level ?? -1))?.title ?? null,
         ...Object.fromEntries(
-          Object.entries(nationRows.find((nation) => nation.id === id)!).filter(([key]) => key !== 'id'),
+          Object.entries(nationRows.find((nation) => nation.id === id)!).filter(
+            ([key]) => key !== 'id' && key !== 'level',
+          ),
         ),
         rank: index + 1,
         value: values[index],
@@ -255,12 +328,59 @@ describe('T2-22 / AC-M2-19 실제 TCP HTTP·PostgreSQL 순위', () => {
     expect((await query('ranking.generals', { worldId, by: 'dedication' })).data.me?.generalId).toBe(105);
   });
 
+  it('100위 이후에도 전역 순번과 내 순위를 유지하며 장수 종류를 먼저 거른다', async () => {
+    const input = { worldId, by: 'dedication' };
+    const first = await query('ranking.generals', input);
+    const second = await query('ranking.generals', { ...input, page: 2 });
+    expect(second.data.pagination).toEqual({ page: 2, pageCount: 2 });
+    expect(second.data.top.map(({ rank }) => rank)).toEqual([101, 102, 103, 104, 105]);
+    expect(second.data.me).toEqual(first.data.me);
+    expect(new Set([...first.data.top, ...second.data.top].map(({ generalId }) => generalId)).size).toBe(105);
+    const filtered = await query('ranking.generals', { ...input, page: 2, kind: 'human' });
+    expect(filtered.data.top.map(({ rank }) => rank)).toEqual([1, 2]);
+    expect(filtered.data.pagination).toBeNull();
+  });
+
+  it('국가 병력 추정은 현재 출사 장수만 집계하고 개인 활동 시각을 반환하지 않는다', async () => {
+    const id = await fixtureWorld('force-estimate', true);
+    await db.world.update({ where: { id }, data: { turnTermMinutes: 20_000 } });
+    await db.general.updateMany({ where: { worldId: id }, data: { nationId: null } });
+    for (const [generalId, leadership, lastActiveTick, activeFromYear] of [
+      [1, 90, 19_000, 190],
+      [105, 80, 0, 190],
+      [2, 50, 0, 190],
+      [3, 39, 0, 190],
+      [4, 100, 0, 200],
+    ] as const) {
+      await db.general.update({
+        where: { worldId_id: { worldId: id, id: generalId } },
+        data: { nationId: 1, leadership, lastActiveTick, activeFromYear },
+      });
+    }
+    const result = await query(
+      'ranking.nations',
+      { worldId: id, by: 'power', includeForceEstimate: true },
+      users[2]!.cookie,
+    );
+    expect(result.status).toBe(200);
+    expect(result.data.items.find((nation) => nation.nationId === 1)?.forceEstimate).toEqual({
+      totalGeneralCount: 4,
+      userCombatGeneralCount: 1,
+      userTroops: 9000,
+      npcCombatGeneralCount: 1,
+      npcTroops: 5000,
+      inactiveGeneralCount: 1,
+    });
+    expect(JSON.stringify(result.data)).not.toMatch(/lastActiveTick|userId|leadership/);
+  });
+
   it('정산 전 월드는 빈 순위와 null 시점을 반환하며 조회로 스냅샷을 만들지 않는다', async () => {
     for (const by of ['dedication', 'experience', 'merit'])
       expect((await query('ranking.generals', { worldId: emptyWorldId, by })).data).toEqual({
         top: [],
         me: null,
         at: null,
+        pagination: null,
       });
     for (const by of ['cities', 'generals', 'power'])
       expect((await query('ranking.nations', { worldId: emptyWorldId, by })).data).toEqual({ items: [], at: null });
@@ -306,6 +426,10 @@ describe('T2-22 / AC-M2-19 실제 TCP HTTP·PostgreSQL 순위', () => {
       'name',
       'nation',
       'portraitId',
+      'isHuman',
+      'possessedNpc',
+      'stratagemSuccesses',
+      'battleStats',
       'dedication',
       'experience',
       'wins',
@@ -328,6 +452,7 @@ describe('T2-22 / AC-M2-19 실제 TCP HTTP·PostgreSQL 순위', () => {
         'philosophy',
         'power',
         'rank',
+        'rankTitle',
         'value',
       ]);
     expect(JSON.stringify([generals, nations])).not.toMatch(/private|userId|gold|rice|crew|turns|password|session/);

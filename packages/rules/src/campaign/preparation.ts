@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { addGeneralProficiency } from '../general/proficiency';
 import { BALANCE } from '../balance';
 import { ownCity } from '../commands/support';
 import { drillGain, recruitCost } from '../commands/statScores';
@@ -63,7 +64,7 @@ export function applyCampaignPreparation(view: WorldView, actor: Actor, key: Cam
     if (commanded + args.amount > commander.leadership * BALANCE.CREW_PER_LEADERSHIP)
       return fail('AT_MAX', '실제 지휘관의 전체 병력 상한을 넘습니다.');
     if (city.population < args.amount) return fail('NO_POPULATION', '도시 인구가 부족합니다.');
-    const cost = recruitCost(view, owner, args.amount, crewType.cost, key === 'conscript');
+    const cost = recruitCost(view, owner, args.amount, crewType.cost, key === 'conscript', crewType.armType);
     if (owner.gold < cost) return fail('NO_GOLD', '금이 부족합니다.');
     if (!unit) {
       unit = {
@@ -83,7 +84,10 @@ export function applyCampaignPreparation(view: WorldView, actor: Actor, key: Cam
     unit.troops += args.amount;
     unit.crewType = args.crewType;
     city.population -= args.amount;
-    if (key === 'conscript') city.trust = Math.max(0, city.trust - BALANCE.CONSCRIPT_TRUST_LOSS);
+    if (key === 'conscript') {
+      city.trust = Math.max(0, city.trust - BALANCE.CONSCRIPT_TRUST_LOSS);
+      addGeneralProficiency(state, general, crewType.armType, args.amount);
+    }
     text = `${key === 'conscript' ? '징병' : '모병'}: 부곡${unit.id} ${args.amount}명, 병력 ${unit.troops}명`;
   } else {
     if (unit!.troops <= 0) return fail('NO_CREW', '병력이 없습니다.');
@@ -99,7 +103,11 @@ export function applyCampaignPreparation(view: WorldView, actor: Actor, key: Cam
       if (unit![field] >= 100) return fail('AT_MAX', '이미 최대치입니다.');
       if (owner.gold < BALANCE.DRILL_COST) return fail('NO_GOLD', '금이 부족합니다.');
       general.gold -= BALANCE.DRILL_COST;
-      unit![field] = Math.min(100, unit![field] + drillGain(view, commander, key === 'morale'));
+      const before = unit![field];
+      unit![field] = Math.min(100, before + drillGain(view, commander, key === 'morale'));
+      const armType = actor.unitSet?.crewTypes.find((type) => type.id === unit!.crewType)?.armType;
+      if (armType !== undefined)
+        addGeneralProficiency(state, state.generals[commander.id]!, armType, unit![field] - before);
       text = `부곡${unit!.id} ${key === 'morale' ? '사기진작' : '훈련'}: ${unit![field]}`;
     }
   }

@@ -209,6 +209,7 @@ export const turnsRouter = router({
         const commandActor = {
           generalId: actor.id,
           tick: actor.nextTurnTick,
+          worldSeed: world.seed,
           unitSet: unitSetSchema.parse(world.unitSet),
         };
         const failure = def.precheck(view, commandActor, turn.args);

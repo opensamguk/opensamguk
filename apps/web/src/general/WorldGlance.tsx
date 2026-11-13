@@ -41,6 +41,19 @@ function GlanceMap({ worldId }: { worldId: string }) {
     <div className={styles.glanceMap}>
       <WorldMap operationalMap={map.data.operationalMap} cities={map.data.cities} nations={map.data.nations} />
       <MapLegend cities={map.data.cities} nations={map.data.nations} readOnly />
+      {map.data.nations.length > 0 ? (
+        <section aria-label="국가별 임관 권유문">
+          <h3>국가별 임관 권유문</h3>
+          <dl>
+            {map.data.nations.map((nation) => (
+              <div key={nation.id}>
+                <dt>{nation.name}</dt>
+                <dd>{nation.recruitmentNotice || '임관 권유문 없음'}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      ) : null}
     </div>
   );
 }

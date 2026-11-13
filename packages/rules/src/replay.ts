@@ -1,3 +1,4 @@
+import { advanceHeritageTurnTime } from './heritage/turnTime';
 import { emptyTurns, validatePolicyInput } from './replayInputs';
 export { emptyTurns, applyTurnsInput, applyCreationInput } from './replayInputs';
 import { hasRuleFeature, ruleRegistry, settleMonthlyFeatures, type RuleRegistry } from './ruleRegistry';
@@ -5,7 +6,7 @@ import type { CommandResolver } from './commands/resolve';
 import { resolverForRuleFeatures } from './ruleCommands';
 import { rngFor } from '@opensamguk/shared';
 import { runGeneralTurn } from './commands/turn';
-import type { UnitSetResource } from './world/resources';
+import type { StatRules, UnitSetResource } from './world/resources';
 import { TICKS_PER_MONTH } from './clock/constants';
 import { toWorldState, type WorldState, type OfficeRevisions } from './model/world';
 import { monthlyDate, runMonthly } from './monthly/index';
@@ -142,6 +143,7 @@ function replayAction(
   const queue = next.turns[action.generalId] ?? emptyTurns();
   const turns = ownsArchiveState ? structuredClone(queue) : queue;
   const command = turns[0]!;
+  const lastActiveTick = next.policy?.lastActiveTicks[action.generalId];
   const result = runGeneralTurn(
     next.state,
     { generalId: action.generalId, tick: action.tick, unitSet },
@@ -149,13 +151,16 @@ function replayAction(
     seed,
     {
       ...(next.policy ? { policy: next.policy.policies[action.generalId]! } : {}),
+      ...(next.policy && lastActiveTick !== undefined
+        ? { activity: { lastActiveTick, turnTermMinutes: next.policy.turnTermMinutes } }
+        : {}),
       turnRevision: next.revisions[action.generalId] ?? 0,
     },
     resolver ?? resolverForRuleFeatures(next.state, registry),
     personnel ? { offices: next.offices! } : undefined,
   );
   next.state = result.state;
-  next.state.generals[action.generalId]!.nextTurnTick += TICKS_PER_MONTH;
+  advanceHeritageTurnTime(next.state.generals[action.generalId]!, action.tick);
   if (personnel) {
     const packet = completePersonnelStep(
       replay.state,
@@ -197,7 +202,7 @@ export function applyRecordedInput(
   replay: ReplayState,
   input: RecordedInput,
   registry: RuleRegistry = ruleRegistry,
-  context?: { unitSet?: UnitSetResource },
+  context?: { unitSet?: UnitSetResource; seed?: string; statRules?: StatRules },
 ): ReplayState {
   if (isAdminClockKind(input.kind)) return applyAdminClockRecord(replay, input);
   if (isAdminGameKind(input.kind)) validateAdminGameRecord(input);

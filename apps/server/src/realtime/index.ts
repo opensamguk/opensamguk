@@ -380,5 +380,10 @@ export function registerRealtime<L extends FastifyBaseLogger>(
     listener = null;
     if (active) await active.end().catch(() => {});
   });
-  return { closeSession };
+  return {
+    closeSession,
+    connectedSessions: (worldId: string) => [
+      ...new Set([...connections].filter((connection) => connection.worldId === worldId).map((c) => c.sessionId)),
+    ],
+  };
 }

@@ -13,13 +13,35 @@ export function cloneWorldWithRegistry(view: WorldView, registry: ExtStateRegist
   const nations: WorldState['nations'] = {};
   const generals: WorldState['generals'] = {};
   for (const key in view.cities) {
-    const city = view.cities[key]!;
-    cities[key] = { ...city, connections: [...city.connections] };
+    const { conflictOrder, ...city } = view.cities[key]!;
+    cities[key] = {
+      ...city,
+      connections: [...city.connections],
+      ...(conflictOrder ? { conflictOrder: [...conflictOrder] } : {}),
+    };
   }
-  for (const key in view.nations) nations[key] = { ...view.nations[key]! };
+  for (const key in view.nations) {
+    const { npcSettings, ...nation } = view.nations[key]!;
+    nations[key] = nation;
+    if (npcSettings) {
+      const { generalPriority, nationPriority, ...settings } = npcSettings;
+      nations[key]!.npcSettings = {
+        ...settings,
+        ...(generalPriority ? { generalPriority: [...generalPriority] } : {}),
+        ...(nationPriority ? { nationPriority: [...nationPriority] } : {}),
+      };
+    }
+  }
   for (const key in view.generals) generals[key] = { ...view.generals[key]! };
   return {
     ...(view.relations ? { relations: structuredClone(view.relations) as NonNullable<WorldState['relations']> } : {}),
+    ...(view.cityOfficeVolunteers
+      ? {
+          cityOfficeVolunteers: structuredClone(view.cityOfficeVolunteers) as NonNullable<
+            WorldState['cityOfficeVolunteers']
+          >,
+        }
+      : {}),
     ...(view.officeEffects ? { officeEffects: structuredClone(view.officeEffects) } : {}),
     ...(view.preparedTurns
       ? { preparedTurns: structuredClone(view.preparedTurns) as NonNullable<WorldState['preparedTurns']> }

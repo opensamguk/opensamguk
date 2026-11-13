@@ -8,12 +8,15 @@ import {
   capitalNameOf,
   NationExtras,
   NationFinanceGrid,
+  NationNpcPolicy,
+  NationRestrictions,
   NationSummaryGrid,
   NationTables,
   useNation,
   useNationPower,
 } from '../main/NationInfo';
 import { Panel } from '../main/Panel';
+import { RecruitmentNotice } from '../main/RecruitmentNotice';
 import {
   ActivityFeed,
   BattleList,
@@ -68,6 +71,33 @@ export function MapPage() {
               <MapLegend cities={map.data.cities} nations={map.data.nations} />
             </div>
           </Panel>
+          {map.data.conflicts?.length ? (
+            <Panel title="분쟁 현황">
+              {map.data.conflicts.map(({ cityKey: key, cityName, shares }) => (
+                <section key={key}>
+                  <button type="button" onClick={() => setSelected(key)}>
+                    {cityName}
+                  </button>
+                  <ul>
+                    {shares.map(({ id, name, color, percent }) => (
+                      <li key={id}>
+                        <span>
+                          {name} {percent.toFixed(1)}%
+                        </span>{' '}
+                        <meter
+                          min={0}
+                          max={100}
+                          value={percent}
+                          aria-label={`${name} 공략 지분`}
+                          style={{ accentColor: color }}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </Panel>
+          ) : null}
           {cityKey !== null ? (
             <Panel title="도시 정보">
               <CityInfo worldId={worldId} cityKey={cityKey} nations={map.data.nations} onSelectCity={setSelected} />
@@ -147,6 +177,9 @@ export function NationPage({ nationIdParam }: { nationIdParam: string }) {
             />
             {/* 소속국은 다음 세금·세곡과 봉급·순수입 예상을 함께 본다 (INT-26). */}
             <NationFinanceGrid nation={nation.data} />
+            <NationRestrictions worldId={worldId} nation={nation.data} />
+            <NationNpcPolicy worldId={worldId} nation={nation.data} />
+            <RecruitmentNotice key={`${worldId}:${nation.data.id}`} worldId={worldId} nation={nation.data} />
             <NationExtras worldId={worldId} nation={nation.data} />
           </Panel>
           <Panel title="소유 도시·소속 장수">
@@ -183,6 +216,9 @@ export function RecordsPage({ tab, city }: { tab: RecordTab; city?: number }) {
   const summary = useWorldSummary(worldId);
   const map = useWorldMap(worldId);
   const home = useHome(worldId);
+  const [activityMonth, setActivityMonth] = useState('');
+  const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(activityMonth);
+  const activityPeriod = match ? { year: Number(match[1]), month: Number(match[2]) } : undefined;
   const label = RECORD_TABS.find((entry) => entry.kind === tab)!.label;
   const nations = map.data?.nations ?? [];
   const cities = map.data?.cities ?? [];
@@ -216,7 +252,16 @@ export function RecordsPage({ tab, city }: { tab: RecordTab; city?: number }) {
         </Panel>
       ) : tab === 'activity' ? (
         <Panel title={RECORD_LABELS.activity}>
-          <ActivityFeed key={worldId} worldId={worldId} />
+          <label>
+            기록 연월
+            <input type="month" value={activityMonth} onChange={(event) => setActivityMonth(event.target.value)} />
+          </label>
+          {activityMonth ? (
+            <button type="button" onClick={() => setActivityMonth('')}>
+              전체 기간
+            </button>
+          ) : null}
+          <ActivityFeed key={worldId} worldId={worldId} period={activityPeriod} />
         </Panel>
       ) : tab === 'battles' ? (
         <Panel title={RECORD_LABELS.battles}>
@@ -258,6 +303,12 @@ export function RecordsPage({ tab, city }: { tab: RecordTab; city?: number }) {
             cities={cities}
             hasNation={home.data ? home.data.nation !== null : true}
           />
+          {tab === 'general' && home.data?.general ? (
+            <details>
+              <summary>내 장수 열전</summary>
+              <ActivityFeed key={worldId} worldId={worldId} biography />
+            </details>
+          ) : null}
         </Panel>
       )}
     </section>

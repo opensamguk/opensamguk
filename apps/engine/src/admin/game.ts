@@ -12,7 +12,10 @@ import {
 import { databaseNow } from '../lease';
 import { loadReplayState } from '../monthly';
 import { checkWorldReplay, type EngineInput, type EngineWorld } from '../features';
+import { persistExt } from '../extState';
 import { persistEffects } from '../persist';
+import { PgHeritageRepository } from '../heritage/repository';
+import { refundRemovedGeneralSpecialties } from '../heritage/service';
 import { persistPersonnelPacket } from '../ruleFeatures';
 import { persistAdminRecord } from './records';
 
@@ -99,7 +102,12 @@ export async function processAdminGame(
             });
         },
       );
+      await persistExt(tx, world.id, before.state.ext, next.state.ext);
       const action = payload.action;
+      if (action.kind === 'admin.general.remove')
+        await refundRemovedGeneralSpecialties(new PgHeritageRepository(tx), world.id, before.state, next.state, [
+          action.generalId,
+        ]);
       if (action.kind === 'admin.general.clearTurns') {
         await tx.generalTurn.deleteMany({ where: { worldId: world.id, generalId: action.generalId } });
         await tx.generalTurn.createMany({

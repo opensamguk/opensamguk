@@ -1,5 +1,7 @@
 import { useId, useMemo, useState, type ReactNode } from 'react';
-import { useWorldId, useWorldRules } from '../game/queries';
+import { useQuery } from '@tanstack/react-query';
+import { useTRPC } from '../trpc';
+import { useHome, useWorldId, useWorldRules } from '../game/queries';
 import { DisabledReason } from '../ui/DisabledReason';
 import { ErrorState, LoadingState } from '../ui/States';
 import { ValueDelta } from '../ui/ValueDelta';
@@ -24,7 +26,7 @@ import { useBattleWorker, type BattleWorkerState } from './useBattleWorker';
 import styles from './BattleSimPage.module.css';
 
 // /w/:worldId/simulator. 보조 화면이다 (T4-34). 사용자가 넣은 가정으로 교전 한 번을 Web Worker에서 계산한다.
-// 이 월드의 병종표 조회(resources.worldRules) 말고는 tRPC를 부르지 않고 게임 상태에서 값을 채우지 않는다 (T4-86).
+// 내 장수 가져오기는 게임 레이아웃과 같은 home.get 조회를 쓴다 (INT-26).
 // 저장소(sessionStorage 등)를 읽거나 쓰지 않는다.
 
 const ERROR_TEXT: Record<Exclude<BattleWorkerState, { status: 'idle' | 'running' | 'done' }>['code'], string> = {
@@ -42,7 +44,14 @@ export function BattleSimPage() {
       <h1 id="battle-sim-title">전투 시뮬레이터</h1>
       {rules.data ? (
         // 월드가 바뀌면 폼과 Worker를 새로 만든다. 앞 월드의 병종표가 남지 않는다.
-        <BattleSimForm key={worldId} unitSetKey={rules.data.unitSetKey} unitSet={rules.data.unitSet} />
+        <BattleSimForm
+          key={worldId}
+          worldId={worldId}
+          unitSetKey={rules.data.unitSetKey}
+          unitSet={rules.data.unitSet}
+          fiveStats={rules.data.statRules.count === 5}
+          battleAffinity={rules.data.battleAffinity}
+        />
       ) : (
         <>
           {rules.isError ? (
@@ -57,12 +66,37 @@ export function BattleSimPage() {
   );
 }
 
-function BattleSimForm({ unitSetKey, unitSet }: { unitSetKey: string; unitSet: WorldUnitSet }) {
+function BattleSimForm({
+  worldId,
+  unitSetKey,
+  unitSet,
+  fiveStats,
+  battleAffinity,
+}: {
+  worldId: string;
+  unitSetKey: string;
+  unitSet: WorldUnitSet;
+  fiveStats: boolean;
+  battleAffinity: 'multiply' | undefined;
+}) {
+  const home = useHome(worldId);
+  const trpc = useTRPC();
+  const mine = useQuery({ ...trpc.general.mine.queryOptions({ worldId }), enabled: fiveStats });
+  const campaign = useQuery({
+    ...trpc.campaign.get.queryOptions({ worldId }),
+    enabled: mine.data?.creationRules.campaignEnabled === true && Boolean(home.data?.general),
+    retry: false,
+  });
+  const [campaignUnit, setCampaignUnit] = useState('');
+  const general = home.isError ? undefined : home.data?.general;
   const units = useMemo(() => worldUnits(unitSet), [unitSet]);
   // shortcut: 장수 병종이 없는 병종표면 0으로 두어 병종 칸 오류로 보인다. 실제 출병도 그런 표로는 돌지 않는다.
   const [form, setForm] = useState<BattleForm>(() => defaultForm(units.defaultId ?? 0));
   const { state, run, cancel, retry } = useBattleWorker(unitSet);
-  const checked = useMemo(() => checkForm(form, units.all), [form, units]);
+  const checked = useMemo(
+    () => checkForm(form, units.all, { recordPhases: true, ...(battleAffinity ? { coefMode: battleAffinity } : {}) }),
+    [form, units, battleAffinity],
+  );
   const problems = useMemo(() => {
     const byField = new Map<string, FieldProblem>();
     for (const found of checked.problems) if (!byField.has(found.field)) byField.set(found.field, found);
@@ -74,12 +108,49 @@ function BattleSimForm({ unitSetKey, unitSet }: { unitSetKey: string; unitSet: W
   const set = (key: 'wall' | 'defence' | 'attackerTech' | 'defenderTech' | 'seed', value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
   const wall = form.defenderKind === 'wall';
+  const importAttacker = (unitId?: number) => {
+    if (!general) return;
+    const nation = home.data?.nation;
+    const unit = unitId === undefined ? undefined : campaign.data?.units.find(({ id }) => id === unitId);
+    if (unitId !== undefined && !unit) return;
+    const commander = unit ? campaign.data?.people.find(({ id }) => id === unit.commanderId) : general;
+    if (!commander) return;
+    const force = unit ?? general;
+    const useOwnTraits = commander.id === general.id;
+    const battleHeritage = { ...general.heritageBenefits };
+    delete battleHeritage.domesticSuccess;
+    delete battleHeritage.domesticFailure;
+    const traits = {
+      ...(general.personalityEffects ? { personality: general.personalityEffects.name } : {}),
+      ...(general.combatSpecialty ? { specialty: general.combatSpecialty.name } : {}),
+      ...(general.battleTactics ? { tactics: general.battleTactics } : {}),
+      ...(general.battleEquipment && Object.keys(general.battleEquipment).length
+        ? { equipment: general.battleEquipment }
+        : {}),
+      ...(Object.keys(battleHeritage).length ? { heritage: battleHeritage } : {}),
+      ...(general.proficiency?.length
+        ? { proficiency: Object.fromEntries(general.proficiency.map(({ armType, value }) => [armType, value])) }
+        : {}),
+    };
+    setForm((current) => ({
+      ...current,
+      statProfile: fiveStats ? 'five-stats' : 'legacy',
+      attackerTraits: useOwnTraits && Object.keys(traits).length ? traits : undefined,
+      attacker: {
+        crew: String(unit?.troops ?? general.crew),
+        crewType: units.generals.some(({ id }) => id === force.crewType) ? String(force.crewType) : '',
+        train: String(force.train),
+        atmos: String(force.atmos),
+      },
+      attackerTech: String(nation && 'tech' in nation ? nation.tech : 0),
+      attackerCommander: { leadership: String(commander.leadership), strength: String(commander.strength) },
+    }));
+  };
 
   return (
     <>
       <p className={styles.muted}>
-        양쪽 값과 시드를 직접 넣으면 교전 한 번을 계산합니다. 다른 국가의 값은 불러오지 않습니다. 병종표는 이 월드의
-        병종표({unitSetKey}) 기준입니다.
+        이 월드의 병종표({unitSetKey})로 교전 한 번을 계산합니다. 공격 칸에는 내 장수의 값을 가져올 수 있습니다.
       </p>
 
       <form
@@ -103,12 +174,65 @@ function BattleSimForm({ unitSetKey, unitSet }: { unitSetKey: string; unitSet: W
             <option value="five-stats">통합판 5능력치, 지휘관 보정</option>
           </select>
         </label>
-        <p className={styles.muted}>
-          월드의 규칙에 맞춰 고릅니다. 지휘관 값은 가정을 직접 입력하며 실제 장수의 비공개 수치를 불러오지 않습니다.
-        </p>
         <div className={styles.sides}>
           <fieldset className={styles.side}>
             <legend>공격</legend>
+            {general ? (
+              <button type="button" className={styles.primary} onClick={() => importAttacker()}>
+                내 장수 값 가져오기
+              </button>
+            ) : null}
+            {campaign.data?.units.length ? (
+              <div className={styles.row}>
+                <label className={styles.field}>
+                  내 부곡
+                  <select
+                    className={styles.input}
+                    value={campaignUnit}
+                    onChange={(event) => setCampaignUnit(event.target.value)}
+                  >
+                    <option value="">부곡 선택</option>
+                    {campaign.data.units.map((unit) => (
+                      <option value={unit.id} key={unit.id}>
+                        {units.generals.find(({ id }) => id === unit.crewType)?.name ?? unit.crewType} ·{' '}
+                        {unit.troops.toLocaleString('ko-KR')}명
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  className={styles.secondary}
+                  disabled={!campaignUnit}
+                  onClick={() => importAttacker(Number(campaignUnit))}
+                >
+                  부곡 값 가져오기
+                </button>
+              </div>
+            ) : null}
+            {form.attackerTraits ? (
+              <div className={styles.row}>
+                <span>
+                  {[
+                    form.attackerTraits.personality,
+                    form.attackerTraits.specialty,
+                    form.attackerTraits.proficiency && '병종 숙련',
+                    form.attackerTraits.tactics && '전투계략',
+                    form.attackerTraits.heritage && '유산 혜택',
+                    form.attackerTraits.equipment && '장비 전투 효과',
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </span>
+                <button
+                  type="button"
+                  className={styles.secondary}
+                  onClick={() => setForm((current) => ({ ...current, attackerTraits: undefined }))}
+                >
+                  가져온 효과 빼기
+                </button>
+              </div>
+            ) : null}
             <ForceFields
               side="attacker"
               form={form.attacker}
@@ -495,6 +619,32 @@ function ResultPanel({
               defence={state.result.input.defence}
             />
           </div>
+          {state.result.phases?.length ? (
+            <details>
+              <summary>교전 단계</summary>
+              <ol>
+                {state.result.phases.map((phase, index) => (
+                  <li key={index}>
+                    {{ volley: '선제 사격', hold: '저지', exchange: '교전' }[phase.kind]}
+                    {' · '}공격군 손실 {phase.attackerLoss.toLocaleString('ko-KR')}
+                    {' · '}수비군 손실 {phase.defenderLoss.toLocaleString('ko-KR')}
+                    {phase.attackerEvaded ? ' · 공격 측 회피' : ''}
+                    {phase.defenderEvaded ? ' · 수비 측 회피' : ''}
+                    {phase.attackerCritical ? ' · 공격 측 필살' : ''}
+                    {phase.defenderCritical ? ' · 수비 측 필살' : ''}
+                    {phase.attackerSniped ? ' · 공격 측 저격' : ''}
+                    {phase.defenderSniped ? ' · 수비 측 저격' : ''}
+                    {phase.attackerTactic
+                      ? ` · 공격 측 ${phase.attackerTactic.name} ${phase.attackerTactic.success ? '성공' : '실패'}`
+                      : ''}
+                    {phase.defenderTactic
+                      ? ` · 수비 측 ${phase.defenderTactic.name} ${phase.defenderTactic.success ? '성공' : '실패'}`
+                      : ''}
+                  </li>
+                ))}
+              </ol>
+            </details>
+          ) : null}
           <div className={styles.row}>
             <button type="button" className={styles.secondary} onClick={onRetry}>
               같은 값으로 다시 실행

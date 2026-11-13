@@ -178,6 +178,13 @@
   font-weight: 400;
 }
 
+.row[data-autoplay='true'] .autoplaySlot {
+  padding: 0 var(--space-1);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--color-info) 12%, transparent);
+  color: var(--color-info);
+}
+
 .args {
   color: var(--color-text-muted);
 }

@@ -23,6 +23,7 @@ const commands = [
   { key: 'nation_seize', allowed: staff },
   { key: 'nation_assign', allowed: staff },
   { key: 'nation_mobilize', allowed: staff },
+  { key: 'nation_troop_expel', allowed: staff },
   { key: 'nation_rivalry', allowed: [11, 12] },
   { key: 'nation_raid', allowed: [11, 12] },
   { key: 'nation_peace', allowed: [11, 12] },
@@ -215,6 +216,7 @@ describe('T2-05 / AC-M2-05·16 순수 직책·명령 권한표', () => {
       | 'nation_seize'
       | 'nation_assign'
       | 'nation_mobilize'
+      | 'nation_troop_expel'
       | 'nation_rivalry'
       | 'nation_raid'
       | 'nation_peace'

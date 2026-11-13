@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Portrait } from '../portrait/Portrait';
 import { useInfiniteQuery, type QueryKey } from '@tanstack/react-query';
 import { retryUnlessClientError, errorCode } from '../game/errors';
@@ -80,10 +81,57 @@ function useRecords(kind: RecordKind, worldId: string, enabled: boolean) {
 }
 
 // 장수 동향(scope all: 평판 사건 + 공개 국가 사건)과 중원 정세(scope world: 국가 사건만). 같은 procedure의 다른 입력이다.
-function useActivity(worldId: string, scope: 'all' | 'world') {
+type ActivityPeriod = { year: number; month: number };
+
+function useActivity(
+  worldId: string,
+  scope: 'all' | 'world' | 'biography',
+  period?: ActivityPeriod,
+  nationId?: number,
+  enabled = true,
+) {
   const trpc = useTRPC();
-  return useCursorPages(trpc.records.activity.queryKey({ worldId, scope }), (cursor) =>
-    trpcClient.records.activity.query(withCursor({ worldId, scope }, cursor)),
+  const input = { worldId, scope, ...(period ? { period } : {}), ...(nationId === undefined ? {} : { nationId }) };
+  return useCursorPages(
+    trpc.records.activity.queryKey(input),
+    (cursor) => trpcClient.records.activity.query(withCursor(input, cursor)),
+    enabled,
+  );
+}
+
+export function SeasonNationChronicle({ worldId, nationId }: { worldId: string; nationId: number }) {
+  const [open, setOpen] = useState(false);
+  const query = useActivity(worldId, 'world', undefined, nationId, open);
+  const items = (query.data?.pages ?? []).flatMap(({ items }) => items.filter((item) => item.source === 'nation'));
+  return (
+    <details onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary>국가열전</summary>
+      {open && (
+        <>
+          {query.isPending ? <LoadingState /> : null}
+          {query.isError ? (
+            <QueryError
+              error={query.error}
+              notFound="국가 기록을 찾을 수 없습니다"
+              onRetry={() => void query.refetch()}
+            />
+          ) : null}
+          {query.isSuccess &&
+            (items.length ? (
+              <ol className={styles.lines}>
+                {items.map(({ id, year, month, text }) => (
+                  <li key={id}>
+                    <span className={styles.date}>{formatYearMonth({ year, month })}</span> {text}
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <EmptyState title="공개 사건 기록이 없습니다" />
+            ))}
+          <MoreButton query={query} />
+        </>
+      )}
+    </details>
   );
 }
 
@@ -132,9 +180,42 @@ export function RecordList({
   const body = renderRecords(kind, query.data.pages, clock, nations, cities, compact, worldLines);
   return (
     <div className={compact ? `${styles.records} ${styles.compact}` : styles.records} data-record-kind={kind}>
+      {kind === 'nation' && !compact ? <NationChronicle worldId={worldId} clock={clock} /> : null}
       {body ?? <EmptyState title={emptyText[kind]} />}
       <MoreButton query={query} />
     </div>
+  );
+}
+
+function NationChronicle({ worldId, clock }: { worldId: string; clock: Clock }) {
+  const trpc = useTRPC();
+  const query = useCursorPages(trpc.records.nationEvents.queryKey({ worldId }), (cursor) =>
+    trpcClient.records.nationEvents.query(withCursor({ worldId }, cursor)),
+  );
+  if (query.isPending) return <p role="status">국가 사건을 불러오는 중…</p>;
+  if (query.isError)
+    return (
+      <QueryError error={query.error} notFound="국가 기록을 찾을 수 없습니다" onRetry={() => void query.refetch()} />
+    );
+  const items = query.data.pages.flatMap(({ items }) => items);
+  if (!items.length) return null;
+  return (
+    <details>
+      <summary>국가 사건</summary>
+      <ol className={styles.lines}>
+        {items.map(({ tick, events }) => (
+          <li key={tick}>
+            <span className={`num ${styles.date}`}>{logDateOf(tick, clock)}</span>
+            <ul>
+              {events.map((event, index) => (
+                <li key={index}>{event}</li>
+              ))}
+            </ul>
+          </li>
+        ))}
+      </ol>
+      <MoreButton query={query} />
+    </details>
   );
 }
 
@@ -196,12 +277,20 @@ function renderRecords(
   return <WorldHistoryList items={items} nations={nations} cities={cities} compact={compact} lines={worldLines} />;
 }
 
+const executionTime = new Intl.DateTimeFormat('ko-KR', {
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+  timeZone: 'Asia/Seoul',
+});
+
 interface GeneralItem {
   id: string;
   tick: number;
   commandKey: string;
   kind: string;
   text: string;
+  createdAt?: string;
 }
 interface NationItem {
   tick: number;
@@ -212,6 +301,38 @@ interface NationItem {
   rice: number;
 }
 
+function outcomeText(text: string) {
+  return text.split(/(성공|실패)(?=[ :.,·]|$)/u).map((part, index) =>
+    index % 2 === 0 ? (
+      part
+    ) : (
+      <strong key={index} className={part === '실패' ? styles.failedOutcome : styles.successfulOutcome}>
+        {part}
+      </strong>
+    ),
+  );
+}
+
+function activityText(text: string, name: string, cityName?: string) {
+  if (!text.startsWith(name)) return text;
+  const rest = text.slice(name.length);
+  const cityIndex = cityName ? rest.indexOf(cityName) : -1;
+  return (
+    <>
+      <strong>{name}</strong>
+      {cityName && cityIndex >= 0 ? (
+        <>
+          {rest.slice(0, cityIndex)}
+          <strong className={styles.recordCity}>{cityName}</strong>
+          {rest.slice(cityIndex + cityName.length)}
+        </>
+      ) : (
+        rest
+      )}
+    </>
+  );
+}
+
 export function GeneralLogList({ items, clock }: { items: readonly GeneralItem[]; clock: Clock }) {
   return (
     <ol className={styles.lines}>
@@ -219,7 +340,12 @@ export function GeneralLogList({ items, clock }: { items: readonly GeneralItem[]
         <li key={item.id} className={styles.line} data-log-kind={item.kind}>
           <span className={`num ${styles.date}`}>{logDateOf(item.tick, clock)}</span>
           {item.kind === 'failure' ? <Tag tone="danger">실패</Tag> : null}
-          <span className={styles.text}>{item.text}</span>
+          <span className={styles.text}>{outcomeText(item.text)}</span>
+          {item.createdAt && Number.isFinite(Date.parse(item.createdAt)) ? (
+            <time className={styles.executionTime} dateTime={item.createdAt} title="실행 시각 (한국 표준시)">
+              {executionTime.format(new Date(item.createdAt))}
+            </time>
+          ) : null}
         </li>
       ))}
     </ol>
@@ -352,6 +478,9 @@ export function WorldHistoryList({
                       <NationBadge name={nation?.name ?? `국가 ${entry.nationId}`} color={nation?.color ?? null} />
                       <span className="num">
                         {entry.cities}성 {entry.generals}명
+                        {'power' in entry && typeof entry.power === 'number'
+                          ? ` · 국력 ${entry.power.toLocaleString('ko-KR')}`
+                          : ''}
                       </span>
                     </span>
                   );
@@ -389,7 +518,7 @@ function FeedList({ months, testId }: { months: readonly FeedMonth[]; testId: st
                 ) : null}
                 {line.nation ? <NationBadge name={line.nation.name} color={line.nation.color} /> : null}
                 {line.nation ? ' ' : null}
-                {line.text}
+                {line.portrait ? activityText(line.text, line.portrait.name, line.cityName) : line.text}
               </span>
             ))}
           </span>
@@ -402,8 +531,18 @@ function FeedList({ months, testId }: { months: readonly FeedMonth[]; testId: st
 const feedClass = (compact: boolean) => (compact ? `${styles.records} ${styles.compact}` : styles.records);
 
 // 장수 동향 (원작 메인 첫 칸). 온 세상 장수의 공개 평판 사건과 건국·멸망·선전포고·점령을 최신순으로 쓴다.
-export function ActivityFeed({ worldId, compact = false }: { worldId: string; compact?: boolean }) {
-  const query = useActivity(worldId, 'all');
+export function ActivityFeed({
+  worldId,
+  compact = false,
+  biography = false,
+  period,
+}: {
+  worldId: string;
+  compact?: boolean;
+  biography?: boolean;
+  period?: ActivityPeriod | undefined;
+}) {
+  const query = useActivity(worldId, biography ? 'biography' : 'all', period);
   if (query.isPending) return <LoadingState />;
   if (query.isError)
     return <QueryError error={query.error} notFound="월드를 찾을 수 없습니다" onRetry={() => void query.refetch()} />;
@@ -413,7 +552,7 @@ export function ActivityFeed({ worldId, compact = false }: { worldId: string; co
       {lines.length > 0 ? (
         <FeedList months={groupByMonth(lines)} testId="activity-feed" />
       ) : (
-        <EmptyState title="장수 동향이 아직 없습니다" />
+        <EmptyState title={biography ? '열전에 기록된 임관·임명·전공이 없습니다' : '장수 동향이 아직 없습니다'} />
       )}
       <MoreButton query={query} />
     </div>
@@ -490,6 +629,39 @@ export function BattleList({ worldId }: { worldId: string }) {
                 <Portrait id={item.portraitId} name="공격 장수" variant="icon" size={20} decorative />{' '}
                 {battleText(item.text)}
               </span>
+              {item.phases?.length ? (
+                <details>
+                  <summary>교전 단계</summary>
+                  <ol>
+                    {item.phases.map((phase, index) => (
+                      <li key={index}>
+                        {phase.opponent ? `${phase.opponent} · ` : ''}
+                        {phase.kind === 'hold' ? (
+                          '수비 측 교전 저지'
+                        ) : (
+                          <>
+                            {phase.kind === 'volley' ? '선제 사격' : '교전'} · 공격 측 {n(phase.attackerLoss)}명 피해 ·
+                            수비 측 {n(phase.defenderLoss)}
+                            {phase.opponent === '성벽' ? ' 피해' : '명 피해'}
+                            {phase.attackerEvaded ? ' · 공격 측 회피' : ''}
+                            {phase.defenderEvaded ? ' · 수비 측 회피' : ''}
+                            {phase.attackerCritical ? ' · 공격 측 필살' : ''}
+                            {phase.defenderCritical ? ' · 수비 측 필살' : ''}
+                            {phase.attackerTactic
+                              ? ` · 공격 측 ${phase.attackerTactic.name} ${phase.attackerTactic.success ? '성공' : '실패'}`
+                              : ''}
+                            {phase.defenderTactic
+                              ? ` · 수비 측 ${phase.defenderTactic.name} ${phase.defenderTactic.success ? '성공' : '실패'}`
+                              : ''}
+                          </>
+                        )}
+                        {phase.attackerSniped ? ' · 공격 측 저격' : ''}
+                        {phase.defenderSniped ? ' · 수비 측 저격' : ''}
+                      </li>
+                    ))}
+                  </ol>
+                </details>
+              ) : null}
             </li>
           ))}
         </ol>

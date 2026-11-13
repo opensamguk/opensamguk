@@ -16,7 +16,7 @@ import { bindGeneral, query } from './world';
 // T4-34 · AC-P2-16 일부: 실제 Chromium에서 전투 시뮬레이터가 진짜 Web Worker로 simulateBattle을 한 번 실행하는지 본다.
 // T4-86 · AC-P2-26: 기대값은 손으로 적지 않고 Node에서 같은 packages/rules의 simulateBattle과
 // 그 월드의 DB World.unitSet으로 계산한다. 저장소 JSON을 읽지 않는다.
-// 시뮬레이터가 부르는 서버 요청은 월드 병종표 조회(resources.worldRules) 하나다.
+// 내 장수 값은 게임 레이아웃의 home.get을 공유하고 병종표는 resources.worldRules로 조회한다.
 
 const STORAGE = 'test-results/t4-34-battle-sim-storage.json';
 const ctx = { worldId: '', unitSetKey: '' };
@@ -105,6 +105,17 @@ async function openSimulatorFromMenu(page: Page) {
   await expect(page).toHaveURL(`/w/${ctx.worldId}/simulator`);
   await expect(page.getByRole('heading', { level: 1, name: '전투 시뮬레이터' })).toBeVisible();
 }
+
+test('INT-26 내 장수 정보를 공격 칸에 가져오고 수비 칸은 유지한다', async ({ page }) => {
+  await page.goto(`/w/${ctx.worldId}/simulator`);
+  const { general } = await query<{ general: Force }>(page.request, 'home.get', { worldId: ctx.worldId });
+  await box(page, '수비', '병력').fill('4321');
+  await page.getByRole('button', { name: '내 장수 값 가져오기' }).click();
+  await expect(box(page, '공격', '병력')).toHaveValue(String(general.crew));
+  await expect(box(page, '공격', '훈련')).toHaveValue(String(general.train));
+  await expect(box(page, '공격', '사기')).toHaveValue(String(general.atmos));
+  await expect(box(page, '수비', '병력')).toHaveValue('4321');
+});
 
 async function fillCase(page: Page, c: Case) {
   await group(page, '공격').getByRole('combobox', { name: '병종' }).selectOption(String(c.attacker.crewType));
@@ -214,7 +225,7 @@ test('메뉴로 들어가 진짜 Worker가 계산한 결과가 Node의 simulateB
   const workers: Worker[] = [];
   page.on('worker', (w) => workers.push(w));
   await openSimulatorFromMenu(page);
-  await expect(page.getByText(`병종표는 이 월드의 병종표(${ctx.unitSetKey}) 기준입니다.`)).toBeVisible();
+  await expect(page.getByText(`이 월드의 병종표(${ctx.unitSetKey})로 교전 한 번을 계산합니다.`)).toBeVisible();
   // 시뮬레이터는 월드 병종표 조회 말고 tRPC를 부르지 않는다. 위쪽 띠가 원래 부르는 조회(1분 턴이 바뀌면
   // 다시 받는다)와 병종표 조회(메인의 명령 칸과 같은 캐시, 30초 뒤 다시 받을 수 있다)만 허용한다.
   const trpc: string[] = [];
@@ -427,7 +438,9 @@ test('T4-86 AC-P2-26 확장 병종표 월드에서 시뮬레이터와 개인 예
 
   // 장수가 없는 사용자도 병종표를 받아 시뮬레이터를 쓴다.
   await page.goto(`/w/${worldId}/simulator`);
-  await expect(page.getByText('병종표는 이 월드의 병종표(expanded) 기준입니다.')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('이 월드의 병종표(expanded)로 교전 한 번을 계산합니다.')).toBeVisible({
+    timeout: 30_000,
+  });
   const attackerUnits = group(page, '공격').getByRole('combobox', { name: '병종' }).locator('option');
   await expect(attackerUnits).toHaveCount(generals.length);
   // basic에 없는 확장 전용 병종끼리 계산한 결과가 Node의 같은 함수·같은 병종표 결과와 같다.

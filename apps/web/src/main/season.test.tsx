@@ -18,6 +18,7 @@ const season = vi.hoisted(() => ({
     captures: number;
   }>,
   calls: [] as string[],
+  topStratagem: [] as { generalId: number; name: string; successes: number }[],
 }));
 vi.mock('../game/queries', () => ({ useWorldId: () => 'world-one' }));
 vi.mock('../trpc', () => ({
@@ -31,6 +32,13 @@ vi.mock('../trpc', () => ({
             const value = (row: (typeof season.rows)[number]) => (by === 'merit' ? row.wins + row.captures : row[by]);
             return {
               result: null,
+              topStratagem: season.topStratagem,
+              statistics: {
+                final: { nations: 2, generals: 7 },
+                peak: { nations: 5, affiliatedGenerals: 12, generals: 14 },
+                traits: { philosophies: [{ name: '법가', count: 2 }], personalities: [], specialties: [] },
+                nationNames: ['위', '촉'],
+              },
               generals: [...season.rows]
                 .sort((a, b) => value(b) - value(a))
                 .map((row, index) => ({ ...row, merit: row.wins + row.captures, rank: index + 1 })),
@@ -46,6 +54,7 @@ afterEach(() => {
   cleanup();
   season.rows = [];
   season.calls = [];
+  season.topStratagem = [];
 });
 
 function render(ui: ReactElement) {
@@ -136,6 +145,14 @@ describe('기수 결과 칸 최종 장수 순위', () => {
     expect(fiveTigers(rows, null)).toEqual([]);
   });
 
+  it('통일국의 건안칠자는 서버에 보관된 계략 성공 횟수로 표시한다', async () => {
+    season.topStratagem = [{ generalId: 1, name: '가후(賈詡)', successes: 3 }];
+    render(
+      <SeasonResult result={result({ reason: 'UNIFIED', winner: { nationId: 4, name: '위', color: '#000080' } })} />,
+    );
+    expect((await screen.findByTestId('season-stratagem-leaders')).textContent).toContain('가후(3)');
+  });
+
   it('공헌 순으로 열고 기준 단추로 다시 받는다', async () => {
     season.rows = [row(1, '조조(曹操)', wei, [50, 10, 1, 1]), row(2, '유비', shu, [40, 90, 5, 0])];
     render(
@@ -153,5 +170,11 @@ describe('기수 결과 칸 최종 장수 순위', () => {
     await waitFor(() => expect(names()).toEqual(['유비', '조조']));
     expect(screen.getByRole('button', { name: '경험' }).getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByTestId('season-tigers').textContent).toBe('오호장군: 조조(1)');
+    fireEvent.click(screen.getByText('기수 통계'));
+    expect(screen.getByText('최종 2 · 최대 5')).toBeTruthy();
+    expect(screen.getByText('최종 장수 수')).toBeTruthy();
+    expect(screen.getByText('전체 장수 최대 수 (월간 기록)')).toBeTruthy();
+    expect(screen.getByText('법가 2')).toBeTruthy();
+    expect(screen.getByText('위 · 촉')).toBeTruthy();
   });
 });

@@ -5,6 +5,7 @@ import {
   cityCapacity,
   cityInfo,
   generalInfo,
+  generalType,
   garrisonGeneralInfo,
   mapCity,
   nationInfo,
@@ -19,6 +20,41 @@ beforeAll(async () => {
 });
 
 describe('T1-12 / AC-M1-19 공개 범위 표', () => {
+  it.each([
+    [30, 12, 15, '아둔'],
+    [35, 20, 80, '학자'],
+    [35, 80, 20, '장사'],
+    [39, 65, 65, '명사'],
+    [78, 70, 72, '만능'],
+    [40, 70, 30, '용장'],
+    [40, 30, 70, '명장'],
+    [78, 30, 30, '차장'],
+    [40, 55, 58, '평범'],
+  ] as const)('장수 유형을 기본 능력치 %i·%i·%i에서 계산한다', (leadership, strength, intel, expected) => {
+    expect(generalType({ leadership, strength, intel })).toBe(expected);
+  });
+  it('명성 및 레벨 경계에서 다음 경험 기준과 품관을 계산한다', () => {
+    const general = {
+      ...state.generals[0]!,
+      worldId: 'world',
+      turnRevision: 0,
+      residenceTick: null,
+      experience: 1_000,
+      dedication: 101,
+    } as Parameters<typeof generalInfo>[0];
+    expect(generalInfo(general, general)).toMatchObject({
+      progression: {
+        level: 10,
+        experienceInLevel: 0,
+        experienceForNextLevel: 210,
+        honorTitle: '무명',
+        dedicationRank: '29품관',
+      },
+    });
+    expect(generalInfo({ ...general, experience: 77_440 }, general)).toMatchObject({
+      progression: { level: 88, honorTitle: '구세주' },
+    });
+  });
   it.each([
     { viewer: 0, cities: [true, false, false], nations: [true, false], generals: [true, true, false, false] },
     { viewer: 2, cities: [true, true, false], nations: [false, true], generals: [false, false, true, false] },
@@ -83,6 +119,10 @@ describe('T1-12 / AC-M1-19 공개 범위 표', () => {
       cities: [{ cityKey: 1, nationId: 1 }],
     });
     expect(nationRecordInfo(data.nations[0]!)).toEqual({ nationId: 1, cities: 3, generals: 4, gold: 100, rice: 200 });
+    expect(worldRecordInfo(data, [{ nationId: 1, power: 145 }])).toEqual({
+      nations: [{ nationId: 1, cities: 3, generals: 4, power: 145 }],
+      cities: [{ cityKey: 1, nationId: 1 }],
+    });
   });
 
   it('AC-INT-11 지휘 병력은 소유자가 아닌 지휘관으로 합산하고 빈 부곡은 평균에서 뺀다', () => {

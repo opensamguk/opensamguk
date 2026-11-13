@@ -1,4 +1,5 @@
 import type { ReplayState } from '../replay';
+import { hasRareEquipment } from '../equipment/config';
 import { readCampaignState } from '../campaign/state';
 import { reconcileLineage, LineageRevisionLimitError } from '../lineage/reconcile';
 import { reconcileGovernance, GovernanceRevisionLimitError } from '../governance/reconcile';
@@ -38,6 +39,7 @@ export function removeAdminGeneral(replay: ReplayState, generalId: number, tick:
     city.population = Math.min(city.populationMax, city.population + general.crew);
   }
   Object.assign(general, { userId: null, nationId: null, officerLevel: 0, crew: 0, removedAt: tick });
+  if (world.equipment && hasRareEquipment(world.equipment.config)) delete world.equipment.generals[generalId];
   if (world.commandMeta) delete world.commandMeta.offers[generalId];
   if (replay.policy) delete replay.policy.lastActiveTicks[generalId];
   if (campaign) readCampaignState(campaign, world);

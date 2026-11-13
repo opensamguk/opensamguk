@@ -160,7 +160,8 @@
 
 /* 점선 실행 버튼(DisabledReason)도 누르는 대상 44px을 지킨다. */
 .actions button,
-.row button {
+.row button,
+.side button {
   min-height: 44px;
   min-width: 44px;
 }

@@ -68,6 +68,70 @@ const registered: RuleRegistry = {
   ],
 };
 describe('AC-M3-04 원생성 설정 조회', () => {
+  it('INT-26 명품 60종 프로필을 선택할 수 있다', () => {
+    const data = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v13.json'));
+    expect(data).toHaveProperty('featureData.equipment-v1.fullRareEquipment', true);
+    expect(
+      expandedCreationProfile(expandedRows, allPresets, data, ruleRegistry, 'san10-191-rare-catalog'),
+    ).toMatchObject({
+      available: true,
+      featureProfileKey: data.key,
+    });
+  });
+
+  it('INT-26 명품 발견 프로필을 선택할 수 있다', () => {
+    const data = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v12.json'));
+    expect(data).toHaveProperty('featureData.equipment-v1.rareEquipment', true);
+    expect(
+      expandedCreationProfile(expandedRows, allPresets, data, ruleRegistry, 'san10-191-rare-equipment'),
+    ).toMatchObject({
+      available: true,
+      featureProfileKey: data.key,
+    });
+  });
+
+  it('INT-26 탁주와 유산 특기는 새 SAN10 프로필에서 선택할 수 있다', () => {
+    const data = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v11.json'));
+    expect(data).toHaveProperty('featureData.equipment-v1.moraleTool', true);
+    expect(
+      expandedCreationProfile(expandedRows, allPresets, data, ruleRegistry, 'san10-191-combat-tools'),
+    ).toMatchObject({
+      available: true,
+      featureProfileKey: data.key,
+      ruleFeatures: expect.arrayContaining(['heritage-specialty-v1']),
+    });
+  });
+
+  it('INT-26 도시 관직 자원 원생성 프로필을 조회한다', () => {
+    const data = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v10.json'));
+    expect(data.ruleFeatures).toEqual(expect.arrayContaining(['office-effects', 'city-office-volunteer-v1']));
+    expect(
+      expandedCreationProfile(expandedRows, allPresets, data, ruleRegistry, 'san10-191-city-office'),
+    ).toMatchObject({ available: true, featureProfileKey: data.key });
+  });
+
+  it('INT-26 환약이 있는 새 원생성 프로필을 조회한다', () => {
+    const data = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v9.json'));
+    expect(data).toHaveProperty('featureData.equipment-v1.treatmentTool', true);
+    expect(expandedCreationProfile(expandedRows, allPresets, data, ruleRegistry, 'san10-191-treatment')).toMatchObject({
+      available: true,
+      featureProfileKey: data.key,
+    });
+  });
+
+  it('INT-26 장수 상태 규칙을 새 프로필에서 켠다', () => {
+    const previous = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v7.json'));
+    const data = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v8.json'));
+    expect(data).toEqual({
+      ...previous,
+      key: 'expanded-191-v8',
+      ruleFeatures: [...previous.ruleFeatures, 'general-condition-v1'].sort(),
+    });
+    expect(
+      expandedCreationProfile(expandedRows, allPresets, data, ruleRegistry, 'san10-191-general-condition'),
+    ).toMatchObject({ available: true, featureProfileKey: data.key, ruleFeatures: data.ruleFeatures });
+  });
+
   it('AC-M1-14 새 선택에서만 기존 연구판과 접경귀환을 함께 고정한다', () => {
     const previous = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v6.json'));
     const data = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v7.json'));

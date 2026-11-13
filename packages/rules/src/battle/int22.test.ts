@@ -65,6 +65,46 @@ it('AC-P2-24 본공성에서 아직 쏘지 않은 공격군만 선제사격한�
   expect(second).not.toHaveProperty('attackerFirstVolleyFired');
 });
 
+it('INT-26 반계 장비는 성공한 계략의 피해를 반대편에 적용하고 전투 기록에 남긴다', () => {
+  const input = fixture();
+  rows(input)[0].magicCoef = 0.1;
+  input.attackerTactics = { leadership: 100, strength: 100, intel: 100 };
+  input.recordPhases = true;
+  const normal = run(input, [0, 0, 0, 0.5, 0.5]);
+  const reflected = run({ ...input, defenderEquipment: { counterTactics: 0.1 } }, [0, 0, 0, 0.05, 0.5, 0.5]);
+  expect(normal.phases?.[0]?.attackerTactic).toEqual({ name: '위보', success: true });
+  expect(reflected.phases?.[0]).toMatchObject({ defenderTactic: { name: '반계(위보)', success: true } });
+  expect(reflected.phases?.[0]).not.toHaveProperty('attackerTactic');
+  expect(reflected.attacker.crew).toBeLessThan(normal.attacker.crew);
+  expect(reflected.defender.crew).toBeGreaterThan(normal.defender.crew);
+});
+
+it('INT-26 저격은 첫 교전에만 사기를 올리고 장수의 부상을 80까지 올린다', () => {
+  const input = fixture();
+  input.attackerEquipment = { snipe: { chance: 0.2, morale: 20, injury: [20, 40] } };
+  input.defenderInjury = 79;
+  input.recordPhases = true;
+  const hit = run(input, [0.1]);
+  expect(hit.defenderInjury).toBe(80);
+  expect(hit.attacker.atmos).toBe(20);
+  expect(hit.phases?.[0]?.attackerSniped).toBe(true);
+  expect(run(input, [0.2])).not.toHaveProperty('defenderInjury');
+  const wallInput = { ...input };
+  delete wallInput.defenderInjury;
+  const wall = run(wallInput, [0.1]);
+  expect(wall).not.toHaveProperty('defenderInjury');
+  expect(wall.attacker.atmos).toBe(20);
+});
+
+it('INT-26 백마와 사륜거 효과는 전투 종료 부상 판정만 건너뛴다', () => {
+  const input = { ...fixture(), attackerInjury: 20, attackerEquipment: {} };
+  expect(run(input, [0.5, 0.5, 0.01]).attackerInjury).toBeGreaterThanOrEqual(30);
+  const protectedInput = { ...input, attackerEquipment: { protectsFromBattleInjury: true as const } };
+  expect(run(protectedInput, [0.5, 0.5, 0.01])).not.toHaveProperty('attackerInjury');
+  const sniper = { snipe: { chance: 1, morale: 20, injury: [20, 40] as const } };
+  expect(run({ ...protectedInput, defenderEquipment: sniper }, [0.01]).attackerInjury).toBeGreaterThanOrEqual(40);
+});
+
 describe('AC-INT-22 기존 월드 전투', () => {
   it.each(legacyBattleGolden)('$a → $b의 실제 기존 결과와 난수 상태를 보존한다', (golden) => {
     const input = {

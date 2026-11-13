@@ -4,6 +4,10 @@ import {
   effectiveWorldOptions,
   OFFICE_EFFECTS_FEATURE,
   officeEffectsSchema,
+  readCityOfficeVolunteers,
+  HERITAGE_SPECIALTY_FEATURE,
+  storedHeritageSpecialty,
+  storedHeritageTurnTime,
   readOperationalMap,
   attachOperationalKinds,
   readStoredGovernance,
@@ -15,6 +19,21 @@ import {
   readStoredNationLifecycle,
   readStoredRelations,
   assertNationLifecycle,
+  storedCitySeasonalEvent,
+  storedCityConflict,
+  storedStatExperience,
+  storedDefenseStance,
+  storedGeneralProficiency,
+  storedHeritageBenefits,
+  HERITAGE_BENEFITS_FEATURE,
+  GENERAL_PROFICIENCY_FEATURE,
+  storedNpcNationPolicy,
+  storedFinanceRates,
+  NATION_FINANCE_FEATURE,
+  storedNationRestrictions,
+  NATION_RESTRICTIONS_FEATURE,
+  NPC_NATION_POLICY_FEATURE,
+  DEFENSE_STANCE_FEATURE,
   type WorldState,
 } from '@opensamguk/rules';
 import { engineFeatures } from './features';
@@ -53,15 +72,22 @@ export async function loadWorldAfterCapabilityCheck(
   const { presetRules: rules, recruitmentLocation } = effectiveWorldOptions(preset, world.runtimeOptions);
   if (world.replayFormat === 3) await assertPersonnelStorage(tx, worldId, world.ruleFeatures.includes('personnel'));
   const ext = await loadExt(tx, worldId, commands, world.ruleFeatures);
-  const cities = await tx.city.findMany({ where: { worldId } });
+  const cities = await tx.city.findMany({ where: { worldId }, omit: { conflictTick: true, stratagemTick: true } });
   const operationalMap = readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin);
   const nations = await tx.nation.findMany({
     where: { worldId },
-    omit: { notice: true, noticeDirective: true, noticeRevision: true, noticeUpdatedAt: true, noticeUpdatedBy: true },
+    omit: {
+      notice: true,
+      recruitmentNotice: true,
+      noticeDirective: true,
+      noticeRevision: true,
+      noticeUpdatedAt: true,
+      noticeUpdatedBy: true,
+    },
   });
   const generals = await tx.general.findMany({
     where: { worldId },
-    omit: { noticeSeen: true, defaultPolicy: true, lastActiveTick: true, lastActiveAt: true },
+    omit: { noticeSeen: true, defaultPolicy: true, lastActiveTick: true, lastActiveAt: true, nationJoinedTick: true },
   });
   if (world.replayFormat === 3 && !world.ruleFeatures.includes('personnel')) assertNoResidenceAnchorsInRows(generals);
   const diplomacies = await tx.diplomacy.findMany({
@@ -91,39 +117,94 @@ export async function loadWorldAfterCapabilityCheck(
     ...(ext ? { ext } : {}),
     startYear: world.startYear,
     cities: Object.fromEntries(
-      attachOperationalKinds(cities.map(stripWorldId), operationalMap).map((city) => [city.cityKey, city]),
+      attachOperationalKinds(
+        cities.map(({ seasonalEvent, warCasualties, conflict, conflictOrder, ...city }) => ({
+          ...stripWorldId(city),
+          ...storedCitySeasonalEvent(seasonalEvent),
+          ...storedCityConflict(conflict, conflictOrder),
+          ...(warCasualties == null ? {} : { warCasualties }),
+        })),
+        operationalMap,
+      ).map((city) => [city.cityKey, city]),
     ),
     nations: Object.fromEntries(
-      nations.map((nation) => {
-        return [nation.id, { ...stripWorldId(nation), capitalCityKey: nation.capitalCityKey }];
+      nations.map(({ diplomaticAidUntilMonth, npcSettings, restrictions, financeRates, ...nation }) => {
+        const rates = world.ruleFeatures.includes(NATION_FINANCE_FEATURE)
+          ? storedFinanceRates(financeRates)
+          : undefined;
+        return [
+          nation.id,
+          {
+            ...stripWorldId(nation),
+            ...(diplomaticAidUntilMonth != null ? { diplomaticAidUntilMonth } : {}),
+            ...storedNpcNationPolicy(world.ruleFeatures.includes(NPC_NATION_POLICY_FEATURE), npcSettings),
+            ...(rates === undefined ? {} : { financeRates: rates }),
+            ...storedNationRestrictions(world.ruleFeatures.includes(NATION_RESTRICTIONS_FEATURE), restrictions),
+          },
+        ];
       }),
     ),
     generals: Object.fromEntries(
-      generals.map(({ turnRevision, battleWins, captures, residenceTick, officerCityKey, ...general }) => {
-        void turnRevision;
-        void residenceTick;
-        // 순위용 누계는 게임 규칙 입력이 아니다. 기존 재생 해시에 섞지 않는다.
-        void battleWins;
-        void captures;
-        return [
-          general.id,
-          storedGeneralStats(
-            storedGeneralRemoval(
-              storedGeneralSex(
-                { ...stripWorldId(general), ...(officerCityKey == null ? {} : { officerCityKey }) },
-                world.ruleFeatures.includes('lineage-v1'),
+      generals.map(
+        ({
+          turnRevision,
+          battleWins,
+          captures,
+          stratagemSuccesses,
+          residenceTick,
+          officerCityKey,
+          defenseThreshold,
+          proficiency,
+          statExperience,
+          heritageBenefits,
+          heritageSpecialty,
+          heritageTurnTime,
+          heritageStatReset,
+          combatSpecial,
+          ...general
+        }) => {
+          void turnRevision;
+          void residenceTick;
+          // 순위용 누계는 게임 규칙 입력이 아니다. 기존 재생 해시에 섞지 않는다.
+          void battleWins;
+          void captures;
+          void stratagemSuccesses;
+          return [
+            general.id,
+            storedGeneralStats(
+              storedGeneralRemoval(
+                storedGeneralSex(
+                  {
+                    ...stripWorldId(general),
+                    ...(officerCityKey == null ? {} : { officerCityKey }),
+                    ...storedHeritageSpecialty(
+                      world.ruleFeatures.includes(HERITAGE_SPECIALTY_FEATURE),
+                      heritageSpecialty,
+                    ),
+                    ...(heritageSpecialty == null ? {} : { combatSpecial }),
+                    ...storedHeritageTurnTime(heritageTurnTime),
+                    ...(heritageStatReset === true ? { heritageStatReset: true as const } : {}),
+                    ...storedHeritageBenefits(world.ruleFeatures.includes(HERITAGE_BENEFITS_FEATURE), heritageBenefits),
+                    ...storedGeneralProficiency(world.ruleFeatures.includes(GENERAL_PROFICIENCY_FEATURE), proficiency),
+                    ...storedStatExperience(statExperience),
+                    ...storedDefenseStance(world.ruleFeatures.includes(DEFENSE_STANCE_FEATURE), defenseThreshold),
+                  },
+                  world.ruleFeatures.includes('lineage-v1'),
+                ),
+                world.replayFormat,
               ),
-              world.replayFormat,
+              world.ruleFeatures?.includes('five-stats') ?? false,
             ),
-            world.ruleFeatures?.includes('five-stats') ?? false,
-          ),
-        ];
-      }),
+          ];
+        },
+      ),
     ),
     diplomacies: diplomacies.map(stripWorldId),
     ...(await loadCommandState(tx, worldId, world)),
     ...(capabilities.kind === 'caps' && 'treaty' in capabilities.selection ? await loadTreaties(tx, worldId) : {}),
   };
+  const volunteers = readCityOfficeVolunteers(world.ruleFeatures, world.cityOfficeVolunteers);
+  if (volunteers) state.cityOfficeVolunteers = volunteers;
   const campaign = readStoredCampaign(world.campaignState, state, world.seed);
   if (campaign) state.campaign = campaign;
   const cityResources = readStoredCityResources(world.cityResourcesState, state, armyTypes);

@@ -10,6 +10,7 @@ import {
   toGameDate,
   seasonOutcome,
   runGeneralTurn,
+  advanceHeritageTurnTime,
   unitSetSchema,
   TICKS_PER_MONTH,
   assertSlotSet,
@@ -39,7 +40,12 @@ import { preparePendingReset, type PendingResetPreparation } from './admin/reset
 import { PgHeritageRepository } from './heritage/repository';
 import { creditHeritageSeason } from './heritage/service';
 import { appendReputationEvents } from './reputationState';
-import { persistSeasonArchive } from './seasonArchive';
+import {
+  finalNationSummaries,
+  persistSeasonArchive,
+  seasonTraitDistribution,
+  seasonWinnerSummary,
+} from './seasonArchive';
 
 export const CLOCK_CHECKPOINT_MS = 5_000;
 export const ENGINE_BATCH_STEPS = 64;
@@ -289,7 +295,12 @@ export class TurnLoop {
             world.treatyFormat === 1 ? hashState(state.treaties ? { treaties: state.treaties } : {}) : null;
           const turn = runGeneralTurn(
             state,
-            { generalId: due.id, tick: due.nextTurnTick, unitSet: unitSetSchema.parse(world.unitSet) },
+            {
+              generalId: due.id,
+              tick: due.nextTurnTick,
+              unitSet: unitSetSchema.parse(world.unitSet),
+              recordBattleStats: true,
+            },
             {
               commandKey: command?.commandKey ?? 'rest',
               args: command?.args ?? {},
@@ -298,6 +309,9 @@ export class TurnLoop {
             world.seed,
             {
               ...(modern ? { policy: actor.defaultPolicy as import('@opensamguk/rules').PolicyKey } : {}),
+              ...(modern && actor.lastActiveTick !== null
+                ? { activity: { lastActiveTick: actor.lastActiveTick, turnTermMinutes: world.turnTermMinutes } }
+                : {}),
               turnRevision: actor.turnRevision,
             },
             engineResolver(world).resolver,
@@ -312,7 +326,7 @@ export class TurnLoop {
           const result = turn.result;
           const failed = 'code' in result;
           next = turn.state;
-          next.generals[due.id]!.nextTurnTick = due.nextTurnTick + TICKS_PER_MONTH;
+          advanceHeritageTurnTime(next.generals[due.id]!, due.nextTurnTick);
           const personnelPacket = personnelBefore
             ? completePersonnelStep(
                 personnelBefore.state,
@@ -358,6 +372,7 @@ export class TurnLoop {
                   })
               : undefined,
             capabilities.kind === 'registry' ? capabilities.armyTypes : undefined,
+            failed ? undefined : result.cityTransfer,
           );
           await persistExt(tx, worldId, state.ext, next.ext);
           if (world.ruleFeatures.includes('reputation-v1'))
@@ -398,13 +413,16 @@ export class TurnLoop {
               sequence,
               commandKey,
               kind: failed ? 'failure' : 'success',
-              text: failed ? `${result.code}: ${result.message}` : result.logs.map((log) => log.text).join('\n'),
+              text: [
+                ...(turn.treatment ? ['환약을 써서 부상을 회복했습니다.'] : []),
+                ...(failed ? [`${result.code}: ${result.message}`] : result.logs.map((log) => log.text)),
+              ].join('\n'),
             },
           });
           await shiftTurns(tx, worldId, due.id, { ...world, actionSequence: sequence }, slots);
           const updated = await tx.general.updateMany({
             where: { worldId, id: due.id, nextTurnTick: due.nextTurnTick, turnRevision: actor.turnRevision },
-            data: { nextTurnTick: due.nextTurnTick + TICKS_PER_MONTH, turnRevision: { increment: 1 } },
+            data: { nextTurnTick: next.generals[due.id]!.nextTurnTick, turnRevision: { increment: 1 } },
           });
           if (updated.count !== 1) throw new Error('예턴이 변경되어 턴 저장을 취소했습니다.');
           await enqueueNotifications(tx, notifications);
@@ -430,6 +448,21 @@ export class TurnLoop {
               ...outcome,
               winnerName: winner?.name ?? null,
               winnerColor: winner?.color ?? null,
+              finalNations: finalNationSummaries(
+                next!,
+                date.year,
+                Object.values(next!.nations).map(({ id }) => id),
+              ),
+              traitDistribution: seasonTraitDistribution(next!, date.year),
+              ...(winner
+                ? {
+                    winnerSummary: seasonWinnerSummary(next!, winner.id, {
+                      seed: world.seed,
+                      tick: endedTick!,
+                      year: date.year,
+                    }),
+                  }
+                : {}),
               endedYear: date.year,
               endedMonth: date.month,
               endedTick: endedTick!,

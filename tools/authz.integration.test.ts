@@ -58,6 +58,7 @@ const paths = [
   'records.general',
   'records.battles',
   'records.activity',
+  'records.traffic',
   'records.nation',
   'records.world',
   'records.season',
@@ -223,6 +224,7 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
             path.startsWith('auth.') ||
             path === 'health' ||
             path === 'world.publicMaps' ||
+            path === 'records.traffic' ||
             path === 'timelapse.publicFrames';
           const cookie =
             category === 'unauthenticated'
@@ -237,7 +239,10 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
                 ? { email: users[2]!.email, password }
                 : input(path);
           const publicWorldRead =
-            path === 'commands.list' || path === 'treaty.relations' || path === 'records.activity';
+            path === 'commands.list' ||
+            path === 'treaty.relations' ||
+            path === 'records.activity' ||
+            path === 'records.traffic';
           const ownerCookie = publicWorldRead && category === 'otherUser' ? await session() : undefined;
           const before = await snapshot();
           const result = await request(path, data, cookie);
@@ -268,7 +273,7 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
                   expect.objectContaining({ key: 'invite', available: null, reason: expect.any(String) }),
                 ]),
               );
-            } else if (path === 'treaty.relations' || path === 'records.activity') {
+            } else if (path === 'treaty.relations' || path === 'records.activity' || path === 'records.traffic') {
               const owner = await request(path, data, ownerCookie);
               expect(owner.status).toBe(200);
               expect(result).toEqual(owner);
@@ -377,6 +382,7 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
       'nation',
       'officerLevel',
       'rank',
+      'stratagemSuccesses',
       'value',
       'wins',
     ]);
@@ -400,6 +406,85 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
       expect(await request('records.season', input, cookie)).toEqual(original);
     } finally {
       await db.general.update({ where, data: general });
+    }
+  });
+  it('AC-INT-26 기수의 국가 기록은 월간 공개 국력과 최대 영토를 모은다', async () => {
+    const city = state.cities[0]!;
+    const nation = state.nations[0]!;
+    const where = { worldId_tick: { worldId: endedWorldId, tick: 10000 } };
+    const original = await db.yearbookSnapshot.findUniqueOrThrow({ where });
+    const entry = { worldId_tick_nationId: { worldId: endedWorldId, tick: 10000, nationId: nation.id } };
+    const archivedNation = await db.yearbookNation.findUniqueOrThrow({ where: entry });
+    try {
+      await db.yearbookNation.update({ where: entry, data: { power: 87, troops: 250 } });
+      await db.yearbookSnapshot.update({
+        where,
+        data: {
+          data: {
+            cities: [{ cityKey: city.cityKey, nationId: nation.id }],
+            nations: [{ nationId: nation.id, cities: 1, generals: 2 }],
+          },
+        },
+      });
+      const result = await request('records.season', { worldId: endedWorldId }, await session());
+      expect(result).toMatchObject({
+        status: 200,
+        data: {
+          nations: expect.arrayContaining([
+            expect.objectContaining({
+              nationId: nation.id,
+              peakCities: 1,
+              peakPower: 87,
+              peakTroops: 250,
+              final: null,
+              recordedAtTick: 10000,
+              cities: [{ cityKey: city.cityKey, name: city.name }],
+            }),
+          ]),
+        },
+      });
+    } finally {
+      await db.yearbookNation.update({
+        where: entry,
+        data: { power: archivedNation.power, troops: archivedNation.troops },
+      });
+      await db.yearbookSnapshot.update({ where, data: { data: original.data as object } });
+    }
+  });
+  it('AC-INT-26 통일국의 건안칠자는 종료 당시의 계략 성공 횟수를 쓴다', async () => {
+    const row = await db.seasonGeneral.findFirstOrThrow({
+      where: { worldId: endedWorldId, nationId: { not: null } },
+      orderBy: { generalId: 'asc' },
+    });
+    const result = await db.worldResult.findUniqueOrThrow({ where: { worldId: endedWorldId } });
+    const archived = { worldId_generalId: { worldId: endedWorldId, generalId: row.generalId } };
+    try {
+      await db.worldResult.update({
+        where: { worldId: endedWorldId },
+        data: {
+          reason: 'UNIFIED',
+          winnerNationId: row.nationId,
+          winnerName: row.nationName,
+          winnerColor: row.nationColor,
+        },
+      });
+      await db.seasonGeneral.update({ where: archived, data: { stratagemSuccesses: 3 } });
+      const response = await request('records.season', { worldId: endedWorldId, by: 'experience' }, await session());
+      expect(response).toMatchObject({
+        status: 200,
+        data: { topStratagem: [{ generalId: row.generalId, name: row.name, successes: 3 }] },
+      });
+    } finally {
+      await db.seasonGeneral.update({ where: archived, data: { stratagemSuccesses: row.stratagemSuccesses } });
+      await db.worldResult.update({
+        where: { worldId: endedWorldId },
+        data: {
+          reason: result.reason,
+          winnerNationId: result.winnerNationId,
+          winnerName: result.winnerName,
+          winnerColor: result.winnerColor,
+        },
+      });
     }
   });
   it('AC-P2-07 첩보 예턴은 같은 국가에만 저장 보고서를 열고 병력을 구간으로 표시한다', async () => {

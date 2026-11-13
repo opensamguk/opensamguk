@@ -11,6 +11,8 @@ export interface Actor {
   unitSet?: DeepReadonly<UnitSetResource> | undefined;
   authority?: 'office';
   campaignOrderId?: number;
+  recordBattleStats?: true;
+  worldSeed?: string | undefined;
 }
 export interface Failure {
   code:
@@ -46,13 +48,23 @@ export interface LogEntry {
 export interface CommandResult {
   effects: Effect[];
   logs: LogEntry[];
-  reports?: { generalId: number; text: string }[];
+  reports?: { generalId: number; text: string; phases?: import('../battle/simulate').BattlePhase[] }[];
   // 실제로 해결한 공격의 점령 전 대상이다. 알림·보고용이며 상태에는 넣지 않는다.
   attackTarget?: { cityKey: number; defendingNationId: number | null };
+  cityTransfer?: { cityKey: number; fromNationId: number; toNationId: number };
+  stratagemCityKey?: number;
   history?: { nationId: number; text: string; kind?: 'intel' }[];
   // 순위용 집계 이벤트이며 재생 상태에는 넣지 않는다.
   battleAwards?: { generalId: number; wins: number; captures: number }[];
+  stratagemSucceeded?: true;
   battleOutcomes?: { winnerId: number; loserId: number }[];
+  generalEngagements?: {
+    attackerId: number;
+    defenderId: number;
+    attackerLoss: number;
+    defenderLoss: number;
+    winnerId: number | null;
+  }[];
 }
 export const COMMAND_CATEGORIES = ['domestic', 'military', 'strategy', 'personal', 'nation'] as const;
 export type CommandCategory = (typeof COMMAND_CATEGORIES)[number];

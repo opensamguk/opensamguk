@@ -104,6 +104,56 @@ afterAll(async () => {
 });
 
 describe('T1-11 실제 HTTP·PostgreSQL 권한', () => {
+  it('INT-26 월드 접속량은 동시 갱신 수와 고유 장수 수를 연월별로 집계한다', async () => {
+    const { a, b, worldId, initial } = await fixture();
+    const traffic = () => request('records.traffic', { worldId });
+    expect((await traffic()).data).toEqual({ periods: [], maxRefresh: 0, maxVisitors: 0 });
+    const reads = await Promise.all(
+      [a.cookie, a.cookie, b.cookie].map((cookie) => request('home.get', { worldId }, cookie)),
+    );
+    expect(reads.every(({ code }) => code === undefined)).toBe(true);
+    expect(reads[2]!.data.refreshScore).toMatchObject({ current: 1, total: 1, grade: '안함', level: 0 });
+    await request('home.get', { worldId });
+    expect((await traffic()).data).toMatchObject({
+      periods: [{ year: initial.startYear, month: 1, refresh: 3, visitors: 2 }],
+      maxRefresh: 3,
+      maxVisitors: 2,
+    });
+    await db.world.update({
+      where: { id: worldId },
+      data: { clockAnchorAt: new Date(Date.now() - 3_600_010) },
+    });
+    const nextMonth = await request('home.get', { worldId }, a.cookie);
+    expect(nextMonth.data.refreshScore).toMatchObject({ current: 1, total: 3, grade: '안함', level: 0 });
+    const after = (await traffic()).data;
+    expect(after).toMatchObject({
+      periods: [
+        { year: initial.startYear, month: 2, refresh: 1, visitors: 1 },
+        { year: initial.startYear, month: 1, refresh: 3, visitors: 2 },
+      ],
+      maxRefresh: 3,
+      maxVisitors: 2,
+    });
+    expect(JSON.stringify(after)).not.toContain(a.id);
+    expect(JSON.stringify(after)).not.toContain(initial.generals[0]!.name);
+  });
+
+  it('장수 열전의 임관 기록에 장수 이름과 초상을 붙여 본인에게만 표시한다', async () => {
+    const { a, b, worldId, initial } = await fixture(true, (world) => {
+      world.generals[0]!.portraitId = 10001;
+    });
+    const general = initial.generals[0]!;
+    const text = '열전 시험 임관';
+    await db.generalLog.create({
+      data: { worldId, generalId: general.id, tick: 1, commandKey: 'join', kind: 'success', text },
+    });
+    const input = { worldId, scope: 'biography' };
+    expect((await request('records.activity', input, a.cookie)).data).toMatchObject({
+      items: [{ source: 'milestone', generalId: general.id, generalName: general.name, portraitId: 10001, text }],
+    });
+    expect((await request('records.activity', input, b.cookie)).data).toMatchObject({ items: [] });
+  });
+
   it('home과 mine의 공개 장수 필드는 유지하고 내부 소유권·성향·revision을 숨긴다', async () => {
     const { a, worldId } = await fixture();
     const home = await request('home.get', { worldId }, a.cookie);
@@ -138,14 +188,27 @@ describe('T1-11 실제 HTTP·PostgreSQL 권한', () => {
     ].sort();
     expect(home.code).toBeUndefined();
     expect(mine.code).toBeUndefined();
-    expect(Object.keys(home.data.general).sort()).toEqual([...fields, 'policy', 'defense', 'salaryEstimate'].sort());
+    const homeFields = [
+      'policy',
+      'defense',
+      'salaryEstimate',
+      'battleStats',
+      'combatSpecialty',
+      'domesticSpecialty',
+      'generalType',
+      'personalityEffects',
+      'progression',
+      'troop',
+    ];
+    expect(Object.keys(home.data.general).sort()).toEqual([...fields, ...homeFields].sort());
     expect(Object.keys(mine.data.general).sort()).toEqual(fields);
-    const { policy, defense, salaryEstimate, ...homeGeneral } = home.data.general;
-    expect(defense).toMatchObject({ troops: expect.any(Number) });
-    expect(salaryEstimate).toMatchObject({ gold: expect.any(Number), rice: expect.any(Number) });
+    expect(home.data.general).toMatchObject({
+      ...mine.data.general,
+      policy: { key: 'none', name: '없음' },
+      defense: { troops: expect.any(Number) },
+      salaryEstimate: { gold: expect.any(Number), rice: expect.any(Number) },
+    });
     expect(mine.data.general.isHuman).toBe(true);
-    expect(policy).toEqual({ key: 'none', name: '없음' });
-    expect(homeGeneral).toEqual(mine.data.general);
     expect(mine.data).toHaveProperty('creation', null);
     expect(home.data).not.toHaveProperty('creation');
     for (const key of ['userId', 'affinity', 'turnRevision']) {

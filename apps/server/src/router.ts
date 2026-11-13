@@ -16,6 +16,7 @@ import { commandsRouter } from './routers/commands';
 import { homeRouter } from './routers/home';
 import { cityRouter } from './routers/city';
 import { nationRouter } from './routers/nation';
+import { nationBoardRouter } from './routers/nationBoard';
 import { recordsRouter } from './routers/records';
 import { reviewRouter } from './routers/review';
 import { rankingRouter } from './routers/ranking';
@@ -26,6 +27,7 @@ import { lobbyRouter } from './routers/lobby';
 import { operationRouter } from './routers/operation';
 import { inspectionRouter } from './routers/inspection';
 import { treatyRouter } from './routers/treaty';
+import { diplomaticDocumentsRouter } from './routers/diplomaticDocuments';
 import { personnelRouter } from './routers/personnel';
 import { offersRouter } from './routers/offers';
 import { nationTurnsRouter } from './routers/nationTurns';
@@ -34,6 +36,7 @@ import { campaignRouter } from './routers/campaign';
 import { cityResourcesRouter } from './routers/cityResources';
 import { logisticsRouter } from './routers/logistics';
 import { equipmentRouter } from './routers/equipment';
+import { troopRouter } from './routers/troop';
 import { governanceRouter } from './routers/governance';
 import { lineageRouter } from './routers/lineage';
 import { stratagemCardsRouter } from './routers/stratagemCards';
@@ -59,6 +62,7 @@ export const appRouter = router({
   home: homeRouter,
   city: cityRouter,
   nation: nationRouter,
+  nationBoard: nationBoardRouter,
   records: recordsRouter,
   review: reviewRouter,
   ranking: rankingRouter,
@@ -69,6 +73,7 @@ export const appRouter = router({
   operation: operationRouter,
   inspection: inspectionRouter,
   treaty: treatyRouter,
+  diplomaticDocuments: diplomaticDocumentsRouter,
   personnel: personnelRouter,
   offers: offersRouter,
   nationTurns: nationTurnsRouter,
@@ -78,6 +83,7 @@ export const appRouter = router({
   logistics: logisticsRouter,
   equipment: equipmentRouter,
   governance: governanceRouter,
+  troop: troopRouter,
   lineage: lineageRouter,
   stratagemCards: stratagemCardsRouter,
   heritage: heritageRouter,

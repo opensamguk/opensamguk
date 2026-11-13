@@ -1,7 +1,7 @@
 import type { CommandInfo } from './CommandPicker';
 
 // 명령 도움말과 실행 가능 여부 (INT-26). commands.list는 설명·비용·요구 조건·소요 턴·가능 여부를 싣고,
-// nationCommands.list는 가능 여부만 싣는다. 없는 값은 줄을 그리지 않는다.
+// 도움말 값이 비어 있으면 해당 줄을 생략한다.
 
 const text = (value: unknown) => (typeof value === 'string' && value.trim() !== '' ? value.trim() : null);
 

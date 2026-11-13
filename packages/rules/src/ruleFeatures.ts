@@ -1,18 +1,27 @@
 import { z } from 'zod';
+import { HERITAGE_BIRTH_FEATURE } from './heritage/birth';
 import { createdHeritageStat } from './heritage/creation';
 import { FIVE_STAT_KEYS, FIVE_STAT_RULES, checkStatProfile } from './general/fiveStats';
 import { validateGeneralCreation } from './general/create';
+import { GENERAL_PERSONALITY_FEATURE } from './general/personality';
 import type { InputKindDefinition, RuleFeatureDefinition } from './ruleRegistry';
 import type { RecordedInput, ReplayState } from './replay';
 import { enableReplayPolicy } from './policy/replay';
 import { applyPersonnelRecordStep } from './personnel/inputStep';
 import { validatePersonnelRecord } from './personnel/inputs';
+import { CITY_OFFICE_VOLUNTEER_FEATURE } from './personnel/cityOfficeVolunteers';
 import { runPersonnelMonth } from './personnel/monthStep';
 import { updateResidenceAnchors } from './personnel/residence';
 import { recordedLineageSuccession } from './lineage/control';
 import { recordedPossession } from './entry/possess';
 import { completePersonnelStep, type PersonnelStepPacket } from './personnel/step';
-import { applyTreatyInput, settleMonthlyTreaties, treatyOptions, validateTreatyRecord } from './diplomacy/treaty';
+import {
+  applyTreatyInput,
+  RANKED_AID_FEATURE,
+  settleMonthlyTreaties,
+  treatyOptions,
+  validateTreatyRecord,
+} from './diplomacy/treaty';
 import { EXPANDED_TREATY_FEATURE } from './diplomacy/treatyClauses';
 import { validatePolicyInput } from './replayInputs';
 import { trade } from './commands/trade';
@@ -64,6 +73,8 @@ export const fiveStatsFeature: RuleFeatureDefinition = {
         FIVE_STAT_RULES,
         origin.initial.ruleFeatures?.includes('lineage-v1'),
         origin.initial.ruleFeatures?.includes('heritage-v1'),
+        origin.initial.ruleFeatures?.includes(GENERAL_PERSONALITY_FEATURE),
+        origin.initial.ruleFeatures?.includes(HERITAGE_BIRTH_FEATURE),
       );
       const general = (input.result as { general?: Record<string, unknown> } | null)?.general;
       if (
@@ -142,7 +153,11 @@ export const personnelFeature: RuleFeatureDefinition = {
   },
   checkArchive({ origin, inputs, end }) {
     for (const input of inputs) {
-      if (!['personnel.appoint', 'personnel.dismiss', 'offer.respond', 'nationTurns.set'].includes(input.kind))
+      if (
+        !['personnel.appoint', 'personnel.dismiss', 'offer.respond', 'personnel.volunteer', 'nationTurns.set'].includes(
+          input.kind,
+        )
+      )
         continue;
       const { tick, ...record } = input;
       const { activeTick, ...result } = record.result as Record<string, unknown>;
@@ -232,6 +247,7 @@ export const personnelInputKinds: readonly InputKindDefinition[] = [
     route: 'queued',
     apply: applyPersonnel,
   })),
+  { kind: 'personnel.volunteer', feature: CITY_OFFICE_VOLUNTEER_FEATURE, route: 'queued', apply: applyPersonnel },
   { kind: 'nationTurns.set', feature: 'personnel', route: 'direct', directTick: true, apply: applyPersonnel },
 ];
 
@@ -250,6 +266,7 @@ export const treatyFeature: RuleFeatureDefinition = {
         treaty: { version: 1 },
         ...(origin.initial.ruleFeatures?.includes('treaty-trade') ? { treatyTrade: { version: 1 } } : {}),
         ...(origin.initial.ruleFeatures?.includes(EXPANDED_TREATY_FEATURE) ? { treatyExpanded: { version: 1 } } : {}),
+        rankedAidEnabled: origin.initial.ruleFeatures?.includes(RANKED_AID_FEATURE) ?? false,
         monthlyTick: 0,
         ...(end && input.sequence > end.sequence ? { endTick: end.tick } : {}),
       });
@@ -279,6 +296,7 @@ export const treatyBreakFeature: RuleFeatureDefinition = {
         treatyBreak: { version: 1 },
         ...(origin.initial.ruleFeatures?.includes('treaty-trade') ? { treatyTrade: { version: 1 } } : {}),
         ...(origin.initial.ruleFeatures?.includes(EXPANDED_TREATY_FEATURE) ? { treatyExpanded: { version: 1 } } : {}),
+        rankedAidEnabled: origin.initial.ruleFeatures?.includes(RANKED_AID_FEATURE) ?? false,
         monthlyTick: 0,
         ...(end && input.sequence > end.sequence ? { endTick: end.tick } : {}),
       });
@@ -316,6 +334,7 @@ function applyTreaty(replay: ReplayState, input: RecordedInput): ReplayState {
       ? { treatyExpanded: { version: 1 as const } }
       : {}),
     monthlyTick: replay.monthlyTick,
+    rankedAidEnabled: replay.state.ruleFeatures?.includes(RANKED_AID_FEATURE) ?? false,
   };
   const validated = validateTreatyRecord(record, context);
   if (validated.status !== 'APPLIED' || validated.result.tick !== tick) throw new Error('조약 처리 tick이 다릅니다.');

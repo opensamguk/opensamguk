@@ -151,6 +151,7 @@ async function fixture(
   const generals = withWorld(initial.generals).map((row) => ({
     ...row,
     turnRevision: 0,
+    stratagemSuccesses: 0,
     battleWins: 0,
     captures: 0,
     defaultPolicy: 'none',
@@ -246,6 +247,7 @@ async function fixture(
     },
     yearbookNation: { createMany: vi.fn().mockResolvedValue({ count: 2 }) },
     nationHistory: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn() },
+    generalBattleStats: { findMany: vi.fn().mockResolvedValue([]) },
     rankingSnapshot: { upsert: vi.fn() },
     $queryRaw: vi.fn(async () => []),
     $executeRaw: vi.fn(async () => {

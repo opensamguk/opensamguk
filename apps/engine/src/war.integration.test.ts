@@ -91,6 +91,37 @@ async function snapshot(worldId: string) {
 }
 
 describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
+  it('초기 소속은 0, 하야는 null, 재임관은 새 턴으로 저장하며 재생 해시를 보존한다', async () => {
+    const initial = await warFixture();
+    const general = initial.generals[0]!;
+    const nationId = general.nationId!;
+    general.officerLevel = 1;
+    const { worldId, loop, lease } = await create(initial);
+    const read = () => db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: general.id } } });
+    try {
+      expect((await read()).nationJoinedTick).toBe(0);
+      await queue(worldId, general.id, 'resign', {});
+      await loop.advanceTo(general.nextTurnTick);
+      expect(await read()).toMatchObject({ nationId: null, nationJoinedTick: null });
+      const joinedTick = (await read()).nextTurnTick;
+      await queue(worldId, general.id, 'join', { nationId });
+      await loop.advanceTo(joinedTick);
+      expect(await read()).toMatchObject({ nationId, nationJoinedTick: joinedTick });
+      expect(await db.publicNationEvent.findMany({ where: { worldId, tick: joinedTick, kind: 'enlist' } })).toEqual([
+        expect.objectContaining({
+          tick: joinedTick,
+          text: `${general.name} ${initial.nations.find((n) => n.id === nationId)!.name} 임관`,
+        }),
+      ]);
+      await loop.advanceTo(20_000);
+      const archive = await exportReplay(db, worldId);
+      const replay = replayArchive(archive, 2);
+      expect(replay.at(-1)?.stateHash).toBe(hashState(await db.$transaction((tx) => loadReplayState(tx, worldId))));
+    } finally {
+      await releaseLease(db, lease);
+    }
+  });
+
   it.each(['basic', 'effects'] as const)(
     'AC-INT-22 %s의 새 계산식은 실제 전투·rollback·12개월 재생·재적재가 같다',
     async (mode) => {
@@ -158,11 +189,16 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
     await loop.advanceTo(100);
     await loop.advanceTo(100);
     const stored = toWorldState(await readWorldState(db, worldId));
+    expect(await db.city.findUnique({ where: { worldId_cityKey: { worldId, cityKey: 2 } } })).toMatchObject({
+      conflictTick: 100,
+      stratagemTick: null,
+    });
     expected.generals[1]!.nextTurnTick = 10100;
     expect(hashState(stored)).toBe(hashState(expected));
     expect(await db.nationTurn.count({ where: { worldId, nationId: 2 } })).toBe(0);
     expect(await db.nationTurn.count({ where: { worldId, nationId: 1 } })).toBe(30);
     expect(await db.battleLog.findMany({ where: { worldId }, orderBy: { generalId: 'asc' } })).toMatchObject([
+      { generalId: 1, text: expect.stringContaining('점령') },
       { generalId: 2, text: expect.stringContaining('점령') },
       { generalId: 3, text: expect.stringContaining('점령') },
     ]);
@@ -281,6 +317,9 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
       expect(events.filter((event) => event.includes('천도'))).toEqual([
         `${initial.nations[1]!.name} 수도 함락, 도시3 천도`,
       ]);
+      expect(await db.publicNationEvent.findMany({ where: { worldId, tick: 100, kind: 'capital' } })).toEqual([
+        expect.objectContaining({ text: `${initial.nations[1]!.name} 도시3 천도` }),
+      ]);
       const counterattackSequence = (await db.world.findUniqueOrThrow({ where: { id: worldId } })).actionSequence + 1;
       await loop.advanceTo(200);
       expect(
@@ -321,7 +360,7 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
       expect(await snapshot(worldId)).toEqual(before);
       expect(loop.state).toBeNull();
       await new TurnLoop(db, lease).advanceTo(100);
-      expect(await db.battleLog.count({ where: { worldId } })).toBe(2);
+      expect(await db.battleLog.count({ where: { worldId } })).toBe(3);
     },
   );
   it.each(['beforeCommit', 'committed'])(
@@ -345,7 +384,7 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
         expect(message).toBe(phase);
         child.kill('SIGKILL');
         await exited;
-        expect(await db.battleLog.count({ where: { worldId } })).toBe(phase === 'committed' ? 2 : 0);
+        expect(await db.battleLog.count({ where: { worldId } })).toBe(phase === 'committed' ? 3 : 0);
         expect(await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } })).toMatchObject({
           battleWins: phase === 'committed' ? 2 : 0,
           captures: phase === 'committed' ? 1 : 0,
@@ -354,7 +393,7 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
         const loop = new TurnLoop(db, (await acquireLease(db, worldId))!);
         await loop.advanceTo(500);
         await loop.advanceTo(500);
-        expect(await db.battleLog.count({ where: { worldId } })).toBe(2);
+        expect(await db.battleLog.count({ where: { worldId } })).toBe(3);
         expect(await db.generalLog.count({ where: { worldId } })).toBe(1);
         expect(await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } })).toMatchObject({
           battleWins: 2,

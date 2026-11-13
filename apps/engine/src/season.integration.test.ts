@@ -50,6 +50,19 @@ async function checkEnd(worldId: string, reason: 'END_YEAR' | 'UNIFIED') {
     orderBy: { id: 'asc' },
     include: { nation: true },
   });
+  expect(result.finalNations).toMatchObject(
+    (await db.nation.findMany({ where: { worldId }, orderBy: { id: 'asc' } })).map(
+      ({ id, philosophy, level, tech }) => ({
+        nationId: id,
+        philosophy,
+        level,
+        tech,
+        roster: finished
+          .filter(({ nationId }) => nationId === id)
+          .map(({ id, name, portraitId }) => ({ generalId: id, name, portraitId })),
+      }),
+    ),
+  );
   expect(value.archive).toEqual(
     finished.map((general) => ({
       worldId,
@@ -64,6 +77,7 @@ async function checkEnd(worldId: string, reason: 'END_YEAR' | 'UNIFIED') {
       experience: general.experience,
       wins: general.battleWins,
       captures: general.captures,
+      stratagemSuccesses: general.stratagemSuccesses,
     })),
   );
   const archive = await exportReplay(db, worldId);
@@ -71,6 +85,12 @@ async function checkEnd(worldId: string, reason: 'END_YEAR' | 'UNIFIED') {
   expect(value.world.actionSequence).toBe(result.endedSequence + archive.afterEnd.length);
   expect(value.logs.every((log) => log.tick <= result.endedTick)).toBe(true);
   expect(value.months.every((month) => month.tick <= result.endedTick)).toBe(true);
+  expect(value.months.every((month) => month.activeGenerals !== null)).toBe(true);
+  expect(result.traitDistribution).toMatchObject({
+    philosophies: expect.any(Array),
+    personalities: expect.any(Array),
+    specialties: expect.any(Array),
+  });
   if (reason === 'UNIFIED') {
     expect(value.archive).toHaveLength(1);
     expect(archive.months).toHaveLength(0);
@@ -78,7 +98,9 @@ async function checkEnd(worldId: string, reason: 'END_YEAR' | 'UNIFIED') {
     expect(value.logs[0]?.text).toContain('점령');
     expect(result.winnerName).toBeTruthy();
     expect(result.winnerColor).toBeTruthy();
+    expect(result.winnerSummary).toMatchObject({ generals: 1, cities: expect.any(Number), power: expect.any(Number) });
   } else {
+    expect(result.winnerSummary).toBeNull();
     expect(result.endedMonth).toBe(12);
     expect(value.months).toHaveLength(12);
     expect(result.finalStateHash).toBe(value.months.at(-1)?.stateHash);

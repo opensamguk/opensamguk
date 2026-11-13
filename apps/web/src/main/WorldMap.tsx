@@ -171,9 +171,21 @@ export function WorldMap({
               {cityLabel(city, nation, mine)}
               {levelName(city.level) ? ` · ${levelName(city.level)}` : ''}
               {here ? ` · ${here}` : ''}
+              {city.events?.length ? ` · ${city.events.map(({ name }) => name).join(' · ')}` : ''}
             </title>
             {mine ? <circle className={styles.mine} cx={city.x} cy={city.y} r={r + 5} /> : null}
             {selected ? <circle className={styles.selected} cx={city.x} cy={city.y} r={r + 3} /> : null}
+            {city.events?.[0] ? (
+              <circle
+                cx={city.x}
+                cy={city.y}
+                r={r + 2}
+                fill="none"
+                stroke={city.events[0].favorable ? 'var(--color-info)' : 'var(--color-danger)'}
+                strokeWidth={2}
+                data-city-event={city.events[0].kind}
+              />
+            ) : null}
             <circle
               className={isCut(city) ? `${styles.dot} ${styles.unsupplied}` : styles.dot}
               cx={city.x}

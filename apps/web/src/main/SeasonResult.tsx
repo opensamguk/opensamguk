@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { retryUnlessClientError } from '../game/errors';
-import { displayName } from '../game/names';
+import { displayName, officerName } from '../game/names';
+import { SeasonNationChronicle } from './Records';
+import { InfoGrid } from './Panel';
 import { useWorldId } from '../game/queries';
 import type { WorldSummary } from '../game/types';
 import { useTRPC } from '../trpc';
@@ -85,12 +87,102 @@ function SeasonGenerals({ winnerNationId }: { winnerNationId: number | null }) {
     retry: retryUnlessClientError,
   });
   const tigers = merit.data ? fiveTigers(merit.data.generals, winnerNationId) : [];
+  const winner = merit.data?.winnerSummary;
+  const topStratagem = merit.data?.topStratagem ?? [];
+  const statistics = query.data?.statistics;
   const n = (value: number) => value.toLocaleString('ko-KR');
+  const formatTraits = (rows: { name: string; count: number }[]) =>
+    rows.map(({ name, count }) => `${name} ${n(count)}`).join(' · ') || '—';
   return (
     <div className={styles.generals} data-testid="season-generals">
+      {statistics ? (
+        <details>
+          <summary>기수 통계</summary>
+          <InfoGrid
+            items={[
+              { label: '국가 수', value: `최종 ${n(statistics.final.nations)} · 최대 ${n(statistics.peak.nations)}` },
+              {
+                label: '최종 장수 수',
+                value: n(statistics.final.generals),
+              },
+              statistics.peak.generals === undefined
+                ? { label: '소속 장수 최대 수 (월간 기록)', value: n(statistics.peak.affiliatedGenerals) }
+                : { label: '전체 장수 최대 수 (월간 기록)', value: n(statistics.peak.generals) },
+              ...(statistics.traits
+                ? [
+                    { label: '국가 성향 분포', value: formatTraits(statistics.traits.philosophies) },
+                    { label: '장수 성격 분포', value: formatTraits(statistics.traits.personalities) },
+                    { label: '장수 특기 분포', value: formatTraits(statistics.traits.specialties) },
+                  ]
+                : []),
+              ...(statistics.nationNames.length
+                ? [{ label: '등장 국가', value: statistics.nationNames.join(' · ') }]
+                : []),
+            ]}
+          />
+        </details>
+      ) : null}
+      {query.data?.nations?.length ? (
+        <details>
+          <summary>국가별 기록</summary>
+          <ul>
+            {query.data.nations.map((nation) => (
+              <li key={nation.nationId}>
+                <NationBadge name={nation.name} color={nation.color} />
+                {' · '}
+                {nation.removedTick === null ? '종료' : '멸망 전'} 장수 {n(nation.finalGenerals)}
+                {nation.final
+                  ? ` · ${nation.final.philosophy} · ${nation.final.title ?? nation.final.level} · 기술력 ${n(nation.final.tech)}`
+                  : ''}
+                {nation.recordedAt ? ` · ${nation.recordedAt.year}년 ${nation.recordedAt.month}월` : ''}
+                {nation.peakTroops === null ? '' : ` · 기록상 최대 병력 ${n(nation.peakTroops)}`}
+                {nation.peakCities === null ? '' : ` · 월간 최대 영토 ${n(nation.peakCities)}`}
+                {nation.peakPower === null ? '' : ` · 월간 최고 국력 ${n(nation.peakPower)}`}
+                {nation.cities.length ? <p>{nation.cities.map(({ name }) => name).join(' · ')}</p> : null}
+                <SeasonNationChronicle worldId={worldId} nationId={nation.nationId} />
+                {nation.final?.roster.length ? (
+                  <details>
+                    <summary>최종 장수 명단</summary>
+                    <p>{nation.final.roster.map(({ name }) => displayName(name)).join(' · ')}</p>
+                  </details>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+      {winner && (
+        <>
+          <h3>통일 국가 현황</h3>
+          <InfoGrid
+            items={[
+              { label: '성향', value: winner.philosophy },
+              { label: '국력', value: n(winner.power) },
+              { label: '도시', value: n(winner.cities) },
+              { label: '장수', value: n(winner.generals) },
+              { label: '주민', value: `${n(winner.population)} / ${n(winner.populationMax)}` },
+              { label: '국고', value: `금 ${n(winner.gold)} · 쌀 ${n(winner.rice)}` },
+            ]}
+          />
+          {winner.officers.length > 0 && (
+            <ul>
+              {winner.officers.map((officer) => (
+                <li key={officer.officerLevel + ':' + officer.name}>
+                  {officer.title ?? officerName(officer.officerLevel)} · {displayName(officer.name)}
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
       {tigers.length > 0 ? (
         <p className={styles.lead} data-testid="season-tigers">
           오호장군: {tigers.join(' · ')}
+        </p>
+      ) : null}
+      {topStratagem.length > 0 ? (
+        <p className={styles.lead} data-testid="season-stratagem-leaders">
+          건안칠자 · {topStratagem.map(({ name, successes }) => `${displayName(name)}(${n(successes)})`).join(' · ')}
         </p>
       ) : null}
       <div className={styles.byRow} role="group" aria-label="최종 순위 기준">

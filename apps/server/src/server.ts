@@ -192,6 +192,7 @@ export async function buildServer(options: {
           legalPolicyRequired: production,
           withdrawalPolicy,
           closeSession: realtime.closeSession,
+          connectedSessions: realtime.connectedSessions,
           loginAudit: audit
             ? {
                 ipHash: audit.ipHash,

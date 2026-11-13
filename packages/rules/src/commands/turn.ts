@@ -6,9 +6,11 @@ import type { DeepReadonly, WorldState } from '../model/world';
 import type { Actor, CommandResult, Failure } from './types';
 import { applyEffects } from './effects';
 import { commandRegistry, runCommand } from './registry';
-import { chooseGeneralTurn, chooseNationTurn, type NpcContext } from '../npc';
+import { chooseAutoplayTurn, chooseGeneralTurn, chooseNationTurn, type NpcContext } from '../npc';
 import { runPolicyCommand } from '../policy/execute';
-import type { PolicyKey } from '../policy';
+import { applyPersonalityProgress } from '../general/personality';
+import { growCommandStat } from '../general/statGrowth';
+import { PLAYER_AUTOPLAY_FEATURE, playerAutoplayWindow, type PolicyKey } from '../policy';
 import { runOfficeAssign, takeOfficeTurn } from '../personnel/officeTurn';
 import { canExecuteNationCommand } from '../personnel/permissions';
 import type { OfficeRevisions } from '../personnel/offices';
@@ -17,6 +19,8 @@ import { canExecuteCityNationCommand } from '../cityResources/commands';
 import { takeCampaignOrder, finishCampaignOrder } from '../campaign/orders';
 import { canExecuteResearchNationCommand } from '../nationResearch/commands';
 import { trackNationTurn } from '../preparedTurns/withPrepare';
+import { applyPreTurnTreatment } from '../equipment/treatment';
+import { RICE_MARKET_FEATURE } from '../world/riceMarket';
 
 export type PersonnelTurnInput = Readonly<{ offices: DeepReadonly<OfficeRevisions> }>;
 export type PersonnelTurnChange = Readonly<{
@@ -39,7 +43,11 @@ export function runGeneralTurn(
   actor: Actor,
   command: { commandKey: string; args: unknown; explicit?: boolean },
   seed: string,
-  options: Pick<NpcContext, 'convergence'> & { policy?: PolicyKey; turnRevision?: number } = {},
+  options: Pick<NpcContext, 'convergence'> & {
+    policy?: PolicyKey;
+    turnRevision?: number;
+    activity?: { lastActiveTick: number; turnTermMinutes: number };
+  } = {},
   resolver?: CommandResolver,
   personnel?: PersonnelTurnInput,
 ): {
@@ -48,7 +56,12 @@ export function runGeneralTurn(
   nation: { commandKey: string; result: CommandResult | Failure; nationId: number } | undefined;
   commandKey: string;
   personnel?: PersonnelTurnChange;
+  treatment?: true;
 } {
+  const treated = applyPreTurnTreatment(state, actor.generalId);
+  const treatment = treated === state ? {} : { treatment: true as const };
+  state = treated;
+  if (state.ruleFeatures?.includes(RICE_MARKET_FEATURE)) actor = { ...actor, worldSeed: seed };
   if (personnel !== undefined) {
     if (Object.hasOwn(state, 'nationTurns'))
       throw new PersonnelInvariantError('인사 기능을 켠 월드에 국가 예턴이 있습니다.');
@@ -70,7 +83,7 @@ export function runGeneralTurn(
   let nation: { commandKey: string; result: CommandResult | Failure; nationId: number } | undefined;
   // 국가 예턴은 턴 시작 시 군주가 한 번만 실행한다. 국가 명령 뒤 장수 명령을 재검사한다.
   const npcNation = general.userId === null && nationId !== null && state.nations[nationId]?.isNpc;
-  const context = { ...options, tick: actor.tick ?? 0, unitSet: actor.unitSet, resolver };
+  const context = { ...options, tick: actor.tick ?? 0, unitSet: actor.unitSet, worldSeed: actor.worldSeed, resolver };
   if (personnelChange) {
     if (take) {
       let slot = take.slot;
@@ -156,15 +169,36 @@ export function runGeneralTurn(
   const instructed = takeCampaignOrder(next, actor.generalId, options.turnRevision, command, actor.tick ?? 0);
   next = instructed.state as WorldState;
   let selected = instructed.order ? { ...instructed.order.command, explicit: true } : command;
-  if (!instructed.order && general.userId !== null && command.explicit === false && options.policy !== undefined) {
+  const emptyHumanTurn = !instructed.order && general.userId !== null && command.explicit === false;
+  const tick = actor.tick ?? 0;
+  let autoplay;
+  if (emptyHumanTurn && options.activity && next.ruleFeatures?.includes(PLAYER_AUTOPLAY_FEATURE)) {
+    const { startsAtTick, expiresAtTick } = playerAutoplayWindow(
+      options.activity.lastActiveTick,
+      options.activity.turnTermMinutes,
+    );
+    if (tick >= startsAtTick && tick < expiresAtTick)
+      autoplay = chooseAutoplayTurn(
+        next,
+        next.generals[actor.generalId]!,
+        rngFor(seed, 'player-autoplay', tick, actor.generalId),
+        context,
+      );
+  }
+  if (autoplay) selected = { commandKey: autoplay.key, args: autoplay.args };
+  if (emptyHumanTurn && !autoplay && options.policy !== undefined) {
     const policy = runPolicyCommand(next, { ...actor, target: 'general' }, options.policy, seed, resolver);
+    const before = next.generals[actor.generalId]!;
     next = applyEffects(next, policy.result.effects);
+    applyPersonalityProgress(next, next.generals[actor.generalId]!, before);
+    if (!('code' in policy.result)) growCommandStat(next, actor.generalId, policy.commandKey);
     applyLastNationRecruitmentLock(next, policy.result, actor.tick ?? 0);
     return {
       state: next,
       result: policy.result,
       nation,
       commandKey: policy.commandKey,
+      ...treatment,
       ...(personnelChange === undefined ? {} : { personnel: personnelChange }),
     };
   }
@@ -182,6 +216,7 @@ export function runGeneralTurn(
     );
     if (decision.chosen) selected = { commandKey: decision.chosen.key, args: decision.chosen.args };
   }
+  const before = next.generals[actor.generalId]!;
   const result = run(
     next,
     { ...actor, target: 'general', ...(instructed.order ? { campaignOrderId: instructed.order.id } : {}) },
@@ -190,6 +225,8 @@ export function runGeneralTurn(
     rngFor(seed, 'turn', actor.tick ?? 0, actor.generalId),
   );
   next = applyEffects(next, 'code' in result ? [] : result.effects);
+  applyPersonalityProgress(next, next.generals[actor.generalId]!, before);
+  if (!('code' in result)) growCommandStat(next, actor.generalId, selected.commandKey);
   applyLastNationRecruitmentLock(next, result, actor.tick ?? 0);
   if (instructed.order)
     next = finishCampaignOrder(
@@ -206,6 +243,7 @@ export function runGeneralTurn(
     result,
     nation,
     commandKey: selected.commandKey,
+    ...treatment,
     ...(personnelChange === undefined ? {} : { personnel: personnelChange }),
   };
 }

@@ -11,6 +11,7 @@ import {
   validTreatyTargets,
   type TreatyAidFailure,
 } from './treatyClauses';
+import { DIPLOMATIC_COOLDOWN_FEATURE, diplomaticAidMonths } from './cooldown';
 import type {
   BrokenTreatyRow,
   ClosedTreatyRow,
@@ -28,12 +29,16 @@ import type {
   TreatyState,
 } from './treatyTypes';
 
-export type TreatyOptions = Readonly<{ tradeEnabled?: boolean; expandedEnabled?: boolean }>;
+export const RANKED_AID_FEATURE = 'ranked-aid-v1';
+// core2026 c81d304, che_물자원조.ts. MIT (c) 2025 devsam.
+export const rankedAidLimit = (level: number) => Math.max(0, Math.min(7, level)) * 10_000;
+export type TreatyOptions = Readonly<{ tradeEnabled?: boolean; expandedEnabled?: boolean; rankedAidEnabled?: boolean }>;
 
 export function treatyOptions(features: readonly string[]): TreatyOptions {
   return {
     tradeEnabled: features.includes('treaty-trade'),
     expandedEnabled: features.includes(EXPANDED_TREATY_FEATURE),
+    ...(features.includes(RANKED_AID_FEATURE) ? { rankedAidEnabled: true } : {}),
   };
 }
 
@@ -150,6 +155,7 @@ function clauseOrder(clause: TreatyClause): number {
 }
 
 const proposeRejectCodes = [
+  'DIPLOMATIC_COOLDOWN',
   'GENERAL_REMOVED',
   'WORLD_CLOSED',
   'ACTOR_INACTIVE',
@@ -174,6 +180,7 @@ const respondRejectCodes = [
   'TREATY_RELATION',
   'INSUFFICIENT_GOLD',
   'COUNTERPART_UNAVAILABLE',
+  'DIPLOMATIC_COOLDOWN',
 ] as const;
 const breakRejectCodes = [
   'GENERAL_REMOVED',
@@ -511,6 +518,7 @@ export function validateTreatyRecord(value: unknown, context: TreatyRecordContex
   assertTreatyRecordConsistency(record, {
     tradeEnabled: context.treatyTrade?.version === 1,
     expandedEnabled: context.treatyExpanded?.version === 1,
+    rankedAidEnabled: context.rankedAidEnabled === true,
   });
   return record;
 }
@@ -531,6 +539,7 @@ const rejectionMessages: Record<TreatyRejectCode, string> = {
   TREATY_RELATION: '현재 외교 관계에서 맺을 수 없는 조항입니다.',
   INSUFFICIENT_GOLD: '국고의 금이 부족합니다.',
   COUNTERPART_UNAVAILABLE: '상대 국가의 사정으로 수락하지 못했습니다.',
+  DIPLOMATIC_COOLDOWN: '원조 당사국의 외교 제한 기간이 남아 있습니다.',
 };
 
 function domainClauses(clauses: readonly TreatyClause[], options: TreatyOptions): TreatyRejectCode | null {
@@ -567,9 +576,9 @@ function domainClauses(clauses: readonly TreatyClause[], options: TreatyOptions)
         clause.months < 1 ||
         clause.months > 120 ||
         clause.gold < 0 ||
-        clause.gold > 10_000 ||
+        clause.gold > (options.rankedAidEnabled ? rankedAidLimit(7) : 10_000) ||
         clause.rice < 0 ||
-        clause.rice > 10_000 ||
+        clause.rice > (options.rankedAidEnabled ? rankedAidLimit(7) : 10_000) ||
         clause.gold + clause.rice === 0
       )
         return 'BAD_INPUT';
@@ -580,6 +589,13 @@ function domainClauses(clauses: readonly TreatyClause[], options: TreatyOptions)
 
 function isFirstClause(clause: TreatyClause): clause is FirstTreatyClause {
   return clause.kind === 'peace' || clause.kind === 'nonAggression' || clause.kind === 'note';
+}
+
+function exceedsRankedAid(state: TreatyView, clauses: readonly TreatyClause[], options: TreatyOptions) {
+  const tribute = clauses.find((clause) => clause.kind === 'tribute');
+  if (!options.rankedAidEnabled || !tribute) return false;
+  const limit = rankedAidLimit(state.nations[tribute.payerNationId]!.level);
+  return tribute.gold > limit || tribute.rice > limit;
 }
 
 function relationAllows(
@@ -617,6 +633,7 @@ export function quoteTreatyProposal(
     clauses: readonly TreatyClause[];
     fromCityCount: number;
     target: Readonly<{ relation: TreatyRelation; cityCount: number }> | null;
+    tributeLimits?: ReadonlyMap<number, number>;
   }>,
   options: TreatyOptions = {},
 ): TreatyQuoteResult {
@@ -635,6 +652,12 @@ export function quoteTreatyProposal(
   if (domain === 'BAD_INPUT' || domain === 'CLAUSE_NOT_CONNECTED') return problem(domain);
   if (domain !== null) throw new Error('조약 견적의 조항 판정을 확인하세요.');
   if (proposal.toNationId === proposal.fromNationId || proposal.target === null) return problem('BAD_TARGET');
+  const tribute = clauses.find((clause) => clause.kind === 'tribute');
+  if (options.rankedAidEnabled && tribute) {
+    const limit = proposal.tributeLimits?.get(tribute.payerNationId);
+    if (limit === undefined || tribute.gold > limit || tribute.rice > limit)
+      return { cost: null, problem: { code: 'BAD_INPUT', message: '지급국의 작위별 원조 한도를 넘었습니다.' } };
+  }
   const months = longestMonths(clauses);
   const cost = {
     from: calculateTreatyFee(proposal.fromCityCount, months),
@@ -805,6 +828,16 @@ export function applyTreatyInput(
   if (input.kind === 'treaty.respond' && !relationAllows(state, treaty.fromNationId, treaty.toNationId, treaty.clauses))
     return reject('TREATY_RELATION');
   if (!validTreatyTargets(state, treaty.fromNationId, treaty.toNationId, treaty.clauses)) return reject('BAD_TARGET');
+  if (exceedsRankedAid(state, treaty.clauses, options)) return reject('BAD_INPUT');
+  const aid = treaty.clauses.find((clause) => clause.kind === 'tribute');
+  const currentMonth = Math.floor(tick / TICKS_PER_MONTH);
+  const aidCooldown = state.ruleFeatures?.includes(DIPLOMATIC_COOLDOWN_FEATURE);
+  if (
+    aidCooldown &&
+    aid &&
+    [treaty.fromNationId, treaty.toNationId].some((id) => diplomaticAidMonths(state.nations[id]!, currentMonth) > 0)
+  )
+    return reject('DIPLOMATIC_COOLDOWN');
   if (input.kind === 'treaty.propose' && !npc) {
     const next = structuredClone(state) as TreatyWorldState;
     putTreaties(next, [...(next.treaties ?? []), treaty]);
@@ -846,6 +879,7 @@ export function applyTreatyInput(
   const next = structuredClone(state) as TreatyWorldState;
   next.nations[treaty.fromNationId]!.gold = fees.gold.from;
   next.nations[treaty.toNationId]!.gold = fees.gold.to;
+  if (aidCooldown && aid) next.nations[aid.payerNationId]!.diplomaticAidUntilMonth = currentMonth + 12;
   treaty.status = 'ACTIVE';
   treaty.startTick = tick;
   treaty.endTick = months === null ? null : checkedTickAdd(tick, months);

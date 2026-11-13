@@ -1,12 +1,187 @@
+import { randomUUID } from 'node:crypto';
 import { TRPCError } from '@trpc/server';
-import { INTEL_FEATURE, OFFICE_EFFECTS_FEATURE, TICKS_PER_MONTH, WANDERING_MONTH_LIMIT } from '@opensamguk/rules';
-import { protectedProcedure, router } from '../trpc';
-import { entityKey, readWorld, viewerGeneral, worldInput } from '../queries';
+import {
+  BALANCE,
+  NATION_FINANCE_FEATURE,
+  NATION_FINANCE_KIND,
+  financeRatesInput,
+  canUseNationTurns,
+  DIPLOMATIC_COOLDOWN_FEATURE,
+  INTEL_FEATURE,
+  NATION_STRATEGY_FEATURE,
+  NPC_NATION_POLICY_FEATURE,
+  NATION_RESTRICTIONS_FEATURE,
+  NATION_RESTRICTIONS_KIND,
+  NATION_RESTRICTIONS_MIN_OFFICE,
+  changeNationRestrictions,
+  nationRestrictions,
+  nationRestrictionsInput,
+  storedNationRestrictions,
+  NPC_NATION_POLICY_KIND,
+  npcNationPolicy,
+  npcGeneralCommands,
+  npcNationCommands,
+  npcNationPolicyInput,
+  npcPolicyLimits,
+  storedNpcNationPolicy,
+  OFFICE_EFFECTS_FEATURE,
+  RICE_MARKET_FEATURE,
+  riceMarketRate,
+  STRATEGY_KEYS,
+  TICKS_PER_MONTH,
+  WANDERING_MONTH_LIMIT,
+  diplomaticAidMonths,
+  effectiveWorldOptions,
+  generalTurnCandidates,
+  nationTurnCandidates,
+  nowTick,
+  parsePreset,
+  readStoredNationStrategy,
+  strategyMonth,
+  toGameDate,
+  unitSetSchema,
+} from '@opensamguk/rules';
+import { protectedProcedure, router, worldVerifiedProcedure } from '../trpc';
+import { entityKey, readWorld, viewerGeneral, worldClock, worldInput } from '../queries';
 import { cityCapacity, cityInfo, garrisonGeneralInfo, mapCity, nationInfo, visibility } from '../visibility';
-import { readView } from '../game/queries';
-import { nationPopulation, projectNationFinance, salaryRate } from '../game/nationFinance';
+import { readView, requireGeneral, requireRuleFeature, requireWorld } from '../game/queries';
+import { effectiveFinanceRates, nationPopulation, projectNationFinance } from '../game/nationFinance';
+import { nationTenureYears } from '../game/nationTenure';
+import { worldResolver } from '../game/resolver';
+import { possessedGenerals } from '../game/possessedGenerals';
 
 export const nationRouter = router({
+  setFinanceRates: worldVerifiedProcedure.input(financeRatesInput.extend(worldInput.shape)).mutation(({ ctx, input }) =>
+    ctx.db.$transaction(async (tx) => {
+      const world = await requireWorld(tx, input.worldId, true);
+      requireRuleFeature(world, NATION_FINANCE_FEATURE);
+      if (world.status === 'ENDED') throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '종료된 월드입니다.' });
+      const actor = await requireGeneral(tx, input.worldId, ctx.user.id, true);
+      if (actor.nationId !== input.nationId || !canUseNationTurns(actor.officerLevel))
+        throw new TRPCError({ code: 'FORBIDDEN', message: '소속 국가의 수뇌부만 세율·지급률을 바꿀 수 있습니다.' });
+      const pending = await tx.inputEvent.findFirst({
+        where: {
+          worldId: input.worldId,
+          kind: NATION_FINANCE_KIND,
+          status: 'PENDING',
+          payload: { path: ['nationId'], equals: input.nationId },
+        },
+        select: { payload: true },
+      });
+      if (pending) {
+        const previous = financeRatesInput.parse(pending.payload).rates;
+        if (previous.taxPercent !== input.rates.taxPercent || previous.salaryPercent !== input.rates.salaryPercent)
+          throw new TRPCError({ code: 'CONFLICT', message: '다른 세율·지급률 요청을 처리하고 있습니다.' });
+      } else {
+        await tx.inputEvent.create({
+          data: {
+            worldId: input.worldId,
+            userId: ctx.user.id,
+            generalId: actor.id,
+            kind: NATION_FINANCE_KIND,
+            idempotencyKey: `${NATION_FINANCE_KIND}:${randomUUID()}`,
+            payload: { nationId: input.nationId, rates: input.rates },
+          },
+        });
+      }
+      return { status: 'pending' as const };
+    }),
+  ),
+  setRestrictions: worldVerifiedProcedure
+    .input(nationRestrictionsInput.safeExtend(worldInput.shape))
+    .mutation(({ ctx, input }) =>
+      ctx.db.$transaction(async (tx) => {
+        const world = await requireWorld(tx, input.worldId, true);
+        requireRuleFeature(world, NATION_RESTRICTIONS_FEATURE);
+        if (world.status === 'ENDED')
+          throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '종료된 월드입니다.' });
+        const actor = await requireGeneral(tx, input.worldId, ctx.user.id, true);
+        if (
+          actor.removedAt !== null ||
+          actor.officerLevel < NATION_RESTRICTIONS_MIN_OFFICE ||
+          actor.nationId !== input.nationId
+        )
+          throw new TRPCError({ code: 'FORBIDDEN', message: '현재 소속국 수뇌부만 제한을 변경할 수 있습니다.' });
+        const pending = await tx.inputEvent.findFirst({
+          where: {
+            worldId: input.worldId,
+            kind: NATION_RESTRICTIONS_KIND,
+            status: 'PENDING',
+            payload: { path: ['nationId'], equals: input.nationId },
+          },
+          select: { payload: true },
+        });
+        const payload = {
+          nationId: input.nationId,
+          setting: input.setting,
+          ...(input.blocked === undefined ? {} : { blocked: input.blocked }),
+          ...(input.confidentialYears === undefined ? {} : { confidentialYears: input.confidentialYears }),
+        };
+        if (pending) {
+          const previous = nationRestrictionsInput.parse(pending.payload);
+          if (
+            previous.setting !== input.setting ||
+            previous.blocked !== input.blocked ||
+            previous.confidentialYears !== input.confidentialYears
+          )
+            throw new TRPCError({ code: 'CONFLICT', message: '다른 국가 제한 변경을 처리하고 있습니다.' });
+          return { status: 'pending' as const };
+        }
+        const row = await tx.nation.findUniqueOrThrow({
+          where: { worldId_id: { worldId: input.worldId, id: input.nationId } },
+          select: { restrictions: true },
+        });
+        const current = nationRestrictions(world, storedNationRestrictions(true, row.restrictions), world.clockTick);
+        if (!changeNationRestrictions(current, payload))
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: '이번 달 출병 제한 변경 횟수가 남아 있지 않습니다.',
+          });
+        await tx.inputEvent.create({
+          data: {
+            worldId: input.worldId,
+            userId: ctx.user.id,
+            generalId: actor.id,
+            kind: NATION_RESTRICTIONS_KIND,
+            idempotencyKey: `${NATION_RESTRICTIONS_KIND}:${randomUUID()}`,
+            payload,
+          },
+        });
+        return { status: 'pending' as const };
+      }),
+    ),
+  setNpcPolicy: worldVerifiedProcedure.input(npcNationPolicyInput.extend(worldInput.shape)).mutation(({ ctx, input }) =>
+    ctx.db.$transaction(async (tx) => {
+      const world = await requireWorld(tx, input.worldId, true);
+      requireRuleFeature(world, NPC_NATION_POLICY_FEATURE);
+      if (world.status === 'ENDED') throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '종료된 월드입니다.' });
+      const actor = await requireGeneral(tx, input.worldId, ctx.user.id, true);
+      if (actor.removedAt !== null || actor.officerLevel !== BALANCE.RULER_LEVEL || actor.nationId !== input.nationId)
+        throw new TRPCError({ code: 'FORBIDDEN', message: '현재 군주만 NPC 운영 기준을 변경할 수 있습니다.' });
+      const pending = await tx.inputEvent.findFirst({
+        where: { worldId: input.worldId, generalId: actor.id, kind: NPC_NATION_POLICY_KIND, status: 'PENDING' },
+        select: { payload: true },
+      });
+      const payload = { nationId: input.nationId, policy: input.policy };
+      if (pending) {
+        const previous = npcNationPolicyInput.parse(pending.payload);
+        if (previous.nationId !== input.nationId || JSON.stringify(previous.policy) !== JSON.stringify(input.policy))
+          throw new TRPCError({ code: 'CONFLICT', message: '다른 NPC 운영 기준 요청을 처리하고 있습니다.' });
+      } else {
+        await tx.inputEvent.create({
+          data: {
+            worldId: input.worldId,
+            userId: ctx.user.id,
+            generalId: actor.id,
+            kind: NPC_NATION_POLICY_KIND,
+            idempotencyKey: `${NPC_NATION_POLICY_KIND}:${randomUUID()}`,
+            payload,
+          },
+        });
+      }
+      return { status: 'pending' as const };
+    }),
+  ),
   get: protectedProcedure.input(worldInput.extend({ nationId: entityKey }).strict()).query(({ ctx, input }) =>
     readWorld(ctx.db, input.worldId, async (tx, world) => {
       const viewer = await viewerGeneral(tx, input.worldId, ctx.user.id);
@@ -16,15 +191,27 @@ export const nationRouter = router({
       if (!nation) throw new TRPCError({ code: 'NOT_FOUND', message: '국가를 찾을 수 없습니다.' });
       const openRoster = !world.ruleFeatures.includes(INTEL_FEATURE);
       const ownNation = visibility(viewer).nation(nation);
+      const tick = world.result?.endedTick ?? nowTick(worldClock(world), ctx.now);
       const cities = await tx.city.findMany({
         where: input,
         orderBy: ownNation ? [{ region: 'asc' }, { level: 'desc' }, { cityKey: 'asc' }] : { cityKey: 'asc' },
       });
+      const marketWorld =
+        ownNation && world.ruleFeatures.includes(RICE_MARKET_FEATURE)
+          ? await tx.world.findUniqueOrThrow({ where: { id: world.id }, select: { seed: true, monthlyTick: true } })
+          : null;
       const generals = await tx.general.findMany({ where: input, orderBy: { id: 'asc' } });
+      const possessed = await possessedGenerals(
+        tx,
+        input.worldId,
+        generals.filter((general) => general.userId !== null).map(({ id }) => id),
+      );
       const needsOfficeEffects =
         ownNation && world.status !== 'ENDED' && world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE);
+      const showNpcOrders = ownNation && viewer?.officerLevel === BALANCE.RULER_LEVEL && world.status !== 'ENDED';
       const state =
         needsOfficeEffects ||
+        showNpcOrders ||
         world.ruleFeatures.some((feature) => ['campaign-v1', 'nation-lifecycle-v1'].includes(feature))
           ? await readView(tx, input.worldId)
           : undefined;
@@ -34,8 +221,64 @@ export const nationRouter = router({
       const settlements = cities.filter((city) => city.kind !== 'PASS').sort((a, b) => a.cityKey - b.cityKey);
       const finance =
         ownNation && world.status !== 'ENDED'
-          ? projectNationFinance(world, ctx.now, settlements, generals, state)
+          ? projectNationFinance(world, ctx.now, settlements, generals, state, nation)
           : undefined;
+      const strategyStatus =
+        ownNation && world.status !== 'ENDED' && world.ruleFeatures.includes(NATION_STRATEGY_FEATURE)
+          ? await readStrategyStatus()
+          : undefined;
+      const diplomaticAid =
+        ownNation && world.ruleFeatures.includes(DIPLOMATIC_COOLDOWN_FEATURE) && world.status !== 'ENDED'
+          ? { remainingMonths: diplomaticAidMonths(nation, strategyMonth(tick)) }
+          : undefined;
+      const npcOrders = showNpcOrders && state ? await readNpcOrders(state) : undefined;
+      const restrictionsEnabled = world.ruleFeatures.includes(NATION_RESTRICTIONS_FEATURE);
+      const restrictions = nationRestrictions(
+        world,
+        storedNationRestrictions(restrictionsEnabled, nation.restrictions),
+        world.clockTick,
+      );
+      const canEditRestrictions =
+        restrictionsEnabled &&
+        ownNation &&
+        world.status !== 'ENDED' &&
+        (viewer?.officerLevel ?? 0) >= NATION_RESTRICTIONS_MIN_OFFICE;
+      const restrictionPending = canEditRestrictions
+        ? await tx.inputEvent.findFirst({
+            where: {
+              worldId: input.worldId,
+              kind: NATION_RESTRICTIONS_KIND,
+              status: 'PENDING',
+              payload: { path: ['nationId'], equals: nation.id },
+            },
+            select: { payload: true },
+          })
+        : null;
+      const npcPolicyEnabled = world.ruleFeatures.includes(NPC_NATION_POLICY_FEATURE);
+      const npcPolicyEditable = npcPolicyEnabled && showNpcOrders;
+      const npcPolicyPending = npcPolicyEditable
+        ? await tx.inputEvent.findFirst({
+            where: { worldId: input.worldId, generalId: viewer!.id, kind: NPC_NATION_POLICY_KIND, status: 'PENDING' },
+            select: { payload: true },
+          })
+        : null;
+      const npcPolicyHistory = npcPolicyEnabled && ownNation ? await readNpcPolicyHistory() : undefined;
+      const canEditFinance =
+        ownNation &&
+        canUseNationTurns(viewer?.officerLevel) &&
+        world.status !== 'ENDED' &&
+        world.ruleFeatures.includes(NATION_FINANCE_FEATURE);
+      const financePending = canEditFinance
+        ? await tx.inputEvent.findFirst({
+            where: {
+              worldId: input.worldId,
+              kind: NATION_FINANCE_KIND,
+              status: 'PENDING',
+              payload: { path: ['nationId'], equals: input.nationId },
+            },
+            select: { payload: true },
+          })
+        : null;
       return {
         ...(lifecycle
           ? {
@@ -52,18 +295,180 @@ export const nationRouter = router({
         ...(world.ruleFeatures.includes('five-stats') ? { fiveStats: true as const } : {}),
         ...nationInfo(nation, { cityCount: settlements.length, generalCount: generals.length }, viewer),
         philosophy: nation.philosophy,
+        ...(restrictionsEnabled
+          ? {
+              restrictions: {
+                recruitmentBlocked: restrictions.recruitmentBlocked,
+                ...(ownNation
+                  ? { warBlocked: restrictions.warBlocked, confidentialYears: restrictions.confidentialYears ?? null }
+                  : {}),
+                ...(canEditRestrictions
+                  ? {
+                      editor: {
+                        warChanges: restrictions.warChanges,
+                        pending: restrictionPending ? nationRestrictionsInput.parse(restrictionPending.payload) : null,
+                      },
+                    }
+                  : {}),
+              },
+            }
+          : {}),
+        ...(nation.recruitmentNotice ? { recruitmentNotice: nation.recruitmentNotice } : {}),
+        ...(ownNation && viewer?.officerLevel === BALANCE.RULER_LEVEL && world.status !== 'ENDED'
+          ? { canEditRecruitmentNotice: true as const }
+          : {}),
         ...nationPopulation(settlements),
-        ...(ownNation ? { salaryRate } : {}),
+        ...(ownNation
+          ? {
+              ...effectiveFinanceRates(world, nation),
+              ...(canEditFinance
+                ? {
+                    financeEditor: {
+                      pending: financePending ? financeRatesInput.parse(financePending.payload).rates : null,
+                    },
+                  }
+                : {}),
+              npcPolicy: {
+                ...npcNationPolicy(world, storedNpcNationPolicy(npcPolicyEnabled, nation.npcSettings)),
+                ...(npcPolicyHistory === undefined ? {} : { history: npcPolicyHistory }),
+                ...(npcPolicyEditable
+                  ? {
+                      editor: {
+                        limits: npcPolicyLimits,
+                        commands: { general: npcGeneralCommands, nation: npcNationCommands },
+                        pending: npcPolicyPending ? npcNationPolicyInput.parse(npcPolicyPending.payload).policy : null,
+                      },
+                    }
+                  : {}),
+                ...npcOrders,
+                aggression:
+                  effectiveWorldOptions(world.preset === null ? null : parsePreset(world.preset), world.runtimeOptions)
+                    .presetRules?.npc.aggression ?? 1,
+              },
+            }
+          : {}),
         ...(finance ? { financeEstimate: finance.financeEstimate } : {}),
+        ...(strategyStatus ? { strategyStatus } : {}),
+        ...(diplomaticAid ? { diplomaticAid } : {}),
         cities: cities.map((city) => {
           if (!ownNation) return { ...mapCity(city), ...cityCapacity(city) };
           const incomeEstimate = finance?.cityIncome.get(city.cityKey);
-          return { ...cityInfo(city, viewer), ...(incomeEstimate ? { incomeEstimate } : {}) };
+          const market = marketWorld
+            ? {
+                rate: riceMarketRate(marketWorld.seed, marketWorld.monthlyTick, {
+                  cityKey: city.cityKey,
+                  level: city.level,
+                  supplied: city.supplied,
+                  kind: city.kind === 'PASS' ? 'PASS' : 'CITY',
+                }),
+              }
+            : undefined;
+          return {
+            ...cityInfo(city, viewer),
+            ...(incomeEstimate ? { incomeEstimate } : {}),
+            ...(market ? { riceMarket: market } : {}),
+          };
         }),
-        generals: generals.map((general) =>
-          garrisonGeneralInfo(general, viewer, units, { stats: openRoster, biography: openRoster }),
-        ),
+        generals: generals.map((general) => {
+          const tenureYears =
+            (ownNation || openRoster) && general.removedAt === null
+              ? nationTenureYears(general.nationJoinedTick, tick)
+              : undefined;
+          return {
+            ...garrisonGeneralInfo(general, viewer, units, { stats: openRoster, biography: openRoster }),
+            possessedNpc: possessed.has(general.id),
+            ...(tenureYears === undefined ? {} : { tenureYears }),
+          };
+        }),
       };
+
+      async function readNpcPolicyHistory() {
+        const events = await tx.inputEvent.findMany({
+          where: {
+            worldId: input.worldId,
+            kind: NPC_NATION_POLICY_KIND,
+            status: 'APPLIED',
+            payload: { path: ['nationId'], equals: input.nationId },
+          },
+          orderBy: { sequence: 'desc' },
+          take: 11,
+          select: { sequence: true, tick: true, generalId: true, createdAt: true, result: true },
+        });
+        const generalIds = [...new Set(events.flatMap((event) => (event.generalId === null ? [] : [event.generalId])))];
+        const actors = generalIds.length
+          ? await tx.general.findMany({
+              where: { worldId: input.worldId, id: { in: generalIds } },
+              select: { id: true, name: true },
+            })
+          : [];
+        const names = new Map(actors.map(({ id, name }) => [id, name]));
+        const policies = events.map(({ result }) => npcNationPolicyInput.parse(result).policy);
+        return events.slice(0, 10).map((event, index) => ({
+          sequence: event.sequence!,
+          date: toGameDate(world.startYear, event.tick!),
+          requestedAt: event.createdAt.toISOString(),
+          generalName: event.generalId === null ? null : (names.get(event.generalId) ?? null),
+          previous: policies[index + 1] ?? null,
+          current: policies[index]!,
+        }));
+      }
+
+      async function readNpcOrders(view: NonNullable<typeof state>) {
+        const stored = await requireWorld(tx, input.worldId);
+        const { resolver } = worldResolver(stored);
+        const ruler = view.generals[viewer!.id];
+        if (!ruler) return undefined;
+        const context = {
+          resolver,
+          unitSet: unitSetSchema.safeParse(stored.unitSet).data,
+          worldSeed: stored.seed,
+        };
+        const summarize = (candidates: ReturnType<typeof generalTurnCandidates>) => {
+          const bestByCommand = new Map<string, (typeof candidates)[number]>();
+          for (const candidate of candidates) {
+            const best = bestByCommand.get(candidate.key);
+            if (!best || candidate.score > best.score) bestByCommand.set(candidate.key, candidate);
+          }
+          return [...bestByCommand.values()]
+            .sort((a, b) => b.score - a.score || a.key.localeCompare(b.key, 'en'))
+            .map(({ key, score, reason }) => ({ key, name: resolver.get(key)?.name ?? key, score, reason }));
+        };
+        const currentYear = toGameDate(world.startYear, tick).year;
+        const npcs = Object.values(view.generals).filter(
+          (general) =>
+            general.nationId === input.nationId &&
+            general.userId === null &&
+            general.removedAt === undefined &&
+            general.activeFromYear <= currentYear,
+        );
+        return {
+          nationOrders: summarize(nationTurnCandidates(view, ruler, { ...context, tick: ruler.nextTurnTick })),
+          generalOrders: summarize(
+            npcs.flatMap((general) => generalTurnCandidates(view, general, { ...context, tick: general.nextTurnTick })),
+          ),
+        };
+      }
+
+      async function readStrategyStatus() {
+        const storedWorld = await requireWorld(tx, input.worldId);
+        const ledger = readStoredNationStrategy(storedWorld)?.nations[input.nationId];
+        const current = strategyMonth(tick);
+        const globalUntil = ledger?.strategicUntil ?? 0;
+        const availability = (until: number) => ({
+          remainingMonths: Math.max(0, until - current),
+          availableAt: until > current ? toGameDate(world.startYear, until * TICKS_PER_MONTH) : null,
+        });
+        const definitions = worldResolver(storedWorld).resolver.list('nation');
+        return {
+          ...availability(globalUntil),
+          commands: STRATEGY_KEYS.flatMap((key) => {
+            const definition = definitions.find((item) => item.key === key);
+            return definition
+              ? [{ key, name: definition.name, ...availability(Math.max(globalUntil, ledger?.commands[key] ?? 0)) }]
+              : [];
+          }),
+        };
+      }
     }),
   ),
 });

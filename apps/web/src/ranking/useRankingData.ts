@@ -13,14 +13,28 @@ export type RankingData =
 export function useRankingData(worldId: string, search: RankingSearch): RankingData {
   const trpc = useTRPC();
   const generals = useQuery(
-    trpc.ranking.generals.queryOptions(search.tab === 'generals' ? { worldId, by: search.by } : skipToken, {
-      placeholderData: keepPreviousData,
-    }),
+    trpc.ranking.generals.queryOptions(
+      search.tab === 'generals'
+        ? {
+            worldId,
+            by: search.by,
+            ...(search.kind ? { kind: search.kind } : {}),
+            ...(search.page ? { page: search.page } : {}),
+          }
+        : skipToken,
+      {
+        placeholderData: (previous) =>
+          search.tab === 'generals' && (previous?.pagination?.page ?? 1) === (search.page ?? 1) ? previous : undefined,
+      },
+    ),
   );
   const nations = useQuery(
-    trpc.ranking.nations.queryOptions(search.tab === 'nations' ? { worldId, by: search.by } : skipToken, {
-      placeholderData: keepPreviousData,
-    }),
+    trpc.ranking.nations.queryOptions(
+      search.tab === 'nations' ? { worldId, by: search.by, includeForceEstimate: true } : skipToken,
+      {
+        placeholderData: keepPreviousData,
+      },
+    ),
   );
   const query = search.tab === 'generals' ? generals : nations;
   if (query.isError) return { state: 'error', retry: () => void query.refetch() };

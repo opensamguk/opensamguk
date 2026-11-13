@@ -176,7 +176,7 @@ beforeEach(async () => {
   await db.notice.deleteMany({ where: { worldId: { in: [worldId, otherWorldId] } } });
   await db.nation.updateMany({
     where: { worldId },
-    data: { notice: '', noticeRevision: 0, noticeUpdatedAt: null, noticeUpdatedBy: null },
+    data: { notice: '', recruitmentNotice: '', noticeRevision: 0, noticeUpdatedAt: null, noticeUpdatedBy: null },
   });
   for (let i = 0; i < 6; i++) {
     await db.general.update({
@@ -207,10 +207,12 @@ describe('T2-09 실제 HTTP 메시지·공지 권한 대조', () => {
     'message.list': { worldId, scope: 'PRIVATE' },
     'message.send': { worldId, scope: 'PRIVATE', toGeneralId: 2, body: '권한 시험' },
     'message.markRead': { worldId, ids: [randomUUID()] },
+    'message.retract': { worldId, id: randomUUID() },
     'message.unread': actorInput(),
     'message.recipients': actorInput(),
     'notice.nation.get': actorInput(),
     'notice.nation.set': { worldId, body: '공지' },
+    'notice.nation.setRecruitment': { worldId, nationId: 1, body: '임관 권유문' },
     'notice.nation.markSeen': { worldId, nationId: 1, revision: 0 },
     'notice.world.list': actorInput(),
   });
@@ -221,8 +223,18 @@ describe('T2-09 실제 HTTP 메시지·공지 권한 대조', () => {
         authzCase(path, category, async () => {
           if (category === 'sanctioned')
             await db.user.update({ where: { id: users[0]!.id }, data: { status: 'SANCTIONED' } });
-          const input =
+          let input: unknown =
             category === 'invalidInput' ? { unexpected: true } : inputs()[path as keyof ReturnType<typeof inputs>];
+          if (path === 'message.retract' && category === 'success') {
+            const sent = await call<Outputs['message']['send']>('message.send', {
+              worldId,
+              scope: 'PRIVATE',
+              toGeneralId: 2,
+              body: '삭제 권한 시험',
+            });
+            expect(sent.status).toBe(200);
+            input = { worldId, id: sent.data!.item.id };
+          }
           const result = await call(
             path,
             input,
@@ -240,6 +252,20 @@ describe('T2-09 실제 HTTP 메시지·공지 권한 대조', () => {
           if (category === 'success') expect(result.status).toBe(200);
         }),
       );
+
+  it('임관 권유문은 소속 군주만 바꾸며 재야 장수도 공개 값을 읽는다', async () => {
+    const route = 'notice.nation.setRecruitment';
+    const input = { worldId, nationId: 1, body: '  함께 지킬 장수를 찾습니다.  ' };
+    expect((await call(route, input, 1)).code).toBe('FORBIDDEN');
+    expect((await call(route, input, 2)).code).toBe('FORBIDDEN');
+    const saved = await call(route, input);
+    expect(saved.data).toEqual({ recruitmentNotice: input.body.trim() });
+    const spectator = await call<Outputs['world']['map']>('world.map', { worldId }, 3);
+    expect(spectator.data?.nations.find(({ id }) => id === 1)?.recruitmentNotice).toBe(input.body.trim());
+    expect((await call(route, { ...input, body: '' })).status).toBe(200);
+    const cleared = await call<Outputs['world']['map']>('world.map', { worldId }, 3);
+    expect(cleared.data?.nations.find(({ id }) => id === 1)).not.toHaveProperty('recruitmentNotice');
+  });
 
   it('개인 읽음은 발신·수신 장수만 바꾸며 남의 ID와 다른 월드 ID는 건너뛴다', async () => {
     const sent = (
@@ -291,6 +317,29 @@ describe('T2-09 실제 HTTP 메시지·공지 권한 대조', () => {
     });
     expect(list.items).toHaveLength(1);
   });
+  it('발신자가 5분 안에 삭제하면 본문을 비우고 읽음 수에서 뺀다', async () => {
+    const send = async (body: string) =>
+      (await call<Outputs['message']['send']>('message.send', { worldId, scope: 'PRIVATE', toGeneralId: 2, body }))
+        .data!.item;
+    const sent = await send('삭제할 본문');
+    expect(sent.retractUntil).toBeTruthy();
+    expect((await call('message.retract', { worldId, id: sent.id }, 1)).code).toBe('NOT_FOUND');
+    expect((await call('message.retract', { worldId: otherWorldId, id: sent.id })).code).toBe('NOT_FOUND');
+    expect((await call<Outputs['message']['unread']>('message.unread', { worldId }, 1)).data!.PRIVATE).toBe(1);
+    const retract = () => call('message.retract', { worldId, id: sent.id });
+    expect((await retract()).status).toBe(200);
+    expect((await retract()).status).toBe(200);
+    expect((await call<Outputs['message']['unread']>('message.unread', { worldId }, 1)).data!.PRIVATE).toBe(0);
+    const inbox = (await call<Outputs['message']['list']>('message.list', { worldId, scope: 'PRIVATE' }, 1)).data!;
+    expect(inbox.items[0]).toMatchObject({ id: sent.id, body: '', deletedAt: expect.any(String), read: true });
+    expect(inbox.items[0]).not.toHaveProperty('retractUntil');
+    expect(await db.message.findUnique({ where: { id: sent.id }, select: { body: true } })).toEqual({ body: '' });
+
+    const expired = await send('시간이 지난 본문');
+    await db.message.update({ where: { id: expired.id }, data: { sentAt: new Date(Date.now() - 6 * 60_000) } });
+    expect((await call('message.retract', { worldId, id: expired.id })).code).toBe('BAD_REQUEST');
+  });
+
   it('국가·외교 권한은 현재 소속·직책을 따르고 표시용 국명은 발신 시점을 보존한다', async () => {
     expect((await call('message.send', { worldId, scope: 'NATION', body: '국가만' }, 5)).status).toBe(200);
     expect((await call('message.send', { worldId, scope: 'DIPLOMACY', toNationId: 2, body: '외교' }, 5)).code).toBe(
@@ -368,7 +417,14 @@ describe('T2-09 실제 HTTP 메시지·공지 권한 대조', () => {
     ).toBe('BAD_REQUEST');
     const recipients = (await call<Outputs['message']['recipients']>('message.recipients', { worldId })).data!;
     expect(recipients.generals.map((g) => g.id)).not.toContain(1);
-    expect(Object.keys(recipients.generals[0]!).sort()).toEqual(['id', 'name', 'nation', 'portraitId']);
+    expect(Object.keys(recipients.generals[0]!).sort()).toEqual([
+      'id',
+      'isAmbassador',
+      'name',
+      'nation',
+      'officerLevel',
+      'portraitId',
+    ]);
     expect(recipients.nations.map((n) => n.id)).toEqual([2]);
   });
   it('같은 시각의 41행을 시간·ID 커서로 빠짐과 중복 없이 읽는다', async () => {
@@ -538,6 +594,23 @@ describe('T2-09 국가 공지 revision', () => {
 });
 
 describe('T2-09 실제 PostgreSQL LISTEN·SSE', () => {
+  it('INT-26 메인에 접속 중인 국가와 같은 나라 장수만 표시한다', async () => {
+    const ally = await stream(1);
+    await stream(1);
+    await stream(2);
+    await stream(5, base, otherWorldId);
+    const read = async () => {
+      const result = await call<Outputs['home']['get']>('home.get', actorInput());
+      expect(result.status).toBe(200);
+      return result.data!.presence;
+    };
+    expect(await read()).toEqual({ nationIds: [1, 2], allies: [{ id: 2, name: '메시지장수2' }] });
+    ally.abort();
+    expect((await read()).allies).toEqual([{ id: 2, name: '메시지장수2' }]);
+    await db.session.update({ where: { id: users[1]!.sessionId }, data: { expiresAt: new Date(0) } });
+    expect(await read()).toEqual({ nationIds: [2], allies: [] });
+  });
+
   it('AC-M2-07 계정과 서버 연결 한도를 각각 적용하고 종료 뒤 다시 받는다', async () => {
     const limited = await buildServer({
       db,

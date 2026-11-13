@@ -12,11 +12,21 @@ export type DisplaySlot = { commandKey: string; args?: unknown; name: string };
 export interface PersonnelBoard {
   // 이 조회를 받은 계정의 지금 장수. 계승으로 바뀌면 화면이 예전 장수의 입력으로 보내지 않는다 (T4-95).
   actorId: number;
+  topVictories?: { generalId: number; name: string; portraitId: number | null; wins: number }[];
+  topStratagem?: { generalId: number; name: string; portraitId: number | null; successes: number }[];
   appoint: Allowed;
   officeEffectsEnabled?: boolean;
+  volunteersEnabled?: true;
+  localOfficeMinimum?: number;
   secretaryEnabled?: boolean;
   officeCities?: CityRef[];
-  levels: Array<{ officerLevel: number; title: string; holderId: number | null }>;
+  levels: Array<{
+    officerLevel: number;
+    title: string;
+    holderId: number | null;
+    qualification?: string;
+    eligibleIds?: number[];
+  }>;
   members: PersonnelMember[];
 }
 
@@ -28,8 +38,10 @@ export interface PersonnelMember {
   isHuman: boolean;
   city: CityRef;
   dedication: number;
+  tenureYears?: number;
   officerCityKey?: number | null;
   resident?: boolean;
+  eligibleLocalOffices?: number[];
 }
 
 export interface Office {

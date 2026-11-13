@@ -1,6 +1,8 @@
 import { nextActionSequence, type Prisma } from '@opensamguk/db';
 import {
   buildCreatedGeneral,
+  GENERAL_PERSONALITY_FEATURE,
+  HERITAGE_BIRTH_FEATURE,
   creationHeritageRecord,
   lateJoinBonus,
   parsePreset,
@@ -315,6 +317,8 @@ const processGeneralCreation: QueuedInputHandler = async (tx, world, event, { ti
     world.statRules,
     world.ruleFeatures.includes('lineage-v1'),
     world.ruleFeatures.includes('heritage-v1'),
+    world.ruleFeatures.includes(GENERAL_PERSONALITY_FEATURE),
+    world.ruleFeatures.includes(HERITAGE_BIRTH_FEATURE),
   );
   if (!parsed.ok) return reject(parsed.code);
   if (
@@ -328,6 +332,11 @@ const processGeneralCreation: QueuedInputHandler = async (tx, world, event, { ti
     select: { cityKey: true },
     orderBy: { cityKey: 'asc' },
   });
+  if (
+    parsed.value.heritageBirth?.cityKey !== undefined &&
+    !cities.some(({ cityKey }) => cityKey === parsed.value.heritageBirth?.cityKey)
+  )
+    return reject('BAD_HERITAGE');
   const preset = world.preset ? parsePreset(world.preset) : null;
   const lateJoin = effectiveWorldOptions(preset, world.runtimeOptions).presetRules?.boost.lateJoin;
   const bonus = lateJoin
@@ -352,7 +361,7 @@ const processGeneralCreation: QueuedInputHandler = async (tx, world, event, { ti
     cityKeys: cities.map((c) => c.cityKey),
     unitSet: world.unitSet,
   });
-  const heritage = creationHeritageRecord(parsed.value.heritage);
+  const heritage = creationHeritageRecord(parsed.value.heritage, parsed.value.heritageBirth);
   if (
     heritage &&
     !(await new PgHeritageRepository(tx).spend({

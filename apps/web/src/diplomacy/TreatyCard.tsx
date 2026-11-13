@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Portrait } from '../portrait/Portrait';
 import { formatYearMonth } from '../game/gameDate';
 import { DisabledReason } from '../ui/DisabledReason';
 import { NationBadge } from '../ui/NationBadge';
@@ -168,6 +169,25 @@ export function TreatyCard({ treaty, cityLabel = (key) => `도시 ${key}`, busy,
             <dd>{formatYearMonth(treaty.endAt)}</dd>
           </div>
         ) : null}
+        {treaty.signatories
+          ? (
+              [
+                ['proposer', '제안 장수'],
+                ['approver', '수락 장수'],
+              ] as const
+            ).map(([role, label]) => {
+              const signer = treaty.signatories?.[role];
+              return signer ? (
+                <div key={role}>
+                  <dt>{label}</dt>
+                  <dd>
+                    <Portrait id={signer.portraitId} name={signer.name} variant="icon" size={20} decorative />{' '}
+                    {signer.name}
+                  </dd>
+                </div>
+              ) : null;
+            })
+          : null}
         <CostFact treaty={treaty} />
       </dl>
 

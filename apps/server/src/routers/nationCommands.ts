@@ -3,6 +3,7 @@ import {
   canExecuteCityNationCommand,
   canExecuteResearchNationCommand,
   canUseNationTurns,
+  readTroops,
   STRATEGY_KEYS,
   strategyMonth,
   TICKS_PER_MONTH,
@@ -10,13 +11,27 @@ import {
   unitSetSchema,
 } from '@opensamguk/rules';
 import { TRPCError } from '@trpc/server';
-import { z } from 'zod';
 import { protectedProcedure, router } from '../trpc';
 import { requireGeneral, requireWorld, readView, worldInput } from '../game/queries';
 import { worldResolver } from '../game/resolver';
 import { withPersonnel } from '../game/personnelApi';
 import { commandInput } from '../game/slots';
 import { commandAvailability } from '../game/commandAvailability';
+import { describeCommand } from './commands';
+
+const nationGroups: Readonly<Record<string, 'rest' | 'personnel' | 'diplomacy' | 'special'>> = {
+  nation_rest: 'rest',
+  nation_assign: 'personnel',
+  nation_reward: 'personnel',
+  nation_seize: 'personnel',
+  nation_troop_expel: 'personnel',
+  nation_aid: 'diplomacy',
+  nation_break_pact: 'diplomacy',
+  nation_declare: 'diplomacy',
+  nation_pact: 'diplomacy',
+  nation_peace: 'diplomacy',
+  nation_capital: 'special',
+};
 
 async function actorCommands(tx: Parameters<typeof requireWorld>[0], worldId: string, userId: string) {
   const world = await requireWorld(tx, worldId);
@@ -48,13 +63,30 @@ export const nationCommandsRouter = router({
       };
       const cooldown = view?.nationStrategy?.nations[actor.nationId!];
       const current = strategyMonth(commandActor.tick);
+      const troops = view ? readTroops(view) : undefined;
       return commands.map((def) => {
         const key = STRATEGY_KEYS.find((key) => key === def.key);
         const availableMonth = key ? Math.max(cooldown?.strategicUntil ?? 0, cooldown?.commands[key] ?? 0) : 0;
+        const troopTargets =
+          def.key === 'nation_troop_expel'
+            ? Object.values(troops?.troops ?? {})
+                .filter((troop) => troop.nationId === actor.nationId)
+                .flatMap((troop) =>
+                  troop.members
+                    .filter((generalId) => generalId !== actor.id)
+                    .map((generalId) => ({ generalId, troopName: troop.name })),
+                )
+            : undefined;
+        const availability =
+          !ended && availableMonth > current
+            ? { available: false, reason: `${availableMonth - current}개월 더 기다려야 합니다.` }
+            : commandAvailability(def, view, commandActor, ended);
         return {
-          key: def.key,
-          name: def.name,
-          category: def.category,
+          ...describeCommand(def),
+          group:
+            def.category === 'strategy'
+              ? 'strategy'
+              : (nationGroups[def.key] ?? (def.key.startsWith('nation_research_') ? 'special' : 'other')),
           ...(key
             ? {
                 cooldown: {
@@ -64,8 +96,15 @@ export const nationCommandsRouter = router({
                 },
               }
             : {}),
-          argsSchema: z.toJSONSchema(def.args, { io: 'input' }),
-          ...commandAvailability(def, view, commandActor, ended),
+          ...availability,
+          ...(troopTargets === undefined
+            ? {}
+            : {
+                troopTargets,
+                ...(availability.available !== false && troopTargets.length === 0
+                  ? { available: false, reason: '탈퇴를 지시할 부대원이 없습니다.' }
+                  : {}),
+              }),
         };
       });
     }),

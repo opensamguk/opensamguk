@@ -1,4 +1,11 @@
-import { BALANCE, simulateBattle, unitSetSchema, commanderBattleModifiers } from '@opensamguk/rules';
+import {
+  BALANCE,
+  simulateBattle,
+  unitSetSchema,
+  commanderBattleModifiers,
+  combatSpecialty,
+  COMBAT_SPECIALTY_FEATURE,
+} from '@opensamguk/rules';
 import { createRng } from '@opensamguk/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createCompute, createWorkerHandler } from './compute';
@@ -47,6 +54,96 @@ describe('AC-INT-11 통합판의 단일 교전', () => {
     expect(compute(message)).toEqual(reply);
     expect(message).toEqual(original);
   });
+  it('요청한 교전 단계는 엔진의 단계별 병력 손실을 돌려준다', () => {
+    const message = general({ recordPhases: true });
+    const reply = compute(message);
+    expect(reply).toMatchObject({ type: 'result', input: { recordPhases: true } });
+    if (reply.type !== 'result') throw new Error('교전 결과가 없습니다.');
+    expect(reply.phases?.some(({ kind }) => kind === 'exchange')).toBe(true);
+    expect(reply.phases?.reduce((total, phase) => total + phase.attackerLoss, 0)).toBe(
+      message.attacker.crew - reply.attacker.crew,
+    );
+    expect(reply.phases?.reduce((total, phase) => total + phase.defenderLoss, 0)).toBe(
+      message.defender.crew - reply.defender.crew,
+    );
+    expect(compute({ ...message, recordPhases: false })).toMatchObject({ type: 'error', field: 'recordPhases' });
+  });
+
+  it('가져온 성격·전투 특기·숙련은 엔진과 같은 전투 값으로 적용한다', () => {
+    const attackerTraits = { personality: '대의', specialty: '돌격', proficiency: { '1': 44625 } };
+    const message = general({ attackerTraits });
+    const expected = simulateBattle(
+      {
+        attacker: message.attacker,
+        defender: message.defender,
+        attackerTech: message.attackerTech,
+        defenderTech: message.defenderTech,
+        unitSet,
+        attackerReadiness: { train: -5 },
+        attackerSpecialty: combatSpecialty({ ruleFeatures: [COMBAT_SPECIALTY_FEATURE] }, '돌격'),
+        attackerProficiency: attackerTraits.proficiency,
+      },
+      createRng(message.seed),
+    );
+    expect(compute(message)).toMatchObject({
+      type: 'result',
+      input: { attackerTraits },
+      attacker: expected.attacker,
+      defender: expected.defender,
+    });
+    expect(compute(general({ attackerTraits: { proficiency: { '0': 1 } } }))).toMatchObject({
+      type: 'error',
+      field: 'attackerTraits.proficiency.0',
+    });
+  });
+
+  it('불러온 전투계략과 유산은 교전 계산의 실제 입력에 들어간다', () => {
+    const tactics = { leadership: 30, strength: 50, intel: 100 };
+    const heritage = { tactics: 5, opponentEvasion: 4 };
+    const message = general({ recordPhases: true, attackerTraits: { tactics, heritage } });
+    expect(compute(message)).toMatchObject({ type: 'result', phases: expect.any(Array) });
+    expect(simulateBattle).toHaveBeenLastCalledWith(
+      expect.objectContaining({ attackerTactics: tactics, attackerHeritage: heritage, recordPhases: true }),
+      expect.anything(),
+    );
+    expect(compute(general({ attackerTraits: { heritage: { tactics: 6 } } }))).toMatchObject({
+      type: 'error',
+      field: 'attackerTraits.heritage.tactics',
+    });
+  });
+
+  it('INT-26 가져온 장비 효과로 교전을 계산하고 범위를 벗어난 입력을 거절한다', () => {
+    const equipment = {
+      damageFactor: 1.2,
+      extraPhases: -1,
+      snipe: { chance: 1, morale: 20, injury: [20, 40] as const },
+    };
+    const message = general({ recordPhases: true, attackerTraits: { equipment } });
+    expect(compute(message)).toMatchObject({
+      type: 'result',
+      phases: [{ attackerSniped: true }, ...Array.from({ length: 8 }, () => expect.any(Object))],
+    });
+    expect(simulateBattle).toHaveBeenLastCalledWith(
+      expect.objectContaining({ attackerEquipment: equipment }),
+      expect.anything(),
+    );
+    expect(compute(general({ attackerTraits: { equipment: { extraPhases: 4 } } }))).toMatchObject({
+      type: 'error',
+      field: 'attackerTraits.equipment',
+    });
+  });
+
+  it('월드의 병종 상성 규칙을 그대로 적용한다', () => {
+    expect(compute(general({ coefMode: 'multiply' }))).toMatchObject({
+      type: 'result',
+      input: { coefMode: 'multiply' },
+    });
+    expect(simulateBattle).toHaveBeenLastCalledWith(
+      expect.objectContaining({ coefMode: 'multiply' }),
+      expect.anything(),
+    );
+  });
+
   it('성벽에는 가짜 지휘관을 만들지 않고 공격 지휘관만 보정한다', () => {
     const commanders = { attacker: { leadership: 78, strength: 80 } };
     const message = wall({ commanders });

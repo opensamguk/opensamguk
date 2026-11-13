@@ -28,7 +28,8 @@ type Route =
   | 'operation.get'
   | 'operation.suggest'
   | 'operation.close'
-  | 'inspection.members';
+  | 'inspection.members'
+  | 'inspection.memberRecords';
 type Result = {
   'operation.create': Output['operation']['create'];
   'operation.list': Output['operation']['list'];
@@ -36,6 +37,7 @@ type Result = {
   'operation.suggest': Output['operation']['suggest'];
   'operation.close': Output['operation']['close'];
   'inspection.members': Output['inspection']['members'];
+  'inspection.memberRecords': Output['inspection']['memberRecords'];
 };
 async function rpc<R extends Route>(path: R, input: unknown, cookie?: string) {
   const mutation = path === 'operation.create' || path === 'operation.close';
@@ -303,6 +305,20 @@ it('직책 4는 생성과 감찰이 막히고 5는 허용하며 같은 국가 �
   expect(
     (await rpc('operation.close', { worldId: f.worldId, id: f.operationId }, f.outsider.cookie)).data!.status,
   ).toBe('CLOSED');
+});
+
+it('감찰 기록은 같은 국가 직책자만 읽으며 대상 장수가 다른 국가로 옮기면 차단한다', async () => {
+  const f = await fixture();
+  const input = { worldId: f.worldId, generalId: 2 };
+  await db.generalLog.create({
+    data: { ...input, tick: 100, commandKey: 'rest', kind: 'success', text: '감찰 개인 기록' },
+  });
+  await db.battleLog.create({ data: { ...input, tick: 101, attackerId: 3, text: '감찰 전투 기록' } });
+  expect((await rpc('inspection.memberRecords', input, f.bob.cookie)).error).toBe('FORBIDDEN');
+  const observed = await rpc('inspection.memberRecords', input, f.alice.cookie);
+  expect(observed.data).toMatchObject({ logs: [{ text: '감찰 개인 기록' }], battles: [{ text: '감찰 전투 기록' }] });
+  await db.general.update({ where: { worldId_id: { worldId: f.worldId, id: 2 } }, data: { nationId: null } });
+  expect((await rpc('inspection.memberRecords', input, f.alice.cookie)).error).toBe('NOT_FOUND');
 });
 
 it('지난달·잘못된 월·중복·다른 국가 참여자를 거부하고 현재월과 Int32 밖 목표는 받는다', async () => {

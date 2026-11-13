@@ -30,15 +30,22 @@ function readEquipmentSlots(value: unknown): NonNullable<SuccessionPreview['equi
   if (
     !raw ||
     Object.keys(raw).length === 0 ||
-    Object.keys(raw).some((key) => !slots.includes(key as (typeof slots)[number]))
+    Object.keys(raw).some((key) => key !== 'tool' && !slots.includes(key as (typeof slots)[number]))
   )
     return undefined;
   const result: NonNullable<NonNullable<SuccessionPreview['equipment']>['from']> = {};
   for (const slot of slots) {
     if (!Object.hasOwn(raw, slot)) continue;
     const key = raw[slot];
-    if (typeof key !== 'string' || !new RegExp(`^${slot}_0[1-6]$`).test(key)) return undefined;
+    if (typeof key !== 'string' || !new RegExp(`^${slot}_(0[1-6]|15)$`).test(key)) return undefined;
     result[slot] = key;
+  }
+  if (Object.hasOwn(raw, 'tool')) {
+    const tool = record(raw.tool);
+    if (!tool || !exactKeys(tool, ['key', 'charges'])) return undefined;
+    if (tool.key === 'tool_01' && int(tool.charges, 1, 3)) result.tool = { key: tool.key, charges: tool.charges };
+    else if (tool.key === 'tool_02' && tool.charges === 1) result.tool = { key: tool.key, charges: tool.charges };
+    else return undefined;
   }
   return result;
 }

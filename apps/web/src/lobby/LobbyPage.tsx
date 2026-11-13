@@ -87,11 +87,108 @@ export function LobbyPage() {
             월드
           </h2>
           {body}
-          {ended.length > 0 ? <PastSeasons worlds={ended} /> : null}
+          {ended.length > 0 ? (
+            <>
+              <PastSeasons worlds={ended} />
+              <HallOfFame worlds={ended} />
+            </>
+          ) : null}
         </section>
         {noticeBoard ? <aside className={styles.side}>{noticeBoard}</aside> : null}
       </div>
     </div>
+  );
+}
+
+function HallOfFame({ worlds }: { worlds: LobbyWorld[] }) {
+  const trpc = useTRPC();
+  const [open, setOpen] = useState(false);
+  const [worldId, setWorldId] = useState('');
+  const [scenarioTitle, setScenarioTitle] = useState('');
+  const scenarios = [...new Set(worlds.map((world) => world.scenarioTitle))];
+  const seasons = scenarioTitle ? worlds.filter((world) => world.scenarioTitle === scenarioTitle) : worlds;
+  const [by, setBy] = useState<'dedication' | 'experience' | 'merit'>('merit');
+  const ranking = useQuery({
+    ...trpc.lobby.hallOfFame.queryOptions({
+      by,
+      worldId: worldId || undefined,
+      scenarioTitle: scenarioTitle || undefined,
+    }),
+    enabled: open,
+  });
+  return (
+    <details className={styles.past} onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary>명예의 전당</summary>
+      {open ? (
+        <>
+          <label>
+            시나리오{' '}
+            <select
+              value={scenarioTitle}
+              onChange={(event) => {
+                setScenarioTitle(event.target.value);
+                setWorldId('');
+              }}
+            >
+              <option value="">전체 시나리오</option>
+              {scenarios.map((title) => (
+                <option key={title}>{title}</option>
+              ))}
+            </select>
+          </label>{' '}
+          <label>
+            기수{' '}
+            <select value={worldId} onChange={(event) => setWorldId(event.currentTarget.value)}>
+              <option value="">전체 기수</option>
+              {seasons.map((world) => (
+                <option key={world.id} value={world.id}>
+                  {world.name} · {world.scenarioTitle}
+                </option>
+              ))}
+            </select>
+          </label>{' '}
+          <label>
+            기준{' '}
+            <select
+              value={by}
+              onChange={(event) => {
+                const value = event.currentTarget.value;
+                if (value === 'dedication' || value === 'experience' || value === 'merit') setBy(value);
+              }}
+            >
+              <option value="merit">전공</option>
+              <option value="dedication">공헌</option>
+              <option value="experience">경험</option>
+            </select>
+          </label>
+          {ranking.isPending ? <LoadingState /> : null}
+          {ranking.isError ? (
+            <ErrorState title="순위를 불러오지 못했습니다" onRetry={() => void ranking.refetch()} />
+          ) : null}
+          {ranking.data?.length === 0 ? <EmptyState title="보관된 순위가 없습니다" /> : null}
+          {ranking.data?.length ? (
+            <ol>
+              {ranking.data.map((row) => (
+                <li key={`${row.worldId}:${row.generalId}`}>
+                  {displayName(row.name)} · {row.nationName ?? '재야'} · {row.value.toLocaleString('ko-KR')}
+                  {' · '}
+                  {row.worldName} · {row.scenarioTitle}
+                  {row.winnerName ? ` · 통일 ${row.winnerName}` : ''}
+                  {' · '}
+                  {row.startedAt ? (
+                    <>
+                      <time dateTime={row.startedAt}>{shortDate(row.startedAt)}</time>
+                      {' ~ '}
+                    </>
+                  ) : null}
+                  <time dateTime={row.endedAt}>{shortDate(row.endedAt)}</time>
+                </li>
+              ))}
+            </ol>
+          ) : null}
+        </>
+      ) : null}
+    </details>
   );
 }
 

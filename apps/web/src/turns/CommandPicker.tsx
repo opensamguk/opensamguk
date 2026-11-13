@@ -28,13 +28,14 @@ import type { EquipmentRead } from '../equipment/useEquipment';
 
 type ServerCommand = inferRouterOutputs<AppRouter>['commands']['list'][number];
 
-// 서버 명령 목록(commands.list)의 한 줄. 국가 명령(nationCommands.list)은 도움말 없이 가능 여부만 실어 도움말 칸은 비어 있을 수 있다.
+// 개인·국가 명령 목록에서 명령 카드에 사용하는 응답 필드.
 // argsSchema는 화면이 JSON Schema로 읽기만 하므로 unknown으로 둔다.
 export type CommandInfo = {
   key: string;
   name: string;
   category: string;
   argsSchema: unknown;
+  troopTargets?: readonly { generalId: number; troopName: string }[];
 } & Partial<Pick<ServerCommand, 'description' | 'cost' | 'requirements' | 'turns' | 'available' | 'reason'>>;
 
 // 예턴 연결이 넘기는 대상 장수. 국가 칸은 인사부 조회의 소재 도시·유저 여부를 함께 싣는다.
@@ -58,8 +59,14 @@ export const CATEGORY_LABELS: Record<string, string> = {
   strategy: '전략',
   personal: '개인',
   nation: '국가',
+  rest: '휴식',
+  personnel: '인사',
+  diplomacy: '외교',
+  special: '특수',
+  other: '기타',
 };
 const CATEGORY_ORDER = ['domestic', 'military', 'strategy', 'personal', 'nation'];
+const NATION_CATEGORY_ORDER = ['rest', 'personnel', 'diplomacy', 'special', 'strategy', 'other', 'nation'];
 
 // 명령마다 대상 도시 후보를 바꿀 때 쓴다 (교역 대상, T2-08). note는 후보가 없을 때의 이유 같은 안내다.
 export interface CityChoices {
@@ -103,8 +110,11 @@ interface Props {
 // 장비매매 품목 키 → 이름. 장비 정보를 아직 못 받았으면 없다.
 export function equipmentName(read: EquipmentRead | undefined): ((itemKey: string) => string | undefined) | undefined {
   if (read?.kind !== 'ready') return undefined;
-  const items = read.data.items;
-  return (itemKey) => items.find((item) => item.key === itemKey)?.name;
+  const { items, tools, tool } = read.data;
+  return (itemKey) =>
+    items.find((item) => item.key === itemKey)?.name ??
+    tools?.find((item) => item.key === itemKey)?.name ??
+    (tool?.key === itemKey ? tool.name : undefined);
 }
 
 // 서버가 준 명령을 카드로 고른다. 카드 선택과 실제 명령/패 소비는 별개다.
@@ -160,28 +170,42 @@ export function CommandPicker({
   const generalsFor = (key: string | undefined): TargetGeneral[] | undefined => {
     if (key === RECRUIT_COMMAND && recruits) return [...recruits.list];
     const byId = new Map((members ?? []).map((member) => [member.id, member]));
-    if (generals)
-      return generals.map((general) => {
-        const detail = byId.get(general.id);
-        return { ...detail, ...general, cityName: general.cityName ?? detail?.cityName };
-      });
+    if (generals) {
+      const troopTargets = commands.find((command) => command.key === key)?.troopTargets;
+      const troopNames =
+        troopTargets && new Map(troopTargets.map(({ generalId, troopName }) => [generalId, troopName]));
+      return generals
+        .filter(({ id }) => !troopNames || troopNames.has(id))
+        .map((general) => {
+          const detail = byId.get(general.id);
+          return {
+            ...detail,
+            ...general,
+            cityName: general.cityName ?? detail?.cityName,
+            troopName: troopNames?.get(general.id),
+          };
+        });
+    }
     if (key && SAME_NATION_TARGET.has(key) && members) return members.filter((member) => member.id !== myId);
     return undefined;
   };
   // 대상 장수를 이름으로 고르면 카드 설명·입력 칸·누락 안내가 같은 이름을 쓴다.
   const fieldsFor = (target: unknown, key?: string): ArgField[] =>
     target
-      ? argFields(target, units.all).map((field) =>
+      ? argFields(target, units.all, units.armTypes).map((field) =>
           field.key === 'generalId' && generalsFor(key) ? { ...field, label: '대상 장수' } : field,
         )
       : [];
 
   const categories = useMemo(
     () =>
-      [...new Set([...CATEGORY_ORDER, ...commands.map((command) => command.category)])].filter((key) =>
-        commands.some((command) => command.category === key),
-      ),
-    [commands],
+      [
+        ...new Set([
+          ...(argContext.walletKind === 'nation' ? NATION_CATEGORY_ORDER : CATEGORY_ORDER),
+          ...commands.map((command) => command.category),
+        ]),
+      ].filter((key) => commands.some((command) => command.category === key)),
+    [commands, argContext.walletKind],
   );
   const activeCategory = categories.includes(category) ? category : 'all';
 
@@ -238,7 +262,7 @@ export function CommandPicker({
           [own, fallback].find((v) => field.options.some((o) => o.value === v)) ?? field.options[0]?.value ?? '';
       }
       if (field.kind === 'boolean') initial[field.key] = 'true';
-      if (field.kind === 'enum') initial[field.key] = field.options[0]?.value ?? '';
+      if (field.kind === 'enum' && !field.philosophyEffects) initial[field.key] = field.options[0]?.value ?? '';
       if (field.kind === 'color') initial[field.key] = '#8a5a2b';
     }
     setValues(initial);
@@ -327,6 +351,7 @@ export function CommandPicker({
           nation: (id) => nations.find((n) => n.id === id)?.name,
           general: screenGenerals ? (id) => screenGenerals.find((g) => g.id === id)?.name : undefined,
           unit: (id) => units.name(id),
+          armType: (id) => units.armTypes?.[id],
           equipment: equipmentName(equipment),
         }),
       ]
@@ -645,6 +670,7 @@ export function CommandPicker({
                         options={nations}
                         onChange={set}
                         checks={checks}
+                        showIntroductions={command.key === 'join'}
                       />
                     );
                     return precheck && candidateTurns.length > 0 ? (
@@ -669,6 +695,7 @@ export function CommandPicker({
                         {...(command.key === RECRUIT_COMMAND && recruits
                           ? { note: recruits.note, empty: '등용할 수 있는 재야 장수가 없습니다' }
                           : {})}
+                        {...(command.troopTargets ? { empty: '탈퇴를 지시할 부대원이 없습니다' } : {})}
                       />
                     );
                   }
@@ -765,8 +792,9 @@ function ArgInput({
         {/* 병종표를 늦게 받아 고른 값이 없으면 첫 병종이 고른 것처럼 보이지 않게 빈 선택을 둔다. */}
         {field.kind === 'city' ||
         field.kind === 'nation' ||
+        (field.kind === 'enum' && field.philosophyEffects) ||
         (field.kind === 'unit' && !field.options.some((option) => option.value === value)) ? (
-          <option value="">고르세요</option>
+          <option value="">{field.kind === 'enum' && field.philosophyEffects ? '중립' : '고르세요'}</option>
         ) : null}
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -821,6 +849,19 @@ function ArgInput({
         <p className={styles.muted} role="note">
           {note}
         </p>
+      ) : null}
+      {field.kind === 'enum' && field.philosophyEffects ? (
+        <details>
+          <summary>국가 성향 장단점</summary>
+          <ul>
+            {field.options.map((option) => {
+              const effects = field.philosophyEffects?.[option.value];
+              if (!effects) return null;
+              const text = `${option.label} · 장점 ${effects.benefits.join(', ') || '없음'} · 단점 ${effects.drawbacks.join(', ') || '없음'}`;
+              return <li key={option.value}>{option.value === value ? <strong>{text}</strong> : text}</li>;
+            })}
+          </ul>
+        </details>
       ) : null}
       {after}
     </div>

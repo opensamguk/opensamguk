@@ -1,3 +1,4 @@
+import { domesticSpecialtyFor } from '../../../general/domesticSpecialty';
 // core2026 df6c926 packages/logic/src/actions/turn/general/strategyCommand.ts의 계략 확률·피해 공식을 옮겼다.
 // MIT (c) 2025 devsam. resources/NOTICE.md.
 import { z } from 'zod';
@@ -6,15 +7,21 @@ import { toGameDate } from '../../../clock/clock';
 import type { WorldView } from '../../../model/world';
 import type { InitialGeneral } from '../../../world/bootstrap';
 import type { CityField, Effect } from '../../effects';
+import { applyEffects } from '../../effects';
 import { fail, ownCity, positive, relation } from '../../support';
 import type { Actor, CommandResult, Failure } from '../../types';
 import { fiveStatsSchema } from '../../../general/fiveStats';
-import { equipmentBonus, withEquipmentBonus } from '../../../equipment/stats';
+import { equipmentBonus } from '../../../equipment/stats';
+import { allEquipmentTools } from '../../../equipment/config';
+import { consumeBattleTool } from '../../../equipment/morale';
+import { commandConditionStats, GENERAL_CONDITION_FEATURE, generalCondition } from '../../../general/condition';
 
 // S1: 연도와 무관하게 금·쌀 각 100. S2: 부상으로 능력치를 줄이지 않는다.
 // S3: 부상 80 이상은 유지. S4: 불탐 표시·성공 횟수·별도 능력치 경험은 생략한다.
 // S5: 탈취는 보급과 무관하게 대상 재고에서 뺀다. S6: 장비는 능력치에 합산하며 별도 특기 보정은 없다.
 // S7: 장수 로그·다친 장수 보고·대상 국가 기록. 판정은 확률 0·0.5에도 next 한 번이다.
+import { nationPhilosophy } from '../../../personnel/nationPhilosophy';
+
 export const STRATAGEM = {
   COST_GOLD: 100,
   COST_RICE: 100,
@@ -47,7 +54,7 @@ export function effectiveStat(general: Pick<InitialGeneral, Stat>, stat: Stat): 
 export function stratagemAttackScore(general: InitialGeneral, commandKey: string, view?: WorldView): number {
   const { leadership, strength, intel, politics, charm } = general;
   const base = fiveStatsSchema.parse({ leadership, strength, intel, politics, charm });
-  const stats = view ? withEquipmentBonus(view, general.id, base) : base;
+  const stats = view ? commandConditionStats(view, general, base) : base;
   if (commandKey === 'fire_attack' || commandKey === 'sabotage') return stats.intel;
   if (commandKey !== 'plunder' && commandKey !== 'incite') throw new Error('기본 계략의 명령 키를 확인하세요.');
   const primary = commandKey === 'plunder' ? stats.strength : stats.charm;
@@ -90,22 +97,37 @@ export function stratagemProbability(
   const year = toGameDate(view.startYear, actor.tick ?? 0).year;
   const defenders = stratagemDefenders(view, cityKey, year);
   const modern = view.ruleFeatures?.includes('stratagem-basic') ?? false;
+  const conditionEnabled = view.ruleFeatures?.includes(GENERAL_CONDITION_FEATURE) ?? false;
   const attack =
     (modern ? stratagemAttackScore(general, commandKey ?? '', view) : effectiveStat(general, stat)) /
     STRATAGEM.STAT_COEFFICIENT;
   const defence =
     Math.max(
       0,
-      ...defenders.map((g) => (modern ? g.intel + equipmentBonus(view, g.id).intel : effectiveStat(g, stat))),
+      ...defenders.map((g) => {
+        if (!modern) return effectiveStat(g, stat);
+        const intel = conditionEnabled ? generalCondition(g, 0).injuredStats.intel : g.intel;
+        return intel + equipmentBonus(view, g.id).intel;
+      }),
     ) /
       STRATAGEM.STAT_COEFFICIENT +
     (Math.log2(defenders.length + 1) - 1.25) * 0.04 +
     developmentRatio(view, city.security, city.securityMax) / 5 +
     (city.supplied ? 0.1 : 0);
-  return Math.min(
-    STRATAGEM.MAX_PROBABILITY,
-    Math.max(0, (STRATAGEM.BASE_PROBABILITY + attack - defence) / stratagemDistance(view, general.cityKey, cityKey)),
-  );
+  const nation = general.nationId === null ? undefined : view.nations[general.nationId];
+  const bonus = nationPhilosophy(view, nation?.philosophy)?.stratagem ?? 0;
+  const base = (STRATAGEM.BASE_PROBABILITY + attack - defence) / stratagemDistance(view, general.cityKey, cityKey);
+  const specialty = domesticSpecialtyFor(view, general, 'stratagem')?.successBonus ?? 0;
+  const normal = Math.min(STRATAGEM.MAX_PROBABILITY, Math.max(0, base + bonus + specialty));
+  return normal + (stratagemTool(view, general.id)?.stratagemBonus ?? 0);
+}
+
+function stratagemTool(view: WorldView, generalId: number) {
+  const equipment = view.equipment;
+  if (!equipment || !('fullRareEquipment' in equipment.config)) return undefined;
+  const key = equipment.generals[generalId]?.tool?.key;
+  const tool = key && allEquipmentTools[key];
+  return tool && 'stratagemBonus' in tool ? tool : undefined;
 }
 
 // 폐허의 내림으로 최대치가 0이 된 새 월드만 비율을 0으로 읽는다. 기존 공식은 보존한다.
@@ -226,15 +248,23 @@ export function executeStratagem(
     ...damage,
   ];
   if (!success) return { effects, logs: [{ kind: 'success', text: `${spec.name} 실패: ${city.name}` }] };
+  const tool = stratagemTool(view, general.id);
+  if (tool) {
+    const state = applyEffects(view, effects);
+    consumeBattleTool(state, general.id);
+    effects.splice(0, effects.length, { kind: 'world', state });
+  }
   const amounts = spec.fields
     ? `${spec.labels![0]} ${primary}, ${spec.labels![1]} ${spec.key === 'incite' ? secondary.toFixed(1) : secondary} 감소`
     : `금 ${Math.round(primary)}, 쌀 ${Math.round(secondary)}`;
   return {
+    stratagemSucceeded: true,
+    stratagemCityKey: cityKey,
     effects,
     logs: [
       {
         kind: 'success',
-        text: `${spec.name} 성공: ${city.name} ${amounts}${spec.fields ? `, 장수 ${reports.length}명 부상` : ' 획득'}`,
+        text: `${spec.name} 성공: ${city.name} ${amounts}${spec.fields ? `, 장수 ${reports.length}명 부상` : ' 획득'}${tool ? ` · ${tool.name} 사용` : ''}`,
       },
     ],
     ...(spec.fields ? { reports } : {}),

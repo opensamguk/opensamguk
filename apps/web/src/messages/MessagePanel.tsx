@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { errorCode } from '../game/errors';
 import { displayName } from '../game/names';
 import { Portrait } from '../portrait/Portrait';
@@ -117,6 +117,19 @@ function MessageList({ worldId, scope }: { worldId: string; scope: MessageScope 
   const queryClient = useQueryClient();
   const list = useMessageList(worldId, scope);
   const { mutateAsync: markRead } = useMutation(trpc.message.markRead.mutationOptions());
+  const {
+    mutate: retract,
+    isPending: retracting,
+    error: retractError,
+  } = useMutation({
+    ...trpc.message.retract.mutationOptions(),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: messageListKey(trpc, worldId, scope) }),
+        queryClient.invalidateQueries({ queryKey: trpc.message.unread.queryKey({ worldId }) }),
+      ]);
+    },
+  });
   const items = listItems(list.data);
   const firstPage = list.data?.pages[0]?.items;
   const requested = useRef(new Set<string>());
@@ -150,9 +163,19 @@ function MessageList({ worldId, scope }: { worldId: string; scope: MessageScope 
     <div className={styles.listWrap}>
       <ol className={styles.list} aria-label={`${SCOPE_LABELS[scope]} 메시지`}>
         {items.map((item) => (
-          <MessageRow key={item.id} item={item} />
+          <MessageRow
+            key={item.id}
+            item={item}
+            retracting={retracting}
+            onRetract={() => retract({ worldId, id: item.id })}
+          />
         ))}
       </ol>
+      {retractError ? (
+        <p className={styles.error} role="alert">
+          {serverMessage(retractError) ?? '메시지를 삭제하지 못했습니다.'}
+        </p>
+      ) : null}
       {list.hasNextPage ? (
         <button
           type="button"
@@ -196,7 +219,23 @@ function PartyName({ party }: { party: Party }) {
   );
 }
 
-export function MessageRow({ item }: { item: MessageItem }) {
+export function MessageRow({
+  item,
+  onRetract,
+  retracting = false,
+}: {
+  item: MessageItem;
+  onRetract?: () => void;
+  retracting?: boolean;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const [windowOpen, setWindowOpen] = useState(() => Date.parse(item.retractUntil ?? '') > Date.now());
+  useEffect(() => {
+    const remaining = Date.parse(item.retractUntil ?? '') - Date.now();
+    if (!(remaining > 0)) return;
+    const timer = setTimeout(() => setWindowOpen(false), remaining);
+    return () => clearTimeout(timer);
+  }, [item.retractUntil]);
   const sent = item.direction === 'sent';
   const unread = !sent && !item.read;
   return (
@@ -217,7 +256,31 @@ export function MessageRow({ item }: { item: MessageItem }) {
         </time>
         {unread ? <Tag tone="accent">안 읽음</Tag> : null}
       </div>
-      <p className={styles.body}>{item.body}</p>
+      <p className={styles.body}>{item.deletedAt ? '삭제된 메시지입니다' : item.body}</p>
+      {sent && !item.deletedAt && windowOpen && onRetract ? (
+        confirming ? (
+          <div className={styles.meta}>
+            <span>이 메시지를 삭제할까요?</span>
+            <button
+              type="button"
+              disabled={retracting}
+              onClick={() => {
+                setConfirming(false);
+                onRetract();
+              }}
+            >
+              삭제 확인
+            </button>
+            <button type="button" onClick={() => setConfirming(false)}>
+              취소
+            </button>
+          </div>
+        ) : (
+          <button type="button" disabled={retracting} onClick={() => setConfirming(true)}>
+            삭제
+          </button>
+        )
+      ) : null}
     </li>
   );
 }
@@ -322,9 +385,14 @@ function Compose({ worldId, scope, draftKey }: { worldId: string; scope: SendSco
             <option value="">고르세요</option>
             {recipients.data?.generals.map((general, _index, all) => {
               const name = pickerName(general.name, all);
+              const roles = [];
+              if (general.nation && general.officerLevel === 12) roles.push('군주');
+              if (general.nation && general.officerLevel === 11) roles.push('참모');
+              if (general.isAmbassador) roles.push('외교권자');
+              const recipientName = roles.length ? `${name} (${roles.join(' · ')})` : name;
               return (
                 <option key={general.id} value={general.id}>
-                  {general.nation ? `${name} (${general.nation.name})` : `${name} (재야)`}
+                  {general.nation ? `${recipientName} (${general.nation.name})` : `${recipientName} (재야)`}
                 </option>
               );
             })}

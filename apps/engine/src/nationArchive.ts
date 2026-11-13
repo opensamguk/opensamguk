@@ -1,5 +1,13 @@
 import { notifyActivityOnCommit, type Prisma } from '@opensamguk/db';
-import type { WorldState } from '@opensamguk/rules';
+import {
+  COURT_PROMOTION_FEATURE,
+  nationRank,
+  toGameDate,
+  type CommandResult,
+  type WorldState,
+} from '@opensamguk/rules';
+
+import { finalNationSummaries } from './seasonArchive';
 
 export type ActionAt = { sequence: number; tick: number };
 
@@ -9,19 +17,52 @@ export async function persistPublicNationEvents(
   before: WorldState,
   next: WorldState,
   at: ActionAt,
+  transfer?: CommandResult['cityTransfer'],
 ) {
-  const data: { kind: string; text: string }[] = [];
+  const data: { kind: string; text: string; nationIds: number[] }[] = [];
   for (const nation of Object.values(next.nations)) {
-    if (!before.nations[nation.id]) data.push({ kind: 'found', text: `${nation.name} 건국` });
+    const prior = before.nations[nation.id];
+    if (!prior) data.push({ kind: 'found', nationIds: [nation.id], text: `${nation.name} 건국` });
+    else if (next.ruleFeatures?.includes(COURT_PROMOTION_FEATURE) && prior.level < nation.level) {
+      const title = nationRank(nation.level)?.title;
+      if (title) data.push({ kind: 'promotion', nationIds: [nation.id], text: `${nation.name} 작위 승급 · ${title}` });
+    }
+    if (prior && nation.capitalCityKey !== null && prior.capitalCityKey !== nation.capitalCityKey) {
+      const capital = next.cities[nation.capitalCityKey];
+      if (capital) data.push({ kind: 'capital', nationIds: [nation.id], text: `${nation.name} ${capital.name} 천도` });
+    }
   }
   for (const nation of Object.values(before.nations)) {
-    if (!next.nations[nation.id]) data.push({ kind: 'fall', text: `${nation.name} 멸망` });
+    if (!next.nations[nation.id]) data.push({ kind: 'fall', nationIds: [nation.id], text: `${nation.name} 멸망` });
+  }
+  for (const general of Object.values(next.generals)) {
+    const prior = before.generals[general.id];
+    if (!prior || general.nationId === null || prior.nationId === general.nationId) continue;
+    const nation = before.nations[general.nationId];
+    if (nation && next.nations[nation.id])
+      data.push({ kind: 'enlist', nationIds: [nation.id], text: `${general.name} ${nation.name} 임관` });
   }
   for (const city of Object.values(next.cities)) {
     const previous = before.cities[city.cityKey]?.nationId;
     const owner = city.nationId === null ? undefined : next.nations[city.nationId];
-    if (previous !== undefined && previous !== city.nationId && owner && before.nations[owner.id])
-      data.push({ kind: 'capture', text: `${owner.name}의 ${city.name} 점령` });
+    if (previous === undefined || previous === city.nationId || !owner || !before.nations[owner.id]) continue;
+    const attacker =
+      transfer?.cityKey === city.cityKey && transfer.toNationId === owner.id
+        ? before.nations[transfer.fromNationId]
+        : undefined;
+    data.push(
+      attacker
+        ? {
+            kind: 'transfer',
+            nationIds: [...new Set([attacker.id, owner.id, previous].filter((id) => id !== null))],
+            text: `${city.name} 공략 후 ${attacker.name}에서 ${owner.name}에 양도`,
+          }
+        : {
+            kind: 'capture',
+            nationIds: previous === null ? [owner.id] : [owner.id, previous],
+            text: `${owner.name}의 ${city.name} 점령`,
+          },
+    );
   }
   if (before.diplomacies !== next.diplomacies) {
     const prior = new Set(
@@ -33,7 +74,8 @@ export async function persistPublicNationEvents(
       if (state !== 'DECLARED' || prior.has(`${nationA}:${nationB}`)) continue;
       const a = next.nations[nationA],
         b = next.nations[nationB];
-      if (a && b) data.push({ kind: 'declare', text: `${a.name}·${b.name} 사이 선전포고` });
+      if (a && b)
+        data.push({ kind: 'declare', nationIds: [nationA, nationB], text: `${a.name}·${b.name} 사이 선전포고` });
     }
   }
   if (data.length) {
@@ -42,33 +84,22 @@ export async function persistPublicNationEvents(
   }
 }
 
-export async function archiveRemovedNation(
-  tx: Prisma.TransactionClient,
-  worldId: string,
-  nation: { id: number; name: string; color: string },
-  at: ActionAt,
-) {
-  await tx.removedNation.create({
-    data: {
-      worldId,
-      nationId: nation.id,
-      name: nation.name,
-      color: nation.color,
-      removedSequence: at.sequence,
-      removedTick: at.tick,
-    },
-  });
-}
-
 export async function persistYearbookNations(
   tx: Prisma.TransactionClient,
   worldId: string,
   tick: number,
-  state: WorldState,
+  nations: readonly { id: number; name: string; color: string; power: number }[],
+  troopTotals: ReadonlyMap<number, number>,
 ) {
-  const data = Object.values(state.nations)
-    .sort((a, b) => a.id - b.id)
-    .map(({ id, name, color }) => ({ worldId, tick, nationId: id, name, color }));
+  const data = nations.map(({ id, name, color, power }) => ({
+    worldId,
+    tick,
+    nationId: id,
+    name,
+    color,
+    power,
+    troops: troopTotals.get(id) ?? 0,
+  }));
   if (data.length) await tx.yearbookNation.createMany({ data });
 }
 
@@ -80,10 +111,25 @@ export async function persistRemovedNations(
   next: WorldState,
   at: ActionAt,
 ) {
-  for (const nation of Object.values(before.nations)) {
-    if (next.nations[nation.id]) continue;
-    await archiveRemovedNation(tx, worldId, nation, at);
-    await tx.nation.update({ where: { worldId_id: { worldId, id: nation.id } }, data: { capitalCityKey: null } });
-    await tx.nation.delete({ where: { worldId_id: { worldId, id: nation.id } } });
+  const ids = Object.values(before.nations)
+    .filter(({ id }) => !next.nations[id])
+    .map(({ id }) => id);
+  if (!ids.length) return;
+  const year = toGameDate(before.startYear, at.tick).year;
+  for (const nation of finalNationSummaries(before, year, ids)) {
+    const where = { worldId_id: { worldId, id: nation.nationId } };
+    await tx.removedNation.create({
+      data: {
+        worldId,
+        nationId: nation.nationId,
+        name: nation.name,
+        color: nation.color,
+        removedSequence: at.sequence,
+        removedTick: at.tick,
+        finalSummary: nation,
+      },
+    });
+    await tx.nation.update({ where, data: { capitalCityKey: null } });
+    await tx.nation.delete({ where });
   }
 }

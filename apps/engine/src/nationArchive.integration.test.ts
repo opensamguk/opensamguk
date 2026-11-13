@@ -170,6 +170,18 @@ describe('T4-56 / AC-P2-17 실제 PostgreSQL 국가 표시값 저장', () => {
       color: initial.nations[1]!.color,
       removedSequence: world.actionSequence,
       removedTick: 10100,
+      finalSummary: expect.objectContaining({
+        nationId: 2,
+        philosophy: initial.nations[1]!.philosophy,
+        level: initial.nations[1]!.level,
+        tech: initial.nations[1]!.tech,
+        roster: initial.generals
+          .filter((general) => general.nationId === 2)
+          .map(({ id, name, portraitId }) => ({ generalId: id, name, portraitId })),
+        troops: initial.generals
+          .filter((general) => general.nationId === 2)
+          .reduce((sum, general) => sum + general.crew, 0),
+      }),
     });
     expect(
       await db.generalLog.findFirstOrThrow({
@@ -465,7 +477,7 @@ describe('T4-56 / AC-P2-17 실제 PostgreSQL legacy 백필', () => {
     expect(dry).toMatchObject({ status: 'ok', inserted: 0, wouldInsert: expected.length });
     expect(await archived(worldId)).toEqual([]);
     expect((await cli(worldId, true)).inserted).toBe(expected.length);
-    expect(await archived(worldId)).toEqual(expected);
+    expect(await archived(worldId)).toEqual(expected.map((row) => ({ ...row, power: null, troops: null })));
     expect(await db.removedNation.findMany({ where: { worldId } })).toEqual(removed);
     expect(await backfillWorld(db, worldId, true)).toMatchObject({
       status: 'ok',

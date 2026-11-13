@@ -88,16 +88,36 @@ function SortHeader<K extends string>({
   );
 }
 
+function generalValue(row: RankedGeneral, key: GeneralSortKey) {
+  if (key === 'stratagem') return number(row.stratagemSuccesses);
+  if (key === 'dedication' || key === 'experience' || key === 'merit') return number(row[key]);
+  if (
+    key === 'proficiency1' ||
+    key === 'proficiency2' ||
+    key === 'proficiency3' ||
+    key === 'proficiency4' ||
+    key === 'proficiency5'
+  )
+    return number(row.proficiency?.[key.at(-1)!] ?? 0);
+  const value = row.battleStats?.[key];
+  if (value === undefined) return '—';
+  return key === 'winRate' || key === 'killRate' || key === 'humanKillRate'
+    ? `${(value * 100).toFixed(1)}%`
+    : number(value);
+}
+
 function GeneralRow({
   row,
   me,
   rowRef,
   narrow,
+  columns,
 }: {
   row: RankedGeneral;
   me: boolean;
   rowRef?: (el: HTMLElement | null) => void;
   narrow: boolean;
+  columns: typeof GENERAL_COLUMNS;
 }) {
   return (
     <tr ref={rowRef} tabIndex={me ? -1 : undefined} data-me={me || undefined} className={me ? styles.meRow : undefined}>
@@ -115,13 +135,15 @@ function GeneralRow({
         <span className={styles.name} data-testid="ranked-general-name" data-general-name>
           {displayName(row.name)}
         </span>
+        {row.isHuman === false ? <span className={styles.name}> NPC</span> : null}
+        {row.possessedNpc ? <span className={styles.name}> 맡은 NPC</span> : null}
         {me ? <span className={styles.meChip}>나</span> : null}
         {narrow ? (
           <dl className={styles.details}>
-            {GENERAL_COLUMNS.map((column) => (
+            {columns.map((column) => (
               <div key={column.key}>
                 <dt>{column.label}</dt>
-                <dd>{number(row[column.key])}</dd>
+                <dd>{generalValue(row, column.key)}</dd>
               </div>
             ))}
             {MERIT_PARTS.map((part) => (
@@ -142,9 +164,11 @@ function GeneralRow({
       </td>
       {narrow ? null : (
         <>
-          <td className="num">{number(row.dedication)}</td>
-          <td className="num">{number(row.experience)}</td>
-          <td className="num">{number(row.merit)}</td>
+          {columns.map(({ key }) => (
+            <td key={key} className="num">
+              {generalValue(row, key)}
+            </td>
+          ))}
           <td className="num">{number(row.wins)}</td>
           <td className="num">{number(row.captures)}</td>
         </>
@@ -166,6 +190,10 @@ export function GeneralRankingTable({
 }) {
   const mine = useRef<HTMLElement | null>(null);
   const narrow = useNarrowTable();
+  const columns =
+    'proficiencyEnabled' in ranking && ranking.proficiencyEnabled
+      ? GENERAL_COLUMNS
+      : GENERAL_COLUMNS.filter(({ key }) => !key.startsWith('proficiency') || key === by);
   const meId = ranking.me?.generalId ?? null;
   const meInTop = meId !== null && ranking.top.some((row) => row.generalId === meId);
   const mineRef = (el: HTMLElement | null) => {
@@ -178,7 +206,7 @@ export function GeneralRankingTable({
 
   return (
     <div className={styles.wrap}>
-      {narrow ? <MobileSort columns={GENERAL_COLUMNS} by={by} onSort={onSort} label="장수 순위" /> : null}
+      {narrow ? <MobileSort columns={columns} by={by} onSort={onSort} label="장수 순위" /> : null}
       <table className={styles.table} aria-label="장수 순위">
         <thead>
           <tr>
@@ -189,7 +217,7 @@ export function GeneralRankingTable({
             <th scope="col">소속</th>
             {narrow
               ? null
-              : GENERAL_COLUMNS.map((column) => (
+              : columns.map((column) => (
                   <SortHeader key={column.key} column={column} active={column.key === by} onSort={onSort} />
                 ))}
             {narrow
@@ -205,18 +233,25 @@ export function GeneralRankingTable({
           {ranking.top.map((row) => {
             const me = row.generalId === meId;
             return (
-              <GeneralRow key={row.generalId} row={row} me={me} narrow={narrow} {...(me ? { rowRef: mineRef } : {})} />
+              <GeneralRow
+                key={row.generalId}
+                row={row}
+                me={me}
+                narrow={narrow}
+                columns={columns}
+                {...(me ? { rowRef: mineRef } : {})}
+              />
             );
           })}
         </tbody>
         {ranking.me && !meInTop ? (
           <tbody className={styles.outside}>
             <tr aria-hidden="true">
-              <td colSpan={narrow ? 3 : 8} className={styles.gap}>
+              <td colSpan={narrow ? 3 : 3 + columns.length + MERIT_PARTS.length} className={styles.gap}>
                 ⋯
               </td>
             </tr>
-            <GeneralRow row={ranking.me} me rowRef={mineRef} narrow={narrow} />
+            <GeneralRow row={ranking.me} me rowRef={mineRef} narrow={narrow} columns={columns} />
           </tbody>
         ) : null}
       </table>
@@ -263,6 +298,51 @@ export function NationRankingTable({
               <RankCell rank={row.rank} />
               <td>
                 <NationBadge name={row.name} color={row.color} />
+                {row.rankTitle || row.philosophy ? (
+                  <dl className={styles.details}>
+                    {row.rankTitle ? (
+                      <div>
+                        <dt>작위</dt>
+                        <dd>{row.rankTitle}</dd>
+                      </div>
+                    ) : null}
+                    {row.philosophy ? (
+                      <div>
+                        <dt>성향</dt>
+                        <dd>{row.philosophy}</dd>
+                      </div>
+                    ) : null}
+                  </dl>
+                ) : null}
+                {row.forceEstimate ? (
+                  <details>
+                    <summary>현재 병력 추정</summary>
+                    <dl className={styles.details}>
+                      <div>
+                        <dt>소속 장수</dt>
+                        <dd>{number(row.forceEstimate.totalGeneralCount)}명</dd>
+                      </div>
+                      <div>
+                        <dt>사람 전투장</dt>
+                        <dd>
+                          {number(row.forceEstimate.userCombatGeneralCount)}명 · 약{' '}
+                          {number(row.forceEstimate.userTroops)}명
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>NPC 전투장</dt>
+                        <dd>
+                          {number(row.forceEstimate.npcCombatGeneralCount)}명 · 약 {number(row.forceEstimate.npcTroops)}
+                          명
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>장기 미활동 장수</dt>
+                        <dd>{number(row.forceEstimate.inactiveGeneralCount)}명</dd>
+                      </div>
+                    </dl>
+                  </details>
+                ) : null}
                 {narrow ? (
                   <dl className={styles.details}>
                     {NATION_COLUMNS.map((column) => (

@@ -1,3 +1,4 @@
+import { domesticSpecialtyDetails } from '../game/specialtyDetails';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { retryUnlessClientError } from '../game/errors';
@@ -9,6 +10,7 @@ import { RelationList } from '../relations/RelationList';
 import { NationBadge } from '../ui/NationBadge';
 import { Tag } from '../ui/Tag';
 import { useTRPC } from '../trpc';
+import { HeritageBenefits } from './HeritageBenefits';
 import { meritText } from './infoView';
 import { InfoGrid } from './Panel';
 import { UnitName } from './UnitName';
@@ -58,17 +60,61 @@ export function GeneralInfo({
   const summary = useWorldSummary(worldId).data;
   const merit = useMyMerit(worldId);
   const board = equipment?.kind === 'ready' && equipment.data.generalId === g.id ? equipment.data : null;
-  const stat = (key: 'leadership' | 'strength' | 'intel') =>
-    board && board.bonus[key] > 0 ? (
+  const condition = g.condition;
+  const stat = (key: 'leadership' | 'strength' | 'intel') => {
+    const injured = condition?.injuredStats[key] ?? g[key];
+    const leadershipBonus = key === 'leadership' ? (condition?.leadershipBonus ?? 0) : 0;
+    const equipmentBonus = board?.bonus[key] ?? 0;
+    const applied = injured + leadershipBonus + equipmentBonus;
+    const details = [
+      injured !== g[key] ? `부상 ${n(g[key])} → ${n(injured)}` : null,
+      leadershipBonus > 0 ? `관직 +${n(leadershipBonus)}` : null,
+      equipmentBonus > 0 ? `장비 +${n(equipmentBonus)}` : null,
+    ].filter(Boolean);
+    const experience = g.statExperience?.[key];
+    const limit = g.statUpgradeLimit;
+    return details.length > 0 || (experience !== undefined && limit !== undefined) ? (
       <span>
-        <strong>{n(board.stats[key])}</strong>
-        <small className={styles.statNote}>
-          기본 {n(board.baseStats[key])} + 장비 {board.bonus[key]}
-        </small>
+        <strong className={injured !== g[key] ? styles.ageWarning : undefined}>{n(applied)}</strong>
+        {details.length ? <small className={styles.statNote}>{details.join(' · ')}</small> : null}
+        {experience === undefined || limit === undefined ? null : (
+          <small className={styles.statNote}>
+            <progress
+              aria-label={`${{ leadership: '통솔', strength: '무력', intel: '지력' }[key]} 성장`}
+              max={limit}
+              value={experience}
+            />{' '}
+            {experience} / {limit}
+          </small>
+        )}
       </span>
     ) : (
-      n(board?.stats[key] ?? g[key])
+      n(applied)
     );
+  };
+  const age = displayedAge(g, summary);
+  const retirementAge = condition?.retirementAge ?? 70;
+  const progression = g.progression;
+  const personality = g.personalityEffects;
+  const specialty = g.domesticSpecialty;
+  const specialtyDetails = domesticSpecialtyDetails(specialty);
+  const signed = (value: number) => (value > 0 ? `+${value}` : String(value));
+  const personalityDetails = personality
+    ? [
+        personality.train !== undefined && `전투 훈련 ${signed(personality.train)}`,
+        personality.morale !== undefined && `전투 사기 ${signed(personality.morale)}`,
+        personality.recruitPercent !== undefined && `징·모병 비용 ${signed(personality.recruitPercent - 100)}%`,
+        personality.experiencePercent !== undefined && `명성 획득 ${signed(personality.experiencePercent - 100)}%`,
+        personality.dedicationPercent !== undefined && `공헌 획득 ${signed(personality.dedicationPercent - 100)}%`,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : undefined;
+  const battle = g.battleStats;
+  const defense = g.defense;
+  const salary = g.salaryEstimate;
+  const ageStyle =
+    age < retirementAge * 0.75 ? styles.ageNormal : age < retirementAge ? styles.ageWarning : styles.ageHigh;
   return (
     <div className={styles.general} data-general-id={g.id}>
       <div className={styles.head}>
@@ -84,6 +130,7 @@ export function GeneralInfo({
               <NationBadge name="재야" color={null} />
             )}
             <span>{officerName(g.officerLevel, g.nationId !== null)}</span>
+            {g.generalType ? <Tag tone="muted">{g.generalType}</Tag> : null}
             <button type="button" className={styles.place} onClick={() => onSelectCity(g.cityKey)}>
               {cityName}
             </button>
@@ -102,12 +149,25 @@ export function GeneralInfo({
                 { label: '매력', value: n(g.charm) },
               ]
             : []),
-          { label: '나이', value: `${displayedAge(g, summary)}세` },
-          // 성격·특기는 시나리오 장수만 값이 있다. 효과 설명은 규칙이 생긴 뒤에 붙인다 (INT-25).
-          { label: '성격', value: g.personality || '—' },
-          { label: '특기', value: g.special || '—' },
+          { label: '나이', value: <span className={ageStyle}>{age}세</span> },
+          { label: '성격', value: personality?.name || g.personality || '—', title: personalityDetails },
+          {
+            label: '특기',
+            value: specialty?.name || g.combatSpecialty?.name || g.special || '—',
+            title: specialtyDetails ?? g.combatSpecialty?.description,
+          },
+          ...(g.troop
+            ? [
+                {
+                  label: '부대',
+                  value: g.troop.leaderCity ? `${g.troop.name} (${g.troop.leaderCity})` : g.troop.name,
+                  title: `부대장 ${g.troop.leader}`,
+                },
+              ]
+            : []),
           { label: '금', value: n(g.gold) },
           { label: '쌀', value: n(g.rice) },
+          ...(salary ? [{ label: '다음 봉급', value: `금 ${n(salary.gold)} · 쌀 ${n(salary.rice)}`, wide: true }] : []),
           ...(campaignEnabled
             ? [{ label: '병력·훈련·사기', value: '부곡별 현황 참조' }]
             : [
@@ -116,17 +176,117 @@ export function GeneralInfo({
                 { label: '훈련', value: n(g.train) },
                 { label: '사기', value: n(g.atmos) },
               ]),
-          { label: '경험', value: n(g.experience) },
-          { label: '공헌', value: n(g.dedication) },
+          ...(defense
+            ? [
+                {
+                  label: '도시 수비',
+                  value:
+                    defense.stance?.enabled === false
+                      ? '수비 안 함'
+                      : defense.participating
+                        ? `참전 · ${n(defense.troops)}명`
+                        : '참전 조건 미충족',
+                  title:
+                    defense.stance?.enabled === false
+                      ? undefined
+                      : `수비 기준은 훈련 ${defense.minimumTraining}, 사기 ${defense.minimumMorale} 이상입니다`,
+                },
+              ]
+            : []),
+          {
+            label: '경험',
+            value: progression ? (
+              <span>
+                Lv {progression.level} · {progression.honorTitle}
+                <small className={styles.statNote}>{n(g.experience)} 경험</small>
+                {progression.experienceForNextLevel !== null && (
+                  <progress
+                    aria-label="다음 레벨까지 경험"
+                    value={progression.experienceInLevel}
+                    max={progression.experienceForNextLevel}
+                    className={styles.levelProgress}
+                  />
+                )}
+              </span>
+            ) : (
+              n(g.experience)
+            ),
+          },
+          {
+            label: '공헌',
+            value: progression ? `${n(g.dedication)} · ${progression.dedicationRank}` : n(g.dedication),
+          },
           merit.row
             ? { label: '전공', value: meritText(merit.row), title: merit.at }
             : { label: '전공', value: '—', title: merit.at },
           { label: '다음 턴', value: formatClock(home.nextTurnAt) },
+          ...(home.refreshScore
+            ? [
+                {
+                  label: '갱신 점수',
+                  value: `${home.refreshScore.grade} ${n(home.refreshScore.total)}점 (${n(home.refreshScore.current)})`,
+                  title: `이번 달 기준 ${n(home.refreshScore.limit)}점`,
+                },
+              ]
+            : []),
           { label: '기본 방침', value: g.policy.name },
+          ...(g.autoplay?.removalOn
+            ? [
+                {
+                  label: '미접속 퇴장 예정',
+                  value: `${g.autoplay.removalOn.year}년 ${g.autoplay.removalOn.month}월`,
+                },
+              ]
+            : []),
+          ...(g.autoplay
+            ? [
+                {
+                  label: '자율 행동',
+                  value: g.autoplay.active
+                    ? `${g.autoplay.expiresOn.year}년 ${g.autoplay.expiresOn.month}월까지`
+                    : g.autoplay.expired
+                      ? '기간 종료'
+                      : '대기',
+                  title: formatClock(
+                    g.autoplay.active || g.autoplay.expired ? g.autoplay.expiresAt : g.autoplay.startsAt,
+                  ),
+                },
+              ]
+            : []),
         ]}
       />
+      {g.proficiency?.length ? (
+        <details>
+          <summary>병종 숙련도</summary>
+          <ul>
+            {g.proficiency.map(({ armType, name, grade, value, progress, overall }) => (
+              <li key={armType}>
+                {name} · {grade} · {n(value)}
+                <progress aria-label={`${name} 등급 진행률`} max={100} value={progress} />
+                <progress aria-label={`${name} 전체 진행률`} max={100} value={overall} />
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+      {battle && (
+        <details>
+          <summary>전투 전과</summary>
+          <InfoGrid
+            items={[
+              { label: '교전', value: `${n(battle.engagements)}회 · ${n(battle.wins)}승 ${n(battle.losses)}패` },
+              { label: '승률', value: `${(battle.winRate * 100).toFixed(1)}%` },
+              { label: '사살', value: BigInt(battle.kills).toLocaleString('ko-KR') },
+              { label: '피살', value: BigInt(battle.casualties).toLocaleString('ko-KR') },
+              { label: '살상률', value: battle.killRate === null ? '—' : `${(battle.killRate * 100).toFixed(1)}%` },
+              { label: '최근 전투', value: `${battle.lastBattle.year}년 ${battle.lastBattle.month}월` },
+            ]}
+          />
+        </details>
+      )}
       {/* 장착 장비는 원작 장수 칸처럼 여기 둔다. 가문(T4-95)은 내 정보 화면(/me)으로 옮겼다 (INT-25). */}
       {equipment ? <EquipmentStatus read={equipment} /> : null}
+      {home.heritageBenefitsEnabled ? <HeritageBenefits worldId={worldId} /> : null}
       {summary && 'relationsEnabled' in summary ? <RelationList worldId={worldId} generalId={g.id} /> : null}
       <p className={styles.links}>
         <Link to="/w/$worldId/me" params={{ worldId }}>

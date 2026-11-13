@@ -9,6 +9,7 @@ import {
 } from '@opensamguk/rules';
 import { loadWorld } from '../worldLoader';
 import { loadReplayState } from '../monthly';
+import { persistExt } from '../extState';
 import { persistEffects } from '../persist';
 import { databaseNow } from '../lease';
 import type { LineageRepository } from './port';
@@ -42,6 +43,7 @@ export class PgLineageRepository implements LineageRepository {
   }
   async save(worldId: string, before: WorldState, next: WorldState, at: { tick: number; sequence: number }) {
     await persistEffects(this.tx, worldId, next, [{ kind: 'world', state: next }], at, before);
+    await persistExt(this.tx, worldId, before.ext, next.ext);
     await appendLineageHistory(this.tx, worldId, before, next, at);
   }
   async saveControl(
@@ -153,6 +155,7 @@ export async function persistLineageMonth(
       data: {
         ...general,
         worldId,
+        ...(general.nationId === null ? {} : { nationJoinedTick: at.tick }),
         turnRevision: 0,
         defaultPolicy: 'none',
         lastActiveTick: null,

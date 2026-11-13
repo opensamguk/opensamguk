@@ -3,6 +3,8 @@ import { expect, it } from 'vitest';
 import { commandWorld } from '../../../test/commandFixture';
 import { applyEffects } from '../effects';
 import { DOMESTIC_SPECS, makeInvestment } from './investment';
+import { initialEquipment } from '../../equipment/state';
+import { TEST_EQUIPMENT_CONFIG } from '../../equipment/testFixture';
 
 // 기준 09604e71806b1f22012ab6df9026e02085d80a38을 git archive로 풀어 hook 구현 전에 실측했다.
 it('T4-18 투자 8종의 여섯 경계 결과·적용 상태·RNG 소비를 보존한다', async () => {
@@ -380,4 +382,33 @@ it('T4-18 투자 8종의 여섯 경계 결과·적용 상태·RNG 소비를 보�
       },
     ]
   `);
+});
+
+it('INT-26 납금박산로는 내정 대성공 구간을 15%p 넓히고 소모되지 않는다', () => {
+  const state = commandWorld();
+  state.cities[1]!.trust = 100;
+  state.equipment = initialEquipment({
+    ...TEST_EQUIPMENT_CONFIG,
+    treatmentTool: true,
+    moraleTool: true,
+    rareEquipment: true,
+    fullRareEquipment: true,
+    rareTools: true,
+  });
+  const farm = makeInvestment(DOMESTIC_SPECS.find(({ key }) => key === 'farm')!);
+  const run = () => {
+    const rolls = [0.5, 0.23, 0.5];
+    return farm.execute(
+      state,
+      { generalId: 1 },
+      {},
+      { ...createRng('rare-domestic-tool'), next: () => rolls.shift()! },
+    );
+  };
+  const without = run();
+  state.equipment.generals[1] = { tool: { key: 'tool_08', charges: 1 } };
+  const withTool = run();
+  const agriculture = (output: ReturnType<typeof run>) => applyEffects(state, output.effects).cities[1]!.agriculture;
+  expect(agriculture(withTool)).toBeGreaterThan(agriculture(without));
+  expect(applyEffects(state, withTool.effects).equipment?.generals[1]?.tool).toEqual({ key: 'tool_08', charges: 1 });
 });

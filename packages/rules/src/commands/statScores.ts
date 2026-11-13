@@ -1,7 +1,9 @@
+import { combatSpecialty, combatSpecialtyKey } from '../general/combatSpecialty';
+import { personalityEffects } from '../general/personality';
 import { BALANCE } from '../balance';
 import { FIVE_STAT_KEYS, fiveStatsSchema, type FiveStats } from '../general/fiveStats';
 import type { WorldView } from '../model/world';
-import { withEquipmentBonus } from '../equipment/stats';
+import { commandConditionStats } from '../general/condition';
 
 type General = WorldView['generals'][number];
 type LegacyStat = 'leadership' | 'strength' | 'intel';
@@ -13,7 +15,7 @@ export function commandFiveStats(view: WorldView, general: General): FiveStats |
 
 function commandScores(view: WorldView, general: General): FiveStats | null {
   const stats = commandFiveStats(view, general);
-  return stats ? withEquipmentBonus(view, general.id, stats) : null;
+  return stats ? commandConditionStats(view, general, stats) : null;
 }
 
 export function domesticStatScore(view: WorldView, general: General, key: string, legacy: LegacyStat): number {
@@ -45,10 +47,19 @@ export function recruitCost(
   amount: number,
   unitCost: number,
   forced: boolean,
+  armType?: number,
 ): number {
   const stats = commandFiveStats(view, general);
-  if (forced) return Math.ceil(amount * unitCost * BALANCE.CONSCRIPT_COST_FACTOR);
-  return stats ? Math.ceil((amount * unitCost * (250 - stats.charm)) / 200) : Math.ceil(amount * unitCost);
+  const rate = personalityEffects(view, general.personality)?.recruitPercent;
+  const specialty = combatSpecialty(view, combatSpecialtyKey(general));
+  const discount = armType !== undefined && specialty?.armType === armType ? 90 : undefined;
+  if (rate === undefined && discount === undefined) {
+    if (forced) return Math.ceil(amount * unitCost * BALANCE.CONSCRIPT_COST_FACTOR);
+    return stats ? Math.ceil((amount * unitCost * (250 - stats.charm)) / 200) : Math.ceil(amount * unitCost);
+  }
+  const factor = forced ? BALANCE.CONSCRIPT_COST_FACTOR : stats ? (250 - stats.charm) / 200 : 1;
+  const cost = (amount * unitCost * factor * (rate ?? 100)) / 100;
+  return Math.ceil(discount === undefined ? cost : (cost * discount) / 100);
 }
 
 export function drillGain(view: WorldView, general: General, morale: boolean): number {
@@ -58,12 +69,18 @@ export function drillGain(view: WorldView, general: General, morale: boolean): n
   return 8 + Math.floor(score / 25);
 }
 
-export function affordableRecruits(view: WorldView, general: General, unitCost: number, limit: number): number {
+export function affordableRecruits(
+  view: WorldView,
+  general: General,
+  unitCost: number,
+  limit: number,
+  armType?: number,
+): number {
   let low = 0;
   let high = Math.floor(limit);
   while (low < high) {
     const amount = Math.ceil((low + high) / 2);
-    if (recruitCost(view, general, amount, unitCost, false) <= general.gold) low = amount;
+    if (recruitCost(view, general, amount, unitCost, false, armType) <= general.gold) low = amount;
     else high = amount - 1;
   }
   return low;

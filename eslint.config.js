@@ -168,10 +168,18 @@ export default defineConfig([
             { group: ['@opensamguk/rules/*'], message: BOUNDARY_MESSAGE },
             {
               group: ['@opensamguk/rules'],
-              allowImportNames: ['simulateBattle', 'unitSetSchema', 'BALANCE', 'commanderBattleModifiers'],
+              allowImportNames: [
+                'simulateBattle',
+                'unitSetSchema',
+                'BALANCE',
+                'commanderBattleModifiers',
+                'personalityEffects',
+                'combatSpecialty',
+                'GENERAL_PERSONALITY_FEATURE',
+                'COMBAT_SPECIALTY_FEATURE',
+              ],
               allowTypeImports: true,
-              message:
-                'battleSim은 rules에서 simulateBattle·unitSetSchema·BALANCE·commanderBattleModifiers와 타입만 import합니다 (E1).',
+              message: 'battleSim은 rules에서 전투 계산·병종 검증·장수 효과에 허용된 값과 타입만 import합니다 (E1).',
             },
             {
               group: ['/@opensamguk/shared/node', '/@opensamguk/shared/resource-root', ...NODE_BUILTINS],

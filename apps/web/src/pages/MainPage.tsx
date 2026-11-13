@@ -75,6 +75,17 @@ function turnStatusBadge(status: TurnEditorStatus): string | null {
 // 지도에서 도시를 고르면 주소의 ?city만 바꾼다. 같은 화면이 유지되므로 다른 칸의 상태(예턴 편집 초안 등)는 그대로다.
 // 768px 미만은 하단 막대(지도·예턴·현황·기록·메시지·메뉴)로 패널을 하나씩 바꿔 본다 (INT-25). 고른 패널은 주소 해시에 두고,
 // 숨긴 패널도 그대로 붙여 두므로 예턴 편집 초안과 고른 칸, 지도 선택이 패널을 오가도 남는다.
+const buildRevision = import.meta.env.VITE_SOURCE_REVISION;
+const releaseRevision = /^[a-f0-9]{40}$/.test(buildRevision ?? '') ? buildRevision : undefined;
+
+const serverClock = new Intl.DateTimeFormat('ko-KR', {
+  month: 'numeric',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
+
 export function MainPage() {
   const page = useRef<HTMLElement>(null);
   const layout = useRef<HTMLDivElement>(null);
@@ -106,10 +117,10 @@ export function MainPage() {
   const { city: selected } = useSearch({ from: '/w/$worldId/' });
   const navigate = useNavigate({ from: '/w/$worldId/' });
   const summary = useWorldSummary(worldId);
-  const home = useHome(worldId);
+  const home = useHome(worldId, true);
   const trpc = useTRPC();
   const mine = useQuery(trpc.general.mine.queryOptions({ worldId }));
-  // 사람 장수 수와 시나리오 이름은 world.summary에 없어 로비 목록(로비·장수 생성 화면과 같은 캐시)에서 읽는다.
+  // 시나리오 제목은 로비 목록에서 읽는다.
   // 로비 목록은 기본으로 끝난 월드를 빼므로 끝난 판이면 함께 달라고 한다.
   const lobbyWorlds = useQuery({
     ...trpc.lobby.worlds.queryOptions(summary.data?.status === 'ENDED' ? { includeEnded: true } : undefined),
@@ -197,6 +208,11 @@ export function MainPage() {
     <section className={styles.page} ref={page}>
       <header className={styles.header}>
         <h1 className={styles.h1}>군략도</h1>
+        {homeData?.pendingCityOfficeRequests ? (
+          <Link to="/w/$worldId/nation/personnel" params={{ worldId }}>
+            인사부 · 관직 요청 {homeData.pendingCityOfficeRequests}건
+          </Link>
+        ) : null}
         {summary.data ? (
           <p className={styles.progress} aria-label="게임 진행 정보" data-testid="main-progress">
             <span>
@@ -213,9 +229,35 @@ export function MainPage() {
               {map.data?.operationalMap ? '거점' : '도시'} {cities.length}
             </span>
             {humans ? <span data-testid="main-humans">{humans}</span> : null}
+            {typeof summary.data.npcCount === 'number' ? (
+              <span data-testid="main-npcs">NPC {summary.data.npcCount.toLocaleString('ko-KR')}명</span>
+            ) : null}
+            {summary.data.scenarioType ? (
+              <span className={styles.progressTag} data-testid="main-scenario-type">
+                {summary.data.scenarioType === 'historical' ? '역사' : '가상'}
+              </span>
+            ) : null}
+            {summary.data.serverTime ? (
+              <span>
+                서버{' '}
+                <time dateTime={summary.data.serverTime}>{serverClock.format(new Date(summary.data.serverTime))}</time>
+              </span>
+            ) : null}
+            {summary.data.engineStale === true ? <span role="status">엔진 응답 지연</span> : null}
+            {summary.data.technologyEra ? (
+              <span title="기준에 도달한 국가는 기술 연구 증가량이 4분의 1로 줄어듭니다">
+                기술 {summary.data.technologyEra.level}등급 기준
+                {summary.data.technologyEra.nextYear ? ` · 다음 ${summary.data.technologyEra.nextYear}년` : ''}
+              </span>
+            ) : null}
             {lobbyWorld ? (
               <span className={styles.progressTag} data-testid="main-scenario">
                 {lobbyWorld.scenarioTitle}
+              </span>
+            ) : null}
+            {releaseRevision ? (
+              <span title={releaseRevision}>
+                빌드 <code>{releaseRevision.slice(0, 8)}</code>
               </span>
             ) : null}
             {settings.map((tag) => (
@@ -387,7 +429,13 @@ export function MainPage() {
           'status',
           <Panel title="국가 정보" area="nation" headingId="main-nation">
             {withHome((data) => (
-              <NationInfo worldId={worldId} nation={data.nation} cities={cities} />
+              <NationInfo
+                worldId={worldId}
+                nation={data.nation}
+                cities={cities}
+                nations={nations}
+                presence={data.presence}
+              />
             ))}
           </Panel>,
           'nation',

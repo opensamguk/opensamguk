@@ -1,7 +1,10 @@
 import { z } from 'zod';
 import type { Rng } from '@opensamguk/shared';
+import { addGeneralProficiency } from '../general/proficiency';
+import { nationRestrictions } from '../personnel/nationRestrictions';
 import { BALANCE } from '../balance';
-import { canDefend } from '../battle/defenders';
+import { canDefend, DEFENSE_STANCE_FEATURE } from '../battle/defenders';
+import type { BattlePhase } from '../battle/simulate';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import { fail, positive, relation, removeNation, success } from '../commands/support';
 import type { Actor, CommandDef, CommandResult } from '../commands/types';
@@ -13,6 +16,8 @@ import { fightCampaignCityGarrison, fightCampaignUnits, fightCampaignWall } from
 import { readCampaignState, type CampaignUnitState } from './state';
 import { readCityResourcesState } from '../cityResources/state';
 import { disbandCityGarrison } from '../cityResources/ownership';
+import { recordWarCasualties } from '../monthly/warIncome';
+import { recordSiegeContribution, settleCityConflict } from '../battle/cityConflict';
 
 const argsSchema = z.strictObject({ cityKey: positive });
 const year = (view: WorldView, tick: number) => view.startYear + Math.floor(tick / (12 * TICKS_PER_MONTH));
@@ -42,7 +47,13 @@ export function campaignDefenders(view: WorldView, tick: number, cityKey: number
         owner.nationId === city.nationId &&
         commander.cityKey === cityKey &&
         commander.activeFromYear <= year(view, tick) &&
-        canDefend(unit.troops, unit.train, unit.atmos)
+        canDefend(
+          unit.troops,
+          unit.train,
+          unit.atmos,
+          view.ruleFeatures?.includes(DEFENSE_STANCE_FEATURE),
+          commander.defenseThreshold,
+        )
       );
     })
     .sort((a, b) => b.troops - a.troops || a.id - b.id);
@@ -55,6 +66,8 @@ function check(view: WorldView, actor: Actor, raw: unknown) {
   if (Math.floor((actor.tick ?? 0) / TICKS_PER_MONTH) < (view.presetRules?.protection.peaceMonths ?? 0))
     return fail('PROTECTED', '초반 보호 기간에는 출병할 수 없습니다.');
   if (owner.nationId === null) return fail('NOT_NATION', '국가에 소속되어야 합니다.');
+  if (nationRestrictions(view, view.nations[owner.nationId]).warBlocked)
+    return fail('PROTECTED', '국가가 출병을 금지했습니다.');
   const from = view.cities[owner.cityKey],
     target = view.cities[parsed.data.cityKey];
   if (!target || target.nationId === owner.nationId)
@@ -87,6 +100,7 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
   if (failure) throw new Error(failure.message);
   const { cityKey } = argsSchema.parse(raw),
     ownerId = actor.generalId;
+  const sourceCityKey = view.generals[ownerId]!.cityKey;
   let state = cloneWorld(view);
   const nationId = state.generals[ownerId]!.nationId!,
     defendingNation = state.cities[cityKey]!.nationId;
@@ -101,17 +115,29 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
     reports: NonNullable<CommandResult['reports']> = [];
   const battleAwards: NonNullable<CommandResult['battleAwards']> = [];
   const battleOutcomes: NonNullable<CommandResult['battleOutcomes']> = [];
+  const generalEngagements: NonNullable<CommandResult['generalEngagements']> = [];
+  const attackPhases: BattlePhase[] = [];
   const reputation = state.ruleFeatures?.includes('reputation-v1');
   for (const attackerId of attackingIds) {
     let attackerFirstVolleyUsed = false;
     const fightWall = (openingSkirmish = false) => {
+      const priorWall = state.cities[cityKey]!.wall;
+      const priorTroops = get(attackerId).troops;
       const outcome = fightCampaignWall(state, attackerId, cityKey, actor.unitSet!, rng, {
         openingSkirmish,
         attackerFirstVolleyUsed,
+        recordPhases: actor.recordBattleStats === true,
       });
       state = outcome.state;
       attackerFirstVolleyUsed ||= outcome.attackerFirstVolleyFired === true;
+      const unit = get(attackerId);
+      recordWarCasualties(state, sourceCityKey, cityKey, priorTroops - unit.troops);
+      const city = state.cities[cityKey]!;
+      const wallDamage = priorWall - city.wall;
+      addGeneralProficiency(state, state.generals[unit.commanderId]!, 5, wallDamage);
+      recordSiegeContribution(state, city, nationId, wallDamage);
       const name = openingSkirmish ? '성벽 선제 교전' : '성벽 교전';
+      for (const phase of outcome.phases ?? []) attackPhases.push({ ...phase, opponent: '성벽' });
       rounds.push(`부곡${attackerId} ${name}: 공격 ${get(attackerId).troops}명, 성벽 ${state.cities[cityKey]!.wall}`);
     };
     const wallFirst =
@@ -127,11 +153,42 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
       if (!alive(get(defenderId))) continue;
       const attackerCommander = get(attackerId).commanderId,
         defenderCommander = get(defenderId).commanderId;
-      const outcome = fightCampaignUnits(state, attackerId, defenderId, actor.unitSet!, rng, attackerFirstVolleyUsed);
+      const attackerTroops = get(attackerId).troops;
+      const defenderTroops = get(defenderId).troops;
+      const outcome = fightCampaignUnits(
+        state,
+        attackerId,
+        defenderId,
+        actor.unitSet!,
+        rng,
+        attackerFirstVolleyUsed,
+        actor.recordBattleStats === true,
+      );
       state = outcome.state;
       attackerFirstVolleyUsed ||= outcome.attackerFirstVolleyFired === true;
       const a = get(attackerId),
         d = get(defenderId);
+      recordWarCasualties(state, sourceCityKey, cityKey, attackerTroops - a.troops + defenderTroops - d.troops);
+      const arms = actor.unitSet!.crewTypes;
+      addGeneralProficiency(
+        state,
+        state.generals[attackerCommander]!,
+        arms.find((type) => type.id === a.crewType)!.armType,
+        defenderTroops - d.troops,
+      );
+      addGeneralProficiency(
+        state,
+        state.generals[defenderCommander]!,
+        arms.find((type) => type.id === d.crewType)!.armType,
+        (attackerTroops - a.troops) * 0.8,
+      );
+      generalEngagements.push({
+        attackerId: attackerCommander,
+        defenderId: defenderCommander,
+        attackerLoss: attackerTroops - a.troops,
+        defenderLoss: defenderTroops - d.troops,
+        winnerId: alive(a) === alive(d) ? null : alive(a) ? attackerCommander : defenderCommander,
+      });
       if (alive(a) && !alive(d)) {
         battleAwards.push({ generalId: attackerCommander, wins: 1, captures: 0 });
         if (reputation) battleOutcomes.push({ winnerId: attackerCommander, loserId: defenderCommander });
@@ -139,12 +196,21 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
         battleAwards.push({ generalId: defenderCommander, wins: 1, captures: 0 });
         if (reputation) battleOutcomes.push({ winnerId: defenderCommander, loserId: attackerCommander });
       }
-      const text = `${state.generals[attackerCommander]!.name} 부곡${attackerId} 대 ${state.generals[defenderCommander]!.name} 부곡${defenderId}: 공격 ${a.troops}명, 수비 ${d.troops}명`;
+      const text = `${state.generals[attackerCommander]!.name} 부곡${attackerId} 대 ${state.generals[defenderCommander]!.name} 부곡${defenderId}: 공격 ${a.troops}명, 수비 ${d.troops}명${outcome.loot ? ` · ${outcome.loot}` : ''}`;
       rounds.push(text);
+      const opponent = `${state.generals[defenderCommander]!.name} 부곡${defenderId}`;
+      for (const phase of outcome.phases ?? []) attackPhases.push({ ...phase, opponent });
       // BattleLog의 (worldId,tick,attackerId,generalId) 키당 한 행으로 저장한다.
       const report = reports.find((row) => row.generalId === defenderCommander);
-      if (report) report.text += `; ${text}`;
-      else reports.push({ generalId: defenderCommander, text });
+      if (report) {
+        report.text += `; ${text}`;
+        if (outcome.phases?.length) (report.phases ??= []).push(...outcome.phases);
+      } else
+        reports.push({
+          generalId: defenderCommander,
+          text,
+          ...(outcome.phases?.length ? { phases: outcome.phases } : {}),
+        });
       if (alive(d)) break;
     }
     if (defendingIds.some((id) => alive(get(id)))) continue;
@@ -152,6 +218,8 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
       .map((row) => row.crewType)
       .sort((a, b) => a - b)) {
       if (!alive(get(attackerId))) break;
+      const prior = cityDefense().find((row) => row.crewType === crewType)?.troops ?? 0;
+      const priorTroops = get(attackerId).troops;
       const outcome = fightCampaignCityGarrison(
         state,
         attackerId,
@@ -160,10 +228,17 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
         actor.unitSet!,
         rng,
         attackerFirstVolleyUsed,
+        actor.recordBattleStats === true,
       );
       state = outcome.state;
       attackerFirstVolleyUsed ||= outcome.attackerFirstVolleyFired === true;
+      const unit = get(attackerId);
+      const remaining = cityDefense().find((row) => row.crewType === crewType)?.troops ?? 0;
+      recordWarCasualties(state, sourceCityKey, cityKey, priorTroops - unit.troops + prior - remaining);
+      const armType = actor.unitSet!.crewTypes.find((type) => type.id === unit.crewType)!.armType;
+      addGeneralProficiency(state, state.generals[unit.commanderId]!, armType, prior - remaining);
       rounds.push(outcome.text);
+      for (const phase of outcome.phases ?? []) attackPhases.push({ ...phase, opponent: `도시 병종${crewType}` });
       if (cityDefense().some((row) => row.crewType === crewType && row.troops > 0 && row.atmos > 0)) break;
     }
     if (cityDefense().some((row) => row.troops > 0 && row.atmos > 0)) continue;
@@ -185,11 +260,11 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
     }
     battleAwards.push({ generalId: ownerId, wins: 0, captures: 1 });
     const city = state.cities[cityKey]!;
-    city.nationId = nationId;
+    city.nationId = settleCityConflict(state, city, nationId, history);
     city.defence = 0;
     city.security = Math.round(city.security * BALANCE.CAPTURE_SECURITY_FACTOR);
     city.trust = Math.max(0, city.trust - BALANCE.CAPTURE_TRUST_LOSS);
-    state.generals[ownerId]!.cityKey = cityKey;
+    if (city.nationId === nationId) state.generals[ownerId]!.cityKey = city.cityKey;
     if (defendingNation !== null) {
       const nation = state.nations[defendingNation]!;
       const remaining = Object.values(state.cities)
@@ -216,6 +291,8 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
   const troops = attackingIds.reduce((sum, id) => sum + get(id).troops, 0);
   const summary = `${state.generals[ownerId]!.name} ${state.cities[cityKey]!.name} ${captured ? '점령' : '점령 실패'}: 병력 ${troops}명`;
   for (const report of reports) report.text += `, ${captured ? '점령' : '수비 유지'}`;
+  if (actor.recordBattleStats)
+    reports.push({ generalId: ownerId, text: summary, ...(attackPhases.length ? { phases: attackPhases } : {}) });
   history.push({ nationId, text: `${rounds.join('; ')}; ${summary}` });
   if (defendingNation !== null) history.push({ nationId: defendingNation, text: summary });
   readCampaignState(state.campaign, state);
@@ -225,7 +302,11 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
     reports,
     history,
     battleAwards,
+    ...(actor.recordBattleStats ? { generalEngagements } : {}),
     attackTarget: { cityKey, defendingNationId: defendingNation },
+    ...(captured && state.cities[cityKey]!.nationId !== nationId
+      ? { cityTransfer: { cityKey, fromNationId: nationId, toNationId: state.cities[cityKey]!.nationId! } }
+      : {}),
     ...(reputation ? { battleOutcomes } : {}),
   };
 }

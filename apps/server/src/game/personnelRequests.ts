@@ -1,8 +1,9 @@
 import type { Prisma } from '@opensamguk/db';
+import { cityOfficeVolunteerResult, PERSONNEL_QUEUED_KINDS } from '@opensamguk/rules';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
-const kinds = ['personnel.appoint', 'personnel.dismiss', 'offer.respond'] as const;
+const kinds = PERSONNEL_QUEUED_KINDS;
 type PersonnelKind = (typeof kinds)[number];
 export type AppointResult = {
   generalId: number;
@@ -19,13 +20,19 @@ export type RequestState<R> =
   | { status: 'pending'; requestId: string }
   | { status: 'applied'; requestId: string; result: R }
   | { status: 'rejected'; requestId: string; code: string; message: string };
-export type PersonnelRecord = { kind: PersonnelKind; state: RequestState<AppointResult | RespondResult> };
+export type VolunteerResult = z.infer<typeof volunteerResult>;
+export type PersonnelRecord = {
+  kind: PersonnelKind;
+  state: RequestState<AppointResult | RespondResult | VolunteerResult>;
+};
 export type PersonnelReady = Readonly<{
   worldId: string;
   personnel: 'ready';
   courtRankEnabled?: true;
   officeEffectsEnabled?: true;
+  localOfficeMinimum?: number;
   secretaryEnabled?: true;
+  volunteersEnabled?: true;
 }>;
 type EventRow = Pick<
   Prisma.InputEventGetPayload<Record<string, never>>,
@@ -43,6 +50,7 @@ const respondResult = z.object({
   city: z.object({ cityKey: positive, name: z.string() }),
   dedicationLost: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
 });
+const volunteerResult = cityOfficeVolunteerResult.omit({ tick: true });
 const rejection = z.object({ code: z.string().min(1), message: z.string().min(1) });
 function invalid(): never {
   throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: '인사 요청 결과를 확인하지 못했습니다.' });
@@ -61,7 +69,12 @@ export function toPersonnelRecord(event: EventRow): PersonnelRecord {
   if (event.status === 'REJECTED')
     return { kind, state: { status: 'rejected', requestId, ...read(rejection, event.result) } };
   if (event.status !== 'APPLIED') invalid();
-  const result = kind === 'offer.respond' ? read(respondResult, event.result) : read(appointResult, event.result);
+  const result =
+    kind === 'personnel.volunteer'
+      ? read(z.object(volunteerResult.shape), event.result)
+      : kind === 'offer.respond'
+        ? read(respondResult, event.result)
+        : read(appointResult, event.result);
   return { kind, state: { status: 'applied', requestId, result } };
 }
 

@@ -1,4 +1,4 @@
-import { COURT_RANK_FEATURE, courtOfficeTitle } from './nationRank';
+import { COURT_ABILITY_FEATURE, COURT_RANK_FEATURE, courtAbilityRequirement, courtOfficeTitle } from './nationRank';
 import { canManagePersonnel, isAppointableOfficerLevel, officerTitle } from './permissions';
 import { hasCitySecretary, isLocalOffice, localOfficeAbility, localOfficeTitle } from './residentOffice';
 import { clonePersonnel, personnelFailure } from './types';
@@ -92,6 +92,12 @@ export function appointOfficer(
     ? courtOfficeTitle(view.nations[nationId!]!.level, officerLevel)
     : undefined;
   if (courtTitle === null) return personnelFailure('BAD_ARGS', '현재 작위에서 열리지 않은 직책입니다.');
+  if (view.ruleFeatures?.includes(COURT_ABILITY_FEATURE)) {
+    const candidate = view.generals[generalId]!;
+    const required = courtAbilityRequirement(officerLevel);
+    if (candidate.removedAt !== undefined || (required && candidate[required.stat] < required.minimum))
+      return personnelFailure('BAD_TARGET', '임명 자격을 갖춘 장수만 가능합니다.');
+  }
   if (
     Object.values(view.generals).some(
       (general) => general.nationId === nationId && general.officerLevel === officerLevel,

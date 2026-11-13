@@ -26,6 +26,7 @@ export interface Context {
   legalPolicyRequired?: boolean | undefined;
   withdrawalPolicy?: WithdrawalPolicy | null | undefined;
   closeSession?: ((sessionId: string) => void) | undefined;
+  connectedSessions?: ((worldId: string) => readonly string[]) | undefined;
   loginAudit?: LoginAuditRequest | undefined;
   notificationTransport?: DiscordWebhookTransport | undefined;
 }

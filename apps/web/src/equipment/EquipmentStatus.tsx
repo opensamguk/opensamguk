@@ -9,11 +9,17 @@ export const equipmentEffectText = (item: Pick<EquipmentItem, 'stat' | 'bonus'>)
   `${EQUIPMENT_STATS[item.stat]} +${item.bonus}`;
 
 // 이름과 효과를 따로 감싼다. 이름만으로 찾는 기존 시험(getByText 정확히 일치)이 그대로 맞는다.
-function EquippedItem({ item }: { item: EquipmentItem | undefined }) {
+function EquippedItem({
+  item,
+}: {
+  item: (Pick<EquipmentItem, 'name' | 'stat' | 'bonus'> & { description?: string; battleEffect?: string }) | undefined;
+}) {
   if (!item) return <>미장착</>;
   return (
     <>
-      <span>{item.name}</span> <span data-testid="equipment-effect">({equipmentEffectText(item)})</span>
+      <span>{item.name}</span>{' '}
+      <span data-testid="equipment-effect">({item.description ?? equipmentEffectText(item)})</span>
+      {item.battleEffect ? <span> {item.battleEffect}</span> : null}
     </>
   );
 }
@@ -26,10 +32,33 @@ export function EquipmentStatus({ read }: { read: EquipmentRead }) {
     <section aria-label="장착 장비">
       <h3>장착 장비</h3>
       <InfoGrid
-        items={EQUIPMENT_SLOTS.map((slot) => ({
-          label: slot.label,
-          value: <EquippedItem item={read.data.items.find((item) => item.key === read.data.slots[slot.key])} />,
-        }))}
+        items={[
+          ...EQUIPMENT_SLOTS.map((slot) => ({
+            label: slot.label,
+            value: (
+              <EquippedItem
+                item={[...read.data.items, ...(read.data.rare ?? [])].find(
+                  (item) => item.key === read.data.slots[slot.key],
+                )}
+              />
+            ),
+          })),
+          ...(read.data.tool
+            ? [
+                {
+                  label: '도구',
+                  value: read.data.tool.remainingCharges ? (
+                    <span title={read.data.tool.description}>
+                      {read.data.tool.name}
+                      {'slot' in read.data.tool ? null : ` · ${read.data.tool.remainingCharges}회`}
+                    </span>
+                  ) : (
+                    '미장착'
+                  ),
+                },
+              ]
+            : []),
+        ]}
       />
     </section>
   );

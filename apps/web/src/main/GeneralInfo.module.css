@@ -39,6 +39,19 @@
   font-weight: normal;
   color: var(--color-text-muted);
 }
+.ageNormal {
+  color: var(--color-success);
+}
+.ageWarning {
+  color: var(--color-warning);
+}
+.ageHigh {
+  color: var(--color-danger);
+}
+.levelProgress {
+  width: 100%;
+  accent-color: var(--color-accent);
+}
 
 @media (max-width: 767px) {
   .place,

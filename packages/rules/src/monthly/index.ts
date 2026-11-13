@@ -1,4 +1,8 @@
 import type { GameDate, Rng } from '@opensamguk/shared';
+import { COURT_PROMOTION_FEATURE, promoteNationCourts } from '../personnel/nationRank';
+import { nationPhilosophy } from '../personnel/nationPhilosophy';
+import { discoverRareEquipment } from '../equipment/rare';
+import { settleHeritageSpecialties } from '../heritage/specialty';
 import { BALANCE } from '../balance';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import type { WorldState, WorldView } from '../model/world';
@@ -6,6 +10,15 @@ import { refreshSupply } from '../supply';
 import { readCampaignState } from '../campaign/state';
 import { residentOfficeBonuses, type OfficeBonuses } from '../personnel/residentOffice';
 import { applyCityResourceIncome } from '../cityResourceIncome';
+import { WAR_INCOME_FEATURE, settleWarIncome } from './warIncome';
+import { CITY_SEASONAL_EVENTS_FEATURE, settleCitySeasonalEvents } from './citySeasonalEvents';
+import {
+  financeRates,
+  rankedPayroll,
+  RANKED_PAYROLL_FEATURE,
+  WALL_INCOME_FEATURE,
+  wallRiceIncome,
+} from '../personnel/financeRates';
 
 export const MONTHLY_STAGES = ['income', 'population', 'supply', 'diplomacy', 'yearbook'] as const;
 export interface NationSummary {
@@ -34,26 +47,74 @@ const generalsById = (state: WorldView) =>
     .sort((a, b) => a.id - b.id);
 const nationsById = (state: WorldView) => Object.values(state.nations).sort((a, b) => a.id - b.id);
 
+function byNation<T extends { nationId: number | null }>(rows: readonly T[]) {
+  const groups = new Map<number, T[]>();
+  for (const row of rows) {
+    if (row.nationId === null) continue;
+    const members = groups.get(row.nationId) ?? [];
+    members.push(row);
+    groups.set(row.nationId, members);
+  }
+  return groups;
+}
+
+export type TaxCity = Parameters<typeof wallRiceIncome>[0] & {
+  cityKey: number;
+  commerce: number;
+  agriculture: number;
+  population: number;
+};
+
 export function estimateTaxIncome(
-  cities: readonly { cityKey: number; commerce: number; agriculture: number; population: number }[],
+  cities: readonly TaxCity[],
   memberCount: number,
   resource: 'gold' | 'rice',
   bonuses?: ReturnType<typeof residentOfficeBonuses>,
+  incomeMultiplier = 1,
+  rates = financeRates(),
+  reserves = 0,
+  wallIncome?: { capitalCityKey: number | null; level: number },
 ) {
-  const gross = Math.round(
-    cities.reduce(
-      (sum, city) =>
-        sum +
-        city[resource === 'gold' ? 'commerce' : 'agriculture'] *
-          (city.population / BALANCE.MONTHLY_POPULATION_UNIT) *
-          BALANCE.MONTHLY_TAX_RATE *
-          (1 + (bonuses?.get(city.cityKey)?.tax?.percent ?? 0) / 100),
-      0,
-    ),
+  const tax = Math.round(
+    incomeMultiplier *
+      cities.reduce(
+        (sum, city) =>
+          sum +
+          city[resource === 'gold' ? 'commerce' : 'agriculture'] *
+            (city.population / BALANCE.MONTHLY_POPULATION_UNIT) *
+            rates.taxRate *
+            (1 + (bonuses?.get(city.cityKey)?.tax?.percent ?? 0) / 100),
+        0,
+      ),
   );
-  const perGeneral = memberCount ? Math.floor(Math.round(gross * BALANCE.MONTHLY_SALARY_RATE) / memberCount) : 0;
+  const wall =
+    resource === 'rice' && wallIncome
+      ? Math.round(
+          cities.reduce(
+            (sum, city) =>
+              sum +
+              wallRiceIncome(
+                city,
+                rates.taxRate,
+                incomeMultiplier,
+                1 + (bonuses?.get(city.cityKey)?.tax?.percent ?? 0) / 100,
+                city.cityKey === wallIncome.capitalCityKey ? wallIncome.level : 0,
+              ),
+            0,
+          ),
+        )
+      : 0;
+  const gross = tax + wall;
+  const payrollBudget = Math.min(gross + reserves, Math.round(gross * rates.salaryRate));
+  const perGeneral = memberCount ? Math.floor(payrollBudget / memberCount) : 0;
   const payroll = perGeneral * memberCount;
-  return { gross, perGeneral, payroll, net: gross - payroll };
+  return {
+    gross,
+    perGeneral,
+    payroll,
+    net: gross - payroll,
+    ...(wallIncome && resource === 'rice' ? { wallIncome: wall } : {}),
+  };
 }
 
 export function settleIncome(
@@ -64,14 +125,32 @@ export function settleIncome(
   const next = structuredClone(state) as WorldState;
   const resource = [1, 7].includes(date.month) ? 'gold' : [4, 10].includes(date.month) ? 'rice' : null;
   if (!resource) return next;
+  const cityGroups = byNation(citiesById(next).filter((city) => city.kind !== 'PASS'));
+  const generalGroups = byNation(generalsById(next).filter((general) => general.activeFromYear <= date.year));
   for (const nation of nationsById(next)) {
-    const cities = citiesById(next).filter((city) => city.nationId === nation.id && city.kind !== 'PASS');
-    const members = generalsById(next).filter(
-      (general) => general.nationId === nation.id && general.activeFromYear <= date.year,
+    const cities = cityGroups.get(nation.id) ?? [];
+    const members = generalGroups.get(nation.id) ?? [];
+    const multiplier = nationPhilosophy(next, nation.philosophy)?.[resource];
+    const reserves = next.ruleFeatures?.includes('city-resources-v1') ? 0 : nation[resource];
+    const rates = financeRates(nation.financeRates);
+    const { gross, net, perGeneral } = estimateTaxIncome(
+      cities,
+      members.length,
+      resource,
+      bonuses,
+      multiplier,
+      rates,
+      reserves,
+      next.ruleFeatures?.includes(WALL_INCOME_FEATURE) ? nation : undefined,
     );
-    const { net, perGeneral } = estimateTaxIncome(cities, members.length, resource, bonuses);
-    next.nations[nation.id]![resource] += net;
-    for (const general of members) next.generals[general.id]![resource] += perGeneral;
+    if (next.ruleFeatures?.includes(RANKED_PAYROLL_FEATURE)) {
+      const payments = rankedPayroll(members, rates.salaryRate, gross + reserves);
+      next.nations[nation.id]![resource] += gross - payments.reduce((sum, payment) => sum + payment, 0);
+      members.forEach((general, index) => (next.generals[general.id]![resource] += payments[index]!));
+    } else {
+      next.nations[nation.id]![resource] += net;
+      for (const general of members) next.generals[general.id]![resource] += perGeneral;
+    }
   }
   return next;
 }
@@ -81,18 +160,25 @@ export function settlePopulation(state: WorldView, taxRate: number = BALANCE.MON
   for (const city of citiesById(next)) {
     if (city.kind === 'PASS') continue;
     const target = next.cities[city.cityKey]!;
+    const nation = city.nationId === null ? undefined : state.nations[city.nationId];
+    const growth = nationPhilosophy(state, nation?.philosophy)?.population ?? 1;
     target.population = Math.max(
       0,
       Math.min(
         city.populationMax,
-        Math.round(city.population + BALANCE.MONTHLY_SETTLEMENT_RATE * (city.populationMax - city.population)),
+        Math.round(city.population + BALANCE.MONTHLY_SETTLEMENT_RATE * (city.populationMax - city.population) * growth),
       ),
     );
     target.trust = Math.max(
       0,
       Math.min(
         BALANCE.MAX_TRUST,
-        Math.round(city.trust + (BALANCE.MONTHLY_TRUST_BASE - taxRate) * BALANCE.MONTHLY_TRUST_FACTOR),
+        Math.round(
+          city.trust +
+            (BALANCE.MONTHLY_TRUST_BASE -
+              (nation?.financeRates ? financeRates(nation.financeRates).taxRate : taxRate)) *
+              BALANCE.MONTHLY_TRUST_FACTOR,
+        ),
       ),
     );
   }
@@ -152,12 +238,27 @@ export function settleDiplomacy(state: WorldView, tick: number): WorldState {
 
 export function buildYearbook(state: WorldView, year: number): Yearbook {
   const campaign = state.ruleFeatures?.includes('campaign-v1') ? readCampaignState(state.campaign, state) : undefined;
+  const cities = citiesById(state);
+  const cityGroups = byNation(cities.filter((city) => city.kind !== 'PASS'));
+  const generalGroups = byNation(generalsById(state).filter((general) => general.activeFromYear <= year));
+  const campaignTroops = new Map<number, number>();
+  if (campaign) {
+    for (const unit of campaign.units) {
+      const owner = state.generals[unit.ownerId]!;
+      if (
+        owner.nationId === null ||
+        owner.removedAt !== undefined ||
+        owner.activeFromYear > year ||
+        state.generals[unit.commanderId]!.activeFromYear > year
+      )
+        continue;
+      campaignTroops.set(owner.nationId, (campaignTroops.get(owner.nationId) ?? 0) + unit.troops);
+    }
+  }
   return {
     nations: nationsById(state).map((nation) => {
-      const cities = citiesById(state).filter((city) => city.nationId === nation.id && city.kind !== 'PASS');
-      const generals = generalsById(state).filter(
-        (general) => general.nationId === nation.id && general.activeFromYear <= year,
-      );
+      const cities = cityGroups.get(nation.id) ?? [];
+      const generals = generalGroups.get(nation.id) ?? [];
       return {
         nationId: nation.id,
         cities: cities.length,
@@ -167,33 +268,32 @@ export function buildYearbook(state: WorldView, year: number): Yearbook {
             nation.rice +
             cities.reduce((sum, city) => sum + city.population, 0) +
             (campaign
-              ? campaign.units
-                  .filter(
-                    (unit) =>
-                      generals.some((general) => general.id === unit.ownerId) &&
-                      state.generals[unit.commanderId]!.activeFromYear <= year,
-                  )
-                  .reduce((sum, unit) => sum + unit.troops, 0)
+              ? (campaignTroops.get(nation.id) ?? 0)
               : generals.reduce((sum, general) => sum + general.crew, 0)),
         ),
         gold: nation.gold,
         rice: nation.rice,
       };
     }),
-    cities: citiesById(state).map(({ cityKey, nationId }) => ({ cityKey, nationId })),
+    cities: cities.map(({ cityKey, nationId }) => ({ cityKey, nationId })),
   };
 }
 
 export function runMonthly(state: WorldView, tick: number, rng: Rng) {
   const date = monthlyDate(state.startYear, tick);
-  // 현 단계는 난수를 소비하지 않는다. 재해·사건을 붙일 때 이 스트림만 쓴다.
-  void rng;
   const bonuses = residentOfficeBonuses(state, date.year);
   let next = settleIncome(state, date, bonuses);
   if (state.ruleFeatures?.includes('city-resources-v1')) next = applyCityResourceIncome(state, next, date, bonuses);
   next = settlePopulation(next);
   next = settleSupply(next, bonuses);
+  if (next.ruleFeatures?.includes(WAR_INCOME_FEATURE)) settleWarIncome(next);
   next = settleDiplomacy(next, tick);
+  const specialtyGrowthLogs = settleHeritageSpecialties(next, date.year, rng);
+  if (state.ruleFeatures?.includes(COURT_PROMOTION_FEATURE)) promoteNationCourts(next);
+  const seasonalEventLogs = state.ruleFeatures?.includes(CITY_SEASONAL_EVENTS_FEATURE)
+    ? settleCitySeasonalEvents(next, date, rng)
+    : [];
+  const rareEquipmentLogs = discoverRareEquipment(next, date.year, rng);
   // 미등장 장수는 턴을 쌓지 않는다. 등장 연도 1월에는 원래 offset부터 실행한다.
   for (const general of generalsById(next)) {
     if (general.activeFromYear > date.year) {
@@ -213,5 +313,14 @@ export function runMonthly(state: WorldView, tick: number, rng: Rng) {
         officeTaxLogs.push({ generalId: tax.generalId, text: `${city.name} 주재로 세수 ${tax.percent}% 보정` });
     }
   }
-  return { state: next, date, officeTaxLogs, stages: [...MONTHLY_STAGES], yearbook: buildYearbook(next, date.year) };
+  return {
+    state: next,
+    date,
+    officeTaxLogs,
+    seasonalEventLogs,
+    rareEquipmentLogs,
+    specialtyGrowthLogs,
+    stages: [...MONTHLY_STAGES],
+    yearbook: buildYearbook(next, date.year),
+  };
 }

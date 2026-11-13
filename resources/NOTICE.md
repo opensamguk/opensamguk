@@ -169,3 +169,85 @@ core2026 커밋 df6c9269fa1e2862418ba9da481c8dd2d758d6c5의 MIT © 2025 devsam �
 ## 접경귀환
 
 `packages/rules/src/commands/ext/return_border/`는 core2026 `df6c9269fa1e2862418ba9da481c8dd2d758d6c5`의 `packages/logic/src/actions/turn/general/che_접경귀환.ts`에서 연결 3칸의 탐색 규칙을 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+### INT-26 장수 수비 기준
+
+장수별 수비 기준과 기본값 80은 core2026 `c81d304`의 `app/game-frontend/src/views/MyPageView.vue`, `app/game-engine/src/turn/worldCommandHandler.ts`, `packages/logic/src/war/engine.ts`를 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+### INT-26 국가 임관·출병 제한
+
+임관·출병 제한과 출병 제한 변경 한도는 core2026 `c81d304`의 `packages/logic/src/constraints/general.ts`, `packages/logic/src/constraints/nation.ts`, `app/game-engine/src/turn/monthlyNationStatsHandler.ts`를 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+### INT-26 미접속 장수 퇴장
+
+장수 퇴장과 군주 계승은 core2026 `c81d304`의 `app/game-engine/src/turn/reservedTurnHandler.ts`를 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다. OpenSamguk은 자율 행동 기간 종료 뒤 첫 월말에 기존 장수·국가 정리 규칙을 적용한다.
+
+### INT-26 장수 성격
+
+성격별 전투 훈련·사기, 징·모병 비용, 명성·공헌 보정은 core2026 `c81d304`의 `packages/logic/src/actionModules/traits/personality/`와 `packages/logic/src/war/units/general.ts`를 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+### INT-26 병종 숙련
+
+숙련 등급 구간, 숙련전환 공식과 전투 등급 보정은 core2026 `c81d304`의 `app/game-frontend/src/utils/legacyProgress.ts`와 `packages/logic/src/actions/turn/general/che_숙련전환.ts`, `packages/logic/src/war/utils.ts`를 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+### INT-26 장수 내정 특기
+
+내정 특기의 비용·효과·성공 확률은 core2026 `c81d304`의 `packages/logic/src/actionModules/traits/domestic/`를 참고했다. OpenSamguk 내정의 성공률 보정은 기존 대성공 구간에 적용한다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+### INT-26 장수 전투 특기
+
+병종·전투 특기의 징·모병비, 숙련, 피해와 회피 보정은 core2026 `c81d304`의 `packages/logic/src/actionModules/traits/war/`를 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+### INT-26 부대
+
+부대 이름 폭·소속 규칙과 집합은 core2026 `c81d304`의 `packages/logic/src/troop/management.ts`, `app/game-engine/src/turn/worldCommandHandler.ts`, `packages/logic/src/actions/turn/general/che_집합.ts`를 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+### INT-26 NPC 명령 우선순위
+
+모집 인구 제한과 국고 예비금, 포상 금액 한도, 활성 명령 순서는 core2026 `c81d304`의 `app/game-frontend/src/views/NpcControlView.vue`와 대응 정책을 참고했다. OpenSamguk에서 실행할 수 있는 명령을 대상으로 한다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+### INT-26 유산 혜택 구매
+
+내정 성공·실패와 전투 회피 확률 보정은 core2026 `c81d304`의 `packages/logic/src/inheritance/inheritBuff.ts`를 참고했다. 포인트 가격은 OpenSamguk의 기수당 최대 5점과 양립하도록 단계별 누적 1·3·6·10·15점을 적용한다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+### INT-26 필살과 전투계략
+
+필살 확률·피해 범위, 전투계략 종류와 피해 배율은 core2026 `c81d304`의 `packages/logic/src/war/units/general.ts`, `war/triggers/che_필살.ts`, `war/triggers/che_계략.ts`를 참고했다. OpenSamguk의 기존 교환 단계에 적용한다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+### INT-26 장비와 입장 후보
+
+환약·탁주, 적토마·의천검·손자병법의 이름과 효과는 core2026 `c81d304`의 `packages/logic/src/items/`를 참고했다. 입장 후보 수·보관 횟수·시간 공식은 같은 커밋의 `app/game-engine/src/turn/npcPossessionService.ts`를 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다. 명품 발견 확률은 OpenSamguk 규칙이다.
+
+### INT-26 성장에 따른 특기 습득
+
+특기 습득 연령 공식과 기수 시작 3년 기준은 core2026 `c81d304`의 `app/game-engine/src/turn/monthlySpecialityBetrayAction.ts`를 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+### INT-26 갱신 점수
+
+등급 구간과 턴 주기별 점수 기준은 core2026 `c81d304`의 `app/game-api/src/services/generalBasicCardProjection.ts`와 `packages/common/src/game/accessPenalty.ts`를 참고했다. 점수는 OpenSamguk 메인 조회를 기준으로 집계하며 장수 본인에게 표시한다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+### INT-26 턴 시간 초기화
+
+반복 구매 비용과 다다음 턴부터의 변경은 core2026 `c81d304`의 `app/game-engine/src/turn/inheritanceActionService.ts`를 참고했다. 새 턴 시각은 OpenSamguk의 월 내 tick으로 뽑으며 원래 시각을 제외한다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+### INT-26 능력치 초기화
+
+기수별 한 번, 무료 무작위 배분과 유산 1,000점 직접 배분은 core2026 `c81d304`의 `app/game-engine/src/turn/inheritanceActionService.ts`를 참고했다. 배분 범위는 OpenSamguk의 생성 규칙을 따른다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+### INT-26 명품 장비 목록
+
+SAN10 확장 명품 프로필의 명마·무기·서적 60종 이름과 기본 능력치 효과는 core2026 `c81d304`의 `packages/logic/src/items/`를 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+명마의 교전 단계·피해·회피와 서적의 계략·반계 효과는 같은 커밋의 아이템 모듈과 `war/triggers/che_반계.ts`를 참고했다. 백상의 군량 배율은 OpenSamguk의 교전 시작 군량 소모에 적용한다.
+
+명품 무기 네 종류의 저격 확률과 사기·부상 수치는 같은 커밋의 아이템 모듈과 `war/triggers/che_저격.ts`를 참고했다.
+
+구매 도구 청주의 훈련 상승량, 횟수, 가격과 요구 치안은 같은 커밋의 `che_훈련_청주.ts`를 참고했다.
+
+확장 명품 프로필의 일반 서적 여섯 종류와 단궁에는 앞서 기록한 원작 장비의 계략 시도·저격 효과를 적용한다.
+
+계략 도구 이추·향낭의 가격, 치안 조건, 성공 확률과 성공 시 소모는 같은 커밋의 아이템 모듈을 참고했다.
+
+수극의 구매 조건과 첫 교전 저격은 같은 커밋의 `che_저격_수극.ts`를 참고했다.
+
+명마 백마·사륜거의 전투 종료 부상 방지와 기본 5% 부상 판정은 같은 커밋의 `war/units/general.ts`와 `war/triggers/che_퇴각부상무효.ts`를 참고했다.

@@ -246,6 +246,8 @@ describe('감찰 표', () => {
     cityName: '진류',
     isHuman: true,
     crew: 1200,
+    stratagemSuccesses: 0,
+    battle: null,
     train: 70,
     atmos: 60,
     turns: [slot('train', '훈련'), blank, rest, slot('attack', '출병', { cityKey: 12 }), blank],
@@ -291,5 +293,31 @@ describe('감찰 표', () => {
     expect(rows[1]!.textContent).not.toContain('기록 없음');
     expect(rows[2]!.textContent).toContain('NPC');
     expect(rows[2]!.textContent).not.toContain('오래 접속 안 함');
+  });
+
+  it('최근 전투와 교전 횟수로 정렬하고 미집계 장수는 뒤에 둔다', () => {
+    render(
+      <InspectionTable
+        names={names}
+        rows={[
+          row({ generalId: 1, name: '미집계' }),
+          row({ generalId: 2, name: '최근 장수', battle: { lastTick: 100, engagements: 1 } }),
+          row({ generalId: 3, name: '다전 장수', battle: { lastTick: 50, engagements: 5 } }),
+        ]}
+      />,
+    );
+    const sort = screen.getByRole('combobox', { name: '정렬' });
+    fireEvent.change(sort, { target: { value: 'lastTick' } });
+    expect(screen.getAllByRole('rowheader').map((node) => node.textContent)).toEqual([
+      '최근 장수',
+      '다전 장수',
+      '미집계',
+    ]);
+    fireEvent.change(sort, { target: { value: 'engagements' } });
+    expect(screen.getAllByRole('rowheader').map((node) => node.textContent)).toEqual([
+      '다전 장수',
+      '최근 장수',
+      '미집계',
+    ]);
   });
 });

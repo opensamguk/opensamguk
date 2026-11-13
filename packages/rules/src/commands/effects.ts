@@ -1,5 +1,6 @@
 import { BALANCE } from '../balance';
 import type { WorldState, WorldView } from '../model/world';
+import { cleanTroops } from './ext/troop/state';
 import { cloneWorld } from '../model/clone';
 
 type Change<K extends string, F extends string> = { kind: K; id: number; field: F; op: 'add' | 'set'; value: number };
@@ -36,5 +37,7 @@ export function applyEffects(state: WorldView, effects: readonly Effect[]): Worl
     const value = Math.max(0, Math.min(max, effect.op === 'add' ? old + effect.value : effect.value));
     values[effect.field] = ['trust', 'tech'].includes(effect.field) ? value : Math.round(value);
   }
-  return next ?? cloneWorld(state);
+  const result = next ?? cloneWorld(state);
+  cleanTroops(result);
+  return result;
 }

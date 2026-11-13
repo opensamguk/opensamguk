@@ -35,9 +35,11 @@ export function checkHeritage(
   rules: CreationRules,
   heritage: HeritageRules,
   stale: boolean,
+  birthCost = 0,
 ): HeritageCheck {
   const fields: readonly { key: StatKey; label: string }[] = rules.count === 5 ? FIVE_STATS : STATS;
   const spent = fields.reduce((sum, stat) => sum + (bonus[stat.key] ?? 0), 0);
+  const total = spent + birthCost;
   const problems: string[] = stale ? [HERITAGE_STALE] : [];
   const rows = fields.map(({ key, label }): HeritageRow => {
     const n = integer(values[key]);
@@ -49,18 +51,18 @@ export function checkHeritage(
     else if (b >= heritage.perStat) why = `능력치 하나에는 +${heritage.perStat}까지입니다.`;
     else if (final! >= rules.max) why = `최종값이 최대 ${rules.max}에 닿아 더 올릴 수 없습니다.`;
     else if (spent >= heritage.perGeneral) why = `한 장수에는 합계 +${heritage.perGeneral}까지입니다.`;
-    else if (spent >= heritage.balance)
+    else if (total >= heritage.balance)
       why =
         heritage.balance === 0 ? '보유한 유산 포인트가 없습니다.' : `보유 ${heritage.balance}점을 모두 배분했습니다.`;
     if (b > 0 && final !== null && final > rules.max)
       problems.push(`${label} 최종값은 ${final}입니다. 최대 ${rules.max}까지라 유산이나 기본값을 줄이세요.`);
     return { key, label, base, bonus: b, final, why };
   });
-  if (spent > heritage.balance)
+  if (total > heritage.balance)
     problems.push(
-      `유산 배분은 ${spent}점이고 보유는 ${heritage.balance}점입니다. ${spent - heritage.balance}점 줄이세요.`,
+      `유산 배분은 ${total}점이고 보유는 ${heritage.balance}점입니다. ${total - heritage.balance}점 줄이세요.`,
     );
-  return { rows, spent, after: heritage.balance - spent, problems };
+  return { rows, spent, after: heritage.balance - total, problems };
 }
 
 // 「이 장수는」 요약용 최종 능력치. 보낼 값(기본 능력치)에는 쓰지 않는다.

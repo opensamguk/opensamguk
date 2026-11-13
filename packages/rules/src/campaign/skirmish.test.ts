@@ -52,6 +52,22 @@ describe('AC-INT-09 부곡별 실제 교전·군량', () => {
     expect(equipped.state.generals[2]).toMatchObject({ leadership: 100, strength: 100 });
     expect(world).toEqual(before);
   });
+  it('INT-26 탁주는 교전 지휘관과 수비 장수에게 한 번씩 적용되고 소유자 장비는 보존된다', () => {
+    const world = fixture();
+    world.ruleFeatures!.push('equipment-v1');
+    world.equipment = initialEquipment({ ...STANDARD_EQUIPMENT_CONFIG, treatmentTool: true, moraleTool: true });
+    const held = { tool: { key: 'tool_02', charges: 1 } } as const;
+    world.equipment.generals = { '1': held, '2': { ...held, horse: 'horse_01' }, '3': held };
+    const manuallyRaised = structuredClone(world);
+    manuallyRaised.campaign!.units[0]!.atmos = 100;
+    manuallyRaised.campaign!.units[1]!.atmos = 100;
+    delete manuallyRaised.equipment!.generals['2']!.tool;
+    delete manuallyRaised.equipment!.generals['3'];
+    const result = fightCampaignUnits(deepFreeze(world), 1, 2, testUnits, rng());
+    expect(result).toEqual(fightCampaignUnits(manuallyRaised, 1, 2, testUnits, rng()));
+    expect(result.state.equipment!.generals).toEqual({ '1': held, '2': { horse: 'horse_01' } });
+  });
+
   it('AC-P2-12 미장착 부곡은 확장 전과 같은 전투 결과와 난수 위치를 유지한다', () => {
     const plain = fixture(),
       equipped = structuredClone(plain),

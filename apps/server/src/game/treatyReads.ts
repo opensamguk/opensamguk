@@ -2,8 +2,12 @@ import type { Prisma } from '@opensamguk/db';
 import {
   canExecuteNationCommand,
   decodeTreatyRecord,
+  DIPLOMATIC_COOLDOWN_FEATURE,
+  diplomaticAidMonths,
   guideTreatyResponse,
   quoteTreatyProposal,
+  rankedAidLimit,
+  strategyMonth,
   toGameDate,
   TREATY_INPUTS,
   validateNationTrustState,
@@ -33,8 +37,18 @@ import { normalizeTreatyRequestPayload, type TreatyRequestKind } from './treatyR
 
 type GameDate = { year: number; month: number };
 type NationRef = { id: number; name: string; color: string };
+type TreatySigner = { name: string; portraitId: number | null };
+const cooldownReason = '원조 당사국의 외교 제한 기간이 남아 있습니다.';
+type Signatories = { proposer?: TreatySigner; approver?: TreatySigner };
 export type TrustRow = { nation: NationRef; brokenTreaties: number; lastBrokenAt: GameDate | null };
-export type TreatyDenyCode = 'NO_PERMISSION' | 'WORLD_CLOSED' | 'IN_PROGRESS' | 'BAD_TARGET' | TreatyResponseGuideCode;
+export type TreatyDenyCode =
+  | 'NO_PERMISSION'
+  | 'WORLD_CLOSED'
+  | 'IN_PROGRESS'
+  | 'BAD_TARGET'
+  | 'BAD_INPUT'
+  | 'DIPLOMATIC_COOLDOWN'
+  | TreatyResponseGuideCode;
 export type TreatyAllowed = { ok: true } | { ok: false; code: TreatyDenyCode; reason: string };
 export type TreatyListItem = TreatyDetail & {
   from: NationRef | null;
@@ -48,6 +62,7 @@ export type TreatyListItem = TreatyDetail & {
   canReject: TreatyAllowed | null;
   canBreak?: TreatyAllowed;
   brokenBy?: NationRef;
+  signatories?: Signatories;
 };
 type TreatyTarget = { nation: NationRef; relation: TreatyRelation; relationEndAt: GameDate | null };
 type PendingAction = {
@@ -70,6 +85,7 @@ export type TreatyListPage = {
   breakEnabled?: true;
   tradeEnabled?: true;
   expandedEnabled?: true;
+  rankedAid?: { limits: { nationId: number; amount: number }[] };
   canPropose: TreatyAllowed;
   targets: TreatyTarget[];
   items: TreatyListItem[];
@@ -79,7 +95,7 @@ export type TreatyListPage = {
 };
 export type TreatyQuote = {
   cost: { mine: number; theirs: number } | null;
-  problem: { code: TreatyQuoteCode; reason: string } | null;
+  problem: { code: TreatyQuoteCode | 'DIPLOMATIC_COOLDOWN'; reason: string } | null;
 };
 
 const kindSchema = z.enum(Object.keys(TREATY_INPUTS) as [TreatyRequestKind, ...TreatyRequestKind[]]);
@@ -216,6 +232,40 @@ async function recentActions(
   });
 }
 
+async function treatySignatories(tx: Prisma.TransactionClient, worldId: string, ids: number[]) {
+  if (!ids.length) return new Map<number, Signatories>();
+  const rows = await tx.inputEvent.findMany({
+    where: {
+      worldId,
+      status: 'APPLIED',
+      kind: { in: ['treaty.propose', 'treaty.respond'] },
+      OR: ids.map((id) => ({ result: { path: ['treatyId'], equals: String(id) } })),
+    },
+    select: { generalId: true, kind: true, result: true },
+  });
+  if (!rows.length) return new Map<number, Signatories>();
+  const signature = z.object({ treatyId: z.string(), outcome: z.enum(['PROPOSED', 'ACCEPTED', 'DECLINED']) });
+  const generals = await tx.general.findMany({
+    where: { worldId, id: { in: rows.flatMap(({ generalId }) => (generalId === null ? [] : [generalId])) } },
+    select: { id: true, name: true, portraitId: true },
+  });
+  const byId = new Map(generals.map(({ id, ...general }) => [id, general]));
+  const signers = new Map<number, Signatories>();
+  for (const row of rows) {
+    const result = signature.safeParse(row.result);
+    if (!result.success || row.generalId === null) continue;
+    const id = Number(result.data.treatyId);
+    const signer = byId.get(row.generalId);
+    if (!signer || !ids.includes(id)) continue;
+    const entry = signers.get(id) ?? {};
+    if (row.kind === 'treaty.propose') entry.proposer = signer;
+    else if (result.data.outcome === 'ACCEPTED') entry.approver = signer;
+    else continue;
+    signers.set(id, entry);
+  }
+  return signers;
+}
+
 // 세션의 userId를 받는다. 호출자는 인증 뒤 RepeatableRead 트랜잭션 하나를 넘긴다.
 export async function listTreaties(
   tx: Prisma.TransactionClient,
@@ -252,10 +302,25 @@ export async function listTreaties(
 
   const nations = await tx.nation.findMany({
     where: { worldId: input.worldId },
-    select: { id: true, name: true, color: true },
+    select: {
+      id: true,
+      name: true,
+      color: true,
+      ...(worldTreatyOptions(world).rankedAidEnabled ? { level: true } : {}),
+      ...(world.ruleFeatures.includes(DIPLOMATIC_COOLDOWN_FEATURE) ? { diplomaticAidUntilMonth: true } : {}),
+    },
     orderBy: { id: 'asc' },
   });
   const refs = new Map(nations.map((n) => [n.id, publicNation(n)]));
+  const rankedAid = worldTreatyOptions(world).rankedAidEnabled
+    ? new Map(nations.map(({ id, level }) => [id, rankedAidLimit(level)]))
+    : null;
+  const month = strategyMonth(world.clockTick);
+  const restricted = new Set(
+    world.ruleFeatures.includes(DIPLOMATIC_COOLDOWN_FEATURE)
+      ? nations.filter((nation) => diplomaticAidMonths(nation, month) > 0).map(({ id }) => id)
+      : [],
+  );
   const diplomacies = await tx.diplomacy.findMany({
     where: { worldId: input.worldId, OR: [{ nationA: nationId }, { nationB: nationId }] },
     select: { nationA: true, nationB: true, state: true, untilTick: true },
@@ -395,6 +460,7 @@ export async function listTreaties(
       to = refs.get(row.toNationId) ?? null;
     const current = relations.get(row.fromNationId === nationId ? row.toNationId : row.fromNationId)?.state ?? 'NONE';
     let estimate: TreatyListItem['estimate'] = null;
+    let aidUnavailable: string | null = null;
     if (row.status === 'PROPOSED' && from !== null && to !== null) {
       const result = quote(
         {
@@ -403,13 +469,16 @@ export async function listTreaties(
           clauses: row.clauses,
           fromCityCount: cityCounts.get(row.fromNationId) ?? 0,
           target: { relation: current, cityCount: cityCounts.get(row.toNationId) ?? 0 },
+          ...(rankedAid ? { tributeLimits: rankedAid } : {}),
         },
         worldTreatyOptions(world),
       );
-      if (result.cost === null) invalid();
-      estimate = detail.incoming
-        ? { mine: result.cost.to, theirs: result.cost.from }
-        : { mine: result.cost.from, theirs: result.cost.to };
+      if (result.cost === null && !rankedAid) invalid();
+      if (rankedAid && result.problem?.code === 'BAD_INPUT') aidUnavailable = result.problem.message;
+      if (result.cost)
+        estimate = detail.incoming
+          ? { mine: result.cost.to, theirs: result.cost.from }
+          : { mine: result.cost.from, theirs: result.cost.to };
     }
     let canAccept: TreatyAllowed | null = null,
       canReject: TreatyAllowed | null = null;
@@ -457,6 +526,13 @@ export async function listTreaties(
           worldTreatyOptions(world),
         );
         canAccept = guidance.accept === null ? { ok: true } : allowed(guidance.accept.code, guidance.accept.message);
+        if (canAccept.ok && aidUnavailable !== null) canAccept = allowed('BAD_INPUT', aidUnavailable);
+        if (
+          canAccept.ok &&
+          row.clauses.some(({ kind }) => kind === 'tribute') &&
+          (restricted.has(row.fromNationId) || restricted.has(row.toNationId))
+        )
+          canAccept = allowed('DIPLOMATIC_COOLDOWN', cooldownReason);
         canReject = guidance.reject === null ? { ok: true } : allowed(guidance.reject.code, guidance.reject.message);
       }
     }
@@ -488,6 +564,15 @@ export async function listTreaties(
       ...(row.status === 'BROKEN' ? { brokenBy: brokenBy.get(row.id)! } : {}),
     });
   }
+  const signatories = await treatySignatories(
+    tx,
+    input.worldId,
+    checked.map(({ id }) => id),
+  );
+  for (const item of items) {
+    const signers = signatories.get(Number(item.id));
+    if (signers) item.signatories = signers;
+  }
   const targets = nations
     .filter((n) => n.id !== nationId)
     .map((n) => ({ nation: publicNation(n), ...publicRelation(world.startYear, relations.get(n.id)) }));
@@ -497,6 +582,7 @@ export async function listTreaties(
     ...(worldTreatyOptions(world).expandedEnabled ? { expandedEnabled: true } : {}),
     canPropose,
     targets,
+    ...(rankedAid ? { rankedAid: { limits: [...rankedAid].map(([nationId, amount]) => ({ nationId, amount })) } } : {}),
     items,
     nextCursor: page.length > 30 ? String(checked.at(-1)!.id) : null,
     pending,
@@ -559,6 +645,7 @@ export async function quoteTreaty(
   if (!('clauses' in payload)) invalid();
   if (world.status === 'ENDED') throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '종료된 월드입니다.' });
   const actor = await requireGeneral(tx, input.worldId, input.userId);
+  const options = worldTreatyOptions(world);
   if (actor.nationId === null || !canExecuteNationCommand(actor.officerLevel, 'nation_pact'))
     throw new TRPCError({ code: 'FORBIDDEN', message: '조약을 처리할 권한이 없습니다.' });
   const target =
@@ -589,6 +676,13 @@ export async function quoteTreaty(
     });
     targetValue = { relation: relation?.state ?? 'NONE', cityCount };
   }
+  const parties =
+    options.rankedAidEnabled && target && payload.clauses.some(({ kind }) => kind === 'tribute')
+      ? await tx.nation.findMany({
+          where: { worldId: input.worldId, id: { in: [actor.nationId, payload.toNationId] } },
+          select: { id: true, level: true, diplomaticAidUntilMonth: true },
+        })
+      : [];
   const result = quote(
     {
       fromNationId: actor.nationId,
@@ -596,9 +690,19 @@ export async function quoteTreaty(
       clauses: payload.clauses,
       fromCityCount,
       target: targetValue,
+      ...(parties.length
+        ? { tributeLimits: new Map(parties.map(({ id, level }) => [id, rankedAidLimit(level)])) }
+        : {}),
     },
-    worldTreatyOptions(world),
+    options,
   );
+  const month = strategyMonth(world.clockTick);
+  if (
+    result.problem === null &&
+    world.ruleFeatures.includes(DIPLOMATIC_COOLDOWN_FEATURE) &&
+    parties.some((nation) => diplomaticAidMonths(nation, month) > 0)
+  )
+    return { cost: null, problem: { code: 'DIPLOMATIC_COOLDOWN', reason: cooldownReason } };
   return {
     cost: result.cost === null ? null : { mine: result.cost.from, theirs: result.cost.to },
     problem: result.problem === null ? null : { code: result.problem.code, reason: result.problem.message },

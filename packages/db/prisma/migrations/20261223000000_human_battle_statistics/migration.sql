@@ -1,0 +1,4 @@
+ALTER TABLE "GeneralBattleStats"
+  ADD COLUMN "humanEngagements" INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN "humanKills" BIGINT NOT NULL DEFAULT 0,
+  ADD COLUMN "humanCasualties" BIGINT NOT NULL DEFAULT 0;

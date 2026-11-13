@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util';
 import type { Prisma } from '@opensamguk/db';
 import {
   assertSlotSet,
@@ -21,6 +22,7 @@ import { hashState } from '@opensamguk/shared/node';
 import { engineFeatures } from './features';
 import { loadWorld } from './worldLoader';
 import { persistRanking } from './ranking';
+import { activeSeasonGenerals, nationTroopTotals } from './seasonArchive';
 import { persistYearbookNations, persistRemovedNations, persistPublicNationEvents } from './nationArchive';
 import { persistCommandMeta } from './commandPersistence';
 import { persistExt } from './extState';
@@ -121,7 +123,10 @@ export async function persistMonthly(
   for (const city of Object.values(next.cities)) {
     const old = before.cities[city.cityKey]!;
     if (JSON.stringify(city) !== JSON.stringify(old)) {
-      await tx.city.update({ where: { worldId_cityKey: { worldId, cityKey: city.cityKey } }, data: city });
+      await tx.city.update({
+        where: { worldId_cityKey: { worldId, cityKey: city.cityKey } },
+        data: { ...city, ...(old.seasonalEvent ? { seasonalEvent: city.seasonalEvent ?? null } : {}) },
+      });
     }
   }
   for (const nation of Object.values(next.nations)) {
@@ -138,7 +143,13 @@ export async function persistMonthly(
     if (JSON.stringify(general) !== JSON.stringify(before.generals[general.id])) {
       await tx.general.update({
         where: { worldId_id: { worldId, id: general.id } },
-        data: { ...general, ...(before.officeEffects ? { officerCityKey: general.officerCityKey ?? null } : {}) },
+        data: {
+          ...general,
+          ...(before.officeEffects ? { officerCityKey: general.officerCityKey ?? null } : {}),
+          ...(general.nationId === before.generals[general.id]!.nationId
+            ? {}
+            : { nationJoinedTick: general.nationId === null ? null : tick }),
+        },
       });
     }
   }
@@ -155,6 +166,46 @@ export async function persistMonthly(
       })),
     });
   }
+  if (result.seasonalEventLogs.length) {
+    await tx.generalLog.createMany({
+      data: result.seasonalEventLogs.map((log, index) => ({
+        ...log,
+        worldId,
+        tick,
+        sequence,
+        ordinal: result.officeTaxLogs.length + index,
+        commandKey: 'city.seasonal-event',
+        kind: 'success',
+      })),
+    });
+  }
+  if (result.rareEquipmentLogs.length) {
+    await tx.generalLog.createMany({
+      data: result.rareEquipmentLogs.map((log, index) => ({
+        ...log,
+        worldId,
+        tick,
+        sequence,
+        ordinal: result.officeTaxLogs.length + result.seasonalEventLogs.length + index,
+        commandKey: 'equipment.discovery',
+        kind: 'success',
+      })),
+    });
+  }
+  if (result.specialtyGrowthLogs.length) {
+    await tx.generalLog.createMany({
+      data: result.specialtyGrowthLogs.map((log, index) => ({
+        ...log,
+        worldId,
+        tick,
+        sequence,
+        ordinal:
+          result.officeTaxLogs.length + result.seasonalEventLogs.length + result.rareEquipmentLogs.length + index,
+        commandKey: 'specialty.growth',
+        kind: 'success',
+      })),
+    });
+  }
   await tx.diplomacy.deleteMany({ where: { worldId } });
   await tx.diplomacy.createMany({ data: next.diplomacies.map((entry) => ({ ...entry, worldId })) });
   await persistExt(tx, worldId, before.ext, next.ext);
@@ -167,6 +218,8 @@ export async function persistMonthly(
   await persistGovernanceState(tx, worldId, before, next);
   await persistLineageState(tx, worldId, before, next);
   await persistEquipmentState(tx, worldId, before, next);
+  if (next.cityOfficeVolunteers && !isDeepStrictEqual(before.cityOfficeVolunteers, next.cityOfficeVolunteers))
+    await tx.world.update({ where: { id: worldId }, data: { cityOfficeVolunteers: next.cityOfficeVolunteers } });
   await persistStratagemCardsState(tx, worldId, before, next, tick);
   await persistCampaignState(tx, worldId, before, next);
   await persistCityResourcesState(
@@ -190,6 +243,7 @@ export async function persistMonthly(
   await persistRemovedNations(tx, worldId, before, next, { tick, sequence });
   await tx.world.update({ where: { id: worldId }, data: { monthlyTick: tick } });
   const snapshot = await loadReplayState(tx, worldId);
+  const rankedNations = await persistRanking(tx, worldId, next, seed, { tick, ...date });
   await tx.yearbookSnapshot.create({
     data: {
       worldId,
@@ -198,9 +252,10 @@ export async function persistMonthly(
       sequence,
       data: yearbook as unknown as Prisma.InputJsonValue,
       stateHash: hashState(snapshot),
+      activeGenerals: activeSeasonGenerals(next, date.year).length,
     },
   });
-  await persistYearbookNations(tx, worldId, tick, next);
+  await persistYearbookNations(tx, worldId, tick, rankedNations, nationTroopTotals(next, date.year));
   for (const nation of yearbook.nations) {
     const where = { worldId_tick_nationId: { worldId, tick, nationId: nation.nationId } };
     // 같은 월드 잠금 안에서 기존 사건을 보존하고 월간 수치를 덧붙인다.
@@ -212,6 +267,5 @@ export async function persistMonthly(
       update: { data },
     });
   }
-  await persistRanking(tx, worldId, next, seed, { tick, ...date });
   return next;
 }

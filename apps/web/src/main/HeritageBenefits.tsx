@@ -1,0 +1,491 @@
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { useRef, useState } from 'react';
+import type { AppRouter } from '@opensamguk/server/router';
+import type { inferRouterOutputs } from '@trpc/server';
+import { useTRPC } from '../trpc';
+import { serverMessage } from '../turns/apiError';
+import { retryUnlessClientError } from '../game/errors';
+
+type Benefits = Extract<inferRouterOutputs<AppRouter>['heritage']['benefits'], { enabled: true }>;
+type Benefit = Benefits['options'][number];
+
+export function HeritageBenefits({ worldId }: { worldId: string }) {
+  const trpc = useTRPC();
+  const query = useQuery({
+    ...trpc.heritage.benefits.queryOptions({ worldId }),
+    retry: retryUnlessClientError,
+    refetchInterval: (query) =>
+      query.state.data?.enabled && query.state.data.latest?.status === 'PENDING' ? 1000 : false,
+  });
+  if (!query.data?.enabled) return null;
+  return <PurchaseForm key={query.data.generalId} worldId={worldId} data={query.data} refresh={query.refetch} />;
+}
+
+function PurchaseForm({
+  worldId,
+  data,
+  refresh,
+}: {
+  worldId: string;
+  data: Benefits;
+  refresh: () => Promise<unknown>;
+}) {
+  const trpc = useTRPC();
+  const mutation = useMutation(trpc.heritage.purchase.mutationOptions());
+  const [selected, setSelected] = useState<Benefit['benefit'] | ''>('');
+  const [level, setLevel] = useState(0);
+  const [confirm, setConfirm] = useState(false);
+  const option = data.options.find(({ benefit }) => benefit === selected);
+  const cost = option && level > option.level ? (data.costs[level] ?? 0) - (data.costs[option.level] ?? 0) : 0;
+  const pending = mutation.isPending || data.latest?.status === 'PENDING';
+  return (
+    <details>
+      <summary>유산 혜택</summary>
+      <p>보유 {data.balance}점 · 단계마다 확률 1%p 보정</p>
+      <ul>
+        {data.options.map(({ benefit, label, level }) => (
+          <li key={benefit}>
+            {label} · {level}단계
+          </li>
+        ))}
+      </ul>
+      {data.canPurchase ? (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!option || !cost || cost > data.balance || pending) return;
+            if (!confirm) {
+              setConfirm(true);
+              return;
+            }
+            mutation.mutate(
+              { worldId, benefit: option.benefit, level, expectedGeneralId: data.generalId, expectedCost: cost },
+              {
+                onSuccess: async () => {
+                  await refresh();
+                  setConfirm(false);
+                  setLevel(0);
+                },
+              },
+            );
+          }}
+        >
+          <label>
+            혜택
+            <select
+              disabled={pending}
+              value={selected}
+              onChange={(event) => {
+                const next = data.options.find(({ benefit }) => benefit === event.currentTarget.value);
+                setSelected(next?.benefit ?? '');
+                setLevel(0);
+                setConfirm(false);
+              }}
+            >
+              <option value="">선택</option>
+              {data.options
+                .filter(({ level }) => level < 5)
+                .map(({ benefit, label }) => (
+                  <option key={benefit} value={benefit}>
+                    {label}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <label>
+            구매 단계
+            <select
+              disabled={!option || pending}
+              value={level}
+              onChange={(event) => {
+                setLevel(Number(event.currentTarget.value));
+                setConfirm(false);
+              }}
+            >
+              <option value={0}>선택</option>
+              {option
+                ? data.costs.map((total, index) =>
+                    index > option.level ? (
+                      <option key={index} value={index}>
+                        {index}단계 · {total - (data.costs[option.level] ?? 0)}점
+                      </option>
+                    ) : null,
+                  )
+                : null}
+            </select>
+          </label>
+          {confirm && option ? (
+            <p role="status">
+              {option.label} {level}단계에 {cost}점을 사용합니다.
+            </p>
+          ) : null}
+          <button type="submit" disabled={!cost || cost > data.balance || pending}>
+            {confirm ? '구매 확정' : '구매 확인'}
+          </button>
+          {confirm ? (
+            <button type="button" onClick={() => setConfirm(false)} disabled={pending}>
+              취소
+            </button>
+          ) : null}
+        </form>
+      ) : null}
+      {data.statReset ? <StatReset worldId={worldId} data={data} pending={pending} refresh={refresh} /> : null}
+      {data.turnTime ? <TurnTimePurchase worldId={worldId} data={data} pending={pending} refresh={refresh} /> : null}
+      {data.specialty ? <SpecialtyPurchase worldId={worldId} data={data} pending={pending} refresh={refresh} /> : null}
+      {pending ? <p role="status">구매 처리 중</p> : null}
+      {mutation.isError || data.latest?.status === 'REJECTED' ? (
+        <p role="alert">{mutation.isError ? serverMessage(mutation.error) : data.latest?.message}</p>
+      ) : null}
+    </details>
+  );
+}
+
+const resetStats = [
+  ['leadership', '통솔'],
+  ['strength', '무력'],
+  ['intel', '지력'],
+  ['politics', '정치'],
+  ['charm', '매력'],
+] as const;
+
+function StatReset({
+  worldId,
+  data,
+  pending,
+  refresh,
+}: {
+  worldId: string;
+  data: Benefits;
+  pending: boolean;
+  refresh: () => Promise<unknown>;
+}) {
+  const trpc = useTRPC();
+  const reset = data.statReset!;
+  const keys = resetStats.slice(0, reset.rules.count ?? 3);
+  const [stats, setStats] = useState({
+    leadership: reset.rules.min,
+    strength: reset.rules.min,
+    intel: reset.rules.min,
+    politics: reset.rules.min,
+    charm: reset.rules.min,
+  });
+  const [bonus, setBonus] = useState({ leadership: 0, strength: 0, intel: 0, politics: 0, charm: 0 });
+  const [manual, setManual] = useState(false);
+  const [confirm, setConfirm] = useState(false);
+  const requestId = useRef<string | null>(null);
+  const mutation = useMutation(trpc.heritage.statReset.mutationOptions());
+  const total = keys.reduce((sum, [key]) => sum + stats[key], 0);
+  const bonusTotal = keys.reduce((sum, [key]) => sum + bonus[key], 0);
+  const validBase =
+    total === reset.rules.total &&
+    keys.every(
+      ([key]) => Number.isInteger(stats[key]) && stats[key] >= reset.rules.min && stats[key] <= reset.rules.max,
+    );
+  const validBonus =
+    !manual ||
+    (bonusTotal >= 3 &&
+      bonusTotal <= 5 &&
+      keys.every(
+        ([key]) =>
+          Number.isInteger(bonus[key]) &&
+          bonus[key] >= 0 &&
+          bonus[key] <= 3 &&
+          stats[key] + bonus[key] <= reset.rules.max,
+      ));
+  const cost = manual ? reset.cost : 0;
+  const busy = pending || mutation.isPending;
+  const changed = () => {
+    setConfirm(false);
+    requestId.current = null;
+  };
+  return (
+    <div>
+      <h3>능력치 초기화</h3>
+      {reset.used ? (
+        <p>이번 기수의 초기화를 사용했습니다.</p>
+      ) : !reset.eligible ? (
+        <p>맡은 NPC 장수는 초기화할 수 없습니다.</p>
+      ) : data.canPurchase ? (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!validBase || !validBonus || cost > data.balance || busy) return;
+            if (!confirm) {
+              setConfirm(true);
+              return;
+            }
+            const { leadership, strength, intel, politics, charm } = stats;
+            requestId.current ??= crypto.randomUUID();
+            mutation.mutate(
+              {
+                worldId,
+                requestId: requestId.current,
+                expectedGeneralId: data.generalId,
+                expectedCost: cost,
+                stats: { leadership, strength, intel, ...(keys.length === 5 ? { politics, charm } : {}) },
+                ...(manual
+                  ? {
+                      bonus: Object.fromEntries(
+                        keys.filter(([key]) => bonus[key] > 0).map(([key]) => [key, bonus[key]]),
+                      ),
+                    }
+                  : {}),
+              },
+              {
+                onSuccess: async () => {
+                  await refresh();
+                  changed();
+                },
+              },
+            );
+          }}
+        >
+          <p>
+            기본 능력치 합계 {total} / {reset.rules.total}
+          </p>
+          {keys.map(([key, label]) => (
+            <label key={key}>
+              {label}
+              <input
+                type="number"
+                min={reset.rules.min}
+                max={reset.rules.max}
+                value={stats[key]}
+                disabled={busy}
+                onChange={(event) => {
+                  setStats({ ...stats, [key]: Number(event.currentTarget.value) });
+                  changed();
+                }}
+              />
+            </label>
+          ))}
+          <label>
+            <input
+              type="checkbox"
+              checked={manual}
+              disabled={busy}
+              onChange={(event) => {
+                setManual(event.currentTarget.checked);
+                changed();
+              }}
+            />{' '}
+            보너스 직접 배분 · {reset.cost}점
+          </label>
+          {manual ? (
+            <>
+              <p>보너스 합계 {bonusTotal}점 · 3~5점 배분</p>
+              {keys.map(([key, label]) => (
+                <label key={key}>
+                  {label} 보너스
+                  <input
+                    type="number"
+                    min={0}
+                    max={3}
+                    value={bonus[key]}
+                    disabled={busy}
+                    onChange={(event) => {
+                      setBonus({ ...bonus, [key]: Number(event.currentTarget.value) });
+                      changed();
+                    }}
+                  />
+                </label>
+              ))}
+            </>
+          ) : (
+            <p>보너스 3~5점을 무작위로 배분합니다.</p>
+          )}
+          {confirm ? <p role="status">이번 기수에 한 번만 바꿀 수 있습니다. {cost}점을 사용합니다.</p> : null}
+          <button type="submit" disabled={busy || !validBase || !validBonus || cost > data.balance}>
+            {confirm ? '능력치 초기화 확정' : '능력치 초기화 확인'}
+          </button>
+          {confirm ? (
+            <button type="button" disabled={busy} onClick={changed}>
+              취소
+            </button>
+          ) : null}
+        </form>
+      ) : null}
+      {mutation.isError ? <p role="alert">{serverMessage(mutation.error)}</p> : null}
+    </div>
+  );
+}
+
+function TurnTimePurchase({
+  worldId,
+  data,
+  pending,
+  refresh,
+}: {
+  worldId: string;
+  data: Benefits;
+  pending: boolean;
+  refresh: () => Promise<unknown>;
+}) {
+  const trpc = useTRPC();
+  const [confirm, setConfirm] = useState(false);
+  const requestId = useRef<string | null>(null);
+  const mutation = useMutation(trpc.heritage.turnTime.mutationOptions());
+  const timing = data.turnTime!;
+  const busy = pending || mutation.isPending;
+  const cost = timing.cost;
+  const date = timing.pendingAt ? new Date(timing.pendingAt).toLocaleString('ko-KR') : null;
+  return (
+    <div>
+      <h3>랜덤 턴 시간 초기화</h3>
+      {timing.pendingTick !== null ? (
+        <p>다다음 턴부터 적용{date ? ` · ${date}` : ''}</p>
+      ) : data.canPurchase && cost !== null ? (
+        <>
+          {confirm ? <p role="status">{cost}점을 사용합니다. 이번에 예약된 다음 턴 시각은 유지됩니다.</p> : null}
+          <button
+            type="button"
+            disabled={busy || cost > data.balance}
+            onClick={() => {
+              if (!confirm) {
+                setConfirm(true);
+                return;
+              }
+              requestId.current ??= crypto.randomUUID();
+              mutation.mutate(
+                { worldId, requestId: requestId.current, expectedGeneralId: data.generalId, expectedCost: cost },
+                {
+                  onSuccess: async () => {
+                    await refresh();
+                    setConfirm(false);
+                    requestId.current = null;
+                  },
+                },
+              );
+            }}
+          >
+            {confirm ? '초기화 확정' : `초기화 확인 · ${cost}점`}
+          </button>
+          {confirm ? (
+            <button type="button" disabled={busy} onClick={() => setConfirm(false)}>
+              취소
+            </button>
+          ) : null}
+        </>
+      ) : null}
+      {mutation.isError ? <p role="alert">{serverMessage(mutation.error)}</p> : null}
+    </div>
+  );
+}
+
+function SpecialtyPurchase({
+  worldId,
+  data,
+  pending,
+  refresh,
+}: {
+  worldId: string;
+  data: Benefits;
+  pending: boolean;
+  refresh: () => Promise<unknown>;
+}) {
+  const trpc = useTRPC();
+  const [selected, setSelected] = useState('');
+  const [confirm, setConfirm] = useState<'reserve' | 'reset' | null>(null);
+  const requestId = useRef<string | null>(null);
+  const mutation = useMutation(trpc.heritage.specialty.mutationOptions());
+  const specialty = data.specialty!;
+  const option = specialty.options.find(({ name }) => name === selected);
+  const busy = pending || mutation.isPending;
+  const cost = confirm === 'reserve' ? specialty.reserveCost : specialty.resetCost;
+  return (
+    <div>
+      <h3>전투 특기</h3>
+      <p>
+        현재 {specialty.current ?? '없음'} · 예약 {specialty.next ?? '없음'}
+      </p>
+      {data.canPurchase ? (
+        <>
+          <label>
+            다음 전투 특기
+            <select
+              disabled={busy || specialty.next !== null}
+              value={selected}
+              onChange={(event) => {
+                setSelected(event.currentTarget.value);
+                setConfirm(null);
+                requestId.current = null;
+              }}
+            >
+              <option value="">선택</option>
+              {specialty.options
+                .filter(({ name }) => name !== specialty.current)
+                .map(({ name }) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+            </select>
+          </label>
+          {option ? <p>{option.description}</p> : null}
+          <button
+            type="button"
+            disabled={busy || !option || !!specialty.next || specialty.reserveCost > data.balance}
+            onClick={() => {
+              setConfirm('reserve');
+              requestId.current = null;
+            }}
+          >
+            다음 특기 예약 · {specialty.reserveCost}점
+          </button>
+          {specialty.resetCost !== null ? (
+            <button
+              type="button"
+              disabled={busy || specialty.resetCost > data.balance}
+              onClick={() => {
+                setConfirm('reset');
+                requestId.current = null;
+              }}
+            >
+              전투 특기 초기화 · {specialty.resetCost}점
+            </button>
+          ) : null}
+          {confirm && cost ? (
+            <div>
+              <p role="status">
+                {confirm === 'reserve' ? option?.name + ' 예약' : '전투 특기 초기화'}에 {cost}점을 사용합니다.
+              </p>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  const action =
+                    confirm === 'reset'
+                      ? { action: 'reset' as const }
+                      : { action: 'reserve' as const, specialty: selected };
+                  requestId.current ??= crypto.randomUUID();
+                  mutation.mutate(
+                    {
+                      worldId,
+                      action,
+                      requestId: requestId.current,
+                      expectedGeneralId: data.generalId,
+                      expectedCost: cost,
+                    },
+                    {
+                      onSuccess: async () => {
+                        await refresh();
+                        setConfirm(null);
+                        requestId.current = null;
+                      },
+                    },
+                  );
+                }}
+              >
+                구매 확정
+              </button>
+              <button type="button" disabled={busy} onClick={() => setConfirm(null)}>
+                취소
+              </button>
+            </div>
+          ) : null}
+          {mutation.isError ? <p role="alert">{serverMessage(mutation.error)}</p> : null}
+        </>
+      ) : null}
+    </div>
+  );
+}

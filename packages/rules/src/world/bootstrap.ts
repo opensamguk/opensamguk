@@ -20,6 +20,10 @@ import { CITY_SCALE_FEATURE, resolveCityScale, type CityScaleRecord, type ScaleA
 import { appliesOperationalOpening, LEGACY_OPENING_CITY_PROFILE, legacyOpeningCityValues } from './openingCityProfile';
 
 export interface InitialCity {
+  conflict?: Record<string, number>;
+  conflictOrder?: number[];
+  warCasualties?: number | null;
+  seasonalEvent?: string | null;
   kind?: 'CITY' | 'PASS';
   cityKey: number;
   name: string;
@@ -57,6 +61,10 @@ export interface InitialNation {
   level: number;
   capitalCityKey: number | null;
   isNpc: boolean;
+  diplomaticAidUntilMonth?: number;
+  npcSettings?: import('../npc/policy').NpcNationPolicy;
+  financeRates?: import('../personnel/financeRates').FinanceRates;
+  restrictions?: import('../personnel/nationRestrictions').NationRestrictions;
 }
 
 export interface InitialGeneral {
@@ -75,6 +83,14 @@ export interface InitialGeneral {
   charm?: number;
   officerLevel: number;
   officerCityKey?: number | null;
+  defenseThreshold?: number;
+  combatSpecial?: string | null;
+  heritageSpecialty?: import('../heritage/specialty').HeritageSpecialtyState;
+  heritageTurnTime?: import('../heritage/turnTime').HeritageTurnTimeState;
+  heritageStatReset?: true;
+  heritageBenefits?: import('../heritage/benefits').HeritageBenefits;
+  proficiency?: import('../general/proficiency').GeneralProficiency;
+  statExperience?: import('../general/statGrowth').StatExperience;
   birthYear: number;
   deathYear: number;
   activeFromYear: number;

@@ -1,4 +1,40 @@
-import { COURT_RANK_FEATURE } from './personnel/nationRank';
+import { BATTLE_TACTICS_FEATURE } from './battle/tactics';
+import { WAR_INCOME_FEATURE } from './monthly/warIncome';
+import { CITY_CONFLICT_AWARD_FEATURE, CITY_CONFLICT_FEATURE } from './battle/cityConflict';
+import { MILITARY_STAT_GROWTH_FEATURE, STAT_GROWTH_FEATURE } from './general/statGrowth';
+import {
+  applyFinanceRates,
+  NATION_FINANCE_FEATURE,
+  NATION_FINANCE_KIND,
+  RANKED_PAYROLL_FEATURE,
+  WALL_INCOME_FEATURE,
+} from './personnel/financeRates';
+import {
+  applyHeritageSpecialtyPurchase,
+  HERITAGE_SPECIALTY_FEATURE,
+  SPECIALTY_GROWTH_FEATURE,
+  HERITAGE_SPECIALTY_KIND,
+} from './heritage/specialty';
+import { applyHeritageStatReset, HERITAGE_STAT_RESET_KIND } from './heritage/statReset';
+import { applyHeritageTurnTime, HERITAGE_TURN_TIME_KIND } from './heritage/turnTime';
+import { applyHeritagePurchase, HERITAGE_BENEFIT_KIND, HERITAGE_BENEFITS_FEATURE } from './heritage/benefits';
+import { applyDefenseStance, DEFENSE_STANCE_FEATURE, DEFENSE_STANCE_KIND } from './battle/defenders';
+import { NPC_NATION_POLICY_FEATURE, NPC_NATION_POLICY_KIND, applyNpcNationPolicy } from './npc/policy';
+import {
+  NATION_RESTRICTIONS_FEATURE,
+  NATION_RESTRICTIONS_KIND,
+  applyNationRestrictions,
+} from './personnel/nationRestrictions';
+import { inactiveRemovalFeature, INACTIVE_REMOVAL_FEATURE } from './policy/inactiveRemoval';
+import { GENERAL_PROFICIENCY_FEATURE } from './general/proficiency';
+import { convertProficiency } from './commands/convertProficiency';
+import { COMBAT_SPECIALTY_FEATURE } from './general/combatSpecialty';
+import { DOMESTIC_SPECIALTY_FEATURE } from './general/domesticSpecialty';
+import { GENERAL_PERSONALITY_FEATURE } from './general/personality';
+import { HERITAGE_BIRTH_FEATURE } from './heritage/birth';
+import { RESEARCH_ERA_FEATURE } from './nationResearch/era';
+import { NATION_PHILOSOPHY_FEATURE } from './personnel/nationPhilosophy';
+import { COURT_ABILITY_FEATURE, COURT_PROMOTION_FEATURE, COURT_RANK_FEATURE } from './personnel/nationRank';
 import type { JsonValue, WorldView } from './model/world';
 import type { WorldInit } from './world/bootstrap';
 import { checkInitialNpcStatLimits } from './world/initialNpcStats';
@@ -6,7 +42,7 @@ import { assertInitialNationLifecycle, NATION_LIFECYCLE_FEATURE } from './nation
 import type { CommandDef } from './commands/types';
 import type { CommandResolver } from './commands/resolve';
 import { applyCreationInput, applyPolicyInput, applyTurnsInput } from './replayInputs';
-import { POSSESSION_KIND, applyPossessionInput } from './entry/possess';
+import { NPC_ENTRY_DRAFT_FEATURE, POSSESSION_KIND, applyPossessionInput } from './entry/possess';
 import {
   personnelFeature,
   policyFeature,
@@ -23,6 +59,13 @@ import {
   treatyBreakInputKind,
 } from './ruleFeatures';
 import { checkStatProfile } from './general/fiveStats';
+import { GENERAL_CONDITION_FEATURE } from './general/condition';
+import { RICE_MARKET_FEATURE } from './world/riceMarket';
+import { RANKED_AID_FEATURE } from './diplomacy/treaty';
+import { DIPLOMATIC_COOLDOWN_FEATURE } from './diplomacy/cooldown';
+import { PLAYER_AUTOPLAY_FEATURE } from './policy';
+import { CITY_SEASONAL_EVENTS_FEATURE } from './monthly/citySeasonalEvents';
+import { EXPANDED_TREATY_FEATURE } from './diplomacy/treatyClauses';
 import { checkOperationalProfile } from './world/map/profile';
 import type { RecordedInput, ReplayState } from './replay';
 import { campaignFeature, campaignInputKinds } from './campaign/feature';
@@ -40,7 +83,8 @@ import { heritageFeature } from './heritage/feature';
 import { ADMIN_GAME_KINDS } from './admin/game';
 import { applyAdminGameRecord } from './admin/apply';
 import { ADMIN_SETTING_KINDS, applyAdminSettingRecord } from './admin/settings';
-import type { UnitSetResource } from './world/resources';
+import type { StatRules, UnitSetResource } from './world/resources';
+import { CITY_OFFICE_VOLUNTEER_FEATURE, initialCityOfficeVolunteers } from './personnel/cityOfficeVolunteers';
 import { OFFICE_EFFECTS_FEATURE, officeEffectsSchema } from './personnel/residentOffice';
 import { reputationFeature } from './review/feature';
 import { cityScaleFeature } from './cityScale/feature';
@@ -50,6 +94,11 @@ import { nationLifecycleFeature } from './nationLifecycle/feature';
 import { preparedTurnsFeature } from './preparedTurns/feature';
 import { nationResearchFeature } from './nationResearch/feature';
 import { relationsFeature } from './relations/data';
+import { cleanTroops, gatherBinding, TROOP_FEATURE } from './commands/ext/troop/state';
+import { TROOP_ACTION_KIND } from './commands/ext/troop/actions';
+import { applyTroopInput } from './commands/ext/troop/replay';
+import { troopExpel } from './commands/ext/troop/expel';
+import { troopGather } from './commands/ext/troop/gather';
 import { INTEL_FEATURE, spyBinding } from './commands/ext/intel/record';
 import { spy } from './commands/ext/intel/spy';
 import { returnBorder } from './commands/ext/return_border/return_border';
@@ -110,7 +159,12 @@ export interface InputKindDefinition {
   apply(
     replay: ReplayState,
     input: RecordedInput,
-    context?: { resolver?: CommandResolver | undefined; unitSet?: UnitSetResource },
+    context?: {
+      resolver?: CommandResolver | undefined;
+      unitSet?: UnitSetResource;
+      seed?: string;
+      statRules?: StatRules;
+    },
   ): ReplayState;
 }
 export interface RuleRegistry {
@@ -120,6 +174,11 @@ export interface RuleRegistry {
 }
 export const ruleRegistry: RuleRegistry = {
   features: [
+    { key: BATTLE_TACTICS_FEATURE, requires: ['combat-specialty-v1'], conflicts: [] },
+    { key: SPECIALTY_GROWTH_FEATURE, requires: [HERITAGE_SPECIALTY_FEATURE, 'domestic-specialty-v1'], conflicts: [] },
+    { key: HERITAGE_SPECIALTY_FEATURE, requires: [HERITAGE_BENEFITS_FEATURE, 'combat-specialty-v1'], conflicts: [] },
+    { key: HERITAGE_BENEFITS_FEATURE, requires: ['heritage-v1'], conflicts: [] },
+    { key: HERITAGE_BIRTH_FEATURE, requires: [HERITAGE_SPECIALTY_FEATURE], conflicts: [] },
     preparedTurnsFeature,
     nationResearchFeature,
     relationsFeature,
@@ -147,12 +206,56 @@ export const ruleRegistry: RuleRegistry = {
         return { ...replay, state: { ...replay.state, officeEffects: officeEffectsSchema.parse(data) } };
       },
     },
+    {
+      key: CITY_OFFICE_VOLUNTEER_FEATURE,
+      requires: [OFFICE_EFFECTS_FEATURE],
+      conflicts: [],
+      checkOrigin({ initial, data }) {
+        if (data !== undefined || Object.hasOwn(initial, 'cityOfficeVolunteers'))
+          throw new Error('도시 관직 자원은 빈 상태에서 시작합니다.');
+      },
+      initReplayState(replay) {
+        return { ...replay, state: { ...replay.state, cityOfficeVolunteers: initialCityOfficeVolunteers() } };
+      },
+    },
     policyFeature,
+    inactiveRemovalFeature,
+    { key: NATION_RESTRICTIONS_FEATURE, requires: [], conflicts: [] },
+    { key: NPC_NATION_POLICY_FEATURE, requires: [], conflicts: [] },
+    { key: NATION_FINANCE_FEATURE, requires: [], conflicts: [] },
+    { key: RANKED_PAYROLL_FEATURE, requires: [NATION_FINANCE_FEATURE], conflicts: [] },
+    { key: WALL_INCOME_FEATURE, requires: [], conflicts: [] },
+    { key: WAR_INCOME_FEATURE, requires: [], conflicts: [] },
+    { key: CITY_CONFLICT_FEATURE, requires: [], conflicts: [] },
+    { key: CITY_CONFLICT_AWARD_FEATURE, requires: [CITY_CONFLICT_FEATURE], conflicts: [] },
+    { key: STAT_GROWTH_FEATURE, requires: [], conflicts: [] },
+    { key: MILITARY_STAT_GROWTH_FEATURE, requires: [STAT_GROWTH_FEATURE], conflicts: [] },
+    { key: DEFENSE_STANCE_FEATURE, requires: [], conflicts: [] },
+    { key: PLAYER_AUTOPLAY_FEATURE, requires: ['policy'], conflicts: [] },
+    { key: CITY_SEASONAL_EVENTS_FEATURE, requires: [], conflicts: [] },
+    { key: NATION_PHILOSOPHY_FEATURE, requires: [], conflicts: [] },
+    { key: RESEARCH_ERA_FEATURE, requires: [], conflicts: [] },
+    { key: COURT_PROMOTION_FEATURE, requires: [COURT_RANK_FEATURE], conflicts: [] },
+    { key: COURT_ABILITY_FEATURE, requires: [COURT_RANK_FEATURE], conflicts: [] },
     treatyFeature,
     treatyBreakFeature,
     treatyTradeFeature,
     treatyExpandedFeature,
+    { key: RANKED_AID_FEATURE, requires: [EXPANDED_TREATY_FEATURE], conflicts: [] },
+    { key: DIPLOMATIC_COOLDOWN_FEATURE, requires: [RANKED_AID_FEATURE], conflicts: [] },
     fiveStatsFeature,
+    {
+      key: GENERAL_PROFICIENCY_FEATURE,
+      requires: [],
+      conflicts: [],
+      commandBindings: [{ definition: convertProficiency, sliceKeys: [] }],
+    },
+    { key: NPC_ENTRY_DRAFT_FEATURE, requires: [], conflicts: [] },
+    { key: COMBAT_SPECIALTY_FEATURE, requires: [], conflicts: [] },
+    { key: DOMESTIC_SPECIALTY_FEATURE, requires: [], conflicts: [] },
+    { key: GENERAL_PERSONALITY_FEATURE, requires: [], conflicts: [] },
+    { key: GENERAL_CONDITION_FEATURE, requires: ['five-stats'], conflicts: [] },
+    { key: RICE_MARKET_FEATURE, requires: [], conflicts: [] },
     operationalMapFeature,
     basicStratagemFeature,
     battleAffinityFeature,
@@ -176,6 +279,25 @@ export const ruleRegistry: RuleRegistry = {
       commandBindings: [{ definition: returnBorder, sliceKeys: [] }],
     },
     {
+      key: TROOP_FEATURE,
+      requires: ['policy'],
+      conflicts: [],
+      commandBindings: [
+        { definition: troopGather, sliceKeys: gatherBinding.sliceKeys },
+        { definition: troopExpel, sliceKeys: gatherBinding.sliceKeys },
+      ],
+      checkOrigin({ initial, data }) {
+        if (Object.hasOwn(initial, 'ext') || data !== undefined) throw new Error('부대는 빈 상태에서 시작합니다.');
+      },
+      initReplayState(replay) {
+        return { ...replay, state: { ...replay.state, ext: { ...replay.state.ext, troop: { troops: {} } } } };
+      },
+      settleMonthly({ settled }) {
+        cleanTroops(settled.state);
+        return { replay: settled, effects: null };
+      },
+    },
+    {
       key: INTEL_FEATURE,
       requires: ['policy'],
       conflicts: [],
@@ -184,11 +306,12 @@ export const ruleRegistry: RuleRegistry = {
         if (Object.hasOwn(initial, 'ext') || data !== undefined) throw new Error('첩보는 빈 기록에서 시작합니다.');
       },
       initReplayState(replay) {
-        return { ...replay, state: { ...replay.state, ext: { intel: {} } } };
+        return { ...replay, state: { ...replay.state, ext: { ...replay.state.ext, intel: {} } } };
       },
     },
   ],
   monthlyOrder: [
+    INACTIVE_REMOVAL_FEATURE,
     'treaty',
     'lineage-v1',
     'nation-lifecycle-v1',
@@ -199,8 +322,29 @@ export const ruleRegistry: RuleRegistry = {
     'stratagem-cards-v1',
     'reputation-v1',
     'city-scale-v1',
+    TROOP_FEATURE,
   ],
   inputKinds: [
+    {
+      kind: HERITAGE_STAT_RESET_KIND,
+      feature: HERITAGE_SPECIALTY_FEATURE,
+      route: 'queued',
+      apply: applyHeritageStatReset,
+    },
+    {
+      kind: HERITAGE_TURN_TIME_KIND,
+      feature: HERITAGE_SPECIALTY_FEATURE,
+      route: 'queued',
+      apply: applyHeritageTurnTime,
+    },
+    {
+      kind: HERITAGE_SPECIALTY_KIND,
+      feature: HERITAGE_SPECIALTY_FEATURE,
+      route: 'queued',
+      apply: applyHeritageSpecialtyPurchase,
+    },
+    { kind: HERITAGE_BENEFIT_KIND, feature: HERITAGE_BENEFITS_FEATURE, route: 'queued', apply: applyHeritagePurchase },
+    { kind: TROOP_ACTION_KIND, feature: TROOP_FEATURE, route: 'queued', apply: applyTroopInput },
     ...ADMIN_SETTING_KINDS.map((kind) => ({
       kind,
       feature: null,
@@ -227,6 +371,15 @@ export const ruleRegistry: RuleRegistry = {
     { kind: 'turns.set', feature: null, route: 'direct', apply: applyTurnsInput },
     { kind: 'general.create', feature: null, route: 'queued', apply: applyCreationInput },
     { kind: POSSESSION_KIND, feature: null, route: 'queued', apply: applyPossessionInput },
+    {
+      kind: NATION_RESTRICTIONS_KIND,
+      feature: NATION_RESTRICTIONS_FEATURE,
+      route: 'queued',
+      apply: applyNationRestrictions,
+    },
+    { kind: NPC_NATION_POLICY_KIND, feature: NPC_NATION_POLICY_FEATURE, route: 'queued', apply: applyNpcNationPolicy },
+    { kind: NATION_FINANCE_KIND, feature: NATION_FINANCE_FEATURE, route: 'queued', apply: applyFinanceRates },
+    { kind: DEFENSE_STANCE_KIND, feature: DEFENSE_STANCE_FEATURE, route: 'queued', apply: applyDefenseStance },
     { kind: 'general.setPolicy', feature: 'policy', route: 'queued', apply: applyPolicyInput },
     { kind: 'general.active', feature: 'policy', route: 'queued', apply: applyPolicyInput },
     ...personnelInputKinds,
@@ -303,6 +456,14 @@ export function checkReplayOrigin(
     throw new Error('재생 생성 기록의 모집 위치를 확인하세요.');
   if (origin.initial.generals.some((general) => Object.hasOwn(general, 'officerCityKey')))
     throw new Error('초기 장수에는 도시 관직을 배정할 수 없습니다.');
+  if (origin.initial.generals.some((general) => Object.hasOwn(general, 'defenseThreshold')))
+    throw new Error('초기 장수에는 개별 수비 기준을 지정할 수 없습니다.');
+  if (origin.initial.generals.some((general) => Object.hasOwn(general, 'proficiency')))
+    throw new Error('초기 장수의 숙련도는 기본값에서 시작합니다.');
+  if (origin.initial.nations.some((nation) => Object.hasOwn(nation, 'npcSettings')))
+    throw new Error('초기 국가에는 개별 NPC 운영 기준을 지정할 수 없습니다.');
+  if (origin.initial.nations.some((nation) => Object.hasOwn(nation, 'restrictions')))
+    throw new Error('초기 국가에는 개별 임관·출병 제한을 지정할 수 없습니다.');
   checkStatProfile(origin.initial);
   checkInitialNpcStatLimits(origin.initial, origin.version === 3 ? 'current' : 'legacy');
   checkCityScaleInitial(origin.initial);

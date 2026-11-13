@@ -72,6 +72,7 @@ it('같은 트랜잭션의 이전 상태를 넘기면 재조회 없이 기존과
           color: before.nations[2]!.color,
           removedSequence: 7,
           removedTick: 100,
+          finalSummary: expect.objectContaining({ nationId: 2, name: before.nations[2]!.name }),
         },
       },
     ],
@@ -81,13 +82,14 @@ it('같은 트랜잭션의 이전 상태를 넘기면 재조회 없이 기존과
     args: [
       {
         data: expect.arrayContaining([
-          { worldId, ...at, kind: 'fall', text: `${before.nations[2]!.name} 멸망` },
+          { worldId, ...at, kind: 'fall', nationIds: [2], text: `${before.nations[2]!.name} 멸망` },
           ...Object.values(before.cities)
             .filter((city) => city.nationId === 2)
             .map((city) => ({
               worldId,
               ...at,
               kind: 'capture',
+              nationIds: [1, 2],
               text: `${before.nations[1]!.name}의 ${city.name} 점령`,
             })),
         ]),

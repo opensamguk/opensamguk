@@ -9,7 +9,7 @@ export interface HeritageEntryWrite {
   userId: string;
   worldId: string | null;
   key: string;
-  kind: 'SEASON_CREDIT' | 'CREATION_SPEND' | 'CREATION_REFUND' | 'FORFEIT';
+  kind: 'SEASON_CREDIT' | 'CREATION_SPEND' | 'CREATION_REFUND' | 'SPECIALTY_REFUND' | 'FORFEIT';
   delta: number;
   detail: Record<string, unknown>;
 }

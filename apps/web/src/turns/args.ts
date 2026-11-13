@@ -9,7 +9,13 @@ export type ArgField =
   | { key: string; kind: 'integer'; label: string; min: number; max: number }
   | { key: string; kind: 'unit'; label: string; options: Array<{ value: string; label: string }> }
   | { key: string; kind: 'boolean'; label: string; options: [string, string] }
-  | { key: string; kind: 'enum'; label: string; options: Array<{ value: string; label: string }> }
+  | {
+      key: string;
+      kind: 'enum';
+      label: string;
+      options: Array<{ value: string; label: string }>;
+      philosophyEffects?: Record<string, { benefits: string[]; drawbacks: string[] }>;
+    }
   | { key: string; kind: 'color'; label: string }
   | { key: string; kind: 'text'; label: string; maxLength: number };
 
@@ -19,20 +25,31 @@ const LABELS: Record<string, string> = {
   generalId: '대상 장수 번호',
   amount: '수량',
   crewType: '병종',
+  srcArmType: '기존 병종 계열',
+  destArmType: '전환할 병종 계열',
   unitId: '부곡 번호',
   buy: '사고팔기',
   resource: '자원',
   name: '나라 이름',
   color: '나라 색',
+  philosophy: '국가 성향',
   slot: '장비 칸',
   itemKey: '매매할 장비',
 };
 
-const ENUM_LABELS: Record<string, string> = { gold: '금', rice: '쌀', horse: '명마', weapon: '무기', book: '서적' };
+const ENUM_LABELS: Record<string, string> = {
+  gold: '금',
+  rice: '쌀',
+  horse: '명마',
+  weapon: '무기',
+  book: '서적',
+  tool: '도구',
+};
 
 interface JsonProperty {
   type?: string;
   enum?: unknown[];
+  'x-philosophy-effects'?: Record<string, { benefits: string[]; drawbacks: string[] }>;
   pattern?: string;
   maximum?: number;
   exclusiveMinimum?: number;
@@ -46,7 +63,11 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 // units는 월드 병종표의 병종이다 (T4-86, worldUnits().all). 불러오는 중·오류면 빈 목록이라 병종 칸 선택지가 빈다.
-export function argFields(schema: unknown, units: readonly UnitInfo[]): ArgField[] {
+export function argFields(
+  schema: unknown,
+  units: readonly UnitInfo[],
+  armTypes: Readonly<Record<string, string>> = {},
+): ArgField[] {
   const properties = asRecord(asRecord(schema).properties);
   const fields: ArgField[] = [];
   for (const [key, raw] of Object.entries(properties)) {
@@ -59,6 +80,15 @@ export function argFields(schema: unknown, units: readonly UnitInfo[]): ArgField
       else if (key === 'nationId') fields.push({ key, kind: 'nation', label });
       // 병종은 번호를 치지 않고 이름으로 고른다. 장수 병종(armType > 0)은 모집 조건과 관계없이 모두 둔다.
       // 지금 조건을 못 갖춘 병종도 예약할 수 있고 사전 검사가 경고한다.
+      else if (key === 'srcArmType' || key === 'destArmType')
+        fields.push({
+          key,
+          kind: 'unit',
+          label,
+          options: Object.entries(armTypes)
+            .filter(([id]) => Number(id) > 0)
+            .map(([value, label]) => ({ value, label })),
+        });
       else if (key === 'crewType')
         fields.push({
           key,
@@ -83,6 +113,7 @@ export function argFields(schema: unknown, units: readonly UnitInfo[]): ArgField
         key,
         kind: 'enum',
         label,
+        ...(prop['x-philosophy-effects'] ? { philosophyEffects: prop['x-philosophy-effects'] } : {}),
         options: prop.enum.map((value) => ({
           value: String(value),
           label: ENUM_LABELS[String(value)] ?? String(value),
@@ -143,6 +174,7 @@ export interface ArgNames {
   general?: ((id: number) => string | undefined) | undefined;
   // 월드 병종표의 병종 이름 (T4-86). 없거나 못 읽었으면 병종은 번호로 적는다.
   unit?: ((id: number) => string | undefined) | undefined;
+  armType?: ((id: number) => string | undefined) | undefined;
   // 장비매매의 품목 이름 (equipment.mine). 못 읽었으면 품목 키를 적는다.
   equipment?: ((itemKey: string) => string | undefined) | undefined;
 }
@@ -156,6 +188,8 @@ export function describeArgs(args: Record<string, unknown>, names: ArgNames): st
     else if (key === 'generalId' && typeof value === 'number' && names.general)
       parts.push(displayName(names.general(value) ?? `장수 ${value}`));
     else if (key === 'crewType' && typeof value === 'number') parts.push(names.unit?.(value) ?? `병종 ${value}`);
+    else if ((key === 'srcArmType' || key === 'destArmType') && typeof value === 'number')
+      parts.push(names.armType?.(value) ?? `병종 계열 ${value}`);
     else if (key === 'buy' && typeof value === 'boolean') parts.push(value ? '쌀 사기' : '쌀 팔기');
     else if (key === 'resource' && typeof value === 'string') parts.push(ENUM_LABELS[value] ?? value);
     // 장비매매는 원작 요약처럼 칸 이름(명마·무기·서적)과 장비 이름을 적고, none은 판매다.

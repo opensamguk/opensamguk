@@ -31,6 +31,7 @@ import styles from './CommandArgsScreen.module.css';
 export interface TargetGeneral extends GeneralFacts {
   portraitId?: number | null | undefined;
   cityName?: string | undefined;
+  troopName?: string | undefined;
 }
 
 // 인자 입력 화면이 열릴 때 편집기에 받아 달라고 알리는 조회. 국가 대상은 순위·외교, 장수 대상은 국가 장수 상세, 등용은 등용 후보다.
@@ -330,6 +331,7 @@ export function NationTargetPicker({
   onChange,
   context,
   checks,
+  showIntroductions = false,
 }: {
   context: ArgContext;
   label: string;
@@ -338,15 +340,14 @@ export function NationTargetPicker({
   onChange: (value: string) => void;
   // 있으면 후보마다 가능·불가를 붙이고 가능한 국가를 앞에 둔다.
   checks?: ReadonlyMap<number, CandidateCheck> | undefined;
+  showIntroductions?: boolean;
 }) {
   const [query, setQuery] = useState('');
   const listId = useId();
   const map = context.map;
   const cities = useMemo(() => map?.cities ?? [], [map]);
   const nations = useMemo(
-    () =>
-      map?.nations ??
-      options.map((option) => ({ ...option, color: null as string | null, capitalCityKey: null as number | null })),
+    () => map?.nations ?? options.map((option) => ({ ...option, color: null, capitalCityKey: null, description: '' })),
     [map, options],
   );
   const allowed = useMemo(() => new Set(options.map((option) => option.id)), [options]);
@@ -450,9 +451,19 @@ export function NationTargetPicker({
                 <span className={styles.cardHead}>
                   <NationBadge name={nation.name} color={nation.color} />
                   {relation ? <span className={styles.muted}>{relation}</span> : null}
+                  {showIntroductions && 'recruitmentBlocked' in nation && nation.recruitmentBlocked ? (
+                    <Tag tone="warning">임관 금지</Tag>
+                  ) : null}
                   {check ? check.ok ? <Tag tone="info">가능</Tag> : <Tag tone="warning">불가</Tag> : null}
                 </span>
                 <span className={styles.cardLine}>{cardText(nation)}</span>
+                {showIntroductions ? (
+                  <span className={styles.cardLine}>
+                    {('recruitmentNotice' in nation && nation.recruitmentNotice) ||
+                      nation.description?.trim() ||
+                      '임관 권유문 없음'}
+                  </span>
+                ) : null}
                 {check && !check.ok ? <span className={styles.reason}>{check.message}</span> : null}
               </button>
             );
@@ -505,6 +516,7 @@ export function GeneralTargetPicker({
           </span>
           <div className={styles.pickedText}>
             <strong>{title(selected)}</strong>
+            {selected.troopName ? <span>부대 {selected.troopName}</span> : null}
             {[statLine(selected), troopLine(selected), purseLine(selected)].map((line, i) =>
               line ? <span key={i}>{line}</span> : null,
             )}
@@ -532,7 +544,11 @@ export function GeneralTargetPicker({
         ) : null}
         {rows.map((general) => {
           const stats = statLine(general);
-          const second = [order ? purseLine(general) : troopLine(general)].filter(Boolean).join('');
+          const second = general.troopName
+            ? `부대 ${general.troopName}`
+            : order
+              ? purseLine(general)
+              : troopLine(general);
           return (
             <button
               key={general.id}

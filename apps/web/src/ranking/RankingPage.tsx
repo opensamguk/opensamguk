@@ -1,10 +1,24 @@
 import { publicImageUrl } from '@opensamguk/shared/public-images';
 import { getRouteApi, Link } from '@tanstack/react-router';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useTRPC } from '../trpc';
+import { displayName } from '../game/names';
+import { formatYearMonth } from '../game/gameDate';
+import { Portrait } from '../portrait/Portrait';
 const rankingIcon = publicImageUrl('apps/web/src/art/icons/ranking.png');
 import { EmptyState, ErrorState } from '../ui/States';
 import styles from './Ranking.module.css';
 import { GeneralRankingTable, NationRankingTable } from './RankingTables';
-import { defaultSearch, formatAt, type GeneralSortKey, type NationSortKey, type RankingSearch } from './rankingView';
+import {
+  defaultSearch,
+  formatAt,
+  parseRankingSearch,
+  type GeneralKind,
+  type GeneralSortKey,
+  type NationSortKey,
+  type RankingSearch,
+} from './rankingView';
 import { useRankingData, type RankingData } from './useRankingData';
 
 const route = getRouteApi('/w/$worldId/ranking');
@@ -23,7 +37,16 @@ export function RankingPage() {
     <RankingView
       search={search}
       data={data}
-      onSort={(by) => void navigate({ search: { tab: search.tab, by } as RankingSearch, replace: true })}
+      onSort={(by) => void navigate({ search: parseRankingSearch({ ...search, by, page: 1 }), replace: true })}
+      onKind={(kind) => void navigate({ search: parseRankingSearch({ ...search, kind, page: 1 }), replace: true })}
+      onPage={(page) => void navigate({ search: parseRankingSearch({ ...search, page }) })}
+      supplemental={
+        <>
+          {search.tab === 'nations' ? <FreeGenerals worldId={worldId} /> : <HeritageRankings worldId={worldId} />}
+          <RareEquipmentOwners worldId={worldId} />
+          <TrafficRecords worldId={worldId} />
+        </>
+      }
       renderTab={(tab, label, active) => (
         <Link
           key={tab}
@@ -46,11 +69,17 @@ export function RankingView({
   data,
   onSort,
   renderTab,
+  onKind,
+  onPage,
+  supplemental,
 }: {
   search: RankingSearch;
   data: RankingData;
   onSort: (by: GeneralSortKey | NationSortKey) => void;
   renderTab: (tab: RankingSearch['tab'], label: string, active: boolean) => React.ReactNode;
+  onKind?: (kind: GeneralKind) => void;
+  onPage?: (page: number) => void;
+  supplemental?: React.ReactNode;
 }) {
   return (
     <section className={styles.page}>
@@ -64,8 +93,194 @@ export function RankingView({
       <nav className={styles.tabs} aria-label="순위 종류">
         {TABS.map(({ tab, label }) => renderTab(tab, label, tab === search.tab))}
       </nav>
+      {search.tab === 'generals' && onKind ? (
+        <div className={styles.tabs} role="group" aria-label="장수 종류">
+          {(
+            [
+              ['all', '전체'],
+              ['human', '사람'],
+              ['npc', 'NPC'],
+            ] as const
+          ).map(([kind, label]) => (
+            <button
+              key={kind}
+              className={styles.tab}
+              type="button"
+              aria-pressed={(search.kind ?? 'all') === kind}
+              onClick={() => onKind(kind)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      ) : null}
       <RankingBody search={search} data={data} onSort={onSort} />
+      {onPage &&
+      search.tab === 'generals' &&
+      data.state === 'ready' &&
+      data.tab === 'generals' &&
+      data.ranking.pagination ? (
+        <RankingPages {...data.ranking.pagination} onPage={onPage} />
+      ) : null}
+      {supplemental}
     </section>
+  );
+}
+
+function RankingPages({
+  page,
+  pageCount,
+  onPage,
+}: {
+  page: number;
+  pageCount: number;
+  onPage: (page: number) => void;
+}) {
+  return (
+    <nav className={styles.tabs} aria-label="장수 순위 페이지">
+      <button type="button" className={styles.tab} disabled={page === 1} onClick={() => onPage(page - 1)}>
+        이전
+      </button>
+      <span aria-live="polite">
+        {page} / {pageCount}
+      </span>
+      <button type="button" className={styles.tab} disabled={page === pageCount} onClick={() => onPage(page + 1)}>
+        다음
+      </button>
+    </nav>
+  );
+}
+
+function RareEquipmentOwners({ worldId }: { worldId: string }) {
+  const trpc = useTRPC();
+  const query = useQuery(trpc.equipment.rare.queryOptions({ worldId }));
+  if (!query.data?.enabled) return null;
+  return (
+    <details>
+      <summary>명품 소유자</summary>
+      <ul>
+        {query.data.items.map((item) => (
+          <li key={item.key}>
+            <strong title={item.description}>{item.name}</strong>
+            {' · '}
+            {item.owner ? (
+              <>
+                <Portrait id={item.owner.portraitId} name={item.owner.name} variant="icon" shape="round" decorative />
+                {displayName(item.owner.name)} · {item.owner.nation?.name ?? '재야'}
+              </>
+            ) : (
+              '미발견'
+            )}
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
+const trafficDate = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'short', timeStyle: 'short' });
+
+function TrafficRecords({ worldId }: { worldId: string }) {
+  const [open, setOpen] = useState(false);
+  const trpc = useTRPC();
+  const query = useQuery(trpc.records.traffic.queryOptions({ worldId }, { enabled: open }));
+  const n = (value: number) => value.toLocaleString('ko-KR');
+  return (
+    <details onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary>월드 접속량</summary>
+      {open && query.isPending ? <p role="status">접속량을 불러오는 중입니다.</p> : null}
+      {open && query.isError ? (
+        <ErrorState title="접속량을 불러오지 못했습니다." onRetry={() => void query.refetch()} />
+      ) : null}
+      {open &&
+        query.isSuccess &&
+        (query.data.periods.length === 0 ? (
+          <EmptyState title="집계된 접속량이 없습니다" />
+        ) : (
+          <div className={styles.wrap}>
+            <p>
+              기록 최대 갱신 {n(query.data.maxRefresh)}회 · 방문 장수 {n(query.data.maxVisitors)}명
+            </p>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th scope="col">게임 연월</th>
+                  <th scope="col">마지막 갱신</th>
+                  <th scope="col">갱신</th>
+                  <th scope="col">방문 장수</th>
+                </tr>
+              </thead>
+              <tbody>
+                {query.data.periods.map((row) => (
+                  <tr key={`${row.year}:${row.month}`}>
+                    <th scope="row">{formatYearMonth(row)}</th>
+                    <td>{trafficDate.format(new Date(row.lastAt))}</td>
+                    <td className="num">{n(row.refresh)}회</td>
+                    <td className="num">{n(row.visitors)}명</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
+    </details>
+  );
+}
+
+function HeritageRankings({ worldId }: { worldId: string }) {
+  const trpc = useTRPC();
+  const query = useQuery(trpc.ranking.heritage.queryOptions({ worldId }));
+  if (query.isPending || query.isError || (!query.data.spent.length && !query.data.earned.length)) return null;
+  const { spent, earned, identitiesVisible } = query.data;
+  return (
+    <details>
+      <summary>유산 포인트 순위</summary>
+      {[
+        { title: '유산 소모량', rows: spent },
+        { title: '유산 획득량', rows: earned },
+      ].map(({ title, rows }) => (
+        <section key={title} aria-label={title}>
+          <h3>{title}</h3>
+          {rows.length ? (
+            <ol>
+              {rows.map(({ rank, name, nationName, points }) => (
+                <li key={rank}>
+                  {identitiesVisible ? (name === null ? '???' : displayName(name)) : '???'}
+                  {' · '}
+                  {identitiesVisible && name !== null ? (nationName ?? '재야') : '???'}
+                  {' · '}
+                  {points}점
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p>아직 기록이 없습니다.</p>
+          )}
+        </section>
+      ))}
+    </details>
+  );
+}
+
+function FreeGenerals({ worldId }: { worldId: string }) {
+  const trpc = useTRPC();
+  const query = useQuery(trpc.ranking.freeGenerals.queryOptions({ worldId }));
+  if (query.isPending) return <p role="status">재야 장수를 불러오는 중…</p>;
+  if (query.isError) return <ErrorState title="재야 장수를 불러오지 못했습니다" onRetry={() => void query.refetch()} />;
+  return (
+    <details>
+      <summary>재야 장수 {query.data.count}명</summary>
+      {query.data.items.length > 0 ? (
+        <ul>
+          {query.data.items.map((general) => (
+            <li key={general.id}>
+              {displayName(general.name)}
+              {general.isHuman ? '' : ' · NPC'}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </details>
   );
 }
 

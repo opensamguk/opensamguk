@@ -230,8 +230,14 @@ it('직책별 목록·사전 검사·저장은 세션과 기능을 검사하고 
   const staff = (await rpc('nationCommands.list', { worldId: f.worldId }, f.staff)).data!;
   expect(staff.find((row) => row.key === 'nation_mobilize')).toMatchObject({
     category: 'strategy',
+    group: 'strategy',
+    description: '자기 국가 도시의 수비와 성벽을 최대치의 80%까지 복구합니다.',
+    cost: null,
+    requirements: expect.arrayContaining(['전략 재사용 대기 종료']),
+    turns: 1,
     cooldown: { remainingMonths: 0, availableAt: null },
   });
+  expect(staff.find((row) => row.key === 'nation_rest')?.group).toBe('rest');
   expect(staff.map((row) => row.key)).not.toContain('nation_rivalry');
   const adviser = (await rpc('nationCommands.list', { worldId: f.worldId }, f.adviser)).data!;
   expect(adviser.map((row) => row.key)).toEqual(

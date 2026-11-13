@@ -11,7 +11,9 @@ type Entry = Heritage['entries'][number];
 const KIND: Record<Entry['kind'], [string, TagTone]> = {
   SEASON_CREDIT: ['기수 지급', 'info'],
   CREATION_SPEND: ['생성 사용', 'muted'],
+  BENEFIT_SPEND: ['혜택 구매', 'muted'],
   CREATION_REFUND: ['반환', 'accent'],
+  SPECIALTY_REFUND: ['특기 예약 반환', 'accent'],
   FORFEIT: ['몰수', 'danger'],
 };
 
@@ -30,6 +32,8 @@ function describe(entry: Entry, first: number) {
     return winPoints > 0 ? `${months} · 통일 국가 소속 ${winPoints}점` : months;
   }
   if (entry.kind === 'CREATION_SPEND') return '장수 생성에 사용';
+  if (entry.kind === 'BENEFIT_SPEND') return '장수 유산 혜택 구매에 사용';
+  if (entry.kind === 'SPECIALTY_REFUND') return '장수 퇴장으로 사용하지 않은 전투 특기 예약 비용 반환';
   if (entry.kind === 'CREATION_REFUND') {
     const cause = entry.refund ? REFUND[entry.refund.reason] : '관리자 강제 종료·초기화';
     return `${cause}로 이 월드에서 장수 생성에 쓴 점수 반환`;
@@ -50,8 +54,9 @@ export function HeritagePanel({ heritage }: { heritage: Heritage }) {
         <span>점</span>
       </p>
       <p className={own.text}>
-        유산 규칙을 켠 월드에서만 받습니다. 쓰는 것도 그런 월드에서 새 장수를 만들 때뿐입니다. 1점이 능력치 +1이며
-        능력치 하나에 +{heritage.perStat}, 한 장수에 +{heritage.perGeneral}까지입니다.
+        유산 월드에서 포인트를 받고 장수 생성에 쓸 수 있습니다. 혜택을 지원하는 월드에서는 내 장수의 혜택도 구매할 수
+        있습니다. 장수 생성에 1점이 능력치 +1이며 능력치 하나에 +{heritage.perStat}, 한 장수에 +{heritage.perGeneral}
+        까지입니다.
       </p>
       <details className={own.rules}>
         <summary>받는 기준과 돌려받는 경우</summary>
@@ -69,6 +74,19 @@ export function HeritagePanel({ heritage }: { heritage: Heritage }) {
           <li>보유 점수에는 상한이 없습니다. 탈퇴하면 남은 점수는 몰수되어 되살리지 않습니다.</li>
         </ul>
       </details>
+      {(heritage.activeWorlds?.length ?? 0) > 0 && (
+        <>
+          <h3 className={own.subtitle}>진행 중인 유산 월드</h3>
+          <ul>
+            {heritage.activeWorlds.map((world) => (
+              <li key={world.worldId}>
+                <b>{world.worldName}</b> · 직접 명령 {world.activityMonths}개월 · 활동으로 {world.activityPoints}점
+                {world.monthsToNextPoint === null ? '' : ` · 다음 기준까지 ${world.monthsToNextPoint}개월`}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
       <h3 id="heritage-history" className={own.subtitle}>
         최근 기록
       </h3>

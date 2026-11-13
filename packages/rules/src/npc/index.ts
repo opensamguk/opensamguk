@@ -1,4 +1,6 @@
+import { combatSpecialty, combatSpecialtyKey } from '../general/combatSpecialty';
 import type { Rng } from '@opensamguk/shared';
+import { personalityEffects } from '../general/personality';
 import { BALANCE } from '../balance';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import { commandRegistry } from '../commands/registry';
@@ -12,6 +14,8 @@ import type { CommandResolver } from '../commands/resolve';
 import { readCampaignState } from '../campaign/state';
 import { cityNpcAllocations, cityNpcPreparation } from '../cityResources/npc';
 import { frontier } from './frontier';
+import { npcNationPolicy, npcRecruitPopulation } from './policy';
+export { NPC_DEFAULT_POLICY } from './policy';
 import { crewContext, crewTypeFailure } from '../world/crewRequirements';
 import { nationStrategyNpcCandidates } from '../nationStrategy/npc';
 
@@ -30,15 +34,26 @@ export interface NpcContext {
   unitSet?: Actor['unitSet'];
   convergence?: boolean;
   resolver?: CommandResolver | undefined;
+  worldSeed?: string | undefined;
 }
 type General = DeepReadonly<InitialGeneral>;
 const compareText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
 function chooser(view: WorldView, general: General, context: NpcContext, target: 'general' | 'nation') {
   const candidates: NpcCandidate[] = [];
-  const actor: Actor = { generalId: general.id, tick: context.tick ?? 0, unitSet: context.unitSet, target };
+  const policy = npcNationPolicy(view, general.nationId === null ? undefined : view.nations[general.nationId]);
+  const priority: readonly string[] | undefined = target === 'general' ? policy.generalPriority : policy.nationPriority;
+  const fallback = target === 'general' ? 'rest' : 'nation_rest';
+  const actor: Actor = {
+    generalId: general.id,
+    tick: context.tick ?? 0,
+    unitSet: context.unitSet,
+    target,
+    worldSeed: context.worldSeed,
+  };
   return {
     add(key: string, args: Record<string, unknown>, score: number, reason: string) {
+      if (priority && key !== fallback && !priority.includes(key)) return;
       const command = context.resolver ? context.resolver.get(key) : commandRegistry.get(key);
       const parsed = command?.args.safeParse(args);
       if (command?.target === target && parsed?.success && !command.check(view, actor, parsed.data)) {
@@ -49,6 +64,14 @@ function chooser(view: WorldView, general: General, context: NpcContext, target:
       }
     },
     finish(): NpcCandidate[] {
+      if (priority) {
+        const scores = candidates.map(({ score }) => score);
+        const spread = Math.max(0, ...scores) - Math.min(0, ...scores) + 1;
+        for (const candidate of candidates) {
+          if (candidate.key !== fallback)
+            candidate.score += (priority.length - priority.indexOf(candidate.key)) * spread;
+        }
+      }
       candidates.sort(
         (a, b) =>
           b.score - a.score || compareText(a.key, b.key) || compareText(JSON.stringify(a.args), JSON.stringify(b.args)),
@@ -98,6 +121,24 @@ export function chooseGeneralTurn(view: WorldView, general: General, rng: Rng, c
   return decision(generalTurnCandidates(view, general, context), rng);
 }
 
+const autoplayCommands = new Set([
+  ...DOMESTIC_SPECS.map(({ key }) => key),
+  'recruit',
+  'train',
+  'morale',
+  'return',
+  'move',
+  'attack',
+  'heal',
+]);
+
+export function chooseAutoplayTurn(view: WorldView, general: General, rng: Rng, context: NpcContext) {
+  return decision(
+    generalTurnCandidates(view, general, context).filter(({ key }) => autoplayCommands.has(key)),
+    rng,
+  ).chosen;
+}
+
 // 사람 조언도 실제 소유권과 권한을 유지한 채 같은 후보 계산을 쓴다.
 export function generalTurnCandidates(view: WorldView, general: General, context: NpcContext = {}): NpcCandidate[] {
   if (general.removedAt !== undefined) return [];
@@ -105,6 +146,10 @@ export function generalTurnCandidates(view: WorldView, general: General, context
   const militaryScore = stats ? Math.max(stats.leadership, stats.strength) : 0;
   const choice = chooser(view, general, context, 'general');
   choice.add('rest', {}, 0, '실행할 명령이 없으면 쉰다.');
+  const nation = general.nationId === null ? undefined : view.nations[general.nationId];
+  const policy = npcNationPolicy(view, nation);
+  if (policy.cureThreshold !== undefined && general.injury > policy.cureThreshold)
+    choice.add('heal', {}, 300, '부상이 운영 기준을 넘으면 요양한다.');
   if (general.nationId === null) {
     for (const nation of Object.values(view.nations))
       choice.add('join', { nationId: nation.id }, 100, '재야 장수는 국가에 임관한다.');
@@ -135,7 +180,11 @@ export function generalTurnCandidates(view: WorldView, general: General, context
       60 + militaryScore,
       '후방에서 자기 영토를 따라 가까운 전선으로 한 칸 이동한다.',
     );
-  if (front && city.nationId === general.nationId) {
+  if (
+    front &&
+    city.nationId === general.nationId &&
+    (stats?.leadership ?? general.leadership) >= (policy.minNpcWarLeadership ?? 0)
+  ) {
     const campaign = view.ruleFeatures?.includes('campaign-v1') ? readCampaignState(view.campaign, view) : undefined;
     const owned = campaign?.units.filter((unit) => unit.ownerId === general.id).sort((a, b) => a.id - b.id);
     const army = owned?.[0];
@@ -148,7 +197,7 @@ export function generalTurnCandidates(view: WorldView, general: General, context
       ? campaign.units.filter((unit) => unit.commanderId === commander.id).reduce((sum, unit) => sum + unit.troops, 0)
       : general.crew;
     const capacity = commander.leadership * BALANCE.CREW_PER_LEADERSHIP;
-    const minimum = Math.min(capacity, 2000);
+    const minimum = Math.min(capacity, policy.recruitTarget);
     const requirements = crewContext(view, { generalId: general.id, tick: context.tick ?? 0 });
     const preferred = context.unitSet?.crewTypes.find((u) => u.id === crewType && u.armType > 0);
     const unit =
@@ -162,11 +211,14 @@ export function generalTurnCandidates(view: WorldView, general: General, context
     if (cityResources)
       for (const candidate of cityNpcPreparation(view, general.id, context))
         choice.add(candidate.key, candidate.args, candidate.score, candidate.reason);
-    if (!cityResources && troops < minimum && unit) {
+    if (!cityResources && troops < minimum && unit && npcRecruitPopulation(policy, city)) {
       const limit = Math.min(capacity - commanded, city.population);
-      const amount = stats
-        ? affordableRecruits(view, general, unit.cost, limit)
-        : Math.min(limit, Math.floor(general.gold / unit.cost));
+      const amount =
+        stats ||
+        personalityEffects(view, general.personality)?.recruitPercent !== undefined ||
+        combatSpecialty(view, combatSpecialtyKey(general))?.armType === unit.armType
+          ? affordableRecruits(view, general, unit.cost, limit, unit.armType)
+          : Math.min(limit, Math.floor(general.gold / unit.cost));
       if (amount > 0)
         choice.add(
           'recruit',
@@ -175,14 +227,14 @@ export function generalTurnCandidates(view: WorldView, general: General, context
           '전선에서 부족한 병력을 모은다.',
         );
     }
-    if (!cityResources && train < 60)
+    if (!cityResources && train < policy.trainingTarget)
       choice.add(
         'train',
         army ? { unitId: army.id } : {},
         100 + (stats ? (drillGain(view, commander, false) - 10) * 10 : 0),
         '출병 전에 병력을 훈련한다.',
       );
-    if (!cityResources && atmos < 70)
+    if (!cityResources && atmos < policy.moraleTarget)
       choice.add(
         'morale',
         army ? { unitId: army.id } : {},
@@ -200,7 +252,7 @@ export function generalTurnCandidates(view: WorldView, general: General, context
     const bonus = assisted ? ownCities.length : 0;
     for (const key of city.connections) {
       const target = view.cities[key]!;
-      if (target.nationId === general.nationId) continue;
+      if (target.nationId === general.nationId || battleTroops < (policy.minWarCrew ?? 0)) continue;
       choice.add(
         'attack',
         { cityKey: key },
@@ -213,14 +265,14 @@ export function generalTurnCandidates(view: WorldView, general: General, context
 }
 
 export function chooseNationTurn(view: WorldView, ruler: General, rng: Rng, context: NpcContext = {}): NpcDecision {
-  const nation = ruler.nationId === null ? undefined : view.nations[ruler.nationId];
-  if (
-    ruler.removedAt !== undefined ||
-    ruler.userId !== null ||
-    !nation?.isNpc ||
-    ruler.officerLevel !== BALANCE.RULER_LEVEL
-  )
+  if (ruler.userId !== null || ruler.nationId === null || !view.nations[ruler.nationId]?.isNpc)
     return { chosen: null, candidates: [] };
+  return decision(nationTurnCandidates(view, ruler, context), rng);
+}
+
+export function nationTurnCandidates(view: WorldView, ruler: General, context: NpcContext = {}): NpcCandidate[] {
+  const nation = ruler.nationId === null ? undefined : view.nations[ruler.nationId];
+  if (ruler.removedAt !== undefined || !nation || ruler.officerLevel !== BALANCE.RULER_LEVEL) return [];
   const choice = chooser(view, ruler, context, 'nation');
   choice.add('nation_rest', {}, 0, '국가 명령이 없으면 쉰다.');
   for (const candidate of nationStrategyNpcCandidates(view, nation.id, context.tick ?? 0))
@@ -255,21 +307,49 @@ export function chooseNationTurn(view: WorldView, ruler: General, rng: Rng, cont
         choice.add('nation_declare', { nationId: id }, 100, '교전국이 없어 접경 국가에 선전포고한다.');
     }
   }
-  if (nation.gold >= 10000) {
-    const members = Object.values(view.generals).filter(
-      (g) =>
-        g.removedAt === undefined &&
-        g.nationId === nation.id &&
-        g.activeFromYear <= view.startYear + Math.floor((context.tick ?? 0) / (12 * TICKS_PER_MONTH)),
-    );
-    const poorest = members.sort((a, b) => a.gold - b.gold || a.id - b.id)[0];
-    if (poorest && poorest.gold < 10000)
+  const policy = npcNationPolicy(view, nation);
+  const members = Object.values(view.generals).filter(
+    (g) =>
+      g.removedAt === undefined &&
+      g.nationId === nation.id &&
+      g.activeFromYear <= view.startYear + Math.floor((context.tick ?? 0) / (12 * TICKS_PER_MONTH)),
+  );
+  for (const [resource, target, reserve, surplus] of [
+    ['gold', policy.rewardGoldTarget, policy.reserveGold, policy.seizeGoldAbove],
+    ['rice', policy.rewardRiceTarget, policy.reserveRice, policy.seizeRiceAbove],
+  ] as const) {
+    const label = resource === 'gold' ? '금' : '쌀';
+    const available = nation[resource] - (reserve ?? 0);
+    const poorest = members.sort((a, b) => a[resource] - b[resource] || a.id - b.id)[0];
+    const reward = target === undefined || !poorest ? 0 : Math.min(target - poorest[resource], available);
+    const rewardAmount = Math.min(reward, policy.maxReward ?? reward);
+    if (
+      poorest &&
+      target !== undefined &&
+      nation[resource] >= target &&
+      rewardAmount > 0 &&
+      rewardAmount >= (policy.minReward ?? 0)
+    )
       choice.add(
         'nation_reward',
-        { generalId: poorest.id, resource: 'gold', amount: Math.min(10000 - poorest.gold, nation.gold) },
+        { generalId: poorest.id, resource, amount: rewardAmount },
         50,
-        '국고의 금을 자원이 부족한 장수에게 포상한다.',
+        `국고의 ${label}을 자원이 부족한 장수에게 포상한다.`,
+      );
+    if (surplus === undefined || nation[resource] >= (reserve ?? 0)) continue;
+    const richest = members
+      .filter((general) => general.userId === null)
+      .sort((a, b) => b[resource] - a[resource] || a.id - b.id)[0];
+    if (!richest) continue;
+    const need = (reserve ?? 0) - nation[resource];
+    const seizeAmount = Math.min(richest[resource] - surplus, need, policy.maxReward ?? need);
+    if (seizeAmount > 0 && seizeAmount >= (policy.minReward ?? 0))
+      choice.add(
+        'nation_seize',
+        { generalId: richest.id, resource, amount: seizeAmount },
+        55,
+        `자원이 부족한 국고를 채우기 위해 NPC 장수의 여유 ${label}을 거둔다.`,
       );
   }
-  return decision(choice.finish(), rng);
+  return choice.finish();
 }

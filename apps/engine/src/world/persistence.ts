@@ -1,4 +1,13 @@
-import { OFFICE_EFFECTS_FEATURE, defaultOfficeEffects, officeEffectsSchema } from '@opensamguk/rules';
+import {
+  CITY_OFFICE_VOLUNTEER_FEATURE,
+  HERITAGE_SPECIALTY_FEATURE,
+  storedHeritageSpecialty,
+  storedHeritageTurnTime,
+  initialCityOfficeVolunteers,
+  OFFICE_EFFECTS_FEATURE,
+  defaultOfficeEffects,
+  officeEffectsSchema,
+} from '@opensamguk/rules';
 import type { PrismaClient, Prisma } from '@opensamguk/db';
 import type { WorldInit } from '@opensamguk/rules';
 import {
@@ -36,6 +45,7 @@ import {
   initialNationResearch,
   initialNationLifecycle,
   INTEL_FEATURE,
+  TROOP_FEATURE,
   assertInitialNationLifecycle,
   assertNationLifecycle,
   readStoredNationLifecycle,
@@ -131,6 +141,8 @@ export function prepareInitialWorld(
       (featureData === null || typeof featureData !== 'object' || Array.isArray(featureData))
     )
       throw new Error('규칙 기능 자료를 확인하세요.');
+    if (features.includes('heritage-benefits-v1') && featureData?.['heritage-v1'] === undefined)
+      featureData = { ...featureData, 'heritage-v1': { version: 1 } };
     if (features.includes(OFFICE_EFFECTS_FEATURE) && featureData?.[OFFICE_EFFECTS_FEATURE] === undefined)
       featureData = { ...featureData, [OFFICE_EFFECTS_FEATURE]: defaultOfficeEffects };
     if (features.includes('policy')) {
@@ -297,6 +309,9 @@ export function prepareInitialWorld(
         ...(features.includes('city-scale-v1')
           ? { cityRuinsState: initialCityRuins(creationState) as Prisma.InputJsonValue }
           : {}),
+        ...(features.includes(CITY_OFFICE_VOLUNTEER_FEATURE)
+          ? { cityOfficeVolunteers: initialCityOfficeVolunteers() }
+          : {}),
         ...(features.includes('nation-strategy-v1')
           ? { nationStrategyState: initialNationStrategy() as Prisma.InputJsonValue }
           : {}),
@@ -357,6 +372,8 @@ export function prepareInitialWorld(
       },
     });
     const worldId = world.id;
+    if (features.includes(TROOP_FEATURE))
+      await tx.worldExtSlice.create({ data: { worldId, key: 'troop', value: { troops: {} } } });
     if (features.includes(INTEL_FEATURE)) await tx.worldExtSlice.create({ data: { worldId, key: 'intel', value: {} } });
     // 국가↔수도 순환 참조는 같은 트랜잭션에서 도시를 만든 뒤 연결한다.
     await tx.nation.createMany({
@@ -374,6 +391,7 @@ export function prepareInitialWorld(
       data: creationState.generals.map((general) => ({
         ...general,
         worldId,
+        ...(general.nationId === null ? {} : { nationJoinedTick: 0 }),
         ...((featureFormat ? !features.includes('policy') : options.replayFormat === 'legacy')
           ? {}
           : { defaultPolicy: 'none', lastActiveTick: general.userId === null ? null : 0 }),
@@ -450,12 +468,20 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
         cityScale = origin.initial.cityScale;
       }
       const ext = await loadExt(tx, worldId, commands, world.ruleFeatures);
-      const cities = await tx.city.findMany({ where: { worldId }, orderBy: { cityKey: 'asc' } });
+      const cities = await tx.city.findMany({
+        where: { worldId },
+        orderBy: { cityKey: 'asc' },
+        omit: { conflictTick: true, stratagemTick: true, warCasualties: true, conflict: true, conflictOrder: true },
+      });
       const nations = await tx.nation.findMany({
         where: { worldId },
         orderBy: { id: 'asc' },
         omit: {
           notice: true,
+          recruitmentNotice: true,
+          npcSettings: true,
+          financeRates: true,
+          restrictions: true,
           noticeDirective: true,
           noticeRevision: true,
           noticeUpdatedAt: true,
@@ -465,7 +491,18 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
       const generals = await tx.general.findMany({
         where: { worldId },
         orderBy: { id: 'asc' },
-        omit: { noticeSeen: true, defaultPolicy: true, lastActiveTick: true, lastActiveAt: true, residenceTick: true },
+        omit: {
+          noticeSeen: true,
+          defaultPolicy: true,
+          lastActiveTick: true,
+          lastActiveAt: true,
+          residenceTick: true,
+          nationJoinedTick: true,
+          defenseThreshold: true,
+          proficiency: true,
+          statExperience: true,
+          heritageBenefits: true,
+        },
       });
       const diplomacies = await tx.diplomacy.findMany({
         where: { worldId },
@@ -493,25 +530,56 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
         startYear: world.startYear,
         statRules: statRulesSchema.parse({ stat: world.statRules }).stat,
         unitSet: unitSetSchema.parse(world.unitSet),
-        cities: attachOperationalKinds(cities.map(stripWorldId), operationalMap),
-        nations: nations.map((nation) => {
+        cities: attachOperationalKinds(
+          cities.map(({ seasonalEvent, ...city }) => {
+            void seasonalEvent;
+            return stripWorldId(city);
+          }),
+          operationalMap,
+        ),
+        nations: nations.map(({ diplomaticAidUntilMonth, ...nation }) => {
+          void diplomaticAidUntilMonth;
           return { ...stripWorldId(nation), capitalCityKey: nation.capitalCityKey };
         }),
-        generals: generals.map(({ turnRevision, battleWins, captures, officerCityKey, ...general }) => {
-          void turnRevision;
-          void battleWins;
-          void captures;
-          return storedGeneralStats(
-            storedGeneralRemoval(
-              storedGeneralSex(
-                { ...stripWorldId(general), ...(officerCityKey == null ? {} : { officerCityKey }) },
-                world.ruleFeatures.includes('lineage-v1'),
+        generals: generals.map(
+          ({
+            turnRevision,
+            battleWins,
+            captures,
+            stratagemSuccesses,
+            officerCityKey,
+            combatSpecial,
+            heritageSpecialty,
+            heritageTurnTime,
+            heritageStatReset,
+            ...general
+          }) => {
+            void turnRevision;
+            void battleWins;
+            void captures;
+            void stratagemSuccesses;
+            return storedGeneralStats(
+              storedGeneralRemoval(
+                storedGeneralSex(
+                  {
+                    ...stripWorldId(general),
+                    ...(officerCityKey == null ? {} : { officerCityKey }),
+                    ...storedHeritageSpecialty(
+                      world.ruleFeatures.includes(HERITAGE_SPECIALTY_FEATURE),
+                      heritageSpecialty,
+                    ),
+                    ...(heritageSpecialty == null ? {} : { combatSpecial }),
+                    ...storedHeritageTurnTime(heritageTurnTime),
+                    ...(heritageStatReset === true ? { heritageStatReset: true as const } : {}),
+                  },
+                  world.ruleFeatures.includes('lineage-v1'),
+                ),
+                world.replayFormat,
               ),
-              world.replayFormat,
-            ),
-            world.ruleFeatures?.includes('five-stats') ?? false,
-          );
-        }),
+              world.ruleFeatures?.includes('five-stats') ?? false,
+            );
+          },
+        ),
         diplomacies: diplomacies.map(stripWorldId),
         ...(await loadCommandState(tx, worldId)),
       };

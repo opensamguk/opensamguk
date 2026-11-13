@@ -4,12 +4,124 @@ import { commandWorld, testUnits } from '../../test/commandFixture';
 import type { WorldState } from '../model/world';
 import { applyEffects } from './effects';
 import { attack } from './attack';
+import { DEFENSE_STANCE_FEATURE } from '../battle/defenders';
 import { runCommand } from './registry';
 import { verifySuccess, verifyFailure } from './contracts';
+import { BALANCE } from '../balance';
+import { initialEquipment } from '../equipment/state';
+import { TEST_EQUIPMENT_CONFIG } from '../equipment/testFixture';
 
 describe('attack', () => {
   it('성공', () => verifySuccess('attack'));
   it('실패', () => verifyFailure('attack'));
+  it('INT-26 수극을 첫 상대에게만 쓰고 실제 출병의 장수 부상과 기록에 반영한다', () => {
+    const world = commandWorld();
+    Object.assign(world.generals[1]!, { crew: 20_000, atmos: 100, rice: 10_000 });
+    for (const id of [2, 3]) Object.assign(world.generals[id]!, { crew: 1, atmos: 100 });
+    world.cities[2]!.wall = 100_000;
+    world.equipment = initialEquipment({
+      ...TEST_EQUIPMENT_CONFIG,
+      treatmentTool: true,
+      moraleTool: true,
+      rareEquipment: true,
+      fullRareEquipment: true,
+    });
+    world.equipment.generals['1'] = { tool: { key: 'tool_06', charges: 1 } };
+    const result = attack.execute(
+      world,
+      { generalId: 1, tick: 100, unitSet: testUnits, recordBattleStats: true },
+      { cityKey: 2 },
+      rngFor('snipe-tool'),
+    );
+    const after = applyEffects(world, result.effects);
+    expect(after.equipment!.generals['1']).toBeUndefined();
+    expect(after.generals[2]!.injury).toBeGreaterThanOrEqual(20);
+    expect(after.generals[3]!.injury).toBe(world.generals[3]!.injury);
+    expect(
+      result.reports?.find(({ generalId }) => generalId === 1)?.phases?.filter(({ attackerSniped }) => attackerSniped),
+    ).toHaveLength(1);
+  });
+  it('INT-26 옥벽은 실제 장수 교전에서 금과 쌀을 옮기고 장착 상태를 보존한다', () => {
+    const world = commandWorld();
+    Object.assign(world.generals[1]!, { crew: 10_000, atmos: 100, gold: 1000, rice: 10_000 });
+    Object.assign(world.generals[2]!, { crew: 1, train: 100, atmos: 100, gold: 4000, rice: 7000 });
+    world.generals[3]!.crew = 0;
+    world.cities[2]!.wall = 0;
+    world.equipment = initialEquipment({
+      ...TEST_EQUIPMENT_CONFIG,
+      treatmentTool: true,
+      moraleTool: true,
+      rareEquipment: true,
+      fullRareEquipment: true,
+      rareTools: true,
+    });
+    world.equipment.generals['1'] = { tool: { key: 'tool_07', charges: 1 } };
+    const rng = rngFor('jade-tool');
+    const result = attack.execute(
+      world,
+      { generalId: 1, tick: 100, unitSet: testUnits },
+      { cityKey: 2 },
+      { ...rng, next: () => 0.1 },
+    );
+    const after = applyEffects(world, result.effects);
+    expect(after.generals[1]!.gold).toBe(1400);
+    expect(after.generals[2]!.gold).toBe(3600);
+    expect(after.generals[2]!.rice).toBeLessThan(7000);
+    expect(after.equipment!.generals['1']?.tool?.key).toBe('tool_07');
+    expect(result.reports?.find(({ generalId }) => generalId === 2)?.text).toContain('약탈 · 금 400');
+  });
+  it('INT-26 명마 효과를 실제 출병의 교전 단계와 군량에 반영한다', () => {
+    const fight = (horse?: 'horse_07_기주마' | 'horse_07_백상') => {
+      const world = commandWorld();
+      world.generals[2]!.crew = 0;
+      world.generals[3]!.crew = 0;
+      world.cities[2]!.wall = 100_000;
+      const general = world.generals[1]!;
+      general.crew = 10_000;
+      general.rice = 10_000;
+      general.atmos = 100;
+      const unitSet = structuredClone(testUnits);
+      unitSet.crewTypes.find(({ id }) => id === 1000)!.attack = 1;
+      world.equipment = initialEquipment({
+        ...TEST_EQUIPMENT_CONFIG,
+        treatmentTool: true,
+        moraleTool: true,
+        rareEquipment: true,
+        fullRareEquipment: true,
+      });
+      if (horse) world.equipment.generals['1'] = { horse };
+      const result = attack.execute(
+        world,
+        { generalId: 1, tick: 100, unitSet, recordBattleStats: true },
+        { cityKey: 2 },
+        rngFor('rare-horse'),
+      );
+      const after = applyEffects(world, result.effects);
+      return { phases: result.reports?.[0]?.phases ?? [], rice: after.generals[1]!.rice };
+    };
+    const plain = fight(),
+      giju = fight('horse_07_기주마'),
+      baeksang = fight('horse_07_백상');
+    expect(giju.phases).toHaveLength(plain.phases.length + 1);
+    expect(baeksang.phases).toHaveLength(plain.phases.length - 1);
+    expect(baeksang.phases[0]!.defenderLoss).toBeGreaterThan(plain.phases[0]!.defenderLoss);
+    expect(baeksang.rice).toBe(10_000 - Math.ceil(10_000 * BALANCE.BATTLE_RICE_PER_CREW * 1.1));
+  });
+  it('실제 교전은 수비를 끈 장수를 제외하고 조건을 충족한 장수를 포함한다', () => {
+    const world = commandWorld();
+    world.ruleFeatures = [DEFENSE_STANCE_FEATURE];
+    Object.assign(world.generals[2]!, { train: 100, atmos: 100, defenseThreshold: 999 });
+    Object.assign(world.generals[3]!, { train: 60, atmos: 60, defenseThreshold: 60 });
+    const result = runCommand(
+      world,
+      { generalId: 1, tick: 100, unitSet: testUnits },
+      'attack',
+      { cityKey: 2 },
+      rngFor('defense-stance', 1),
+    );
+    if ('code' in result) throw Error(result.message);
+    expect(result.reports?.map(({ generalId }) => generalId)).toEqual([3]);
+  });
 });
 
 describe('AC-P2-24 공성 병종의 성벽선제', () => {

@@ -1,0 +1,802 @@
+{
+  "version": 3,
+  "key": "expanded-191-v11",
+  "scenarioKey": "san10-191@2",
+  "mapKey": "san10",
+  "ruleFeatures": [
+    "battle-affinity-v2",
+    "border-return-v1",
+    "campaign-assignment-v2",
+    "campaign-v1",
+    "city-office-volunteer-v1",
+    "city-resources-v1",
+    "city-scale-v1",
+    "combat-specialty-v1",
+    "equipment-v1",
+    "five-stats",
+    "general-condition-v1",
+    "governance-v1",
+    "heritage-benefits-v1",
+    "heritage-specialty-v1",
+    "heritage-v1",
+    "lineage-v1",
+    "logistics-v1",
+    "nation-lifecycle-v1",
+    "nation-research-v1",
+    "nation-strategy-v1",
+    "office-effects",
+    "operational-map",
+    "personnel",
+    "policy",
+    "prepared-turns-v1",
+    "reputation-v1",
+    "stratagem-basic",
+    "stratagem-cards-v1",
+    "treaty"
+  ],
+  "featureData": {
+    "logistics-v1": {
+      "version": 1,
+      "specialties": [
+        {
+          "cityKey": 8,
+          "good": "horses",
+          "perMonth": 100
+        },
+        {
+          "cityKey": 13,
+          "good": "wood",
+          "perMonth": 500
+        },
+        {
+          "cityKey": 22,
+          "good": "horses",
+          "perMonth": 100
+        },
+        {
+          "cityKey": 23,
+          "good": "iron",
+          "perMonth": 500
+        },
+        {
+          "cityKey": 24,
+          "good": "wood",
+          "perMonth": 500
+        },
+        {
+          "cityKey": 35,
+          "good": "horses",
+          "perMonth": 100
+        },
+        {
+          "cityKey": 40,
+          "good": "iron",
+          "perMonth": 500
+        },
+        {
+          "cityKey": 42,
+          "good": "iron",
+          "perMonth": 500
+        },
+        {
+          "cityKey": 57,
+          "good": "wood",
+          "perMonth": 500
+        }
+      ],
+      "capacity": {
+        "base": 10000,
+        "perLevel": 10000,
+        "maxLevel": 5
+      },
+      "upgrade": {
+        "gold": 1000,
+        "wood": 500
+      },
+      "transport": {
+        "hopsPerMonth": 2,
+        "maxHops": 8,
+        "lossBpPerHop": 100,
+        "maxPerOrder": 100000,
+        "maxActivePerNation": 20
+      },
+      "recruitPer100": {
+        "1": {
+          "iron": 2,
+          "wood": 0,
+          "horses": 0
+        },
+        "2": {
+          "iron": 2,
+          "wood": 0,
+          "horses": 0
+        },
+        "3": {
+          "iron": 2,
+          "wood": 0,
+          "horses": 10
+        },
+        "4": {
+          "iron": 2,
+          "wood": 0,
+          "horses": 0
+        },
+        "5": {
+          "iron": 2,
+          "wood": 10,
+          "horses": 0
+        }
+      },
+      "build": {
+        "wall": {
+          "iron": 0,
+          "wood": 50,
+          "horses": 0
+        },
+        "defence": {
+          "iron": 20,
+          "wood": 20,
+          "horses": 0
+        }
+      },
+      "trade": {
+        "iron": {
+          "buy": 3,
+          "sell": 1
+        },
+        "wood": {
+          "buy": 3,
+          "sell": 1
+        },
+        "horses": {
+          "buy": 3,
+          "sell": 1
+        }
+      },
+      "npc": {
+        "maxActions": 3,
+        "upgradeAtBp": 8000,
+        "recruitTarget": 1000,
+        "stockCapBp": 5000,
+        "budgetBp": 1000
+      }
+    },
+    "governance-v1": {
+      "version": 1,
+      "seatCityKey": 4,
+      "legitimacy": {
+        "seatGain": 2,
+        "emperorGain": 1,
+        "officeGain": 1,
+        "maxOfficeGain": 3,
+        "decay": 1,
+        "ascendAt": 60,
+        "censureLoss": 5,
+        "renounceLoss": 10
+      },
+      "tribute": {
+        "maxBp": 2000,
+        "maxAmount": 100000
+      },
+      "stipendGold": {
+        "chancellor": 100,
+        "grandMarshal": 100,
+        "minister": 100
+      },
+      "offerMonths": 6,
+      "maxDepth": 3,
+      "maxRemitMonths": 12,
+      "censureCooldownMonths": 6,
+      "npc": {
+        "cityRatio": 2,
+        "acceptMaxBp": 1000,
+        "offerBp": 500,
+        "cooldownMonths": 12
+      },
+      "limits": {
+        "sentOffers": 3,
+        "receivedOffers": 5,
+        "worldOffers": 200
+      }
+    },
+    "lineage-v1": {
+      "heir": {
+        "depth": 3
+      },
+      "limits": {
+        "receivedOffers": 5,
+        "worldOffers": 200,
+        "sentOffers": 3,
+        "maxBirthsPerYear": 30,
+        "maxGenerals": 2500
+      },
+      "version": 2,
+      "marriage": {
+        "maxAge": 60,
+        "kinDepth": 3,
+        "maxSpouses": 1,
+        "offerMonths": 6,
+        "minAge": 16,
+        "npc": {
+          "chanceBp": 3000,
+          "perMonth": 10,
+          "affinityGap": 30
+        }
+      },
+      "birth": {
+        "lifespan": {
+          "max": 75,
+          "min": 50
+        },
+        "comingOfAgeYears": 15,
+        "chanceBp": 500,
+        "femaleBp": 5000,
+        "maxParentAge": 45,
+        "minParentAge": 16,
+        "compoundSurnames": [
+          "공손",
+          "사마",
+          "제갈",
+          "하후",
+          "황보",
+          "태사"
+        ],
+        "givenNames": [
+          "가",
+          "각",
+          "간",
+          "강",
+          "개",
+          "거",
+          "거아",
+          "건",
+          "견",
+          "겸",
+          "경",
+          "공",
+          "광",
+          "굉",
+          "교",
+          "구검",
+          "군",
+          "궁",
+          "권",
+          "궐",
+          "규",
+          "균",
+          "근",
+          "기",
+          "길",
+          "녕",
+          "다나",
+          "단",
+          "달",
+          "담",
+          "당",
+          "대",
+          "대목",
+          "덕",
+          "도",
+          "도영",
+          "돈",
+          "돌골",
+          "동",
+          "둔",
+          "등",
+          "란",
+          "람",
+          "랑",
+          "량",
+          "령",
+          "례",
+          "로",
+          "료",
+          "루",
+          "륭",
+          "림",
+          "립",
+          "막",
+          "망",
+          "모",
+          "몽",
+          "무",
+          "묵",
+          "민",
+          "박",
+          "반",
+          "방",
+          "배",
+          "백",
+          "백호",
+          "번",
+          "범",
+          "벽",
+          "병",
+          "보",
+          "복",
+          "봉",
+          "부",
+          "부라",
+          "분",
+          "비",
+          "비능",
+          "빙",
+          "사",
+          "사인",
+          "상",
+          "색",
+          "서",
+          "선",
+          "섬",
+          "섭",
+          "성",
+          "소",
+          "속",
+          "손",
+          "송",
+          "수",
+          "숙",
+          "순",
+          "술",
+          "숭",
+          "습",
+          "승",
+          "시",
+          "식",
+          "심",
+          "쌍",
+          "아장",
+          "안",
+          "안국",
+          "앙",
+          "애",
+          "약",
+          "양흥",
+          "언",
+          "엄",
+          "여",
+          "역거",
+          "연",
+          "염",
+          "엽",
+          "영",
+          "예",
+          "온",
+          "옹",
+          "완",
+          "요",
+          "우",
+          "우경",
+          "욱",
+          "운",
+          "웅",
+          "원",
+          "원소",
+          "원지",
+          "월",
+          "위",
+          "위황",
+          "유",
+          "유지",
+          "윤",
+          "융",
+          "은",
+          "의",
+          "의거",
+          "이",
+          "익",
+          "인",
+          "일",
+          "임",
+          "자",
+          "장",
+          "저",
+          "적",
+          "전",
+          "정",
+          "제",
+          "조",
+          "종",
+          "주",
+          "주천",
+          "준",
+          "중",
+          "지",
+          "직",
+          "진",
+          "질",
+          "찬",
+          "창",
+          "책",
+          "철",
+          "첨",
+          "초",
+          "총",
+          "추",
+          "축",
+          "충",
+          "치",
+          "침",
+          "타",
+          "탁",
+          "탄",
+          "탐",
+          "태",
+          "택",
+          "통",
+          "파",
+          "패",
+          "평",
+          "포",
+          "표",
+          "풍",
+          "합",
+          "항",
+          "해",
+          "핵",
+          "향",
+          "헌",
+          "혁",
+          "현",
+          "형",
+          "혜",
+          "호",
+          "혼",
+          "화",
+          "환",
+          "황",
+          "회",
+          "회남",
+          "획",
+          "횡",
+          "후",
+          "훈",
+          "휘",
+          "휴",
+          "흠",
+          "흥",
+          "희"
+        ],
+        "statSpread": 10
+      }
+    },
+    "heritage-v1": {
+      "version": 1
+    },
+    "equipment-v1": {
+      "version": 1,
+      "items": [
+        {
+          "key": "horse_01",
+          "name": "노기",
+          "slot": "horse",
+          "grade": 1,
+          "cost": 1000,
+          "requiredSecurity": 1000,
+          "stat": "leadership",
+          "bonus": 1,
+          "goods": {
+            "iron": 0,
+            "wood": 0,
+            "horses": 5
+          }
+        },
+        {
+          "key": "horse_02",
+          "name": "조랑",
+          "slot": "horse",
+          "grade": 2,
+          "cost": 3000,
+          "requiredSecurity": 2000,
+          "stat": "leadership",
+          "bonus": 2,
+          "goods": {
+            "iron": 0,
+            "wood": 0,
+            "horses": 10
+          }
+        },
+        {
+          "key": "horse_03",
+          "name": "노새",
+          "slot": "horse",
+          "grade": 3,
+          "cost": 6000,
+          "requiredSecurity": 3000,
+          "stat": "leadership",
+          "bonus": 3,
+          "goods": {
+            "iron": 0,
+            "wood": 0,
+            "horses": 15
+          }
+        },
+        {
+          "key": "horse_04",
+          "name": "나귀",
+          "slot": "horse",
+          "grade": 4,
+          "cost": 10000,
+          "requiredSecurity": 4000,
+          "stat": "leadership",
+          "bonus": 4,
+          "goods": {
+            "iron": 0,
+            "wood": 0,
+            "horses": 20
+          }
+        },
+        {
+          "key": "horse_05",
+          "name": "갈색마",
+          "slot": "horse",
+          "grade": 5,
+          "cost": 15000,
+          "requiredSecurity": 5000,
+          "stat": "leadership",
+          "bonus": 5,
+          "goods": {
+            "iron": 0,
+            "wood": 0,
+            "horses": 25
+          }
+        },
+        {
+          "key": "horse_06",
+          "name": "흑색마",
+          "slot": "horse",
+          "grade": 6,
+          "cost": 21000,
+          "requiredSecurity": 6000,
+          "stat": "leadership",
+          "bonus": 6,
+          "goods": {
+            "iron": 0,
+            "wood": 0,
+            "horses": 30
+          }
+        },
+        {
+          "key": "weapon_01",
+          "name": "단도",
+          "slot": "weapon",
+          "grade": 1,
+          "cost": 1000,
+          "requiredSecurity": 1000,
+          "stat": "strength",
+          "bonus": 1,
+          "goods": {
+            "iron": 5,
+            "wood": 0,
+            "horses": 0
+          }
+        },
+        {
+          "key": "weapon_02",
+          "name": "단궁",
+          "slot": "weapon",
+          "grade": 2,
+          "cost": 3000,
+          "requiredSecurity": 2000,
+          "stat": "strength",
+          "bonus": 2,
+          "goods": {
+            "iron": 10,
+            "wood": 0,
+            "horses": 0
+          }
+        },
+        {
+          "key": "weapon_03",
+          "name": "단극",
+          "slot": "weapon",
+          "grade": 3,
+          "cost": 6000,
+          "requiredSecurity": 3000,
+          "stat": "strength",
+          "bonus": 3,
+          "goods": {
+            "iron": 15,
+            "wood": 0,
+            "horses": 0
+          }
+        },
+        {
+          "key": "weapon_04",
+          "name": "목검",
+          "slot": "weapon",
+          "grade": 4,
+          "cost": 10000,
+          "requiredSecurity": 4000,
+          "stat": "strength",
+          "bonus": 4,
+          "goods": {
+            "iron": 20,
+            "wood": 0,
+            "horses": 0
+          }
+        },
+        {
+          "key": "weapon_05",
+          "name": "죽창",
+          "slot": "weapon",
+          "grade": 5,
+          "cost": 15000,
+          "requiredSecurity": 5000,
+          "stat": "strength",
+          "bonus": 5,
+          "goods": {
+            "iron": 25,
+            "wood": 0,
+            "horses": 0
+          }
+        },
+        {
+          "key": "weapon_06",
+          "name": "소부",
+          "slot": "weapon",
+          "grade": 6,
+          "cost": 21000,
+          "requiredSecurity": 6000,
+          "stat": "strength",
+          "bonus": 6,
+          "goods": {
+            "iron": 30,
+            "wood": 0,
+            "horses": 0
+          }
+        },
+        {
+          "key": "book_01",
+          "name": "효경전",
+          "slot": "book",
+          "grade": 1,
+          "cost": 1000,
+          "requiredSecurity": 1000,
+          "stat": "intel",
+          "bonus": 1,
+          "goods": {
+            "iron": 0,
+            "wood": 0,
+            "horses": 0
+          }
+        },
+        {
+          "key": "book_02",
+          "name": "회남자",
+          "slot": "book",
+          "grade": 2,
+          "cost": 3000,
+          "requiredSecurity": 2000,
+          "stat": "intel",
+          "bonus": 2,
+          "goods": {
+            "iron": 0,
+            "wood": 0,
+            "horses": 0
+          }
+        },
+        {
+          "key": "book_03",
+          "name": "변도론",
+          "slot": "book",
+          "grade": 3,
+          "cost": 6000,
+          "requiredSecurity": 3000,
+          "stat": "intel",
+          "bonus": 3,
+          "goods": {
+            "iron": 0,
+            "wood": 0,
+            "horses": 0
+          }
+        },
+        {
+          "key": "book_04",
+          "name": "건상역주",
+          "slot": "book",
+          "grade": 4,
+          "cost": 10000,
+          "requiredSecurity": 4000,
+          "stat": "intel",
+          "bonus": 4,
+          "goods": {
+            "iron": 0,
+            "wood": 0,
+            "horses": 0
+          }
+        },
+        {
+          "key": "book_05",
+          "name": "여씨춘추",
+          "slot": "book",
+          "grade": 5,
+          "cost": 15000,
+          "requiredSecurity": 5000,
+          "stat": "intel",
+          "bonus": 5,
+          "goods": {
+            "iron": 0,
+            "wood": 0,
+            "horses": 0
+          }
+        },
+        {
+          "key": "book_06",
+          "name": "사민월령",
+          "slot": "book",
+          "grade": 6,
+          "cost": 21000,
+          "requiredSecurity": 6000,
+          "stat": "intel",
+          "bonus": 6,
+          "goods": {
+            "iron": 0,
+            "wood": 0,
+            "horses": 0
+          }
+        }
+      ],
+      "sellRateBp": 5000,
+      "tradeExperience": 10,
+      "treatmentTool": true,
+      "moraleTool": true
+    },
+    "stratagem-cards-v1": {
+      "version": 1,
+      "config": {
+        "version": 1,
+        "capacity": 3,
+        "deck": [
+          {
+            "kind": "fire_attack",
+            "weight": 1
+          },
+          {
+            "kind": "sabotage",
+            "weight": 1
+          },
+          {
+            "kind": "incite",
+            "weight": 1
+          },
+          {
+            "kind": "plunder",
+            "weight": 1
+          },
+          {
+            "kind": "nation_mobilize",
+            "weight": 1
+          },
+          {
+            "kind": "nation_rivalry",
+            "weight": 1
+          },
+          {
+            "kind": "nation_raid",
+            "weight": 1
+          },
+          {
+            "kind": "trap",
+            "weight": 1
+          }
+        ],
+        "trapCountsInCapacity": true,
+        "trap": {
+          "lossBp": 1000,
+          "atmosLoss": 10
+        },
+        "campaignLoss": "eligibleAll",
+        "consumeOnRollFailure": true,
+        "checkOnReserve": false,
+        "setter": "ruler",
+        "zeroForce": "cancel",
+        "startHand": 0,
+        "trapExpiryMonths": null
+      }
+    }
+  },
+  "unitSetKey": "expanded",
+  "statRulesKey": "five-stats",
+  "portraitMapKey": "191-map"
+}

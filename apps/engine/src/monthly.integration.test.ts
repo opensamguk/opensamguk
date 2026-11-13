@@ -5,7 +5,15 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb, nextActionSequence, type Prisma } from '@opensamguk/db';
-import { emptyTurns, type WorldInit } from '@opensamguk/rules';
+import {
+  CITY_SEASONAL_EVENTS_FEATURE,
+  COURT_PROMOTION_FEATURE,
+  COURT_RANK_FEATURE,
+  emptyTurns,
+  NATION_PHILOSOPHY_FEATURE,
+  type WorldInit,
+} from '@opensamguk/rules';
+import { rngFor } from '@opensamguk/shared';
 import { hashState } from '@opensamguk/shared/node';
 import { monthlyFixture } from '../test/monthlyFixture';
 import { TurnLoop } from './turnLoop';
@@ -84,6 +92,80 @@ async function setTurns(worldId: string, commandKey: string, idempotencyKey: str
 }
 
 describe('AC-M1-12 실제 PostgreSQL 월 경계', () => {
+  it('작위 승급과 하사금, 공개 사건을 한 번 저장하고 재생한다', async () => {
+    const initial = structuredClone(template);
+    initial.ruleFeatures = [COURT_RANK_FEATURE, COURT_PROMOTION_FEATURE, 'personnel'].sort();
+    initial.nations[0]!.level = 0;
+    initial.cities[0]!.level = 4;
+    initial.cities[0]!.nationId = initial.nations[0]!.id;
+    for (const general of initial.generals) general.activeFromYear = initial.startYear + 1;
+    const { worldId } = await saveInitialWorld(db, initial, { name: '작위 승급', turnTermMinutes: 60, endYear: null });
+    await controlClock(db, worldId, 'start');
+    const lease = (await acquireLease(db, worldId))!;
+    const loop = new TurnLoop(db, lease);
+    await loop.advanceTo(20_000);
+    const first = initial.nations[0]!;
+    expect(await db.nation.findUniqueOrThrow({ where: { worldId_id: { worldId, id: first.id } } })).toMatchObject({
+      level: 2,
+      rice: first.rice + 2000,
+    });
+    expect(await db.publicNationEvent.findMany({ where: { worldId, kind: 'promotion' } })).toMatchObject([
+      { text: `${first.name} 작위 승급 · 군벌`, tick: 10_000 },
+    ]);
+    const archive = await exportReplay(db, worldId);
+    expect(replayArchive(archive, 2).map(({ stateHash }) => stateHash)).toEqual(
+      archive.months.map(({ stateHash }) => stateHash),
+    );
+  });
+
+  it('성향을 적용한 실제 세수와 인구 정산이 재생과 일치한다', async () => {
+    const initial = structuredClone(template);
+    initial.ruleFeatures = [NATION_PHILOSOPHY_FEATURE];
+    initial.nations[0]!.philosophy = '법가';
+    for (const general of initial.generals) general.activeFromYear = initial.startYear + 1;
+    const { worldId } = await saveInitialWorld(db, initial, { name: '성향 정산', turnTermMinutes: 60, endYear: null });
+    await controlClock(db, worldId, 'start');
+    const lease = (await acquireLease(db, worldId))!;
+    const loop = new TurnLoop(db, lease);
+    await loop.advanceTo(10_000);
+    const archive = await exportReplay(db, worldId);
+    expect(replayArchive(archive, 1)[0]?.stateHash).toBe(archive.months[0]?.stateHash);
+  });
+
+  it('분기 도시 사건과 수치가 월 경계에 저장되고 이후 해제되며 재생 결과와 일치한다', async () => {
+    const initial = structuredClone(template);
+    initial.ruleFeatures = [CITY_SEASONAL_EVENTS_FEATURE];
+    const year = initial.startYear + 3;
+    for (let seed = 0; ; seed++) {
+      initial.seed = `city-seasonal-${seed}`;
+      const rng = rngFor(initial.seed, 'monthly', year, 1);
+      rng.next();
+      if (rng.next() < 0.01) break;
+    }
+    for (const general of initial.generals) general.activeFromYear = year + 1;
+    const { worldId } = await saveInitialWorld(db, initial, { name: '계절 도시', turnTermMinutes: 60, endYear: null });
+    await controlClock(db, worldId, 'start');
+    const lease = (await acquireLease(db, worldId))!;
+    const loop = new TurnLoop(db, lease);
+    for (let month = 1; month <= 37; month++) {
+      if (month % 6 === 0) await renewLease(db, lease);
+      await loop.advanceTo(month * 10_000);
+    }
+    const cities = () => db.city.findMany({ where: { worldId }, orderBy: { cityKey: 'asc' } });
+    expect((await cities())[0]?.seasonalEvent).toMatch(/epidemic|earthquake|cold|rebellion/);
+    for (let month = 38; month <= 40; month++) await loop.advanceTo(month * 10_000);
+    expect(
+      (await cities()).every(
+        ({ seasonalEvent }) =>
+          seasonalEvent === null || ['boom', 'flood', 'earthquake', 'typhoon'].includes(seasonalEvent),
+      ),
+    ).toBe(true);
+    const archive = await exportReplay(db, worldId);
+    expect(replayArchive(archive, 40).map(({ stateHash }) => stateHash)).toEqual(
+      archive.months.map(({ stateHash }) => stateHash),
+    );
+  });
+
   it('앞선 턴 → 정산 → 같은 tick 턴, 국가 기록·소유권·해시를 한 번만 저장한다', async () => {
     const { worldId, loop } = await create(true);
     expect(await loop.advanceTo(10000)).toEqual([
@@ -92,6 +174,11 @@ describe('AC-M1-12 실제 PostgreSQL 월 경계', () => {
     ]);
     const snapshot = await db.yearbookSnapshot.findFirstOrThrow({ where: { worldId } });
     expect(snapshot).toMatchObject({ tick: 10000, year: 191, month: 1, sequence: 2 });
+    const ranking = await db.rankingSnapshot.findUniqueOrThrow({ where: { worldId } });
+    const rankedNations = ranking.nations as Array<{ id: number; power: number }>;
+    expect(await db.yearbookNation.findMany({ where: { worldId }, orderBy: { nationId: 'asc' } })).toMatchObject(
+      rankedNations.map(({ id, power }) => ({ nationId: id, power })),
+    );
     expect(await db.nationHistory.count({ where: { worldId } })).toBe(2);
     expect(await db.world.findUniqueOrThrow({ where: { id: worldId } })).toMatchObject({
       monthlyTick: 10000,

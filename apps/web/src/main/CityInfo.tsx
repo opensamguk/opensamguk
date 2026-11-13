@@ -9,6 +9,7 @@ import {
   isDetailedCity,
   isDetailedGeneral,
   type CityDetailFields,
+  type CityView,
   type MapNation,
   type GeneralView,
 } from '../game/types';
@@ -143,6 +144,12 @@ export function CityInfo({
           </span>
         )}
         {data.ruin ? <Tag tone="danger">폐허 복구 {data.ruin.percent}%</Tag> : null}
+        {data.events?.map((event) => (
+          <Tag key={event.kind} tone={event.favorable ? 'info' : 'danger'}>
+            {event.name}
+            {event.monthsRemaining ? ` · ${event.monthsRemaining}개월` : ''}
+          </Tag>
+        ))}
         {owner ? (
           <Link to="/w/$worldId/nation/$nationId" params={{ worldId, nationId: String(owner.id) }}>
             <NationBadge name={owner.name} color={owner.color} />
@@ -166,12 +173,31 @@ export function CityInfo({
         </p>
       )}
       <CityStats rows={rows} />
+      {data.incomeEstimate ? (
+        <p className={styles.meta}>
+          예상 세입 · 금 {n(data.incomeEstimate.gold.amount)} ({data.incomeEstimate.gold.year}년{' '}
+          {data.incomeEstimate.gold.month}월)
+          {' · '}쌀 {n(data.incomeEstimate.rice.amount)} ({data.incomeEstimate.rice.year}년{' '}
+          {data.incomeEstimate.rice.month}월)
+          {data.incomeEstimate.warIncome === undefined ? null : ` · 단기 금 ${n(data.incomeEstimate.warIncome)}`}
+          {data.incomeEstimate.rice.wallIncome === undefined
+            ? null
+            : ` · 둔전 포함 ${n(data.incomeEstimate.rice.wallIncome)}`}
+        </p>
+      ) : null}
+      {data.riceMarket && (
+        <p className={styles.facts}>
+          쌀 시세 {data.riceMarket.rate === null ? '상인 없음' : `${data.riceMarket.rate}%`}
+        </p>
+      )}
       {/* 태수·군사·종사는 관직 효과 월드에서 서버가 officers로 준다(타국 도시는 첩보 기능이면 빠진다). */}
       {data.nationId !== null && data.kind !== 'PASS' && data.officeEffectsEnabled && data.officers ? (
         <CityOffices officers={data.officers} secretaryEnabled={data.secretaryEnabled === true} />
       ) : null}
       {isDetailedCity(data) ? <CityFacts city={data} /> : null}
-      {garrisonHidden ? null : <GarrisonLine generals={data.generals} campaign={data.campaignEnabled === true} />}
+      {garrisonHidden ? null : (
+        <GarrisonLine generals={data.generals} campaign={data.campaignEnabled === true} defense={data.defense} />
+      )}
       {/* 도시 금·쌀·수비병(INT-18)은 모병·배속 명령과 함께 쓰므로 메인에도 둔다. */}
       <CityResourcesPanel worldId={worldId} cityKey={cityKey} />
       {summary ? (
@@ -219,6 +245,8 @@ export function CityInfo({
           nations={nationById}
           campaign={data.campaignEnabled === true}
           fiveStats={data.fiveStats === true}
+          defense={data.defense}
+          ownerId={data.nationId}
         />
       ) : null}
     </div>
@@ -402,7 +430,17 @@ function CityFacts({ city }: { city: CityDetailFields }) {
 }
 
 // 주둔 병력 요약 (원작 현재 도시의 병장(총)·90병장·60병장·적군 칸). 아군은 수치를 받은 같은 국가 장수다.
-export function GarrisonLine({ generals, campaign }: { generals: readonly GeneralView[]; campaign: boolean }) {
+type CityDefense = CityView['defense'];
+
+export function GarrisonLine({
+  generals,
+  campaign,
+  defense,
+}: {
+  generals: readonly GeneralView[];
+  campaign: boolean;
+  defense?: CityDefense;
+}) {
   const sum = garrisonSummary(generals);
   return (
     <p className={styles.facts} data-testid="garrison-summary">
@@ -414,6 +452,17 @@ export function GarrisonLine({ generals, campaign }: { generals: readonly Genera
         훈련·사기 90 이상 {n(sum.ready90.troops)}명({n(sum.ready90.count)}장수) · 60 이상 {n(sum.ready60.troops)}명(
         {n(sum.ready60.count)}장수)
       </span>
+      {defense ? (
+        <span
+          title={
+            defense.individualThresholds
+              ? '각 장수의 수비 기준과 현재 훈련·사기로 집계합니다'
+              : `훈련 ${defense.minimumTraining}, 사기 ${defense.minimumMorale} 이상`
+          }
+        >
+          수비 참가 {n(defense.troops)}명 · 장수 {n(defense.generals.length)}명
+        </span>
+      ) : null}
       {sum.foreign + sum.ronin > 0 ? (
         <span>
           타국 장수 {n(sum.foreign)}명 · 재야 {n(sum.ronin)}명
@@ -431,10 +480,12 @@ export function GeneralNameCell({
   general,
   injury = true,
   npc = false,
+  possessedNpc = false,
 }: {
   general: GeneralView;
   injury?: boolean;
   npc?: boolean;
+  possessedNpc?: boolean;
 }) {
   const name = displayName(general.name);
   const isNpc = npc || general.isHuman === false;
@@ -453,6 +504,8 @@ export function GeneralNameCell({
         <Tag tone="muted" title="사람이 맡지 않은 장수입니다">
           NPC
         </Tag>
+      ) : possessedNpc ? (
+        <Tag tone="muted">맡은 NPC</Tag>
       ) : null}
     </span>
   );
@@ -464,17 +517,22 @@ function Garrison({
   nations,
   campaign,
   fiveStats,
+  defense,
+  ownerId,
 }: {
   worldId: string;
   generals: readonly GeneralView[];
   nations: Map<number, MapNation>;
   campaign: boolean;
   fiveStats: boolean;
+  defense?: CityDefense;
+  ownerId: number | null;
 }) {
   const crewTypes = useWorldRules(worldId).data?.unitSet.crewTypes;
   // 직책자만 감찰 자료로 같은 국가 장수의 예턴 앞 5칸을 본다 (원작 현재 도시의 명령 열). 일반 장수는 열이 없다.
   const inspection = useInspectionRows(worldId);
   const names = useArgNames(worldId);
+  const defenders = new Map(defense?.generals.map(({ generalId, troops }) => [generalId, troops]));
   if (generals.length === 0) return <p className={styles.meta}>주둔 장수가 없습니다.</p>;
   const hidden = (g: GeneralView) => (isDetailedGeneral(g) ? undefined : HIDDEN_GENERAL);
   const num = (pick: (g: Extract<GeneralView, { leadership: number }>) => number | undefined) => ({
@@ -547,6 +605,18 @@ function Garrison({
       label: campaign ? '평균 사기' : '사기',
       ...num((g) => (campaign ? ('commandedArmy' in g ? g.commandedArmy.atmos : undefined) : g.atmos)),
     },
+    ...(defense
+      ? [
+          {
+            key: 'defending',
+            label: '수비 참가',
+            numeric: true,
+            sortValue: (g: GeneralView) => defenders.get(g.id) ?? 0,
+            render: (g: GeneralView) =>
+              defenders.has(g.id) ? `${n(defenders.get(g.id)!)}명` : g.nationId === ownerId ? '불참' : '—',
+          },
+        ]
+      : []),
     ...(inspection
       ? [
           {
@@ -579,6 +649,7 @@ function Garrison({
         'crewType',
         'train',
         'atmos',
+        'defending',
         'turns',
       ]}
     />

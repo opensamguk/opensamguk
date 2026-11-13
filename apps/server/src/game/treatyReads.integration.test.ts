@@ -38,6 +38,7 @@ function world(patch: Partial<World> = {}): World {
   return {
     runtimeOptions: null,
     officeEffects: null,
+    cityOfficeVolunteers: null,
     id: 'world',
     name: '조약 조회 단위',
     operationalMap: null,
@@ -96,12 +97,22 @@ function general(patch: Partial<General> = {}): General {
   return {
     ...initial.generals[0]!,
     officerCityKey: null,
+    nationJoinedTick: null,
+    defenseThreshold: null,
+    proficiency: null,
+    statExperience: null,
+    heritageBenefits: null,
+    heritageSpecialty: null,
+    heritageTurnTime: null,
+    heritageStatReset: null,
+    combatSpecial: null,
     removedAt: null,
     sex: null,
     politics: null,
     charm: null,
     worldId: 'world',
     userId: alice,
+    stratagemSuccesses: 0,
     battleWins: 0,
     captures: 0,
     turnRevision: 0,
@@ -117,7 +128,12 @@ function nation(id = 1, patch: Partial<Nation> = {}): Nation {
   return {
     ...initial.nations[id - 1]!,
     worldId: 'world',
+    diplomaticAidUntilMonth: null,
+    npcSettings: null,
+    financeRates: null,
+    restrictions: null,
     notice: '비공개 표지',
+    recruitmentNotice: '',
     noticeDirective: null,
     noticeRevision: 0,
     noticeUpdatedAt: null,
@@ -192,6 +208,12 @@ function fixture() {
     {
       ...initial.cities[0]!,
       kind: null,
+      seasonalEvent: null,
+      conflictTick: null,
+      warCasualties: null,
+      conflict: null,
+      conflictOrder: null,
+      stratagemTick: null,
       worldId: 'world',
       nationId: 1,
       _count: { _all: 1 },
@@ -203,6 +225,12 @@ function fixture() {
     {
       ...initial.cities[1]!,
       kind: null,
+      seasonalEvent: null,
+      conflictTick: null,
+      warCasualties: null,
+      conflict: null,
+      conflictOrder: null,
+      stratagemTick: null,
       worldId: 'world',
       nationId: 2,
       _count: { _all: 1 },
@@ -373,8 +401,20 @@ describe('T2-07 / AC-M2-06 새 조회 leaf 보조 단위', () => {
         },
       ])
       .mockResolvedValueOnce([]);
+    f.events
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        completed(),
+        completed({ generalId: 2, kind: 'treaty.respond', result: json(applied.result) }),
+      ]);
+    f.generals.mockResolvedValueOnce([f.actor]).mockResolvedValueOnce([
+      { ...f.actor, name: '제안자', portraitId: 101 },
+      { ...f.actor, id: 2, name: '수락자', portraitId: 102 },
+    ]);
     const result = await listTreaties(f.db, identity);
     expect(result.items[0]).toMatchObject({
+      signatories: { proposer: { name: '제안자', portraitId: 101 }, approver: { name: '수락자', portraitId: 102 } },
       status: 'ACTIVE',
       cost: applied.result.cost,
       estimate: null,
@@ -472,7 +512,7 @@ describe('T2-07 / AC-M2-06 새 조회 leaf 보조 단위', () => {
       },
     ]);
     expect(result.items[0]).toMatchObject({ canAccept: { code: 'IN_PROGRESS' }, canReject: { code: 'IN_PROGRESS' } });
-    expect(f.events).toHaveBeenLastCalledWith({
+    expect(f.events).toHaveBeenCalledWith({
       where: {
         worldId: 'world',
         status: 'PENDING',
@@ -631,7 +671,7 @@ describe('T2-07 / AC-M2-06 새 조회 leaf 보조 단위', () => {
       orderBy: { sequence: 'desc' },
       take: 5,
     });
-    expect(f.events).toHaveBeenLastCalledWith({
+    expect(f.events).toHaveBeenCalledWith({
       where: {
         worldId: 'world',
         status: 'PENDING',
@@ -645,6 +685,25 @@ describe('T2-07 / AC-M2-06 새 조회 leaf 보조 단위', () => {
     expect(JSON.stringify(result)).not.toContain(alice);
     assertNoPrivate(result);
   });
+  it('원조 견적은 제한 대상국의 남은 외교 기간을 확인한다', async () => {
+    const f = fixture();
+    f.worlds.mockResolvedValue(
+      world({
+        ruleFeatures: ['diplomatic-cooldown-v1', 'ranked-aid-v1', 'treaty', 'treaty-expanded', 'treaty-trade'],
+        replayFormat: 3,
+        clockTick: 10_000,
+      }),
+    );
+    f.nationQuery.mockResolvedValue(nation(2));
+    f.nations.mockResolvedValue([nation(1, { level: 1 }), nation(2, { level: 1, diplomaticAidUntilMonth: 3 })]);
+    expect(
+      await quoteTreaty(f.db, {
+        ...identity,
+        payload: { toNationId: 2, clauses: [{ kind: 'tribute', payerNationId: 1, gold: 1, rice: 0, months: 2 }] },
+      }),
+    ).toMatchObject({ cost: null, problem: { code: 'DIPLOMATIC_COOLDOWN' } });
+  });
+
   it('V1 quote를 공개 비용과 단일 문제로 투영하고 쓰기·중첩 tx는 없다', async () => {
     const f = fixture();
     f.nationQuery.mockResolvedValue(nation(2));

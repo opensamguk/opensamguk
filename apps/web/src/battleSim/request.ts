@@ -3,6 +3,26 @@
 
 export type BattleForce = { crew: number; crewType: number; train: number; atmos: number };
 export type CommanderStats = { leadership: number; strength: number };
+export type BattleEquipment = {
+  extraPhases?: number;
+  damageFactor?: number;
+  riceFactor?: number;
+  evasionLeadership?: number;
+  protectsFromBattleInjury?: true;
+  tacticsTrial?: number;
+  opposingTacticsSuccess?: number;
+  tacticsDamageFactor?: number;
+  counterTactics?: number;
+  snipe?: { chance: number; morale: number; injury: readonly [number, number] };
+};
+export type AttackerTraits = {
+  personality?: string;
+  specialty?: string;
+  proficiency?: Record<string, number>;
+  tactics?: CommanderStats & { intel: number };
+  heritage?: Partial<Record<(typeof combatHeritageKeys)[number], number>>;
+  equipment?: BattleEquipment;
+};
 export type BattleCommanders = { attacker: CommanderStats; defender?: CommanderStats };
 
 // simulateBattle의 BattleInput에서 unitSet을 뺀 부분. 병종표는 화면이 Worker를 만들 때 rules 메시지로 한 번 보낸다 (T4-86).
@@ -13,11 +33,28 @@ export type BattleRunInput = {
   defenderTech: number;
   defence?: number;
   commanders?: BattleCommanders;
+  recordPhases?: true;
+  coefMode?: 'multiply';
+  attackerTraits?: AttackerTraits;
 };
 export type BattleRunBody = BattleRunInput & { seed: string };
 export type BattleRunRequest = BattleRunBody & { type: 'run'; requestId: number };
 // 월드 병종표. Worker 하나에 병종표 하나이며 Worker가 처음 받은 것만 쓴다 (compute.ts createWorkerHandler).
 export type BattleRulesMessage = { type: 'rules'; unitSet: unknown };
+
+export type BattlePhase = {
+  kind: 'volley' | 'hold' | 'exchange';
+  attackerLoss: number;
+  defenderLoss: number;
+  attackerEvaded?: boolean;
+  defenderEvaded?: boolean;
+  attackerCritical?: boolean;
+  defenderCritical?: boolean;
+  attackerTactic?: { name: string; success: boolean };
+  defenderTactic?: { name: string; success: boolean };
+  attackerSniped?: boolean;
+  defenderSniped?: boolean;
+};
 
 export type BattleRunResult = {
   type: 'result';
@@ -27,6 +64,7 @@ export type BattleRunResult = {
   unitSetId: string;
   attacker: BattleForce;
   defender: BattleForce;
+  phases?: BattlePhase[];
 };
 export type BattleRunErrorCode = 'INVALID_INPUT' | 'UNIT_SET_INVALID' | 'FAILED';
 export type BattleRunError = { type: 'error'; requestId: number | null; code: BattleRunErrorCode; field?: string };
@@ -72,8 +110,61 @@ const REQUEST_KEYS = new Set([
   'attackerTech',
   'defenderTech',
   'commanders',
+  'recordPhases',
+  'coefMode',
+  'attackerTraits',
 ]);
+const combatHeritageKeys = [
+  'evasion',
+  'opponentEvasion',
+  'critical',
+  'opponentCritical',
+  'tactics',
+  'opponentTactics',
+] as const;
 const FORCE_KEYS = ['crew', 'crewType', 'train', 'atmos'] as const;
+const equipmentRanges: Readonly<Record<string, readonly [number, number]>> = {
+  extraPhases: [-1, 1],
+  damageFactor: [1, 2],
+  riceFactor: [1, 2],
+  evasionLeadership: [1, 255],
+  tacticsTrial: [0, 1],
+  opposingTacticsSuccess: [-1, 0],
+  tacticsDamageFactor: [1, 2],
+  counterTactics: [0, 1],
+};
+
+function validBattleEquipment(value: unknown): value is BattleEquipment {
+  if (!isRecord(value)) return false;
+  for (const [key, stat] of Object.entries(value)) {
+    if (key === 'protectsFromBattleInjury' && stat === true) continue;
+    if (
+      key === 'snipe' &&
+      isRecord(stat) &&
+      Object.keys(stat).length === 3 &&
+      typeof stat.chance === 'number' &&
+      stat.chance >= 0 &&
+      stat.chance <= 1 &&
+      !intProblem(stat.morale, 0, 100) &&
+      Array.isArray(stat.injury) &&
+      stat.injury.length === 2 &&
+      !intProblem(stat.injury[0], 0, 80) &&
+      !intProblem(stat.injury[1], stat.injury[0], 80)
+    )
+      continue;
+    const range = Object.hasOwn(equipmentRanges, key) ? equipmentRanges[key] : undefined;
+    if (
+      !range ||
+      typeof stat !== 'number' ||
+      !Number.isFinite(stat) ||
+      stat < range[0] ||
+      stat > range[1] ||
+      (key === 'extraPhases' && !Number.isInteger(stat))
+    )
+      return false;
+  }
+  return true;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -104,6 +195,42 @@ export function requestProblems(message: unknown, units: readonly UnitChoice[]):
   if (readRequestId(message) === null) add('requestId', { problem: 'notInteger' });
   for (const key of Object.keys(message)) {
     if (!REQUEST_KEYS.has(key) && key !== 'defence') add(key, { problem: 'unexpected' });
+  }
+
+  if ('coefMode' in message && message.coefMode !== 'multiply') add('coefMode', { problem: 'unexpected' });
+  if ('recordPhases' in message && message.recordPhases !== true) add('recordPhases', { problem: 'unexpected' });
+
+  if ('attackerTraits' in message) {
+    const traits = message.attackerTraits;
+    if (!isRecord(traits)) add('attackerTraits', { problem: 'unexpected' });
+    else {
+      for (const key of Object.keys(traits)) {
+        const value = traits[key];
+        if (key === 'personality' || key === 'specialty') {
+          if (typeof value !== 'string' || value.length < 1 || value.length > 40)
+            add(`attackerTraits.${key}`, { problem: 'unexpected' });
+        } else if (key === 'tactics' && isRecord(value)) {
+          const stats = ['leadership', 'strength', 'intel'];
+          for (const stat of stats) add(`attackerTraits.tactics.${stat}`, intProblem(value[stat], 0, 100));
+          for (const stat of Object.keys(value))
+            if (!stats.includes(stat)) add(`attackerTraits.tactics.${stat}`, { problem: 'unexpected' });
+        } else if (key === 'heritage' && isRecord(value)) {
+          for (const [benefit, level] of Object.entries(value)) {
+            if ((combatHeritageKeys as readonly string[]).includes(benefit))
+              add(`attackerTraits.heritage.${benefit}`, intProblem(level, 1, 5));
+            else add(`attackerTraits.heritage.${benefit}`, { problem: 'unexpected' });
+          }
+        } else if (key === 'equipment' && validBattleEquipment(value)) {
+          continue;
+        } else if (key === 'proficiency' && isRecord(value)) {
+          for (const [armType, points] of Object.entries(value)) {
+            if (!units.some((unit) => unit.armType > 0 && String(unit.armType) === armType))
+              add(`attackerTraits.proficiency.${armType}`, { problem: 'unknownUnit' });
+            else add(`attackerTraits.proficiency.${armType}`, intProblem(points, 0, 2_147_483_647));
+          }
+        } else add(`attackerTraits.${key}`, { problem: 'unexpected' });
+      }
+    }
   }
 
   const seed = message.seed;
@@ -215,6 +342,19 @@ export function checkRequest(message: unknown, units: readonly UnitChoice[]): Ch
     defenderTech: m.defenderTech,
   };
   if (m.defender.crewType === WALL_CREW_TYPE) request.defence = m.defence!;
+  if (m.recordPhases) request.recordPhases = true;
+  if (m.coefMode) request.coefMode = m.coefMode;
+  if (m.attackerTraits) {
+    const { personality, specialty, proficiency, tactics, heritage, equipment } = m.attackerTraits;
+    request.attackerTraits = {
+      ...(personality === undefined ? {} : { personality }),
+      ...(specialty === undefined ? {} : { specialty }),
+      ...(proficiency === undefined ? {} : { proficiency: { ...proficiency } }),
+      ...(tactics === undefined ? {} : { tactics: { ...tactics } }),
+      ...(heritage === undefined ? {} : { heritage: { ...heritage } }),
+      ...(equipment === undefined ? {} : { equipment: structuredClone(equipment) }),
+    };
+  }
   if (m.commanders) {
     const copyStats = (stats: CommanderStats) => ({ leadership: stats.leadership, strength: stats.strength });
     request.commanders = {
@@ -231,6 +371,7 @@ export type DefenderKind = 'general' | 'wall';
 export type BattleForm = {
   statProfile: 'legacy' | 'five-stats';
   attackerCommander: { leadership: string; strength: string };
+  attackerTraits?: AttackerTraits | undefined;
   defenderCommander: { leadership: string; strength: string };
   attacker: ForceForm;
   defender: ForceForm;
@@ -282,6 +423,7 @@ export function formBody(form: BattleForm): Record<string, unknown> {
     defenderTech: toNumber(form.defenderTech),
   };
   if (form.defenderKind === 'wall') body.defence = toNumber(form.defence);
+  if (form.attackerTraits) body.attackerTraits = form.attackerTraits;
   if (form.statProfile === 'five-stats') {
     const commander = (stats: { leadership: string; strength: string }) => ({
       leadership: toNumber(stats.leadership),
@@ -297,8 +439,12 @@ export function formBody(form: BattleForm): Record<string, unknown> {
 
 export type FormCheck = { body: BattleRunBody; problems: [] } | { body: null; problems: FieldProblem[] };
 
-export function checkForm(form: BattleForm, units: readonly UnitChoice[]): FormCheck {
-  const message = { type: 'run', requestId: 1, ...formBody(form) };
+export function checkForm(
+  form: BattleForm,
+  units: readonly UnitChoice[],
+  options: Pick<BattleRunInput, 'recordPhases' | 'coefMode'> = {},
+): FormCheck {
+  const message = { type: 'run', requestId: 1, ...formBody(form), ...options };
   const checked = checkRequest(message, units);
   if (!checked.ok) return { body: null, problems: requestProblems(message, units) };
   return { body: requestBody(checked.request), problems: [] };
@@ -314,6 +460,9 @@ export function requestBody(request: BattleRunRequest): BattleRunBody {
     defenderTech: request.defenderTech,
   };
   if (request.defence !== undefined) body.defence = request.defence;
+  if (request.recordPhases) body.recordPhases = true;
+  if (request.coefMode) body.coefMode = request.coefMode;
+  if (request.attackerTraits) body.attackerTraits = request.attackerTraits;
   if (request.commanders) body.commanders = request.commanders;
   return body;
 }

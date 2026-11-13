@@ -1,5 +1,5 @@
 import { assertStorableJson, type Prisma } from '@opensamguk/db';
-import { noticeDirectiveSchema } from '@opensamguk/rules';
+import { BALANCE, noticeDirectiveSchema } from '@opensamguk/rules';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { protectedProcedure, router, worldVerifiedProcedure } from '../trpc';
@@ -8,6 +8,8 @@ import { bodyLimit, databaseTime, isLeader, messagingActor, writeMessaging } fro
 import type { Context } from '../context';
 import { requireWorld } from '../game/queries';
 import { worldResolver } from '../game/resolver';
+
+const recruitmentNotice = bodyLimit.transform((body) => body.trim());
 
 async function nationNotice(tx: Prisma.TransactionClient, ctx: Context, worldId: string) {
   const g = await messagingActor(tx, ctx, worldId);
@@ -34,6 +36,27 @@ export const noticeRouter = router({
       .input(worldInput)
       .query(({ ctx, input }) =>
         ctx.db.$transaction((tx) => nationNotice(tx, ctx, input.worldId), { isolationLevel: 'RepeatableRead' }),
+      ),
+    setRecruitment: worldVerifiedProcedure
+      .input(worldInput.extend({ nationId: entityKey, body: recruitmentNotice }).strict())
+      .mutation(({ ctx, input }) =>
+        ctx.db.$transaction(async (tx) => {
+          const general = await messagingActor(tx, ctx, input.worldId, true);
+          if (
+            general.nationId !== input.nationId ||
+            general.officerLevel !== BALANCE.RULER_LEVEL ||
+            general.removedAt !== null
+          )
+            throw new TRPCError({ code: 'FORBIDDEN', message: '소속 국가의 군주만 임관 권유문을 바꿀 수 있습니다.' });
+          if ((await requireWorld(tx, input.worldId)).status === 'ENDED')
+            throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '종료된 월드입니다.' });
+          const saved = await tx.nation.update({
+            where: { worldId_id: { worldId: input.worldId, id: input.nationId } },
+            data: { recruitmentNotice: input.body },
+            select: { recruitmentNotice: true },
+          });
+          return saved;
+        }),
       ),
     set: worldVerifiedProcedure
       .input(worldInput.extend({ body: bodyLimit, directive: noticeDirectiveSchema.nullable().optional() }).strict())

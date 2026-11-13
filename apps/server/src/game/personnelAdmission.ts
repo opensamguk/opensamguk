@@ -2,7 +2,9 @@ import { isDeepStrictEqual } from 'node:util';
 import type { Prisma } from '@opensamguk/db';
 import {
   canManagePersonnel,
+  COURT_ABILITY_FEATURE,
   COURT_RANK_FEATURE,
+  courtAbilityRequirement,
   courtOfficeTitle,
   isAppointableOfficerLevel,
   isLocalOffice,
@@ -10,7 +12,9 @@ import {
   localOfficeAbility,
   OFFICE_EFFECTS_FEATURE,
   officeEffectsSchema,
+  CITY_OFFICE_VOLUNTEER_FEATURE,
   PERSONNEL_INPUTS,
+  PERSONNEL_QUEUED_KINDS,
   type PersonnelInputKind,
 } from '@opensamguk/rules';
 import { TRPCError } from '@trpc/server';
@@ -19,7 +23,7 @@ import { requireGeneral, requireWorld } from './queries';
 import type { PersonnelReady } from './personnelRequests';
 
 export type PersonnelIdentity = { userId: string; sessionId: string; at: Date };
-const kinds = ['personnel.appoint', 'personnel.dismiss', 'offer.respond'] as const;
+const kinds = PERSONNEL_QUEUED_KINDS;
 
 export async function requirePersonnelSession(tx: Prisma.TransactionClient, input: PersonnelIdentity) {
   if (!input.sessionId || !input.userId || !Number.isFinite(input.at.getTime()))
@@ -39,15 +43,17 @@ export function requirePersonnelWorld(world: {
 }): PersonnelReady {
   if (world.replayFormat !== 3 || !world.ruleFeatures.includes('personnel'))
     throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '이 월드에서 인사 기능을 사용할 수 없습니다.' });
+  const officeEffects = world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE)
+    ? officeEffectsSchema.safeParse(world.officeEffects).data
+    : undefined;
   return {
     worldId: world.id,
     personnel: 'ready',
     ...(world.ruleFeatures.includes(COURT_RANK_FEATURE) ? { courtRankEnabled: true as const } : {}),
     ...(world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE) ? { officeEffectsEnabled: true as const } : {}),
-    ...(world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE) &&
-    hasCitySecretary(officeEffectsSchema.safeParse(world.officeEffects).data)
-      ? { secretaryEnabled: true as const }
-      : {}),
+    ...(officeEffects ? { localOfficeMinimum: officeEffects.minimumAbility } : {}),
+    ...(world.ruleFeatures.includes(CITY_OFFICE_VOLUNTEER_FEATURE) ? { volunteersEnabled: true as const } : {}),
+    ...(hasCitySecretary(officeEffects) ? { secretaryEnabled: true as const } : {}),
   };
 }
 
@@ -81,7 +87,14 @@ export async function submitPersonnelRequest(
   if (world.status !== 'RUNNING')
     throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '실행 중인 월드가 아닙니다.' });
   const actor = await requireGeneral(tx, world.id, input.userId, true);
-  if (kind.data === 'offer.respond') {
+  if (kind.data === 'personnel.volunteer') {
+    if (
+      !world.ruleFeatures.includes(CITY_OFFICE_VOLUNTEER_FEATURE) ||
+      actor.nationId === null ||
+      actor.removedAt !== null
+    )
+      throw new TRPCError({ code: 'FORBIDDEN', message: '도시 관직 자원을 사용할 수 없습니다.' });
+  } else if (kind.data === 'offer.respond') {
     if (!('offerId' in payload)) throw new Error('발령 응답 입력이 다릅니다.');
     const offer = await tx.assignmentOffer.findUnique({
       where: { worldId_id: { worldId: world.id, id: payload.offerId } },
@@ -136,6 +149,11 @@ export async function submitPersonnelRequest(
           });
           if (courtOfficeTitle(nation.level, appointment.officerLevel) === null)
             throw new TRPCError({ code: 'BAD_REQUEST', message: '현재 작위에서 열리지 않은 직책입니다.' });
+        }
+        if (world.ruleFeatures.includes(COURT_ABILITY_FEATURE)) {
+          const required = courtAbilityRequirement(appointment.officerLevel);
+          if (target.removedAt !== null || (required && target[required.stat] < required.minimum))
+            throw new TRPCError({ code: 'BAD_REQUEST', message: '임명 자격을 갖춘 장수만 가능합니다.' });
         }
         const occupied = await tx.general.findFirst({
           where: { worldId: world.id, nationId: actor.nationId, officerLevel: appointment.officerLevel },

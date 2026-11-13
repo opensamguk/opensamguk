@@ -4,6 +4,10 @@
     "target": "general"
   },
   {
+    "key": "convert_proficiency",
+    "target": "general"
+  },
+  {
     "key": "disband",
     "target": "general"
   },
@@ -68,6 +72,10 @@
     "target": "nation"
   },
   {
+    "key": "nation_troop_expel",
+    "target": "nation"
+  },
+  {
     "key": "plunder",
     "target": "general"
   },
@@ -90,6 +98,10 @@
   },
   {
     "key": "trade",
+    "target": "general"
+  },
+  {
+    "key": "troop_gather",
     "target": "general"
   },
   {

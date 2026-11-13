@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { errorCode, retryUnlessClientError } from '../game/errors';
 import { NoGeneral, QueryError } from '../game/QueryState';
 import { displayName } from '../game/names';
@@ -55,7 +55,7 @@ export function InspectionPage() {
     );
   else if (!members.data) body = <LoadingState />;
   else if (members.data.items.length === 0) body = <EmptyState title="소속 장수가 없습니다" />;
-  else body = <InspectionTable rows={members.data.items} names={names} />;
+  else body = <InspectionTable rows={members.data.items} names={names} worldId={worldId} />;
 
   return (
     <section className={styles.page}>
@@ -87,17 +87,66 @@ function TurnPreview({ turns, names }: { turns: InspectionRow['turns']; names: A
   );
 }
 
+function MemberRecords({ worldId, generalId }: { worldId: string; generalId: number }) {
+  const trpc = useTRPC();
+  const query = useQuery({
+    ...trpc.inspection.memberRecords.queryOptions({ worldId, generalId }),
+    retry: retryUnlessClientError,
+  });
+  if (query.isPending) return <LoadingState />;
+  if (query.isError)
+    return (
+      <QueryError error={query.error} notFound="소속 장수를 찾을 수 없습니다" onRetry={() => void query.refetch()} />
+    );
+  const rows = [
+    ...query.data.logs.map((row) => ({ ...row, key: `log-${row.id}`, label: '개인' })),
+    ...query.data.battles.map((row) => ({ ...row, key: `battle-${row.tick}-${row.attackerId}`, label: '전투' })),
+  ].sort((a, b) => b.tick - a.tick);
+  if (!rows.length) return <p className={styles.muted}>최근 기록이 없습니다.</p>;
+  return (
+    <ul>
+      {rows.map(({ key, text, gameDate, label }) => (
+        <li key={key}>
+          {gameDate.year}년 {gameDate.month}월 · {label} · {text}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function InspectionTable({
   rows,
   names,
   now = new Date(),
+  worldId,
 }: {
   rows: InspectionRow[];
   names: ArgNames;
   now?: Date;
+  worldId?: string;
 }) {
+  const [opened, setOpened] = useState<number | null>(null);
+  const [sort, setSort] = useState<'office' | 'lastTick' | 'engagements'>('office');
+  const sorted =
+    sort === 'office' ? rows : [...rows].sort((a, b) => (b.battle?.[sort] ?? -1) - (a.battle?.[sort] ?? -1));
   return (
     <table className={styles.table} data-testid="inspection-table">
+      <caption>
+        <label>
+          정렬{' '}
+          <select
+            value={sort}
+            onChange={(event) => {
+              const value = event.currentTarget.value;
+              setSort(value === 'lastTick' || value === 'engagements' ? value : 'office');
+            }}
+          >
+            <option value="office">직책</option>
+            <option value="lastTick">최근 전투</option>
+            <option value="engagements">교전 횟수</option>
+          </select>
+        </label>
+      </caption>
       <thead>
         <tr>
           <th scope="col">장수</th>
@@ -112,13 +161,19 @@ export function InspectionTable({
           <th scope="col" className="num">
             사기
           </th>
+          <th scope="col" className="num">
+            계략 성공
+          </th>
+          <th scope="col" className="num">
+            교전 횟수
+          </th>
           <th scope="col">예턴 앞 5칸</th>
           <th scope="col">다음 턴</th>
           <th scope="col">마지막 접속</th>
         </tr>
       </thead>
       <tbody>
-        {rows.map((row) => (
+        {sorted.map((row) => (
           <tr key={row.generalId} className={row.idle ? styles.idle : undefined} data-idle={row.idle}>
             <th scope="row">
               <Portrait
@@ -136,12 +191,26 @@ export function InspectionTable({
                   <Tag tone="muted">NPC</Tag>
                 </>
               )}
+              {worldId ? (
+                <details
+                  open={opened === row.generalId}
+                  onToggle={(event) => {
+                    if (event.currentTarget.open) setOpened(row.generalId);
+                    else setOpened((id) => (id === row.generalId ? null : id));
+                  }}
+                >
+                  <summary>최근 기록</summary>
+                  {opened === row.generalId ? <MemberRecords worldId={worldId} generalId={row.generalId} /> : null}
+                </details>
+              ) : null}
             </th>
             <td>{officerName(row.officerLevel)}</td>
             <td>{row.cityName}</td>
             <td className="num">{row.crew.toLocaleString('ko-KR')}</td>
             <td className="num">{row.train}</td>
             <td className="num">{row.atmos}</td>
+            <td className="num">{row.stratagemSuccesses}</td>
+            <td className="num">{row.battle?.engagements ?? '—'}</td>
             <td>
               <TurnPreview turns={row.turns} names={names} />
             </td>

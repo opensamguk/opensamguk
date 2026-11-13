@@ -10,6 +10,7 @@ export {
 export type { AssignmentResult } from './assignments';
 export {
   PERSONNEL_INPUTS,
+  PERSONNEL_QUEUED_KINDS,
   applyPersonnelInput,
   validatePersonnelRecord,
   replayPersonnelInput,

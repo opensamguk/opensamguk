@@ -1,6 +1,55 @@
 import type { Prisma } from '@opensamguk/db';
 import {
   assertSlotSet,
+  CITY_SEASONAL_EVENTS_FEATURE,
+  DEFENSE_STANCE_FEATURE,
+  INACTIVE_REMOVAL_FEATURE,
+  GENERAL_PERSONALITY_FEATURE,
+  COMBAT_SPECIALTY_FEATURE,
+  BATTLE_TACTICS_FEATURE,
+  TROOP_FEATURE,
+  TROOP_ACTION_KIND,
+  HERITAGE_BENEFIT_KIND,
+  HERITAGE_BENEFITS_FEATURE,
+  HERITAGE_SPECIALTY_FEATURE,
+  HERITAGE_BIRTH_FEATURE,
+  HERITAGE_SPECIALTY_KIND,
+  HERITAGE_TURN_TIME_KIND,
+  HERITAGE_STAT_RESET_KIND,
+  DOMESTIC_SPECIALTY_FEATURE,
+  GENERAL_PROFICIENCY_FEATURE,
+  NPC_NATION_POLICY_FEATURE,
+  NPC_ENTRY_DRAFT_FEATURE,
+  SPECIALTY_GROWTH_FEATURE,
+  NATION_FINANCE_FEATURE,
+  NATION_FINANCE_KIND,
+  RANKED_PAYROLL_FEATURE,
+  WALL_INCOME_FEATURE,
+  WAR_INCOME_FEATURE,
+  CITY_CONFLICT_FEATURE,
+  CITY_CONFLICT_AWARD_FEATURE,
+  STAT_GROWTH_FEATURE,
+  MILITARY_STAT_GROWTH_FEATURE,
+  financeRatesInput,
+  CITY_OFFICE_VOLUNTEER_FEATURE,
+  NATION_RESTRICTIONS_FEATURE,
+  NATION_RESTRICTIONS_KIND,
+  NATION_RESTRICTIONS_MIN_OFFICE,
+  changeNationRestrictions,
+  nationRestrictions,
+  nationRestrictionsInput,
+  storedNationRestrictions,
+  NPC_NATION_POLICY_KIND,
+  npcNationPolicyInput,
+  BALANCE,
+  DEFENSE_STANCE_KIND,
+  defenseStanceInput,
+  COURT_PROMOTION_FEATURE,
+  COURT_ABILITY_FEATURE,
+  DIPLOMATIC_COOLDOWN_FEATURE,
+  NATION_PHILOSOPHY_FEATURE,
+  PLAYER_AUTOPLAY_FEATURE,
+  RESEARCH_ERA_FEATURE,
   isPolicyKey,
   activityPayloadSchema,
   applyPersonnelInputStep,
@@ -21,6 +70,10 @@ import {
   type NationLifecycleEffects,
 } from '@opensamguk/rules';
 import type { EngineFeature, QueuedInputHandler } from './features';
+import { processHeritagePurchase } from './heritagePurchase';
+import { PgHeritageRepository } from './heritage/repository';
+import { refundRemovedGeneralSpecialties } from './heritage/service';
+import { processTroopInput } from './troopInput';
 import { loadReplayState } from './monthly';
 import { loadWorld } from './worldLoader';
 import { loadOfficeRevisions, loadOfficeState, persistOfficeState } from './personnelState';
@@ -108,6 +161,116 @@ export async function persistPersonnelPacket(
   await persistResidenceAnchors(tx, worldId, before.residenceAnchors!, anchors);
 }
 
+const processNationRestrictions: QueuedInputHandler = async (tx, world, event, { tick }) => {
+  const reject = (code: string, message: string) => ({ status: 'REJECTED' as const, result: { code, message } });
+  if (world.status === 'ENDED') return reject('WORLD_CLOSED', '종료된 월드입니다.');
+  const input = nationRestrictionsInput.safeParse(event.payload);
+  if (!input.success) return reject('BAD_RESTRICTION', '국가 제한을 확인하세요.');
+  await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${event.userId} FOR SHARE`;
+  const user = await tx.user.findUnique({ where: { id: event.userId }, select: { status: true } });
+  if (user?.status !== 'ACTIVE') return reject('ACTOR_INACTIVE', '활성 계정이 아닙니다.');
+  const actor =
+    event.generalId === null
+      ? null
+      : await tx.general.findUnique({
+          where: { worldId_id: { worldId: world.id, id: event.generalId } },
+          select: { userId: true, officerLevel: true, nationId: true },
+        });
+  if (
+    !actor ||
+    actor.userId !== event.userId ||
+    actor.officerLevel < NATION_RESTRICTIONS_MIN_OFFICE ||
+    actor.nationId !== input.data.nationId
+  )
+    return reject('FORBIDDEN', '현재 소속국 수뇌부만 제한을 변경할 수 있습니다.');
+  const where = { worldId_id: { worldId: world.id, id: input.data.nationId } };
+  const nation = await tx.nation.findUniqueOrThrow({ where, select: { restrictions: true } });
+  const state = nationRestrictions(world, storedNationRestrictions(true, nation.restrictions), tick);
+  const changed = changeNationRestrictions(state, input.data);
+  if (!changed) return reject('NO_WAR_CHANGES', '이번 달 출병 제한 변경 횟수가 남아 있지 않습니다.');
+  await tx.nation.update({ where, data: { restrictions: changed } });
+  return { status: 'APPLIED', result: changed };
+};
+
+const processNpcNationPolicy: QueuedInputHandler = async (tx, world, event) => {
+  const reject = (code: string, message: string) => ({ status: 'REJECTED' as const, result: { code, message } });
+  if (world.status === 'ENDED') return reject('WORLD_CLOSED', '종료된 월드입니다.');
+  const input = npcNationPolicyInput.safeParse(event.payload);
+  if (!input.success) return reject('BAD_NPC_POLICY', 'NPC 운영 기준을 확인하세요.');
+  await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${event.userId} FOR SHARE`;
+  const user = await tx.user.findUnique({ where: { id: event.userId }, select: { status: true } });
+  if (user?.status !== 'ACTIVE') return reject('ACTOR_INACTIVE', '활성 계정이 아닙니다.');
+  const actor =
+    event.generalId === null
+      ? null
+      : await tx.general.findUnique({
+          where: { worldId_id: { worldId: world.id, id: event.generalId } },
+          select: { userId: true, officerLevel: true, nationId: true },
+        });
+  if (
+    !actor ||
+    actor.userId !== event.userId ||
+    actor.officerLevel !== BALANCE.RULER_LEVEL ||
+    actor.nationId !== input.data.nationId
+  )
+    return reject('FORBIDDEN', '현재 군주만 NPC 운영 기준을 변경할 수 있습니다.');
+  await tx.nation.update({
+    where: { worldId_id: { worldId: world.id, id: input.data.nationId } },
+    data: { npcSettings: input.data.policy },
+  });
+  return { status: 'APPLIED', result: input.data };
+};
+
+const processFinanceRates: QueuedInputHandler = async (tx, world, event) => {
+  const request = financeRatesInput.safeParse(event.payload);
+  if (!request.success || world.status === 'ENDED')
+    return { status: 'REJECTED', result: { code: 'BAD_FINANCE_RATES' } };
+  await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${event.userId} FOR SHARE`;
+  const actor =
+    event.generalId === null
+      ? null
+      : await tx.general.findUnique({
+          where: { worldId_id: { worldId: world.id, id: event.generalId } },
+          select: {
+            userId: true,
+            nationId: true,
+            officerLevel: true,
+            removedAt: true,
+            user: { select: { status: true } },
+          },
+        });
+  if (
+    !actor ||
+    actor.userId !== event.userId ||
+    actor.user?.status !== 'ACTIVE' ||
+    actor.nationId !== request.data.nationId ||
+    actor.officerLevel < 5 ||
+    actor.removedAt !== null
+  )
+    return { status: 'REJECTED', result: { code: 'FORBIDDEN' } };
+  await tx.nation.update({
+    where: { worldId_id: { worldId: world.id, id: request.data.nationId } },
+    data: { financeRates: request.data.rates },
+  });
+  return { status: 'APPLIED', result: request.data };
+};
+
+const processDefenseStance: QueuedInputHandler = async (tx, world, event) => {
+  const reject = (code: string, message: string) => ({ status: 'REJECTED' as const, result: { code, message } });
+  if (world.status === 'ENDED') return reject('WORLD_CLOSED', '종료된 월드입니다.');
+  await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${event.userId} FOR SHARE`;
+  const user = await tx.user.findUnique({ where: { id: event.userId }, select: { status: true } });
+  if (user?.status !== 'ACTIVE') return reject('ACTOR_INACTIVE', '활성 계정이 아닙니다.');
+  if (event.generalId === null) return reject('NO_GENERAL', '장수가 없습니다.');
+  const where = { worldId_id: { worldId: world.id, id: event.generalId } };
+  const general = await tx.general.findUnique({ where, select: { userId: true } });
+  if (general?.userId !== event.userId) return reject('NO_GENERAL', '내 장수가 아닙니다.');
+  const stance = defenseStanceInput.safeParse(event.payload);
+  if (!stance.success) return reject('BAD_STANCE', '수비 기준을 확인하세요.');
+  await tx.general.update({ where, data: { defenseThreshold: stance.data.threshold } });
+  return { status: 'APPLIED', result: stance.data };
+};
+
 const processPolicyInput: QueuedInputHandler = async (tx, world, event, { tick }) => {
   const reject = (code: string, message: string) => ({ status: 'REJECTED' as const, result: { code, message } });
   if (world.status === 'ENDED') return reject('WORLD_CLOSED', '종료된 월드입니다.');
@@ -141,7 +304,12 @@ const processPersonnelInput: QueuedInputHandler = async (tx, world, event, { tic
   if (event.generalId === null) throw new Error('인사 입력의 장수가 없습니다.');
   await tx.$queryRaw`SELECT id FROM "General" WHERE "worldId" = ${world.id} AND id = ${event.generalId} FOR UPDATE`;
   const kind = event.kind;
-  if (kind !== 'personnel.appoint' && kind !== 'personnel.dismiss' && kind !== 'offer.respond')
+  if (
+    kind !== 'personnel.appoint' &&
+    kind !== 'personnel.dismiss' &&
+    kind !== 'offer.respond' &&
+    kind !== 'personnel.volunteer'
+  )
     throw new Error('인사 입력 종류를 확인하세요.');
   const outcome = applyPersonnelInputStep(
     before.state,
@@ -180,10 +348,77 @@ const processPersonnelInput: QueuedInputHandler = async (tx, world, event, { tic
 
 export const builtInEngineFeatures: readonly EngineFeature[] = [
   { key: 'office-effects' },
+  { key: CITY_OFFICE_VOLUNTEER_FEATURE, queuedInputs: { 'personnel.volunteer': processPersonnelInput } },
   { key: 'nation-strategy-v1' },
   { key: 'prepared-turns-v1' },
   { key: 'nation-research-v1' },
+  { key: RESEARCH_ERA_FEATURE },
   { key: 'court-rank-v1' },
+  { key: COURT_PROMOTION_FEATURE },
+  { key: COURT_ABILITY_FEATURE },
+  { key: CITY_SEASONAL_EVENTS_FEATURE },
+  {
+    key: INACTIVE_REMOVAL_FEATURE,
+    async persistMonthly(tx, worldId, before, next, effects, { tick, sequence }) {
+      const ids = z.array(z.number().int().positive()).parse(effects);
+      if (!ids.length) return;
+      await refundRemovedGeneralSpecialties(new PgHeritageRepository(tx), worldId, before.state, next.state, ids);
+      await tx.general.updateMany({
+        where: { worldId, id: { in: ids } },
+        data: { lastActiveTick: null, lastActiveAt: null },
+      });
+      const last = await tx.generalLog.findFirst({
+        where: { worldId, sequence },
+        orderBy: { ordinal: 'desc' },
+        select: { ordinal: true },
+      });
+      await tx.generalLog.createMany({
+        data: ids.map((generalId, index) => ({
+          worldId,
+          generalId,
+          tick,
+          sequence,
+          ordinal: (last?.ordinal ?? -1) + index + 1,
+          commandKey: 'general.inactive-removal',
+          kind: 'success',
+          text: '장기 미접속으로 장수가 퇴장했습니다.',
+        })),
+      });
+    },
+  },
+  { key: NATION_RESTRICTIONS_FEATURE, queuedInputs: { [NATION_RESTRICTIONS_KIND]: processNationRestrictions } },
+  { key: NPC_ENTRY_DRAFT_FEATURE },
+  { key: SPECIALTY_GROWTH_FEATURE },
+  { key: NPC_NATION_POLICY_FEATURE, queuedInputs: { [NPC_NATION_POLICY_KIND]: processNpcNationPolicy } },
+  { key: NATION_FINANCE_FEATURE, queuedInputs: { [NATION_FINANCE_KIND]: processFinanceRates } },
+  { key: RANKED_PAYROLL_FEATURE },
+  { key: WALL_INCOME_FEATURE },
+  { key: WAR_INCOME_FEATURE },
+  { key: CITY_CONFLICT_FEATURE },
+  { key: CITY_CONFLICT_AWARD_FEATURE },
+  { key: STAT_GROWTH_FEATURE },
+  { key: MILITARY_STAT_GROWTH_FEATURE },
+  { key: DEFENSE_STANCE_FEATURE, queuedInputs: { [DEFENSE_STANCE_KIND]: processDefenseStance } },
+  { key: NATION_PHILOSOPHY_FEATURE },
+  { key: PLAYER_AUTOPLAY_FEATURE },
+  { key: 'general-condition-v1' },
+  { key: GENERAL_PERSONALITY_FEATURE },
+  { key: HERITAGE_BIRTH_FEATURE },
+  { key: COMBAT_SPECIALTY_FEATURE },
+  { key: BATTLE_TACTICS_FEATURE },
+  {
+    key: HERITAGE_SPECIALTY_FEATURE,
+    queuedInputs: {
+      [HERITAGE_SPECIALTY_KIND]: processHeritagePurchase,
+      [HERITAGE_TURN_TIME_KIND]: processHeritagePurchase,
+      [HERITAGE_STAT_RESET_KIND]: processHeritagePurchase,
+    },
+  },
+  { key: HERITAGE_BENEFITS_FEATURE, queuedInputs: { [HERITAGE_BENEFIT_KIND]: processHeritagePurchase } },
+  { key: TROOP_FEATURE, queuedInputs: { [TROOP_ACTION_KIND]: processTroopInput } },
+  { key: DOMESTIC_SPECIALTY_FEATURE },
+  { key: GENERAL_PROFICIENCY_FEATURE },
+  { key: 'rice-market-v1' },
   { key: RELATIONS_FEATURE },
   { key: 'city-scale-v1' },
   {
@@ -351,6 +586,8 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
   },
   { key: 'treaty-trade' },
   { key: EXPANDED_TREATY_FEATURE },
+  { key: 'ranked-aid-v1' },
+  { key: DIPLOMATIC_COOLDOWN_FEATURE },
   {
     key: 'reputation-v1',
     async loadReplayState(tx, worldId, replay) {

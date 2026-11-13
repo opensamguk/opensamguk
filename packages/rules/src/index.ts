@@ -4,6 +4,8 @@ export * from './world/bootstrap';
 export * from './world/preset';
 export * from './world/options';
 export * from './world/resources';
+export * from './personnel/financeRates';
+export * from './general/statGrowth';
 export {
   checkInitialNpcStatLimits,
   MAX_LEGACY_STARTING_NPC_STAT,
@@ -19,7 +21,15 @@ export {
 export { checkOperationalProfile } from './world/map/profile';
 export type { OperationalMapResource } from './world/map/operational';
 export * from './clock/constants';
-export { canDefend } from './battle/defenders';
+export {
+  canDefend,
+  defenseRequirements,
+  DEFENSE_STANCES,
+  DEFENSE_STANCE_FEATURE,
+  DEFENSE_STANCE_KIND,
+  defenseStanceInput,
+  storedDefenseStance,
+} from './battle/defenders';
 export * from './clock/clock';
 export * from './clock/admin';
 export * from './admin/game';
@@ -40,6 +50,18 @@ export * from './commands/types';
 export * from './commands/effects';
 export * from './commands/registry';
 export { commandPlayerDocs } from './commands/playerDoc';
+export {
+  HERITAGE_BENEFITS_FEATURE,
+  HERITAGE_BENEFIT_KIND,
+  heritageBenefitInput,
+  heritageBenefitNames,
+  heritageBenefitCosts,
+  battleHeritageBenefits,
+  heritagePurchase,
+  storedHeritageBenefits,
+} from './heritage/benefits';
+export { TROOP_FEATURE, readTroops } from './commands/ext/troop/state';
+export { TROOP_ACTION_KIND, troopActionSchema, changeTroop, troopOf } from './commands/ext/troop/actions';
 export { extSliceKeys, restoreExtState } from './commands/ext/state';
 export { INTEL_FEATURE, intelRecordSchema, getIntelSliceSchema } from './commands/ext/intel/record';
 export * from './monthly/index';
@@ -62,6 +84,8 @@ export {
 export { selectWorldCapabilities, projectTreatyRows, type WorldCapabilities } from './capsWorld';
 export * from './general/create';
 export * from './general/fiveStats';
+export * from './general/condition';
+export * from './world/riceMarket';
 export { commanderBattleModifiers, type CommanderBattleStats } from './general/fiveStatsBattle';
 export * from './general/creationBlock';
 export * from './supply';
@@ -70,6 +94,9 @@ export * from './ranking';
 export * from './npc';
 export * from './advice/general';
 export * from './policy';
+export * from './monthly/citySeasonalEvents';
+export * from './monthly/warIncome';
+export * from './battle/cityConflict';
 export * from './policy/replay';
 export * from './operation/calendar';
 export * from './operation/timeline';
@@ -94,6 +121,8 @@ export {
   treatyClauseEndTick,
   type TreatyOptions,
   treatyOptions,
+  RANKED_AID_FEATURE,
+  rankedAidLimit,
   applyTreatyInput,
   settleTreaties,
   treatyClosures,
@@ -141,6 +170,7 @@ export {
 } from './personnel/permissions';
 export {
   PERSONNEL_INPUTS,
+  PERSONNEL_QUEUED_KINDS,
   appointOfficer,
   applyPersonnelInput,
   validatePersonnelRecord,
@@ -226,6 +256,19 @@ export * from './equipment/config';
 export * from './equipment/state';
 export * from './equipment/origin';
 export * from './equipment/stats';
+export {
+  TREATMENT_TOOL,
+  MORALE_TOOL,
+  availableEquipmentTools,
+  availableRareEquipmentTools,
+  allEquipmentTools,
+  hasTreatmentTool,
+  hasMoraleTool,
+  hasRareEquipment,
+  rareEquipment,
+  equipmentTools,
+  toolSaleProceeds,
+} from './equipment/config';
 export { STANDARD_EQUIPMENT_CONFIG } from './equipment/catalog';
 export * from './logistics/ledger';
 export * from './logistics/consumption';
@@ -262,6 +305,10 @@ export * from './lineage/visibility';
 export * from './lineage/history';
 export * from './personnel/assignmentRows';
 export * from './personnel/residentOffice';
+export * from './personnel/cityOfficeVolunteers';
+export * from './heritage/specialty';
+export * from './heritage/turnTime';
+export * from './heritage/statReset';
 export * from './lineage/control';
 export { reconcileLineage } from './lineage/reconcile';
 export * from './lineage/monthly';
@@ -272,6 +319,7 @@ export * from './heritage/activity';
 export * from './heritage/awards';
 export * from './heritage/refund';
 export * from './heritage/creation';
+export * from './heritage/birth';
 export { heritageFeatureDataSchema } from './heritage/feature';
 export * from './clock/featureProfile';
 export * from './entry/possess';
@@ -303,6 +351,7 @@ export {
   type NationStrategyState,
 } from './nationStrategy/state';
 export { readStoredNationStrategy } from './nationStrategy/origin';
+export { DIPLOMATIC_COOLDOWN_FEATURE, diplomaticAidMonths } from './diplomacy/cooldown';
 export {
   readPreparedTurns,
   initialPreparedTurns,
@@ -319,4 +368,56 @@ export {
 export { readStoredNationResearch } from './nationResearch/origin';
 export { canExecuteResearchNationCommand } from './nationResearch/commands';
 
-export { COURT_RANK_FEATURE, courtOfficeTitle, nationRank } from './personnel/nationRank';
+export { NATION_PHILOSOPHY_FEATURE, nationPhilosophy, nationPhilosophyEffects } from './personnel/nationPhilosophy';
+export { RESEARCH_ERA_FEATURE, researchEra } from './nationResearch/era';
+export {
+  COURT_ABILITY_FEATURE,
+  COURT_RANK_FEATURE,
+  COURT_PROMOTION_FEATURE,
+  courtAbilityRequirement,
+  courtOfficeTitle,
+  nationRank,
+} from './personnel/nationRank';
+
+export {
+  NPC_NATION_POLICY_FEATURE,
+  NPC_NATION_POLICY_KIND,
+  npcNationPolicy,
+  npcGeneralCommands,
+  npcNationCommands,
+  npcNationPolicyInput,
+  npcNationPolicySchema,
+  npcPolicyLimits,
+  storedNpcNationPolicy,
+} from './npc/policy';
+
+export {
+  NATION_RESTRICTIONS_FEATURE,
+  NATION_RESTRICTIONS_KIND,
+  NATION_RESTRICTIONS_MIN_OFFICE,
+  nationRestrictions,
+  nationRestrictionsInput,
+  storedNationRestrictions,
+  changeNationRestrictions,
+} from './personnel/nationRestrictions';
+
+export { INACTIVE_REMOVAL_FEATURE, inactiveRemovalTick } from './policy/inactiveRemoval';
+
+export { GENERAL_PERSONALITY_FEATURE, generalPersonalityChoices, personalityEffects } from './general/personality';
+export { equipmentBattleEffects, regularEquipmentBattleDescription } from './equipment/battle';
+
+export {
+  GENERAL_PROFICIENCY_FEATURE,
+  proficiencyByArmType,
+  proficiencyGrade,
+  storedGeneralProficiency,
+} from './general/proficiency';
+
+export { BATTLE_TACTICS_FEATURE } from './battle/tactics';
+export {
+  COMBAT_SPECIALTY_FEATURE,
+  combatSpecialty,
+  combatSpecialtyKey,
+  combatSpecialtyNames,
+} from './general/combatSpecialty';
+export { DOMESTIC_SPECIALTY_FEATURE, domesticSpecialty } from './general/domesticSpecialty';

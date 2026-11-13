@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { addGeneralProficiency } from '../general/proficiency';
 import { BALANCE } from '../balance';
 import { defineCommand, fail, noArgs, ownCity, positive, success } from './support';
 import { drillGain, recruitCost } from './statScores';
@@ -27,7 +28,7 @@ const recruits = (forced: boolean) =>
       if (general.crew + args.amount > general.leadership * BALANCE.CREW_PER_LEADERSHIP)
         return fail('AT_MAX', '통솔 가능한 병력을 넘습니다.');
       if (city.population < args.amount) return fail('NO_POPULATION', '도시 인구가 부족합니다.');
-      const cost = recruitCost(view, general, args.amount, unit.cost, forced);
+      const cost = recruitCost(view, general, args.amount, unit.cost, forced, unit.armType);
       if (general.gold < cost) return fail('NO_GOLD', '금이 부족합니다.');
       return null;
     },
@@ -35,12 +36,13 @@ const recruits = (forced: boolean) =>
       const general = state.generals[actor.generalId]!;
       const city = state.cities[general.cityKey]!;
       const unit = actor.unitSet!.crewTypes.find((unit) => unit.id === args.crewType)!;
-      general.gold -= recruitCost(state, general, args.amount, unit.cost, forced);
+      general.gold -= recruitCost(state, general, args.amount, unit.cost, forced, unit.armType);
       general.train = Math.floor((general.train * general.crew) / (general.crew + args.amount));
       general.atmos = Math.floor((general.atmos * general.crew) / (general.crew + args.amount));
       general.crew += args.amount;
       general.crewType = args.crewType;
       city.population -= args.amount;
+      if (forced) addGeneralProficiency(state, general, unit.armType, args.amount);
       if (forced) city.trust = Math.max(0, city.trust - BALANCE.CONSCRIPT_TRUST_LOSS);
       return success(`${forced ? '징병' : '모병'}: ${args.amount}명, 병력 ${general.crew}명`);
     },
@@ -63,7 +65,10 @@ const drill = (morale: boolean) =>
       const general = state.generals[actor.generalId]!;
       general.gold -= BALANCE.DRILL_COST;
       const field = morale ? 'atmos' : 'train';
-      general[field] = Math.min(100, general[field] + drillGain(state, general, morale));
+      const before = general[field];
+      general[field] = Math.min(100, before + drillGain(state, general, morale));
+      const armType = actor.unitSet?.crewTypes.find((unit) => unit.id === general.crewType)?.armType;
+      if (armType !== undefined) addGeneralProficiency(state, general, armType, general[field] - before);
       return success(`${morale ? '사기진작' : '훈련'}: ${general[field]}`);
     },
   });

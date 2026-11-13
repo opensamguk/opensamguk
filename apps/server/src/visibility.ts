@@ -10,11 +10,13 @@ import {
   type UnitSetResource,
 } from '@opensamguk/rules';
 import type { IntelDisclosurePolicy } from './intelPolicy';
+import { generalProgress } from './game/generalProgress';
 import { z } from 'zod';
 
 type General = Omit<
   Prisma.GeneralGetPayload<true>,
   | 'battleWins'
+  | 'stratagemSuccesses'
   | 'captures'
   | 'noticeSeen'
   | 'defaultPolicy'
@@ -25,11 +27,34 @@ type General = Omit<
   | 'sex'
   | 'removedAt'
   | 'officerCityKey'
+  | 'nationJoinedTick'
+  | 'defenseThreshold'
+  | 'proficiency'
+  | 'statExperience'
+  | 'heritageBenefits'
+  | 'heritageSpecialty'
+  | 'heritageTurnTime'
+  | 'heritageStatReset'
+  | 'combatSpecial'
 > & { politics?: number | null; charm?: number | null };
-type City = Omit<Prisma.CityGetPayload<true>, 'kind'> & { kind?: string | null };
+type City = Omit<
+  Prisma.CityGetPayload<true>,
+  'kind' | 'seasonalEvent' | 'conflictTick' | 'stratagemTick' | 'warCasualties' | 'conflict' | 'conflictOrder'
+> & {
+  kind?: string | null;
+};
 type Nation = Omit<
   Prisma.NationGetPayload<true>,
-  'notice' | 'noticeDirective' | 'noticeRevision' | 'noticeUpdatedAt' | 'noticeUpdatedBy'
+  | 'notice'
+  | 'recruitmentNotice'
+  | 'noticeDirective'
+  | 'noticeRevision'
+  | 'noticeUpdatedAt'
+  | 'noticeUpdatedBy'
+  | 'diplomaticAidUntilMonth'
+  | 'npcSettings'
+  | 'financeRates'
+  | 'restrictions'
 >;
 export type Viewer = Pick<General, 'id' | 'nationId' | 'cityKey'> | null;
 
@@ -99,6 +124,25 @@ function generalIdentity(general: Pick<General, 'id' | 'name' | 'nationId' | 'us
   return { id: general.id, name: general.name, nationId: general.nationId, isHuman: general.userId !== null };
 }
 
+// core2026 c81d304, generalBasicCardProjection.ts. MIT (c) 2025 devsam.
+export function generalType({ leadership, strength, intel }: Pick<General, 'leadership' | 'strength' | 'intel'>) {
+  const chiefStatMin = 70;
+  const statGradeLevel = 5;
+  if (leadership < 40) {
+    if (strength + intel < 40) return '아둔';
+    if (intel >= chiefStatMin && strength < intel * 0.8) return '학자';
+    if (strength >= chiefStatMin && intel < strength * 0.8) return '장사';
+    return '명사';
+  }
+  const strongest = Math.max(leadership, strength, intel);
+  const weakerTotal = leadership + strength + intel - strongest;
+  if (strongest >= chiefStatMin + statGradeLevel && weakerTotal >= strongest * 1.7) return '만능';
+  if (strength >= chiefStatMin - statGradeLevel && intel < strength * 0.8) return '용장';
+  if (intel >= chiefStatMin - statGradeLevel && strength < intel * 0.8) return '명장';
+  if (leadership >= chiefStatMin - statGradeLevel && strength + intel < leadership) return '차장';
+  return '평범';
+}
+
 export function ownGeneralInfo(general: General) {
   return {
     ...generalIdentity(general),
@@ -107,6 +151,7 @@ export function ownGeneralInfo(general: General) {
     leadership: general.leadership,
     strength: general.strength,
     intel: general.intel,
+    generalType: generalType(general),
     ...(general.politics != null && general.charm != null ? { politics: general.politics, charm: general.charm } : {}),
     officerLevel: general.officerLevel,
     birthYear: general.birthYear,
@@ -122,6 +167,7 @@ export function ownGeneralInfo(general: General) {
     atmos: general.atmos,
     experience: general.experience,
     dedication: general.dedication,
+    progression: generalProgress(general.experience, general.dedication),
     age: general.age,
     injury: general.injury,
     nextTurnTick: general.nextTurnTick,
@@ -138,6 +184,7 @@ export function publicGeneralStats(general: General) {
     leadership,
     strength,
     intel,
+    generalType: generalType(general),
     ...(politics != null && charm != null ? { politics, charm } : {}),
     portraitId,
     officerLevel,
@@ -268,7 +315,20 @@ const publicYearbook = z.object({
   nations: z.array(publicNationSummary),
   cities: z.array(z.object({ cityKey: z.number().int(), nationId: z.number().int().nullable() })),
 });
-export const worldRecordInfo = (data: Prisma.JsonValue) => publicYearbook.parse(data);
+export function worldRecordInfo(
+  data: Prisma.JsonValue,
+  publicPowers: readonly { nationId: number; power: number | null }[] = [],
+) {
+  const { nations, cities } = publicYearbook.parse(data);
+  const powerById = new Map(publicPowers.map(({ nationId, power }) => [nationId, power]));
+  return {
+    nations: nations.map((nation) => {
+      const power = powerById.get(nation.nationId);
+      return power == null ? nation : { ...nation, power };
+    }),
+    cities,
+  };
+}
 export const nationRecordInfo = (data: Prisma.JsonValue) => memberNationSummary.parse(data);
 
 const timelapseYearbook = z.object({

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useEffect, useId, useRef, useState } from 'react';
 import { retryUnlessClientError } from '../game/errors';
@@ -78,6 +78,8 @@ export function NationSummaryGrid({
   const headValue = (name: string | null | undefined) => (name ? displayName(name) : '—');
   // 성향은 모든 국가에 공개된다 (nation.get philosophy, INT-26). 홈 응답처럼 값이 없으면 소속국만 보인다.
   const philosophy = 'philosophy' in nation ? nation.philosophy : undefined;
+  const strategy = 'strategyStatus' in nation ? nation.strategyStatus : undefined;
+  const aid = 'diplomaticAid' in nation ? nation.diplomaticAid : undefined;
   // 총 주민은 nation.get이 모든 국가에 준다 (소유 도시 주민 합계 / 최대, INT-26).
   const population =
     'populationMax' in nation && typeof nation.population === 'number' && typeof nation.populationMax === 'number'
@@ -88,6 +90,7 @@ export function NationSummaryGrid({
       items={[
         member ? { label: '군주', value: headValue(heads?.ruler) } : { label: '군주', ...hidden },
         member ? { label: '참모', value: headValue(heads?.advisor) } : { label: '참모', ...hidden },
+        { label: '작위', value: nation.rank?.title ?? '—' },
         { label: '속령', value: n(nation.cityCount) },
         { label: '장수', value: n(nation.generalCount) },
         population
@@ -112,11 +115,393 @@ export function NationSummaryGrid({
         member ? { label: '군량', value: n(nation.rice) } : { label: '군량', ...hidden },
         member ? { label: '세율', value: `${Math.round(nation.taxRate * 100)}%` } : { label: '세율', ...hidden },
         member ? { label: '기술', value: techText(nation.tech) } : { label: '기술', ...hidden },
+        ...(aid
+          ? [{ label: '외교 원조', value: aid.remainingMonths ? `${aid.remainingMonths}개월 대기` : '대기 없음' }]
+          : []),
+        ...(strategy
+          ? [
+              {
+                label: '전략',
+                wide: true,
+                value: (
+                  <details>
+                    <summary>
+                      {strategy.remainingMonths ? `${strategy.remainingMonths}개월 대기` : '공통 대기 없음'}
+                    </summary>
+                    <ul>
+                      {strategy.commands.map((command) => (
+                        <li key={command.key}>
+                          {command.name} ·{' '}
+                          {command.availableAt
+                            ? `${command.remainingMonths}개월 대기 (${command.availableAt.year}년 ${command.availableAt.month}월)`
+                            : '대기 없음'}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                ),
+              },
+            ]
+          : []),
         // 수도는 지도 응답(world.map)에 모든 국가 것이 있어 다른 국가도 보인다 (원작 세력일람의 [수도]).
         { label: '수도', value: capitalName ?? '—' },
         philosophy !== undefined ? { label: '성향', value: philosophy || '—' } : { label: '성향', ...hidden },
       ]}
     />
+  );
+}
+
+export function NationNpcPolicy({ worldId, nation }: { worldId: string; nation: NationView }) {
+  const policy = nation.npcPolicy;
+  if (!policy) return null;
+  return (
+    <details>
+      <summary>NPC 운영 기준</summary>
+      {policy.editor ? (
+        <NationNpcPolicyEditor key={`${worldId}:${nation.id}`} worldId={worldId} nationId={nation.id} policy={policy} />
+      ) : null}
+      <InfoGrid
+        items={[
+          { label: '전선 모집 목표', value: `${n(policy.recruitTarget)}명` },
+          { label: '훈련 목표', value: n(policy.trainingTarget) },
+          { label: '사기 목표', value: n(policy.moraleTarget) },
+          { label: '포상 기준 금', value: n(policy.rewardGoldTarget) },
+          { label: '출병·선전포고 점수 배율', value: `×${n(policy.aggression)}` },
+        ]}
+      />
+      {policy.history?.length ? (
+        <section>
+          <h3>정책 변경 이력</h3>
+          {policy.history.map(({ sequence, date, requestedAt, generalName, previous, current }) => (
+            <details key={sequence}>
+              <summary>
+                {date.year}년 {date.month}월 · {generalName ?? '장수 정보 없음'} ·{' '}
+                <time dateTime={requestedAt}>{new Date(requestedAt).toLocaleString('ko-KR')}</time>
+              </summary>
+              <ul>
+                {(Object.keys(npcPolicyLabels) as Array<keyof NationNpcSettings>)
+                  .filter((field) => previous?.[field] !== current[field])
+                  .map((field) => (
+                    <li key={field}>
+                      {npcPolicyLabels[field]} · {previous?.[field] ?? '—'} → {current[field] ?? '—'}
+                    </li>
+                  ))}
+                {(['generalPriority', 'nationPriority'] as const)
+                  .filter((field) => JSON.stringify(previous?.[field]) !== JSON.stringify(current[field]))
+                  .map((field) => (
+                    <li key={field}>
+                      {field === 'generalPriority' ? '장수 명령 순서' : '국가 명령 순서'} ·{' '}
+                      {previous === null ? '—' : npcPriorityText(previous[field])} → {npcPriorityText(current[field])}
+                    </li>
+                  ))}
+              </ul>
+            </details>
+          ))}
+        </section>
+      ) : null}
+      {[
+        { label: '현재 국가 명령 후보', orders: policy.nationOrders },
+        { label: '현재 NPC 장수 명령 후보', orders: policy.generalOrders },
+      ].map(({ label, orders }) =>
+        orders?.length ? (
+          <section key={label}>
+            <h3>{label}</h3>
+            <ol>
+              {orders.map(({ key, name, score, reason }) => (
+                <li key={key}>
+                  {name} · {n(score)}점 · {reason}
+                </li>
+              ))}
+            </ol>
+          </section>
+        ) : null,
+      )}
+    </details>
+  );
+}
+
+type NationNpcSettings = NonNullable<NonNullable<NationView['npcPolicy']>['editor']>['limits'];
+const npcPriorityText = (priority: readonly string[] | undefined) =>
+  priority === undefined ? '기본 순서' : priority.join(', ') || '모두 끔';
+const npcPolicyLabels = {
+  recruitTarget: '전선 모집 목표',
+  trainingTarget: '훈련 목표',
+  moraleTarget: '사기 목표',
+  rewardGoldTarget: '포상 기준 금',
+  rewardRiceTarget: '포상 기준 쌀',
+  reserveRice: '포상 뒤 보유할 국고 쌀',
+  seizeGoldAbove: 'NPC 몰수 뒤 보유할 금',
+  seizeRiceAbove: 'NPC 몰수 뒤 보유할 쌀',
+  minRecruitPopulation: '모집 최소 도시 인구',
+  safeRecruitPopulationPercent: '모집 최소 도시 인구율 (%)',
+  reserveGold: '포상 뒤 보유할 국고 금',
+  minReward: '최소 포상·몰수 단위',
+  maxReward: '최대 포상·몰수 단위',
+  minWarCrew: '출병 최소 병력',
+  minNpcWarLeadership: '전투 참여 최소 통솔',
+  cureThreshold: '요양 기준 부상',
+} satisfies Record<keyof NationNpcSettings, string>;
+
+function NationNpcPolicyEditor({
+  worldId,
+  nationId,
+  policy,
+}: {
+  worldId: string;
+  nationId: number;
+  policy: NonNullable<NationView['npcPolicy']>;
+}) {
+  const trpc = useTRPC();
+  const client = useQueryClient();
+  const [draft, setDraft] = useState<Partial<Record<keyof NationNpcSettings, string>>>({});
+  const save = useMutation(
+    trpc.nation.setNpcPolicy.mutationOptions({
+      onSuccess: async () => {
+        await client.invalidateQueries({ queryKey: trpc.nation.get.queryKey({ worldId, nationId }) });
+        setDraft({});
+        setPriorities({});
+      },
+    }),
+  );
+  const [priorities, setPriorities] = useState<{ general?: string[] | null; nation?: string[] | null }>({});
+  const editor = policy.editor;
+  if (!editor) return null;
+  const fields = Object.keys(npcPolicyLabels) as Array<keyof NationNpcSettings>;
+  const value = (field: keyof NationNpcSettings) =>
+    draft[field] ?? String(editor.pending?.[field] ?? policy[field] ?? '');
+  const generalPriority = editor.pending ? editor.pending.generalPriority : policy.generalPriority;
+  const nationPriority = editor.pending ? editor.pending.nationPriority : policy.nationPriority;
+  const priorityFor = (kind: 'general' | 'nation') =>
+    priorities[kind] === null
+      ? undefined
+      : (priorities[kind] ?? (kind === 'general' ? generalPriority : nationPriority));
+  const names: Record<string, string> = {
+    join: '임관',
+    return: '귀환',
+    move: '이동',
+    farm: '농지 개간',
+    commerce: '상업 투자',
+    security: '치안 강화',
+    settle: '정착 장려',
+    goodwill: '민심 수습',
+    defence: '수비 강화',
+    wall: '성벽 보수',
+    research: '기술 연구',
+    form_unit: '빈 부곡 편성',
+    recruit: '모병',
+    train: '훈련',
+    morale: '사기진작',
+    trade_rice: '군량 매입',
+    attack: '출병',
+    heal: '요양',
+    nation_capital: '천도',
+    nation_declare: '선전포고',
+    nation_reward: '포상',
+    nation_seize: 'NPC 몰수',
+    nation_city_allocate: '도시 병력 배속',
+    nation_mobilize: '백성동원',
+    nation_rivalry: '이호경식',
+    nation_raid: '급습',
+  };
+  const changePriority = (kind: 'general' | 'nation', key: string, direction: -1 | 0 | 1) => {
+    const current = [...(priorityFor(kind) ?? editor.commands[kind])];
+    const index = current.indexOf(key);
+    if (direction === 0) {
+      if (index < 0) current.push(key);
+      else current.splice(index, 1);
+    } else if (index >= 0 && index + direction >= 0 && index + direction < current.length) {
+      [current[index], current[index + direction]] = [current[index + direction]!, current[index]!];
+    }
+    setPriorities((previous) => ({ ...previous, [kind]: current }));
+  };
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (editor.pending) return;
+        save.mutate({
+          worldId,
+          nationId,
+          policy: {
+            recruitTarget: Number(value('recruitTarget')),
+            trainingTarget: Number(value('trainingTarget')),
+            moraleTarget: Number(value('moraleTarget')),
+            rewardGoldTarget: Number(value('rewardGoldTarget')),
+            ...Object.fromEntries(
+              fields
+                .slice(4)
+                .filter((key) => value(key) !== '')
+                .map((key) => [key, Number(value(key))]),
+            ),
+            generalPriority: priorityFor('general')?.filter((key): key is NonNullable<typeof generalPriority>[number] =>
+              (editor.commands.general as readonly string[]).includes(key),
+            ),
+            nationPriority: priorityFor('nation')?.filter((key): key is NonNullable<typeof nationPriority>[number] =>
+              (editor.commands.nation as readonly string[]).includes(key),
+            ),
+          },
+        });
+      }}
+    >
+      <fieldset disabled={save.isPending || editor.pending !== null}>
+        <legend>NPC 운영 기준 편집</legend>
+        {fields.map((field) => (
+          <label key={field}>
+            {npcPolicyLabels[field]}{' '}
+            <input
+              type="number"
+              min={editor.limits[field].min}
+              max={editor.limits[field].max}
+              step={1}
+              required={fields.indexOf(field) < 4}
+              value={value(field)}
+              onChange={(event) => {
+                const next = event.currentTarget.value;
+                setDraft((previous) => ({ ...previous, [field]: next }));
+              }}
+            />
+          </label>
+        ))}
+        {(['general', 'nation'] as const).map((kind) => {
+          const order = priorityFor(kind);
+          const commands: readonly string[] = editor.commands[kind];
+          const active = order ?? commands;
+          const all = [...active, ...commands.filter((key) => !active.includes(key))];
+          return (
+            <details key={kind}>
+              <summary>{kind === 'general' ? 'NPC 장수 명령 우선순위' : 'NPC 국가 명령 우선순위'}</summary>
+              <button
+                type="button"
+                disabled={order === undefined}
+                onClick={() => setPriorities((previous) => ({ ...previous, [kind]: null }))}
+              >
+                기본 순서로 되돌리기
+              </button>
+              {order === undefined ? <p>상황에 따라 기본 순서를 적용합니다.</p> : null}
+              <ol>
+                {all.map((key) => {
+                  const index = active.indexOf(key);
+                  return (
+                    <li key={key}>
+                      <label>
+                        <input type="checkbox" checked={index >= 0} onChange={() => changePriority(kind, key, 0)} />
+                        {names[key] ?? key}
+                      </label>{' '}
+                      <button
+                        type="button"
+                        aria-label={`${names[key] ?? key} 위로`}
+                        disabled={index <= 0}
+                        onClick={() => changePriority(kind, key, -1)}
+                      >
+                        ↑
+                      </button>{' '}
+                      <button
+                        type="button"
+                        aria-label={`${names[key] ?? key} 아래로`}
+                        disabled={index < 0 || index >= active.length - 1}
+                        onClick={() => changePriority(kind, key, 1)}
+                      >
+                        ↓
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
+            </details>
+          );
+        })}
+        <button type="submit" disabled={Object.keys(draft).length === 0 && Object.keys(priorities).length === 0}>
+          저장
+        </button>
+      </fieldset>
+      {editor.pending ? <p role="status">NPC 운영 기준 변경을 처리하고 있습니다.</p> : null}
+      {save.isError ? <p role="alert">{save.error.message}</p> : null}
+    </form>
+  );
+}
+
+export function NationRestrictions({ worldId, nation }: { worldId: string; nation: NationView }) {
+  const trpc = useTRPC();
+  const client = useQueryClient();
+  const save = useMutation(
+    trpc.nation.setRestrictions.mutationOptions({
+      onSuccess: async () => {
+        await client.invalidateQueries({ queryKey: trpc.nation.get.queryKey({ worldId, nationId: nation.id }) });
+      },
+    }),
+  );
+  const [confidentialDraft, setConfidentialDraft] = useState<string>();
+  const restrictions = nation.restrictions;
+  if (!restrictions) return null;
+  const editor = restrictions.editor;
+  const change = (setting: 'recruitment' | 'war', blocked: boolean) =>
+    save.mutate({ worldId, nationId: nation.id, setting, blocked });
+  return (
+    <section aria-label="임관과 출병">
+      <InfoGrid
+        items={[
+          { label: '임관', value: restrictions.recruitmentBlocked ? '금지' : '허용' },
+          ...(restrictions.warBlocked === undefined
+            ? []
+            : [{ label: '출병', value: restrictions.warBlocked ? '금지' : '허용' }]),
+        ]}
+      />
+      {editor ? (
+        <>
+          <button
+            type="button"
+            disabled={save.isPending || editor.pending !== null}
+            onClick={() => change('recruitment', !restrictions.recruitmentBlocked)}
+          >
+            {restrictions.recruitmentBlocked ? '임관 허용' : '임관 금지'}
+          </button>{' '}
+          <button
+            type="button"
+            disabled={save.isPending || editor.pending !== null || editor.warChanges === 0}
+            onClick={() => change('war', !restrictions.warBlocked)}
+          >
+            {restrictions.warBlocked ? '출병 허용' : '출병 금지'}
+          </button>{' '}
+          <small>출병 제한 변경 {editor.warChanges}회 남음</small>
+          <div>
+            <label>
+              기밀실 최소 소속 연차
+              <input
+                type="number"
+                min={1}
+                max={99}
+                value={confidentialDraft ?? restrictions.confidentialYears ?? ''}
+                onChange={(event) => setConfidentialDraft(event.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              disabled={
+                save.isPending ||
+                editor.pending !== null ||
+                !confidentialDraft ||
+                !/^[1-9][0-9]?$/.test(confidentialDraft)
+              }
+              onClick={() =>
+                save.mutate(
+                  {
+                    worldId,
+                    nationId: nation.id,
+                    setting: 'confidential',
+                    confidentialYears: Number(confidentialDraft),
+                  },
+                  { onSuccess: () => setConfidentialDraft(undefined) },
+                )
+              }
+            >
+              기밀 권한 변경
+            </button>
+          </div>
+        </>
+      ) : null}
+      {editor?.pending ? <p role="status">국가 제한 변경을 처리하고 있습니다.</p> : null}
+      {save.isError ? <p role="alert">{save.error.message}</p> : null}
+    </section>
   );
 }
 
@@ -137,14 +522,29 @@ export function NationFinanceGrid({ nation }: { nation: NationSummary }) {
       <InfoGrid
         items={[
           { label: '세금', value: `금 ${n(gold.gross)} · ${due(gold)}`, title: '상업·주민으로 걷는 금', wide: true },
-          { label: '세곡', value: `쌀 ${n(rice.gross)} · ${due(rice)}`, title: '농업·주민으로 걷는 쌀', wide: true },
+          ...(estimate.warIncome === undefined
+            ? []
+            : [{ label: '단기', value: `금 ${n(estimate.warIncome)} · 다음 월말`, wide: true }]),
+          {
+            label: '세곡',
+            value: `쌀 ${n(rice.gross - (rice.wallIncome ?? 0))} · ${due(rice)}`,
+            title: '농업·주민으로 걷는 쌀',
+            wide: true,
+          },
+          ...(rice.wallIncome === undefined
+            ? []
+            : [{ label: '둔전', value: `쌀 ${n(rice.wallIncome)} · ${due(rice)}`, wide: true }]),
           {
             label: rate === undefined ? '봉급' : `봉급(지급률 ${Math.round(rate * 100)}%)`,
             value: `금 ${n(gold.payroll)} · 쌀 ${n(rice.payroll)}`,
             title: '세입 가운데 소속 장수에게 나눠 주는 몫',
             wide: true,
           },
-          { label: '1인 봉급', value: `금 ${n(gold.perGeneral)} · 쌀 ${n(rice.perGeneral)}`, wide: true },
+          {
+            label: estimate.rankedPayroll ? '평균 봉급' : '1인 봉급',
+            value: `금 ${n(gold.perGeneral)} · 쌀 ${n(rice.perGeneral)}`,
+            wide: true,
+          },
           {
             label: toCity ? '순수입(도시 창고)' : '순수입(국고)',
             value: `금 ${signed(gold.net)} · 쌀 ${signed(rice.net)}`,
@@ -157,9 +557,77 @@ export function NationFinanceGrid({ nation }: { nation: NationSummary }) {
   );
 }
 
+function NationFinanceEditor({ worldId, nation }: { worldId: string; nation: NationView }) {
+  const trpc = useTRPC();
+  const client = useQueryClient();
+  const [tax, setTax] = useState<number>();
+  const [salary, setSalary] = useState<number>();
+  const save = useMutation(
+    trpc.nation.setFinanceRates.mutationOptions({
+      onSuccess: async () => {
+        setTax(undefined);
+        setSalary(undefined);
+        await client.invalidateQueries({ queryKey: trpc.nation.get.queryKey({ worldId, nationId: nation.id }) });
+      },
+    }),
+  );
+  const editor = nation.financeEditor;
+  if (!editor) return null;
+  const taxPercent =
+    tax ?? editor.pending?.taxPercent ?? Math.round(('taxRate' in nation ? nation.taxRate : 0.2) * 100);
+  const salaryPercent = salary ?? editor.pending?.salaryPercent ?? Math.round((nation.salaryRate ?? 0.5) * 100);
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        save.mutate({ worldId, nationId: nation.id, rates: { taxPercent, salaryPercent } });
+      }}
+    >
+      <fieldset disabled={save.isPending || editor.pending !== null}>
+        <legend>세율·지급률 설정</legend>
+        <label>
+          세율 (%){' '}
+          <input
+            type="number"
+            required
+            min={5}
+            max={30}
+            value={taxPercent}
+            onChange={(event) => setTax(Number(event.target.value))}
+          />
+        </label>
+        <label>
+          지급률 (%){' '}
+          <input
+            type="number"
+            required
+            min={20}
+            max={200}
+            value={salaryPercent}
+            onChange={(event) => setSalary(Number(event.target.value))}
+          />
+        </label>
+        <button type="submit">저장</button>
+      </fieldset>
+      {editor.pending ? <p role="status">세율·지급률 변경을 처리하고 있습니다.</p> : null}
+      {save.error ? <p role="alert">{save.error.message}</p> : null}
+    </form>
+  );
+}
+
 export function useNation(worldId: string, nationId: number, enabled = true) {
   const trpc = useTRPC();
-  return useQuery({ ...trpc.nation.get.queryOptions({ worldId, nationId }), enabled, retry: retryUnlessClientError });
+  return useQuery({
+    ...trpc.nation.get.queryOptions({ worldId, nationId }),
+    enabled,
+    retry: retryUnlessClientError,
+    refetchInterval: (query) =>
+      query.state.data?.npcPolicy?.editor?.pending ||
+      query.state.data?.restrictions?.editor?.pending ||
+      query.state.data?.financeEditor?.pending
+        ? 1000
+        : false,
+  });
 }
 
 // 공개 국력과 그 순위. 순위 화면과 같은 조회(ranking.nations, 국력 기준)에서 이 국가 줄을 읽는다.
@@ -219,18 +687,41 @@ export function NationInfo({
   worldId,
   nation,
   cities,
+  nations,
+  presence,
 }: {
   worldId: string;
   nation: Home['nation'];
   cities: readonly MapCity[];
+  nations: readonly { id: number; name: string }[];
+  presence: Home['presence'];
 }) {
   const detail = useNation(worldId, nation?.id ?? 1, nation !== null);
   const power = useNationPower(worldId, nation?.id ?? null);
+  const onlineNations = nations
+    .filter(({ id }) => presence?.nationIds.includes(id))
+    .map(({ name }) => displayName(name));
+  const presenceGrid = (
+    <InfoGrid
+      items={[
+        { label: '접속 중인 국가', value: onlineNations.join(', ') || '—' },
+        ...(nation && presence
+          ? [
+              {
+                label: '접속 중인 우리 장수',
+                value: presence.allies.map(({ name }) => displayName(name)).join(', ') || '—',
+              },
+            ]
+          : []),
+      ]}
+    />
+  );
   // 통치(황실·정통성)는 전용 화면으로 옮겼다 (INT-25). 재야 장수도 링크로 공개 정보를 본다.
   if (nation === null)
     return (
       <>
         <EmptyState title="재야입니다">국가에 임관하면 국고·군량과 소속 장수를 여기서 봅니다.</EmptyState>
+        {presenceGrid}
         <p className={styles.links}>
           <Link to="/w/$worldId/nation/governance" params={{ worldId }}>
             통치
@@ -259,6 +750,7 @@ export function NationInfo({
         power={power}
       />
       {detail.data ? <NationFinanceGrid nation={detail.data} /> : null}
+      {detail.data ? <NationFinanceEditor key={detail.data.id} worldId={worldId} nation={detail.data} /> : null}
       <NationExtras worldId={worldId} nation={detail.data ?? nation} />
       {/* 소속 장수·도시 표와 통치는 전용 화면으로 옮겼다 (INT-25). */}
       <p className={styles.links}>
@@ -272,6 +764,7 @@ export function NationInfo({
           통치
         </Link>
       </p>
+      {presenceGrid}
       <NationNoticeBox worldId={worldId} />
     </div>
   );
@@ -314,6 +807,7 @@ export function NationTables({
   const crewTypes = useWorldRules(worldId).data?.unitSet.crewTypes;
   // 소유 도시 표에서 펼친 도시 (원작 세력 도시의 암행부 연동). 한 번에 한 도시만 펼친다.
   const [openCity, setOpenCity] = useState<number | null>(null);
+  const [showCapacity, setShowCapacity] = useState(false);
   const panelId = useId();
   // 예턴·다음 턴 시각·NPC 여부는 감찰 자료다. 이 국가 소속 직책자만 받는다.
   const inspection = useInspectionRows(worldId, nationId);
@@ -346,6 +840,15 @@ export function NationTables({
   const regionName = new Map(map?.cities.map((city) => [city.key, city.regionName ?? null]) ?? []);
   const showRegion = data.cities.some((city) => regionName.get(city.key));
   const showPopulation = data.cities.some(isDetailedCity);
+  const detailedCityStats = [
+    { key: 'agriculture', max: 'agricultureMax', label: '농업' },
+    { key: 'commerce', max: 'commerceMax', label: '상업' },
+    { key: 'security', max: 'securityMax', label: '치안' },
+    { key: 'defence', max: 'defenceMax', label: '수비' },
+    { key: 'wall', max: 'wallMax', label: '성벽' },
+  ] as const;
+  const capacityColumns = [{ key: 'population', max: 'populationMax', label: '주민' }, ...detailedCityStats] as const;
+  const marketRate = (city: City) => ('riceMarket' in city ? (city.riceMarket?.rate ?? null) : null);
   const opened = openCity === null ? undefined : data.cities.find((c) => c.key === openCity);
 
   const cityColumns: Column<City>[] = [
@@ -393,6 +896,46 @@ export function NationTables({
           },
         ]
       : []),
+    ...(showPopulation
+      ? [
+          {
+            key: 'populationRate',
+            label: '주민율',
+            numeric: true,
+            sortValue: (c: City) => (isDetailedCity(c) && c.populationMax > 0 ? c.population / c.populationMax : null),
+            render: (c: City) =>
+              isDetailedCity(c) && c.populationMax > 0 ? `${Math.round((c.population / c.populationMax) * 100)}%` : '—',
+          },
+          {
+            key: 'trust',
+            label: '민심',
+            numeric: true,
+            sortValue: (c: City) => (isDetailedCity(c) ? c.trust : null),
+            render: (c: City) => (isDetailedCity(c) ? n(c.trust) : '—'),
+          },
+          ...detailedCityStats.map(({ key, max, label }) => ({
+            key,
+            label,
+            numeric: true,
+            sortValue: (c: City) => (isDetailedCity(c) ? c[key] : null),
+            render: (c: City) => (isDetailedCity(c) ? `${n(c[key])} / ${n(c[max])}` : '—'),
+          })),
+        ]
+      : []),
+    ...(data.cities.some((city) => 'riceMarket' in city)
+      ? [
+          {
+            key: 'market',
+            label: '시세',
+            numeric: true,
+            sortValue: marketRate,
+            render: (c: City) => {
+              const rate = marketRate(c);
+              return rate === null ? '상인 없음' : `${n(rate)}%`;
+            },
+          },
+        ]
+      : []),
     {
       key: 'generals',
       label: '장수',
@@ -431,6 +974,25 @@ export function NationTables({
       ),
     },
   ];
+
+  const cityTableColumns =
+    showCapacity && showPopulation
+      ? cityColumns.map((column) => {
+          const field = capacityColumns.find(({ key }) => key === column.key);
+          if (!field) return column;
+          const remaining = (city: City) =>
+            isDetailedCity(city) ? Math.max(0, city[field.max] - city[field.key]) : null;
+          return {
+            ...column,
+            label: `남은 ${field.label}`,
+            sortValue: remaining,
+            render: (city: City) => {
+              const value = remaining(city);
+              return value === null ? '—' : n(value);
+            },
+          };
+        })
+      : cityColumns;
 
   const hidden = (g: General) => (isDetailedGeneral(g) ? undefined : HIDDEN_NATION);
   const num = (pick: (g: Extract<General, { leadership: number }>) => number | undefined) => ({
@@ -499,6 +1061,13 @@ export function NationTables({
     { key: 'gold', label: '금', ...num((g) => g.gold) },
     { key: 'rice', label: '쌀', ...num((g) => g.rice) },
     { key: 'age', label: '나이', ...num((g) => displayedAge(g, summary)) },
+    {
+      key: 'tenureYears',
+      label: '임관',
+      numeric: true,
+      sortValue: (g) => g.tenureYears ?? null,
+      render: (g) => (g.tenureYears === undefined ? '—' : `${n(g.tenureYears)}년`),
+    },
     { key: 'experience', label: '경험', ...num((g) => g.experience) },
     { key: 'dedication', label: '공헌', ...num((g) => g.dedication) },
     { key: 'personality', label: '성격', ...text((g) => g.personality) },
@@ -513,12 +1082,25 @@ export function NationTables({
         </p>
       )}
       <div id="cities">
+        {showPopulation ? (
+          <label className={styles.note}>
+            <input type="checkbox" checked={showCapacity} onChange={(event) => setShowCapacity(event.target.checked)} />{' '}
+            최대치까지 남은 양 보기
+          </label>
+        ) : null}
         <DataTable
           caption={`소유 도시 ${data.cities.length}곳`}
           rows={data.cities}
-          columns={cityColumns}
+          columns={cityTableColumns}
           rowKey={(c) => c.key}
-          mobileDetails={['region', 'population']}
+          mobileDetails={[
+            'region',
+            'population',
+            'populationRate',
+            'trust',
+            'market',
+            ...detailedCityStats.map(({ key }) => key),
+          ]}
         />
         {member && opened ? (
           <StationedPanel
@@ -562,7 +1144,7 @@ export function NationTables({
           rows={data.generals}
           columns={recordColumns}
           rowKey={(g) => g.id}
-          mobileDetails={['age', 'experience', 'dedication', 'personality', 'special']}
+          mobileDetails={['age', 'tenureYears', 'experience', 'dedication', 'personality', 'special']}
         />
       ) : null}
     </div>
@@ -695,7 +1277,9 @@ export function StationedTable({
       label: '장수',
       sortValue: (g) => displayName(g.name),
       // NPC 딱지는 장수 행의 isHuman으로 단다. 감찰 자료의 사람 여부도 함께 본다.
-      render: (g) => <GeneralNameCell general={g} npc={inspection?.get(g.id)?.isHuman === false} />,
+      render: (g) => (
+        <GeneralNameCell general={g} npc={inspection?.get(g.id)?.isHuman === false} possessedNpc={g.possessedNpc} />
+      ),
     },
     {
       key: 'officer',

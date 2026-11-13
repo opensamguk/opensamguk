@@ -23,6 +23,9 @@ import {
   readLogisticsState,
   readStoredGovernance,
   storedGeneralSex,
+  storedStatExperience,
+  storedFinanceRates,
+  storedCityConflict,
   storedGeneralRemoval,
   readStoredLineage,
   readStoredEquipment,
@@ -35,6 +38,21 @@ import {
   assertNationLifecycle,
   OFFICE_EFFECTS_FEATURE,
   officeEffectsSchema,
+  readCityOfficeVolunteers,
+  HERITAGE_SPECIALTY_FEATURE,
+  storedHeritageSpecialty,
+  storedHeritageTurnTime,
+  storedCitySeasonalEvent,
+  storedDefenseStance,
+  storedGeneralProficiency,
+  storedHeritageBenefits,
+  HERITAGE_BENEFITS_FEATURE,
+  GENERAL_PROFICIENCY_FEATURE,
+  storedNpcNationPolicy,
+  storedNationRestrictions,
+  NATION_RESTRICTIONS_FEATURE,
+  NPC_NATION_POLICY_FEATURE,
+  DEFENSE_STANCE_FEATURE,
 } from '@opensamguk/rules';
 import { z } from 'zod';
 import { worldResolver } from './resolver';
@@ -94,11 +112,20 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
     ? projectTreatyRows(breakEnabled ? treatyRows.filter((row) => row.status !== 'BROKEN') : treatyRows, clauses)
     : undefined;
   const ext = restoreExtState(commands, await readWorldExtRows(tx, worldId), world.ruleFeatures);
-  const cities = await tx.city.findMany({ where: { worldId } });
-  const nations = await tx.nation.findMany({ where: { worldId }, omit: { noticeDirective: true } });
+  const cities = await tx.city.findMany({ where: { worldId }, omit: { conflictTick: true, stratagemTick: true } });
+  const nations = await tx.nation.findMany({
+    where: { worldId },
+    omit: { noticeDirective: true, recruitmentNotice: true },
+  });
   const generals = await tx.general.findMany({
     where: { worldId },
-    omit: { defaultPolicy: true, lastActiveTick: true, lastActiveAt: true, residenceTick: true },
+    omit: {
+      defaultPolicy: true,
+      lastActiveTick: true,
+      lastActiveAt: true,
+      residenceTick: true,
+      nationJoinedTick: true,
+    },
   });
   const diplomacies = await tx.diplomacy.findMany({ where: { worldId } });
   const state = toWorldState({
@@ -108,18 +135,58 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
     ...(ext ? { ext } : {}),
     startYear: world.startYear,
     cities: attachOperationalKinds(
-      cities,
+      cities.map(({ seasonalEvent, conflict, conflictOrder, warCasualties, ...city }) => ({
+        ...city,
+        ...storedCitySeasonalEvent(seasonalEvent),
+        ...storedCityConflict(conflict, conflictOrder),
+        ...(warCasualties == null ? {} : { warCasualties }),
+      })),
       readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin),
     ),
-    nations,
-    generals: generals.map((general) =>
-      storedGeneralRemoval(storedGeneralSex(general, world.ruleFeatures.includes('lineage-v1')), world.replayFormat),
+    nations: nations.map(({ diplomaticAidUntilMonth, npcSettings, restrictions, financeRates, ...nation }) => ({
+      ...nation,
+      ...storedNpcNationPolicy(world.ruleFeatures.includes(NPC_NATION_POLICY_FEATURE), npcSettings),
+      ...storedNationRestrictions(world.ruleFeatures.includes(NATION_RESTRICTIONS_FEATURE), restrictions),
+      ...(financeRates === null ? {} : { financeRates: storedFinanceRates(financeRates) }),
+      ...(diplomaticAidUntilMonth != null ? { diplomaticAidUntilMonth } : {}),
+    })),
+    generals: generals.map(
+      ({
+        defenseThreshold,
+        proficiency,
+        heritageBenefits,
+        heritageSpecialty,
+        heritageTurnTime,
+        heritageStatReset,
+        combatSpecial,
+        statExperience,
+        ...general
+      }) =>
+        storedGeneralRemoval(
+          storedGeneralSex(
+            {
+              ...general,
+              ...storedDefenseStance(world.ruleFeatures.includes(DEFENSE_STANCE_FEATURE), defenseThreshold),
+              ...storedHeritageSpecialty(world.ruleFeatures.includes(HERITAGE_SPECIALTY_FEATURE), heritageSpecialty),
+              ...(heritageSpecialty == null ? {} : { combatSpecial }),
+              ...storedHeritageTurnTime(heritageTurnTime),
+              ...(heritageStatReset === true ? { heritageStatReset: true as const } : {}),
+              ...storedHeritageBenefits(world.ruleFeatures.includes(HERITAGE_BENEFITS_FEATURE), heritageBenefits),
+              ...storedGeneralProficiency(world.ruleFeatures.includes(GENERAL_PROFICIENCY_FEATURE), proficiency),
+              ...storedStatExperience(statExperience),
+            },
+            world.ruleFeatures.includes('lineage-v1'),
+          ),
+          world.replayFormat,
+        ),
     ),
     diplomacies,
     ...(world.commandMeta ? { commandMeta: world.commandMeta } : {}),
   } as unknown as WorldInit);
   if (world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE)) {
     state.officeEffects = officeEffectsSchema.parse(world.officeEffects);
+    const volunteers = readCityOfficeVolunteers(world.ruleFeatures, world.cityOfficeVolunteers);
+    if (volunteers) state.cityOfficeVolunteers = volunteers;
   }
   if (world.ruleFeatures.includes('campaign-v1')) {
     if (Object.values(state.generals).some((general) => general.crew !== 0))

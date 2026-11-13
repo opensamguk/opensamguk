@@ -553,7 +553,11 @@ function applyArchiveInput(
   }
   if (input.status === 'APPLIED' && input.kind === 'turns.set' && input.generalId !== null)
     untouched.delete(input.generalId);
-  return applyRecordedInput(replay, input, registry, { unitSet: archive.origin.initial.unitSet });
+  return applyRecordedInput(replay, input, registry, {
+    unitSet: archive.origin.initial.unitSet,
+    seed: archive.origin.initial.seed,
+    statRules: archive.origin.initial.statRules,
+  });
 }
 
 function validSequence(sequence: number, maximum = 10_000_000): boolean {

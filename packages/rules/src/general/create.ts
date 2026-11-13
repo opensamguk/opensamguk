@@ -9,6 +9,8 @@ import { FIVE_STAT_KEYS } from './fiveStats';
 import { knownGeneralSexSchema } from './sex';
 import { heritageBonusSchema, readHeritageAllocation } from '../heritage/allocation';
 import { HERITAGE_ERRORS } from '../heritage/constants';
+import { generalPersonalitySchema } from './personality';
+import { heritageBirthSchema, heritageBirthZone } from '../heritage/birth';
 
 export interface CreationBonus {
   gold: number;
@@ -51,7 +53,9 @@ export const generalCreationSchema = z.strictObject({
   politics: dbInt.optional(),
   charm: dbInt.optional(),
   sex: knownGeneralSexSchema.optional(),
+  personality: generalPersonalitySchema.optional(),
   heritage: heritageBonusSchema.optional(),
+  heritageBirth: heritageBirthSchema.optional(),
   portraitId: z.union([z.number().int().min(10001).max(11008), dbInt.min(PLAYER_PORTRAIT_MIN_ID)]).nullable(),
 });
 export type GeneralCreation = z.infer<typeof generalCreationSchema>;
@@ -61,6 +65,7 @@ export const CREATION_ERRORS = {
   BAD_STATS: '능력치 합계와 범위를 확인하세요.',
   BAD_PORTRAIT: '초상 번호를 확인하세요.',
   BAD_SEX: '이 판의 성별 선택을 확인하세요.',
+  BAD_PERSONALITY: '이 판에서 고를 수 있는 성격을 확인하세요.',
   WORLD_FULL: '이 판의 장수 정원에 닿았습니다.',
   ALREADY_EXISTS: '이미 장수가 있습니다.',
   NAME_TAKEN: '이미 사용 중인 장수 이름입니다.',
@@ -77,6 +82,8 @@ export function validateGeneralCreation(
   statRules: unknown,
   lineage = false,
   heritage = false,
+  personalityEnabled = false,
+  heritageBirthEnabled = false,
 ): { ok: true; value: GeneralCreation } | { ok: false; code: CreationCode; message: string } {
   const parsed = generalCreationSchema.safeParse(payload);
   if (!parsed.success) {
@@ -90,15 +97,23 @@ export function validateGeneralCreation(
             ? 'BAD_PORTRAIT'
             : path === 'sex'
               ? 'BAD_SEX'
-              : path === 'heritage'
-                ? 'BAD_HERITAGE'
-                : 'BAD_STATS',
+              : path === 'personality'
+                ? 'BAD_PERSONALITY'
+                : path === 'heritage' || path === 'heritageBirth'
+                  ? 'BAD_HERITAGE'
+                  : 'BAD_STATS',
       ),
     };
   }
   if (lineage ? parsed.data.sex === undefined : Object.hasOwn(parsed.data, 'sex'))
     return { ok: false, ...creationFailure('BAD_SEX') };
-  if (!heritage && Object.hasOwn(parsed.data, 'heritage')) return { ok: false, ...creationFailure('BAD_HERITAGE') };
+  if (
+    (!heritage && Object.hasOwn(parsed.data, 'heritage')) ||
+    (!heritageBirthEnabled && Object.hasOwn(parsed.data, 'heritageBirth'))
+  )
+    return { ok: false, ...creationFailure('BAD_HERITAGE') };
+  if (!personalityEnabled && Object.hasOwn(parsed.data, 'personality'))
+    return { ok: false, ...creationFailure('BAD_PERSONALITY') };
   const rules = statRulesSchema.parse({ stat: statRules }).stat;
   const five = rules.count === 5;
   if (
@@ -130,16 +145,26 @@ export function buildCreatedGeneral(input: {
 }): InitialGeneral {
   const rng = rngFor(input.seed, 'create', input.userId);
   // 고정 소비 순서: cityKey 오름차순 후보의 도시, affinity, 턴 offset.
-  const cityKey = rng.pick([...input.cityKeys].sort((a, b) => a - b));
+  const { heritageBirth } = input.payload;
+  const randomCity = rng.pick([...input.cityKeys].sort((a, b) => a - b));
+  const cityKey = heritageBirth?.cityKey ?? randomCity;
+  if (heritageBirth?.cityKey !== undefined && !input.cityKeys.includes(cityKey))
+    throw new Error('시작 도시를 선택할 수 없습니다.');
   const affinity = rng.int(1, 150);
-  let nextTurnTick = input.monthlyTick + rng.int(0, TICKS_PER_MONTH - 1);
+  const randomOffset = rng.int(0, TICKS_PER_MONTH - 1);
+  const zone = heritageBirth?.turnZone === undefined ? undefined : heritageBirthZone(heritageBirth.turnZone);
+  const offset = zone
+    ? zone.start + Math.floor((randomOffset * (zone.end - zone.start)) / TICKS_PER_MONTH)
+    : randomOffset;
+  let nextTurnTick = input.monthlyTick + offset;
   if (nextTurnTick <= input.tick)
     nextTurnTick += (Math.floor((input.tick - nextTurnTick) / TICKS_PER_MONTH) + 1) * TICKS_PER_MONTH;
   if (nextTurnTick > 2_147_483_647 || !Number.isSafeInteger(input.id) || input.id < 1 || input.id > 2_147_483_647)
     throw new Error('장수 저장 범위를 넘었습니다.');
   // monthlyDate는 정산할 달의 끝 경계를 받는다. monthlyTick=0도 첫 달이다.
   const birthYear = monthlyDate(input.startYear, input.monthlyTick + TICKS_PER_MONTH).year - 20;
-  const { politics, charm, sex, heritage, ...payload } = input.payload;
+  const { politics, charm, sex, heritage, heritageBirth: _birth, personality, ...payload } = input.payload;
+  void _birth;
   if ((politics === undefined) !== (charm === undefined)) throw new Error('5능력치 생성 값을 확인하세요.');
   const stats = { ...payload, ...(politics !== undefined && charm !== undefined ? { politics, charm } : {}) };
   if (heritage !== undefined)
@@ -162,8 +187,8 @@ export function buildCreatedGeneral(input: {
     birthYear,
     deathYear: birthYear + 80,
     activeFromYear: birthYear + 15,
-    personality: null,
-    special: null,
+    personality: personality ?? null,
+    special: heritageBirth?.specialty ?? null,
     gold: input.bonus?.gold ?? 1000,
     rice: input.bonus?.rice ?? 1000,
     crew: 0,

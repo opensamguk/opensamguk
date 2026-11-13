@@ -514,6 +514,7 @@ describe('인사부', () => {
     expect([...table.querySelectorAll('thead th')].map((th) => th.textContent?.replace(/[▲▼]/g, ''))).toEqual([
       '이름',
       '직책',
+      '임관',
       '도시',
       '통솔',
       '무력',
@@ -535,7 +536,7 @@ describe('인사부', () => {
     const liu = [...rows.find((row) => row.textContent?.includes('유비'))!.querySelectorAll('td')].map(
       (td) => td.textContent,
     );
-    expect(liu.slice(3, 10)).toEqual(['90', '80', '80', '—', '—', '0', '없음']);
+    expect(liu.slice(4, 11)).toEqual(['90', '80', '80', '—', '—', '0', '없음']);
 
     fireEvent.click(screen.getByRole('button', { name: '수뇌 임명할 장수 고르기' }));
     const picker = screen.getByRole('group', { name: '수뇌 임명 후보' });

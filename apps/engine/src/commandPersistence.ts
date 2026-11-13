@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util';
 import type { Prisma } from '@opensamguk/db';
 import type { RealtimeSignal } from '@opensamguk/db';
 import type { CommandResult, WorldState } from '@opensamguk/rules';
@@ -43,6 +44,7 @@ export async function persistCommandState(
   beforeNationRemoval?: () => Promise<void>,
   // 같은 트랜잭션에서 잠근 World 행의 원생성을 검증해 얻은 목록만 전달한다.
   knownCityArmyTypes?: readonly number[],
+  cityTransfer?: CommandResult['cityTransfer'],
 ) {
   // 같은 잠긴 트랜잭션에서 읽은 사본은 다시 조회하지 않는다.
   const before = previous ?? (await loadWorld(tx, worldId));
@@ -62,6 +64,8 @@ export async function persistCommandState(
   await persistGovernanceState(tx, worldId, before, state);
   await persistLineageState(tx, worldId, before, state);
   await persistEquipmentState(tx, worldId, before, state);
+  if (state.cityOfficeVolunteers && !isDeepStrictEqual(before.cityOfficeVolunteers, state.cityOfficeVolunteers))
+    await tx.world.update({ where: { id: worldId }, data: { cityOfficeVolunteers: state.cityOfficeVolunteers } });
   await persistStratagemCardsState(tx, worldId, before, state);
   for (const nation of Object.values(state.nations)) {
     if (!before.nations[nation.id]) {
@@ -96,7 +100,15 @@ export async function persistCommandState(
       // 장수 턴의 nextTurnTick·revision은 TurnLoop의 조건부 갱신만 바꾼다.
       const { nextTurnTick, ...data } = general;
       void nextTurnTick;
-      await tx.general.update({ where: { worldId_id: { worldId, id: general.id } }, data });
+      await tx.general.update({
+        where: { worldId_id: { worldId, id: general.id } },
+        data: {
+          ...data,
+          ...(general.nationId === before.generals[general.id]?.nationId
+            ? {}
+            : { nationJoinedTick: general.nationId === null ? null : at.tick }),
+        },
+      });
     }
   }
   if (JSON.stringify(state.diplomacies) !== JSON.stringify(before.diplomacies)) {
@@ -120,7 +132,7 @@ export async function persistCommandState(
   await persistCommandMeta(tx, worldId, before, state);
   // 새 국가의 FK 대상은 생긴 뒤, 멸망 국가의 직책이 연쇄 삭제되기 전에 후속 상태를 저장한다.
   await beforeNationRemoval?.();
-  await persistPublicNationEvents(tx, worldId, before, state, at);
+  await persistPublicNationEvents(tx, worldId, before, state, at, cityTransfer);
   await persistRemovedNations(tx, worldId, before, state, at);
 }
 
@@ -147,11 +159,80 @@ export async function persistCommandReports(
   attackerId: number,
   result: CommandResult,
 ) {
+  if (result.attackTarget) {
+    await tx.city.update({
+      where: { worldId_cityKey: { worldId, cityKey: result.attackTarget.cityKey } },
+      data: { conflictTick: tick },
+    });
+  }
+  if (result.stratagemCityKey !== undefined) {
+    await tx.city.update({
+      where: { worldId_cityKey: { worldId, cityKey: result.stratagemCityKey } },
+      data: { stratagemTick: tick },
+    });
+  }
+  if (result.stratagemSucceeded) {
+    await tx.general.update({
+      where: { worldId_id: { worldId, id: attackerId } },
+      data: { stratagemSuccesses: { increment: 1 } },
+    });
+  }
   for (const award of result.battleAwards ?? []) {
     await tx.general.update({
       where: { worldId_id: { worldId, id: award.generalId } },
       data: { battleWins: { increment: award.wins }, captures: { increment: award.captures } },
     });
+  }
+  const engagements = result.generalEngagements ?? [];
+  const opponents = new Set(engagements.flatMap(({ attackerId, defenderId }) => [attackerId, defenderId]));
+  const humans = new Set(
+    opponents.size
+      ? (
+          await tx.general.findMany({
+            where: { worldId, id: { in: [...opponents] }, userId: { not: null } },
+            select: { id: true },
+          })
+        ).map(({ id }) => id)
+      : [],
+  );
+  for (const engagement of engagements) {
+    for (const [generalId, opponentId, kills, casualties] of [
+      [engagement.attackerId, engagement.defenderId, engagement.defenderLoss, engagement.attackerLoss],
+      [engagement.defenderId, engagement.attackerId, engagement.attackerLoss, engagement.defenderLoss],
+    ] as const) {
+      const wins = Number(engagement.winnerId === generalId);
+      const losses = Number(engagement.winnerId !== null && engagement.winnerId !== generalId);
+      const human = humans.has(opponentId);
+      await tx.generalBattleStats.upsert({
+        where: { worldId_generalId: { worldId, generalId } },
+        create: {
+          worldId,
+          generalId,
+          engagements: 1,
+          wins,
+          losses,
+          kills,
+          casualties,
+          lastTick: tick,
+          ...(human ? { humanEngagements: 1, humanKills: kills, humanCasualties: casualties } : {}),
+        },
+        update: {
+          engagements: { increment: 1 },
+          wins: { increment: wins },
+          losses: { increment: losses },
+          kills: { increment: kills },
+          casualties: { increment: casualties },
+          ...(human
+            ? {
+                humanEngagements: { increment: 1 },
+                humanKills: { increment: kills },
+                humanCasualties: { increment: casualties },
+              }
+            : {}),
+          lastTick: tick,
+        },
+      });
+    }
   }
   await tx.battleLog.createMany({
     data: (result.reports ?? []).map((report) => ({ ...report, worldId, tick, attackerId })),

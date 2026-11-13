@@ -62,6 +62,7 @@ interface Props {
   targets: TreatyTarget[];
   tradeEnabled?: boolean;
   expandedEnabled?: boolean;
+  rankedAidLimits?: readonly { nationId: number; amount: number }[] | undefined;
   ownNationId: number;
   map: WorldMap | undefined;
   // 이 상대에게 보낸 제안이 처리 중이면 그 안내. 있으면 보내기를 잠근다.
@@ -77,6 +78,7 @@ export function TreatyComposer({
   onPropose,
   tradeEnabled = false,
   expandedEnabled = false,
+  rankedAidLimits,
   ownNationId,
   map,
 }: Props) {
@@ -86,7 +88,9 @@ export function TreatyComposer({
   const target = targets.find((t) => t.nation.id === form.toNationId);
   const parties = map?.nations.filter(({ id }) => id === ownNationId || id === target?.nation.id) ?? [];
   const cities = clauseCities(map?.cities ?? [], parties);
-  const built = buildClauses(form, target?.relation, expandedEnabled ? { parties, cities } : undefined);
+  const tributeLimit =
+    rankedAidLimits?.find(({ nationId }) => nationId === form.tribute.payerNationId)?.amount ?? TRIBUTE_MAX_AMOUNT;
+  const built = buildClauses(form, target?.relation, expandedEnabled ? { parties, cities, tributeLimit } : undefined);
   const labels = {
     city: (key: number) => map?.cities.find((city) => city.key === key)?.name ?? `도시 ${key}`,
     nation: (id: number) => parties.find((nation) => nation.id === id)?.name ?? `국가 ${id}`,
@@ -319,13 +323,16 @@ export function TreatyComposer({
                   <input
                     type="number"
                     min={0}
-                    max={TRIBUTE_MAX_AMOUNT}
+                    max={tributeLimit}
                     step={1}
                     value={form.tribute[resource]}
                     onChange={(e) => set('tribute', { ...form.tribute, [resource]: e.target.value })}
                   />
                 </label>
               ))}
+              {rankedAidLimits && form.tribute.payerNationId !== null && (
+                <small>지급국 작위별 한도 · 매달 금·쌀 각 {gold(tributeLimit)}</small>
+              )}
             </ClauseRow>
             <ClauseRow
               label={CLAUSE_LABELS.cityTransfer}

@@ -26,8 +26,23 @@
   text-align: left;
   white-space: nowrap;
 }
+.executionTime {
+  margin-inline-start: auto;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 .text {
   min-width: 0;
+}
+.recordCity {
+  color: var(--color-info);
+}
+.successfulOutcome {
+  color: var(--color-success);
+}
+.failedOutcome {
+  color: var(--color-danger);
 }
 .headline {
   flex: 1 0 100%;

@@ -95,6 +95,36 @@ test.describe('외교실', () => {
     map = await nations(page, world);
   });
 
+  test('비공개 외교 문서를 보내고 지정된 외교권자가 확인한 뒤 승인한다', async ({ browser }) => {
+    const [x, y] = map.nations;
+    const a = await officer(browser, world, x!.id, 12);
+    const b = await officer(browser, world, y!.id, 12);
+    const delegate = await officer(browser, world, y!.id, 1);
+    await b.page.goto(`/w/${world}/nation/personnel`);
+    const appointments = b.page.getByRole('region', { name: '외교권자와 조언자' });
+    await appointments.getByLabel('지정할 장수').selectOption(String(delegate.generalId));
+    await appointments.getByLabel('외교 직책').selectOption('AMBASSADOR');
+    await appointments.getByRole('button', { name: '적용' }).click();
+    await expect(appointments.getByText('지정 없음')).toHaveCount(1);
+    const path = `/w/${world}/diplomacy?tab=documents`;
+    await a.page.goto(path);
+    const form = a.page.getByRole('form', { name: '외교 문서 작성' });
+    await form.getByLabel('받는 국가').selectOption(String(y!.id));
+    await form.getByLabel('요약').fill('공동 방어 협의');
+    await form.getByLabel('비공개 본문').fill('수비 방향과 병력은 양국 외교부만 확인합니다.');
+    await form.getByRole('button', { name: '문서 보내기' }).click();
+    const document = (page: Page) => page.getByRole('article', { name: /외교 문서 #/ });
+    await expect(document(a.page)).toContainText('승인 대기');
+    await delegate.page.goto(path);
+    await expect(document(delegate.page)).toContainText('공동 방어 협의');
+    await document(delegate.page).getByText('비공개 본문', { exact: true }).click();
+    await expect(document(delegate.page).getByText('수비 방향과 병력은 양국 외교부만 확인합니다.')).toBeVisible();
+    await document(delegate.page).getByRole('button', { name: '승인', exact: true }).click();
+    await expect(document(delegate.page)).toContainText('승인 대기');
+    await document(delegate.page).getByRole('button', { name: '승인 확인' }).click();
+    await expect(document(delegate.page)).toContainText('승인됨');
+  });
+
   test('군주 A가 불가침을 제안하고 군주 B가 수락하면 결과가 정해진 뒤에만 양쪽에 진행 중으로 보인다', async ({
     browser,
   }) => {

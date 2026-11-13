@@ -147,14 +147,20 @@ export function settleNpcLogistics(world: WorldState, tick: number, unitSet: Npc
       const amount = Math.min(
         npc.recruitTarget,
         plan.limit,
-        affordableRecruits(world, { ...general, gold: resources.gold - budget }, plan.type.cost, plan.limit),
+        affordableRecruits(
+          world,
+          { ...general, gold: resources.gold - budget },
+          plan.type.cost,
+          plan.limit,
+          plan.type.armType,
+        ),
       );
       if (amount < 1) continue;
       demands.push({
         cityKey: city.cityKey,
         need: recruitGoods(stock.config, plan.type.armType, amount),
         budget,
-        recruitGold: recruitCost(world, general, amount, plan.type.cost, false),
+        recruitGold: recruitCost(world, general, amount, plan.type.cost, false, plan.type.armType),
       });
     }
     const byCity = new Map(demands.map((demand) => [demand.cityKey, demand]));

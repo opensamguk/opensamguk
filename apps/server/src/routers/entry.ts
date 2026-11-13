@@ -4,15 +4,22 @@ import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import {
   POSSESSION_KIND,
+  NPC_ENTRY_DRAFT_FEATURE,
   HUMAN_GENERAL_LIMIT,
+  GENERAL_PROFICIENCY_FEATURE,
+  proficiencyByArmType,
+  unitSetSchema,
   POSSESSION_ERRORS,
   possessionPayloadSchema,
   possessionAppliedSchema,
   possessionRejectedSchema,
   validatePossessionRecord,
   availableNpc,
+  combatSpecialty,
+  combatSpecialtyKey,
+  domesticSpecialty,
   classifyRole,
-  recommendNations,
+  nationRecommendations,
   effectiveWorldOptions,
   parsePreset,
   toGameDate,
@@ -23,8 +30,12 @@ import type { Context } from '../context';
 import { router, protectedProcedure, worldVerifiedProcedure } from '../trpc';
 import { countHumanGenerals, worldInput, worldClock } from '../queries';
 import { requireWorld, readView } from '../game/queries';
+import { generalProgress } from '../game/generalProgress';
+import { generalType } from '../visibility';
+import { npcDraftIncludes, npcDraftRefresh, readNpcDraft } from '../game/npcEntryDraft';
 
 const statusInput = worldInput.extend({ expectedUserId: z.uuid(), idempotencyKey: z.uuid() }).strict();
+const rolesInput = worldInput.extend({ redraw: npcDraftRefresh.optional() }).strict();
 const possessInput = statusInput.extend({ generalId: possessionPayloadSchema.shape.generalId }).strict();
 type PossessionReply =
   | { status: 'pending' }
@@ -105,110 +116,164 @@ async function requestResult(ctx: Context, input: z.infer<typeof statusInput>, s
   });
 }
 
-export const entryRouter = router({
-  roles: protectedProcedure.input(worldInput).query(async ({ ctx, input }) => {
-    const started = performance.now();
-    return ctx.db.$transaction(
-      async (tx) => {
-        const world = await requireWorld(tx, input.worldId);
-        const userId = await currentSession(tx, ctx, input.worldId, started);
-        const mine = await tx.general.findUnique({
-          where: { worldId_userId: { worldId: input.worldId, userId } },
-          select: { id: true },
-        });
-        const pending = await tx.inputEvent.findFirst({
-          where: {
-            worldId: input.worldId,
-            userId,
-            status: 'PENDING',
-            kind: { in: ['general.create', POSSESSION_KIND] },
-          },
-          select: { id: true },
-        });
-        const enabled =
-          world.replayFormat === 3 &&
-          effectiveWorldOptions(world.preset === null ? null : parsePreset(world.preset), world.runtimeOptions).entry
-            .npcPlay === 'on';
-        const humans = await countHumanGenerals(tx, input.worldId);
-        const blockedReason = mine
-          ? POSSESSION_ERRORS.ALREADY_HAS_GENERAL
-          : !enabled
-            ? POSSESSION_ERRORS.ENTRY_CLOSED
-            : !['PREOPEN', 'RUNNING'].includes(world.status)
-              ? POSSESSION_ERRORS.NOT_ELIGIBLE
-              : pending
-                ? '입장 요청을 처리하고 있습니다.'
-                : humans >= HUMAN_GENERAL_LIMIT
-                  ? POSSESSION_ERRORS.WORLD_FULL
-                  : null;
-        const tick = nowTick(worldClock(world), ctx.now);
-        type Candidate = {
-          generalId: number;
-          name: string;
-          portraitId: number | null;
-          nation: { id: number; name: string; color: string } | null;
-          city: { key: number; name: string };
-          leadership: number;
-          strength: number;
-          intel: number;
-          politics?: number;
-          charm?: number;
-          officerLevel: number;
-          recommendedNation: { id: number; name: string; reason: string } | null;
-        };
-        const roles: Record<EntryRole, Candidate[]> = { ruler: [], core: [], retainer: [], free: [] };
-        if (blockedReason === null) {
-          const view = await readView(tx, input.worldId);
-          const selectable = new Set(
-            (
-              await tx.general.findMany({
-                where: { worldId: input.worldId, userId: null, removedAt: null, turnRevision: { lt: 2_147_483_647 } },
-                select: { id: true },
-              })
-            ).map((row) => row.id),
-          );
-          const candidates = Object.values(view.generals)
-            .filter((general) => selectable.has(general.id) && availableNpc(view, general.id, tick))
-            .sort(
-              (a, b) =>
-                (a.nationId ?? 2_147_483_647) - (b.nationId ?? 2_147_483_647) ||
-                b.leadership + b.strength + b.intel - (a.leadership + a.strength + a.intel) ||
-                a.id - b.id,
-            );
-          for (const general of candidates) {
-            const nation = general.nationId === null ? null : view.nations[general.nationId]!;
-            const suggested = general.nationId === null ? recommendNations(view, general.id, tick)[0] : undefined;
-            roles[classifyRole(general)].push({
-              generalId: general.id,
-              name: general.name,
-              portraitId: general.portraitId,
-              nation: nation ? { id: nation.id, name: nation.name, color: nation.color } : null,
-              city: { key: general.cityKey, name: view.cities[general.cityKey]!.name },
-              leadership: general.leadership,
-              strength: general.strength,
-              intel: general.intel,
-              ...(world.ruleFeatures.includes('five-stats')
-                ? { politics: general.politics!, charm: general.charm! }
-                : {}),
-              officerLevel: general.officerLevel,
-              recommendedNation: suggested
-                ? { id: suggested.id, name: suggested.name, reason: suggested.reason }
-                : null,
-            });
-          }
+async function readRoles(ctx: Context, input: z.infer<typeof rolesInput>, draw = false) {
+  const started = performance.now();
+  return ctx.db.$transaction(
+    async (tx) => {
+      const world = await requireWorld(tx, input.worldId, draw);
+      const draftEnabled = world.ruleFeatures.includes(NPC_ENTRY_DRAFT_FEATURE);
+      if (draw && !draftEnabled)
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '후보 추첨을 사용할 수 없는 월드입니다.' });
+      const userId = await currentSession(tx, ctx, input.worldId, started);
+      const mine = await tx.general.findUnique({
+        where: { worldId_userId: { worldId: input.worldId, userId } },
+        select: { id: true },
+      });
+      const pending = await tx.inputEvent.findFirst({
+        where: {
+          worldId: input.worldId,
+          userId,
+          status: 'PENDING',
+          kind: { in: ['general.create', POSSESSION_KIND] },
+        },
+        select: { id: true },
+      });
+      const enabled =
+        world.replayFormat === 3 &&
+        effectiveWorldOptions(world.preset === null ? null : parsePreset(world.preset), world.runtimeOptions).entry
+          .npcPlay === 'on';
+      const humans = await countHumanGenerals(tx, input.worldId);
+      const blockedReason = mine
+        ? POSSESSION_ERRORS.ALREADY_HAS_GENERAL
+        : !enabled
+          ? POSSESSION_ERRORS.ENTRY_CLOSED
+          : !['PREOPEN', 'RUNNING'].includes(world.status)
+            ? POSSESSION_ERRORS.NOT_ELIGIBLE
+            : pending
+              ? '입장 요청을 처리하고 있습니다.'
+              : humans >= HUMAN_GENERAL_LIMIT
+                ? POSSESSION_ERRORS.WORLD_FULL
+                : null;
+      const tick = nowTick(worldClock(world), ctx.now);
+      type Candidate = {
+        generalId: number;
+        name: string;
+        portraitId: number | null;
+        nation: { id: number; name: string; color: string } | null;
+        city: { key: number; name: string };
+        leadership: number;
+        strength: number;
+        intel: number;
+        politics?: number;
+        charm?: number;
+        proficiency?: ReturnType<typeof proficiencyByArmType>;
+        officerLevel: number;
+        age: number;
+        dedication: number;
+        personality?: string;
+        special?: string;
+        domesticSpecialty?: ReturnType<typeof domesticSpecialty>;
+        combatSpecialty?: ReturnType<typeof combatSpecialty>;
+        generalType: ReturnType<typeof generalType>;
+        progression: ReturnType<typeof generalProgress>;
+        recommendedNation: { id: number; name: string; reason: string } | null;
+      };
+      const gameDate = toGameDate(world.startYear, tick);
+      const roles: Record<EntryRole, Candidate[]> = { ruler: [], core: [], retainer: [], free: [] };
+      let draft: Awaited<ReturnType<typeof readNpcDraft>> | undefined;
+      if (blockedReason === null) {
+        const view = await readView(tx, input.worldId);
+        const unitSet = world.ruleFeatures.includes(GENERAL_PROFICIENCY_FEATURE)
+          ? unitSetSchema.parse(world.unitSet)
+          : undefined;
+        const selectable = new Set(
+          (
+            await tx.general.findMany({
+              where: { worldId: input.worldId, userId: null, removedAt: null, turnRevision: { lt: 2_147_483_647 } },
+              select: { id: true },
+            })
+          ).map((row) => row.id),
+        );
+        if (draftEnabled) {
+          const queued = await tx.inputEvent.findMany({
+            where: { worldId: world.id, kind: POSSESSION_KIND, status: 'PENDING' },
+            select: { payload: true },
+          });
+          for (const { payload } of queued) selectable.delete(possessionPayloadSchema.parse(payload).generalId);
         }
-        return {
-          gameDate: toGameDate(world.startYear, tick),
-          quota: { humans, max: HUMAN_GENERAL_LIMIT },
-          mine: mine ? { generalId: mine.id } : null,
-          roles,
-          canPossess: blockedReason === null,
-          blockedReason,
-        };
-      },
-      { isolationLevel: 'RepeatableRead' },
-    );
-  }),
+        const candidates = Object.values(view.generals)
+          .filter((general) => selectable.has(general.id) && availableNpc(view, general.id, tick))
+          .sort(
+            (a, b) =>
+              (a.nationId ?? 2_147_483_647) - (b.nationId ?? 2_147_483_647) ||
+              b.leadership + b.strength + b.intel - (a.leadership + a.strength + a.intel) ||
+              a.id - b.id,
+          );
+        draft = draftEnabled
+          ? await readNpcDraft(
+              tx,
+              {
+                worldId: world.id,
+                userId,
+                candidateIds: candidates.map(({ id }) => id),
+                now: ctx.now,
+                turnTermMinutes: world.turnTermMinutes,
+              },
+              draw,
+              input.redraw,
+            )
+          : undefined;
+        const drawn = draft ? new Set(draft.cards.map(({ generalId }) => generalId)) : null;
+        const recommend = nationRecommendations(view, tick);
+        for (const general of candidates) {
+          if (draftEnabled && !drawn?.has(general.id)) continue;
+          const nation = general.nationId === null ? null : view.nations[general.nationId]!;
+          const suggested = general.nationId === null ? recommend(general.id)[0] : undefined;
+          const domestic = domesticSpecialty(world, general.special);
+          const combat = combatSpecialty(world, combatSpecialtyKey(general));
+          roles[classifyRole(general)].push({
+            generalId: general.id,
+            name: general.name,
+            portraitId: general.portraitId,
+            nation: nation ? { id: nation.id, name: nation.name, color: nation.color } : null,
+            city: { key: general.cityKey, name: view.cities[general.cityKey]!.name },
+            leadership: general.leadership,
+            strength: general.strength,
+            intel: general.intel,
+            ...(world.ruleFeatures.includes('five-stats')
+              ? { politics: general.politics!, charm: general.charm! }
+              : {}),
+            ...(unitSet ? { proficiency: proficiencyByArmType(unitSet.armTypes, general.proficiency) } : {}),
+            officerLevel: general.officerLevel,
+            age: Math.max(0, gameDate.year - general.birthYear),
+            dedication: general.dedication,
+            ...(general.personality ? { personality: general.personality.replace(/^che_/, '') } : {}),
+            ...(general.special ? { special: general.special.replace(/^che_/, '') } : {}),
+            ...(domestic ? { domesticSpecialty: domestic } : {}),
+            ...(combat ? { combatSpecialty: combat } : {}),
+            generalType: generalType(general),
+            progression: generalProgress(general.experience, general.dedication),
+            recommendedNation: suggested ? { id: suggested.id, name: suggested.name, reason: suggested.reason } : null,
+          });
+        }
+      }
+      return {
+        gameDate,
+        quota: { humans, max: HUMAN_GENERAL_LIMIT },
+        mine: mine ? { generalId: mine.id } : null,
+        roles,
+        ...(draftEnabled ? { draft: draft ?? null } : {}),
+        canPossess: blockedReason === null,
+        blockedReason,
+      };
+    },
+    draw ? undefined : { isolationLevel: 'RepeatableRead' },
+  );
+}
+
+export const entryRouter = router({
+  roles: protectedProcedure.input(worldInput).query(({ ctx, input }) => readRoles(ctx, input)),
+  draw: worldVerifiedProcedure.input(rolesInput).mutation(({ ctx, input }) => readRoles(ctx, input, true)),
   possess: worldVerifiedProcedure.input(possessInput).mutation(async ({ ctx, input }): Promise<PossessionReply> => {
     const started = performance.now();
     expectedActor(ctx, input.expectedUserId);
@@ -251,6 +316,11 @@ export const entryRouter = router({
       )
         throw new TRPCError({ code: 'CONFLICT', message: '입장 요청을 처리하고 있습니다.' });
       if ((await countHumanGenerals(tx, input.worldId)) >= HUMAN_GENERAL_LIMIT) return rejected('WORLD_FULL');
+      if (
+        world.ruleFeatures.includes(NPC_ENTRY_DRAFT_FEATURE) &&
+        !(await npcDraftIncludes(tx, world.id, userId, input.generalId, ctx.now))
+      )
+        return rejected('NOT_ELIGIBLE');
       const target = await tx.general.findUnique({
         where: { worldId_id: { worldId: input.worldId, id: input.generalId } },
       });

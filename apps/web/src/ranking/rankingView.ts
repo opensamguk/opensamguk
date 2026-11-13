@@ -20,6 +20,18 @@ export const GENERAL_COLUMNS: ReadonlyArray<{ key: GeneralSortKey; label: string
   { key: 'dedication', label: '공헌' },
   { key: 'experience', label: '경험' },
   { key: 'merit', label: '전공' },
+  { key: 'stratagem', label: '계략 성공' },
+  { key: 'engagements', label: '교전' },
+  { key: 'winRate', label: '승률' },
+  { key: 'kills', label: '사살' },
+  { key: 'killRate', label: '살상률' },
+  { key: 'humanKills', label: '대인 사살' },
+  { key: 'humanKillRate', label: '대인 살상률' },
+  { key: 'proficiency1', label: '보병 숙련' },
+  { key: 'proficiency2', label: '궁병 숙련' },
+  { key: 'proficiency3', label: '기병 숙련' },
+  { key: 'proficiency4', label: '귀병 숙련' },
+  { key: 'proficiency5', label: '차병 숙련' },
 ];
 
 export const NATION_COLUMNS: ReadonlyArray<{ key: NationSortKey; label: string }> = [
@@ -28,7 +40,9 @@ export const NATION_COLUMNS: ReadonlyArray<{ key: NationSortKey; label: string }
   { key: 'power', label: '국력' },
 ];
 
-export type RankingSearch = { tab: 'generals'; by: GeneralSortKey } | { tab: 'nations'; by: NationSortKey };
+export type GeneralKind = 'all' | 'human' | 'npc';
+export type RankingSearch =
+  { tab: 'generals'; by: GeneralSortKey; kind?: GeneralKind; page?: number } | { tab: 'nations'; by: NationSortKey };
 
 // 주소의 tab·by가 틀리면 탭마다 첫 기준으로 돌린다. 장수 탭에 국가 기준(by=cities)이 오는 경우도 같다.
 export function parseRankingSearch(search: Record<string, unknown>): RankingSearch {
@@ -37,7 +51,12 @@ export function parseRankingSearch(search: Record<string, unknown>): RankingSear
     return { tab: 'nations', by };
   }
   const by = GENERAL_COLUMNS.find((c) => c.key === search.by)?.key ?? 'dedication';
-  return { tab: 'generals', by };
+  const kind = search.kind === 'human' || search.kind === 'npc' ? search.kind : null;
+  const page =
+    typeof search.page === 'number' && Number.isInteger(search.page) && search.page > 1 && search.page <= 10_000
+      ? search.page
+      : null;
+  return { tab: 'generals', by, ...(kind ? { kind } : {}), ...(page ? { page } : {}) };
 }
 
 // 탭을 바꾸면 그 탭의 첫 기준부터 본다.

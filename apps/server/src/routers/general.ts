@@ -4,6 +4,18 @@ import { TRPCError } from '@trpc/server';
 import {
   POSSESSION_KIND,
   CREATION_ERRORS,
+  DEFENSE_STANCE_FEATURE,
+  DEFENSE_STANCE_KIND,
+  GENERAL_PERSONALITY_FEATURE,
+  HERITAGE_BIRTH_FEATURE,
+  HERITAGE_BIRTH_ZONES,
+  heritageBirthCosts,
+  combatSpecialty,
+  combatSpecialtyNames,
+  cityRegionName,
+  readOperationalMap,
+  generalPersonalityChoices,
+  defenseStanceInput,
   creationBlock,
   effectiveWorldOptions,
   parsePreset,
@@ -17,7 +29,7 @@ import {
 } from '@opensamguk/rules';
 import { z } from 'zod';
 import { router, protectedProcedure, worldVerifiedProcedure } from '../trpc';
-import { requireGeneral, requireWorld, worldInput } from '../game/queries';
+import { requireGeneral, requireRuleFeature, requireWorld, worldInput } from '../game/queries';
 import { countHumanGenerals } from '../queries';
 import { ownGeneral } from '../game/projection';
 import { readPolicy, requirePolicyReady } from '../game/policy';
@@ -33,6 +45,7 @@ const codes = {
   BAD_STATS: 'BAD_REQUEST',
   BAD_PORTRAIT: 'BAD_REQUEST',
   BAD_SEX: 'BAD_REQUEST',
+  BAD_PERSONALITY: 'BAD_REQUEST',
   BAD_HERITAGE: 'BAD_REQUEST',
   HERITAGE_INSUFFICIENT: 'CONFLICT',
   WORLD_FULL: 'BAD_REQUEST',
@@ -56,7 +69,9 @@ const creationEnvelope = worldInput.extend({
   politics: z.unknown().optional(),
   charm: z.unknown().optional(),
   sex: z.unknown().optional(),
+  personality: z.unknown().optional(),
   heritage: z.unknown().optional(),
+  heritageBirth: z.unknown().optional(),
   expectedUserId: z.uuid().optional(),
   portraitId: z.unknown(),
 });
@@ -78,6 +93,39 @@ export const generalRouter = router({
       { isolationLevel: 'RepeatableRead' },
     ),
   ),
+  setDefenseStance: worldVerifiedProcedure
+    .input(defenseStanceInput.extend(worldInput.shape))
+    .mutation(({ ctx, input }) =>
+      ctx.db.$transaction(async (tx) => {
+        const world = await requireWorld(tx, input.worldId, true);
+        requireRuleFeature(world, DEFENSE_STANCE_FEATURE);
+        if (world.status === 'ENDED')
+          throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '종료된 월드입니다.' });
+        const general = await requireGeneral(tx, input.worldId, ctx.user.id, true);
+        if (general.removedAt !== null)
+          throw new TRPCError({ code: 'FORBIDDEN', message: '은퇴한 장수의 수비 기준은 바꿀 수 없습니다.' });
+        const pending = await tx.inputEvent.findFirst({
+          where: { worldId: world.id, generalId: general.id, kind: DEFENSE_STANCE_KIND, status: 'PENDING' },
+          select: { payload: true },
+        });
+        if (pending) {
+          if (defenseStanceInput.parse(pending.payload).threshold !== input.threshold)
+            throw new TRPCError({ code: 'CONFLICT', message: '다른 수비 기준 요청을 처리하고 있습니다.' });
+        } else {
+          await tx.inputEvent.create({
+            data: {
+              worldId: world.id,
+              userId: ctx.user.id,
+              generalId: general.id,
+              kind: DEFENSE_STANCE_KIND,
+              idempotencyKey: `${DEFENSE_STANCE_KIND}:${randomUUID()}`,
+              payload: { threshold: input.threshold },
+            },
+          });
+        }
+        return { status: 'pending' as const };
+      }),
+    ),
   setPolicy: worldVerifiedProcedure
     .input(worldInput.extend({ policy: policyKeySchema }))
     .mutation(async ({ ctx, input }) => {
@@ -165,9 +213,11 @@ export const generalRouter = router({
           code: 'BAD_REQUEST',
           message: parsed.error.issues.some((issue) => issue.path[0] === 'sex')
             ? CREATION_ERRORS.BAD_SEX
-            : parsed.error.issues.some((issue) => issue.path[0] === 'heritage')
-              ? CREATION_ERRORS.BAD_HERITAGE
-              : parsed.error.message,
+            : parsed.error.issues.some((issue) => issue.path[0] === 'personality')
+              ? CREATION_ERRORS.BAD_PERSONALITY
+              : parsed.error.issues.some((issue) => issue.path[0] === 'heritage' || issue.path[0] === 'heritageBirth')
+                ? CREATION_ERRORS.BAD_HERITAGE
+                : parsed.error.message,
           cause: parsed.error,
         });
       const checked = validateGeneralCreation(
@@ -175,9 +225,19 @@ export const generalRouter = router({
         world.statRules,
         world.ruleFeatures.includes('lineage-v1'),
         world.ruleFeatures.includes('heritage-v1'),
+        world.ruleFeatures.includes(GENERAL_PERSONALITY_FEATURE),
+        world.ruleFeatures.includes(HERITAGE_BIRTH_FEATURE),
       );
       if (!checked.ok) throw new TRPCError({ code: 'BAD_REQUEST', message: checked.message });
-      const { portraitId } = checked.value;
+      const { portraitId, heritageBirth } = checked.value;
+      if (
+        heritageBirth?.cityKey !== undefined &&
+        !(await tx.city.findFirst({
+          where: { worldId, cityKey: heritageBirth.cityKey, OR: [{ kind: null }, { kind: 'CITY' }] },
+          select: { cityKey: true },
+        }))
+      )
+        throw new TRPCError({ code: 'BAD_REQUEST', message: CREATION_ERRORS.BAD_HERITAGE });
       if (
         portraitId !== null &&
         portraitId >= PLAYER_PORTRAIT_MIN_ID &&
@@ -235,6 +295,10 @@ export const generalRouter = router({
     ctx.db.$transaction(
       async (tx) => {
         const world = await requireWorld(tx, input.worldId);
+        const birthEnabled = world.ruleFeatures.includes(HERITAGE_BIRTH_FEATURE);
+        const regionScheme = birthEnabled
+          ? readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin)?.regionScheme
+          : undefined;
         const creationRules = {
           ...statRulesSchema.parse({ stat: world.statRules }).stat,
           count: world.ruleFeatures.includes('five-stats') ? (5 as const) : (3 as const),
@@ -249,6 +313,28 @@ export const generalRouter = router({
             ? { npcPlayEnabled: true as const }
             : {}),
           ...(world.ruleFeatures.includes('lineage-v1') ? { lineageEnabled: true as const } : {}),
+          ...(world.ruleFeatures.includes(GENERAL_PERSONALITY_FEATURE)
+            ? { personalities: generalPersonalityChoices }
+            : {}),
+          ...(birthEnabled
+            ? {
+                heritageBirth: {
+                  costs: heritageBirthCosts,
+                  turnZones: HERITAGE_BIRTH_ZONES,
+                  specialties: combatSpecialtyNames.flatMap((name) => combatSpecialty(world, name) ?? []),
+                  cities: (
+                    await tx.city.findMany({
+                      where: { worldId: world.id, OR: [{ kind: null }, { kind: 'CITY' }] },
+                      select: { cityKey: true, name: true, level: true, region: true },
+                      orderBy: { cityKey: 'asc' },
+                    })
+                  ).map(({ region, ...city }) => ({
+                    ...city,
+                    regionName: cityRegionName(region, world.mapKey, regionScheme),
+                  })),
+                },
+              }
+            : {}),
           ...(world.ruleFeatures.includes('nation-lifecycle-v1') ? { nationLifecycleEnabled: true as const } : {}),
           ...(world.ruleFeatures.includes('heritage-v1')
             ? {

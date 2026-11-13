@@ -1,17 +1,26 @@
+import { useBattleTool } from '../equipment/morale';
+import { applyBattleLoot, consumeSnipeTool, equipmentBattleEffects } from '../equipment/battle';
+import { battleTacticsStats } from '../battle/tactics';
+import { combatSpecialty, combatSpecialtyKey } from '../general/combatSpecialty';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import { z } from 'zod';
+import { nationRestrictions } from '../personnel/nationRestrictions';
+import { addGeneralProficiency } from '../general/proficiency';
+import { personalityEffects } from '../general/personality';
 import { BALANCE } from '../balance';
-import { simulateBattle } from '../battle/simulate';
-import { canDefend } from '../battle/defenders';
+import { simulateBattle, type BattlePhase } from '../battle/simulate';
+import { canDefend, DEFENSE_STANCE_FEATURE } from '../battle/defenders';
 import type { CommandResult } from './types';
 import type { InitialGeneral } from '../world/bootstrap';
 import { refreshSupply } from '../supply';
 import { defineCommand, fail, positive, relation, removeNation, success } from './support';
 import { collectModifiers, collectModifiersWith, type ModifierProvider } from '../modifiers';
+import { recordWarCasualties } from '../monthly/warIncome';
+import { recordSiegeContribution, settleCityConflict } from '../battle/cityConflict';
 
 type Force = Pick<InitialGeneral, 'crew' | 'crewType' | 'train' | 'atmos' | 'rice'>;
-function feed(force: Force) {
-  force.rice = Math.max(0, force.rice - Math.ceil(force.crew * BALANCE.BATTLE_RICE_PER_CREW));
+function feed(force: Force, riceFactor = 1) {
+  force.rice = Math.max(0, force.rice - Math.ceil(force.crew * BALANCE.BATTLE_RICE_PER_CREW * riceFactor));
   if (force.rice === 0) force.atmos = Math.max(0, force.atmos - BALANCE.STARVATION_ATMOS_LOSS);
 }
 export const attack = makeAttack(collectModifiers);
@@ -31,6 +40,8 @@ function makeAttack(collect: typeof collectModifiers) {
         return fail('PROTECTED', '초반 보호 기간에는 출병할 수 없습니다.');
       const g = view.generals[actor.generalId]!;
       if (g.nationId === null) return fail('NOT_NATION', '국가에 소속되어야 합니다.');
+      if (nationRestrictions(view, view.nations[g.nationId]).warBlocked)
+        return fail('PROTECTED', '국가가 출병을 금지했습니다.');
       const from = view.cities[g.cityKey],
         target = view.cities[args.cityKey];
       if (!target || target.nationId === g.nationId)
@@ -65,27 +76,45 @@ function makeAttack(collect: typeof collectModifiers) {
             defendingNation !== null &&
             d.nationId === defendingNation &&
             d.cityKey === city.cityKey &&
-            canDefend(d.crew, d.train, d.atmos) &&
+            canDefend(
+              d.crew,
+              d.train,
+              d.atmos,
+              state.ruleFeatures?.includes(DEFENSE_STANCE_FEATURE),
+              d.defenseThreshold,
+            ) &&
             d.activeFromYear <= state.startYear + Math.floor((actor.tick ?? 0) / (12 * 10000)),
         )
         .sort((a, b) => b.crew - a.crew || a.id - b.id);
-      const reports: { generalId: number; text: string }[] = [];
+      const reports: NonNullable<CommandResult['reports']> = [];
       const battleAwards: NonNullable<CommandResult['battleAwards']> = [];
       const battleOutcomes: NonNullable<CommandResult['battleOutcomes']> = [];
+      const generalEngagements: NonNullable<CommandResult['generalEngagements']> = [];
       const reputation = state.ruleFeatures?.includes('reputation-v1');
       const rounds: string[] = [];
+      const attackPhases: BattlePhase[] = [];
       let attackerFirstVolleyUsed = false;
       const wallFirst =
         defenders.length > 0 &&
         city.wall > 0 &&
         actor.unitSet!.crewTypes.find((unit) => unit.id === g.crewType)?.effects?.includes('wallFirst');
       const fightWall = (openingSkirmish = false) => {
+        const attackerEquipment = equipmentBattleEffects(state, g.id);
         const wall: Force = { crew: city.wall, crewType: 1000, train: 100, atmos: 100, rice: 0 };
-        feed(g);
+        feed(g, attackerEquipment?.riceFactor);
+        useBattleTool(state, g.id, g);
         const battle = simulateBattle(
           {
             attacker: g,
+            attackerEquipment,
+            attackerInjury: g.injury,
+            attackerReadiness: personalityEffects(state, g.personality),
+            attackerProficiency: g.proficiency,
+            attackerSpecialty: combatSpecialty(state, combatSpecialtyKey(g)),
+            attackerHeritage: g.heritageBenefits,
+            attackerTactics: battleTacticsStats(state, g),
             defender: wall,
+            recordPhases: actor.recordBattleStats === true,
             attackerTech: aTech,
             defenderTech: bTech,
             defence: city.defence,
@@ -102,20 +131,46 @@ function makeAttack(collect: typeof collectModifiers) {
           rng,
         );
         attackerFirstVolleyUsed ||= battle.attackerFirstVolleyFired === true;
+        consumeSnipeTool(state, g.id, battle.attackerSniped);
+        recordWarCasualties(state, g.cityKey, city.cityKey, g.crew - battle.attacker.crew);
         Object.assign(g, battle.attacker);
+        if (battle.attackerInjury !== undefined) g.injury = battle.attackerInjury;
+        const wallDamage = city.wall - battle.defender.crew;
+        addGeneralProficiency(state, g, 5, wallDamage);
         city.wall = battle.defender.crew;
+        recordSiegeContribution(state, city, attackingNation, wallDamage);
         const name = openingSkirmish ? '성벽 선제 교전' : '성벽 교전';
+        for (const phase of battle.phases ?? []) attackPhases.push({ ...phase, opponent: '성벽' });
         rounds.push(`${name}: 공격 ${g.crew}명, 성벽 ${city.wall}`);
       };
       if (wallFirst) fightWall(true);
       let cleared = g.crew > 0 && g.atmos > 0;
       for (const defender of cleared ? defenders : []) {
-        feed(g);
-        feed(defender);
+        const attackerEquipment = equipmentBattleEffects(state, g.id);
+        const defenderEquipment = equipmentBattleEffects(state, defender.id);
+        feed(g, attackerEquipment?.riceFactor);
+        feed(defender, defenderEquipment?.riceFactor);
+        useBattleTool(state, g.id, g);
+        useBattleTool(state, defender.id, defender);
         const battle = simulateBattle(
           {
             attacker: g,
+            attackerEquipment,
+            defenderEquipment,
+            attackerInjury: g.injury,
+            defenderInjury: defender.injury,
+            attackerReadiness: personalityEffects(state, g.personality),
+            attackerProficiency: g.proficiency,
+            attackerSpecialty: combatSpecialty(state, combatSpecialtyKey(g)),
+            attackerHeritage: g.heritageBenefits,
+            attackerTactics: battleTacticsStats(state, g),
             defender,
+            defenderReadiness: personalityEffects(state, defender.personality),
+            defenderProficiency: defender.proficiency,
+            defenderSpecialty: combatSpecialty(state, combatSpecialtyKey(defender)),
+            defenderHeritage: defender.heritageBenefits,
+            defenderTactics: battleTacticsStats(state, defender),
+            recordPhases: actor.recordBattleStats === true,
             attackerTech: aTech,
             defenderTech: bTech,
             attackerFirstVolleyUsed,
@@ -133,10 +188,32 @@ function makeAttack(collect: typeof collectModifiers) {
           rng,
         );
         attackerFirstVolleyUsed ||= battle.attackerFirstVolleyFired === true;
+        consumeSnipeTool(state, g.id, battle.attackerSniped);
+        consumeSnipeTool(state, defender.id, battle.defenderSniped);
+        const attackerLoss = g.crew - battle.attacker.crew;
+        const defenderLoss = defender.crew - battle.defender.crew;
+        recordWarCasualties(state, g.cityKey, city.cityKey, attackerLoss + defenderLoss);
+        const arms = actor.unitSet!.crewTypes;
+        addGeneralProficiency(state, g, arms.find((type) => type.id === g.crewType)!.armType, defenderLoss);
+        addGeneralProficiency(
+          state,
+          defender,
+          arms.find((type) => type.id === defender.crewType)!.armType,
+          attackerLoss * 0.8,
+        );
         Object.assign(g, battle.attacker);
         Object.assign(defender, battle.defender);
+        if (battle.attackerInjury !== undefined) g.injury = battle.attackerInjury;
+        if (battle.defenderInjury !== undefined) defender.injury = battle.defenderInjury;
         const attackerSurvives = g.crew > 0 && g.atmos > 0;
         const defenderSurvives = defender.crew > 0 && defender.atmos > 0;
+        generalEngagements.push({
+          attackerId: g.id,
+          defenderId: defender.id,
+          attackerLoss,
+          defenderLoss,
+          winnerId: attackerSurvives === defenderSurvives ? null : attackerSurvives ? g.id : defender.id,
+        });
         if (attackerSurvives && !defenderSurvives) {
           battleAwards.push({ generalId: g.id, wins: 1, captures: 0 });
           if (reputation) battleOutcomes.push({ winnerId: g.id, loserId: defender.id });
@@ -144,9 +221,11 @@ function makeAttack(collect: typeof collectModifiers) {
           battleAwards.push({ generalId: defender.id, wins: 1, captures: 0 });
           if (reputation) battleOutcomes.push({ winnerId: defender.id, loserId: g.id });
         }
-        const text = `${g.name} 대 ${defender.name}: 공격 ${g.crew}명, 수비 ${defender.crew}명`;
+        const loot = applyBattleLoot(state, g, defender, rng);
+        const text = `${g.name} 대 ${defender.name}: 공격 ${g.crew}명, 수비 ${defender.crew}명${loot ? ` · ${loot}` : ''}`;
         rounds.push(text);
-        reports.push({ generalId: defender.id, text });
+        for (const phase of battle.phases ?? []) attackPhases.push({ ...phase, opponent: defender.name });
+        reports.push({ generalId: defender.id, text, ...(battle.phases?.length ? { phases: battle.phases } : {}) });
         if (g.crew <= 0 || g.atmos <= 0 || (defender.crew > 0 && defender.atmos > 0)) {
           cleared = false;
           break;
@@ -157,11 +236,11 @@ function makeAttack(collect: typeof collectModifiers) {
       const history: { nationId: number; text: string }[] = [];
       if (captured) {
         battleAwards.push({ generalId: g.id, wins: 0, captures: 1 });
-        city.nationId = attackingNation;
+        city.nationId = settleCityConflict(state, city, attackingNation, history);
         city.defence = 0;
         city.security = Math.round(city.security * BALANCE.CAPTURE_SECURITY_FACTOR);
         city.trust = Math.max(0, city.trust - BALANCE.CAPTURE_TRUST_LOSS);
-        g.cityKey = city.cityKey;
+        if (city.nationId === attackingNation) g.cityKey = city.cityKey;
         let relocated: { nationId: number; text: string } | undefined;
         if (defendingNation !== null) {
           const nation = state.nations[defendingNation]!;
@@ -182,6 +261,8 @@ function makeAttack(collect: typeof collectModifiers) {
       }
       const summary = `${g.name} ${city.name} ${captured ? '점령' : '점령 실패'}: 병력 ${g.crew}명`;
       for (const report of reports) report.text += `, ${captured ? '점령' : '수비 유지'}`;
+      if (actor.recordBattleStats)
+        reports.push({ generalId: g.id, text: summary, ...(attackPhases.length ? { phases: attackPhases } : {}) });
       history.push({ nationId: attackingNation, text: `${rounds.join('; ')}; ${summary}` });
       if (defendingNation !== null) history.push({ nationId: defendingNation, text: summary });
       return {
@@ -189,8 +270,12 @@ function makeAttack(collect: typeof collectModifiers) {
         reports,
         history,
         battleAwards,
+        ...(actor.recordBattleStats ? { generalEngagements } : {}),
         ...(reputation ? { battleOutcomes } : {}),
         attackTarget: { cityKey: args.cityKey, defendingNationId: defendingNation },
+        ...(captured && city.nationId !== attackingNation
+          ? { cityTransfer: { cityKey: city.cityKey, fromNationId: attackingNation, toNationId: city.nationId! } }
+          : {}),
       };
     },
   });
