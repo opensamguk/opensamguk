@@ -849,6 +849,9 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     expect(JSON.stringify(publicRecords)).not.toMatch(/gold|rice|power|stateHash|private/);
     const home = (await query('home.get', { worldId })).data;
     expect(home.recentLogs).toEqual((await query('records.general', { worldId })).data.items.slice(0, 10));
+    const first = home.recentLogs[0]!;
+    const stored = await db.generalLog.findUniqueOrThrow({ where: { id: BigInt(first.id) } });
+    expect(first.createdAt).toBe(stored.createdAt.toISOString());
   });
 
   it('전투 기록은 세션 장수의 보고서만 같은 턴에서도 빠짐없이 이어 읽는다', async () => {
