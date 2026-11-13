@@ -81,7 +81,7 @@ it('INT-26 반계 장비는 성공한 계략의 피해를 반대편에 적용하
 
 it('INT-26 저격은 첫 교전에만 사기를 올리고 장수의 부상을 80까지 올린다', () => {
   const input = fixture();
-  input.attackerEquipment = { snipe: { chance: 0.2, morale: 20 } };
+  input.attackerEquipment = { snipe: { chance: 0.2, morale: 20, injury: [20, 40] } };
   input.defenderInjury = 79;
   input.recordPhases = true;
   const hit = run(input, [0.1]);
@@ -89,7 +89,8 @@ it('INT-26 저격은 첫 교전에만 사기를 올리고 장수의 부상을 80
   expect(hit.attacker.atmos).toBe(20);
   expect(hit.phases?.[0]?.attackerSniped).toBe(true);
   expect(run(input, [0.2])).not.toHaveProperty('defenderInjury');
-  const { defenderInjury: _injury, ...wallInput } = input;
+  const wallInput = { ...input };
+  delete wallInput.defenderInjury;
   const wall = run(wallInput, [0.1]);
   expect(wall).not.toHaveProperty('defenderInjury');
   expect(wall.attacker.atmos).toBe(20);

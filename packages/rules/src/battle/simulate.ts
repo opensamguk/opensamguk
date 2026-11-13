@@ -162,11 +162,13 @@ export function simulateBattle(input: BattleInput, rng: Rng): BattleResult {
   const snipes = { ...(attackerSniped ? { attackerSniped } : {}), ...(defenderSniped ? { defenderSniped } : {}) };
   if (attackerSniped) {
     attacker.atmos = Math.min(100, attacker.atmos + attackerSnipe.morale);
-    if (input.defenderInjury !== undefined) result.defenderInjury = snipeInjury(input.defenderInjury, rng);
+    if (input.defenderInjury !== undefined)
+      result.defenderInjury = snipeInjury(input.defenderInjury, attackerSnipe.injury, rng);
   }
   if (defenderSniped) {
     defender.atmos = Math.min(100, defender.atmos + defenderSnipe.morale);
-    if (input.attackerInjury !== undefined) result.attackerInjury = snipeInjury(input.attackerInjury, rng);
+    if (input.attackerInjury !== undefined)
+      result.attackerInjury = snipeInjury(input.attackerInjury, defenderSnipe.injury, rng);
   }
   const aUnit = unit(unitSet, attacker.crewType),
     bUnit = unit(unitSet, defender.crewType);
@@ -283,8 +285,8 @@ function equipmentEvasion(force: BattleForce, equipment: EquipmentBattleEffects 
   return leadership ? Math.min(0.5, Math.max(0, (1 - force.crew / (100 * leadership)) * 0.5)) : 0;
 }
 
-function snipeInjury(injury: number, rng: Rng) {
-  return Math.max(injury, Math.min(80, injury + rng.int(20, 40)));
+function snipeInjury(injury: number, [min, max]: readonly [number, number], rng: Rng) {
+  return Math.max(injury, Math.min(80, injury + rng.int(min, max)));
 }
 
 function reflectedTactic(

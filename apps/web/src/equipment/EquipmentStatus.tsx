@@ -12,13 +12,14 @@ export const equipmentEffectText = (item: Pick<EquipmentItem, 'stat' | 'bonus'>)
 function EquippedItem({
   item,
 }: {
-  item: (Pick<EquipmentItem, 'name' | 'stat' | 'bonus'> & { description?: string }) | undefined;
+  item: (Pick<EquipmentItem, 'name' | 'stat' | 'bonus'> & { description?: string; battleEffect?: string }) | undefined;
 }) {
   if (!item) return <>미장착</>;
   return (
     <>
       <span>{item.name}</span>{' '}
       <span data-testid="equipment-effect">({item.description ?? equipmentEffectText(item)})</span>
+      {item.battleEffect ? <span> {item.battleEffect}</span> : null}
     </>
   );
 }

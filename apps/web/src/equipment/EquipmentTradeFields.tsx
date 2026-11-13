@@ -121,6 +121,12 @@ export function EquipmentTradeFields({
           </strong>
           <br />
           치안 {n(item.requiredSecurity)} 이상 · {materials || '재료 소모 없음'}
+          {item.battleEffect ? (
+            <>
+              <br />
+              {item.battleEffect}
+            </>
+          ) : null}
           {security === undefined ? null : (
             <>
               <br />

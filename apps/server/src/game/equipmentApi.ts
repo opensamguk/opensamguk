@@ -3,6 +3,7 @@ import {
   equipmentSlotSchema,
   TREATMENT_TOOL,
   availableEquipmentTools,
+  regularEquipmentBattleDescription,
   hasRareEquipment,
   rareEquipmentCatalog,
   equipmentTools,
@@ -61,10 +62,14 @@ export function readEquipmentBoard(ctx: PersonnelActorContext, worldId: string, 
         sellRateBp: equipment.config.sellRateBp,
         tradeExperience: equipment.config.tradeExperience,
         // 게임 내 조건이다. 예턴 편집·실행의 세션·제재·진행 상태 검사는 기존 경로가 맡는다.
-        items: equipment.config.items.map((item) => ({
-          ...item,
-          failure: command.check(state, actor, { slot: item.slot, itemKey: item.key }),
-        })),
+        items: equipment.config.items.map((item) => {
+          const battleEffect = regularEquipmentBattleDescription(equipment.config, item.key);
+          return {
+            ...item,
+            ...(battleEffect ? { battleEffect } : {}),
+            failure: command.check(state, actor, { slot: item.slot, itemKey: item.key }),
+          };
+        }),
         sales: equipmentSlotSchema.options.map((slot) => {
           const held = equipment.config.items.find((item) => item.key === slots[slot]);
           return {

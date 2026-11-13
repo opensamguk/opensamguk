@@ -1,4 +1,5 @@
 import type { WorldView } from '../model/world';
+import type { EquipmentConfig } from './config';
 
 export type EquipmentBattleEffects = {
   extraPhases?: number;
@@ -9,8 +10,14 @@ export type EquipmentBattleEffects = {
   opposingTacticsSuccess?: number;
   tacticsDamageFactor?: number;
   counterTactics?: number;
-  snipe?: { chance: number; morale: number };
+  snipe?: { chance: number; morale: number; injury: readonly [min: number, max: number] };
 };
+
+const standardBookTrial = (key: string | undefined) => {
+  const grade = /^book_0([1-6])$/.exec(key ?? '')?.[1];
+  return grade ? Math.ceil(Number(grade) / 2) : 0;
+};
+const shortBow = { chance: 0.01, morale: 20, injury: [10, 30] } satisfies EquipmentBattleEffects['snipe'];
 
 // core2026 c81d304, packages/logic/src/items (MIT).
 export function equipmentBattleEffects(world: WorldView, generalId: number): EquipmentBattleEffects | undefined {
@@ -19,6 +26,8 @@ export function equipmentBattleEffects(world: WorldView, generalId: number): Equ
   const slots = equipment.generals[String(generalId)];
   if (!slots) return undefined;
   const effects: EquipmentBattleEffects = {};
+  const bookTrial = standardBookTrial(slots.book);
+  if (bookTrial) effects.tacticsTrial = bookTrial / 100;
   switch (slots.horse) {
     case 'horse_07_기주마':
       effects.extraPhases = 1;
@@ -47,14 +56,24 @@ export function equipmentBattleEffects(world: WorldView, generalId: number): Equ
       break;
   }
   switch (slots.weapon) {
+    case 'weapon_02':
+      effects.snipe = shortBow;
+      break;
     case 'weapon_07_맥궁':
     case 'weapon_09_동호비궁':
-      effects.snipe = { chance: 0.2, morale: 20 };
+      effects.snipe = { chance: 0.2, morale: 20, injury: [20, 40] };
       break;
     case 'weapon_11_이광궁':
     case 'weapon_13_양유기궁':
-      effects.snipe = { chance: 0.1, morale: 10 };
+      effects.snipe = { chance: 0.1, morale: 10, injury: [20, 40] };
       break;
   }
   return effects;
+}
+
+export function regularEquipmentBattleDescription(config: Readonly<EquipmentConfig>, key: string) {
+  if (!('fullRareEquipment' in config)) return undefined;
+  if (key === 'weapon_02') return `교전 시작 시 ${shortBow.chance * 100}% 확률로 저격하고 사기 +${shortBow.morale}.`;
+  const trial = standardBookTrial(key);
+  return trial ? `전투 계략 시도 확률 +${trial}%p.` : undefined;
 }
