@@ -572,6 +572,12 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     });
     const activity = await query('records.activity', { worldId: world }, users[3]!.cookie);
     expect(activity.data.items[0]).toMatchObject({ kind: 'enlist', text: '공개 장수 1 공개 국가 임관' });
+    expect(
+      (await query('records.activity', { worldId: world, period: { year: state.startYear, month: 1 } })).data,
+    ).toEqual(activity.data);
+    expect(
+      (await query('records.activity', { worldId: world, period: { year: state.startYear, month: 2 } })).data,
+    ).toEqual({ items: [], nextCursor: null });
     expect((await query('records.activity', { worldId: world, scope: 'world' })).data.items).toEqual(news.data.items);
     expect((await query('records.activity', { worldId: otherWorldId })).data.items).toEqual([]);
     expect((await query('records.activity', { worldId: world, cursor: '?' })).status).toBe(400);

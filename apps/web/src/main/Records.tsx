@@ -80,10 +80,13 @@ function useRecords(kind: RecordKind, worldId: string, enabled: boolean) {
 }
 
 // 장수 동향(scope all: 평판 사건 + 공개 국가 사건)과 중원 정세(scope world: 국가 사건만). 같은 procedure의 다른 입력이다.
-function useActivity(worldId: string, scope: 'all' | 'world' | 'biography') {
+type ActivityPeriod = { year: number; month: number };
+
+function useActivity(worldId: string, scope: 'all' | 'world' | 'biography', period?: ActivityPeriod) {
   const trpc = useTRPC();
-  return useCursorPages(trpc.records.activity.queryKey({ worldId, scope }), (cursor) =>
-    trpcClient.records.activity.query(withCursor({ worldId, scope }, cursor)),
+  const input = { worldId, scope, ...(period ? { period } : {}) };
+  return useCursorPages(trpc.records.activity.queryKey(input), (cursor) =>
+    trpcClient.records.activity.query(withCursor(input, cursor)),
   );
 }
 
@@ -442,12 +445,14 @@ export function ActivityFeed({
   worldId,
   compact = false,
   biography = false,
+  period,
 }: {
   worldId: string;
   compact?: boolean;
   biography?: boolean;
+  period?: ActivityPeriod | undefined;
 }) {
-  const query = useActivity(worldId, biography ? 'biography' : 'all');
+  const query = useActivity(worldId, biography ? 'biography' : 'all', period);
   if (query.isPending) return <LoadingState />;
   if (query.isError)
     return <QueryError error={query.error} notFound="월드를 찾을 수 없습니다" onRetry={() => void query.refetch()} />;

@@ -187,6 +187,9 @@ export function RecordsPage({ tab, city }: { tab: RecordTab; city?: number }) {
   const summary = useWorldSummary(worldId);
   const map = useWorldMap(worldId);
   const home = useHome(worldId);
+  const [activityMonth, setActivityMonth] = useState('');
+  const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(activityMonth);
+  const activityPeriod = match ? { year: Number(match[1]), month: Number(match[2]) } : undefined;
   const label = RECORD_TABS.find((entry) => entry.kind === tab)!.label;
   const nations = map.data?.nations ?? [];
   const cities = map.data?.cities ?? [];
@@ -220,7 +223,16 @@ export function RecordsPage({ tab, city }: { tab: RecordTab; city?: number }) {
         </Panel>
       ) : tab === 'activity' ? (
         <Panel title={RECORD_LABELS.activity}>
-          <ActivityFeed key={worldId} worldId={worldId} />
+          <label>
+            기록 연월
+            <input type="month" value={activityMonth} onChange={(event) => setActivityMonth(event.target.value)} />
+          </label>
+          {activityMonth ? (
+            <button type="button" onClick={() => setActivityMonth('')}>
+              전체 기간
+            </button>
+          ) : null}
+          <ActivityFeed key={worldId} worldId={worldId} period={activityPeriod} />
         </Panel>
       ) : tab === 'battles' ? (
         <Panel title={RECORD_LABELS.battles}>
