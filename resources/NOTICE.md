@@ -225,3 +225,7 @@ core2026 커밋 df6c9269fa1e2862418ba9da481c8dd2d758d6c5의 MIT © 2025 devsam �
 ### INT-26 갱신 점수
 
 등급 구간과 턴 주기별 점수 기준은 core2026 `c81d304`의 `app/game-api/src/services/generalBasicCardProjection.ts`와 `packages/common/src/game/accessPenalty.ts`를 참고했다. 점수는 OpenSamguk 메인 조회를 기준으로 집계하며 장수 본인에게 표시한다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+### INT-26 턴 시간 초기화
+
+반복 구매 비용과 다다음 턴부터의 변경은 core2026 `c81d304`의 `app/game-engine/src/turn/inheritanceActionService.ts`를 참고했다. 새 턴 시각은 OpenSamguk의 월 내 tick으로 뽑으며 원래 시각을 제외한다. 원저작자 devsam의 위 MIT 고지를 유지한다.

@@ -1,3 +1,4 @@
+import { advanceHeritageTurnTime } from './heritage/turnTime';
 import { emptyTurns, validatePolicyInput } from './replayInputs';
 export { emptyTurns, applyTurnsInput, applyCreationInput } from './replayInputs';
 import { hasRuleFeature, ruleRegistry, settleMonthlyFeatures, type RuleRegistry } from './ruleRegistry';
@@ -159,7 +160,7 @@ function replayAction(
     personnel ? { offices: next.offices! } : undefined,
   );
   next.state = result.state;
-  next.state.generals[action.generalId]!.nextTurnTick += TICKS_PER_MONTH;
+  advanceHeritageTurnTime(next.state.generals[action.generalId]!, action.tick);
   if (personnel) {
     const packet = completePersonnelStep(
       replay.state,
@@ -201,7 +202,7 @@ export function applyRecordedInput(
   replay: ReplayState,
   input: RecordedInput,
   registry: RuleRegistry = ruleRegistry,
-  context?: { unitSet?: UnitSetResource },
+  context?: { unitSet?: UnitSetResource; seed?: string },
 ): ReplayState {
   if (isAdminClockKind(input.kind)) return applyAdminClockRecord(replay, input);
   if (isAdminGameKind(input.kind)) validateAdminGameRecord(input);

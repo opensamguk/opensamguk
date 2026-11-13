@@ -15,6 +15,7 @@ import {
   SPECIALTY_GROWTH_FEATURE,
   HERITAGE_SPECIALTY_KIND,
 } from './heritage/specialty';
+import { applyHeritageTurnTime, HERITAGE_TURN_TIME_KIND } from './heritage/turnTime';
 import { applyHeritagePurchase, HERITAGE_BENEFIT_KIND, HERITAGE_BENEFITS_FEATURE } from './heritage/benefits';
 import { applyDefenseStance, DEFENSE_STANCE_FEATURE, DEFENSE_STANCE_KIND } from './battle/defenders';
 import { NPC_NATION_POLICY_FEATURE, NPC_NATION_POLICY_KIND, applyNpcNationPolicy } from './npc/policy';
@@ -156,7 +157,7 @@ export interface InputKindDefinition {
   apply(
     replay: ReplayState,
     input: RecordedInput,
-    context?: { resolver?: CommandResolver | undefined; unitSet?: UnitSetResource },
+    context?: { resolver?: CommandResolver | undefined; unitSet?: UnitSetResource; seed?: string },
   ): ReplayState;
 }
 export interface RuleRegistry {
@@ -316,6 +317,12 @@ export const ruleRegistry: RuleRegistry = {
     TROOP_FEATURE,
   ],
   inputKinds: [
+    {
+      kind: HERITAGE_TURN_TIME_KIND,
+      feature: HERITAGE_SPECIALTY_FEATURE,
+      route: 'queued',
+      apply: applyHeritageTurnTime,
+    },
     {
       kind: HERITAGE_SPECIALTY_KIND,
       feature: HERITAGE_SPECIALTY_FEATURE,

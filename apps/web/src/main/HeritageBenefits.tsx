@@ -129,12 +129,75 @@ function PurchaseForm({
           ) : null}
         </form>
       ) : null}
+      {data.turnTime ? <TurnTimePurchase worldId={worldId} data={data} pending={pending} refresh={refresh} /> : null}
       {data.specialty ? <SpecialtyPurchase worldId={worldId} data={data} pending={pending} refresh={refresh} /> : null}
       {pending ? <p role="status">구매 처리 중</p> : null}
       {mutation.isError || data.latest?.status === 'REJECTED' ? (
         <p role="alert">{mutation.isError ? serverMessage(mutation.error) : data.latest?.message}</p>
       ) : null}
     </details>
+  );
+}
+
+function TurnTimePurchase({
+  worldId,
+  data,
+  pending,
+  refresh,
+}: {
+  worldId: string;
+  data: Benefits;
+  pending: boolean;
+  refresh: () => Promise<unknown>;
+}) {
+  const trpc = useTRPC();
+  const [confirm, setConfirm] = useState(false);
+  const requestId = useRef<string | null>(null);
+  const mutation = useMutation(trpc.heritage.turnTime.mutationOptions());
+  const timing = data.turnTime!;
+  const busy = pending || mutation.isPending;
+  const cost = timing.cost;
+  const date = timing.pendingAt ? new Date(timing.pendingAt).toLocaleString('ko-KR') : null;
+  return (
+    <div>
+      <h3>랜덤 턴 시간 초기화</h3>
+      {timing.pendingTick !== null ? (
+        <p>다다음 턴부터 적용{date ? ` · ${date}` : ''}</p>
+      ) : data.canPurchase && cost !== null ? (
+        <>
+          {confirm ? <p role="status">{cost}점을 사용합니다. 이번에 예약된 다음 턴 시각은 유지됩니다.</p> : null}
+          <button
+            type="button"
+            disabled={busy || cost > data.balance}
+            onClick={() => {
+              if (!confirm) {
+                setConfirm(true);
+                return;
+              }
+              requestId.current ??= crypto.randomUUID();
+              mutation.mutate(
+                { worldId, requestId: requestId.current, expectedGeneralId: data.generalId, expectedCost: cost },
+                {
+                  onSuccess: async () => {
+                    await refresh();
+                    setConfirm(false);
+                    requestId.current = null;
+                  },
+                },
+              );
+            }}
+          >
+            {confirm ? '초기화 확정' : `초기화 확인 · ${cost}점`}
+          </button>
+          {confirm ? (
+            <button type="button" disabled={busy} onClick={() => setConfirm(false)}>
+              취소
+            </button>
+          ) : null}
+        </>
+      ) : null}
+      {mutation.isError ? <p role="alert">{serverMessage(mutation.error)}</p> : null}
+    </div>
   );
 }
 

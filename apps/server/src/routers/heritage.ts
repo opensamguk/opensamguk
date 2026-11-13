@@ -6,6 +6,10 @@ import {
   HERITAGE_BENEFIT_KIND,
   HERITAGE_SPECIALTY_FEATURE,
   HERITAGE_SPECIALTY_KIND,
+  HERITAGE_TURN_TIME_KIND,
+  heritageTurnTimeQuote,
+  heritageTurnTimeInput,
+  storedHeritageTurnTime,
   combatSpecialty,
   combatSpecialtyNames,
   heritageSpecialtyCost,
@@ -24,6 +28,7 @@ import {
 } from '@opensamguk/rules';
 import { router, protectedProcedure, worldVerifiedProcedure } from '../trpc';
 import { requireGeneral, requireRuleFeature, requireWorld, worldInput } from '../game/queries';
+import { nextTurnAt } from '../queries';
 import { PgHeritageReadStore } from '../heritage/pgStore';
 import { HeritageReadError, readHeritageMine } from '../heritage/service';
 
@@ -56,7 +61,7 @@ export const heritageRouter = router({
             worldId: world.id,
             userId: ctx.user.id,
             generalId: general.id,
-            kind: { in: [HERITAGE_BENEFIT_KIND, HERITAGE_SPECIALTY_KIND] },
+            kind: { in: [HERITAGE_BENEFIT_KIND, HERITAGE_SPECIALTY_KIND, HERITAGE_TURN_TIME_KIND] },
           },
           orderBy: { id: 'desc' },
           select: { status: true, result: true },
@@ -68,10 +73,18 @@ export const heritageRouter = router({
         );
         const current =
           combatSpecialty(world, heritageSpecialty ? general.combatSpecial : general.special)?.name ?? null;
+        const timing = heritageTurnTimeQuote({
+          nextTurnTick: general.nextTurnTick,
+          ...storedHeritageTurnTime(general.heritageTurnTime),
+        });
         return {
           enabled: true as const,
           ...(world.ruleFeatures.includes(HERITAGE_SPECIALTY_FEATURE)
             ? {
+                turnTime: {
+                  ...timing,
+                  pendingAt: timing.pendingTick === null ? null : nextTurnAt(world, timing.pendingTick),
+                },
                 specialty: {
                   current,
                   next: heritageSpecialty?.next ?? null,
@@ -172,6 +185,63 @@ export const heritageRouter = router({
             kind: HERITAGE_SPECIALTY_KIND,
             idempotencyKey,
             payload: input.action,
+          },
+          select: { id: true },
+        });
+        return { id: String(event.id) };
+      }),
+    ),
+  turnTime: worldVerifiedProcedure
+    .input(
+      worldInput
+        .extend({ ...heritageTurnTimeInput.shape, requestId: z.uuid(), expectedGeneralId: z.number().int().positive() })
+        .strict(),
+    )
+    .mutation(({ ctx, input }) =>
+      ctx.db.$transaction(async (tx) => {
+        const world = await requireWorld(tx, input.worldId, true);
+        requireRuleFeature(world, HERITAGE_SPECIALTY_FEATURE);
+        if (world.status !== 'RUNNING')
+          throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '실행 중인 월드가 아닙니다.' });
+        const general = await requireGeneral(tx, world.id, ctx.user.id, true);
+        if (general.id !== input.expectedGeneralId || general.removedAt !== null)
+          throw new TRPCError({ code: 'CONFLICT', message: '내 장수를 다시 확인하세요.' });
+        const idempotencyKey = HERITAGE_TURN_TIME_KIND + ':' + input.requestId;
+        const payload = { expectedCost: input.expectedCost };
+        const prior = await tx.inputEvent.findUnique({
+          where: { worldId_userId_idempotencyKey: { worldId: world.id, userId: ctx.user.id, idempotencyKey } },
+          select: { id: true, payload: true, generalId: true },
+        });
+        if (prior) {
+          if (prior.generalId !== general.id || !isDeepStrictEqual(prior.payload, payload))
+            throw new TRPCError({ code: 'CONFLICT', message: '같은 요청 번호의 내용이 다릅니다.' });
+          return { id: String(prior.id) };
+        }
+        const quote = heritageTurnTimeQuote({
+          nextTurnTick: general.nextTurnTick,
+          ...storedHeritageTurnTime(general.heritageTurnTime),
+        });
+        if (quote.cost !== input.expectedCost)
+          throw new TRPCError({ code: 'CONFLICT', message: '턴 시간 초기화 비용이나 예약 상태가 바뀌었습니다.' });
+        const pending = await tx.inputEvent.findFirst({
+          where: { worldId: world.id, generalId: general.id, kind: HERITAGE_TURN_TIME_KIND, status: 'PENDING' },
+          select: { id: true },
+        });
+        if (pending) throw new TRPCError({ code: 'CONFLICT', message: '이미 턴 시간 초기화를 처리하고 있습니다.' });
+        const balance = await tx.heritageAccount.findUnique({
+          where: { userId: ctx.user.id },
+          select: { balance: true },
+        });
+        if ((balance?.balance ?? 0) < input.expectedCost)
+          throw new TRPCError({ code: 'CONFLICT', message: '유산 포인트가 부족합니다.' });
+        const event = await tx.inputEvent.create({
+          data: {
+            worldId: world.id,
+            userId: ctx.user.id,
+            generalId: general.id,
+            kind: HERITAGE_TURN_TIME_KIND,
+            idempotencyKey,
+            payload,
           },
           select: { id: true },
         });

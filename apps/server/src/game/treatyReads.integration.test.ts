@@ -103,6 +103,7 @@ function general(patch: Partial<General> = {}): General {
     statExperience: null,
     heritageBenefits: null,
     heritageSpecialty: null,
+    heritageTurnTime: null,
     combatSpecial: null,
     removedAt: null,
     sex: null,

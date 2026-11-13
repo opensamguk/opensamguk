@@ -70,6 +70,7 @@ type Replies = {
   'heritage.mine': Out['heritage']['mine'];
   'heritage.benefits': Out['heritage']['benefits'];
   'heritage.specialty': Out['heritage']['specialty'];
+  'heritage.turnTime': Out['heritage']['turnTime'];
   'heritage.purchase': Out['heritage']['purchase'];
   'lineage.get': Out['lineage']['get'];
   'lineage.submit': Out['lineage']['submit'];
@@ -86,6 +87,7 @@ async function rpc<R extends keyof Replies>(route: R, input: unknown, user?: Use
       route === 'turns.set' ||
       route === 'heritage.purchase' ||
       route === 'heritage.specialty' ||
+      route === 'heritage.turnTime' ||
       route === 'nationTurns.set' ||
       route === 'lineage.submit' ||
       route === 'admin.world.requestReset',
@@ -127,6 +129,7 @@ async function world(
     enabled?: boolean;
     benefits?: boolean;
     specialty?: boolean | 'growth';
+    turnTime?: boolean;
     inactive?: boolean;
     turnTermMinutes?: number;
     endYear?: number | null;
@@ -150,6 +153,7 @@ async function world(
   } else if (options.actor) {
     initial.generals[0]!.userId = options.actor.id;
   }
+  if (options.turnTime) initial.generals[0]!.nextTurnTick = 100;
   if (options.specialty && options.specialty !== 'growth') initial.generals[0]!.special = 'che_보병';
   if (options.specialty === 'growth') {
     initial.generals[0]!.birthYear = initial.startYear - 70;
@@ -1540,6 +1544,35 @@ it('전투 특기 유산의 확인 가격·중복 요청·초기화와 월말 �
   expect(await db.heritageEntry.count({ where: { worldId, kind: 'BENEFIT_SPEND' } })).toBe(2);
   const archive = await exportReplay(db, worldId);
   expect(replayArchive(archive, 1)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
+});
+
+it('유산 턴 시간 초기화는 다음 턴을 유지하고 다다음 턴과 재생에 한 번 적용한다', async () => {
+  const player = await user();
+  const worldId = await world({ actor: player, specialty: true, turnTime: true });
+  await db.heritageAccount.create({ data: { userId: player.id, balance: 3000 } });
+  const request = { worldId, requestId: randomUUID(), expectedGeneralId: 1, expectedCost: 1000 };
+  const buy = (input = request) => rpc('heritage.turnTime', input, player);
+  expect((await buy({ ...request, expectedCost: 999 })).status).toBe(409);
+  const first = await buy();
+  expect(first.status).toBe(200);
+  expect((await buy()).data).toEqual(first.data);
+  expect((await buy({ ...request, requestId: randomUUID() })).status).toBe(409);
+  await advance(worldId);
+  const general = () => db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
+  expect((await general()).nextTurnTick).toBe(100);
+  const quote = (await rpc('heritage.benefits', { worldId }, player)).data;
+  expect(quote).toMatchObject({ balance: 2000, turnTime: { cost: null, pendingTick: expect.any(Number) } });
+  if (!quote?.enabled || quote.turnTime?.pendingTick == null) throw Error('새 턴 시간이 없습니다.');
+  const pendingTick = quote.turnTime.pendingTick;
+  expect(pendingTick).toBeGreaterThanOrEqual(TICKS_PER_MONTH);
+  expect(pendingTick).not.toBe(TICKS_PER_MONTH + 100);
+  await advance(worldId, 100);
+  expect(await general()).toMatchObject({ nextTurnTick: pendingTick, heritageTurnTime: { resets: 1, offset: null } });
+  await advance(worldId, TICKS_PER_MONTH * 2);
+  expect((await general()).nextTurnTick).toBe(pendingTick + TICKS_PER_MONTH);
+  expect(await db.heritageEntry.count({ where: { worldId, kind: 'BENEFIT_SPEND' } })).toBe(1);
+  const archive = await exportReplay(db, worldId);
+  expect(replayArchive(archive, 2)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
 });
 
 it('성장 특기 월드는 3년까지 기다렸다가 내정 특기와 예약 전투 특기를 함께 얻는다', async () => {

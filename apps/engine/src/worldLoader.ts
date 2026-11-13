@@ -7,6 +7,7 @@ import {
   readCityOfficeVolunteers,
   HERITAGE_SPECIALTY_FEATURE,
   storedHeritageSpecialty,
+  storedHeritageTurnTime,
   readOperationalMap,
   attachOperationalKinds,
   readStoredGovernance,
@@ -157,6 +158,7 @@ export async function loadWorldAfterCapabilityCheck(
           statExperience,
           heritageBenefits,
           heritageSpecialty,
+          heritageTurnTime,
           combatSpecial,
           ...general
         }) => {
@@ -179,6 +181,7 @@ export async function loadWorldAfterCapabilityCheck(
                       heritageSpecialty,
                     ),
                     ...(heritageSpecialty == null ? {} : { combatSpecial }),
+                    ...storedHeritageTurnTime(heritageTurnTime),
                     ...storedHeritageBenefits(world.ruleFeatures.includes(HERITAGE_BENEFITS_FEATURE), heritageBenefits),
                     ...storedGeneralProficiency(world.ruleFeatures.includes(GENERAL_PROFICIENCY_FEATURE), proficiency),
                     ...storedStatExperience(statExperience),

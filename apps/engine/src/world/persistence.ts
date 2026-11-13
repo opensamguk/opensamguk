@@ -2,6 +2,7 @@ import {
   CITY_OFFICE_VOLUNTEER_FEATURE,
   HERITAGE_SPECIALTY_FEATURE,
   storedHeritageSpecialty,
+  storedHeritageTurnTime,
   initialCityOfficeVolunteers,
   OFFICE_EFFECTS_FEATURE,
   defaultOfficeEffects,
@@ -549,6 +550,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
             officerCityKey,
             combatSpecial,
             heritageSpecialty,
+            heritageTurnTime,
             ...general
           }) => {
             void turnRevision;
@@ -566,6 +568,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
                       heritageSpecialty,
                     ),
                     ...(heritageSpecialty == null ? {} : { combatSpecial }),
+                    ...storedHeritageTurnTime(heritageTurnTime),
                   },
                   world.ruleFeatures.includes('lineage-v1'),
                 ),

@@ -3,6 +3,7 @@ import { TRPCError } from '@trpc/server';
 import {
   nowTick,
   RELATIONS_FEATURE,
+  turnTickForSlot,
   TICKS_PER_MONTH,
   toGameDate,
   effectiveWorldOptions,
@@ -149,10 +150,10 @@ export function nextTurnAt(world: ClockWorld, tick: number): string | null {
   if (world.status !== 'RUNNING' || world.clockMode === 'ACCELERATED' || world.clockAnchorAt === null) return null;
   return scheduledAt(worldClock(world), tick);
 }
-export function turnSchedule(world: ClockWorld, tick: number): Array<string | null> | null {
+export function turnSchedule(world: ClockWorld, tick: number, offset?: number | null): Array<string | null> | null {
   if (world.status !== 'RUNNING' || world.clockMode === 'ACCELERATED' || world.clockAnchorAt === null) return null;
   const clock = worldClock(world);
-  return Array.from({ length: 30 }, (_, slot) => scheduledAt(clock, tick + slot * TICKS_PER_MONTH));
+  return Array.from({ length: 30 }, (_, slot) => scheduledAt(clock, turnTickForSlot(tick, offset, slot)));
 }
 
 export function page<T extends { tick: number }>(rows: T[]) {

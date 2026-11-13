@@ -41,6 +41,7 @@ import {
   readCityOfficeVolunteers,
   HERITAGE_SPECIALTY_FEATURE,
   storedHeritageSpecialty,
+  storedHeritageTurnTime,
   storedCitySeasonalEvent,
   storedDefenseStance,
   storedGeneralProficiency,
@@ -155,6 +156,7 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
         proficiency,
         heritageBenefits,
         heritageSpecialty,
+        heritageTurnTime,
         combatSpecial,
         statExperience,
         ...general
@@ -166,6 +168,7 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
               ...storedDefenseStance(world.ruleFeatures.includes(DEFENSE_STANCE_FEATURE), defenseThreshold),
               ...storedHeritageSpecialty(world.ruleFeatures.includes(HERITAGE_SPECIALTY_FEATURE), heritageSpecialty),
               ...(heritageSpecialty == null ? {} : { combatSpecial }),
+              ...storedHeritageTurnTime(heritageTurnTime),
               ...storedHeritageBenefits(world.ruleFeatures.includes(HERITAGE_BENEFITS_FEATURE), heritageBenefits),
               ...storedGeneralProficiency(world.ruleFeatures.includes(GENERAL_PROFICIENCY_FEATURE), proficiency),
               ...storedStatExperience(statExperience),

@@ -10,6 +10,7 @@ import {
   toGameDate,
   seasonOutcome,
   runGeneralTurn,
+  advanceHeritageTurnTime,
   unitSetSchema,
   TICKS_PER_MONTH,
   assertSlotSet,
@@ -325,7 +326,7 @@ export class TurnLoop {
           const result = turn.result;
           const failed = 'code' in result;
           next = turn.state;
-          next.generals[due.id]!.nextTurnTick = due.nextTurnTick + TICKS_PER_MONTH;
+          advanceHeritageTurnTime(next.generals[due.id]!, due.nextTurnTick);
           const personnelPacket = personnelBefore
             ? completePersonnelStep(
                 personnelBefore.state,
@@ -421,7 +422,7 @@ export class TurnLoop {
           await shiftTurns(tx, worldId, due.id, { ...world, actionSequence: sequence }, slots);
           const updated = await tx.general.updateMany({
             where: { worldId, id: due.id, nextTurnTick: due.nextTurnTick, turnRevision: actor.turnRevision },
-            data: { nextTurnTick: due.nextTurnTick + TICKS_PER_MONTH, turnRevision: { increment: 1 } },
+            data: { nextTurnTick: next.generals[due.id]!.nextTurnTick, turnRevision: { increment: 1 } },
           });
           if (updated.count !== 1) throw new Error('예턴이 변경되어 턴 저장을 취소했습니다.');
           await enqueueNotifications(tx, notifications);

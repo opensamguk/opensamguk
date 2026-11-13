@@ -184,7 +184,7 @@ async function existingRows(client: PgClient) {
           : table === 'City'
             ? "to_jsonb(t) - 'kind' - 'seasonalEvent' - 'conflictTick' - 'stratagemTick' - 'conflict' - 'conflictOrder' - 'warCasualties'"
             : table === 'General'
-              ? "to_jsonb(t) - 'residenceTick' - 'politics' - 'charm' - 'sex' - 'removedAt' - 'officerCityKey' - 'stratagemSuccesses' - 'nationJoinedTick' - 'combatSpecial' - 'defenseThreshold' - 'heritageBenefits' - 'heritageSpecialty' - 'proficiency' - 'statExperience'"
+              ? "to_jsonb(t) - 'residenceTick' - 'politics' - 'charm' - 'sex' - 'removedAt' - 'officerCityKey' - 'stratagemSuccesses' - 'nationJoinedTick' - 'combatSpecial' - 'defenseThreshold' - 'heritageBenefits' - 'heritageSpecialty' - 'heritageTurnTime' - 'proficiency' - 'statExperience'"
               : table === 'YearbookSnapshot'
                 ? "to_jsonb(t) - 'activeGenerals'"
                 : "to_jsonb(t) - 'treatyFormat'";

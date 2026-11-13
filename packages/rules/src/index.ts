@@ -304,6 +304,7 @@ export * from './personnel/assignmentRows';
 export * from './personnel/residentOffice';
 export * from './personnel/cityOfficeVolunteers';
 export * from './heritage/specialty';
+export * from './heritage/turnTime';
 export * from './lineage/control';
 export { reconcileLineage } from './lineage/reconcile';
 export * from './lineage/monthly';

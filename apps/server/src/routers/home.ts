@@ -34,9 +34,10 @@ import {
   CITY_OFFICE_VOLUNTEER_FEATURE,
   PLAYER_AUTOPLAY_FEATURE,
   playerAutoplayWindow,
-  TICKS_PER_MONTH,
   policyOptions,
   toGameDate,
+  storedHeritageTurnTime,
+  turnTickForSlot,
 } from '@opensamguk/rules';
 import { displaySlots, readSlots } from '../game/slots';
 import { readCityScaleProjection } from '../game/cityScale';
@@ -49,6 +50,7 @@ export const homeRouter = router({
   get: protectedProcedure.input(worldInput).query(async ({ ctx, input }) => {
     const { page, traffic } = await readWorld(ctx.db, input.worldId, async (tx, world) => {
       const general = await requireGeneral(tx, input.worldId, ctx.user.id);
+      const offset = storedHeritageTurnTime(general.heritageTurnTime).heritageTurnTime?.offset;
       const city = await tx.city.findUniqueOrThrow({
         where: { worldId_cityKey: { worldId: input.worldId, cityKey: general.cityKey } },
       });
@@ -270,7 +272,7 @@ export const homeRouter = router({
                       }
                     : {}),
                   slots: Array.from({ length: turns.length }, (_, slot) => slot).filter((slot) => {
-                    const turn = general.nextTurnTick + slot * TICKS_PER_MONTH;
+                    const turn = turnTickForSlot(general.nextTurnTick, offset, slot);
                     return turn >= autoplay.startsAtTick && turn < autoplay.expiresAtTick;
                   }),
                 },
@@ -301,7 +303,7 @@ export const homeRouter = router({
               ? []
               : connected.filter(({ nationId }) => nationId === general.nationId).map(({ id, name }) => ({ id, name })),
         },
-        turnSchedule: turnSchedule(world, general.nextTurnTick),
+        turnSchedule: turnSchedule(world, general.nextTurnTick, offset),
         turnsPreview: Array.from({ length: 5 }, (_, slot) => ({ slot, ...turns[slot]! })),
         recentLogs: logs.map(logInfo),
       };

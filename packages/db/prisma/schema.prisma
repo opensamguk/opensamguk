@@ -502,6 +502,7 @@ model General {
   statExperience    Json?
   heritageBenefits  Json?
   heritageSpecialty Json?
+  heritageTurnTime Json?
   combatSpecial     String?
   special           String?
   gold              Int

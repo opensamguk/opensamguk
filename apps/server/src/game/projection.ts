@@ -10,6 +10,7 @@ export function ownGeneral(
     | 'proficiency'
     | 'heritageBenefits'
     | 'heritageSpecialty'
+    | 'heritageTurnTime'
     | 'statExperience'
   > & {
     politics?: number | null;
