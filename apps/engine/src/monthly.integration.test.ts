@@ -92,6 +92,11 @@ describe('AC-M1-12 실제 PostgreSQL 월 경계', () => {
     ]);
     const snapshot = await db.yearbookSnapshot.findFirstOrThrow({ where: { worldId } });
     expect(snapshot).toMatchObject({ tick: 10000, year: 191, month: 1, sequence: 2 });
+    const ranking = await db.rankingSnapshot.findUniqueOrThrow({ where: { worldId } });
+    const rankedNations = ranking.nations as Array<{ id: number; power: number }>;
+    expect(await db.yearbookNation.findMany({ where: { worldId }, orderBy: { nationId: 'asc' } })).toMatchObject(
+      rankedNations.map(({ id, power }) => ({ nationId: id, power })),
+    );
     expect(await db.nationHistory.count({ where: { worldId } })).toBe(2);
     expect(await db.world.findUniqueOrThrow({ where: { id: worldId } })).toMatchObject({
       monthlyTick: 10000,

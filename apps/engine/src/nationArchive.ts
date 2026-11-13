@@ -64,11 +64,9 @@ export async function persistYearbookNations(
   tx: Prisma.TransactionClient,
   worldId: string,
   tick: number,
-  state: WorldState,
+  nations: readonly { id: number; name: string; color: string; power: number }[],
 ) {
-  const data = Object.values(state.nations)
-    .sort((a, b) => a.id - b.id)
-    .map(({ id, name, color }) => ({ worldId, tick, nationId: id, name, color }));
+  const data = nations.map(({ id, name, color, power }) => ({ worldId, tick, nationId: id, name, color, power }));
   if (data.length) await tx.yearbookNation.createMany({ data });
 }
 
