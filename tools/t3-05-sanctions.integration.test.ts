@@ -1053,7 +1053,8 @@ it('정식 두191년 월드에서21개 변경 차단·본인 조회·같은 월�
   const guarded = Object.entries(procedures)
     .filter(([, procedure]) => procedure._def.meta?.worldSanction)
     .map(([path]) => path);
-  expect(guarded).toHaveLength(29);
+  expect(guarded).toHaveLength(30);
+  expect(guarded).toContain('relations.list');
   expect(guarded).toContain('records.season');
   expect(guarded).toContain('intel.records');
   expect(guarded).toContain('entry.possess');

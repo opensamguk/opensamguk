@@ -213,6 +213,7 @@ export function CityTargetPicker({
                     type="button"
                     role="radio"
                     aria-checked={String(city.key) === value}
+                    value={city.key}
                     className={styles.row}
                     onClick={() => pick(city.key)}
                   >
@@ -306,6 +307,7 @@ export function NationTargetPicker({
               type="button"
               role="radio"
               aria-checked={String(nation.id) === value}
+              value={nation.id}
               className={styles.row}
               onClick={() => onChange(String(nation.id))}
             >
@@ -355,6 +357,7 @@ export function GeneralTargetPicker({
             type="button"
             role="radio"
             aria-checked={String(general.id) === value}
+            value={general.id}
             className={styles.row}
             onClick={() => onChange(String(general.id))}
           >

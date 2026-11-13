@@ -9,7 +9,7 @@ import { monthlyFixture } from '../apps/engine/test/monthlyFixture';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
-import { CREATION_ERRORS, toGameDate } from '../packages/rules/src/index';
+import { CREATION_ERRORS, officerTitle, toGameDate } from '../packages/rules/src/index';
 import { loadPreset } from '../apps/engine/src/world/resources';
 import { prepareSeasonWorld, finishSeasonWorld } from '../apps/engine/test/seasonFixture';
 
@@ -200,12 +200,22 @@ describe('T2-03 실제 로비 HTTP·PostgreSQL', () => {
           ENDED: '끝난 월드입니다',
         };
         expect(row.createBlockedReason).toBe(kind === 'own' ? null : reasons[status]);
+        const general = initial.generals[0]!;
         expect(row.myGeneral).toEqual(
           kind === 'own'
             ? {
                 id: 1,
-                name: initial.generals[0]!.name,
+                name: general.name,
                 nationName: initial.nations[0]!.name,
+                nationColor: initial.nations[0]!.color,
+                portraitId: general.portraitId ?? null,
+                cityName: initial.cities.find((city) => city.cityKey === general.cityKey)!.name,
+                officerTitle: officerTitle(general.officerLevel),
+                stats: {
+                  leadership: general.leadership,
+                  strength: general.strength,
+                  intel: general.intel,
+                },
               }
             : null,
         );

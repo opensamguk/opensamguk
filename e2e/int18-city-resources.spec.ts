@@ -681,6 +681,11 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
     await editor.getByLabel('명령 찾기', { exact: true }).fill(name);
     await editor.getByRole('radio', { name, exact: true }).check();
     for (const [label, value] of Object.entries(fields)) {
+      const group = editor.getByRole('radiogroup', { name: label, exact: true });
+      if (await group.count()) {
+        await group.locator(`[value="${value}"]`).click();
+        continue;
+      }
       const control = editor
         .getByRole('combobox', { name: label, exact: true })
         .or(editor.getByRole('spinbutton', { name: label, exact: true }))
