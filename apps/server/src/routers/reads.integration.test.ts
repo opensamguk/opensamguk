@@ -266,6 +266,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
   });
   it('AC-INT-26 장수 동향은 공개 평판 스냅샷을 같은 tick의 끝까지 조회한다', async () => {
     const world = await fixtureWorld('activity');
+    await db.general.update({ where: { worldId_id: { worldId: world, id: 1 } }, data: { portraitId: 101 } });
     await db.reputationEvent.createMany({
       data: Array.from({ length: 31 }, (_, index) => ({
         worldId: world,
@@ -290,6 +291,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       id: expect.any(String),
       source: 'reputation',
       generalId: 31,
+      portraitId: null,
       year: state.startYear,
       month: 1,
       kind: 'domestic',
@@ -299,8 +301,8 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     });
     const next = await query('records.activity', { worldId: world, cursor: first.data.nextCursor });
     expect(next.data.items).toEqual([
-      expect.objectContaining({ source: 'reputation', generalId: 1 }),
-      expect.objectContaining({ source: 'nation', kind: 'found', text: '공개 국가 건국' }),
+      expect.objectContaining({ source: 'reputation', generalId: 1, portraitId: 101 }),
+      expect.objectContaining({ source: 'nation', kind: 'found', text: '공개 국가 건국', portraitId: null }),
     ]);
     expect(next.data.nextCursor).toBeNull();
     const news = await query('records.activity', { worldId: world, scope: 'world' });
