@@ -415,6 +415,15 @@ it('INT-26 SAN10 명품 목록은 60개를 공개하고 월말 발견을 재생�
   );
 });
 
+it('INT-26 SAN10 훈련 청주는 장비매매로 구매하고 보유 도구로 조회한다', async () => {
+  const f = await fixture(true, false, 'iron', 'fullRare');
+  const board = () => rpc('equipment.mine', { worldId: f.id }, f.player);
+  expect((await board()).data?.tools?.map((tool) => tool.key)).toEqual(['tool_01', 'tool_02', 'tool_03']);
+  await execute(f, 'trade_rice', { amount: 1000, buy: false });
+  await execute(f, 'equipment_trade', { slot: 'tool', itemKey: 'tool_03' });
+  expect((await board()).data?.tool).toMatchObject({ key: 'tool_03', remainingCharges: 1, sale: { proceeds: 500 } });
+});
+
 for (const category of ['unauthenticated', 'otherUser', 'sanctioned', 'invalidInput'] as const) {
   it(
     `equipment.rare ${category}`,

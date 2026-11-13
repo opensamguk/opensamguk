@@ -1,4 +1,4 @@
-import { useBattleMoraleTool } from '../equipment/morale';
+import { useBattleTool } from '../equipment/morale';
 import { equipmentBattleEffects } from '../equipment/battle';
 import { battleTacticsStats } from '../battle/tactics';
 import { combatSpecialty, combatSpecialtyKey } from '../general/combatSpecialty';
@@ -102,7 +102,7 @@ function makeAttack(collect: typeof collectModifiers) {
       const fightWall = (openingSkirmish = false) => {
         const wall: Force = { crew: city.wall, crewType: 1000, train: 100, atmos: 100, rice: 0 };
         feed(g, attackerEquipment?.riceFactor);
-        useBattleMoraleTool(state, g.id, g);
+        useBattleTool(state, g.id, g);
         const battle = simulateBattle(
           {
             attacker: g,
@@ -146,8 +146,8 @@ function makeAttack(collect: typeof collectModifiers) {
         const defenderEquipment = equipmentBattleEffects(state, defender.id);
         feed(g, attackerEquipment?.riceFactor);
         feed(defender, defenderEquipment?.riceFactor);
-        useBattleMoraleTool(state, g.id, g);
-        useBattleMoraleTool(state, defender.id, defender);
+        useBattleTool(state, g.id, g);
+        useBattleTool(state, defender.id, defender);
         const battle = simulateBattle(
           {
             attacker: g,

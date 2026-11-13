@@ -7,6 +7,7 @@ import { resolverForRuleFeatures } from '../ruleCommands';
 import { runGeneralTurn } from '../commands/turn';
 import { readEquipmentState } from './state';
 import { equipmentFeature } from './feature';
+import { useBattleTool } from './morale';
 import { TEST_EQUIPMENT_CONFIG, TEST_EQUIPMENT_LOGISTICS_CONFIG } from './testFixture';
 
 const registry = ruleRegistry;
@@ -141,4 +142,27 @@ it('INT-26 환약은 턴 전에 부상을 회복하고 세 번째 사용 후 장
     state = treated.state;
   }
   expect(state.equipment!.generals['1']).toBeUndefined();
+});
+
+it('INT-26 훈련 청주는 전투에서 한 번 사용되고 훈련을 100까지 올린다', () => {
+  const value = origin();
+  const featureData = {
+    ...value.featureData,
+    'equipment-v1': {
+      ...TEST_EQUIPMENT_CONFIG,
+      treatmentTool: true,
+      moraleTool: true,
+      rareEquipment: true,
+      fullRareEquipment: true,
+    },
+  };
+  const { state } = initialReplayStateWithRegistry(value.initial, registry, featureData);
+  state.equipment!.generals['1'] = { tool: { key: 'tool_03', charges: 1 } };
+  const force = { train: 75, atmos: 60 };
+  useBattleTool(state, 1, force);
+  expect(force).toEqual({ train: 100, atmos: 60 });
+  expect(state.equipment!.generals['1']).toBeUndefined();
+  force.train = 60;
+  useBattleTool(state, 1, force);
+  expect(force.train).toBe(60);
 });

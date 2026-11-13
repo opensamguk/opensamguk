@@ -259,6 +259,7 @@ export * from './equipment/stats';
 export {
   TREATMENT_TOOL,
   MORALE_TOOL,
+  availableEquipmentTools,
   hasTreatmentTool,
   hasMoraleTool,
   hasRareEquipment,

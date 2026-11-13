@@ -2,8 +2,7 @@ import { TRPCError } from '@trpc/server';
 import {
   equipmentSlotSchema,
   TREATMENT_TOOL,
-  MORALE_TOOL,
-  hasMoraleTool,
+  availableEquipmentTools,
   hasRareEquipment,
   rareEquipmentCatalog,
   equipmentTools,
@@ -33,6 +32,7 @@ export function readEquipmentBoard(ctx: PersonnelActorContext, worldId: string, 
         .find((entry) => entry.key === 'equipment_trade');
       if (!command) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: '장비 명령을 준비하지 못했습니다.' });
       const slots = equipment.generals[String(general.id)] ?? {};
+      const tools = availableEquipmentTools(equipment.config);
       const actor = { generalId: general.id };
       const { leadership, strength, intel, politics, charm } = state.generals[general.id]!;
       const baseStats = fiveStatsSchema.parse({ leadership, strength, intel, politics, charm });
@@ -51,7 +51,7 @@ export function readEquipmentBoard(ctx: PersonnelActorContext, worldId: string, 
         ...(hasTreatmentTool(equipment.config)
           ? { tool: toolEntry(slots.tool ? equipmentTools[slots.tool.key] : TREATMENT_TOOL) }
           : {}),
-        ...(hasMoraleTool(equipment.config) ? { tools: [toolEntry(TREATMENT_TOOL), toolEntry(MORALE_TOOL)] } : {}),
+        ...(tools.length > 1 ? { tools: tools.map(toolEntry) } : {}),
         ...(hasRareEquipment(equipment.config)
           ? { rare: rareEquipmentCatalog(equipment.config).filter((item) => slots[item.slot] === item.key) }
           : {}),

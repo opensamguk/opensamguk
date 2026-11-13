@@ -5,8 +5,9 @@ import { LINEAGE_EXITED_YEAR } from '../lineage/config';
 import {
   EQUIPMENT_MAX,
   MORALE_TOOL,
+  TREATMENT_TOOL,
+  availableEquipmentTools,
   hasTreatmentTool,
-  hasMoraleTool,
   equipmentKeySchema,
   equipmentSlotSchema,
   equipmentTools,
@@ -51,15 +52,21 @@ export const equipmentTrade = defineCommand({
           : null;
       }
       const tool = equipmentTools[args.itemKey];
-      if (tool.key === MORALE_TOOL.key) {
-        if (!hasMoraleTool(equipment.config)) return fail('COMMAND_DISABLED', '탁주를 사용할 수 없는 월드입니다.');
-        if (view.cities[general.cityKey]!.security < tool.requiredSecurity)
-          return fail('BAD_STATE', '도시의 치안이 부족합니다.');
-      }
+      if (!availableEquipmentTools(equipment.config).some(({ key }) => key === tool.key))
+        return fail(
+          'COMMAND_DISABLED',
+          tool.key === MORALE_TOOL.key ? '탁주를 사용할 수 없는 월드입니다.' : '청주를 사용할 수 없는 월드입니다.',
+        );
+      if ('requiredSecurity' in tool && view.cities[general.cityKey]!.security < tool.requiredSecurity)
+        return fail('BAD_STATE', '도시의 치안이 부족합니다.');
       if (slots?.tool?.key === tool.key && slots.tool.charges === tool.charges)
         return fail(
           'BAD_STATE',
-          tool.key === MORALE_TOOL.key ? '탁주가 충분히 남았습니다.' : '환약이 충분히 남았습니다.',
+          tool.key === TREATMENT_TOOL.key
+            ? '환약이 충분히 남았습니다.'
+            : tool.key === MORALE_TOOL.key
+              ? '탁주가 충분히 남았습니다.'
+              : '청주가 충분히 남았습니다.',
         );
       return general.gold < tool.cost ? fail('NO_GOLD', '금이 부족합니다.') : null;
     }

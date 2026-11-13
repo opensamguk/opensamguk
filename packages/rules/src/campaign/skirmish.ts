@@ -1,4 +1,4 @@
-import { useBattleMoraleTool } from '../equipment/morale';
+import { useBattleTool } from '../equipment/morale';
 import { equipmentBattleEffects } from '../equipment/battle';
 import { battleTacticsStats } from '../battle/tactics';
 import { combatSpecialty, combatSpecialtyKey } from '../general/combatSpecialty';
@@ -87,8 +87,8 @@ export function fightCampaignUnits(
   const defenderCommander = state.generals[defender.commanderId]!;
   feed(state, attacker, attackerEquipment?.riceFactor);
   feed(state, defender, defenderEquipment?.riceFactor);
-  useBattleMoraleTool(state, attacker.commanderId, attacker);
-  useBattleMoraleTool(state, defender.commanderId, defender);
+  useBattleTool(state, attacker.commanderId, attacker);
+  useBattleTool(state, defender.commanderId, defender);
   const result = simulateBattle(
     {
       attacker: force(attacker),
@@ -148,7 +148,7 @@ export function fightCampaignWall(
     throw new Error('교전할 성벽을 확인하세요.');
   const attackerEquipment = equipmentBattleEffects(state, attacker.commanderId);
   feed(state, attacker, attackerEquipment?.riceFactor);
-  useBattleMoraleTool(state, attacker.commanderId, attacker);
+  useBattleTool(state, attacker.commanderId, attacker);
   const result = simulateBattle(
     {
       attacker: force(attacker),
@@ -219,7 +219,7 @@ export function fightCampaignCityGarrison(
   }
   const attackerEquipment = equipmentBattleEffects(state, attacker.commanderId);
   feed(state, attacker, attackerEquipment?.riceFactor);
-  useBattleMoraleTool(state, attacker.commanderId, attacker);
+  useBattleTool(state, attacker.commanderId, attacker);
   const result = simulateBattle(
     {
       attacker: force(attacker),

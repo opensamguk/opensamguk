@@ -3,9 +3,7 @@ import type { WorldView } from '../model/world';
 import { LINEAGE_EXITED_YEAR } from '../lineage/config';
 import {
   EQUIPMENT_MAX,
-  MORALE_TOOL,
-  hasMoraleTool,
-  hasTreatmentTool,
+  availableEquipmentTools,
   equipmentConfigSchema,
   equippedItemKeySchema,
   rareEquipmentCatalog,
@@ -63,7 +61,7 @@ export function readEquipmentState(value: unknown, world: WorldView): EquipmentS
     let hasRare = false;
     for (const [slot, itemKey] of Object.entries(slots)) {
       if (slot === 'tool') {
-        if (!hasTreatmentTool(state.config) || (slots.tool?.key === MORALE_TOOL.key && !hasMoraleTool(state.config)))
+        if (!availableEquipmentTools(state.config).some(({ key }) => key === slots.tool?.key))
           throw new Error('도구를 사용할 수 없는 월드입니다.');
         continue;
       }
