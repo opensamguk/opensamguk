@@ -110,6 +110,7 @@ describe('T1-11 실제 HTTP·PostgreSQL 권한', () => {
     const mine = await request('general.mine', { worldId }, a.cookie);
     const fields = [
       'id',
+      'isHuman',
       'name',
       'nationId',
       'portraitId',
@@ -137,9 +138,12 @@ describe('T1-11 실제 HTTP·PostgreSQL 권한', () => {
     ].sort();
     expect(home.code).toBeUndefined();
     expect(mine.code).toBeUndefined();
-    expect(Object.keys(home.data.general).sort()).toEqual([...fields, 'policy'].sort());
+    expect(Object.keys(home.data.general).sort()).toEqual([...fields, 'policy', 'defense', 'salaryEstimate'].sort());
     expect(Object.keys(mine.data.general).sort()).toEqual(fields);
-    const { policy, ...homeGeneral } = home.data.general;
+    const { policy, defense, salaryEstimate, ...homeGeneral } = home.data.general;
+    expect(defense).toMatchObject({ troops: expect.any(Number) });
+    expect(salaryEstimate).toMatchObject({ gold: expect.any(Number), rice: expect.any(Number) });
+    expect(mine.data.general.isHuman).toBe(true);
     expect(policy).toEqual({ key: 'none', name: '없음' });
     expect(homeGeneral).toEqual(mine.data.general);
     expect(mine.data).toHaveProperty('creation', null);

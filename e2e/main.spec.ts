@@ -461,7 +461,7 @@ test.describe('장수가 있는 계정', () => {
 
     await page.goto(`/w/${ctx.worldId}/nation/${enemy.nationId}`);
     await expect(page.getByRole('heading', { level: 1, name: /^국가 정보 · / })).toBeVisible();
-    await expect(page.getByRole('note').first()).toContainText('다른 국가 정보');
+    await expect(page.getByRole('note').first()).toContainText('타국 국고와 장수의 비공개 항목');
     await expect(page.locator('[title="다른 국가 정보"] dd').first()).toHaveText('—');
     await shot(page, '07-nation-other.png');
 
