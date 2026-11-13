@@ -25,7 +25,7 @@ const activityInput = generalInput.extend({
     .optional(),
 });
 const activityCursor = z.tuple([recordTick, z.enum(['reputation', 'nation', 'milestone']), recordId]);
-const nationEventKind = z.enum(['found', 'fall', 'declare', 'capture', 'promotion', 'enlist', 'capital']);
+const nationEventKind = z.enum(['found', 'fall', 'declare', 'capture', 'promotion', 'enlist', 'capital', 'transfer']);
 const battleCursor = z.tuple([recordTick, entityKey]);
 
 async function recordPortraits(tx: Prisma.TransactionClient, worldId: string, ids: number[]) {

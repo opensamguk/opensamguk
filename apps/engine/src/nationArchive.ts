@@ -1,5 +1,5 @@
 import { notifyActivityOnCommit, type Prisma } from '@opensamguk/db';
-import { COURT_PROMOTION_FEATURE, nationRank, type WorldState } from '@opensamguk/rules';
+import { COURT_PROMOTION_FEATURE, nationRank, type CommandResult, type WorldState } from '@opensamguk/rules';
 
 export type ActionAt = { sequence: number; tick: number };
 
@@ -9,6 +9,7 @@ export async function persistPublicNationEvents(
   before: WorldState,
   next: WorldState,
   at: ActionAt,
+  transfer?: CommandResult['cityTransfer'],
 ) {
   const data: { kind: string; text: string }[] = [];
   for (const nation of Object.values(next.nations)) {
@@ -35,8 +36,16 @@ export async function persistPublicNationEvents(
   for (const city of Object.values(next.cities)) {
     const previous = before.cities[city.cityKey]?.nationId;
     const owner = city.nationId === null ? undefined : next.nations[city.nationId];
-    if (previous !== undefined && previous !== city.nationId && owner && before.nations[owner.id])
-      data.push({ kind: 'capture', text: `${owner.name}의 ${city.name} 점령` });
+    if (previous === undefined || previous === city.nationId || !owner || !before.nations[owner.id]) continue;
+    const attacker =
+      transfer?.cityKey === city.cityKey && transfer.toNationId === owner.id
+        ? before.nations[transfer.fromNationId]
+        : undefined;
+    data.push(
+      attacker
+        ? { kind: 'transfer', text: `${city.name} 공략 후 ${attacker.name}에서 ${owner.name}에 양도` }
+        : { kind: 'capture', text: `${owner.name}의 ${city.name} 점령` },
+    );
   }
   if (before.diplomacies !== next.diplomacies) {
     const prior = new Set(
