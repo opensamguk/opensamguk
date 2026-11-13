@@ -10,7 +10,7 @@ type Philosophy = {
   rice?: number;
   population?: number;
   stratagem?: number;
-  delay?: number;
+  delay?: readonly [number, number];
   globalDelay?: number;
 };
 
@@ -23,8 +23,8 @@ const welfare = ['settle', 'goodwill'] as const;
 const policies: Readonly<Record<string, Philosophy>> = {
   도적: { down: ['security', ...welfare], gold: 0.9, stratagem: 0.1 },
   명가: { up: ['research'], down: fortification, rice: 0.9, population: 1.2 },
-  음양가: { up: agriculture, down: ['research'], population: 1.2, delay: 4 / 3 },
-  종횡가: { up: fortification, down: agriculture, gold: 0.9, delay: 3 / 4, globalDelay: 0.5 },
+  음양가: { up: agriculture, down: ['research'], population: 1.2, delay: [4, 3] },
+  종횡가: { up: fortification, down: agriculture, gold: 0.9, delay: [3, 4], globalDelay: 0.5 },
   불가: { up: [...welfare, ...fortification], gold: 0.9 },
   오두미도: { down: ['research', ...fortification, ...agriculture], rice: 1.1, population: 1.2 },
   태평도: { up: welfare, down: ['research', ...fortification], population: 1.2 },
@@ -36,7 +36,9 @@ const policies: Readonly<Record<string, Philosophy>> = {
   법가: { up: ['security'], down: welfare, gold: 1.1, population: 0.8 },
 };
 
-export const nationPhilosophyNames = Object.keys(policies);
+export function nationPhilosophyNames() {
+  return Object.keys(policies);
+}
 
 const domesticLabels: Record<Domestic, string> = {
   farm: '농업',
@@ -62,7 +64,7 @@ export function nationPhilosophyEffects() {
         if (factor && factor !== 1) (factor > 1 ? benefits : drawbacks).push(label);
       }
       if (policy.stratagem) benefits.push('계략 성공률');
-      if (policy.delay) (policy.delay < 1 ? benefits : drawbacks).push('전략 대기 단축');
+      if (policy.delay) (policy.delay[0] < policy.delay[1] ? benefits : drawbacks).push('전략 대기 단축');
       return [name, { benefits, drawbacks }];
     }),
   );

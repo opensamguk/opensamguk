@@ -75,7 +75,8 @@ function defineStrategy<A>(spec: StrategySpec<A>): CommandDef {
       const policy = nationPhilosophy(state, state.nations[nationId]!.philosophy);
       cooldown.strategicUntil = current + Math.round(9 * (policy?.globalDelay ?? 1));
       const delay = Math.round(Math.sqrt(count * WAIT_FACTOR[spec.key]) * 10);
-      cooldown.commands[spec.key] = current + Math.round(delay * (policy?.delay ?? 1));
+      cooldown.commands[spec.key] =
+        current + (policy?.delay ? Math.round((delay * policy.delay[0]) / policy.delay[1]) : delay);
       state.nationStrategy = ledger;
       general.experience += 5;
       general.dedication += 5;

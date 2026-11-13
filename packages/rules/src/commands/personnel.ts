@@ -16,7 +16,7 @@ const establish = (uprising: boolean) =>
     args: z.strictObject({
       name: z.string().trim().min(1).max(30),
       color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
-      philosophy: z.enum(nationPhilosophyNames).optional(),
+      philosophy: z.enum(nationPhilosophyNames()).optional(),
     }),
     check(view, actor, args) {
       if (args.philosophy && !view.ruleFeatures?.includes(NATION_PHILOSOPHY_FEATURE))
