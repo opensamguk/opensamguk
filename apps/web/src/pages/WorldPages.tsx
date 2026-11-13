@@ -258,6 +258,12 @@ export function RecordsPage({ tab, city }: { tab: RecordTab; city?: number }) {
             cities={cities}
             hasNation={home.data ? home.data.nation !== null : true}
           />
+          {tab === 'general' && home.data?.general ? (
+            <details>
+              <summary>내 장수 열전</summary>
+              <ActivityFeed key={worldId} worldId={worldId} biography />
+            </details>
+          ) : null}
         </Panel>
       )}
     </section>
