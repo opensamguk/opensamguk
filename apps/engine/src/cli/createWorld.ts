@@ -20,17 +20,20 @@ async function main() {
       'end-year': { type: 'string' },
       name: { type: 'string' },
       treaty: { type: 'boolean' },
+      ext: { type: 'boolean' },
       help: { type: 'boolean' },
     },
   });
   if (values.help) {
     console.log(
-      'pnpm world:create [--preset <key>] [--published] [--unit-set <key>] [--stat-rules <key>] [--portrait-map <key>] [--rule-features a,b] [--scenario 1030 --map che --turn-term <분>] --seed <문자열> --end-year <연도> --name <이름> [--treaty]',
+      'pnpm world:create [--preset <key>] [--published] [--unit-set <key>] [--stat-rules <key>] [--portrait-map <key>] [--rule-features a,b] [--scenario 1030 --map che --turn-term <분>] --seed <문자열> --end-year <연도> --name <이름> [--treaty] [--ext]',
     );
     console.log('게시된 DB 자원을 사용합니다. --published는 이전 호출과의 호환을 위해 허용합니다.');
     return;
   }
   const preset = values.preset !== undefined ? await loadPreset(values.preset) : null;
+  if (values.ext && (!preset?.commands || values.treaty || values['rule-features'] !== undefined))
+    throw new Error('--ext는 확장 명령을 고른 프리셋으로만 쓰며 조약·규칙 기능 옵션과 함께 쓸 수 없습니다.');
   const scenario = values.scenario ?? preset?.scenario;
   const map = values.map ?? preset?.map;
   const turnTermMinutes = values['turn-term'] === undefined ? preset?.turnTermMinutes : Number(values['turn-term']);
@@ -72,6 +75,7 @@ async function main() {
             turnTermMinutes,
             ...(preset ? { preset: { key: values.preset!, value: preset } } : {}),
             ...(values.treaty ? { treatyFormat: 1 } : {}),
+            ...(values.ext ? { extFormat: 1 } : {}),
             endYear: Number(values['end-year']),
           },
           resources,
