@@ -84,6 +84,11 @@ describe('AC-INT-18B 도시 배속 국가 예약의 서버 권한', () => {
     const f = fixture();
     f.world.startYear = 191;
     vi.mocked(readView).mockResolvedValue({
+      startYear: 191,
+      cities: {},
+      nations: {},
+      generals: {},
+      diplomacies: [],
       nationStrategy: { version: 1, nations: { 1: { strategicUntil: 4, commands: { nation_mobilize: 6 } } } },
     } as Awaited<ReturnType<typeof readView>>);
     expect(await f.caller.list({ worldId: f.world.id })).toContainEqual(
