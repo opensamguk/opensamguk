@@ -540,12 +540,15 @@ export function BattleList({ worldId }: { worldId: string }) {
                   <ol>
                     {item.phases.map((phase, index) => (
                       <li key={index}>
+                        {phase.opponent ? `${phase.opponent} · ` : ''}
                         {phase.kind === 'hold' ? (
                           '수비 측 교전 저지'
                         ) : (
                           <>
                             {phase.kind === 'volley' ? '선제 사격' : '교전'} · 공격 측 {n(phase.attackerLoss)}명 피해 ·
-                            수비 측 {n(phase.defenderLoss)}명 피해{phase.attackerEvaded ? ' · 공격 측 회피' : ''}
+                            수비 측 {n(phase.defenderLoss)}
+                            {phase.opponent === '성벽' ? ' 피해' : '명 피해'}
+                            {phase.attackerEvaded ? ' · 공격 측 회피' : ''}
                             {phase.defenderEvaded ? ' · 수비 측 회피' : ''}
                           </>
                         )}

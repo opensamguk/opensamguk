@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { Rng } from '@opensamguk/shared';
 import { BALANCE } from '../balance';
 import { canDefend } from '../battle/defenders';
+import type { BattlePhase } from '../battle/simulate';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import { fail, positive, relation, removeNation, success } from '../commands/support';
 import type { Actor, CommandDef, CommandResult } from '../commands/types';
@@ -102,6 +103,7 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
   const battleAwards: NonNullable<CommandResult['battleAwards']> = [];
   const battleOutcomes: NonNullable<CommandResult['battleOutcomes']> = [];
   const generalEngagements: NonNullable<CommandResult['generalEngagements']> = [];
+  const attackPhases: BattlePhase[] = [];
   const reputation = state.ruleFeatures?.includes('reputation-v1');
   for (const attackerId of attackingIds) {
     let attackerFirstVolleyUsed = false;
@@ -109,10 +111,12 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
       const outcome = fightCampaignWall(state, attackerId, cityKey, actor.unitSet!, rng, {
         openingSkirmish,
         attackerFirstVolleyUsed,
+        recordPhases: actor.recordBattleStats === true,
       });
       state = outcome.state;
       attackerFirstVolleyUsed ||= outcome.attackerFirstVolleyFired === true;
       const name = openingSkirmish ? '성벽 선제 교전' : '성벽 교전';
+      for (const phase of outcome.phases ?? []) attackPhases.push({ ...phase, opponent: '성벽' });
       rounds.push(`부곡${attackerId} ${name}: 공격 ${get(attackerId).troops}명, 성벽 ${state.cities[cityKey]!.wall}`);
     };
     const wallFirst =
@@ -159,6 +163,8 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
       }
       const text = `${state.generals[attackerCommander]!.name} 부곡${attackerId} 대 ${state.generals[defenderCommander]!.name} 부곡${defenderId}: 공격 ${a.troops}명, 수비 ${d.troops}명`;
       rounds.push(text);
+      const opponent = `${state.generals[defenderCommander]!.name} 부곡${defenderId}`;
+      for (const phase of outcome.phases ?? []) attackPhases.push({ ...phase, opponent });
       // BattleLog의 (worldId,tick,attackerId,generalId) 키당 한 행으로 저장한다.
       const report = reports.find((row) => row.generalId === defenderCommander);
       if (report) {
@@ -185,10 +191,12 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
         actor.unitSet!,
         rng,
         attackerFirstVolleyUsed,
+        actor.recordBattleStats === true,
       );
       state = outcome.state;
       attackerFirstVolleyUsed ||= outcome.attackerFirstVolleyFired === true;
       rounds.push(outcome.text);
+      for (const phase of outcome.phases ?? []) attackPhases.push({ ...phase, opponent: `도시 병종${crewType}` });
       if (cityDefense().some((row) => row.crewType === crewType && row.troops > 0 && row.atmos > 0)) break;
     }
     if (cityDefense().some((row) => row.troops > 0 && row.atmos > 0)) continue;
@@ -241,6 +249,8 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
   const troops = attackingIds.reduce((sum, id) => sum + get(id).troops, 0);
   const summary = `${state.generals[ownerId]!.name} ${state.cities[cityKey]!.name} ${captured ? '점령' : '점령 실패'}: 병력 ${troops}명`;
   for (const report of reports) report.text += `, ${captured ? '점령' : '수비 유지'}`;
+  if (actor.recordBattleStats)
+    reports.push({ generalId: ownerId, text: summary, ...(attackPhases.length ? { phases: attackPhases } : {}) });
   history.push({ nationId, text: `${rounds.join('; ')}; ${summary}` });
   if (defendingNation !== null) history.push({ nationId: defendingNation, text: summary });
   readCampaignState(state.campaign, state);
