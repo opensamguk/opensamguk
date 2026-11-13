@@ -2,9 +2,12 @@ import type { Prisma } from '@opensamguk/db';
 import {
   canExecuteNationCommand,
   decodeTreatyRecord,
+  DIPLOMATIC_COOLDOWN_FEATURE,
+  diplomaticAidMonths,
   guideTreatyResponse,
   quoteTreatyProposal,
   rankedAidLimit,
+  strategyMonth,
   toGameDate,
   TREATY_INPUTS,
   validateNationTrustState,
@@ -35,10 +38,17 @@ import { normalizeTreatyRequestPayload, type TreatyRequestKind } from './treatyR
 type GameDate = { year: number; month: number };
 type NationRef = { id: number; name: string; color: string };
 type TreatySigner = { name: string; portraitId: number | null };
+const cooldownReason = '원조 당사국의 외교 제한 기간이 남아 있습니다.';
 type Signatories = { proposer?: TreatySigner; approver?: TreatySigner };
 export type TrustRow = { nation: NationRef; brokenTreaties: number; lastBrokenAt: GameDate | null };
 export type TreatyDenyCode =
-  'NO_PERMISSION' | 'WORLD_CLOSED' | 'IN_PROGRESS' | 'BAD_TARGET' | 'BAD_INPUT' | TreatyResponseGuideCode;
+  | 'NO_PERMISSION'
+  | 'WORLD_CLOSED'
+  | 'IN_PROGRESS'
+  | 'BAD_TARGET'
+  | 'BAD_INPUT'
+  | 'DIPLOMATIC_COOLDOWN'
+  | TreatyResponseGuideCode;
 export type TreatyAllowed = { ok: true } | { ok: false; code: TreatyDenyCode; reason: string };
 export type TreatyListItem = TreatyDetail & {
   from: NationRef | null;
@@ -85,7 +95,7 @@ export type TreatyListPage = {
 };
 export type TreatyQuote = {
   cost: { mine: number; theirs: number } | null;
-  problem: { code: TreatyQuoteCode; reason: string } | null;
+  problem: { code: TreatyQuoteCode | 'DIPLOMATIC_COOLDOWN'; reason: string } | null;
 };
 
 const kindSchema = z.enum(Object.keys(TREATY_INPUTS) as [TreatyRequestKind, ...TreatyRequestKind[]]);
@@ -297,6 +307,7 @@ export async function listTreaties(
       name: true,
       color: true,
       ...(worldTreatyOptions(world).rankedAidEnabled ? { level: true } : {}),
+      ...(world.ruleFeatures.includes(DIPLOMATIC_COOLDOWN_FEATURE) ? { diplomaticAidUntilMonth: true } : {}),
     },
     orderBy: { id: 'asc' },
   });
@@ -304,6 +315,12 @@ export async function listTreaties(
   const rankedAid = worldTreatyOptions(world).rankedAidEnabled
     ? new Map(nations.map(({ id, level }) => [id, rankedAidLimit(level)]))
     : null;
+  const month = strategyMonth(world.clockTick);
+  const restricted = new Set(
+    world.ruleFeatures.includes(DIPLOMATIC_COOLDOWN_FEATURE)
+      ? nations.filter((nation) => diplomaticAidMonths(nation, month) > 0).map(({ id }) => id)
+      : [],
+  );
   const diplomacies = await tx.diplomacy.findMany({
     where: { worldId: input.worldId, OR: [{ nationA: nationId }, { nationB: nationId }] },
     select: { nationA: true, nationB: true, state: true, untilTick: true },
@@ -510,6 +527,12 @@ export async function listTreaties(
         );
         canAccept = guidance.accept === null ? { ok: true } : allowed(guidance.accept.code, guidance.accept.message);
         if (canAccept.ok && aidUnavailable !== null) canAccept = allowed('BAD_INPUT', aidUnavailable);
+        if (
+          canAccept.ok &&
+          row.clauses.some(({ kind }) => kind === 'tribute') &&
+          (restricted.has(row.fromNationId) || restricted.has(row.toNationId))
+        )
+          canAccept = allowed('DIPLOMATIC_COOLDOWN', cooldownReason);
         canReject = guidance.reject === null ? { ok: true } : allowed(guidance.reject.code, guidance.reject.message);
       }
     }
@@ -653,6 +676,13 @@ export async function quoteTreaty(
     });
     targetValue = { relation: relation?.state ?? 'NONE', cityCount };
   }
+  const parties =
+    options.rankedAidEnabled && target && payload.clauses.some(({ kind }) => kind === 'tribute')
+      ? await tx.nation.findMany({
+          where: { worldId: input.worldId, id: { in: [actor.nationId, payload.toNationId] } },
+          select: { id: true, level: true, diplomaticAidUntilMonth: true },
+        })
+      : [];
   const result = quote(
     {
       fromNationId: actor.nationId,
@@ -660,21 +690,19 @@ export async function quoteTreaty(
       clauses: payload.clauses,
       fromCityCount,
       target: targetValue,
-      ...(options.rankedAidEnabled && payload.clauses.some((clause) => clause.kind === 'tribute')
-        ? {
-            tributeLimits: new Map(
-              (
-                await tx.nation.findMany({
-                  where: { worldId: input.worldId, id: { in: [actor.nationId, payload.toNationId] } },
-                  select: { id: true, level: true },
-                })
-              ).map(({ id, level }) => [id, rankedAidLimit(level)]),
-            ),
-          }
+      ...(parties.length
+        ? { tributeLimits: new Map(parties.map(({ id, level }) => [id, rankedAidLimit(level)])) }
         : {}),
     },
     options,
   );
+  const month = strategyMonth(world.clockTick);
+  if (
+    result.problem === null &&
+    world.ruleFeatures.includes(DIPLOMATIC_COOLDOWN_FEATURE) &&
+    parties.some((nation) => diplomaticAidMonths(nation, month) > 0)
+  )
+    return { cost: null, problem: { code: 'DIPLOMATIC_COOLDOWN', reason: cooldownReason } };
   return {
     cost: result.cost === null ? null : { mine: result.cost.from, theirs: result.cost.to },
     problem: result.problem === null ? null : { code: result.problem.code, reason: result.problem.message },
