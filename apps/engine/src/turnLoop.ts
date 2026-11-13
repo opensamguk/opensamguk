@@ -412,7 +412,10 @@ export class TurnLoop {
               sequence,
               commandKey,
               kind: failed ? 'failure' : 'success',
-              text: failed ? `${result.code}: ${result.message}` : result.logs.map((log) => log.text).join('\n'),
+              text: [
+                ...(turn.treatment ? ['환약을 써서 부상을 회복했습니다.'] : []),
+                ...(failed ? [`${result.code}: ${result.message}`] : result.logs.map((log) => log.text)),
+              ].join('\n'),
             },
           });
           await shiftTurns(tx, worldId, due.id, { ...world, actionSequence: sequence }, slots);

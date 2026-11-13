@@ -109,3 +109,36 @@ it.each([true, false])('AC-P2-12 기능표 resolver의 실제 개인 차례는 �
   }
   expect(replay.state).toEqual(before);
 });
+
+it('INT-26 환약은 턴 전에 부상을 회복하고 세 번째 사용 후 장비에서 사라진다', () => {
+  const value = origin();
+  const featureData = { ...value.featureData, 'equipment-v1': { ...TEST_EQUIPMENT_CONFIG, treatmentTool: true } };
+  const replay = initialReplayStateWithRegistry(value.initial, registry, featureData);
+  const resolver = resolverForRuleFeatures(replay.state, registry)!;
+  const actor = { generalId: 1, tick: 1, unitSet: value.initial.unitSet };
+  const general = replay.state.generals[1]!;
+  general.userId = 'equipment-test-user';
+  general.gold = 200;
+  general.injury = 9;
+  const buy = { commandKey: 'equipment_trade', args: { slot: 'tool', itemKey: 'tool_01' }, explicit: true };
+  const turn = (state: typeof replay.state, command: Parameters<typeof runGeneralTurn>[2]) =>
+    runGeneralTurn(state, actor, command, value.initial.seed, {}, resolver, { offices: replay.offices! });
+  const purchased = turn(replay.state, buy);
+  expect(purchased.result).not.toHaveProperty('code');
+  expect(purchased.state.equipment!.generals['1']!.tool?.charges).toBe(3);
+  expect(purchased.state.generals[1]!.gold).toBe(0);
+  expect(purchased.treatment).toBeUndefined();
+  const unavailable = { commandKey: 'unknown-command', args: {}, explicit: true } as const;
+  let state = purchased.state;
+  for (const charges of [2, 1, 0]) {
+    state.generals[1]!.injury = 10;
+    const treated = turn(state, unavailable);
+    expect(treated.result).toMatchObject({ code: 'UNKNOWN_COMMAND' });
+    expect(treated.treatment).toBe(true);
+    expect(treated.state.generals[1]!.injury).toBe(0);
+    expect(treated.state.equipment!.generals['1']?.tool?.charges ?? 0).toBe(charges);
+    expect(state.generals[1]!.injury).toBe(10);
+    state = treated.state;
+  }
+  expect(state.equipment!.generals['1']).toBeUndefined();
+});

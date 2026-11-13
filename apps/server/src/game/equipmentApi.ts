@@ -1,5 +1,12 @@
 import { TRPCError } from '@trpc/server';
-import { equipmentSlotSchema, equipmentBonus, fiveStatsSchema, withEquipmentBonus } from '@opensamguk/rules';
+import {
+  equipmentSlotSchema,
+  TREATMENT_TOOL,
+  hasTreatmentTool,
+  equipmentBonus,
+  fiveStatsSchema,
+  withEquipmentBonus,
+} from '@opensamguk/rules';
 import { requirePersonnelSession } from './personnelAdmission';
 import { personnelIdentity, type PersonnelActorContext } from './personnelApi';
 import { requireWorld, requireGeneral, requireRuleFeature, readView } from './queries';
@@ -25,6 +32,23 @@ export function readEquipmentBoard(ctx: PersonnelActorContext, worldId: string, 
       return {
         generalId: general.id,
         slots,
+        ...(hasTreatmentTool(equipment.config)
+          ? {
+              tool: {
+                ...TREATMENT_TOOL,
+                remainingCharges: slots.tool?.charges ?? 0,
+                failure: command.check(state, actor, { slot: 'tool', itemKey: TREATMENT_TOOL.key }),
+                sale: {
+                  proceeds: Math.floor(
+                    (Math.floor((TREATMENT_TOOL.cost * (slots.tool?.charges ?? 0)) / TREATMENT_TOOL.charges) *
+                      equipment.config.sellRateBp) /
+                      10_000,
+                  ),
+                  failure: command.check(state, actor, { slot: 'tool', itemKey: 'none' }),
+                },
+              },
+            }
+          : {}),
         baseStats,
         stats: withEquipmentBonus(state, general.id, baseStats),
         bonus: equipmentBonus(state, general.id),

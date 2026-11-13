@@ -147,6 +147,7 @@ export function previewRows(view: LineageView, preview: SuccessionPreview): Arra
         ['horse', '명마'],
         ['weapon', '무기'],
         ['book', '서적'],
+        ['tool', '도구'],
       ] as const
     )
       .filter(([slot]) => slots?.[slot])

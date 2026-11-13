@@ -5,6 +5,7 @@ import { z } from 'zod';
 import type { PublishedResource } from '@opensamguk/db';
 import {
   checkRuleFeatures,
+  hasTreatmentTool,
   DIPLOMATIC_COOLDOWN_FEATURE,
   PLAYER_AUTOPLAY_FEATURE,
   CITY_SEASONAL_EVENTS_FEATURE,
@@ -167,6 +168,16 @@ const contracts = {
     presets: presetKeys,
     suggestedEndYear: 231,
   },
+  'san10-191-treatment': {
+    id: 'san10-191-treatment',
+    label: 'SAN10 확장 · 도구와 환약',
+    selection: { ...san10Selection, scenarioKey: 'san10-191@2' },
+    startYear: 191,
+    nations: 21,
+    counts: { cities: 147, gates: 8, ports: 0, fields: 0, anchors: 155 },
+    presets: presetKeys,
+    suggestedEndYear: 231,
+  },
 } as const;
 const expandedProfiles = [
   ['integration-v01', 'expanded-191-v3'],
@@ -175,6 +186,7 @@ const expandedProfiles = [
   ['san10-191-research', 'expanded-191-v6'],
   ['san10-191-border-return', 'expanded-191-v7'],
   ['san10-191-general-condition', 'expanded-191-v8'],
+  ['san10-191-treatment', 'expanded-191-v9'],
 ] as const satisfies readonly (readonly [ProfileId, string])[];
 function profileRefs(id: ProfileId) {
   const selection = contracts[id].selection;
@@ -385,6 +397,8 @@ export function expandedCreationProfile(
       (profileId === 'san10-191-border-return' &&
         (!profile.ruleFeatures.includes('border-return-v1') || !profile.ruleFeatures.includes('nation-research-v1'))) ||
       (profileId === 'san10-191-general-condition' && !profile.ruleFeatures.includes(GENERAL_CONDITION_FEATURE)) ||
+      (profileId === 'san10-191-treatment' &&
+        (profile.version !== 3 || !hasTreatmentTool(profile.featureData['equipment-v1']))) ||
       profile.scenarioKey !== contracts[profileId].selection.scenarioKey ||
       profile.mapKey !== contracts[profileId].selection.mapKey ||
       (profileId !== 'integration-v01' &&
