@@ -136,7 +136,7 @@ export function CityInfo({
       )}
       <StatTable rows={rows} />
       {data.nationId !== null && data.kind !== 'PASS' && data.officeEffectsEnabled && data.officers ? (
-        <CityOfficeResidences officers={data.officers} />
+        <CityOfficeResidences officers={data.officers} secretaryEnabled={data.secretaryEnabled === true} />
       ) : null}
       {isDetailedCity(data) ? <CityFacts city={data} /> : null}
       {garrisonHidden ? null : <GarrisonLine generals={data.generals} campaign={data.campaignEnabled === true} />}

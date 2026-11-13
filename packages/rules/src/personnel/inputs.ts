@@ -41,7 +41,7 @@ const turnsPayload = z.strictObject({
 const appointResult = z.strictObject({
   ...tickResult,
   generalId: positive,
-  officerLevel: z.number().int().min(3).max(11),
+  officerLevel: z.number().int().min(2).max(11),
   officerCityKey: positive.optional(),
   title: z.string().min(1),
 });
