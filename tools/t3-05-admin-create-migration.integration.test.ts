@@ -50,10 +50,6 @@ let oid: string | undefined,
   address = '',
   ownerId = '',
   passwordHash = '';
-const officeMigration = new URL(
-  '../packages/db/prisma/migrations/20261215000000_resident_city_offices/migration.sql',
-  import.meta.url,
-);
 const officeRequestColumn = 'ALTER TABLE "WorldCreateRequest" ADD COLUMN "officeEffects" JSONB;';
 const migration = '20261110000000_world_create_requests',
   origin = 'http://127.0.0.1:5173';
@@ -232,18 +228,15 @@ beforeAll(
           all = (await checked(async () => readdir(directory))).filter((value) => /^\d{14}_/.test(value)).sort();
         expect(all).toContain(migration);
         expect(all.indexOf('20261117000000_stratagem_cards_state')).toBe(44);
-        for (const item of all.filter(
-          (value) => value !== migration && value !== '20261215000000_resident_city_offices',
-        )) {
+        for (const item of all.filter((value) => value !== migration)) {
           signal.throwIfAborted();
-          await checked(async () =>
-            gate.query(await checked(async () => readFile(new URL(item + '/migration.sql', directory), 'utf8'))),
-          );
+          const sql = await checked(async () => readFile(new URL(item + '/migration.sql', directory), 'utf8'));
+          if (item === '20261215000000_resident_city_offices') {
+            expect(sql).toContain(officeRequestColumn);
+            // The current client needs the new office columns, except on the request table that this test migrates.
+            await checked(async () => gate.query(sql.replace(officeRequestColumn, '')));
+          } else await checked(async () => gate.query(sql));
         }
-        const officeSql = await checked(async () => readFile(officeMigration, 'utf8'));
-        expect(officeSql).toContain(officeRequestColumn);
-        // The current Prisma client reads the new World and General columns while preparing the legacy fixture.
-        await checked(async () => gate.query(officeSql.replace(officeRequestColumn, '')));
         await checked(async () =>
           initializeResources(
             db,
