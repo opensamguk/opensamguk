@@ -1,4 +1,4 @@
-import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useRouterState } from '@tanstack/react-router';
 import {
   useCallback,
@@ -13,7 +13,7 @@ import {
 } from 'react';
 import { emptySlotLabel } from '../policy/policyText';
 import { usePolicyQuery } from '../policy/usePolicy';
-import { TRADE_COMMAND_KEY } from '../diplomacy/contract';
+import { fetchTreatyPage, TRADE_COMMAND_KEY } from '../diplomacy/contract';
 import { useTradeCityChoices } from '../diplomacy/tradeTargets';
 import { useTRPC } from '../trpc';
 import { DisabledReason } from '../ui/DisabledReason';
@@ -21,6 +21,8 @@ import { EmptyState, ErrorState, LoadingState } from '../ui/States';
 import { errorCode, retryUnlessClientError } from './apiError';
 import { describeArgs, type ArgNames } from './args';
 import { useWorldRules, useWorldUnits } from '../game/queries';
+import { isDetailedCity, isDetailedGeneral, isMemberNation } from '../game/types';
+import type { ArgContext } from './CommandArgsScreen';
 import { CommandPicker, type CommandInfo } from './CommandPicker';
 import { useEquipment } from '../equipment/useEquipment';
 import {
@@ -36,6 +38,7 @@ import {
 } from './draft';
 import { slotTimes, type SlotTime } from './schedule';
 import { personalSource, type Check, type DisplaySlot, type TurnSource, type TurnSourceFactory } from './source';
+import { relationLabel } from './targets';
 import styles from './TurnEditor.module.css';
 import { useStoredSelection, useTurnDraft, type TurnDraftState } from './useTurnDraft';
 
@@ -230,17 +233,101 @@ function Editor<S extends DisplaySlot>({
   // 월드 병종표 (T4-86). 불러오는 중·오류여도 병종 없는 명령·표·저장은 그대로 쓰고 병종은 번호로 적는다.
   const { units, note: unitNote } = useWorldUnits(worldId);
   const rules = useWorldRules(worldId);
-  const argContext = useMemo(
-    () => ({
+
+  // 인자 입력 화면이 국가·장수 대상을 열면 그때부터 받는 조회 (INT-25 3단계). 한 번 열면 편집기가 있는 동안 계속 쓴다.
+  const [needs, setNeeds] = useState<{ nations: boolean; generals: boolean }>({ nations: false, generals: false });
+  const onNeed = useCallback(
+    (kind: 'nations' | 'generals') => setNeeds((prev) => (prev[kind] ? prev : { ...prev, [kind]: true })),
+    [],
+  );
+  const myNationId = home.data?.general.nationId ?? null;
+  // 같은 국가 장수 상세(능력치·병력·물자·얼굴). 메인 국가 정보 칸과 같은 조회다.
+  const nationView = useQuery({
+    ...trpc.nation.get.queryOptions({ worldId, nationId: myNationId ?? 0 }),
+    enabled: needs.generals && myNationId !== null,
+    staleTime: 15_000,
+    retry: retryUnlessClientError,
+  });
+  // 국가별 국력·도시·장수. 순위 화면과 같은 조회다.
+  const ranking = useQuery({
+    ...trpc.ranking.nations.queryOptions({ worldId, by: 'power' }),
+    enabled: needs.nations,
+    staleTime: 60_000,
+    retry: retryUnlessClientError,
+  });
+  // 우리와의 관계. 외교실과 같은 조회 키다. 조약을 쓰지 않는 월드는 서버가 거절하고 관계를 적지 않는다.
+  const treaties = useInfiniteQuery({
+    queryKey: trpc.treaty.list.infiniteQueryKey({ worldId }),
+    queryFn: ({ pageParam, signal }) => fetchTreatyPage(worldId, pageParam, signal),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.nextCursor,
+    enabled: needs.nations && myNationId !== null,
+    retry: false,
+  });
+  const treatyTargets = treaties.data?.pages[0]?.targets;
+  const gameDate = summary.data?.gameDate;
+
+  const argContext = useMemo((): ArgContext => {
+    const general = home.data?.general;
+    const nation = home.data?.nation;
+    const city = home.data?.city;
+    const cityName = (key: number) => map.data?.cities.find((c) => c.key === key)?.name;
+    const members = nationView.data?.generals.filter(isDetailedGeneral).map((g) => {
+      const army = 'commandedArmy' in g ? g.commandedArmy : undefined;
+      return {
+        id: g.id,
+        name: g.name,
+        portraitId: g.portraitId,
+        cityName: cityName(g.cityKey),
+        leadership: g.leadership,
+        strength: g.strength,
+        intel: g.intel,
+        gold: g.gold,
+        rice: g.rice,
+        crew: army ? army.troops : g.crew,
+        train: army ? army.train : g.train,
+        atmos: army ? army.atmos : g.atmos,
+      };
+    });
+    return {
       map: map.data,
-      here: home.data?.general.cityKey ?? null,
-      ownNationId: home.data?.general.nationId ?? null,
-      wallet: home.data ? { gold: home.data.general.gold, rice: home.data.general.rice } : undefined,
+      here: general?.cityKey ?? null,
+      ownNationId: general?.nationId ?? null,
+      wallet: general ? { gold: general.gold, rice: general.rice } : undefined,
+      walletKind: source.walletKind,
+      treasury: nation && isMemberNation(nation) ? { gold: nation.gold, rice: nation.rice } : undefined,
       unitSet: rules.data?.unitSet,
       recruitment: rules.data && 'recruitment' in rules.data ? rules.data.recruitment : undefined,
-    }),
-    [map.data, home.data, rules.data],
-  );
+      me: general
+        ? {
+            id: general.id,
+            leadership: general.leadership,
+            crew: general.crew,
+            crewType: general.crewType,
+            gold: general.gold,
+          }
+        : undefined,
+      tech: nation && isMemberNation(nation) ? nation.tech : undefined,
+      security: city && isDetailedCity(city) ? city.security : undefined,
+      members,
+      nationFacts: ranking.data
+        ? new Map(
+            ranking.data.items.map((row) => [
+              row.nationId,
+              { power: row.power, cities: row.cities, generals: row.generals },
+            ]),
+          )
+        : undefined,
+      relations: treatyTargets
+        ? new Map(
+            treatyTargets.map((target) => [
+              target.nation.id,
+              relationLabel(target.relation, target.relationEndAt, gameDate),
+            ]),
+          )
+        : undefined,
+    };
+  }, [map.data, home.data, rules.data, source.walletKind, nationView.data, ranking.data, treatyTargets, gameDate]);
   const names: ArgNames = useMemo(
     () => ({
       city: (key: number) => cities.find((c) => c.key === key)?.name,
@@ -425,6 +512,12 @@ function Editor<S extends DisplaySlot>({
   return (
     <div className={styles.editor} data-testid="turn-editor">
       {renderTop?.(state)}
+      {argContext.walletKind === 'nation' && argContext.treasury ? (
+        <p className={styles.treasury} data-testid="nation-treasury">
+          국고 금 <span className="num">{argContext.treasury.gold.toLocaleString('ko-KR')}</span> · 쌀{' '}
+          <span className="num">{argContext.treasury.rice.toLocaleString('ko-KR')}</span>
+        </p>
+      ) : null}
       <div className={styles.saveBar}>
         <p className={styles.saveState} data-testid="draft-state">
           {editCount > 0 ? `저장하지 않은 편집 ${editCount}건` : '저장된 목록'}
@@ -628,6 +721,7 @@ function Editor<S extends DisplaySlot>({
           cityChoicesFor={cityChoicesFor}
           precheck={source.precheck}
           argContext={argContext}
+          onNeed={onNeed}
         />
       )}
 

@@ -20,18 +20,24 @@ export function EquipmentTradeFields({
   values,
   onChange,
   firstArgRef,
+  security,
 }: {
   read: EquipmentRead | undefined;
   values: Record<string, string>;
   onChange: (next: Record<string, string>) => void;
   firstArgRef: RefObject<HTMLElement | null>;
+  // 내 도시의 지금 치안 (home.get). 장비별 요구 치안과 견준다. 모르면 적지 않는다.
+  security?: number | undefined;
 }) {
   // 실패·불러오는 중은 공통 상태 부품을 쓴다. 다시 시도 단추가 모든 폭에서 44px이다 (AC-P2-34).
   if (read?.kind === 'error') return <ErrorState title="장비 정보를 불러오지 못했습니다." onRetry={read.retry} />;
   if (read?.kind !== 'ready') return <LoadingState>장비 정보를 불러오는 중입니다.</LoadingState>;
   const board = read.data,
     slot = EQUIPMENT_SLOTS.find((row) => row.key === values.slot)?.key ?? 'horse';
-  const items = board.items.filter((item) => item.slot === slot);
+  // 지금 살 수 있는 장비를 앞에 둔다. 못 사는 장비도 예약할 수 있어 목록에 남기고 (불가)를 붙인다 (INT-25).
+  const items = board.items
+    .filter((item) => item.slot === slot)
+    .sort((a, b) => Number(a.failure !== null) - Number(b.failure !== null));
   const item = items.find((row) => row.key === values.itemKey);
   const sale = board.sales.find((row) => row.slot === slot)!;
   const selling = values.itemKey === 'none';
@@ -75,9 +81,10 @@ export function EquipmentTradeFields({
             {items.map((row) => (
               <option key={row.key} value={row.key}>
                 {row.name} · 금 {n(row.cost)} · {EQUIPMENT_STATS[row.stat]} +{row.bonus}
+                {row.failure ? ' (불가)' : ''}
               </option>
             ))}
-            <option value="none">현재 장비 판매</option>
+            <option value="none">현재 장비 판매{sale.failure ? ' (불가)' : ''}</option>
           </select>
         </label>
       </div>
@@ -89,6 +96,14 @@ export function EquipmentTradeFields({
           </strong>
           <br />
           치안 {n(item.requiredSecurity)} 이상 · {materials || '재료 소모 없음'}
+          {security === undefined ? null : (
+            <>
+              <br />
+              <span className={security < item.requiredSecurity ? styles.warn : styles.muted}>
+                현재 도시 치안 {n(security)}
+              </span>
+            </>
+          )}
         </p>
       ) : null}
       {selling ? <p>현재 장착품 기준 판매 금액: 금 {n(sale.proceeds)}</p> : null}
