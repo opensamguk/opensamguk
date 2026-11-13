@@ -1170,6 +1170,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       .sort((a, b) => a - b);
     const [first, second, third, fourth] = keys;
     try {
+      await db.world.update({ where: { id }, data: { ruleFeatures: { push: 'rice-market-v1' } } });
       await db.$transaction(
         [
           { region: 2, level: 9 },
@@ -1179,7 +1180,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
         ].map((data, index) =>
           db.city.update({
             where: { worldId_cityKey: { worldId: id, cityKey: keys[index]! } },
-            data: { ...data, nationId: 1 },
+            data: { ...data, nationId: 1, supplied: true },
           }),
         ),
       );
@@ -1189,7 +1190,11 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       expect(own.map((city) => city.key)).toEqual([third, fourth, second, first]);
       expect(foreign.map((city) => city.key)).toEqual(keys);
       expect(own.map((city) => ('region' in city ? city.region : null))).toEqual([1, 1, 1, 2]);
-      for (const city of foreign) expect(city).not.toHaveProperty('region');
+      expect(own.find((city) => city.key === first)).toHaveProperty('riceMarket.rate', expect.any(Number));
+      for (const city of foreign) {
+        expect(city).not.toHaveProperty('region');
+        expect(city).not.toHaveProperty('riceMarket');
+      }
     } finally {
       await db.world.delete({ where: { id } });
     }
