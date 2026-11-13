@@ -62,6 +62,7 @@ export function CityOffices({
                     </Tag>
                   )}
                   <span className={styles.presence}>{holder.resident ? '주재' : '부재'}</span>
+                  {holder.tenureYears === undefined ? null : <span>임관 {holder.tenureYears}년</span>}
                 </span>
               ) : (
                 <span className={styles.empty}>없음</span>

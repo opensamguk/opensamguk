@@ -24,6 +24,7 @@ import { readCityIntel } from '../game/fog';
 import { cityDefense } from '../game/defenseRead';
 import { cityEvents } from '../game/cityEvents';
 import { projectCityIncome } from '../game/nationFinance';
+import { nationTenureYears } from '../game/nationTenure';
 
 export const cityRouter = router({
   get: protectedProcedure.input(worldInput.extend({ cityKey: entityKey }).strict()).query(({ ctx, input }) =>
@@ -37,6 +38,7 @@ export const cityRouter = router({
       });
       if (!city) throw new TRPCError({ code: 'NOT_FOUND', message: '도시를 찾을 수 없습니다.' });
       const garrisonHidden = fogEnabled && city.nationId !== null && viewer?.nationId !== city.nationId;
+      const tenureTick = world.result?.endedTick ?? nowTick(worldClock(world), ctx.now);
       const generals = garrisonHidden
         ? []
         : await tx.general.findMany({
@@ -122,6 +124,7 @@ export const cityRouter = router({
                 cityKey: true,
                 userId: true,
                 portraitId: true,
+                nationJoinedTick: true,
               },
             })
           : [];
@@ -132,14 +135,18 @@ export const cityRouter = router({
               ...(secretaryEnabled ? { secretaryEnabled: true as const } : {}),
               ...(!garrisonHidden
                 ? {
-                    officers: officers.map((officer) => ({
-                      generalId: officer.id,
-                      name: officer.name,
-                      officerLevel: officer.officerLevel,
-                      isHuman: officer.userId !== null,
-                      portraitId: officer.portraitId,
-                      resident: isOfficeResident(officer, city.nationId),
-                    })),
+                    officers: officers.map((officer) => {
+                      const tenureYears = nationTenureYears(officer.nationJoinedTick, tenureTick);
+                      return {
+                        generalId: officer.id,
+                        name: officer.name,
+                        officerLevel: officer.officerLevel,
+                        isHuman: officer.userId !== null,
+                        portraitId: officer.portraitId,
+                        resident: isOfficeResident(officer, city.nationId),
+                        ...(tenureYears === undefined ? {} : { tenureYears }),
+                      };
+                    }),
                   }
                 : {}),
             }

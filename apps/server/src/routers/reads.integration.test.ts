@@ -638,7 +638,13 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     });
     await db.general.update({
       where: { worldId_id: { worldId: world, id: 1 } },
-      data: { officerLevel: 2, officerCityKey: cityKey, portraitId: 10001, activeFromYear: state.startYear },
+      data: {
+        officerLevel: 2,
+        officerCityKey: cityKey,
+        portraitId: 10001,
+        activeFromYear: state.startYear,
+        nationJoinedTick: 0,
+      },
     });
     const result = await query('city.get', { worldId: world, cityKey });
     expect(result.status).toBe(200);
@@ -650,6 +656,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       portraitId: 10001,
       isHuman: true,
       resident: true,
+      tenureYears: 1,
     });
   });
   it('summary는 서버 시계와 공개 기수 설정을 반환한다', async () => {
