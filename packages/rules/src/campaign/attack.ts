@@ -16,6 +16,7 @@ import { fightCampaignCityGarrison, fightCampaignUnits, fightCampaignWall } from
 import { readCampaignState, type CampaignUnitState } from './state';
 import { readCityResourcesState } from '../cityResources/state';
 import { disbandCityGarrison } from '../cityResources/ownership';
+import { recordWarCasualties } from '../monthly/warIncome';
 
 const argsSchema = z.strictObject({ cityKey: positive });
 const year = (view: WorldView, tick: number) => view.startYear + Math.floor(tick / (12 * TICKS_PER_MONTH));
@@ -98,6 +99,7 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
   if (failure) throw new Error(failure.message);
   const { cityKey } = argsSchema.parse(raw),
     ownerId = actor.generalId;
+  const sourceCityKey = view.generals[ownerId]!.cityKey;
   let state = cloneWorld(view);
   const nationId = state.generals[ownerId]!.nationId!,
     defendingNation = state.cities[cityKey]!.nationId;
@@ -119,6 +121,7 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
     let attackerFirstVolleyUsed = false;
     const fightWall = (openingSkirmish = false) => {
       const priorWall = state.cities[cityKey]!.wall;
+      const priorTroops = get(attackerId).troops;
       const outcome = fightCampaignWall(state, attackerId, cityKey, actor.unitSet!, rng, {
         openingSkirmish,
         attackerFirstVolleyUsed,
@@ -127,6 +130,7 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
       state = outcome.state;
       attackerFirstVolleyUsed ||= outcome.attackerFirstVolleyFired === true;
       const unit = get(attackerId);
+      recordWarCasualties(state, sourceCityKey, cityKey, priorTroops - unit.troops);
       addGeneralProficiency(state, state.generals[unit.commanderId]!, 5, priorWall - state.cities[cityKey]!.wall);
       const name = openingSkirmish ? '성벽 선제 교전' : '성벽 교전';
       for (const phase of outcome.phases ?? []) attackPhases.push({ ...phase, opponent: '성벽' });
@@ -160,6 +164,7 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
       attackerFirstVolleyUsed ||= outcome.attackerFirstVolleyFired === true;
       const a = get(attackerId),
         d = get(defenderId);
+      recordWarCasualties(state, sourceCityKey, cityKey, attackerTroops - a.troops + defenderTroops - d.troops);
       const arms = actor.unitSet!.crewTypes;
       addGeneralProficiency(
         state,
@@ -210,6 +215,7 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
       .sort((a, b) => a - b)) {
       if (!alive(get(attackerId))) break;
       const prior = cityDefense().find((row) => row.crewType === crewType)?.troops ?? 0;
+      const priorTroops = get(attackerId).troops;
       const outcome = fightCampaignCityGarrison(
         state,
         attackerId,
@@ -224,6 +230,7 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
       attackerFirstVolleyUsed ||= outcome.attackerFirstVolleyFired === true;
       const unit = get(attackerId);
       const remaining = cityDefense().find((row) => row.crewType === crewType)?.troops ?? 0;
+      recordWarCasualties(state, sourceCityKey, cityKey, priorTroops - unit.troops + prior - remaining);
       const armType = actor.unitSet!.crewTypes.find((type) => type.id === unit.crewType)!.armType;
       addGeneralProficiency(state, state.generals[unit.commanderId]!, armType, prior - remaining);
       rounds.push(outcome.text);

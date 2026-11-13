@@ -6,6 +6,7 @@ import { readView } from '../game/queries';
 import {
   NATION_FINANCE_FEATURE,
   WALL_INCOME_FEATURE,
+  WAR_INCOME_FEATURE,
   NATION_PHILOSOPHY_FEATURE,
   cityRegionName,
   DEFENSE_STANCE_FEATURE,
@@ -86,7 +87,8 @@ export const cityRouter = router({
           (feature) =>
             feature === NATION_PHILOSOPHY_FEATURE ||
             feature === NATION_FINANCE_FEATURE ||
-            feature === WALL_INCOME_FEATURE,
+            feature === WALL_INCOME_FEATURE ||
+            feature === WAR_INCOME_FEATURE,
         )
           ? await tx.nation.findUnique({
               where: { worldId_id: { worldId: input.worldId, id: city.nationId } },

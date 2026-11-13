@@ -5,6 +5,8 @@ import {
   rankedPayroll,
   RANKED_PAYROLL_FEATURE,
   WALL_INCOME_FEATURE,
+  WAR_INCOME_FEATURE,
+  cityWarIncome,
   estimateTaxIncome,
   nationPhilosophy,
   nowTick,
@@ -15,7 +17,7 @@ import {
 import { worldClock } from '../queries';
 
 type TaxCity = Parameters<typeof estimateTaxIncome>[0][number];
-type City = TaxCity & { populationMax: number };
+type City = TaxCity & { populationMax: number; warCasualties?: number | null };
 type Member = { id: number; dedication: number; activeFromYear: number; removedAt: number | null };
 type World = Parameters<typeof worldClock>[0] & {
   startYear: number;
@@ -37,6 +39,24 @@ type NationFinanceSource = {
 };
 const wallIncomeNation = (world: World, nation?: NationFinanceSource | null) =>
   world.ruleFeatures.includes(WALL_INCOME_FEATURE) ? (nation ?? undefined) : undefined;
+function projectedWarIncome(
+  world: World,
+  cities: readonly City[],
+  nation?: NationFinanceSource | null,
+): { warIncome?: number } {
+  if (!world.ruleFeatures.includes(WAR_INCOME_FEATURE)) return {};
+  const multiplier = nationPhilosophy(world, nation?.philosophy)?.gold;
+  return {
+    warIncome:
+      nation && nation.level > 0
+        ? cities.reduce(
+            (sum, city) =>
+              sum + cityWarIncome({ supplied: city.supplied, warCasualties: city.warCasualties ?? 0 }, multiplier),
+            0,
+          )
+        : 0,
+  };
+}
 export const effectiveFinanceRates = (world: World, nation?: NationFinanceSource | null) =>
   financeRates(
     world.ruleFeatures.includes(NATION_FINANCE_FEATURE) ? storedFinanceRates(nation?.financeRates) : undefined,
@@ -70,7 +90,7 @@ export function projectCityIncome(
       ...(income.wallIncome === undefined ? {} : { wallIncome: income.wallIncome }),
     };
   };
-  return { gold: estimate('gold', 1, 7), rice: estimate('rice', 4, 10) };
+  return { gold: estimate('gold', 1, 7), rice: estimate('rice', 4, 10), ...projectedWarIncome(world, [city], nation) };
 }
 
 export function nationPopulation(settlements: readonly City[]) {
@@ -126,6 +146,7 @@ export function projectNationFinance(
   const rice = estimate('rice', 4, 10);
   return {
     financeEstimate: {
+      ...projectedWarIncome(world, settlements, nation),
       gold: gold.totals,
       rice: rice.totals,
       destination: world.ruleFeatures.includes('city-resources-v1') ? ('city' as const) : ('nation' as const),

@@ -32,7 +32,10 @@ type General = Omit<
   | 'proficiency'
   | 'heritageBenefits'
 > & { politics?: number | null; charm?: number | null };
-type City = Omit<Prisma.CityGetPayload<true>, 'kind' | 'seasonalEvent' | 'conflictTick' | 'stratagemTick'> & {
+type City = Omit<
+  Prisma.CityGetPayload<true>,
+  'kind' | 'seasonalEvent' | 'conflictTick' | 'stratagemTick' | 'warCasualties'
+> & {
   kind?: string | null;
 };
 type Nation = Omit<

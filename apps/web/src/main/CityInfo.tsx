@@ -179,6 +179,7 @@ export function CityInfo({
           {data.incomeEstimate.gold.month}월)
           {' · '}쌀 {n(data.incomeEstimate.rice.amount)} ({data.incomeEstimate.rice.year}년{' '}
           {data.incomeEstimate.rice.month}월)
+          {data.incomeEstimate.warIncome === undefined ? null : ` · 단기 금 ${n(data.incomeEstimate.warIncome)}`}
           {data.incomeEstimate.rice.wallIncome === undefined
             ? null
             : ` · 둔전 포함 ${n(data.incomeEstimate.rice.wallIncome)}`}

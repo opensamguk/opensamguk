@@ -13,6 +13,7 @@ import type { InitialGeneral } from '../world/bootstrap';
 import { refreshSupply } from '../supply';
 import { defineCommand, fail, positive, relation, removeNation, success } from './support';
 import { collectModifiers, collectModifiersWith, type ModifierProvider } from '../modifiers';
+import { recordWarCasualties } from '../monthly/warIncome';
 
 type Force = Pick<InitialGeneral, 'crew' | 'crewType' | 'train' | 'atmos' | 'rice'>;
 function feed(force: Force) {
@@ -123,6 +124,7 @@ function makeAttack(collect: typeof collectModifiers) {
           rng,
         );
         attackerFirstVolleyUsed ||= battle.attackerFirstVolleyFired === true;
+        recordWarCasualties(state, g.cityKey, city.cityKey, g.crew - battle.attacker.crew);
         Object.assign(g, battle.attacker);
         addGeneralProficiency(state, g, 5, city.wall - battle.defender.crew);
         city.wall = battle.defender.crew;
@@ -169,6 +171,7 @@ function makeAttack(collect: typeof collectModifiers) {
         attackerFirstVolleyUsed ||= battle.attackerFirstVolleyFired === true;
         const attackerLoss = g.crew - battle.attacker.crew;
         const defenderLoss = defender.crew - battle.defender.crew;
+        recordWarCasualties(state, g.cityKey, city.cityKey, attackerLoss + defenderLoss);
         const arms = actor.unitSet!.crewTypes;
         addGeneralProficiency(state, g, arms.find((type) => type.id === g.crewType)!.armType, defenderLoss);
         addGeneralProficiency(
