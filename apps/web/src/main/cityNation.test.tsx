@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { GeneralView, NationView } from '../game/types';
-import { GarrisonLine, GeneralNameCell } from './CityInfo';
-import { NationSummaryGrid } from './NationInfo';
+import type { GeneralView, NationView, WorldSummary } from '../game/types';
+import type { InspectionRow } from '../operations/contract';
+import type { ArgNames } from '../turns/args';
+import { CityStats, GarrisonLine, GeneralNameCell, TurnFive } from './CityInfo';
+import { nextTurnText, NationSummaryGrid, StationedTable } from './NationInfo';
 
 // 도시·국가 칸의 원작 정보 (INT-25 3단계). 장수·국가 값은 city.get·nation.get 응답 모양의 시험 값이다.
 vi.mock('../portrait/Portrait', () => ({
@@ -129,5 +131,122 @@ describe('국가 요약 칸', () => {
     expect(value('총 병사')).toBe('—');
     expect(value('국력')).toBe('—');
     expect(value('수도')).toBe('성도');
+  });
+});
+
+describe('도시 수치 구간', () => {
+  it('막대 읽기 이름은 그대로 두고 낮음·보통·높음 글자를 붙인다', () => {
+    render(
+      <CityStats
+        rows={[
+          { label: '주민', value: 10_000, max: 100_000 },
+          { label: '농업', value: 500, max: 1000 },
+          { label: '성벽', value: 950, max: 1000 },
+          { label: '치안', value: null, max: 1000, hiddenReason: '다른 국가의 도시입니다' },
+        ]}
+      />,
+    );
+    expect(screen.getByRole('meter', { name: '주민 10000 / 100000' })).toBeTruthy();
+    const band = (label: string) =>
+      screen.getByText(label, { selector: 'th' }).closest('tr')?.getAttribute('data-band') ?? null;
+    expect(band('주민')).toBe('low');
+    expect(band('농업')).toBe('mid');
+    expect(band('성벽')).toBe('high');
+    expect(band('치안')).toBeNull();
+    expect(screen.getByText('낮음')).toBeTruthy();
+    expect(screen.getByText('보통')).toBeTruthy();
+    expect(screen.getByText('높음')).toBeTruthy();
+  });
+});
+
+const names: ArgNames = { city: (key) => (key === 12 ? '낙양' : undefined), nation: () => undefined };
+const slots = [
+  { commandKey: 'farm', args: {}, explicit: true, name: '농지 개간' },
+  { commandKey: 'attack', args: { cityKey: 12 }, explicit: true, name: '출병' },
+  { commandKey: 'rest', args: {}, explicit: false, name: '휴식' },
+  { commandKey: 'rest', args: {}, explicit: true, name: '휴식' },
+  { commandKey: 'rest', args: {}, explicit: false, name: '휴식' },
+] as InspectionRow['turns'];
+const inspectionRow = (generalId: number, isHuman: boolean) =>
+  ({
+    generalId,
+    name: '',
+    officerLevel: 1,
+    cityKey: 3,
+    cityName: '허창',
+    isHuman,
+    crew: 0,
+    train: 0,
+    atmos: 0,
+    turns: slots,
+    nextTurnAt: '2026-11-13T09:30:00.000Z',
+    lastActiveAt: null,
+    idle: false,
+  }) as InspectionRow;
+
+describe('예턴 앞 5칸', () => {
+  it('칸 번호와 인자 이름을 붙이고 비워 둔 칸은 빈 칸으로 쓴다', () => {
+    render(<TurnFive turns={slots} names={names} />);
+    const items = Array.from(screen.getByTestId('turn-five').querySelectorAll('li'), (li) => li.textContent);
+    expect(items).toEqual(['1 농지 개간', '2 출병 낙양', '3 빈 칸', '4 휴식', '5 빈 칸']);
+  });
+});
+
+describe('펼친 도시의 장수 표', () => {
+  const generals = [
+    detailed(1, '조조(曹操)', { officerLevel: 12, crew: 2000, train: 80, atmos: 70, gold: 3000, rice: 2500 }),
+    detailed(2, '하후돈', { nextTurnTick: 12 }),
+  ] as unknown as Parameters<typeof StationedTable>[0]['generals'];
+  const props = {
+    caption: '허창 배치 장수 2명',
+    generals,
+    crewTypes: undefined,
+    campaign: false,
+    fiveStats: false,
+    names,
+    summary: undefined,
+  };
+  const headers = () => screen.getAllByRole('columnheader').map((th) => th.textContent?.replace(/[▲▼]/g, '').trim());
+
+  it('일반 장수에게는 능력치·금·쌀·병종·병력·훈련·사기·다음 턴만 보이고 예턴 열이 없다', () => {
+    render(<StationedTable {...props} inspection={null} />);
+    expect(headers()).toEqual(['장수', '직책', '통·무·지', '금', '쌀', '병종', '병력', '훈련', '사기', '다음 턴']);
+    const row = screen.getByText('조조').closest('tr')!;
+    const cells = Array.from(row.querySelectorAll('td'), (td) => td.textContent);
+    expect(cells.slice(1, 9)).toEqual(['군주', '70 / 60 / 50', '3,000', '2,500', '병종 1', '2,000', '80', '70']);
+    expect(screen.queryByText('NPC')).toBeNull();
+  });
+
+  it('직책자는 감찰 자료로 예턴 5칸·서버 다음 턴 시각·NPC 딱지를 본다', () => {
+    const inspection = new Map([
+      [1, inspectionRow(1, true)],
+      [2, inspectionRow(2, false)],
+    ]);
+    render(<StationedTable {...props} inspection={inspection} now={new Date('2026-11-13T09:00:00.000Z')} />);
+    expect(headers().at(-1)).toBe('예턴');
+    expect(screen.getAllByTestId('turn-five')).toHaveLength(2);
+    expect(screen.getByText('하후돈').closest('tr')?.textContent).toContain('NPC');
+    expect(screen.getByText('조조').closest('tr')?.textContent).not.toContain('NPC');
+  });
+});
+
+describe('다음 턴 글자', () => {
+  const summary = {
+    gameDate: { year: 191, month: 3 },
+    nowTick: 0,
+    msPerTick: 60_000,
+    turnTermMinutes: 60,
+  } as unknown as WorldSummary;
+
+  it('감찰 시각이 없으면 nextTurnTick으로 센 게임 연월만 쓴다', () => {
+    expect(nextTurnText({ nextTurnTick: 60 }, undefined, summary)).toBe('191년 4월');
+    expect(nextTurnText({ nextTurnTick: 60 }, undefined, undefined)).toBe('—');
+  });
+
+  it('감찰 시각이 있으면 그 시각을 쓴다', () => {
+    const now = new Date(2026, 10, 13, 9, 0);
+    expect(
+      nextTurnText({ nextTurnTick: 60 }, { nextTurnAt: new Date(2026, 10, 13, 9, 30).toISOString() }, summary, now),
+    ).toBe('09:30');
   });
 });

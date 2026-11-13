@@ -89,3 +89,48 @@
   height: 28px;
   border-width: 1px;
 }
+
+/* 도시 수치의 개발 정도 구간 (INT-25). 막대 색과 글자를 함께 쓴다. 글자색은 바탕 대비 4.5:1 이상인 상태 색이다. */
+.stats .fillLow {
+  background: var(--color-danger);
+}
+.stats .fillMid {
+  background: var(--color-warning);
+}
+.stats .fillHigh {
+  background: var(--color-success);
+}
+.bandCell {
+  padding-left: var(--space-2);
+  white-space: nowrap;
+}
+.band {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.bandLow {
+  color: var(--color-danger);
+}
+.bandMid {
+  color: var(--color-warning);
+}
+.bandHigh {
+  color: var(--color-success);
+}
+
+/* 예턴 앞 5칸 (직책자만, INT-25). 칸마다 번호를 붙여 한 줄씩 쌓는다. */
+.turnFive {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-xs);
+  white-space: normal;
+}
+.turnFive li {
+  min-width: 8em;
+}
+.slotNo {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
