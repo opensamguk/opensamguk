@@ -30,6 +30,7 @@ type PersonnelMember = {
 };
 export type PersonnelBoard = {
   actorId: number;
+  topVictories?: { generalId: number; name: string; portraitId: number | null; wins: number }[];
   topStratagem?: { generalId: number; name: string; portraitId: number | null; successes: number }[];
   officeEffectsEnabled?: true;
   localOfficeMinimum?: number;
