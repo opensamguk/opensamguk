@@ -95,9 +95,17 @@ function BattleSimForm({
   const importAttacker = () => {
     if (!general) return;
     const nation = home.data?.nation;
+    const traits = {
+      ...(general.personalityEffects ? { personality: general.personalityEffects.name } : {}),
+      ...(general.combatSpecialty ? { specialty: general.combatSpecialty.name } : {}),
+      ...(general.proficiency?.length
+        ? { proficiency: Object.fromEntries(general.proficiency.map(({ armType, value }) => [armType, value])) }
+        : {}),
+    };
     setForm((current) => ({
       ...current,
       statProfile: fiveStats ? 'five-stats' : 'legacy',
+      attackerTraits: Object.keys(traits).length ? traits : undefined,
       attacker: {
         crew: String(general.crew),
         crewType: units.generals.some(({ id }) => id === general.crewType) ? String(general.crewType) : '',
@@ -143,6 +151,26 @@ function BattleSimForm({
               <button type="button" className={styles.primary} onClick={importAttacker}>
                 내 장수 값 가져오기
               </button>
+            ) : null}
+            {form.attackerTraits ? (
+              <div className={styles.row}>
+                <span>
+                  {[
+                    form.attackerTraits.personality,
+                    form.attackerTraits.specialty,
+                    form.attackerTraits.proficiency && '병종 숙련',
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </span>
+                <button
+                  type="button"
+                  className={styles.secondary}
+                  onClick={() => setForm((current) => ({ ...current, attackerTraits: undefined }))}
+                >
+                  가져온 효과 빼기
+                </button>
+              </div>
             ) : null}
             <ForceFields
               side="attacker"
