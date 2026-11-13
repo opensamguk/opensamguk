@@ -261,6 +261,8 @@ export {
   MORALE_TOOL,
   hasTreatmentTool,
   hasMoraleTool,
+  hasRareEquipment,
+  rareEquipment,
   equipmentTools,
   toolSaleProceeds,
 } from './equipment/config';

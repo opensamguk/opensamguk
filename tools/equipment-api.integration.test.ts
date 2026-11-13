@@ -7,6 +7,7 @@ import { operationalInput } from '../packages/rules/test/operationalMapFixture';
 import { TEST_EQUIPMENT_LOGISTICS_CONFIG } from '../packages/rules/src/equipment/testFixture';
 import { lineageTestConfig } from '../packages/rules/src/lineage/testFixture';
 import type { LineageInput } from '../packages/rules/src/lineage/actions';
+import { rngFor } from '../packages/shared/src/rng';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
@@ -17,7 +18,7 @@ import { loadReplayState } from '../apps/engine/src/monthly';
 import { exportReplay, replayArchive } from '../apps/engine/src/replay';
 import { buildServer } from '../apps/server/src/server';
 import { newSession } from '../apps/server/src/auth/session';
-import type { readEquipmentBoard } from '../apps/server/src/game/equipmentApi';
+import type { readEquipmentBoard, readRareEquipment } from '../apps/server/src/game/equipmentApi';
 import type { readLineageBoard, readLineageRequest } from '../apps/server/src/lineage/service';
 import { authzCase } from '../apps/server/src/authz/case';
 import { categories } from '../apps/server/src/authz/coverage';
@@ -39,6 +40,7 @@ const app = await buildServer({ db, now: () => now, logging: false });
 let base: string;
 type Results = {
   'equipment.mine': Awaited<ReturnType<typeof readEquipmentBoard>>;
+  'equipment.rare': Awaited<ReturnType<typeof readRareEquipment>>;
   'general.create': unknown;
   'turns.set': unknown;
   'logistics.submit': { status: string };
@@ -48,7 +50,7 @@ type Results = {
 };
 type User = { id: string; cookie: string };
 async function rpc<R extends keyof Results>(route: R, input: unknown, player?: User) {
-  const mutation = !['equipment.mine', 'lineage.get', 'lineage.request'].includes(route),
+  const mutation = !['equipment.mine', 'equipment.rare', 'lineage.get', 'lineage.request'].includes(route),
     encoded = JSON.stringify(input);
   const response = await fetch(`${base}/trpc/${route}${mutation ? '' : `?input=${encodeURIComponent(encoded)}`}`, {
     method: mutation ? 'POST' : 'GET',
@@ -93,7 +95,7 @@ async function fixture(
   enabled = true,
   lineage = false,
   specialty: 'iron' | 'horses' = 'iron',
-  toolProfile: boolean | 'morale' = false,
+  toolProfile: boolean | 'morale' | 'rare' = false,
 ) {
   const input = operationalInput();
   const template = input.map.sites.find((site) => site.kind === 'CITY')!;
@@ -118,6 +120,15 @@ async function fixture(
   });
   const initial = buildInitialWorld(input);
   initial.seed = `equipment-pg-${randomUUID()}`;
+  if (toolProfile === 'rare') {
+    for (let i = 0; ; i++) {
+      const seed = `equipment-rare-${i}`;
+      if (rngFor(seed, 'monthly', initial.startYear, 1).next() < 0.1) {
+        initial.seed = seed;
+        break;
+      }
+    }
+  }
   initial.generals = initial.generals.map((general) => ({
     ...general,
     crew: 0,
@@ -159,7 +170,8 @@ async function fixture(
               ? {
                   ...STANDARD_EQUIPMENT_CONFIG,
                   treatmentTool: true,
-                  ...(toolProfile === 'morale' ? { moraleTool: true } : {}),
+                  ...(toolProfile === 'morale' || toolProfile === 'rare' ? { moraleTool: true } : {}),
+                  ...(toolProfile === 'rare' ? { rareEquipment: true } : {}),
                 }
               : STANDARD_EQUIPMENT_CONFIG,
           }
@@ -353,6 +365,47 @@ it('INT-26 탁주를 구매하고 판매할 때 활성 도구와 실제 판매�
     archive.months.map(({ stateHash }) => stateHash),
   );
 });
+
+it(
+  'INT-26 월말 명품 발견이 공개 소유자와 재생 기록에 일치한다',
+  authzCase('equipment.rare', 'success', async () => {
+    const f = await fixture(true, false, 'iron', 'rare');
+    const before = await rpc('equipment.rare', { worldId: f.id }, f.player);
+    expect(before.data?.items).toHaveLength(3);
+    expect(before.data?.items.every(({ owner }) => owner === null)).toBe(true);
+    await advance(f.id, 10_000);
+    const after = await rpc('equipment.rare', { worldId: f.id }, f.player);
+    const found = after.data!.items.filter(({ owner }) => owner);
+    expect(found).toHaveLength(1);
+    expect(found[0]!.owner).toMatchObject({ id: f.actorId, name: '장비시험자', portraitId: null });
+    expect((await rpc('equipment.mine', { worldId: f.id }, f.player)).data?.rare).toMatchObject([
+      { key: found[0]!.key },
+    ]);
+    expect(await db.generalLog.count({ where: { worldId: f.id, commandKey: 'equipment.discovery' } })).toBe(1);
+    const archive = await exportReplay(db, f.id);
+    expect(replayArchive(archive, archive.months.length).map(({ stateHash }) => stateHash)).toEqual(
+      archive.months.map(({ stateHash }) => stateHash),
+    );
+  }),
+);
+
+for (const category of ['unauthenticated', 'otherUser', 'sanctioned', 'invalidInput'] as const) {
+  it(
+    `equipment.rare ${category}`,
+    authzCase('equipment.rare', category, async () => {
+      const f = await fixture(true, false, 'iron', 'rare');
+      const caller = category === 'unauthenticated' ? undefined : await user();
+      if (category === 'sanctioned')
+        await db.sanction.create({
+          data: { userId: caller!.id, worldId: f.id, reason: '명품 조회 제재 검증', createdBy: f.player.id },
+        });
+      const input = { worldId: f.id, ...(category === 'invalidInput' ? { generalId: f.actorId } : {}) };
+      const result = await rpc('equipment.rare', input, caller);
+      expect(result.status).toBe(category === 'unauthenticated' ? 401 : category === 'invalidInput' ? 400 : 200);
+      if (result.status === 200) expect(result.data).toEqual((await rpc('equipment.rare', input, f.player)).data);
+    }),
+  );
+}
 
 it.each([
   { slot: 'weapon', itemKey: 'weapon_01', good: 'iron', stat: 'strength' },

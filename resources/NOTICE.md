@@ -213,3 +213,7 @@ core2026 커밋 df6c9269fa1e2862418ba9da481c8dd2d758d6c5의 MIT © 2025 devsam �
 ### INT-26 필살과 전투계략
 
 필살 확률·피해 범위, 전투계략 종류와 피해 배율은 core2026 `c81d304`의 `packages/logic/src/war/units/general.ts`, `war/triggers/che_필살.ts`, `war/triggers/che_계략.ts`를 참고했다. OpenSamguk의 기존 교환 단계에 적용한다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+### INT-26 장비와 입장 후보
+
+환약·탁주, 적토마·의천검·손자병법의 이름과 효과는 core2026 `c81d304`의 `packages/logic/src/items/`를 참고했다. 입장 후보 수·보관 횟수·시간 공식은 같은 커밋의 `app/game-engine/src/turn/npcPossessionService.ts`를 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다. 명품 발견 확률은 OpenSamguk 규칙이다.

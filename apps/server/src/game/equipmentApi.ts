@@ -4,6 +4,8 @@ import {
   TREATMENT_TOOL,
   MORALE_TOOL,
   hasMoraleTool,
+  hasRareEquipment,
+  rareEquipment,
   equipmentTools,
   toolSaleProceeds,
   hasTreatmentTool,
@@ -15,6 +17,7 @@ import { requirePersonnelSession } from './personnelAdmission';
 import { personnelIdentity, type PersonnelActorContext } from './personnelApi';
 import { requireWorld, requireGeneral, requireRuleFeature, readView } from './queries';
 import { worldResolver } from './resolver';
+import { readWorld } from '../queries';
 
 export function readEquipmentBoard(ctx: PersonnelActorContext, worldId: string, started = performance.now()) {
   return ctx.db.$transaction(
@@ -49,6 +52,9 @@ export function readEquipmentBoard(ctx: PersonnelActorContext, worldId: string, 
           ? { tool: toolEntry(slots.tool ? equipmentTools[slots.tool.key] : TREATMENT_TOOL) }
           : {}),
         ...(hasMoraleTool(equipment.config) ? { tools: [toolEntry(TREATMENT_TOOL), toolEntry(MORALE_TOOL)] } : {}),
+        ...(hasRareEquipment(equipment.config)
+          ? { rare: rareEquipment.filter((item) => slots[item.slot] === item.key) }
+          : {}),
         baseStats,
         stats: withEquipmentBonus(state, general.id, baseStats),
         bonus: equipmentBonus(state, general.id),
@@ -71,4 +77,32 @@ export function readEquipmentBoard(ctx: PersonnelActorContext, worldId: string, 
     },
     { isolationLevel: 'RepeatableRead' },
   );
+}
+
+export function readRareEquipment(db: PersonnelActorContext['db'], worldId: string) {
+  return readWorld(db, worldId, async (tx, world) => {
+    if (!world.ruleFeatures.includes('equipment-v1')) return { enabled: false, items: [] };
+    const state = await readView(tx, worldId);
+    const equipment = state.equipment!;
+    if (!hasRareEquipment(equipment.config)) return { enabled: false, items: [] };
+    return {
+      enabled: true,
+      items: rareEquipment.map((item) => {
+        const match = Object.entries(equipment.generals).find(([, slots]) => slots[item.slot] === item.key);
+        const owner = match ? state.generals[Number(match[0])] : undefined;
+        const nation = owner?.nationId != null ? state.nations[owner.nationId] : undefined;
+        return {
+          ...item,
+          owner: owner
+            ? {
+                id: owner.id,
+                name: owner.name,
+                portraitId: owner.portraitId,
+                nation: nation ? { id: nation.id, name: nation.name, color: nation.color } : null,
+              }
+            : null,
+        };
+      }),
+    };
+  });
 }

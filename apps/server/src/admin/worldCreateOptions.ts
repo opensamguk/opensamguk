@@ -7,6 +7,7 @@ import {
   checkRuleFeatures,
   hasTreatmentTool,
   hasMoraleTool,
+  hasRareEquipment,
   CITY_OFFICE_VOLUNTEER_FEATURE,
   DIPLOMATIC_COOLDOWN_FEATURE,
   PLAYER_AUTOPLAY_FEATURE,
@@ -202,6 +203,16 @@ const contracts = {
     presets: presetKeys,
     suggestedEndYear: 231,
   },
+  'san10-191-rare-equipment': {
+    id: 'san10-191-rare-equipment',
+    label: 'SAN10 확장 · 명품 발견',
+    selection: { ...san10Selection, scenarioKey: 'san10-191@2' },
+    startYear: 191,
+    nations: 21,
+    counts: { cities: 147, gates: 8, ports: 0, fields: 0, anchors: 155 },
+    presets: presetKeys,
+    suggestedEndYear: 231,
+  },
 } as const;
 const expandedProfiles = [
   ['integration-v01', 'expanded-191-v3'],
@@ -213,6 +224,7 @@ const expandedProfiles = [
   ['san10-191-treatment', 'expanded-191-v9'],
   ['san10-191-city-office', 'expanded-191-v10'],
   ['san10-191-combat-tools', 'expanded-191-v11'],
+  ['san10-191-rare-equipment', 'expanded-191-v12'],
 ] as const satisfies readonly (readonly [ProfileId, string])[];
 function profileRefs(id: ProfileId) {
   const selection = contracts[id].selection;
@@ -424,6 +436,8 @@ export function expandedCreationProfile(
         (!profile.ruleFeatures.includes('border-return-v1') || !profile.ruleFeatures.includes('nation-research-v1'))) ||
       (profileId === 'san10-191-general-condition' && !profile.ruleFeatures.includes(GENERAL_CONDITION_FEATURE)) ||
       (profileId === 'san10-191-city-office' && !profile.ruleFeatures.includes(CITY_OFFICE_VOLUNTEER_FEATURE)) ||
+      (profileId === 'san10-191-rare-equipment' &&
+        (profile.version !== 3 || !hasRareEquipment(profile.featureData['equipment-v1']))) ||
       (profileId === 'san10-191-combat-tools' &&
         (profile.version !== 3 ||
           !hasMoraleTool(profile.featureData['equipment-v1']) ||

@@ -25,6 +25,14 @@ export const equipmentTools = { [TREATMENT_TOOL.key]: TREATMENT_TOOL, [MORALE_TO
 export const equipmentToolKeySchema = z.enum([TREATMENT_TOOL.key, MORALE_TOOL.key]);
 export const equipmentSlotSchema = z.enum(['horse', 'weapon', 'book']);
 export const equipmentKeySchema = z.string().regex(/^(horse|weapon|book)_0[1-6]$/);
+export const rareEquipmentKeySchema = z.string().regex(/^(horse|weapon|book)_15$/);
+export const equippedItemKeySchema = z.union([equipmentKeySchema, rareEquipmentKeySchema]);
+// Names and +15 stat effects from core2026 c81d304 items (MIT). Discovery is a new rule.
+export const rareEquipment = [
+  { key: 'horse_15', name: '적토마', slot: 'horse', stat: 'leadership', bonus: 15, description: '통솔 +15' },
+  { key: 'weapon_15', name: '의천검', slot: 'weapon', stat: 'strength', bonus: 15, description: '무력 +15' },
+  { key: 'book_15', name: '손자병법', slot: 'book', stat: 'intel', bonus: 15, description: '지력 +15' },
+] as const;
 const quantity = z.number().int().min(0).max(EQUIPMENT_MAX);
 const itemSchema = z
   .strictObject({
@@ -56,11 +64,16 @@ const baseEquipmentConfigSchema = z.strictObject({
   sellRateBp: quantity.max(10_000),
   tradeExperience: quantity,
 });
+const moraleEquipmentConfigSchema = baseEquipmentConfigSchema.extend({
+  treatmentTool: z.literal(true),
+  moraleTool: z.literal(true),
+});
 export const equipmentConfigSchema = z
   .union([
     baseEquipmentConfigSchema,
     baseEquipmentConfigSchema.extend({ treatmentTool: z.literal(true) }),
-    baseEquipmentConfigSchema.extend({ treatmentTool: z.literal(true), moraleTool: z.literal(true) }),
+    moraleEquipmentConfigSchema,
+    moraleEquipmentConfigSchema.extend({ rareEquipment: z.literal(true) }),
   ])
   .superRefine((config, context) => {
     const keys = new Set<string>();
@@ -80,6 +93,23 @@ export function hasTreatmentTool(config: Readonly<{ treatmentTool?: true } & Pic
 
 export function hasMoraleTool(config: Readonly<EquipmentConfig>) {
   return 'moraleTool' in config && config.moraleTool === true;
+}
+
+export function hasRareEquipment(config: Pick<EquipmentConfig, 'version'> & { rareEquipment?: true }) {
+  return 'rareEquipment' in config && config.rareEquipment === true;
+}
+
+export function equippedItem(
+  config: Pick<EquipmentConfig, 'version'> & {
+    items: readonly Readonly<EquipmentConfig['items'][number]>[];
+    rareEquipment?: true;
+  },
+  key: string | undefined,
+) {
+  return (
+    config.items.find((item) => item.key === key) ??
+    (hasRareEquipment(config) ? rareEquipment.find((item) => item.key === key) : undefined)
+  );
 }
 
 export function toolSaleProceeds(held: { key: keyof typeof equipmentTools; charges: number }, sellRateBp: number) {
