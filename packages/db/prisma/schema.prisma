@@ -120,6 +120,7 @@ model WorldTrafficMonthly {
   world     World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
 
   @@id([worldId, monthTick, generalId])
+  @@index([worldId, generalId])
 }
 
 model PublicNationEvent {

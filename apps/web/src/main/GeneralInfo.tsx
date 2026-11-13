@@ -220,6 +220,15 @@ export function GeneralInfo({
             ? { label: '전공', value: meritText(merit.row), title: merit.at }
             : { label: '전공', value: '—', title: merit.at },
           { label: '다음 턴', value: formatClock(home.nextTurnAt) },
+          ...(home.refreshScore
+            ? [
+                {
+                  label: '갱신 점수',
+                  value: `${home.refreshScore.grade} ${n(home.refreshScore.total)}점 (${n(home.refreshScore.current)})`,
+                  title: `이번 달 기준 ${n(home.refreshScore.limit)}점`,
+                },
+              ]
+            : []),
           { label: '기본 방침', value: g.policy.name },
           ...(g.autoplay?.removalOn
             ? [

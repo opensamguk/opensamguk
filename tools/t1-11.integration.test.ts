@@ -112,6 +112,7 @@ describe('T1-11 실제 HTTP·PostgreSQL 권한', () => {
       [a.cookie, a.cookie, b.cookie].map((cookie) => request('home.get', { worldId }, cookie)),
     );
     expect(reads.every(({ code }) => code === undefined)).toBe(true);
+    expect(reads[2]!.data.refreshScore).toMatchObject({ current: 1, total: 1, grade: '안함', level: 0 });
     await request('home.get', { worldId });
     expect((await traffic()).data).toMatchObject({
       periods: [{ year: initial.startYear, month: 1, refresh: 3, visitors: 2 }],
@@ -122,7 +123,8 @@ describe('T1-11 실제 HTTP·PostgreSQL 권한', () => {
       where: { id: worldId },
       data: { clockAnchorAt: new Date(Date.now() - 3_600_010) },
     });
-    await request('home.get', { worldId }, a.cookie);
+    const nextMonth = await request('home.get', { worldId }, a.cookie);
+    expect(nextMonth.data.refreshScore).toMatchObject({ current: 1, total: 3, grade: '안함', level: 0 });
     const after = (await traffic()).data;
     expect(after).toMatchObject({
       periods: [

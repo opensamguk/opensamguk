@@ -309,14 +309,22 @@ export const homeRouter = router({
         page,
         traffic:
           world.status === 'RUNNING' && general.removedAt === null && general.activeFromYear !== LINEAGE_EXITED_YEAR
-            ? tick
+            ? { tick, turnTermMinutes: world.turnTermMinutes }
             : null,
       };
     });
-    if (traffic !== null)
-      await recordWorldTraffic(ctx.db, input.worldId, page.general.id, traffic, ctx.now).catch(() =>
-        ctx.reply.log.warn('월드 접속량 집계에 실패했습니다.'),
-      );
-    return page;
+    const refreshScore = traffic
+      ? await recordWorldTraffic(
+          ctx.db,
+          input.worldId,
+          page.general.id,
+          traffic.tick,
+          ctx.now,
+          traffic.turnTermMinutes,
+        ).catch(() => {
+          ctx.reply.log.warn('월드 접속량 집계에 실패했습니다.');
+        })
+      : undefined;
+    return { ...page, ...(refreshScore ? { refreshScore } : {}) };
   }),
 });

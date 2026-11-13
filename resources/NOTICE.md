@@ -221,3 +221,7 @@ core2026 커밋 df6c9269fa1e2862418ba9da481c8dd2d758d6c5의 MIT © 2025 devsam �
 ### INT-26 성장에 따른 특기 습득
 
 특기 습득 연령 공식과 기수 시작 3년 기준은 core2026 `c81d304`의 `app/game-engine/src/turn/monthlySpecialityBetrayAction.ts`를 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+### INT-26 갱신 점수
+
+등급 구간과 턴 주기별 점수 기준은 core2026 `c81d304`의 `app/game-api/src/services/generalBasicCardProjection.ts`와 `packages/common/src/game/accessPenalty.ts`를 참고했다. 점수는 OpenSamguk 메인 조회를 기준으로 집계하며 장수 본인에게 표시한다. 원저작자 devsam의 위 MIT 고지를 유지한다.
