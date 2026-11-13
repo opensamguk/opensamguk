@@ -141,7 +141,7 @@ export const homeRouter = router({
               orderBy: [{ name: 'asc' }, { id: 'asc' }],
             });
       return {
-        heritageBenefitsEnabled: world.ruleFeatures.includes(HERITAGE_BENEFITS_FEATURE),
+        ...(world.ruleFeatures.includes(HERITAGE_BENEFITS_FEATURE) ? { heritageBenefitsEnabled: true as const } : {}),
         general: {
           ...ownGeneralInfo(general),
 
