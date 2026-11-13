@@ -46,6 +46,8 @@ export function invalidationTargets(event: WorldEvent, worldId: string, trpc: Tr
         trpc.personnel.officers.queryKey({ worldId }),
         trpc.equipment.mine.queryKey({ worldId }),
         trpc.world.summary.queryKey({ worldId }),
+        trpc.nation.get.queryKey({ worldId }),
+        trpc.ranking.nations.queryKey({ worldId }),
         trpc.home.get.queryKey({ worldId }),
         trpc.world.map.queryKey({ worldId }),
         trpc.advice.get.queryKey({ worldId }),
