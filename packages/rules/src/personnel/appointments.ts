@@ -1,5 +1,5 @@
 import { canManagePersonnel, isAppointableOfficerLevel, officerTitle } from './permissions';
-import { isLocalOffice, localOfficeAbility, localOfficeTitle } from './residentOffice';
+import { hasCitySecretary, isLocalOffice, localOfficeAbility, localOfficeTitle } from './residentOffice';
 import { clonePersonnel, personnelFailure } from './types';
 import type { AppointResult, PersonnelFailure, PersonnelResult, PersonnelView } from './types';
 
@@ -34,9 +34,10 @@ export function appointOfficer(
   const failure = checkRuler(view, actorId);
   if (failure) return failure;
   const local = isLocalOffice(officerLevel);
+  const officeEnabled = view.officeEffects && (officerLevel !== 2 || hasCitySecretary(view.officeEffects));
   if (
     (!local && !isAppointableOfficerLevel(officerLevel)) ||
-    (local ? !view.officeEffects || cityKey === undefined : cityKey !== undefined || expectedHolderId !== undefined)
+    (local ? !officeEnabled || cityKey === undefined : cityKey !== undefined || expectedHolderId !== undefined)
   )
     return personnelFailure('BAD_ARGS', '직책과 담당 도시를 확인하세요.');
   const targetFailure = checkTarget(view, actorId, generalId);
@@ -114,7 +115,10 @@ export function dismissOfficer(
   const failure = checkRuler(view, actorId) ?? checkTarget(view, actorId, generalId);
   if (failure) return failure;
   const level = view.generals[generalId]!.officerLevel;
-  if (!isAppointableOfficerLevel(level) && !(view.officeEffects && isLocalOffice(level)))
+  if (
+    !isAppointableOfficerLevel(level) &&
+    !(view.officeEffects && isLocalOffice(level) && (level !== 2 || hasCitySecretary(view.officeEffects)))
+  )
     return personnelFailure('BAD_TARGET', '해임할 직책이 없습니다.');
   const state = clonePersonnel(view);
   const target = state.generals[generalId]!;

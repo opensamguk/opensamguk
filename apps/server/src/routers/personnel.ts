@@ -9,19 +9,22 @@ import { submitAndWaitPersonnel, withPersonnel } from '../game/personnelApi';
 const requestInput = worldInput.extend({ requestId: z.uuid() });
 const generalId = z.number().int().positive().max(2_147_483_647);
 export const personnelRouter = router({
-  officers: protectedProcedure
-    .input(worldInput)
-    .query(({ ctx, input }) =>
-      withPersonnel(ctx, input.worldId, (tx, ready) =>
-        readPersonnelBoard(tx, { worldId: input.worldId, userId: ctx.user.id }, ready.officeEffectsEnabled === true),
-      ),
-    ),
+  officers: protectedProcedure.input(worldInput).query(({ ctx, input }) =>
+    withPersonnel(ctx, input.worldId, async (tx, ready) => ({
+      ...(await readPersonnelBoard(
+        tx,
+        { worldId: input.worldId, userId: ctx.user.id },
+        ready.officeEffectsEnabled === true,
+      )),
+      ...(ready.secretaryEnabled ? { secretaryEnabled: true as const } : {}),
+    })),
+  ),
   appoint: worldVerifiedProcedure
     .input(
       requestInput
         .extend({
           generalId,
-          officerLevel: z.number().int().min(3).max(11),
+          officerLevel: z.number().int().min(2).max(11),
           cityKey: generalId.optional(),
           expectedHolderId: generalId.nullable().optional(),
         })

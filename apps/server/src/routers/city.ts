@@ -9,6 +9,8 @@ import {
   OFFICE_EFFECTS_FEATURE,
   toGameDate,
   isOfficeResident,
+  officeEffectsSchema,
+  hasCitySecretary,
 } from '@opensamguk/rules';
 import { readCityScaleProjection } from '../game/cityScale';
 import { readCityIntel } from '../game/fog';
@@ -42,6 +44,14 @@ export const cityRouter = router({
           ? await readCityIntel(tx, world, viewer.nationId, city.cityKey, ctx)
           : null;
       const officeEffectsEnabled = world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE);
+      const secretaryEnabled =
+        officeEffectsEnabled &&
+        hasCitySecretary(
+          officeEffectsSchema.parse(
+            (await tx.world.findUniqueOrThrow({ where: { id: input.worldId }, select: { officeEffects: true } }))
+              .officeEffects,
+          ),
+        );
       const officers =
         officeEffectsEnabled && !garrisonHidden && city.nationId !== null && city.kind !== 'PASS'
           ? await tx.general.findMany({
@@ -53,19 +63,31 @@ export const cityRouter = router({
                 OR: [{ officerCityKey: city.cityKey }, { cityKey: city.cityKey, officerLevel: { gte: 5, lte: 11 } }],
               },
               orderBy: [{ officerLevel: 'desc' }, { id: 'asc' }],
-              select: { id: true, name: true, nationId: true, officerLevel: true, officerCityKey: true, cityKey: true },
+              select: {
+                id: true,
+                name: true,
+                nationId: true,
+                officerLevel: true,
+                officerCityKey: true,
+                cityKey: true,
+                userId: true,
+                portraitId: true,
+              },
             })
           : [];
       return {
         ...(officeEffectsEnabled
           ? {
               officeEffectsEnabled: true as const,
+              ...(secretaryEnabled ? { secretaryEnabled: true as const } : {}),
               ...(!garrisonHidden
                 ? {
                     officers: officers.map((officer) => ({
                       generalId: officer.id,
                       name: officer.name,
                       officerLevel: officer.officerLevel,
+                      isHuman: officer.userId !== null,
+                      portraitId: officer.portraitId,
                       resident: isOfficeResident(officer, city.nationId),
                     })),
                   }

@@ -48,6 +48,20 @@ function appoint(state: WorldState, generalId: number, officerLevel: number, cit
 }
 
 describe('AC-M3-12 1030 고정 시드 관직 주재 골든', () => {
+  it('AC-INT-26 새 월드는 종사를 임명하고 기존 월드는 예전 규칙을 적용한다', async () => {
+    const before = await source();
+    before.generals[3]!.strength = 20;
+    before.generals[3]!.intel = 20;
+    const result = appointOfficer(before, 1, 3, 2, 1, null);
+    expect(result).toMatchObject({ ok: true, result: { officerLevel: 2, title: '종사', officerCityKey: 1 } });
+    if (!result.ok) throw Error(result.message);
+    expect(residentOfficeBonuses(result.state, before.startYear)).toEqual(
+      residentOfficeBonuses(before, before.startYear),
+    );
+    const { version, minimumAbility, tax, supplyLoss } = before.officeEffects!;
+    before.officeEffects = { version, minimumAbility, tax, supplyLoss };
+    expect(appointOfficer(before, 1, 3, 2, 1, null)).toMatchObject({ ok: false, code: 'BAD_ARGS' });
+  });
   it('태수와 군사 보정은 각각 10%이고 참모가 함께 있어도 가장 큰 한 번만 붙는다', async () => {
     const before = await source();
     const disabled = structuredClone(before);

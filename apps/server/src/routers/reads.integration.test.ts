@@ -205,6 +205,38 @@ afterAll(async () => {
 });
 
 describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
+  it('AC-INT-26 종사 임지에서 초상·사람 여부와 주재 상태를 읽는다', async () => {
+    const world = await fixtureWorld('secretary');
+    const cityKey = state.cities[0]!.cityKey;
+    await db.world.update({
+      where: { id: world },
+      data: {
+        ruleFeatures: { push: 'office-effects' },
+        officeEffects: {
+          version: 1,
+          secretary: true,
+          minimumAbility: 65,
+          tax: { 3: 10, 4: 10, 11: 5 },
+          supplyLoss: { 5: 10, 6: 10, 7: 10, 8: 10, 9: 10, 10: 10 },
+        },
+      },
+    });
+    await db.general.update({
+      where: { worldId_id: { worldId: world, id: 1 } },
+      data: { officerLevel: 2, officerCityKey: cityKey, portraitId: 10001, activeFromYear: state.startYear },
+    });
+    const result = await query('city.get', { worldId: world, cityKey });
+    expect(result.status).toBe(200);
+    expect(result.data.secretaryEnabled).toBe(true);
+    expect(result.data.officers).toContainEqual({
+      generalId: 1,
+      name: state.generals[0]!.name,
+      officerLevel: 2,
+      portraitId: 10001,
+      isHuman: true,
+      resident: true,
+    });
+  });
   it('summary는 서버 시계와 공개 기수 설정을 반환한다', async () => {
     expect(await query('world.summary', { worldId })).toEqual({
       status: 200,
