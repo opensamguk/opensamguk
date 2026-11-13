@@ -119,6 +119,10 @@ describe('T1-12 / AC-M1-19 공개 범위 표', () => {
       cities: [{ cityKey: 1, nationId: 1 }],
     });
     expect(nationRecordInfo(data.nations[0]!)).toEqual({ nationId: 1, cities: 3, generals: 4, gold: 100, rice: 200 });
+    expect(worldRecordInfo(data, [{ nationId: 1, power: 145 }])).toEqual({
+      nations: [{ nationId: 1, cities: 3, generals: 4, power: 145 }],
+      cities: [{ cityKey: 1, nationId: 1 }],
+    });
   });
 
   it('AC-INT-11 지휘 병력은 소유자가 아닌 지휘관으로 합산하고 빈 부곡은 평균에서 뺀다', () => {

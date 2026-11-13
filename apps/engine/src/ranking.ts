@@ -62,4 +62,5 @@ export async function persistRanking(
     });
   const data = { ...at, generals, nations };
   await tx.rankingSnapshot.upsert({ where: { worldId }, create: { worldId, ...data }, update: data });
+  return nations;
 }

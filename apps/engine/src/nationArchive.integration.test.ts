@@ -465,7 +465,7 @@ describe('T4-56 / AC-P2-17 실제 PostgreSQL legacy 백필', () => {
     expect(dry).toMatchObject({ status: 'ok', inserted: 0, wouldInsert: expected.length });
     expect(await archived(worldId)).toEqual([]);
     expect((await cli(worldId, true)).inserted).toBe(expected.length);
-    expect(await archived(worldId)).toEqual(expected);
+    expect(await archived(worldId)).toEqual(expected.map((row) => ({ ...row, power: null })));
     expect(await db.removedNation.findMany({ where: { worldId } })).toEqual(removed);
     expect(await backfillWorld(db, worldId, true)).toMatchObject({
       status: 'ok',

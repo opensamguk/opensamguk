@@ -352,6 +352,9 @@ export function WorldHistoryList({
                       <NationBadge name={nation?.name ?? `국가 ${entry.nationId}`} color={nation?.color ?? null} />
                       <span className="num">
                         {entry.cities}성 {entry.generals}명
+                        {'power' in entry && typeof entry.power === 'number'
+                          ? ` · 국력 ${entry.power.toLocaleString('ko-KR')}`
+                          : ''}
                       </span>
                     </span>
                   );

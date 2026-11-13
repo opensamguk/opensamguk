@@ -190,6 +190,7 @@ export async function persistMonthly(
   await persistRemovedNations(tx, worldId, before, next, { tick, sequence });
   await tx.world.update({ where: { id: worldId }, data: { monthlyTick: tick } });
   const snapshot = await loadReplayState(tx, worldId);
+  const rankedNations = await persistRanking(tx, worldId, next, seed, { tick, ...date });
   await tx.yearbookSnapshot.create({
     data: {
       worldId,
@@ -200,7 +201,7 @@ export async function persistMonthly(
       stateHash: hashState(snapshot),
     },
   });
-  await persistYearbookNations(tx, worldId, tick, next);
+  await persistYearbookNations(tx, worldId, tick, rankedNations);
   for (const nation of yearbook.nations) {
     const where = { worldId_tick_nationId: { worldId, tick, nationId: nation.nationId } };
     // 같은 월드 잠금 안에서 기존 사건을 보존하고 월간 수치를 덧붙인다.
@@ -212,6 +213,5 @@ export async function persistMonthly(
       update: { data },
     });
   }
-  await persistRanking(tx, worldId, next, seed, { tick, ...date });
   return next;
 }

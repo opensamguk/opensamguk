@@ -99,7 +99,7 @@ describe('중원 정세 글줄', () => {
     year: 191,
     month: m,
     nations: [
-      { nationId: 1, cities: owner2 === 1 ? 2 : 1, generals: 3 },
+      { nationId: 1, cities: owner2 === 1 ? 2 : 1, generals: 3, ...(tick === 20 && !headline ? { power: 1234 } : {}) },
       { nationId: 2, cities: owner2 === 2 ? 1 : 0, generals: 2 },
     ],
     cities: [
@@ -128,6 +128,7 @@ describe('중원 정세 글줄', () => {
     expect(rows).toHaveLength(2);
     expect(rows[0]!.textContent).toContain('성도가 공백지가 되었습니다.');
     expect(rows[0]!.textContent).toContain('공백지 1성');
+    expect(rows[0]!.textContent).toContain('국력 1,234');
   });
 
   // 기록 화면 월별 세력 (INT-25, D-085). 사건 글줄과 월단평은 서버 사건을 쓰는 중원 정세 칸에만 있다.

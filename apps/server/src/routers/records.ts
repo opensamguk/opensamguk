@@ -268,7 +268,13 @@ export const recordsRouter = router({
         where: { worldId: input.worldId, ...beforeCursor(input.cursor) },
         orderBy: { tick: 'desc' },
         take: 31,
-        select: { tick: true, year: true, month: true, data: true },
+        select: {
+          tick: true,
+          year: true,
+          month: true,
+          data: true,
+          nations: { select: { nationId: true, power: true } },
+        },
       });
       const reviews =
         world.ruleFeatures.includes('reputation-v1') && history.length
@@ -288,7 +294,7 @@ export const recordsRouter = router({
           tick: row.tick,
           year: row.year,
           month: row.month,
-          ...worldRecordInfo(row.data),
+          ...worldRecordInfo(row.data, row.nations),
           ...(headlines.get(row.tick) ? { review: { headline: headlines.get(row.tick)! } } : {}),
         })),
       );

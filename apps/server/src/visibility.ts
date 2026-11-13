@@ -292,7 +292,20 @@ const publicYearbook = z.object({
   nations: z.array(publicNationSummary),
   cities: z.array(z.object({ cityKey: z.number().int(), nationId: z.number().int().nullable() })),
 });
-export const worldRecordInfo = (data: Prisma.JsonValue) => publicYearbook.parse(data);
+export function worldRecordInfo(
+  data: Prisma.JsonValue,
+  publicPowers: readonly { nationId: number; power: number | null }[] = [],
+) {
+  const { nations, cities } = publicYearbook.parse(data);
+  const powerById = new Map(publicPowers.map(({ nationId, power }) => [nationId, power]));
+  return {
+    nations: nations.map((nation) => {
+      const power = powerById.get(nation.nationId);
+      return power == null ? nation : { ...nation, power };
+    }),
+    cities,
+  };
+}
 export const nationRecordInfo = (data: Prisma.JsonValue) => memberNationSummary.parse(data);
 
 const timelapseYearbook = z.object({

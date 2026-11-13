@@ -960,6 +960,7 @@ model YearbookNation {
   nationId Int
   name     String
   color    String
+  power    Int?
   snapshot YearbookSnapshot @relation(fields: [worldId, tick], references: [worldId, tick], onDelete: Cascade)
 
   @@id([worldId, tick, nationId])
