@@ -65,6 +65,20 @@ it('AC-P2-24 본공성에서 아직 쏘지 않은 공격군만 선제사격한�
   expect(second).not.toHaveProperty('attackerFirstVolleyFired');
 });
 
+it('INT-26 반계 장비는 성공한 계략의 피해를 반대편에 적용하고 전투 기록에 남긴다', () => {
+  const input = fixture();
+  rows(input)[0].magicCoef = 0.1;
+  input.attackerTactics = { leadership: 100, strength: 100, intel: 100 };
+  input.recordPhases = true;
+  const normal = run(input, [0, 0, 0, 0.5, 0.5]);
+  const reflected = run({ ...input, defenderEquipment: { counterTactics: 0.1 } }, [0, 0, 0, 0.05, 0.5, 0.5]);
+  expect(normal.phases?.[0]?.attackerTactic).toEqual({ name: '위보', success: true });
+  expect(reflected.phases?.[0]).toMatchObject({ defenderTactic: { name: '반계(위보)', success: true } });
+  expect(reflected.phases?.[0]).not.toHaveProperty('attackerTactic');
+  expect(reflected.attacker.crew).toBeLessThan(normal.attacker.crew);
+  expect(reflected.defender.crew).toBeGreaterThan(normal.defender.crew);
+});
+
 describe('AC-INT-22 기존 월드 전투', () => {
   it.each(legacyBattleGolden)('$a → $b의 실제 기존 결과와 난수 상태를 보존한다', (golden) => {
     const input = {

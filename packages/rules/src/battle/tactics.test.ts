@@ -58,3 +58,25 @@ it('selects a siege tactic and applies success or failure damage', () => {
   expect(fight(0.5)).toMatchObject({ tactic: { name: '급습', success: true }, dealt: 1.2, opposing: 1 });
   expect(fight(0.9)).toMatchObject({ tactic: { name: '급습', success: false }, dealt: 1 / 1.1, opposing: 1.1 });
 });
+
+it('applies book effects at the trial, success and damage stages', () => {
+  const fight = (success: number) =>
+    rollBattleTactics(
+      stats,
+      foot,
+      foot,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      false,
+      rolls(0.15, 0, success),
+      {
+        tacticsTrial: 0.2,
+        tacticsDamageFactor: 1.2,
+      },
+      { opposingTacticsSuccess: -0.1 },
+    );
+  expect(fight(0.55)).toMatchObject({ tactic: { name: '위보', success: true }, dealt: 1.44 });
+  expect(fight(0.65)).toMatchObject({ tactic: { name: '위보', success: false }, dealt: 1 / 1.1 });
+});

@@ -237,3 +237,5 @@ core2026 커밋 df6c9269fa1e2862418ba9da481c8dd2d758d6c5의 MIT © 2025 devsam �
 ### INT-26 명품 장비 목록
 
 SAN10 확장 명품 프로필의 명마·무기·서적 60종 이름과 기본 능력치 효과는 core2026 `c81d304`의 `packages/logic/src/items/`를 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+명마의 교전 단계·피해·회피와 서적의 계략·반계 효과는 같은 커밋의 아이템 모듈과 `war/triggers/che_반계.ts`를 참고했다. 백상의 군량 배율은 OpenSamguk의 교전 시작 군량 소모에 적용한다.

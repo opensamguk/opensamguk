@@ -2,6 +2,7 @@ import type { Rng } from '@opensamguk/shared';
 import type { WorldView } from '../model/world';
 import type { CombatSpecialty } from '../general/combatSpecialty';
 import type { HeritageBenefits } from '../heritage/benefits';
+import type { EquipmentBattleEffects } from '../equipment/battle';
 
 export const BATTLE_TACTICS_FEATURE = 'battle-tactics-v1';
 type Stats = { leadership: number; strength: number; intel: number };
@@ -37,6 +38,8 @@ export function rollBattleTactics(
   opposingHeritage: HeritageBenefits | undefined,
   first: boolean,
   rng: Rng,
+  equipment?: EquipmentBattleEffects,
+  opposingEquipment?: EquipmentBattleEffects,
 ) {
   if (!stats || unit.armType === 0) return { dealt: 1, opposing: 1, ignoresEvasion: false };
   const trait = specialty?.name;
@@ -44,7 +47,8 @@ export function rollBattleTactics(
   let trial =
     (stats.intel * unit.magicCoef) / 100 +
     ((heritage?.tactics ?? 0) - (opposingHeritage?.opponentTactics ?? 0)) / 100 +
-    (trait === '신산' ? 0.2 : 0);
+    (trait === '신산' ? 0.2 : 0) +
+    (equipment?.tacticsTrial ?? 0);
   if (first && stats.intel * 3 >= stats.leadership + stats.strength + stats.intel) trial *= 3;
   if (trial > 0 && rng.next() < trial) {
     const table = target.armType === 0 ? siegeTactics : fieldTactics;
@@ -52,10 +56,13 @@ export function rollBattleTactics(
     const successChance =
       0.7 +
       (trait === '신산' || trait === '귀병' ? 0.2 : trait === '환술' ? 0.1 : 0) -
-      (opponent === '견고' || opponent === '반계' ? 0.1 : 0);
+      (opponent === '견고' || opponent === '반계' ? 0.1 : 0) +
+      (opposingEquipment?.opposingTacticsSuccess ?? 0);
     const success = rng.next() < successChance;
     return {
-      dealt: success ? successDamage * (trait === '환술' ? 1.3 : 1) : 1 / failureDamage,
+      dealt: success
+        ? successDamage * (trait === '환술' ? 1.3 : 1) * (equipment?.tacticsDamageFactor ?? 1)
+        : 1 / failureDamage,
       opposing: success ? 1 : failureDamage,
       ignoresEvasion: false,
       tactic: { name, success } satisfies PhaseTactic,

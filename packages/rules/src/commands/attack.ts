@@ -1,4 +1,5 @@
 import { useBattleMoraleTool } from '../equipment/morale';
+import { equipmentBattleEffects } from '../equipment/battle';
 import { battleTacticsStats } from '../battle/tactics';
 import { combatSpecialty, combatSpecialtyKey } from '../general/combatSpecialty';
 import { TICKS_PER_MONTH } from '../clock/constants';
@@ -18,8 +19,8 @@ import { recordWarCasualties } from '../monthly/warIncome';
 import { recordSiegeContribution, settleCityConflict } from '../battle/cityConflict';
 
 type Force = Pick<InitialGeneral, 'crew' | 'crewType' | 'train' | 'atmos' | 'rice'>;
-function feed(force: Force) {
-  force.rice = Math.max(0, force.rice - Math.ceil(force.crew * BALANCE.BATTLE_RICE_PER_CREW));
+function feed(force: Force, riceFactor = 1) {
+  force.rice = Math.max(0, force.rice - Math.ceil(force.crew * BALANCE.BATTLE_RICE_PER_CREW * riceFactor));
   if (force.rice === 0) force.atmos = Math.max(0, force.atmos - BALANCE.STARVATION_ATMOS_LOSS);
 }
 export const attack = makeAttack(collectModifiers);
@@ -90,6 +91,7 @@ function makeAttack(collect: typeof collectModifiers) {
       const battleOutcomes: NonNullable<CommandResult['battleOutcomes']> = [];
       const generalEngagements: NonNullable<CommandResult['generalEngagements']> = [];
       const reputation = state.ruleFeatures?.includes('reputation-v1');
+      const attackerEquipment = equipmentBattleEffects(state, g.id);
       const rounds: string[] = [];
       const attackPhases: BattlePhase[] = [];
       let attackerFirstVolleyUsed = false;
@@ -99,11 +101,12 @@ function makeAttack(collect: typeof collectModifiers) {
         actor.unitSet!.crewTypes.find((unit) => unit.id === g.crewType)?.effects?.includes('wallFirst');
       const fightWall = (openingSkirmish = false) => {
         const wall: Force = { crew: city.wall, crewType: 1000, train: 100, atmos: 100, rice: 0 };
-        feed(g);
+        feed(g, attackerEquipment?.riceFactor);
         useBattleMoraleTool(state, g.id, g);
         const battle = simulateBattle(
           {
             attacker: g,
+            attackerEquipment,
             attackerReadiness: personalityEffects(state, g.personality),
             attackerProficiency: g.proficiency,
             attackerSpecialty: combatSpecialty(state, combatSpecialtyKey(g)),
@@ -140,13 +143,16 @@ function makeAttack(collect: typeof collectModifiers) {
       if (wallFirst) fightWall(true);
       let cleared = g.crew > 0 && g.atmos > 0;
       for (const defender of cleared ? defenders : []) {
-        feed(g);
-        feed(defender);
+        const defenderEquipment = equipmentBattleEffects(state, defender.id);
+        feed(g, attackerEquipment?.riceFactor);
+        feed(defender, defenderEquipment?.riceFactor);
         useBattleMoraleTool(state, g.id, g);
         useBattleMoraleTool(state, defender.id, defender);
         const battle = simulateBattle(
           {
             attacker: g,
+            attackerEquipment,
+            defenderEquipment,
             attackerReadiness: personalityEffects(state, g.personality),
             attackerProficiency: g.proficiency,
             attackerSpecialty: combatSpecialty(state, combatSpecialtyKey(g)),

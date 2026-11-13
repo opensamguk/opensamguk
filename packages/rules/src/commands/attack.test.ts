@@ -7,10 +7,50 @@ import { attack } from './attack';
 import { DEFENSE_STANCE_FEATURE } from '../battle/defenders';
 import { runCommand } from './registry';
 import { verifySuccess, verifyFailure } from './contracts';
+import { BALANCE } from '../balance';
+import { initialEquipment } from '../equipment/state';
+import { TEST_EQUIPMENT_CONFIG } from '../equipment/testFixture';
 
 describe('attack', () => {
   it('성공', () => verifySuccess('attack'));
   it('실패', () => verifyFailure('attack'));
+  it('INT-26 명마 효과를 실제 출병의 교전 단계와 군량에 반영한다', () => {
+    const fight = (horse?: 'horse_07_기주마' | 'horse_07_백상') => {
+      const world = commandWorld();
+      world.generals[2]!.crew = 0;
+      world.generals[3]!.crew = 0;
+      world.cities[2]!.wall = 100_000;
+      const general = world.generals[1]!;
+      general.crew = 10_000;
+      general.rice = 10_000;
+      general.atmos = 100;
+      const unitSet = structuredClone(testUnits);
+      unitSet.crewTypes.find(({ id }) => id === 1000)!.attack = 1;
+      world.equipment = initialEquipment({
+        ...TEST_EQUIPMENT_CONFIG,
+        treatmentTool: true,
+        moraleTool: true,
+        rareEquipment: true,
+        fullRareEquipment: true,
+      });
+      if (horse) world.equipment.generals['1'] = { horse };
+      const result = attack.execute(
+        world,
+        { generalId: 1, tick: 100, unitSet, recordBattleStats: true },
+        { cityKey: 2 },
+        rngFor('rare-horse'),
+      );
+      const after = applyEffects(world, result.effects);
+      return { phases: result.reports?.[0]?.phases ?? [], rice: after.generals[1]!.rice };
+    };
+    const plain = fight(),
+      giju = fight('horse_07_기주마'),
+      baeksang = fight('horse_07_백상');
+    expect(giju.phases).toHaveLength(plain.phases.length + 1);
+    expect(baeksang.phases).toHaveLength(plain.phases.length - 1);
+    expect(baeksang.phases[0]!.defenderLoss).toBeGreaterThan(plain.phases[0]!.defenderLoss);
+    expect(baeksang.rice).toBe(10_000 - Math.ceil(10_000 * BALANCE.BATTLE_RICE_PER_CREW * 1.1));
+  });
   it('실제 교전은 수비를 끈 장수를 제외하고 조건을 충족한 장수를 포함한다', () => {
     const world = commandWorld();
     world.ruleFeatures = [DEFENSE_STANCE_FEATURE];

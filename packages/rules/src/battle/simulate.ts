@@ -7,6 +7,7 @@ import { BALANCE } from '../balance';
 import type { DeepReadonly } from '../model/world';
 import type { UnitSetResource } from '../world/resources';
 import { applyModifiers, type BattleModifiers } from '../modifiers';
+import type { EquipmentBattleEffects } from '../equipment/battle';
 
 export type BattleForce = { crew: number; crewType: number; train: number; atmos: number };
 export type BattleInput = {
@@ -33,6 +34,8 @@ export type BattleInput = {
   defenderHeritage?: HeritageBenefits | undefined;
   attackerTactics?: ReturnType<typeof battleTacticsStats>;
   defenderTactics?: ReturnType<typeof battleTacticsStats>;
+  attackerEquipment?: EquipmentBattleEffects | undefined;
+  defenderEquipment?: EquipmentBattleEffects | undefined;
 };
 
 type Unit = DeepReadonly<UnitSetResource['crewTypes'][number]>;
@@ -108,6 +111,8 @@ function damage(a: BattleForce, b: BattleForce, input: BattleInput, rng: Rng, at
     power *= proficiencyDamageFactor((attack?.[armType] ?? 0) + attackBonus, (defense?.[armType] ?? 0) + defenseBonus);
   }
   power *= scale;
+  const equipment = attackingSide ? input.attackerEquipment : input.defenderEquipment;
+  power *= equipment?.damageFactor ?? 1;
   const attackerModifiers = attackingSide ? input.attackerModifiers : input.defenderModifiers;
   const defenderModifiers = attackingSide ? input.defenderModifiers : input.attackerModifiers;
   power = applyModifiers(power, attackerModifiers?.dealt ?? []);
@@ -159,7 +164,7 @@ export function simulateBattle(input: BattleInput, rng: Rng): BattleResult {
     if (input.openingSkirmish) return result;
   }
   let held = false;
-  const phases = input.openingSkirmish ? 1 : BALANCE.BATTLE_PHASES;
+  const phases = input.openingSkirmish ? 1 : BALANCE.BATTLE_PHASES + (input.attackerEquipment?.extraPhases ?? 0);
   for (let phase = 0; phase < phases && canFight(); phase++) {
     if (bUnit.effects?.includes('hold') && !held && rng.next() < (defender.train + defender.atmos) / 400) {
       held = true;
@@ -176,6 +181,8 @@ export function simulateBattle(input: BattleInput, rng: Rng): BattleResult {
       input.defenderHeritage,
       phase === 0,
       rng,
+      input.attackerEquipment,
+      input.defenderEquipment,
     );
     const defenderTactic = rollBattleTactics(
       input.defenderTactics,
@@ -187,9 +194,19 @@ export function simulateBattle(input: BattleInput, rng: Rng): BattleResult {
       input.attackerHeritage,
       phase === 0,
       rng,
+      input.defenderEquipment,
+      input.attackerEquipment,
     );
-    const attackerAvoidBonus = input.attackerSpecialty?.avoid ?? 0;
-    const defenderAvoidBonus = input.defenderSpecialty?.avoid ?? 0;
+    const reflectedByAttacker = reflectedTactic(defenderTactic, input.attackerEquipment, rng);
+    const reflectedByDefender = reflectedTactic(attackerTactic, input.defenderEquipment, rng);
+    const attackerTacticDamage = (reflectedByDefender ? 1 : attackerTactic.dealt) * (reflectedByAttacker?.dealt ?? 1);
+    const defenderTacticDamage = (reflectedByAttacker ? 1 : defenderTactic.dealt) * (reflectedByDefender?.dealt ?? 1);
+    const attackerTacticLog = reflectedByAttacker?.tactic ?? (reflectedByDefender ? undefined : attackerTactic.tactic);
+    const defenderTacticLog = reflectedByDefender?.tactic ?? (reflectedByAttacker ? undefined : defenderTactic.tactic);
+    const attackerAvoidBonus =
+      (input.attackerSpecialty?.avoid ?? 0) + equipmentEvasion(attacker, input.attackerEquipment);
+    const defenderAvoidBonus =
+      (input.defenderSpecialty?.avoid ?? 0) + equipmentEvasion(defender, input.defenderEquipment);
     const attackerCanAvoid = aUnit.effects?.includes('avoid');
     const defenderCanAvoid = bUnit.effects?.includes('avoid');
     const attackerHeritageAvoid =
@@ -211,7 +228,7 @@ export function simulateBattle(input: BattleInput, rng: Rng): BattleResult {
       input,
       rng,
       true,
-      (avoidDefender ? 1 / 6 : 1) * attackerTactic.dealt * defenderTactic.opposing,
+      (avoidDefender ? 1 / 6 : 1) * attackerTacticDamage * defenderTactic.opposing,
     );
     const toAttacker = damage(
       defender,
@@ -219,7 +236,7 @@ export function simulateBattle(input: BattleInput, rng: Rng): BattleResult {
       input,
       rng,
       false,
-      (avoidAttacker ? 1 / 6 : 1) * defenderTactic.dealt * attackerTactic.opposing,
+      (avoidAttacker ? 1 / 6 : 1) * defenderTacticDamage * attackerTactic.opposing,
     );
     attacker.crew -= toAttacker;
     defender.crew -= toDefender;
@@ -231,11 +248,25 @@ export function simulateBattle(input: BattleInput, rng: Rng): BattleResult {
       ...(avoidDefender ? { defenderEvaded: true } : {}),
       ...(attackerTactic.critical ? { attackerCritical: true } : {}),
       ...(defenderTactic.critical ? { defenderCritical: true } : {}),
-      ...(attackerTactic.tactic ? { attackerTactic: attackerTactic.tactic } : {}),
-      ...(defenderTactic.tactic ? { defenderTactic: defenderTactic.tactic } : {}),
+      ...(attackerTacticLog ? { attackerTactic: attackerTacticLog } : {}),
+      ...(defenderTacticLog ? { defenderTactic: defenderTacticLog } : {}),
     });
     attacker.atmos = Math.max(0, attacker.atmos - BALANCE.BATTLE_ATMOS_LOSS);
     defender.atmos = Math.max(0, defender.atmos - BALANCE.BATTLE_ATMOS_LOSS);
   }
   return result;
+}
+
+function equipmentEvasion(force: BattleForce, equipment: EquipmentBattleEffects | undefined) {
+  const leadership = equipment?.evasionLeadership;
+  return leadership ? Math.min(0.5, Math.max(0, (1 - force.crew / (100 * leadership)) * 0.5)) : 0;
+}
+
+function reflectedTactic(
+  tactic: ReturnType<typeof rollBattleTactics>,
+  equipment: EquipmentBattleEffects | undefined,
+  rng: Rng,
+) {
+  if (tactic.tactic?.success && equipment?.counterTactics && rng.next() < equipment.counterTactics)
+    return { dealt: tactic.dealt, tactic: { name: `반계(${tactic.tactic.name})`, success: true } };
 }

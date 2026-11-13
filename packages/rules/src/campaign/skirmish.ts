@@ -1,4 +1,5 @@
 import { useBattleMoraleTool } from '../equipment/morale';
+import { equipmentBattleEffects } from '../equipment/battle';
 import { battleTacticsStats } from '../battle/tactics';
 import { combatSpecialty, combatSpecialtyKey } from '../general/combatSpecialty';
 import type { Rng } from '@opensamguk/shared';
@@ -33,9 +34,9 @@ function unit(state: WorldState, id: number) {
 function force(row: CampaignUnitState): BattleForce {
   return { crew: row.troops, crewType: row.crewType, train: row.train, atmos: row.atmos };
 }
-function feed(state: WorldState, row: CampaignUnitState) {
+function feed(state: WorldState, row: CampaignUnitState, riceFactor = 1) {
   const owner = state.generals[row.ownerId]!;
-  owner.rice = Math.max(0, owner.rice - Math.ceil(row.troops * BALANCE.BATTLE_RICE_PER_CREW));
+  owner.rice = Math.max(0, owner.rice - Math.ceil(row.troops * BALANCE.BATTLE_RICE_PER_CREW * riceFactor));
   if (owner.rice === 0) row.atmos = Math.max(0, row.atmos - BALANCE.STARVATION_ATMOS_LOSS);
 }
 function modifiers(state: WorldState, row: CampaignUnitState): BattleModifiers {
@@ -80,13 +81,17 @@ export function fightCampaignUnits(
     bNation = state.generals[defender.ownerId]!.nationId;
   if (aNation === null || bNation === null || aNation === bNation)
     throw new Error('서로 다른 국가의 부곡만 교전할 수 있습니다.');
-  feed(state, attacker);
-  feed(state, defender);
+  const attackerEquipment = equipmentBattleEffects(state, attacker.commanderId);
+  const defenderEquipment = equipmentBattleEffects(state, defender.commanderId);
+  feed(state, attacker, attackerEquipment?.riceFactor);
+  feed(state, defender, defenderEquipment?.riceFactor);
   useBattleMoraleTool(state, attacker.commanderId, attacker);
   useBattleMoraleTool(state, defender.commanderId, defender);
   const result = simulateBattle(
     {
       attacker: force(attacker),
+      attackerEquipment,
+      defenderEquipment,
       attackerReadiness: personalityEffects(state, state.generals[attacker.commanderId]!.personality),
       attackerProficiency: state.generals[attacker.commanderId]!.proficiency,
       attackerSpecialty: combatSpecialty(state, combatSpecialtyKey(state.generals[attacker.commanderId]!)),
@@ -135,11 +140,13 @@ export function fightCampaignWall(
   const aNation = state.generals[attacker.ownerId]!.nationId;
   if (!city || aNation === null || city.nationId === aNation || city.wall < 0)
     throw new Error('교전할 성벽을 확인하세요.');
-  feed(state, attacker);
+  const attackerEquipment = equipmentBattleEffects(state, attacker.commanderId);
+  feed(state, attacker, attackerEquipment?.riceFactor);
   useBattleMoraleTool(state, attacker.commanderId, attacker);
   const result = simulateBattle(
     {
       attacker: force(attacker),
+      attackerEquipment,
       attackerReadiness: personalityEffects(state, state.generals[attacker.commanderId]!.personality),
       attackerProficiency: state.generals[attacker.commanderId]!.proficiency,
       attackerSpecialty: combatSpecialty(state, combatSpecialtyKey(state.generals[attacker.commanderId]!)),
@@ -204,11 +211,13 @@ export function fightCampaignCityGarrison(
     resource.garrison = resource.garrison.filter((row) => row.crewType !== crewType);
     return { state, text: `도시 병종${crewType} 패주: 민간 복귀 ${returned}명, 인구 상한 밖 ${overflow}명` };
   }
-  feed(state, attacker);
+  const attackerEquipment = equipmentBattleEffects(state, attacker.commanderId);
+  feed(state, attacker, attackerEquipment?.riceFactor);
   useBattleMoraleTool(state, attacker.commanderId, attacker);
   const result = simulateBattle(
     {
       attacker: force(attacker),
+      attackerEquipment,
       attackerReadiness: personalityEffects(state, state.generals[attacker.commanderId]!.personality),
       attackerProficiency: state.generals[attacker.commanderId]!.proficiency,
       attackerSpecialty: combatSpecialty(state, combatSpecialtyKey(state.generals[attacker.commanderId]!)),
