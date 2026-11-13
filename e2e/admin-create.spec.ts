@@ -18,6 +18,7 @@ import { endFootprint } from './adminEndSetup';
 import { changeAdminRole } from '../apps/server/src/admin/roleStore';
 import { processWorldCreateRequest } from '../apps/engine/src/admin/createRequests';
 import { creationFeatures, creationSelection } from '../apps/server/src/admin/worldCreateOptions';
+import { defaultOfficeEffects, OFFICE_EFFECTS_FEATURE } from '../packages/rules/src/index';
 
 test.describe.configure({ mode: 'serial' });
 const closers: Array<() => Promise<unknown>> = [];
@@ -122,7 +123,8 @@ test('AC-M3-04 CH-01 실제 생성은 PREOPEN·191·21국491NPC61거점·감사1
     status: 'PREOPEN',
     clockTick: 0,
     startYear: 191,
-    ruleFeatures: [...creationFeatures],
+    ruleFeatures: [...creationFeatures, OFFICE_EFFECTS_FEATURE].sort(),
+    officeEffects: defaultOfficeEffects,
   });
   expect(await legalStack.db.nation.count({ where: { worldId: id } })).toBe(21);
   expect(await legalStack.db.city.count({ where: { worldId: id } })).toBe(61);

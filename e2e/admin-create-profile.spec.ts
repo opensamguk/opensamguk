@@ -9,6 +9,7 @@ import { initializeExpandedResources } from '../tools/expanded-resources';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { creationFeatures } from '../apps/server/src/admin/worldCreateOptions';
+import { defaultOfficeEffects, OFFICE_EFFECTS_FEATURE } from '../packages/rules/src/index';
 import type { CreateInput, CreateOptions, CreateReply } from '../apps/web/src/admin/adminCreateModel';
 import type { WorldMap } from '../apps/web/src/game/types';
 
@@ -408,7 +409,8 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
     seed,
     presetKey: mode.preset,
     endYear: mode.endYear,
-    ruleFeatures: features,
+    ruleFeatures: [...new Set([...features, OFFICE_EFFECTS_FEATURE])].sort(),
+    officeEffects: defaultOfficeEffects,
   });
   expect(result.resolution).toMatchObject({
     selection: {
