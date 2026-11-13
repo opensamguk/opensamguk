@@ -11,6 +11,7 @@ datasource db {
 
 model World {
   generalBattleStats   GeneralBattleStats[]
+  trafficMonthly       WorldTrafficMonthly[]
   reputationEvents     ReputationEvent[]
   publicNationEvents   PublicNationEvent[]
   monthlyReviews       MonthlyReview[]
@@ -92,6 +93,18 @@ model World {
   sanctions            Sanction[]
   createRequest        WorldCreateRequest?
   seasonGenerals       SeasonGeneral[]
+}
+
+model WorldTrafficMonthly {
+  worldId   String
+  monthTick Int
+  generalId Int
+  firstAt   DateTime
+  lastAt    DateTime
+  refresh   BigInt   @default(1)
+  world     World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@id([worldId, monthTick, generalId])
 }
 
 model PublicNationEvent {

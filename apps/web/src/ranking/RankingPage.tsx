@@ -1,8 +1,10 @@
 import { publicImageUrl } from '@opensamguk/shared/public-images';
 import { getRouteApi, Link } from '@tanstack/react-router';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '../trpc';
 import { displayName } from '../game/names';
+import { formatYearMonth } from '../game/gameDate';
 const rankingIcon = publicImageUrl('apps/web/src/art/icons/ranking.png');
 import { EmptyState, ErrorState } from '../ui/States';
 import styles from './Ranking.module.css';
@@ -38,7 +40,10 @@ export function RankingPage() {
       onKind={(kind) => void navigate({ search: parseRankingSearch({ ...search, kind, page: 1 }), replace: true })}
       onPage={(page) => void navigate({ search: parseRankingSearch({ ...search, page }) })}
       supplemental={
-        search.tab === 'nations' ? <FreeGenerals worldId={worldId} /> : <HeritageRankings worldId={worldId} />
+        <>
+          {search.tab === 'nations' ? <FreeGenerals worldId={worldId} /> : <HeritageRankings worldId={worldId} />}
+          <TrafficRecords worldId={worldId} />
+        </>
       }
       renderTab={(tab, label, active) => (
         <Link
@@ -141,6 +146,55 @@ function RankingPages({
         다음
       </button>
     </nav>
+  );
+}
+
+const trafficDate = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'short', timeStyle: 'short' });
+
+function TrafficRecords({ worldId }: { worldId: string }) {
+  const [open, setOpen] = useState(false);
+  const trpc = useTRPC();
+  const query = useQuery(trpc.records.traffic.queryOptions({ worldId }, { enabled: open }));
+  const n = (value: number) => value.toLocaleString('ko-KR');
+  return (
+    <details onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary>월드 접속량</summary>
+      {open && query.isPending ? <p role="status">접속량을 불러오는 중입니다.</p> : null}
+      {open && query.isError ? (
+        <ErrorState title="접속량을 불러오지 못했습니다." onRetry={() => void query.refetch()} />
+      ) : null}
+      {open &&
+        query.isSuccess &&
+        (query.data.periods.length === 0 ? (
+          <EmptyState title="집계된 접속량이 없습니다" />
+        ) : (
+          <div className={styles.wrap}>
+            <p>
+              기록 최대 갱신 {n(query.data.maxRefresh)}회 · 방문 장수 {n(query.data.maxVisitors)}명
+            </p>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th scope="col">게임 연월</th>
+                  <th scope="col">마지막 갱신</th>
+                  <th scope="col">갱신</th>
+                  <th scope="col">방문 장수</th>
+                </tr>
+              </thead>
+              <tbody>
+                {query.data.periods.map((row) => (
+                  <tr key={`${row.year}:${row.month}`}>
+                    <th scope="row">{formatYearMonth(row)}</th>
+                    <td>{trafficDate.format(new Date(row.lastAt))}</td>
+                    <td className="num">{n(row.refresh)}회</td>
+                    <td className="num">{n(row.visitors)}명</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
+    </details>
   );
 }
 

@@ -43,10 +43,11 @@ import { readCityScaleProjection } from '../game/cityScale';
 import { effectiveFinanceRates, nationPopulation, projectNationFinance } from '../game/nationFinance';
 import { readView } from '../game/queries';
 import { cityDefense } from '../game/defenseRead';
+import { recordWorldTraffic } from '../game/worldTraffic';
 
 export const homeRouter = router({
-  get: protectedProcedure.input(worldInput).query(({ ctx, input }) =>
-    readWorld(ctx.db, input.worldId, async (tx, world) => {
+  get: protectedProcedure.input(worldInput).query(async ({ ctx, input }) => {
+    const { page, traffic } = await readWorld(ctx.db, input.worldId, async (tx, world) => {
       const general = await requireGeneral(tx, input.worldId, ctx.user.id);
       const city = await tx.city.findUniqueOrThrow({
         where: { worldId_cityKey: { worldId: input.worldId, cityKey: general.cityKey } },
@@ -168,7 +169,7 @@ export const homeRouter = router({
               (request) => request.nationId === general.nationId && request.status === 'pending',
             ).length
           : 0;
-      return {
+      const page = {
         ...(pendingCityOfficeRequests > 0 ? { pendingCityOfficeRequests } : {}),
         ...(world.ruleFeatures.includes(HERITAGE_BENEFITS_FEATURE) ? { heritageBenefitsEnabled: true as const } : {}),
         general: {
@@ -304,6 +305,18 @@ export const homeRouter = router({
         turnsPreview: Array.from({ length: 5 }, (_, slot) => ({ slot, ...turns[slot]! })),
         recentLogs: logs.map(logInfo),
       };
-    }),
-  ),
+      return {
+        page,
+        traffic:
+          world.status === 'RUNNING' && general.removedAt === null && general.activeFromYear !== LINEAGE_EXITED_YEAR
+            ? tick
+            : null,
+      };
+    });
+    if (traffic !== null)
+      await recordWorldTraffic(ctx.db, input.worldId, page.general.id, traffic, ctx.now).catch(() =>
+        ctx.reply.log.warn('월드 접속량 집계에 실패했습니다.'),
+      );
+    return page;
+  }),
 });
