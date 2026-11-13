@@ -31,15 +31,16 @@ export function Panel({
 }
 
 // 머리글·값 두 칸씩 늘어놓는 정보 격자 (원작 카드의 head/body 칸).
+// wide 칸은 한 줄을 다 쓰고 값이 길면 줄을 바꾼다. 좁은 화면에서 긴 값(금·쌀 두 수)이 잘리지 않게 한다.
 export function InfoGrid({
   items,
 }: {
-  items: ReadonlyArray<{ label: string; value: ReactNode; title?: string | undefined }>;
+  items: ReadonlyArray<{ label: string; value: ReactNode; title?: string | undefined; wide?: boolean }>;
 }) {
   return (
     <dl className={styles.grid}>
       {items.map((item) => (
-        <div key={item.label} className={styles.cell} title={item.title}>
+        <div key={item.label} className={item.wide ? `${styles.cell} ${styles.wide}` : styles.cell} title={item.title}>
           <dt>{item.label}</dt>
           <dd className="num">{item.value}</dd>
         </div>

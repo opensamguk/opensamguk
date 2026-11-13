@@ -55,6 +55,15 @@ test('T4-92 명령 카드의 개인 30칸·국가 12칸 저장과 모바일·키
     for (const command of listed) {
       const radio = picker.getByRole('radio', { name: command.name, exact: true });
       await expect(radio).toHaveAttribute('aria-describedby', /.+/);
+      // INT-26: 지금 실행할 수 없는 명령(available false)만 흐리고 사유를 적는다. null(인자 필요)은 흐리지 않는다.
+      const card = radio.locator('xpath=ancestor::label[1]');
+      if (command.available === false) {
+        await expect(card).toHaveAttribute('data-available', 'false');
+        await expect(card.getByTestId('command-reason')).toHaveText(command.reason ?? '지금은 실행할 수 없습니다.');
+      } else {
+        await expect(card).not.toHaveAttribute('data-available', /.*/);
+        await expect(card.getByTestId('command-reason')).toHaveCount(0);
+      }
     }
     for (const colorScheme of ['light', 'dark'] as const) {
       await page.emulateMedia({ colorScheme });

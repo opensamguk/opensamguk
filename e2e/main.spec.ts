@@ -132,8 +132,8 @@ test.describe('장수가 있는 계정', () => {
       '도시 정보',
       '국가 정보',
       '장수 정보',
+      '장수 동향',
       '개인 기록',
-      '국가 기록',
       '중원 정세',
     ])
       await expect(page.getByRole('region', { name, exact: true })).toBeVisible();
@@ -424,7 +424,8 @@ test.describe('장수가 있는 계정', () => {
     await expect(logs.first()).toBeVisible({ timeout: 30_000 });
   });
 
-  test('월간 정산 뒤 국가 기록과 중원 정세가 메인에 쌓인다', async ({ page }) => {
+  // 메인 기록 줄은 장수 동향 | 개인 기록 | 중원 정세다 (INT-25, D-085). 국가 기록은 기록 화면 국가 역사 탭에 남는다.
+  test('월간 정산 뒤 중원 정세가 메인에, 국가 기록이 기록 화면에 쌓인다', async ({ page }) => {
     test.setTimeout(180_000);
     await expect
       .poll(
@@ -439,10 +440,12 @@ test.describe('장수가 있는 계정', () => {
     await openMain(page);
     const world = page.getByRole('region', { name: '중원 정세', exact: true });
     await expect(world.locator('li').first()).toContainText(/\d+년 \d+월/);
-    const nationRecords = page.getByRole('region', { name: '국가 기록', exact: true });
-    await expect(nationRecords.locator('tbody tr').first()).toBeVisible();
+    await expect(page.getByRole('region', { name: '국가 기록', exact: true })).toHaveCount(0);
     await world.scrollIntoViewIfNeeded();
     await shot(page, '04-main-records.png');
+    await page.goto(`/w/${ctx.worldId}/records?tab=nation`);
+    const nationRecords = page.getByRole('region', { name: '국가 기록', exact: true });
+    await expect(nationRecords.locator('tbody tr').first()).toBeVisible();
   });
 
   test('보조 주소도 같은 실제 데이터로 열린다', async ({ page }) => {
@@ -599,11 +602,13 @@ test('장수 생성 API로 만든 재야 장수는 메인에서 바로 재야 �
   await expect(general.getByText(name, { exact: true })).toBeVisible();
   await expect(general.getByText('재야').first()).toBeVisible();
   await expect(page.getByRole('region', { name: '국가 정보', exact: true }).getByText('재야입니다')).toBeVisible();
+  await expect(editor(page).locator('tr[data-slot]')).toHaveCount(30);
+  await expect(page.getByTestId('world-map').locator('[data-mine="true"]')).toHaveCount(1);
+  // 국가 기록은 메인 기록 줄에서 빠져 기록 화면 국가 역사 탭에서 본다 (D-085).
+  await page.goto(`/w/${ctx.worldId}/records?tab=nation`);
   await expect(
     page.getByRole('region', { name: '국가 기록', exact: true }).getByText('소속 국가가 없습니다'),
   ).toBeVisible();
-  await expect(editor(page).locator('tr[data-slot]')).toHaveCount(30);
-  await expect(page.getByTestId('world-map').locator('[data-mine="true"]')).toHaveCount(1);
 });
 
 test('장수가 없는 계정은 장수 만들기 안내와 공개 지도를 본다', async ({ page }) => {

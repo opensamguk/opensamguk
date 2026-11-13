@@ -3,6 +3,7 @@ import type { QueryClient, QueryFunction, QueryKey } from '@tanstack/react-query
 import type { inferRouterOutputs } from '@trpc/server';
 import { trpcClient, type Trpc } from '../trpc';
 import type { CommandInfo, GeneralChoice } from './CommandPicker';
+import type { SlotTargets } from './args';
 import { SLOT_COUNT, type Turn } from './draft';
 
 // 예턴 편집기가 읽고 쓰는 칸 목록. 개인 30칸(turns.*)과 국가 직책 12칸(nationTurns.*, T2-06)이 같은 편집기를 쓴다.
@@ -13,6 +14,8 @@ export interface DisplaySlot {
   commandKey: string;
   args?: unknown;
   name: string;
+  // 인자가 가리키는 도시·국가·장수 이름 (turns.get, INT-26). 국가 칸은 아직 싣지 않는다.
+  targets?: SlotTargets | undefined;
 }
 
 // 개인 칸은 AppRouter의 turns.get 칸 모양이다. 서버가 explicit을 실으면 캐시와 저장 결과에도 그대로 남는다.
@@ -55,6 +58,9 @@ export interface TurnSource<S extends DisplaySlot = DisplaySlot> {
   precheckRoot: QueryKey;
   // 실행 시기를 셀 수 있는 칸인가. 국가 칸은 내 직책 칸만 내 턴에 실행된다.
   timed: boolean;
+  // timed가 아닌 칸(남의 직책 칸)의 주인 장수 다음 턴 시각. 있으면 그 시각 + 칸 번호 × 턴 간격으로 시:분을 적는다.
+  // null은 서버가 시각을 주지 않은 경우(멈춘 월드·가속), undefined는 모르는 경우다 (INT-25).
+  nextTurnAt?: string | null | undefined;
   // 편집할 수 없는 칸이면 서버가 준 이유. null이면 편집할 수 있다.
   readOnly: string | null;
   // 대상 장수 인자(generalId)를 이름으로 고를 장수 목록. 없으면 번호로 넣는다.

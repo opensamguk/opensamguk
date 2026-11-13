@@ -306,3 +306,53 @@
   color: var(--color-text-muted);
   text-align: left;
 }
+
+/* 지난 기수 (INT-26): 끝난 월드를 한 줄씩. 좁은 화면에서는 이름·승자·링크가 차례로 접힌다. */
+.past {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin-top: var(--space-6);
+}
+.pastList {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-1) var(--space-3);
+  background: var(--color-surface);
+  border: var(--frame);
+}
+.pastRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  min-width: 0;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.pastRow:last-child {
+  border-bottom: 0;
+}
+.pastName {
+  min-width: 0;
+  font-family: var(--font-title);
+  font-size: var(--title-sm);
+  overflow-wrap: anywhere;
+}
+.pastWinner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--text-sm);
+}
+.pastLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+.pastLinks .action {
+  min-width: 0;
+}

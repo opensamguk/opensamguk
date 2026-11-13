@@ -12,6 +12,8 @@ const GAME_PAGES: Array<[string, string]> = [
   ['/w/1/nation/2', '국가 정보'],
   ['/w/1/records', '기록 · 내 장수'],
   ['/w/1/records?tab=world', '기록 · 월드 정세'],
+  ['/w/1/records?tab=activity', '기록 · 장수 동향'],
+  ['/w/1/records?tab=battles', '기록 · 전투 기록'],
   ['/w/1/create', '장수 생성'],
 ];
 

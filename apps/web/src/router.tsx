@@ -344,7 +344,8 @@ const nationTurnsRoute = createRoute({
   component: NationTurnsPage,
 });
 
-const RECORD_TABS = ['general', 'nation', 'world', 'timelapse', 'intel'] as const;
+// 장수 동향(activity)·전투 기록(battles)은 INT-25·INT-26에서 더했다. 모르는 값은 내 장수 탭이다.
+const RECORD_TABS = ['general', 'battles', 'nation', 'activity', 'world', 'timelapse', 'intel'] as const;
 type RecordTab = (typeof RECORD_TABS)[number];
 
 const recordsRoute = createRoute({

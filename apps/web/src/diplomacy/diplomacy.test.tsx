@@ -15,7 +15,15 @@ import type {
   TreatyItem,
   TreatyListPage,
 } from './contract';
-import { busyText, joinTreatyPages, pageCountText, parseDiplomacySearch, treatiesForTab } from './DiplomacyPage';
+import {
+  busyText,
+  joinTreatyPages,
+  monthsLeftText,
+  pageCountText,
+  parseDiplomacySearch,
+  statsByNation,
+  treatiesForTab,
+} from './DiplomacyPage';
 import {
   applyCheckError,
   applyOutcome,
@@ -29,7 +37,7 @@ import {
   type RequestsState,
 } from './requests';
 import { TRADE_UNSUPPORTED } from './tradeTargets';
-import { estimateText, nationName, paidText, TreatyCard } from './TreatyCard';
+import { brokenByText, estimateText, nationName, paidText, TreatyCard } from './TreatyCard';
 
 afterEach(cleanup);
 
@@ -370,6 +378,22 @@ describe('외교실 탭과 쪽', () => {
   });
 });
 
+describe('외교실 국가 탭 계산', () => {
+  it('끝나는 연월에서 지금 연월을 빼 남은 개월을 적고, 지금 연월을 모르면 적지 않는다', () => {
+    expect(monthsLeftText({ year: 192, month: 1 }, { year: 191, month: 7 })).toBe('(6개월 남음)');
+    expect(monthsLeftText({ year: 191, month: 7 }, { year: 191, month: 7 })).toBe('(이번 달 끝남)');
+    expect(monthsLeftText(null, { year: 191, month: 7 })).toBeNull();
+    expect(monthsLeftText({ year: 192, month: 1 }, undefined)).toBeNull();
+  });
+
+  it('순위 줄을 nationId로 묶고 줄이 없으면 빈 지도를 준다', () => {
+    const map = statsByNation([{ nationId: 3, power: 10, generals: 2, cities: 1 }]);
+    expect(map.get(3)).toEqual({ power: 10, generals: 2, cities: 1 });
+    expect(map.get(4)).toBeUndefined();
+    expect(statsByNation(undefined).size).toBe(0);
+  });
+});
+
 describe('조약 카드', () => {
   it('받은 제안은 조항을 집행·기록으로 나누고 내 쪽 추정 비용(estimate)을 보인다', () => {
     render(<TreatyCard treaty={treaty()} busy={null} onRespond={vi.fn()} />);
@@ -380,6 +404,31 @@ describe('조약 카드', () => {
     );
     expect(screen.queryByText(/신의|파기/)).toBeNull();
     expect(screen.queryByRole('button', { name: '파기' })).toBeNull();
+  });
+
+  it('머리에 조약 번호를 적고, 파기된 조약은 상태 옆에 파기한 국가를 적는다', () => {
+    const broken = treaty({
+      id: '7',
+      status: 'BROKEN',
+      estimate: null,
+      canAccept: null,
+      canReject: null,
+      brokenBy: { id: 2, name: '원소', color: '#336699' },
+    });
+    render(<TreatyCard treaty={broken} busy={null} onRespond={vi.fn()} />);
+    expect(screen.getByTestId('treaty-number').textContent).toBe('조약 #7');
+    expect(screen.getByTestId('treaty-broken-by').textContent).toBe('파기: 원소');
+    expect(brokenByText({ id: 1, name: '조조', color: '#000000' })).toBe('파기: 조조');
+    cleanup();
+    // 파기가 아닌 끝난 조약에는 파기 국가를 적지 않는다.
+    render(
+      <TreatyCard
+        treaty={treaty({ status: 'ENDED', canAccept: null, canReject: null })}
+        busy={null}
+        onRespond={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId('treaty-broken-by')).toBeNull();
   });
 
   it('맺은 조약은 추정이 아니라 실제로 낸 cost.from·to를 당사국 이름과 함께 보인다', () => {

@@ -24,6 +24,7 @@ import { TurnEditor, type TurnEditorStatus } from './TurnEditor';
 afterEach(() => {
   cleanup();
   sessionStorage.clear();
+  localStorage.clear();
 });
 
 const notFound = () =>
@@ -207,4 +208,99 @@ it('T4-86 AC-P2-26 병종표 조회가 실패해도 표는 병종 번호로 적�
   );
   fireEvent.click(screen.getByRole('button', { name: '저장' }));
   await waitFor(() => expect(save).toHaveBeenCalledOnce());
+});
+
+it('INT-25 넣은 명령은 최근 넣은 명령 줄에 남고 누르면 고른 칸에 같은 넣기 경로로 넣는다', async () => {
+  const onStatus = vi.fn();
+  const view = await open(makeSource(null), 'RUNNING', onStatus);
+  await waitFor(() => expect(document.querySelector('tr[data-slot="1"]')).not.toBeNull());
+  // 아직 넣은 명령이 없으면 줄을 그리지 않는다.
+  expect(screen.queryByRole('group', { name: '최근 넣은 명령' })).toBeNull();
+  fireEvent.click(document.querySelector('tr[data-slot="1"]')!);
+  fireEvent.click(screen.getByRole('radio', { name: '농지 개간' }));
+  fireEvent.click(screen.getByRole('button', { name: '1번 칸에 넣기' }));
+  const recent = await screen.findByRole('group', { name: '최근 넣은 명령' });
+  expect(recent.textContent).toContain('농지 개간');
+  expect(JSON.parse(localStorage.getItem('opensamguk.recentCommands.v1:u1:w1')!)).toEqual([
+    { commandKey: 'farm', args: {} },
+  ]);
+
+  // 1번을 풀고 2번만 고른 뒤 최근 명령을 누른다.
+  fireEvent.click(document.querySelector('tr[data-slot="1"]')!);
+  fireEvent.click(document.querySelector('tr[data-slot="2"]')!);
+  fireEvent.click(screen.getByRole('button', { name: '농지 개간 다시 넣기' }));
+  await waitFor(() => expect(document.querySelector('tr[data-slot="2"]')?.textContent).toContain('농지 개간'));
+  await waitFor(() =>
+    expect(onStatus).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'unsaved', edits: 2 })),
+  );
+
+  // 다시 열어도 계정·월드의 localStorage에서 읽는다.
+  view.unmount();
+  sessionStorage.clear();
+  await open(makeSource(null), 'RUNNING', vi.fn());
+  expect((await screen.findByRole('group', { name: '최근 넣은 명령' })).textContent).toContain('농지 개간');
+});
+
+it('INT-25 칸을 고르기 전에는 최근 명령도 넣지 않고 이유를 보인다', async () => {
+  localStorage.setItem('opensamguk.recentCommands.v1:u1:w1', JSON.stringify([{ commandKey: 'farm', args: {} }]));
+  const onStatus = vi.fn();
+  await open(makeSource(null), 'RUNNING', onStatus);
+  const recent = await screen.findByRole('group', { name: '최근 넣은 명령' });
+  await waitFor(() => expect(onStatus).toHaveBeenLastCalledWith({ kind: 'saved', behind: false, selection: 0 }));
+  fireEvent.click(screen.getByRole('button', { name: /^농지 개간\s*\(사용 불가\)$/ }));
+  expect(recent.querySelector('[role="note"]')?.textContent).toBe('칸을 먼저 고르세요.');
+  expect(onStatus).toHaveBeenLastCalledWith({ kind: 'saved', behind: false, selection: 0 });
+});
+
+it('INT-25 예턴 표 머리에 지금 시각을 시:분:초로 둔다', async () => {
+  await open(makeSource(null), 'RUNNING', vi.fn());
+  const clock = await screen.findByTestId('turn-clock');
+  expect(clock.textContent).toMatch(/^현재 \d{2}:\d{2}:\d{2}$/);
+});
+
+it('INT-25 남의 직책 칸은 넘겨받은 다음 턴 시각에 칸마다 턴 간격을 더해 시:분을 적는다', async () => {
+  const at = new Date(Date.now() + 5 * 60_000);
+  at.setSeconds(0, 0);
+  const source: TurnSourceFactory = (input) => ({
+    ...makeSource('내 직책 칸이 아닙니다')(input),
+    nextTurnAt: at.toISOString(),
+  });
+  await open(source, 'RUNNING', vi.fn());
+  await waitFor(() => expect(document.querySelector('tr[data-slot="3"] time')).not.toBeNull());
+  // 가짜 월드의 턴 간격은 60분이다.
+  expect(document.querySelector('tr[data-slot="1"] time')?.getAttribute('datetime')).toBe(at.toISOString());
+  expect(document.querySelector('tr[data-slot="3"] time')?.getAttribute('datetime')).toBe(
+    new Date(at.getTime() + 2 * 60 * 60_000).toISOString(),
+  );
+});
+
+it('INT-26 AC-INT-26 예턴 표는 서버 칸이 실은 대상 이름을 번호 대신 적고 칸을 밀어도 같은 이름을 쓴다', async () => {
+  const stored = [
+    { commandKey: 'invite', args: { generalId: 21 }, name: '등용', targets: { general: '서서(徐庶)' } },
+    { commandKey: 'move', args: { cityKey: 99 }, name: '이동', targets: { city: '신야' } },
+    // 서버가 이름을 주지 않은 장수(안개)는 번호로 적는다.
+    { commandKey: 'invite', args: { generalId: 30 }, name: '등용', targets: { general: null } },
+    ...slots.slice(3),
+  ];
+  const source: TurnSourceFactory = (input) => ({
+    ...makeSource(null)(input),
+    list: {
+      queryKey: ['list', 'targets'],
+      queryFn: async () => ({ revision: 1, slots: stored }),
+      select: (d) => d as TurnList,
+    },
+  });
+  await open(source, 'RUNNING', vi.fn());
+  const row = (n: number) => document.querySelector(`tr[data-slot="${n}"]`)?.textContent ?? '';
+  await waitFor(() => expect(row(1)).toContain('서서'));
+  expect(row(1)).not.toContain('徐庶');
+  expect(row(1)).not.toContain('21');
+  expect(row(2)).toContain('신야');
+  expect(row(2)).not.toContain('도시 99');
+  expect(row(3)).toContain('장수 30');
+  // 1번 칸을 골라 한 칸 밀면 등용이 2번 칸으로 가도 이름이 따라간다.
+  fireEvent.click(document.querySelector('tr[data-slot="1"]')!);
+  fireEvent.click(screen.getByRole('button', { name: '밀기' }));
+  await waitFor(() => expect(row(2)).toContain('서서'));
+  expect(row(3)).toContain('신야');
 });

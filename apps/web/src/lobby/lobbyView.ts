@@ -40,6 +40,19 @@ export function myGeneralText(general: LobbyWorld['myGeneral']): string {
   return `내 장수: ${general.name} (${general.nationName ?? '재야'})`;
 }
 
+// 진행 중 카드와 지난 기수 목록으로 나눈다. 각 묶음 안의 순서는 서버 순서 그대로다.
+export function splitWorlds(worlds: readonly LobbyWorld[]): { live: LobbyWorld[]; ended: LobbyWorld[] } {
+  return {
+    live: worlds.filter((world) => world.status !== 'ENDED'),
+    ended: worlds.filter((world) => world.status === 'ENDED'),
+  };
+}
+
+// 끝난 월드의 gameDate는 서버가 WorldResult의 끝난 연월로 준다. 결과 기록이 없으면 마지막 게임 날짜다.
+export function endedText(world: Pick<LobbyWorld, 'gameDate'>): string {
+  return `${world.gameDate.year}년 ${world.gameDate.month}월 끝남`;
+}
+
 export type LobbyAction =
   { kind: 'enter' } | { kind: 'create'; blocked: string | null } | { kind: 'login'; blocked: string | null };
 

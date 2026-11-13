@@ -305,8 +305,9 @@ function OrdersBoard({ worldId, userId, accountNotice }: { worldId: string; user
           >
             <Portrait
               id={data.npcSuperior.portraitId}
-              name={data.npcSuperior.name}
+              name={displayName(data.npcSuperior.name)}
               variant="icon"
+              shape="round"
               size={24}
               decorative
             />{' '}
@@ -321,9 +322,23 @@ function OrdersBoard({ worldId, userId, accountNotice }: { worldId: string; user
         {data.orders.map((item) => (
           <li key={item.id}>
             <p>
-              <Portrait id={item.issuerPortraitId} name={item.issuerName} variant="icon" size={24} decorative />{' '}
+              <Portrait
+                id={item.issuerPortraitId}
+                name={displayName(item.issuerName)}
+                variant="icon"
+                shape="round"
+                size={24}
+                decorative
+              />{' '}
               {displayName(item.issuerName)} →{' '}
-              <Portrait id={item.recipientPortraitId} name={item.recipientName} variant="icon" size={24} decorative />{' '}
+              <Portrait
+                id={item.recipientPortraitId}
+                name={displayName(item.recipientName)}
+                variant="icon"
+                shape="round"
+                size={24}
+                decorative
+              />{' '}
               {displayName(item.recipientName)}: {name(item.command.commandKey)}{' '}
               {args(item.command.args as Record<string, unknown>)}
             </p>

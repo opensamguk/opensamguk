@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  cityBands,
   cityLevelText,
   garrisonSummary,
   nationHeads,
@@ -7,6 +8,7 @@ import {
   nearMax,
   populationRate,
   readyArmy,
+  statBand,
   techText,
   worldEvents,
 } from './infoView';
@@ -154,5 +156,42 @@ describe('중원 정세 글줄', () => {
   it('앞 달이 없거나 변화가 없으면 글줄이 없다', () => {
     expect(worldEvents(older, undefined, names)).toEqual([]);
     expect(worldEvents(older, older, names)).toEqual([]);
+  });
+});
+
+describe('개발 정도 구간', () => {
+  it('최대치 비율 40% 미만은 낮음, 80% 미만은 보통, 그 위는 높음이다', () => {
+    expect(statBand(399, 1000)).toBe('low');
+    expect(statBand(400, 1000)).toBe('mid');
+    expect(statBand(799, 1000)).toBe('mid');
+    expect(statBand(800, 1000)).toBe('high');
+    expect(statBand(1000, 1000)).toBe('high');
+    expect(statBand(10, 0)).toBeNull();
+  });
+
+  it('도시 일곱 줄의 구간을 쓰고 민심은 100을 최대로 본다', () => {
+    const bands = cityBands({
+      population: 10_000,
+      populationMax: 100_000,
+      agriculture: 500,
+      agricultureMax: 1000,
+      commerce: 900,
+      commerceMax: 1000,
+      security: 0,
+      securityMax: 0,
+      defence: 100,
+      defenceMax: 1000,
+      wall: 1000,
+      wallMax: 1000,
+      trust: 85.6,
+    });
+    expect(bands.map((row) => [row.label, row.band])).toEqual([
+      ['주민', 'low'],
+      ['농업', 'mid'],
+      ['상업', 'high'],
+      ['수비', 'low'],
+      ['성벽', 'high'],
+      ['민심', 'high'],
+    ]);
   });
 });
