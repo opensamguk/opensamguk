@@ -242,6 +242,8 @@ export const recordsRouter = router({
         ...toGameDate(world.startYear, tick),
         kind: commandKey,
         text,
+        generalId: biography!.id,
+        generalName: biography!.name,
       }));
       const sorted = [...reputation, ...nation, ...history].sort((a, b) => b.tick - a.tick);
       const page = sorted.slice(0, 30);
@@ -252,7 +254,12 @@ export const recordsRouter = router({
       );
       const items = page.map((item) => ({
         ...item,
-        portraitId: item.source === 'reputation' ? (portraits.get(item.generalId) ?? null) : null,
+        portraitId:
+          item.source === 'reputation'
+            ? (portraits.get(item.generalId) ?? null)
+            : item.source === 'milestone'
+              ? (biography?.portraitId ?? null)
+              : null,
       }));
       const last = items.at(-1);
       return {

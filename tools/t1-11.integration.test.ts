@@ -138,6 +138,22 @@ describe('T1-11 실제 HTTP·PostgreSQL 권한', () => {
     expect(JSON.stringify(after)).not.toContain(initial.generals[0]!.name);
   });
 
+  it('장수 열전의 임관 기록에 장수 이름과 초상을 붙여 본인에게만 표시한다', async () => {
+    const { a, b, worldId, initial } = await fixture(true, (world) => {
+      world.generals[0]!.portraitId = 10001;
+    });
+    const general = initial.generals[0]!;
+    const text = '열전 시험 임관';
+    await db.generalLog.create({
+      data: { worldId, generalId: general.id, tick: 1, commandKey: 'join', kind: 'success', text },
+    });
+    const input = { worldId, scope: 'biography' };
+    expect((await request('records.activity', input, a.cookie)).data).toMatchObject({
+      items: [{ source: 'milestone', generalId: general.id, generalName: general.name, portraitId: 10001, text }],
+    });
+    expect((await request('records.activity', input, b.cookie)).data).toMatchObject({ items: [] });
+  });
+
   it('home과 mine의 공개 장수 필드는 유지하고 내부 소유권·성향·revision을 숨긴다', async () => {
     const { a, worldId } = await fixture();
     const home = await request('home.get', { worldId }, a.cookie);
