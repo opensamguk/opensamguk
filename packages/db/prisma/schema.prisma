@@ -12,6 +12,7 @@ datasource db {
 model World {
   generalBattleStats   GeneralBattleStats[]
   trafficMonthly       WorldTrafficMonthly[]
+  npcEntryDrafts       NpcEntryDraft[]
   reputationEvents     ReputationEvent[]
   publicNationEvents   PublicNationEvent[]
   monthlyReviews       MonthlyReview[]
@@ -93,6 +94,20 @@ model World {
   sanctions            Sanction[]
   createRequest        WorldCreateRequest?
   seasonGenerals       SeasonGeneral[]
+}
+
+model NpcEntryDraft {
+  worldId   String
+  userId    String
+  nonce     String
+  validUntil DateTime
+  redrawAt  DateTime
+  cards     Json
+  world     World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  user      User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([worldId, userId])
+  @@index([worldId, validUntil])
 }
 
 model WorldTrafficMonthly {
@@ -741,6 +756,7 @@ enum AuditActorKind {
 }
 
 model User {
+  npcEntryDrafts NpcEntryDraft[]
   portrait               AccountPortrait?
   notificationOutbox     NotificationOutbox[]
   notificationGeneration Int                  @default(0)

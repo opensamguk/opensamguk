@@ -96,6 +96,34 @@ function NpcEntry({
     enabled: enabled && open && !receipt,
     retry: retryUnlessClientError,
   });
+  const draw = useMutation(trpc.entry.draw.mutationOptions());
+  const draft = candidates.data?.draft;
+  const [clock, setClock] = useState(Date.now);
+  const [kept, setKept] = useState<number[]>([]);
+  const hasDraft = candidates.data && Object.hasOwn(candidates.data, 'draft');
+  useEffect(() => {
+    if (!open || !hasDraft) return;
+    const timer = window.setInterval(() => setClock(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [open, hasDraft]);
+
+  const expired = draft ? new Date(draft.validUntil).getTime() <= clock : false;
+  const redrawSeconds = draft ? Math.max(0, Math.ceil((new Date(draft.redrawAt).getTime() - clock) / 1000)) : 0;
+  async function drawCandidates() {
+    setMessage('');
+    try {
+      const next = await draw.mutateAsync({
+        worldId,
+        ...(draft && !expired ? { redraw: { nonce: draft.nonce, keepIds: kept } } : {}),
+      });
+      if (!mounted.current) return;
+      cache.setQueryData(['npc-entry-roles', worldId, userId], next);
+      setKept([]);
+      setSelected(null);
+    } catch (error) {
+      if (mounted.current) setMessage(serverMessage(error) ?? '장수 후보를 뽑지 못했습니다.');
+    }
+  }
   const possession = useMutation(trpc.entry.possess.mutationOptions());
   const status = useQuery({
     ...trpc.entry.possessStatus.queryOptions({
@@ -155,7 +183,11 @@ function NpcEntry({
     }
   }
 
-  const group = candidates.data?.roles[role] ?? [];
+  const group = expired
+    ? []
+    : draft
+      ? Object.values(candidates.data?.roles ?? {}).flat()
+      : (candidates.data?.roles[role] ?? []);
   // 서버는 국가 순으로 준다. 화면은 역할 묶음 안에서 능력치 합이 큰 순으로 다시 둔다 (원작 빙의 후보 순서).
   const filtered = sortByStatTotal(
     group.filter((general) =>
@@ -214,38 +246,59 @@ function NpcEntry({
           </button>
           {open ? (
             <>
-              <div className={styles.field}>
-                <label>
-                  역할{' '}
-                  <select
-                    className={styles.input}
-                    value={role}
-                    onChange={(event) => {
-                      setRole(event.currentTarget.value as Role);
-                      setSelected(null);
-                      setLimit(30);
-                    }}
+              {hasDraft ? (
+                <div className={styles.actions}>
+                  <button
+                    type="button"
+                    disabled={!candidates.data?.canPossess || draw.isPending || (!expired && redrawSeconds > 0)}
+                    onClick={() => void drawCandidates()}
                   >
-                    {Object.entries(roles).map(([id, label]) => (
-                      <option key={id} value={id}>
-                        {label} ({candidates.data?.roles[id as Role].length ?? 0})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  이름·국가·도시 검색{' '}
-                  <input
-                    className={styles.input}
-                    value={search}
-                    onChange={(event) => {
-                      setSearch(event.currentTarget.value);
-                      setSelected(null);
-                      setLimit(30);
-                    }}
-                  />
-                </label>
-              </div>
+                    {draft && !expired
+                      ? `다른 장수 보기${redrawSeconds > 0 ? ` (${redrawSeconds}초)` : ''}`
+                      : '장수 후보 뽑기'}
+                  </button>
+                  {draft ? (
+                    <span>
+                      {expired
+                        ? '후보가 만료되었습니다.'
+                        : `유효 기한 ${new Date(draft.validUntil).toLocaleTimeString('ko-KR')}`}
+                    </span>
+                  ) : null}
+                </div>
+              ) : (
+                <div className={styles.field}>
+                  <label>
+                    역할{' '}
+                    <select
+                      className={styles.input}
+                      value={role}
+                      onChange={(event) => {
+                        setRole(event.currentTarget.value as Role);
+                        setSelected(null);
+                        setLimit(30);
+                      }}
+                    >
+                      {Object.entries(roles).map(([id, label]) => (
+                        <option key={id} value={id}>
+                          {label} ({candidates.data?.roles[id as Role].length ?? 0})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    이름·국가·도시 검색{' '}
+                    <input
+                      className={styles.input}
+                      value={search}
+                      onChange={(event) => {
+                        setSearch(event.currentTarget.value);
+                        setSelected(null);
+                        setLimit(30);
+                      }}
+                    />
+                  </label>
+                </div>
+              )}
               {candidates.isPending ? <p role="status">입장할 수 있는 무장을 불러오는 중입니다.</p> : null}
               {candidates.isError ? (
                 <button type="button" onClick={() => void candidates.refetch()}>
@@ -253,76 +306,99 @@ function NpcEntry({
                 </button>
               ) : null}
               {candidates.data?.blockedReason ? <p>{candidates.data.blockedReason}</p> : null}
-              {candidates.data?.canPossess && filtered.length === 0 ? <p>조건에 맞는 무장이 없습니다.</p> : null}
+              {candidates.data?.canPossess && filtered.length === 0 && (!hasDraft || (draft && !expired)) ? (
+                <p>조건에 맞는 무장이 없습니다.</p>
+              ) : null}
               {filtered.length > 0 ? (
                 <fieldset className={`${styles.portraits} ${styles.npcList}`} aria-describedby="npc-order">
-                  <legend>{roles[role]} 무장</legend>
+                  <legend>{draft ? '추첨 후보' : `${roles[role]} 무장`}</legend>
                   <p id="npc-order" className={styles.npcStats}>
                     능력치 합이 큰 순입니다.
                   </p>
-                  {filtered.slice(0, limit).map((general) => (
-                    <label key={general.generalId} className={styles.npcRow}>
-                      <input
-                        type="radio"
-                        name="npc-general"
-                        checked={selected === general.generalId}
-                        onChange={() => setSelected(general.generalId)}
-                      />
-                      <Portrait
-                        id={general.portraitId}
-                        name={displayName(general.name)}
-                        variant="icon"
-                        shape="round"
-                        decorative
-                      />
-                      <span className={styles.npcInfo}>
-                        <span>
-                          <strong>{displayName(general.name)}</strong> · {general.nation?.name ?? '재야'} ·{' '}
-                          {general.city.name}
-                        </span>
-                        {general.progression && (
-                          <span className={styles.npcStats}>
-                            {general.age}세 · Lv {general.progression.level} · {general.progression.honorTitle} ·{' '}
-                            {general.progression.dedicationRank} · {general.generalType} ·{' '}
-                            {officerName(general.officerLevel, general.nation !== null)}
-                          </span>
-                        )}
-                        {general.personality || general.special ? (
-                          <span className={styles.npcStats}>
-                            {general.personality ? `성격 ${general.personality}` : null}
-                            {general.personality && general.special ? ' · ' : null}
-                            {general.special ? (
-                              <span
-                                title={
-                                  domesticSpecialtyDetails(general.domesticSpecialty) ??
-                                  general.combatSpecialty?.description
-                                }
-                              >
-                                {general.domesticSpecialty
-                                  ? '내정 특기'
-                                  : general.combatSpecialty
-                                    ? '전투 특기'
-                                    : '특기'}{' '}
-                                {general.special}
+                  {filtered.slice(0, limit).map((general) => {
+                    const card = draft?.cards.find(({ generalId }) => generalId === general.generalId);
+                    return (
+                      <div key={general.generalId}>
+                        <label className={styles.npcRow}>
+                          <input
+                            type="radio"
+                            name="npc-general"
+                            checked={selected === general.generalId}
+                            onChange={() => setSelected(general.generalId)}
+                          />
+                          <Portrait
+                            id={general.portraitId}
+                            name={displayName(general.name)}
+                            variant="icon"
+                            shape="round"
+                            decorative
+                          />
+                          <span className={styles.npcInfo}>
+                            <span>
+                              <strong>{displayName(general.name)}</strong> · {general.nation?.name ?? '재야'} ·{' '}
+                              {general.city.name}
+                            </span>
+                            {general.progression && (
+                              <span className={styles.npcStats}>
+                                {general.age}세 · Lv {general.progression.level} · {general.progression.honorTitle} ·{' '}
+                                {general.progression.dedicationRank} · {general.generalType} ·{' '}
+                                {officerName(general.officerLevel, general.nation !== null)}
+                              </span>
+                            )}
+                            {general.personality || general.special ? (
+                              <span className={styles.npcStats}>
+                                {general.personality ? `성격 ${general.personality}` : null}
+                                {general.personality && general.special ? ' · ' : null}
+                                {general.special ? (
+                                  <span
+                                    title={
+                                      domesticSpecialtyDetails(general.domesticSpecialty) ??
+                                      general.combatSpecialty?.description
+                                    }
+                                  >
+                                    {general.domesticSpecialty
+                                      ? '내정 특기'
+                                      : general.combatSpecialty
+                                        ? '전투 특기'
+                                        : '특기'}{' '}
+                                    {general.special}
+                                  </span>
+                                ) : null}
+                              </span>
+                            ) : null}
+                            <span className={`num ${styles.npcStats}`} data-testid="npc-stats">
+                              {candidateStats(general)
+                                .map((cell) => `${cell.label} ${cell.value}`)
+                                .join(' · ')}{' '}
+                              · 합 {statTotal(general)}
+                            </span>
+                            {general.proficiency?.length ? (
+                              <span className={styles.npcStats}>
+                                {'병종 숙련 '}
+                                {general.proficiency.map(({ name, grade }) => `${name} ${grade}`).join(' · ')}
                               </span>
                             ) : null}
                           </span>
+                        </label>
+                        {card ? (
+                          <label>
+                            <input
+                              type="checkbox"
+                              checked={kept.includes(general.generalId)}
+                              disabled={card.keepCount === 0 || draw.isPending}
+                              onChange={(event) => {
+                                const checked = event.currentTarget.checked;
+                                setKept((ids) =>
+                                  checked ? [...ids, general.generalId] : ids.filter((id) => id !== general.generalId),
+                                );
+                              }}
+                            />
+                            {displayName(general.name)} 보관 ({card.keepCount}회)
+                          </label>
                         ) : null}
-                        <span className={`num ${styles.npcStats}`} data-testid="npc-stats">
-                          {candidateStats(general)
-                            .map((cell) => `${cell.label} ${cell.value}`)
-                            .join(' · ')}{' '}
-                          · 합 {statTotal(general)}
-                        </span>
-                        {general.proficiency?.length ? (
-                          <span className={styles.npcStats}>
-                            {'병종 숙련 '}
-                            {general.proficiency.map(({ name, grade }) => `${name} ${grade}`).join(' · ')}
-                          </span>
-                        ) : null}
-                      </span>
-                    </label>
-                  ))}
+                      </div>
+                    );
+                  })}
                 </fieldset>
               ) : null}
               {filtered.length > limit ? (
@@ -334,9 +410,9 @@ function NpcEntry({
                 <button
                   type="button"
                   className={styles.submit}
-                  disabled={possession.isPending}
+                  disabled={possession.isPending || draw.isPending}
                   onClick={() => {
-                    if (inFlight.current) return;
+                    if (inFlight.current || (draft && new Date(draft.validUntil).getTime() <= Date.now())) return;
                     const current = { generalId: picked.generalId, idempotencyKey: crypto.randomUUID() };
                     try {
                       sessionStorage.setItem(key, JSON.stringify(current));

@@ -38,7 +38,7 @@ import { assertInitialNationLifecycle, NATION_LIFECYCLE_FEATURE } from './nation
 import type { CommandDef } from './commands/types';
 import type { CommandResolver } from './commands/resolve';
 import { applyCreationInput, applyPolicyInput, applyTurnsInput } from './replayInputs';
-import { POSSESSION_KIND, applyPossessionInput } from './entry/possess';
+import { NPC_ENTRY_DRAFT_FEATURE, POSSESSION_KIND, applyPossessionInput } from './entry/possess';
 import {
   personnelFeature,
   policyFeature,
@@ -239,6 +239,7 @@ export const ruleRegistry: RuleRegistry = {
       conflicts: [],
       commandBindings: [{ definition: convertProficiency, sliceKeys: [] }],
     },
+    { key: NPC_ENTRY_DRAFT_FEATURE, requires: [], conflicts: [] },
     { key: COMBAT_SPECIALTY_FEATURE, requires: [], conflicts: [] },
     { key: DOMESTIC_SPECIALTY_FEATURE, requires: [], conflicts: [] },
     { key: GENERAL_PERSONALITY_FEATURE, requires: [], conflicts: [] },
