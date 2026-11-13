@@ -4,8 +4,8 @@ import { readFixture } from '../apps/server/test/readFixture';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { loadPreset } from '../apps/engine/src/world/resources';
-import { hashState } from '@opensamguk/shared/node';
 import { commandInitial } from '../packages/rules/test/commandFixture';
+import { hashState } from '../packages/shared/src/node/hashState';
 import { holdLease, releaseHold } from './game';
 import { test, expect, apiQuery } from './t210-fixture';
 
