@@ -265,7 +265,7 @@ export function GeneralLogList({ items, clock }: { items: readonly GeneralItem[]
           {item.kind === 'failure' ? <Tag tone="danger">실패</Tag> : null}
           <span className={styles.text}>{item.text}</span>
           {item.createdAt && Number.isFinite(Date.parse(item.createdAt)) ? (
-            <time className={styles.date} dateTime={item.createdAt} title="실행 시각 (한국 표준시)">
+            <time className={styles.executionTime} dateTime={item.createdAt} title="실행 시각 (한국 표준시)">
               {executionTime.format(new Date(item.createdAt))}
             </time>
           ) : null}
