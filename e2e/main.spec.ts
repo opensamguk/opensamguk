@@ -182,7 +182,7 @@ test.describe('장수가 있는 계정', () => {
     await shot(page, '01-main.png');
   });
 
-  test('지도에서 적 도시를 고르면 메인을 떠나지 않고 도시 정보만 바뀌며 수치는 보이지 않는다', async ({ page }) => {
+  test('지도에서 적 도시를 고르면 메인을 떠나지 않고 도시 정보만 바뀌며 주민 최대치를 보여 준다', async ({ page }) => {
     await openMain(page);
     const city = page.getByRole('region', { name: '도시 정보', exact: true });
     await expect(city.locator(`[data-city-key="${ctx.home.general.cityKey}"]`)).toBeVisible();
@@ -191,14 +191,14 @@ test.describe('장수가 있는 계정', () => {
     const keyPattern = new RegExp(`%22cityKey%22%3A${enemy.key}(?!\\d)`);
     const response = page.waitForResponse((r) => r.url().includes('city.get') && keyPattern.test(r.url()));
     await page.getByTestId('world-map').locator(`[data-city-key="${enemy.key}"]`).click();
-    // 서버 응답 자체에 적 도시 수치와 적 장수 상세가 없어야 한다 (화면에서 숨기기만 하는 것이 아님).
+    // D-088에 따라 도시 최대치가 공개되고 현재 주민 수는 서버 응답에서 제외된다.
     const res = await response;
     const procedures = new URL(res.url()).pathname.replace('/trpc/', '').split(',');
     const payload = (await res.json()) as unknown[];
     const cityPayload = JSON.stringify(payload[procedures.indexOf('city.get')]);
     expect(cityPayload).toContain(`"key":${enemy.key}`);
-    expect(cityPayload).not.toContain('population');
-    expect(cityPayload).not.toContain('leadership');
+    expect(cityPayload).toContain('"populationMax":');
+    expect(cityPayload).not.toContain('"population":');
 
     await expect(page).toHaveURL(new RegExp(`/w/${ctx.worldId}\\?city=${enemy.key}$`));
     expect(await page.evaluate(() => (window as unknown as { __sameDocument?: boolean }).__sameDocument)).toBe(true);
