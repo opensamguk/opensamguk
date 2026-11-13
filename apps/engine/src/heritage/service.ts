@@ -1,4 +1,10 @@
-import { creationRefunds, seasonHeritageAwards } from '@opensamguk/rules';
+import {
+  creationRefunds,
+  seasonHeritageAwards,
+  heritageSpecialtyCost,
+  SPECIALTY_GROWTH_FEATURE,
+  type WorldView,
+} from '@opensamguk/rules';
 import type { HeritageRepository, HeritageSeason } from './port';
 
 export async function creditHeritageSeason(repository: HeritageRepository, season: HeritageSeason) {
@@ -57,4 +63,35 @@ export async function refundHeritageCreations(
         ...(context.newWorldId === undefined ? {} : { newWorldId: context.newWorldId }),
       },
     });
+}
+
+export async function refundRemovedGeneralSpecialties(
+  repository: HeritageRepository,
+  worldId: string,
+  before: WorldView,
+  after: WorldView,
+  generalIds: readonly number[],
+) {
+  if (!before.ruleFeatures?.includes(SPECIALTY_GROWTH_FEATURE)) return;
+  const refunds = generalIds
+    .flatMap((id) => {
+      const old = before.generals[id];
+      const next = after.generals[id];
+      const specialty = next?.heritageSpecialty?.next;
+      return old?.userId && old.removedAt === undefined && next?.removedAt !== undefined && specialty
+        ? [{ id, userId: old.userId, specialty }]
+        : [];
+    })
+    .sort((a, b) => a.userId.localeCompare(b.userId));
+  for (const { id, userId, specialty } of refunds) {
+    if ((await repository.lockUser(userId)) !== 'OPEN') continue;
+    await repository.append({
+      userId,
+      worldId,
+      key: `specialty-refund:${worldId}:${id}`,
+      kind: 'SPECIALTY_REFUND',
+      delta: heritageSpecialtyCost,
+      detail: { version: 1, generalId: id, specialty, reason: 'GENERAL_REMOVED' },
+    });
+  }
 }

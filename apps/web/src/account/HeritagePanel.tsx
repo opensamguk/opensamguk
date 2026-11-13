@@ -13,6 +13,7 @@ const KIND: Record<Entry['kind'], [string, TagTone]> = {
   CREATION_SPEND: ['생성 사용', 'muted'],
   BENEFIT_SPEND: ['혜택 구매', 'muted'],
   CREATION_REFUND: ['반환', 'accent'],
+  SPECIALTY_REFUND: ['특기 예약 반환', 'accent'],
   FORFEIT: ['몰수', 'danger'],
 };
 
@@ -32,6 +33,7 @@ function describe(entry: Entry, first: number) {
   }
   if (entry.kind === 'CREATION_SPEND') return '장수 생성에 사용';
   if (entry.kind === 'BENEFIT_SPEND') return '장수 유산 혜택 구매에 사용';
+  if (entry.kind === 'SPECIALTY_REFUND') return '장수 퇴장으로 사용하지 않은 전투 특기 예약 비용 반환';
   if (entry.kind === 'CREATION_REFUND') {
     const cause = entry.refund ? REFUND[entry.refund.reason] : '관리자 강제 종료·초기화';
     return `${cause}로 이 월드에서 장수 생성에 쓴 점수 반환`;
