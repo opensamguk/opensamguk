@@ -18,6 +18,7 @@ const season = vi.hoisted(() => ({
     captures: number;
   }>,
   calls: [] as string[],
+  topStratagem: [] as { generalId: number; name: string; successes: number }[],
 }));
 vi.mock('../game/queries', () => ({ useWorldId: () => 'world-one' }));
 vi.mock('../trpc', () => ({
@@ -31,6 +32,7 @@ vi.mock('../trpc', () => ({
             const value = (row: (typeof season.rows)[number]) => (by === 'merit' ? row.wins + row.captures : row[by]);
             return {
               result: null,
+              topStratagem: season.topStratagem,
               statistics: {
                 final: { nations: 2, generals: 7 },
                 peak: { nations: 5, affiliatedGenerals: 12, generals: 14 },
@@ -52,6 +54,7 @@ afterEach(() => {
   cleanup();
   season.rows = [];
   season.calls = [];
+  season.topStratagem = [];
 });
 
 function render(ui: ReactElement) {
@@ -140,6 +143,14 @@ describe('기수 결과 칸 최종 장수 순위', () => {
     ];
     expect(fiveTigers(rows, 4)).toEqual(['하후돈(9)', '장료(7)', '위장수8(4)', '위장수7(3)', '위장수6(2)']);
     expect(fiveTigers(rows, null)).toEqual([]);
+  });
+
+  it('통일국의 건안칠자는 서버에 보관된 계략 성공 횟수로 표시한다', async () => {
+    season.topStratagem = [{ generalId: 1, name: '가후(賈詡)', successes: 3 }];
+    render(
+      <SeasonResult result={result({ reason: 'UNIFIED', winner: { nationId: 4, name: '위', color: '#000080' } })} />,
+    );
+    expect((await screen.findByTestId('season-stratagem-leaders')).textContent).toContain('가후(3)');
   });
 
   it('공헌 순으로 열고 기준 단추로 다시 받는다', async () => {

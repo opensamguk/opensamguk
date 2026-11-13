@@ -87,6 +87,7 @@ function SeasonGenerals({ winnerNationId }: { winnerNationId: number | null }) {
   });
   const tigers = merit.data ? fiveTigers(merit.data.generals, winnerNationId) : [];
   const winner = merit.data?.winnerSummary;
+  const topStratagem = merit.data?.topStratagem ?? [];
   const statistics = query.data?.statistics;
   const n = (value: number) => value.toLocaleString('ko-KR');
   const formatTraits = (rows: { name: string; count: number }[]) =>
@@ -147,6 +148,11 @@ function SeasonGenerals({ winnerNationId }: { winnerNationId: number | null }) {
       {tigers.length > 0 ? (
         <p className={styles.lead} data-testid="season-tigers">
           오호장군: {tigers.join(' · ')}
+        </p>
+      ) : null}
+      {topStratagem.length > 0 ? (
+        <p className={styles.lead} data-testid="season-stratagem-leaders">
+          건안칠자 · {topStratagem.map(({ name, successes }) => `${displayName(name)}(${n(successes)})`).join(' · ')}
         </p>
       ) : null}
       <div className={styles.byRow} role="group" aria-label="최종 순위 기준">

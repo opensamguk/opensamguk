@@ -403,6 +403,42 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
       await db.general.update({ where, data: general });
     }
   });
+  it('AC-INT-26 통일국의 건안칠자는 종료 당시의 계략 성공 횟수를 쓴다', async () => {
+    const row = await db.seasonGeneral.findFirstOrThrow({
+      where: { worldId: endedWorldId, nationId: { not: null } },
+      orderBy: { generalId: 'asc' },
+    });
+    const result = await db.worldResult.findUniqueOrThrow({ where: { worldId: endedWorldId } });
+    const archived = { worldId_generalId: { worldId: endedWorldId, generalId: row.generalId } };
+    try {
+      await db.worldResult.update({
+        where: { worldId: endedWorldId },
+        data: {
+          reason: 'UNIFIED',
+          winnerNationId: row.nationId,
+          winnerName: row.nationName,
+          winnerColor: row.nationColor,
+        },
+      });
+      await db.seasonGeneral.update({ where: archived, data: { stratagemSuccesses: 3 } });
+      const response = await request('records.season', { worldId: endedWorldId, by: 'experience' }, await session());
+      expect(response).toMatchObject({
+        status: 200,
+        data: { topStratagem: [{ generalId: row.generalId, name: row.name, successes: 3 }] },
+      });
+    } finally {
+      await db.seasonGeneral.update({ where: archived, data: { stratagemSuccesses: row.stratagemSuccesses } });
+      await db.worldResult.update({
+        where: { worldId: endedWorldId },
+        data: {
+          reason: result.reason,
+          winnerNationId: result.winnerNationId,
+          winnerName: result.winnerName,
+          winnerColor: result.winnerColor,
+        },
+      });
+    }
+  });
   it('AC-P2-07 첩보 예턴은 같은 국가에만 저장 보고서를 열고 병력을 구간으로 표시한다', async () => {
     const initial = commandInitial();
     initial.ruleFeatures = [INTEL_FEATURE, 'policy'];
