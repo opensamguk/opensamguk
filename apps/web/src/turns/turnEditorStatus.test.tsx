@@ -41,7 +41,7 @@ const summary = (status: WorldSummary['status']): WorldSummary => ({
   msPerTick: 1_000,
   turnTermMinutes: 60,
   truce: null,
-  quota: { humans: 0, max: null },
+  quota: { humans: 0, max: 500 },
   npcCount: 0,
   scenarioType: null,
   serverTime: '2026-01-01T00:00:00.000Z',

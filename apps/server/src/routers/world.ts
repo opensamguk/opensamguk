@@ -1,10 +1,11 @@
 import { z } from 'zod';
 import type { Prisma } from '@opensamguk/db';
 import { protectedProcedure, publicProcedure, router } from '../trpc';
-import { readWorld, viewerGeneral, worldInput, worldSummary } from '../queries';
+import { countHumanGenerals, readWorld, viewerGeneral, worldInput, worldSummary } from '../queries';
 import { mapCity, publicMapInfo } from '../visibility';
 import {
   cityRegionName,
+  HUMAN_GENERAL_LIMIT,
   INTEL_FEATURE,
   LINEAGE_EXITED_YEAR,
   readOperationalMap,
@@ -85,9 +86,7 @@ export const worldRouter = router({
       const scenarioKey = resourceKeySchema.safeParse(world.scenarioKey);
       const scenarioRef = scenarioKey.success ? parseResourceKey(scenarioKey.data) : null;
       const [humans, npcCount, heartbeat, resource] = await Promise.all([
-        tx.general.count({
-          where: { worldId: world.id, removedAt: null, userId: { not: null } },
-        }),
+        countHumanGenerals(tx, world.id),
         tx.general.count({
           where: { worldId: world.id, removedAt: null, userId: null },
         }),
@@ -114,7 +113,7 @@ export const worldRouter = router({
       const health = engineActive ? countEngineHealth(ctx.now, [{ engineHeartbeat: heartbeat }]) : null;
       return {
         ...summary,
-        quota: { humans, max: null },
+        quota: { humans, max: HUMAN_GENERAL_LIMIT },
         npcCount,
         scenarioType:
           scenario?.fiction === 0 ? ('historical' as const) : scenario?.fiction === 1 ? ('fictional' as const) : null,

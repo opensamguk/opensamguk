@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { creationBlock } from './creationBlock';
+import { creationBlock, HUMAN_GENERAL_LIMIT } from './creationBlock';
 
 describe('T2-03 / AC-M2-02 장수 생성 판정', () => {
   it.each(['RUNNING', 'PREOPEN', 'PAUSED', 'ENDED'] as const)(
@@ -43,4 +43,10 @@ it('AC-INT-24 생성 닫기는 새 접수·대기 생성을 막고 기존 장수
   expect(creationBlock({ status: 'PAUSED', hasGeneral: false, hasPending: false, entryOpen: false })!.code).toBe(
     'WORLD_CLOSED',
   );
+});
+
+it('사람 장수 정원 경계에서만 새 장수 생성을 막는다', () => {
+  const options = { status: 'RUNNING', hasGeneral: false, hasPending: false } as const;
+  expect(creationBlock({ ...options, humanCount: HUMAN_GENERAL_LIMIT - 1 })).toBeNull();
+  expect(creationBlock({ ...options, humanCount: HUMAN_GENERAL_LIMIT })).toMatchObject({ code: 'WORLD_FULL' });
 });
