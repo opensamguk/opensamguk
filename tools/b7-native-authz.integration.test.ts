@@ -9,6 +9,8 @@ import {
   assignmentRejectCost,
   ASSIGNMENT_REJECT_PERCENT,
   canExecuteNationCommand,
+  courtOfficeTitle,
+  STRATEGY_KEYS,
 } from '../packages/rules/src/index';
 import { ASSIGNMENT_EXPIRY_MONTHS } from '../packages/rules/src/personnel/types';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
@@ -291,6 +293,7 @@ function expectRead(path: Path, data: unknown, f: Fixture, rows: Rows, foreign =
         }),
     );
   } else if (path === 'nationTurns.get') {
+    const rank = rows.nations.find((nation) => nation.id === actor.nationId)!.level;
     expect(data).toEqual({
       actorId: actor.id,
       tabs: levels.map((officerLevel) => {
@@ -302,7 +305,15 @@ function expectRead(path: Path, data: unknown, f: Fixture, rows: Rows, foreign =
           office: { nationId: actor.nationId, officerLevel, tenure: office?.tenure ?? 0 },
           officerLevel,
           title: officerTitle(officerLevel),
-          holder: holder ? { generalId: holder.id, name: holder.name } : null,
+          courtTitle: courtOfficeTitle(rank, officerLevel),
+          holder: holder
+            ? {
+                generalId: holder.id,
+                name: holder.name,
+                portraitId: holder.portraitId,
+                isHuman: holder.userId !== null,
+              }
+            : null,
           edit:
             actor.officerLevel === officerLevel
               ? { ok: true }
@@ -318,7 +329,23 @@ function expectRead(path: Path, data: unknown, f: Fixture, rows: Rows, foreign =
       worldResolver(rows.world)
         .resolver.list('nation')
         .filter((def) => canExecuteNationCommand(actor.officerLevel, def.key))
-        .map((def) => ({ key: def.key, name: def.name, argsSchema: def.args.toJSONSchema({ io: 'input' }) })),
+        .map((def) => ({
+          key: def.key,
+          name: def.name,
+          category: def.category,
+          argsSchema: def.args.toJSONSchema({ io: 'input' }),
+          ...(STRATEGY_KEYS.some((key) => key === def.key)
+            ? { cooldown: { remainingMonths: 0, availableAt: null } }
+            : {}),
+          ...(!def.args.safeParse({}).success
+            ? { available: null, reason: '대상이나 값을 고르면 실행 가능 여부를 확인합니다.' }
+            : def.key === 'nation_rest'
+              ? { available: true, reason: null }
+              : {
+                  available: expect.any(Boolean),
+                  reason: expect.toSatisfy((value) => value === null || typeof value === 'string'),
+                }),
+        })),
     );
   } else if (path === 'nationCommands.precheck') {
     expect(data).toEqual({ ok: true });

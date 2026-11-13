@@ -195,7 +195,9 @@ function selectPlayer(seed: string, id: number, tick: number, excluded: readonly
       cityKeys: initial.cities.filter((city) => city.kind !== 'PASS').map((city) => city.cityKey),
       unitSet: initial.unitSet,
     });
+    // 월말 스냅샷 뒤 같은 tick에 장수 턴이 실행되는 경우를 피한다.
     if (
+      preview.nextTurnTick % TICKS_PER_MONTH !== 0 &&
       preview.nextTurnTick > tick &&
       preview.nextTurnTick < beforeTick &&
       cities.some((city) => city.cityKey === preview.cityKey)
@@ -588,7 +590,10 @@ describe('AC-P2-31 실제 HTTP 황실 접수·동의·경제', () => {
     const world = await fixture();
     const nationId = world.ruler.nationId!;
     const lowerNationId = world.lower.nationId!;
-    const successor = await createGeneralWithOrder(world.id, await user(), '후임장수', {
+    const timing = await db.world.findUniqueOrThrow({ where: { id: world.id }, select: { clockTick: true } });
+    const successorId = Math.max(...initial.generals.map(({ id }) => id)) + 3;
+    const candidate = selectPlayer(world.seed, successorId, timing.clockTick, [], timing.clockTick + TICKS_PER_MONTH);
+    const successor = await createGeneralWithOrder(world.id, await user(candidate.userId), '후임장수', {
       commandKey: 'join',
       args: { nationId },
     });

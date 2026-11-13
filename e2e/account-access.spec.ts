@@ -262,20 +262,20 @@ scenario(
       await expect(page.getByRole('heading', { name: '군략도', exact: true })).toBeVisible();
       const main = `/w/${worldId}?city=40`;
       await page.goto(main);
-      // 375px에서 내 계정은 위 띠가 아니라 게임 메뉴 `전체`의 계정 줄에 하나만 있다 (T4-97 U1, AC-P2-34).
-      await expect(page.getByRole('banner').getByRole('link', { name: '내 계정', exact: true })).toHaveCount(0);
-      const gameMenu = page.getByRole('navigation', { name: '게임 메뉴', exact: true }).filter({ visible: true });
-      const fullMenu = gameMenu.locator('details');
-      await gameMenu.locator('summary').click();
-      await expect(fullMenu).toHaveAttribute('open');
+      const tabs = page.getByRole('tablist', { name: '메인 화면', exact: true });
       const accountLink = page.getByRole('link', { name: '내 계정', exact: true });
+      await expect(page.getByRole('banner').getByRole('link', { name: '내 계정', exact: true })).toHaveCount(0);
+      await tabs.getByRole('tab', { name: '메뉴', exact: true }).click();
+      await expect(tabs.getByRole('tab', { name: '메뉴', exact: true })).toHaveAttribute('aria-selected', 'true');
       await expect(accountLink).toHaveCount(1);
       await expect(
-        fullMenu.getByRole('group', { name: '계정', exact: true }).getByRole('link', { name: '내 계정', exact: true }),
+        page
+          .getByRole('tabpanel', { name: '메뉴', exact: true })
+          .getByRole('group', { name: '계정', exact: true })
+          .getByRole('link', { name: '내 계정', exact: true }),
       ).toBeVisible();
-      await page.keyboard.press('Escape');
-      await expect(fullMenu).not.toHaveAttribute('open');
-      await expect(gameMenu.locator('summary')).toBeFocused();
+      const commands = tabs.getByRole('tab', { name: '예턴', exact: true });
+      await commands.click();
       const editor = page.getByTestId('turn-editor');
       await expect(editor.locator('tr[data-slot]')).toHaveCount(30);
       async function draft(slot: number) {
@@ -324,6 +324,7 @@ scenario(
       await page.reload();
       await page.getByRole('link', { name: '계속하기', exact: true }).click();
       await expect(page).toHaveURL(main);
+      await commands.click();
       await expect(editor.getByTestId('draft-state')).toHaveText('저장하지 않은 편집 1건');
       await expect(editor.locator('tr[data-slot="2"]')).toContainText('농지 개간');
       await page.screenshot({ path: info.outputPath('required-formal-draft-375.png'), fullPage: true });

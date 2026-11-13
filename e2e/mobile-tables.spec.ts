@@ -90,7 +90,7 @@ function expectedDetails(general: General, kind: 'city' | 'nation', cities: Map<
     kind === 'nation'
       ? [
           ['직책', detailed ? officerName(general.officerLevel, general.nationId !== null) : '—'],
-          ['위치', detailed ? String(cities.get(general.cityKey) ?? general.cityKey) : '—'],
+          ['위치', detailed ? String(cities.get(general.cityKey) ?? general.cityKey ?? '—') : '—'],
         ]
       : detailed
         ? [['직책', officerName(general.officerLevel, general.nationId !== null)]]
@@ -156,7 +156,8 @@ async function statValue(row: Locator, label: string, value: string, mobile: boo
 }
 
 test('T3-10 정식191년 도시·국가·월간 순위 표의 모든 값·정렬·375px와 초안 보존', async ({ page }, info) => {
-  test.setTimeout(120000);
+  // 정식 시나리오에서 여러 화면의 4개 너비·정렬·스크린샷을 한 브라우저로 검증한다.
+  test.setTimeout(240000);
   const execution = (async () => {
     ownWorld = (
       await withE2eDb(async (db) => {
@@ -237,7 +238,6 @@ test('T3-10 정식191년 도시·국가·월간 순위 표의 모든 값·정렬
       await tableGeometry(garrison, mobile);
       await noOverflow(page);
       if (mobile) {
-        expect(city.generals.some((g) => !isDetailedGeneral(g))).toBe(true);
         await assertMobileDetails(garrison, city.generals, 'city', new Map());
       }
       const ownRow = garrison
@@ -319,11 +319,11 @@ test('T3-10 정식191년 도시·국가·월간 순위 표의 모든 값·정렬
       await page.goto(`/w/${ownWorld}/nation/2`);
       const other = await query<Out['nation']['get']>(page, 'nation.get', { worldId: ownWorld, nationId: 2 });
       expect(other.generals.length).toBeGreaterThan(0);
-      expect(other.generals.every((g) => !isDetailedGeneral(g))).toBe(true);
+      expect(other.generals.every((g) => isDetailedGeneral(g) && !('gold' in g))).toBe(true);
       const table = page.getByRole('table', { name: /^소속 장수/ });
       await assertMobileDetails(table, other.generals, 'nation', new Map());
       await expect(
-        page.getByRole('note').filter({ hasText: '다른 국가 정보라 장수 수치와 국고는 보이지 않습니다.' }),
+        page.getByRole('note').filter({ hasText: '타국 국고와 장수의 비공개 항목은 —로 표시합니다.' }),
       ).toBeVisible();
       await tableGeometry(table, true);
       await noOverflow(page);

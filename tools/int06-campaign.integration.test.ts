@@ -772,6 +772,7 @@ it('예약한 실제 부장 부곡에만 모병하고 훈련 미리보기는 그
     id: lieutenantId,
     name: after.state.generals[lieutenantId]!.name,
     nationId: after.state.generals[lieutenantId]!.nationId,
+    isHuman: after.state.generals[lieutenantId]!.userId !== null,
   });
   const nationId = after.state.generals[lieutenantId]!.nationId!;
   const otherBefore = hashState(await snapshot(otherWorldId));
@@ -792,14 +793,25 @@ it('예약한 실제 부장 부곡에만 모병하고 훈련 미리보기는 그
     { worldId, nationId },
     cookies[2],
   );
-  expect(hiddenNation.data!.generals.find((general) => general.id === lieutenantId)).toEqual(masked);
+  const publicRoster = hiddenNation.data!.generals.find((general) => general.id === lieutenantId);
+  expect(publicRoster).toMatchObject({
+    ...masked,
+    leadership: after.state.generals[lieutenantId]!.leadership,
+    strength: after.state.generals[lieutenantId]!.strength,
+    intel: after.state.generals[lieutenantId]!.intel,
+  });
+  expect(publicRoster).not.toHaveProperty('gold');
+  expect(publicRoster).not.toHaveProperty('nextTurnTick');
   const isolatedNation = await http<inferRouterOutputs<AppRouter>['nation']['get']>('nation.get', {
     worldId: otherWorldId,
     nationId,
   });
-  expect(
-    isolatedNation.data!.generals.every((general) => Object.keys(general).sort().join(',') === 'id,name,nationId'),
-  ).toBe(true);
+  expect(isolatedNation.data!.generals.length).toBeGreaterThan(0);
+  for (const general of isolatedNation.data!.generals) {
+    expect(general).toMatchObject({ nationId, isHuman: expect.any(Boolean), leadership: expect.any(Number) });
+    expect(general).not.toHaveProperty('gold');
+    expect(general).not.toHaveProperty('nextTurnTick');
+  }
   expect((await http('nation.get', { worldId, nationId }, '')).code).toBe('UNAUTHORIZED');
   expect((await http('nation.get', { worldId, nationId, userId: users[0] })).code).toBe('BAD_REQUEST');
   expect(hashState(await snapshot())).toBe(hashState(after));

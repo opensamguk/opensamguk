@@ -169,7 +169,7 @@ export function CityInfo({
         </p>
       ) : (
         <p className={styles.note} role="note">
-          {HIDDEN_CITY}. 수치는 자기 국가 도시나 내 장수가 있는 도시에서만 보입니다.
+          {HIDDEN_CITY}. 공개 범위에 따라 최대치와 확인 가능한 수치를 표시합니다.
         </p>
       )}
       <CityStats rows={rows} />
@@ -593,7 +593,7 @@ function Garrison({
     {
       key: 'crew',
       label: campaign ? '지휘 병력' : '병력',
-      ...num((g) => (campaign ? ('commandedArmy' in g ? g.commandedArmy.troops : undefined) : g.crew)),
+      ...num((g) => (campaign && 'commandedArmy' in g ? g.commandedArmy.troops : g.crew)),
     },
     {
       key: 'train',

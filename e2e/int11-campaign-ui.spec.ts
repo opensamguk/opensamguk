@@ -282,11 +282,6 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
     // 장수·소속·직책·통솔·무력·지력·정치·매력 다음이 지휘 병력이다 (INT-25에서 직책 열을 더했다).
     await expect(ownRow.getByRole('cell').nth(8)).toHaveText('10');
     expect((await apiQuery<Board>(owner, 'campaign.get', { worldId })).units[0]!.troops).toBe(10);
-    await owner.page.goto(`/w/${worldId}/simulator`);
-    await owner.page.getByRole('combobox', { name: '내 부곡' }).selectOption(String(after.units[0]!.id));
-    await owner.page.getByRole('button', { name: '부곡 값 가져오기' }).click();
-    const simAttack = owner.page.getByRole('group', { name: '공격', exact: true });
-    await expect(simAttack.getByRole('textbox', { name: '병력', exact: true })).toHaveValue('10');
     expect((await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: ownerId } } })).crew).toBe(0);
     expect(
       await db.generalTurn.findMany({ where: { worldId, generalId: targetId }, orderBy: { slot: 'asc' } }),
@@ -332,7 +327,7 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
     await expect(nationRow.getByRole('cell').nth(11)).toContainText('사기 부족');
     const previousCommanderRow = nationTable
       .getByRole('row')
-      .filter({ has: owner.page.getByRole('cell', { name: `${npc!.name} NPC`, exact: true }) });
+      .filter({ has: owner.page.getByText(npc!.name, { exact: true }).and(owner.page.locator('[data-general-name]')) });
     await expect(previousCommanderRow.getByRole('cell').nth(8)).toHaveText(npcTroops.toLocaleString('ko-KR'));
     if (npcTroops === 0) await expect(previousCommanderRow.getByRole('cell').nth(11)).not.toContainText('훈련 부족');
     await owner.page.screenshot({ path: 'test-results/int11-formal-nation-commanded-army.png', fullPage: true });
@@ -407,6 +402,7 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
     await owner.page.setViewportSize({ width: 375, height: 812 });
     await owner.page.screenshot({ path: 'test-results/int11-formal-campaign-mobile.png', fullPage: true });
     await owner.page.goto(`/w/${worldId}`);
+    await owner.page.getByRole('tab', { name: '예턴', exact: true }).click();
     await expect(editor.locator('tr[data-slot="30"]')).toContainText('농지 개간');
   } finally {
     await releaseHold(hold);

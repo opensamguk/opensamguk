@@ -221,7 +221,13 @@ it.each([false, true])('off 생성·적재·표시는 ext 키와 행을 만들�
   expect(await db.worldExtSlice.count({ where: { worldId: f.worldId } })).toBe(0);
   const list = await rpc('commands.list', { worldId: f.worldId }, f.alice.cookie);
   expect(list.status).toBe(200);
-  expect(JSON.stringify(list.data)).toBe(JSON.stringify(commandList));
+  expect(list.data).toEqual(
+    commandList.map((command) => ({
+      ...command,
+      available: expect.toSatisfy((value) => value === null || typeof value === 'boolean'),
+      reason: expect.toSatisfy((value) => value === null || typeof value === 'string'),
+    })),
+  );
   const turns = await rpc('turns.get', { worldId: f.worldId }, f.alice.cookie);
   expect(JSON.stringify(turns.data?.slots)).toBe(
     JSON.stringify(displaySlots(await db.$transaction((tx) => readSlots(tx, f.worldId, 1)))),
