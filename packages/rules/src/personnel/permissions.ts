@@ -4,6 +4,7 @@ const personnelCommands = Object.freeze([
   'nation_reward',
   'nation_seize',
   'nation_assign',
+  'nation_troop_expel',
   'nation_mobilize',
 ] as const);
 const diplomaticCommands = Object.freeze([

@@ -23,6 +23,7 @@ const nationGroups: Readonly<Record<string, 'rest' | 'personnel' | 'diplomacy' |
   nation_assign: 'personnel',
   nation_reward: 'personnel',
   nation_seize: 'personnel',
+  nation_troop_expel: 'personnel',
   nation_aid: 'diplomacy',
   nation_break_pact: 'diplomacy',
   nation_declare: 'diplomacy',

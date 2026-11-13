@@ -1,3 +1,5 @@
+import { troopExpel } from '../commands/ext/troop/expel';
+import { TROOP_FEATURE } from '../commands/ext/troop/state';
 import { z } from 'zod';
 import { commandRegistry } from '../commands/registry';
 import type { DeepReadonly } from '../model/world';
@@ -309,6 +311,7 @@ export function applyNationTurnsRecord(
     }
     const command =
       commandRegistry.get(turn.commandKey) ??
+      (turn.commandKey === troopExpel.key && view.ruleFeatures?.includes(TROOP_FEATURE) ? troopExpel : undefined) ??
       (view.ruleFeatures?.includes(NATION_STRATEGY_FEATURE)
         ? nationStrategyCommands.find((definition) => definition.key === turn.commandKey)
         : undefined) ??
