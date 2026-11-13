@@ -8,6 +8,10 @@ import {
   readTroops,
   troopOf,
   combatSpecialty,
+  emptyStatExperience,
+  STAT_GROWTH_FEATURE,
+  STAT_UPGRADE_LIMIT,
+  storedStatExperience,
   personalityEffects,
   domesticSpecialty,
   GENERAL_PROFICIENCY_FEATURE,
@@ -157,6 +161,12 @@ export const homeRouter = router({
         ...(world.ruleFeatures.includes(HERITAGE_BENEFITS_FEATURE) ? { heritageBenefitsEnabled: true as const } : {}),
         general: {
           ...ownGeneralInfo(general),
+          ...(world.ruleFeatures.includes(STAT_GROWTH_FEATURE)
+            ? {
+                statExperience: storedStatExperience(general.statExperience).statExperience ?? emptyStatExperience,
+                statUpgradeLimit: STAT_UPGRADE_LIMIT,
+              }
+            : {}),
 
           personalityEffects: personalityEffects(world, general.personality) ?? null,
           domesticSpecialty: domesticSpecialty(world, general.special) ?? null,

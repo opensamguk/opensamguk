@@ -70,10 +70,22 @@ export function GeneralInfo({
       leadershipBonus > 0 ? `관직 +${n(leadershipBonus)}` : null,
       equipmentBonus > 0 ? `장비 +${n(equipmentBonus)}` : null,
     ].filter(Boolean);
-    return details.length > 0 ? (
+    const experience = g.statExperience?.[key];
+    const limit = g.statUpgradeLimit;
+    return details.length > 0 || (experience !== undefined && limit !== undefined) ? (
       <span>
         <strong className={injured !== g[key] ? styles.ageWarning : undefined}>{n(applied)}</strong>
-        <small className={styles.statNote}>{details.join(' · ')}</small>
+        {details.length ? <small className={styles.statNote}>{details.join(' · ')}</small> : null}
+        {experience === undefined || limit === undefined ? null : (
+          <small className={styles.statNote}>
+            <progress
+              aria-label={`${{ leadership: '통솔', strength: '무력', intel: '지력' }[key]} 성장`}
+              max={limit}
+              value={experience}
+            />{' '}
+            {experience} / {limit}
+          </small>
+        )}
       </span>
     ) : (
       n(applied)
