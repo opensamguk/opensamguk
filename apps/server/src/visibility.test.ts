@@ -5,6 +5,7 @@ import {
   cityCapacity,
   cityInfo,
   generalInfo,
+  generalType,
   garrisonGeneralInfo,
   mapCity,
   nationInfo,
@@ -19,6 +20,19 @@ beforeAll(async () => {
 });
 
 describe('T1-12 / AC-M1-19 공개 범위 표', () => {
+  it.each([
+    [30, 12, 15, '아둔'],
+    [35, 20, 80, '학자'],
+    [35, 80, 20, '장사'],
+    [39, 65, 65, '명사'],
+    [78, 70, 72, '만능'],
+    [40, 70, 30, '용장'],
+    [40, 30, 70, '명장'],
+    [78, 30, 30, '차장'],
+    [40, 55, 58, '평범'],
+  ] as const)('장수 유형을 기본 능력치 %i·%i·%i에서 계산한다', (leadership, strength, intel, expected) => {
+    expect(generalType({ leadership, strength, intel })).toBe(expected);
+  });
   it.each([
     { viewer: 0, cities: [true, false, false], nations: [true, false], generals: [true, true, false, false] },
     { viewer: 2, cities: [true, true, false], nations: [false, true], generals: [false, false, true, false] },
