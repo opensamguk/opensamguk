@@ -132,9 +132,13 @@ test('AC-M3-12 군주의 지방 임명·교체·해임, 장수 이동과 375px �
       await expect(strategist.getByText(`${candidate.name} · 주재`)).toBeVisible();
     });
     await member.goto(cityUrl);
-    const offices = member.getByRole('region', { name: '관직 주재' });
-    await expect(offices.getByText('태수 관직장수 · 주재')).toBeVisible();
-    await expect(offices.getByText(`군사 ${candidate.name} · 주재`)).toBeVisible();
+    const offices = member.getByRole('region', { name: '도시 관직' });
+    const mayorSeat = offices.locator('[data-office="태수"]');
+    const strategistSeat = offices.locator('[data-office="군사"]');
+    await expect(mayorSeat.getByText('관직장수', { exact: true })).toBeVisible();
+    await expect(mayorSeat.getByText('주재', { exact: true })).toBeVisible();
+    await expect(strategistSeat.getByText(candidate.name, { exact: true })).toBeVisible();
+    await expect(strategistSeat.getByText('주재', { exact: true })).toBeVisible();
     await member.screenshot({ path: info.outputPath('city-office-desktop.png') });
     await member.setViewportSize({ width: 375, height: 812 });
     expect(await offices.evaluate((node) => node.scrollWidth)).toBeLessThanOrEqual(375);
@@ -148,14 +152,12 @@ test('AC-M3-12 군주의 지방 임명·교체·해임, 장수 이동과 375px �
     expect(move.ok).toBe(true);
     const own = () => hold.db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: memberGeneral.id } } });
     await loop.advanceTo((await own()).nextTurnTick);
-    await expect(offices.getByText('태수 관직장수 · 부재')).toBeVisible();
+    await expect(mayorSeat.getByText('관직장수', { exact: true })).toBeVisible();
+    await expect(mayorSeat.getByText('부재', { exact: true })).toBeVisible();
     const publicRead = await query<{ officers: unknown[] }>(member, 'city.get', { worldId, cityKey: home.cityKey });
-    expect(publicRead.officers).toContainEqual({
-      generalId: memberGeneral.id,
-      name: '관직장수',
-      officerLevel: 4,
-      resident: false,
-    });
+    expect(publicRead.officers).toContainEqual(
+      expect.objectContaining({ generalId: memberGeneral.id, name: '관직장수', officerLevel: 4, resident: false }),
+    );
     expect(await own()).toMatchObject({ cityKey: neighbor.cityKey, officerLevel: 4, officerCityKey: home.cityKey });
 
     await ruler.reload();
@@ -180,7 +182,7 @@ test('AC-M3-12 군주의 지방 임명·교체·해임, 장수 이동과 375px �
       await expect(mayor.getByText('빈 자리')).toBeVisible();
     });
     await member.reload();
-    await expect(offices.getByText('태수 없음')).toBeVisible();
+    await expect(mayorSeat.getByText('없음', { exact: true })).toBeVisible();
 
     const advisor = ruler.locator('tr[data-level="11"]');
     if (await advisor.getByRole('button', { name: '해임', exact: true }).isVisible()) {
@@ -196,7 +198,9 @@ test('AC-M3-12 군주의 지방 임명·교체·해임, 장수 이동과 375px �
       await expect(advisor.getByText(candidate.name, { exact: true })).toBeVisible();
     });
     await member.reload();
-    await expect(offices.getByText(`참모 ${candidate.name} · 주재`)).toBeVisible();
+    const advisorSeat = offices.locator('[data-office="참모"]');
+    await expect(advisorSeat.getByText(candidate.name, { exact: true })).toBeVisible();
+    await expect(advisorSeat.getByText('주재', { exact: true })).toBeVisible();
     const events = await hold.db.inputEvent.findMany({ where: { worldId, kind: 'personnel.appoint' } });
     expect(events).toHaveLength(4);
   } finally {

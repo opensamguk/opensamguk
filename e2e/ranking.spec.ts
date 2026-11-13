@@ -172,7 +172,7 @@ test('국가 표와 응답에 국고·군량이 없다', async () => {
   expect(data.items.length).toBeGreaterThan(0);
   for (const item of data.items) {
     expect(Object.keys(item).sort()).toEqual(
-      ['cities', 'color', 'generals', 'name', 'nationId', 'power', 'rank', 'value'].sort(),
+      ['cities', 'color', 'generals', 'name', 'nationId', 'philosophy', 'power', 'rank', 'value'].sort(),
     );
   }
   expect(JSON.stringify(data)).not.toMatch(/gold|rice|국고|군량/);
