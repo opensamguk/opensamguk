@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { commandWorld } from '../../test/commandFixture';
 import { TICKS_PER_MONTH } from '../clock/constants';
+import { runGeneralTurn } from '../commands/turn';
 import {
   choosePolicyCommand,
   INACTIVE_AFTER_DAYS,
@@ -8,6 +9,8 @@ import {
   isPolicyKey,
   normalizeSlot,
   POLICY_KEYS,
+  PLAYER_AUTOPLAY_FEATURE,
+  playerAutoplayWindow,
   policyOptions,
   sameSlot,
 } from './index';
@@ -67,6 +70,27 @@ describe('AC-M2-17 기본 방침 순수 규칙', () => {
     }
     expect(world).toEqual(original);
     expect(choosePolicyCommand(world, 999, 'farm')).toBeNull();
+  });
+
+  it('자율 행동은 기간 안의 빈 칸에서만 기본 방침보다 앞선다', () => {
+    const world = commandWorld();
+    world.generals[1]!.userId = 'human';
+    world.ruleFeatures = ['policy', PLAYER_AUTOPLAY_FEATURE];
+    const activity = { lastActiveTick: 100, turnTermMinutes: 60 };
+    const window = playerAutoplayWindow(activity.lastActiveTick, activity.turnTermMinutes);
+    const turn = (tick: number, explicit = false) =>
+      runGeneralTurn(world, { generalId: 1, tick }, { commandKey: 'rest', args: {}, explicit }, 'autoplay-test', {
+        policy: 'none',
+        activity,
+      });
+    expect(turn(window.startsAtTick - 1).commandKey).toBe('rest');
+    const played = turn(window.startsAtTick);
+    expect(played.commandKey).not.toBe('rest');
+    expect(played.state.generals[1]!.userId).toBe('human');
+    expect(turn(window.startsAtTick, true).commandKey).toBe('rest');
+    expect(turn(window.expiresAtTick).commandKey).toBe('rest');
+    world.ruleFeatures = ['policy'];
+    expect(turn(window.startsAtTick).commandKey).toBe('rest');
   });
 
   it('수비와 훈련은 선행 수치가 최대일 때만 다음 명령을 고른다', () => {

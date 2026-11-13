@@ -6,6 +6,7 @@ import type { PublishedResource } from '@opensamguk/db';
 import {
   checkRuleFeatures,
   DIPLOMATIC_COOLDOWN_FEATURE,
+  PLAYER_AUTOPLAY_FEATURE,
   GENERAL_CONDITION_FEATURE,
   RANKED_AID_FEATURE,
   RICE_MARKET_FEATURE,
@@ -477,6 +478,7 @@ async function artifactCreationProfiles(
         'treaty-expanded',
         'treaty-trade',
         DIPLOMATIC_COOLDOWN_FEATURE,
+        PLAYER_AUTOPLAY_FEATURE,
         RANKED_AID_FEATURE,
         RICE_MARKET_FEATURE,
       ].sort(),

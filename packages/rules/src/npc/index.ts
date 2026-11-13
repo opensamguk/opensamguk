@@ -105,6 +105,23 @@ export function chooseGeneralTurn(view: WorldView, general: General, rng: Rng, c
   return decision(generalTurnCandidates(view, general, context), rng);
 }
 
+const autoplayCommands = new Set([
+  ...DOMESTIC_SPECS.map(({ key }) => key),
+  'recruit',
+  'train',
+  'morale',
+  'return',
+  'move',
+  'attack',
+]);
+
+export function chooseAutoplayTurn(view: WorldView, general: General, rng: Rng, context: NpcContext) {
+  return decision(
+    generalTurnCandidates(view, general, context).filter(({ key }) => autoplayCommands.has(key)),
+    rng,
+  ).chosen;
+}
+
 // 사람 조언도 실제 소유권과 권한을 유지한 채 같은 후보 계산을 쓴다.
 export function generalTurnCandidates(view: WorldView, general: General, context: NpcContext = {}): NpcCandidate[] {
   if (general.removedAt !== undefined) return [];

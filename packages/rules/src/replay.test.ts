@@ -7,6 +7,7 @@ import { createCommandResolver } from './commands/resolve';
 import { applyEffects } from './commands/effects';
 import { runMonthly } from './monthly';
 import { deepFreeze } from './personnel/testFixture';
+import { emptyQueue, PLAYER_AUTOPLAY_FEATURE, playerAutoplayWindow } from './policy';
 
 // shared/node의 canonicalJson과 같은 JSON을 Web Crypto로 해시한다. rules에서 node 모듈은 읽지 않는다.
 async function stateHash(value: unknown) {
@@ -63,6 +64,29 @@ it('운영 목록 밖 ext는 장수 턴 실행에서 조용히 버리지 않는�
   const replay = initialReplayState(commandInitial());
   replay.state.ext = { test: { nested: [1] } };
   expect(() => runReplayAction(replay, 'ext', testUnits)).toThrow('test');
+});
+
+it('재생도 마지막 활동 시각과 월드 턴 간격으로 자율 행동을 고른다', () => {
+  const replay = initialReplayState(commandInitial());
+  const turnTermMinutes = 60;
+  const tick = playerAutoplayWindow(0, turnTermMinutes).startsAtTick;
+  replay.state.ruleFeatures = [PLAYER_AUTOPLAY_FEATURE, 'policy'];
+  replay.state.generals[1]!.userId = 'human';
+  replay.state.generals[1]!.nextTurnTick = tick;
+  for (const general of Object.values(replay.state.generals))
+    if (general.id !== 1) general.nextTurnTick = tick + 10_000;
+  replay.monthlyTick = tick - 1;
+  replay.policy = { turnTermMinutes, policies: { 1: 'none' }, lastActiveTicks: { 1: 0 } };
+  replay.turns[1] = emptyQueue();
+  const played = runReplayAction(replay, 'autoplay', testUnits);
+  const loggedIn = runReplayAction(
+    { ...replay, policy: { ...replay.policy, lastActiveTicks: { 1: tick } } },
+    'autoplay',
+    testUnits,
+  );
+  expect(played.state).not.toEqual(loggedIn.state);
+  expect(played.state.generals[1]!.userId).toBe('human');
+  expect(played.state.generals[1]!.nextTurnTick).toBe(loggedIn.state.generals[1]!.nextTurnTick);
 });
 
 it('AC-INT-22 기본 아카이브 재생만 실행하지 않는 장수의 예턴 배열을 공유한다', () => {

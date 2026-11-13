@@ -27,6 +27,7 @@ import { GENERAL_CONDITION_FEATURE } from './general/condition';
 import { RICE_MARKET_FEATURE } from './world/riceMarket';
 import { RANKED_AID_FEATURE } from './diplomacy/treaty';
 import { DIPLOMATIC_COOLDOWN_FEATURE } from './diplomacy/cooldown';
+import { PLAYER_AUTOPLAY_FEATURE } from './policy';
 import { EXPANDED_TREATY_FEATURE } from './diplomacy/treatyClauses';
 import { checkOperationalProfile } from './world/map/profile';
 import type { RecordedInput, ReplayState } from './replay';
@@ -153,6 +154,7 @@ export const ruleRegistry: RuleRegistry = {
       },
     },
     policyFeature,
+    { key: PLAYER_AUTOPLAY_FEATURE, requires: ['policy'], conflicts: [] },
     treatyFeature,
     treatyBreakFeature,
     treatyTradeFeature,

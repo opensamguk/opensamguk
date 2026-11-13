@@ -172,6 +172,21 @@ export function GeneralInfo({
             : { label: '전공', value: '—', title: merit.at },
           { label: '다음 턴', value: formatClock(home.nextTurnAt) },
           { label: '기본 방침', value: g.policy.name },
+          ...(g.autoplay
+            ? [
+                {
+                  label: '자율 행동',
+                  value: g.autoplay.active
+                    ? `${g.autoplay.expiresOn.year}년 ${g.autoplay.expiresOn.month}월까지`
+                    : g.autoplay.expired
+                      ? '기간 종료'
+                      : '대기',
+                  title: formatClock(
+                    g.autoplay.active || g.autoplay.expired ? g.autoplay.expiresAt : g.autoplay.startsAt,
+                  ),
+                },
+              ]
+            : []),
         ]}
       />
       {battle && (

@@ -7,6 +7,8 @@ import {
   LINEAGE_EXITED_YEAR,
   nowTick,
   OFFICE_EFFECTS_FEATURE,
+  PLAYER_AUTOPLAY_FEATURE,
+  playerAutoplayWindow,
   policyOptions,
   toGameDate,
 } from '@opensamguk/rules';
@@ -47,13 +49,14 @@ export const homeRouter = router({
           ? projectNationFinance(world, ctx.now, nation.cities, nation.generals, state)
           : undefined;
       const turns = displaySlots(await readSlots(tx, input.worldId, general.id));
-      const defense = cityDefense(
-        city,
-        general.removedAt === null ? [general] : [],
-        world.startYear,
-        nowTick(worldClock(world), ctx.now),
-        state,
-      );
+      const tick = nowTick(worldClock(world), ctx.now);
+      const autoplay =
+        world.ruleFeatures.includes(PLAYER_AUTOPLAY_FEATURE) &&
+        general.lastActiveTick !== null &&
+        world.status !== 'ENDED'
+          ? playerAutoplayWindow(general.lastActiveTick, world.turnTermMinutes)
+          : null;
+      const defense = cityDefense(city, general.removedAt === null ? [general] : [], world.startYear, tick, state);
       const defendingTroops =
         general.removedAt === null
           ? (defense.generals.find(({ generalId }) => generalId === general.id)?.troops ?? 0)
@@ -128,6 +131,17 @@ export const homeRouter = router({
             const option = policyOptions().find((entry) => entry.key === (general.defaultPolicy ?? 'none'))!;
             return { key: option.key, name: option.name };
           })(),
+          ...(autoplay
+            ? {
+                autoplay: {
+                  active: tick >= autoplay.startsAtTick && tick < autoplay.expiresAtTick,
+                  expired: tick >= autoplay.expiresAtTick,
+                  startsAt: nextTurnAt(world, autoplay.startsAtTick),
+                  expiresAt: nextTurnAt(world, autoplay.expiresAtTick),
+                  expiresOn: toGameDate(world.startYear, autoplay.expiresAtTick),
+                },
+              }
+            : {}),
         },
         city: { ...cityInfo(city, general), ...(ruins ? { ruin: ruins.get(city.cityKey) ?? null } : {}) },
         nation:

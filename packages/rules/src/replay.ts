@@ -142,6 +142,7 @@ function replayAction(
   const queue = next.turns[action.generalId] ?? emptyTurns();
   const turns = ownsArchiveState ? structuredClone(queue) : queue;
   const command = turns[0]!;
+  const lastActiveTick = next.policy?.lastActiveTicks[action.generalId];
   const result = runGeneralTurn(
     next.state,
     { generalId: action.generalId, tick: action.tick, unitSet },
@@ -149,6 +150,9 @@ function replayAction(
     seed,
     {
       ...(next.policy ? { policy: next.policy.policies[action.generalId]! } : {}),
+      ...(next.policy && lastActiveTick !== undefined
+        ? { activity: { lastActiveTick, turnTermMinutes: next.policy.turnTermMinutes } }
+        : {}),
       turnRevision: next.revisions[action.generalId] ?? 0,
     },
     resolver ?? resolverForRuleFeatures(next.state, registry),
