@@ -477,7 +477,7 @@ describe('권한 변경', () => {
       pageParams: [null],
     });
     client.setQueryData(keys.recipients, {
-      generals: [{ id: 99, portraitId: null, name: '남의 장수', nation: null }],
+      generals: [{ id: 99, portraitId: null, name: '남의 장수', officerLevel: 0, nation: null }],
       nations: [],
     });
     client.setQueryData(keys.worldNotices, {
