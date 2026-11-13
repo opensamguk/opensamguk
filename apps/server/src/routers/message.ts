@@ -63,7 +63,7 @@ export const messageRouter = router({
     .input(
       worldInput
         .extend({
-          scope: z.enum(['PRIVATE', 'NATION', 'DIPLOMACY']),
+          scope: messageScope,
           toGeneralId: entityKey.optional(),
           toNationId: entityKey.optional(),
           body: messageBody,
@@ -76,7 +76,8 @@ export const messageRouter = router({
         if (
           (input.scope === 'PRIVATE' && (input.toGeneralId === undefined || input.toNationId !== undefined)) ||
           (input.scope === 'DIPLOMACY' && (input.toNationId === undefined || input.toGeneralId !== undefined)) ||
-          (input.scope === 'NATION' && (input.toNationId !== undefined || input.toGeneralId !== undefined))
+          ((input.scope === 'NATION' || input.scope === 'WORLD') &&
+            (input.toNationId !== undefined || input.toGeneralId !== undefined))
         )
           throw new TRPCError({ code: 'BAD_REQUEST', message: '받는 사람과 메시지 범위를 확인하세요.' });
         visibleMessages(g, input.scope);
@@ -104,7 +105,7 @@ export const messageRouter = router({
         if (
           (input.scope === 'PRIVATE' &&
             (!recipient || recipient.removedAt != null || recipient.activeFromYear === LINEAGE_EXITED_YEAR)) ||
-          (input.scope !== 'PRIVATE' && !nation) ||
+          ((input.scope === 'NATION' || input.scope === 'DIPLOMACY') && !nation) ||
           (input.scope === 'DIPLOMACY' && (!isLeader(g) || nation!.id === g.nationId))
         )
           throw new TRPCError({ code: 'BAD_REQUEST', message: '받는 사람을 찾을 수 없습니다.' });
@@ -128,7 +129,7 @@ export const messageRouter = router({
             senderId: g.id,
             senderNationId: g.nationId,
             recipientId: recipient?.id ?? null,
-            recipientNationId: input.scope === 'PRIVATE' ? null : nation!.id,
+            recipientNationId: input.scope === 'NATION' || input.scope === 'DIPLOMACY' ? nation!.id : null,
             fromParty: { generalId: g.id, name: g.name, nation: ownNation, portraitId: g.portraitId },
             toParty: recipient
               ? {
@@ -137,7 +138,9 @@ export const messageRouter = router({
                   nation: recipient.nation,
                   portraitId: recipient.portraitId,
                 }
-              : { generalId: null, name: nation!.name, nation },
+              : input.scope === 'WORLD'
+                ? { generalId: null, name: '전체', nation: null }
+                : { generalId: null, name: nation!.name, nation },
             body: input.body,
             sentAt: now,
             year: date.year,
@@ -153,7 +156,9 @@ export const messageRouter = router({
               ? { generalId: recipient!.id }
               : input.scope === 'NATION'
                 ? { nationId: nation!.id }
-                : { nationIds: [g.nationId!, nation!.id], leadersOnly: true },
+                : input.scope === 'WORLD'
+                  ? 'world'
+                  : { nationIds: [g.nationId!, nation!.id], leadersOnly: true },
         });
         return { item: messageItem(row, g.id) };
       }),

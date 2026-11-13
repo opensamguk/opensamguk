@@ -37,12 +37,12 @@ export function useMessageList(worldId: string, scope: MessageScope) {
   });
 }
 
-export function useRecipients(worldId: string) {
+export function useRecipients(worldId: string, enabled = true) {
   const trpc = useTRPC();
   const { ready } = useAuthority(worldId);
   return useQuery({
     ...trpc.message.recipients.queryOptions({ worldId }),
-    enabled: ready,
+    enabled: enabled && ready,
     staleTime: 60_000,
     retry: retryUnlessClientError,
   });
