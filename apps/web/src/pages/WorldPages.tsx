@@ -15,6 +15,7 @@ import {
   useNationPower,
 } from '../main/NationInfo';
 import { Panel } from '../main/Panel';
+import { RecruitmentNotice } from '../main/RecruitmentNotice';
 import {
   ActivityFeed,
   BattleList,
@@ -149,6 +150,7 @@ export function NationPage({ nationIdParam }: { nationIdParam: string }) {
             {/* 소속국은 다음 세금·세곡과 봉급·순수입 예상을 함께 본다 (INT-26). */}
             <NationFinanceGrid nation={nation.data} />
             <NationNpcPolicy nation={nation.data} />
+            <RecruitmentNotice key={`${worldId}:${nation.data.id}`} worldId={worldId} nation={nation.data} />
             <NationExtras worldId={worldId} nation={nation.data} />
           </Panel>
           <Panel title="소유 도시·소속 장수">

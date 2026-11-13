@@ -461,6 +461,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
         orderBy: { id: 'asc' },
         omit: {
           notice: true,
+          recruitmentNotice: true,
           noticeDirective: true,
           noticeRevision: true,
           noticeUpdatedAt: true,

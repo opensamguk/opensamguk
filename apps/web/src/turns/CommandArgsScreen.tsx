@@ -453,8 +453,12 @@ export function NationTargetPicker({
                   {check ? check.ok ? <Tag tone="info">가능</Tag> : <Tag tone="warning">불가</Tag> : null}
                 </span>
                 <span className={styles.cardLine}>{cardText(nation)}</span>
-                {showIntroductions && nation.description?.trim() ? (
-                  <span className={styles.cardLine}>{nation.description}</span>
+                {showIntroductions ? (
+                  <span className={styles.cardLine}>
+                    {('recruitmentNotice' in nation && nation.recruitmentNotice) ||
+                      nation.description?.trim() ||
+                      '임관 권유문 없음'}
+                  </span>
                 ) : null}
                 {check && !check.ok ? <span className={styles.reason}>{check.message}</span> : null}
               </button>

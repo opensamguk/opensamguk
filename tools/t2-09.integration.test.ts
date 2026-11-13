@@ -176,7 +176,7 @@ beforeEach(async () => {
   await db.notice.deleteMany({ where: { worldId: { in: [worldId, otherWorldId] } } });
   await db.nation.updateMany({
     where: { worldId },
-    data: { notice: '', noticeRevision: 0, noticeUpdatedAt: null, noticeUpdatedBy: null },
+    data: { notice: '', recruitmentNotice: '', noticeRevision: 0, noticeUpdatedAt: null, noticeUpdatedBy: null },
   });
   for (let i = 0; i < 6; i++) {
     await db.general.update({
@@ -212,6 +212,7 @@ describe('T2-09 실제 HTTP 메시지·공지 권한 대조', () => {
     'message.recipients': actorInput(),
     'notice.nation.get': actorInput(),
     'notice.nation.set': { worldId, body: '공지' },
+    'notice.nation.setRecruitment': { worldId, nationId: 1, body: '임관 권유문' },
     'notice.nation.markSeen': { worldId, nationId: 1, revision: 0 },
     'notice.world.list': actorInput(),
   });
@@ -251,6 +252,20 @@ describe('T2-09 실제 HTTP 메시지·공지 권한 대조', () => {
           if (category === 'success') expect(result.status).toBe(200);
         }),
       );
+
+  it('임관 권유문은 소속 군주만 바꾸며 재야 장수도 공개 값을 읽는다', async () => {
+    const route = 'notice.nation.setRecruitment';
+    const input = { worldId, nationId: 1, body: '  함께 지킬 장수를 찾습니다.  ' };
+    expect((await call(route, input, 1)).code).toBe('FORBIDDEN');
+    expect((await call(route, input, 2)).code).toBe('FORBIDDEN');
+    const saved = await call(route, input);
+    expect(saved.data).toEqual({ recruitmentNotice: input.body.trim() });
+    const spectator = await call<Outputs['world']['map']>('world.map', { worldId }, 3);
+    expect(spectator.data?.nations.find(({ id }) => id === 1)?.recruitmentNotice).toBe(input.body.trim());
+    expect((await call(route, { ...input, body: '' })).status).toBe(200);
+    const cleared = await call<Outputs['world']['map']>('world.map', { worldId }, 3);
+    expect(cleared.data?.nations.find(({ id }) => id === 1)).not.toHaveProperty('recruitmentNotice');
+  });
 
   it('개인 읽음은 발신·수신 장수만 바꾸며 남의 ID와 다른 월드 ID는 건너뛴다', async () => {
     const sent = (
