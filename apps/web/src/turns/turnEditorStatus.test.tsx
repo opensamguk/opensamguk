@@ -193,7 +193,9 @@ it('T4-86 AC-P2-26 병종표 조회가 실패해도 표는 병종 번호로 적�
   });
   const onStatus = vi.fn();
   await open(source, 'RUNNING', onStatus);
-  await waitFor(() => expect(document.querySelector('tr[data-slot="1"]')?.textContent).toContain('병종 1300'));
+  await waitFor(() =>
+    expect(document.querySelector('tr[data-slot="1"]')?.textContent).toContain('【병종 1300】 100명'),
+  );
   fireEvent.click(document.querySelector('tr[data-slot="2"]')!);
   fireEvent.click(screen.getByRole('radio', { name: '농지 개간' }));
   fireEvent.click(screen.getByRole('button', { name: '2번 칸에 넣기' }));
@@ -292,6 +294,10 @@ it('INT-26 AC-INT-26 예턴 표는 서버 칸이 실은 대상 이름을 번호 
   expect(row(2)).toContain('신야');
   expect(row(2)).not.toContain('도시 99');
   expect(row(3)).toContain('장수 30');
+  // 칸 요약은 원작 예턴 요약 문장이다 (INT-26).
+  expect(row(1)).toContain('【서서】를 등용');
+  expect(row(2)).toContain('【신야】로 이동');
+  expect(row(3)).toContain('【장수 30】을 등용');
   // 1번 칸을 골라 한 칸 밀면 등용이 2번 칸으로 가도 이름이 따라간다.
   fireEvent.click(document.querySelector('tr[data-slot="1"]')!);
   fireEvent.click(screen.getByRole('button', { name: '밀기' }));

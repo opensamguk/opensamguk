@@ -400,8 +400,8 @@ test.describe('예턴 편집', () => {
     await expect(editor(page).getByRole('button', { name: '1번 칸에 넣기 (사용 불가)' })).toBeVisible();
     await page.getByRole('radiogroup', { name: '대상 도시' }).getByRole('radio', { name: /^낙양/ }).click();
     await editor(page).getByRole('button', { name: '1번 칸에 넣기', exact: true }).click();
-    await expect(row(page, 1)).toContainText('이동');
-    await expect(row(page, 1)).toContainText('낙양');
+    // 칸 요약은 원작 예턴 요약 문장이다 (INT-26).
+    await expect(row(page, 1)).toContainText('【낙양】으로 이동');
 
     await row(page, 1).click();
     await row(page, 2).click();
@@ -411,8 +411,7 @@ test.describe('예턴 편집', () => {
     await expect(editor(page).getByRole('note')).toHaveText('수량 칸을 채우세요.');
     await editor(page).getByRole('spinbutton', { name: '수량' }).fill('100');
     await editor(page).getByRole('button', { name: '2번 칸에 넣기', exact: true }).click();
-    await expect(row(page, 2)).toContainText('모병');
-    await expect(row(page, 2)).toContainText('수량 100');
+    await expect(row(page, 2)).toContainText('100명 모병');
 
     await saveButton(page).click();
     await expect(editor(page).getByText('저장했습니다.')).toBeVisible();

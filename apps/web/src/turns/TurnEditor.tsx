@@ -19,7 +19,9 @@ import { useTRPC } from '../trpc';
 import { DisabledReason } from '../ui/DisabledReason';
 import { EmptyState, ErrorState, LoadingState } from '../ui/States';
 import { errorCode, retryUnlessClientError } from './apiError';
-import { describeArgs, withTargets, type ArgNames, type SlotTargets } from './args';
+import { withTargets, type ArgNames, type SlotTargets } from './args';
+import { reservedBrief } from './brief';
+import { commandName as knownCommandName } from '../game/names';
 import { useWorldRules, useWorldUnits } from '../game/queries';
 import { isDetailedCity, isDetailedGeneral, isMemberNation } from '../game/types';
 import type { ArgContext, ArgNeed, RecruitChoices } from './CommandArgsScreen';
@@ -229,8 +231,9 @@ function Editor<S extends DisplaySlot>({
     worldId,
     commandList.some((c) => c.key === TRADE_COMMAND_KEY),
   );
+  // 서버 명령 목록에 없는 키(지금 못 쓰는 명령)는 화면이 아는 이름을 쓰고, 그것도 없으면 키를 적는다.
   const commandName = useCallback(
-    (key: string) => commandList.find((c) => c.key === key)?.name ?? (key === 'rest' ? '휴식' : key),
+    (key: string) => commandList.find((c) => c.key === key)?.name ?? knownCommandName(key),
     [commandList],
   );
   const cities = useMemo(() => map.data?.cities ?? [], [map.data]);
@@ -690,7 +693,9 @@ function Editor<S extends DisplaySlot>({
                 칸
               </th>
               <th scope="col">실행 시기</th>
-              <th scope="col">명령</th>
+              <th scope="col" className={styles.commandCell}>
+                명령
+              </th>
               <th scope="col">사전 검사</th>
             </tr>
           </thead>
@@ -700,7 +705,14 @@ function Editor<S extends DisplaySlot>({
               const changed = !!draft && !pending && !!serverTurns && turnKey(serverTurns[i]!) !== turnKey(turn);
               const check = turn.commandKey === 'rest' ? undefined : precheckByKey.get(turnKey(turn));
               const isEmpty = !turn.explicit;
-              const args = describeArgs(turn.args, withTargets(names, slotTargets.get(turnKey(turn))));
+              const brief = isEmpty
+                ? null
+                : reservedBrief(
+                    turn.commandKey,
+                    turn.args,
+                    withTargets(names, slotTargets.get(turnKey(turn))),
+                    commandName(turn.commandKey),
+                  );
               const time = times30[i]!;
               return (
                 <tr
@@ -726,16 +738,20 @@ function Editor<S extends DisplaySlot>({
                     <span>{time.date ?? '—'}</span>
                     {time.time ? <time dateTime={time.iso ?? undefined}>{time.time}</time> : null}
                   </td>
-                  <td role="gridcell">
-                    {isEmpty ? (
-                      <span className={styles.emptySlot} title="비워 둔 칸입니다. 기본 방침대로 실행합니다.">
-                        ({emptyLabel.tag}) {emptyLabel.command}
-                      </span>
-                    ) : (
-                      <span className={styles.command}>{commandName(turn.commandKey)}</span>
-                    )}
-                    {args ? <span className={styles.args}> {args}</span> : null}
-                    {changed ? <span className={styles.changedTag}>바뀜</span> : null}
+                  <td role="gridcell" className={styles.commandCell}>
+                    {/* 원작 예턴 요약 한 줄. 좁은 칸에서는 말줄임으로 자르고 전체 문장은 title로 둔다. */}
+                    <div className={styles.commandLine}>
+                      {brief === null ? (
+                        <span className={styles.emptySlot} title="비워 둔 칸입니다. 기본 방침대로 실행합니다.">
+                          ({emptyLabel.tag}) {emptyLabel.command}
+                        </span>
+                      ) : (
+                        <span className={styles.command} title={brief}>
+                          {brief}
+                        </span>
+                      )}
+                      {changed ? <span className={styles.changedTag}>바뀜</span> : null}
+                    </div>
                   </td>
                   <td role="gridcell" className={styles.check}>
                     {check === undefined ? (
@@ -914,12 +930,15 @@ function ReadOnlySlots({
               칸
             </th>
             <th scope="col">실행 시기</th>
-            <th scope="col">명령</th>
+            <th scope="col" className={styles.commandCell}>
+              명령
+            </th>
           </tr>
         </thead>
         <tbody>
           {slots.map((slot, i) => {
-            const args = describeArgs(toTurn(slot).args, withTargets(names, slot.targets));
+            const turn = toTurn(slot);
+            const brief = reservedBrief(turn.commandKey, turn.args, withTargets(names, slot.targets), slot.name);
             const time = times[i];
             return (
               <tr key={i} className={styles.row} data-slot={i + 1}>
@@ -928,9 +947,12 @@ function ReadOnlySlots({
                   {time?.date || !time?.time ? <span>{time?.date ?? '—'}</span> : null}
                   {time?.time ? <time dateTime={time.iso ?? undefined}>{time.time}</time> : null}
                 </td>
-                <td>
-                  <span className={styles.command}>{slot.name}</span>
-                  {args ? <span className={styles.args}> {args}</span> : null}
+                <td className={styles.commandCell}>
+                  <div className={styles.commandLine}>
+                    <span className={styles.command} title={brief}>
+                      {brief}
+                    </span>
+                  </div>
                 </td>
               </tr>
             );
@@ -988,7 +1010,7 @@ function RecentRow({
       <span className={styles.recentLabel}>최근</span>
       <div className={styles.recentList}>
         {shown.map((item) => {
-          const summary = [commandName(item.commandKey), describeArgs(item.args, names)].filter(Boolean).join(' · ');
+          const summary = reservedBrief(item.commandKey, item.args, names, commandName(item.commandKey));
           const key = turnKey({ ...item, explicit: true });
           return blockedReason ? (
             <DisabledReason key={key} reason={blockedReason}>
