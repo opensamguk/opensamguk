@@ -249,6 +249,22 @@ describe('메시지 패널', () => {
     expect(other.querySelector('[data-variant="icon"]')!.getAttribute('data-state')).toBe('fallback');
   });
 
+  it('받는 장수 목록에서 군주와 참모를 구별한다', async () => {
+    const nation = { id: 1, name: '촉', color: '#445566' };
+    on('message.recipients', () => ({
+      generals: [
+        { id: 7, name: '유비', officerLevel: 12, nation },
+        { id: 8, name: '제갈량', officerLevel: 11, nation },
+        { id: 9, name: '관우', officerLevel: 10, nation },
+      ],
+      nations: [],
+    }));
+    renderWith(<MessagePanel worldId={WORLD} />);
+    expect(await screen.findByRole('option', { name: '유비 (군주) (촉)' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: '제갈량 (참모) (촉)' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: '관우 (촉)' })).toBeTruthy();
+  });
+
   it('보내기 실패는 입력을 지우지 않고 서버 문장을 입력칸 설명으로 붙인다', async () => {
     let sends = 0;
     on('message.send', () => {
@@ -461,7 +477,7 @@ describe('권한 변경', () => {
       pageParams: [null],
     });
     client.setQueryData(keys.recipients, {
-      generals: [{ id: 99, portraitId: null, name: '남의 장수', nation: null }],
+      generals: [{ id: 99, portraitId: null, name: '남의 장수', officerLevel: 0, nation: null }],
       nations: [],
     });
     client.setQueryData(keys.worldNotices, {

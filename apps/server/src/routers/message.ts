@@ -208,7 +208,7 @@ export const messageRouter = router({
             removedAt: null,
             activeFromYear: { not: LINEAGE_EXITED_YEAR },
           },
-          select: { id: true, name: true, portraitId: true, nation: { select: nationTagSelect } },
+          select: { id: true, name: true, portraitId: true, officerLevel: true, nation: { select: nationTagSelect } },
           orderBy: [{ name: 'asc' }, { id: 'asc' }],
         });
         const nations = await tx.nation.findMany({
