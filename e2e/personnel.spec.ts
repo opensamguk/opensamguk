@@ -205,8 +205,12 @@ test('임명: 군주가 수뇌를 임명하면 수뇌가 국가 예턴 12칸을 
   const { page } = ruler;
   await page.goto(`/w/${world}/nation/personnel`);
   const row = page.locator('tr[data-level]').filter({ hasText: '빈 자리' }).last();
-  await row.getByRole('combobox').selectOption(String(member.general.id));
-  await row.getByRole('button', { name: '임명' }).click();
+  // 임명 후보는 카드 목록에서 고른다 (INT-25 단계 3). 한 번에 한 직책의 목록만 펼친다.
+  await row.getByRole('button', { name: /임명할 장수 고르기$/ }).click();
+  const picker = page.getByRole('group', { name: /임명 후보$/ });
+  await picker.locator(`[data-general-id="${member.general.id}"]`).click();
+  await expect(picker).toHaveCount(0);
+  await row.getByRole('button', { name: '임명', exact: true }).click();
   await expect(row.getByRole('status')).toHaveText('처리 중');
   await withEngine(() => expect(notice(page)).toContainText('직책을', { timeout: 30_000 }));
 
