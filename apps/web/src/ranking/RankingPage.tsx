@@ -37,7 +37,9 @@ export function RankingPage() {
       onSort={(by) => void navigate({ search: parseRankingSearch({ ...search, by, page: 1 }), replace: true })}
       onKind={(kind) => void navigate({ search: parseRankingSearch({ ...search, kind, page: 1 }), replace: true })}
       onPage={(page) => void navigate({ search: parseRankingSearch({ ...search, page }) })}
-      freeGenerals={search.tab === 'nations' ? <FreeGenerals worldId={worldId} /> : undefined}
+      supplemental={
+        search.tab === 'nations' ? <FreeGenerals worldId={worldId} /> : <HeritageRankings worldId={worldId} />
+      }
       renderTab={(tab, label, active) => (
         <Link
           key={tab}
@@ -62,7 +64,7 @@ export function RankingView({
   renderTab,
   onKind,
   onPage,
-  freeGenerals,
+  supplemental,
 }: {
   search: RankingSearch;
   data: RankingData;
@@ -70,7 +72,7 @@ export function RankingView({
   renderTab: (tab: RankingSearch['tab'], label: string, active: boolean) => React.ReactNode;
   onKind?: (kind: GeneralKind) => void;
   onPage?: (page: number) => void;
-  freeGenerals?: React.ReactNode;
+  supplemental?: React.ReactNode;
 }) {
   return (
     <section className={styles.page}>
@@ -113,7 +115,7 @@ export function RankingView({
       data.ranking.pagination ? (
         <RankingPages {...data.ranking.pagination} onPage={onPage} />
       ) : null}
-      {freeGenerals}
+      {supplemental}
     </section>
   );
 }
@@ -139,6 +141,41 @@ function RankingPages({
         다음
       </button>
     </nav>
+  );
+}
+
+function HeritageRankings({ worldId }: { worldId: string }) {
+  const trpc = useTRPC();
+  const query = useQuery(trpc.ranking.heritage.queryOptions({ worldId }));
+  if (query.isPending || query.isError || (!query.data.spent.length && !query.data.earned.length)) return null;
+  const { spent, earned, identitiesVisible } = query.data;
+  return (
+    <details>
+      <summary>유산 포인트 순위</summary>
+      {[
+        { title: '유산 소모량', rows: spent },
+        { title: '유산 획득량', rows: earned },
+      ].map(({ title, rows }) => (
+        <section key={title} aria-label={title}>
+          <h3>{title}</h3>
+          {rows.length ? (
+            <ol>
+              {rows.map(({ rank, name, nationName, points }) => (
+                <li key={rank}>
+                  {identitiesVisible ? (name === null ? '???' : displayName(name)) : '???'}
+                  {' · '}
+                  {identitiesVisible && name !== null ? (nationName ?? '재야') : '???'}
+                  {' · '}
+                  {points}점
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p>아직 기록이 없습니다.</p>
+          )}
+        </section>
+      ))}
+    </details>
   );
 }
 

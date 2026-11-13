@@ -20,6 +20,7 @@ type Results = {
   'nation.get': Out['nation']['get'];
   'treaty.relations': Out['treaty']['relations'];
   'message.recipients': Out['message']['recipients'];
+  'ranking.heritage': Out['ranking']['heritage'];
   'diplomaticDocuments.list': Out['diplomaticDocuments']['list'];
   'diplomaticDocuments.send': Out['diplomaticDocuments']['send'];
   'diplomaticDocuments.respond': Out['diplomaticDocuments']['respond'];
@@ -222,6 +223,77 @@ afterAll(async () => {
 });
 
 describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
+  it('유산 순위는 현재 월드의 사용·획득만 세고 통일 전에는 장수와 국가를 가린다', async () => {
+    const id = await fixtureWorld('heritage-ranking');
+    try {
+      await db.heritageEntry.createMany({
+        data: [
+          { worldId: id, kind: 'CREATION_SPEND', delta: -3 },
+          { worldId: id, kind: 'SEASON_CREDIT', delta: 2 },
+          { worldId: id, kind: 'CREATION_REFUND', delta: 3 },
+          { worldId: otherWorldId, kind: 'SEASON_CREDIT', delta: 5 },
+        ].map((row) => ({ ...row, userId: users[0]!.id, key: randomUUID(), detail: {} })),
+      });
+      const entry = (points: number, name: string | null, nationName: string | null) => ({
+        rank: 1,
+        points,
+        name,
+        nationName,
+      });
+      expect((await query('ranking.heritage', { worldId: id })).data).toEqual({
+        identitiesVisible: false,
+        spent: [entry(3, null, null)],
+        earned: [entry(2, null, null)],
+      });
+      await db.seasonGeneral.create({
+        data: {
+          worldId: id,
+          generalId: 1,
+          userId: users[0]!.id,
+          name: '최종 장수',
+          nationId: 1,
+          nationName: '통일 국가',
+          officerLevel: 12,
+          dedication: 0,
+          experience: 0,
+          wins: 0,
+          captures: 0,
+        },
+      });
+      await db.world.update({ where: { id }, data: { status: 'ENDED' } });
+      const result = await db.worldResult.create({
+        data: {
+          worldId: id,
+          reason: 'END_YEAR',
+          endedYear: state.startYear,
+          endedMonth: 12,
+          endedTick: 120000,
+          endedSequence: 1,
+          remainingNations: 2,
+          finalStateHash: 'fixture',
+          endedAt: new Date(now),
+        },
+      });
+      expect((await query('ranking.heritage', { worldId: id })).data.identitiesVisible).toBe(false);
+      await db.worldResult.update({
+        where: { worldId: result.worldId },
+        data: { reason: 'UNIFIED', winnerNationId: 1 },
+      });
+      expect((await query('ranking.heritage', { worldId: id }, users[3]!.cookie)).data).toEqual({
+        identitiesVisible: true,
+        spent: [entry(3, '최종 장수', '통일 국가')],
+        earned: [entry(2, '최종 장수', '통일 국가')],
+      });
+    } finally {
+      await db.$transaction(async (tx) => {
+        await tx.$executeRaw`ALTER TABLE "HeritageEntry" DISABLE TRIGGER "HeritageEntry_immutable"`;
+        await tx.heritageEntry.deleteMany({ where: { worldId: { in: [id, otherWorldId] }, userId: users[0]!.id } });
+        await tx.$executeRaw`ALTER TABLE "HeritageEntry" ENABLE TRIGGER "HeritageEntry_immutable"`;
+      });
+      await db.world.delete({ where: { id } });
+    }
+  });
+
   it('외교 문서는 당사국에만 보이고 승인된 후속 문서가 기존 합의를 대체한다', async () => {
     const world = await fixtureWorld('diplomatic-documents');
     const changeOfficer = (index: number, nationId: number, officerLevel: number) =>
