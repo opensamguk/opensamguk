@@ -50,3 +50,9 @@ export function officerName(level: number, hasNation = level !== 0): string {
   if (level === 0) return '재야';
   return `관직 ${level}단계`;
 }
+
+// 장수 이름 표시 (D-085). 괄호와 그 안을 뺀다. 조조(曹操) → 조조, 유도(145년생) → 유도.
+export function displayName(name: string): string {
+  const stripped = name.replace(/\s*[（(][^()（）]*[)）]\s*/g, '').trim();
+  return stripped === '' ? name : stripped;
+}

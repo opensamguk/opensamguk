@@ -60,8 +60,5 @@ export function groupByDistance<T extends TargetCity>(
     }));
 }
 
-// 장수 이름 표시 (D-085). 괄호와 그 안을 뺀다. 조조(曹操) → 조조, 유도(145년생) → 유도.
-export function displayName(name: string): string {
-  const stripped = name.replace(/\s*[（(][^()（）]*[)）]\s*/g, '').trim();
-  return stripped === '' ? name : stripped;
-}
+// 장수 이름 표시는 game/names.ts의 displayName 하나를 쓴다.
+export { displayName } from '../game/names';

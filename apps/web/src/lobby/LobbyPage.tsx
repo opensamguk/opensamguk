@@ -12,7 +12,7 @@ import { EmptyState, ErrorState, LoadingState } from '../ui/States';
 import { Tag } from '../ui/Tag';
 import { NationBadge } from '../ui/NationBadge';
 import { Portrait } from '../portrait/Portrait';
-import { displayName } from '../turns/targets';
+import { displayName } from '../game/names';
 import type { LobbyNotice, LobbyWorld } from './contract';
 import { lobbyAction, metaText, myGeneralText, shortDate, STATUS_LABEL } from './lobbyView';
 import styles from './LobbyPage.module.css';
