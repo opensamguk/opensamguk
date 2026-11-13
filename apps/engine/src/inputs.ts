@@ -1,6 +1,7 @@
 import { nextActionSequence, type Prisma } from '@opensamguk/db';
 import {
   buildCreatedGeneral,
+  GENERAL_PERSONALITY_FEATURE,
   creationHeritageRecord,
   lateJoinBonus,
   parsePreset,
@@ -315,6 +316,7 @@ const processGeneralCreation: QueuedInputHandler = async (tx, world, event, { ti
     world.statRules,
     world.ruleFeatures.includes('lineage-v1'),
     world.ruleFeatures.includes('heritage-v1'),
+    world.ruleFeatures.includes(GENERAL_PERSONALITY_FEATURE),
   );
   if (!parsed.ok) return reject(parsed.code);
   if (

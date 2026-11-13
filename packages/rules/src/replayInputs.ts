@@ -6,6 +6,7 @@ import { assertGeneralStatProfile, FIVE_STAT_KEYS, FIVE_STAT_RULES } from './gen
 import { validateGeneralCreation } from './general/create';
 import { assertGeneralSex, knownGeneralSexSchema } from './general/sex';
 import { assertHeritageCreationResult, createdHeritageStat } from './heritage/creation';
+import { GENERAL_PERSONALITY_FEATURE, generalPersonalitySchema } from './general/personality';
 
 export function validatePolicyInput(input: RecordedInput, five = false, lineage = false, heritage = false): void {
   const { tick, ...legacy } = input;
@@ -81,13 +82,18 @@ export function applyCreationInput(replay: ReplayState, input: RecordedInput): R
   assertHeritageCreationResult(input.payload, input.result, heritage, five);
   assertGeneralSex(general, lineage);
   const payload = input.payload as Record<string, unknown>;
+  const personalityEnabled = next.state.ruleFeatures?.includes(GENERAL_PERSONALITY_FEATURE) ?? false;
+  if (payload && Object.hasOwn(payload, 'personality')) {
+    if (!personalityEnabled || generalPersonalitySchema.parse(payload.personality) !== general.personality)
+      throw new Error('성격 생성 입력과 결과가 다릅니다.');
+  } else if (personalityEnabled && general.personality !== null) throw new Error('성격 생성 입력이 없습니다.');
   if (lineage) {
     if (knownGeneralSexSchema.parse(payload?.sex) !== general.sex) throw Error('성별 생성 입력과 결과가 다릅니다.');
     if (!next.state.lineage || Object.keys(next.state.generals).length >= next.state.lineage.config.limits.maxGenerals)
       throw Error('가문 판의 장수 정원을 넘었습니다.');
   } else if (payload && Object.hasOwn(payload, 'sex')) throw Error('끈 가문 판의 생성 입력에 성별이 있습니다.');
   if (five) {
-    const creation = validateGeneralCreation(input.payload, FIVE_STAT_RULES, lineage, heritage);
+    const creation = validateGeneralCreation(input.payload, FIVE_STAT_RULES, lineage, heritage, personalityEnabled);
     if (!creation.ok || FIVE_STAT_KEYS.some((key) => createdHeritageStat(creation.value, key) !== general[key]))
       throw new Error('5능력치 생성 입력과 결과가 다릅니다.');
   }

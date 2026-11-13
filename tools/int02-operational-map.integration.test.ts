@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
-import { buildInitialWorld, TICKS_PER_MONTH } from '../packages/rules/src/index';
+import { buildInitialWorld, GENERAL_PERSONALITY_FEATURE, TICKS_PER_MONTH } from '../packages/rules/src/index';
 import { operationalInput } from '../packages/rules/test/operationalMapFixture';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { buildServer } from '../apps/server/src/server';
@@ -25,7 +25,8 @@ const userId = randomUUID(),
 const ownedUsers = [userId];
 let cookie: string, worldId: string, legacyWorld: string;
 const initial = buildInitialWorld(operationalInput());
-initial.ruleFeatures!.push('policy');
+initial.ruleFeatures!.push('policy', GENERAL_PERSONALITY_FEATURE);
+initial.ruleFeatures!.sort();
 let legacy: Awaited<ReturnType<typeof loadInitialWorldFromDb>>;
 
 async function request(path: string, input: unknown, session = cookie, mutation = false) {
@@ -83,15 +84,31 @@ it('INT-02 실제 DB·API는 세 전략 앵커와 시설/표시를 분리하고 
 });
 
 it('INT-02 새 장수는 도시에서 생성되고 월간 정산·재시작·동일 시드 재생이 같다', async () => {
+  expect((await request('general.mine', { worldId })).data.creationRules.personalities).toContainEqual({
+    name: '대의',
+    experiencePercent: 110,
+    train: -5,
+  });
+  expect((await request('general.mine', { worldId: legacyWorld })).data.creationRules).not.toHaveProperty(
+    'personalities',
+  );
+  const draft = {
+    name: '지도검사',
+    portraitId: null,
+    leadership: 55,
+    strength: 55,
+    intel: 55,
+    politics: 55,
+    charm: 55,
+  };
+  expect((await request('general.create', { ...draft, worldId, personality: '없는 성격' }, cookie, true)).code).toBe(
+    'BAD_REQUEST',
+  );
+  expect(await db.inputEvent.count({ where: { worldId, kind: 'general.create' } })).toBe(0);
   const lease = await acquireLease(db, worldId);
   if (!lease) throw Error('시험 엔진 리스가 없습니다.');
   try {
-    const creating = request(
-      'general.create',
-      { worldId, name: '지도검사', portraitId: null, leadership: 55, strength: 55, intel: 55, politics: 55, charm: 55 },
-      cookie,
-      true,
-    );
+    const creating = request('general.create', { ...draft, worldId, personality: '대의' }, cookie, true);
     await expect
       .poll(() => db.inputEvent.count({ where: { worldId, kind: 'general.create', status: 'PENDING' } }))
       .toBe(1);
@@ -99,6 +116,7 @@ it('INT-02 새 장수는 도시에서 생성되고 월간 정산·재시작·동
     expect((await creating).data).toMatchObject({ status: 'created' });
     const actor = await db.general.findUniqueOrThrow({ where: { worldId_userId: { worldId, userId } } });
     expect([1, 2]).toContain(actor.cityKey);
+    expect(actor.personality).toBe('대의');
     await new TurnLoop(db, lease).advanceTo(TICKS_PER_MONTH);
     expect(await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId, cityKey: 99 } } })).toMatchObject({
       kind: 'PASS',

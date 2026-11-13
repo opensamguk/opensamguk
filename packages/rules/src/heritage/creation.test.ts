@@ -7,6 +7,7 @@ import { checkRuleFeatures } from '../ruleRegistry';
 import { fiveStatsFeature, policyFeature } from '../ruleFeatures';
 import { assertHeritageCreationResult, creationHeritageRecord } from './creation';
 import { heritageFeature } from './feature';
+import { GENERAL_PERSONALITY_FEATURE } from '../general/personality';
 
 function fixture(five = false) {
   const initial = commandInitial();
@@ -75,6 +76,27 @@ it.each([false, true])('AC-P2-33 %s 능력치 생성의 유산 배분·최종 �
   expect(five ? [general.politics, general.charm] : [general.leadership, general.intel]).toEqual(
     five ? [58, 58] : [73, 63],
   );
+});
+
+it('INT-26 선택한 성격과 기존 입력을 같은 생성 원장에서 재생한다', () => {
+  const { initial, options, recorded, origin } = fixture(true);
+  const payload = { ...options.payload, personality: '대의' };
+  expect(validateGeneralCreation(payload, initial.statRules, false, true)).toMatchObject({ code: 'BAD_PERSONALITY' });
+  expect(
+    validateGeneralCreation({ ...payload, personality: '없는 성격' }, initial.statRules, false, true, true),
+  ).toMatchObject({ code: 'BAD_PERSONALITY' });
+  expect(validateGeneralCreation(payload, initial.statRules, false, true, true)).toMatchObject({ ok: true });
+  initial.ruleFeatures!.push(GENERAL_PERSONALITY_FEATURE);
+  const replay = initialReplayState(initial, origin.featureData);
+  const general = buildCreatedGeneral({ ...options, payload });
+  const withPersonality = { ...recorded, payload, result: { ...recorded.result, general } };
+  expect(() => heritageFeature.checkArchive!({ origin, inputs: [withPersonality] })).not.toThrow();
+  expect(() => fiveStatsFeature.checkArchive!({ origin, inputs: [withPersonality] })).not.toThrow();
+  expect(applyRecordedInput(replay, withPersonality).state.generals[general.id]!.personality).toBe('대의');
+  expect(applyRecordedInput(replay, recorded).state.generals[general.id]!.personality).toBeNull();
+  expect(() =>
+    applyRecordedInput(replay, { ...withPersonality, payload: { ...payload, personality: '의협' } }),
+  ).toThrow('성격 생성 입력과 결과가 다릅니다.');
 });
 it('AC-P2-33 유산은 기존 도시·친화·턴 offset 난수 소비를 바꾸지 않는다', () => {
   const { options, general } = fixture();

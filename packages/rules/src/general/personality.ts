@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { WorldView } from '../model/world';
 
 export const GENERAL_PERSONALITY_FEATURE = 'general-personality-v1';
@@ -23,6 +24,9 @@ const personalities: Record<string, Effects> = {
   패권: { train: 5, recruitPercent: 120 },
   할거: { experiencePercent: 90, train: 5 },
 };
+
+export const generalPersonalitySchema = z.string().refine((name) => Object.hasOwn(personalities, name));
+export const generalPersonalityChoices = Object.entries(personalities).map(([name, effects]) => ({ name, ...effects }));
 
 export function personalityEffects(view: Pick<WorldView, 'ruleFeatures'>, key: string | null | undefined) {
   const name = key?.replace(/^che_/, '');

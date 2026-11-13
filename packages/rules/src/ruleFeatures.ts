@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { createdHeritageStat } from './heritage/creation';
 import { FIVE_STAT_KEYS, FIVE_STAT_RULES, checkStatProfile } from './general/fiveStats';
 import { validateGeneralCreation } from './general/create';
+import { GENERAL_PERSONALITY_FEATURE } from './general/personality';
 import type { InputKindDefinition, RuleFeatureDefinition } from './ruleRegistry';
 import type { RecordedInput, ReplayState } from './replay';
 import { enableReplayPolicy } from './policy/replay';
@@ -71,6 +72,7 @@ export const fiveStatsFeature: RuleFeatureDefinition = {
         FIVE_STAT_RULES,
         origin.initial.ruleFeatures?.includes('lineage-v1'),
         origin.initial.ruleFeatures?.includes('heritage-v1'),
+        origin.initial.ruleFeatures?.includes(GENERAL_PERSONALITY_FEATURE),
       );
       const general = (input.result as { general?: Record<string, unknown> } | null)?.general;
       if (

@@ -11,6 +11,7 @@ const USER_A = '00000000-0000-4000-8000-00000000000a';
 const USER_B = '00000000-0000-4000-8000-00000000000b';
 const mocks = vi.hoisted(() => ({
   lineage: true,
+  personality: false,
   heritageBalance: null as number | null,
   userId: '',
   create: vi.fn(),
@@ -38,6 +39,7 @@ vi.mock('../trpc', () => ({
               count: 3,
               campaignEnabled: false,
               ...(mocks.lineage ? { lineageEnabled: true } : {}),
+              ...(mocks.personality ? { personalities: [{ name: '대의', experiencePercent: 110, train: -5 }] } : {}),
               ...(mocks.heritageBalance === null
                 ? {}
                 : {
@@ -106,6 +108,7 @@ function mount() {
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.lineage = true;
+  mocks.personality = false;
   mocks.heritageBalance = null;
   mocks.userId = USER_A;
   // 결과는 보지 않는다. 보낸 입력만 확인한다.
@@ -128,6 +131,19 @@ it('INT-25 AC-INT-25 머리에 재야 시작 안내와 이 월드의 연월·턴
   expect(glance?.open).toBe(false);
   // 접어 둔 동안은 world.map을 받지 않는다(모의 클라이언트에 world.map이 없다).
   expect(screen.queryByTestId('world-map')).toBeNull();
+});
+
+it('INT-26 서버가 허용한 성격의 효과를 확인하고 장수 생성에 제출한다', async () => {
+  mocks.lineage = false;
+  mocks.personality = true;
+  mount();
+  fireEvent.change(await screen.findByLabelText('이름'), { target: { value: '서윤' } });
+  fireEvent.change(screen.getByLabelText('성격'), { target: { value: '대의' } });
+  expect(screen.getByText('훈련 -5 · 경험 획득 110%')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: '장수 만들기' }));
+  await waitFor(() =>
+    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ personality: '대의' }), expect.anything()),
+  );
 });
 
 it('T4-95 AC-P2-32 가문 월드는 기본 선택 없는 성별 칸을 보이고 고르기 전에는 보내지 않는다', async () => {

@@ -38,6 +38,7 @@ interface Draft {
   portraitId: number | null;
   // 가문 월드에서만 보내는 성별. 기본 선택이 없어 고르기 전에는 ''이다.
   sex: '' | 'MALE' | 'FEMALE';
+  personality: string;
   // 유산 월드에서만 쓰는 능력치별 유산 배분. 0인 능력치는 키가 없다.
   bonus: HeritageBonus;
   // 유산 월드에서 이 입력을 시작한 계정(creationRules.heritage.userId). 보낼 때 expectedUserId로 쓴다. 다른 월드는 null이다.
@@ -47,7 +48,15 @@ interface Draft {
 type HeritageState = 'ok' | 'stale' | 'refreshed';
 type Mine = inferRouterOutputs<AppRouter>['general']['mine'];
 
-const EMPTY_DRAFT: Draft = { name: '', stats: EVEN, portraitId: null, sex: '', bonus: {}, owner: null };
+const EMPTY_DRAFT: Draft = {
+  name: '',
+  stats: EVEN,
+  portraitId: null,
+  sex: '',
+  personality: '',
+  bonus: {},
+  owner: null,
+};
 const SEX_REQUIRED = '성별을 선택하세요.';
 
 // 유산 월드에서 서버가 알려 준 현재 세션 계정. 다른 월드는 null이다.
@@ -171,6 +180,7 @@ function CreateGeneral({ worldId }: { worldId: string }) {
             key={draft.owner ?? ''}
             worldId={worldId}
             rules={mine.data.creationRules}
+            personalities={mine.data.creationRules.personalities}
             lineage={'lineageEnabled' in mine.data.creationRules && mine.data.creationRules.lineageEnabled === true}
             heritage={'heritage' in mine.data.creationRules ? mine.data.creationRules.heritage : undefined}
             currentOwner={owner}
@@ -250,6 +260,7 @@ type Created = NonNullable<inferRouterOutputs<AppRouter>['general']['mine']['gen
 function CreateForm({
   worldId,
   rules,
+  personalities,
   lineage,
   heritage,
   currentOwner,
@@ -266,6 +277,7 @@ function CreateForm({
 }: {
   worldId: string;
   rules: CreationRules;
+  personalities: Mine['creationRules']['personalities'];
   // lineage-v1 월드면 성별을 꼭 고른다. 다른 월드에는 성별 칸이 없고 보내지도 않는다.
   lineage: boolean;
   // heritage-v1 월드에만 있다. 없으면 유산 첩도 heritage 키도 없다.
@@ -330,7 +342,8 @@ function CreateForm({
     }
   }
   // 입력은 화면(CreateGeneral)이 갖는다. 기다리는 동안 폼이 사라졌다가 거절로 돌아와도 보낸 값이 남는다.
-  const { name, stats, sex, bonus } = draft;
+  const { name, stats, sex, bonus, personality } = draft;
+  const chosenPersonality = personalities?.find((choice) => choice.name === personality);
   const setName = (value: string) => onDraft((prev) => ({ ...prev, name: value }));
   const setStats = (update: (prev: StatValues) => StatValues) =>
     onDraft((prev) => ({ ...prev, stats: update(prev.stats) }));
@@ -352,6 +365,8 @@ function CreateForm({
   ];
   const problemsId = useId();
   const nameId = useId();
+  const personalityId = useId();
+  const personalityHelpId = useId();
   const statId = useId();
   const sexHelpId = useId();
   // 유산 월드에서는 유산을 더한 최종 능력치로 요약한다. 보낼 능력치는 기본값 그대로다.
@@ -381,6 +396,7 @@ function CreateForm({
         ...check.stats,
         portraitId,
         ...(lineage && sex !== '' ? { sex } : {}),
+        ...(chosenPersonality ? { personality: chosenPersonality.name } : {}),
         ...heritagePayload,
         // 유산 월드에서는 입력을 시작한 계정을 함께 보낸다. 세션이 바뀌었으면 서버가 입력·잔액을 건드리기 전에 거절한다.
         ...(portraitId !== null && account.data
@@ -431,6 +447,49 @@ function CreateForm({
         />
         <p className={styles.hint}>한글·한자·영문·숫자 1~6글자. 같은 월드에서 이미 쓰는 이름은 쓸 수 없습니다.</p>
       </div>
+
+      {personalities ? (
+        <div className={styles.field}>
+          <label htmlFor={personalityId}>성격</label>
+          <select
+            id={personalityId}
+            className={styles.input}
+            value={personality}
+            aria-describedby={personalityHelpId}
+            onChange={(e) => onDraft((prev) => ({ ...prev, personality: e.target.value }))}
+          >
+            <option value="">선택 안 함</option>
+            {personalities.map(({ name }) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+          <p id={personalityHelpId} className={styles.hint}>
+            {chosenPersonality
+              ? [
+                  chosenPersonality.train === undefined
+                    ? null
+                    : `훈련 ${chosenPersonality.train > 0 ? '+' : ''}${chosenPersonality.train}`,
+                  chosenPersonality.morale === undefined
+                    ? null
+                    : `사기 ${chosenPersonality.morale > 0 ? '+' : ''}${chosenPersonality.morale}`,
+                  chosenPersonality.recruitPercent === undefined
+                    ? null
+                    : `징·모병 비용 ${chosenPersonality.recruitPercent}%`,
+                  chosenPersonality.experiencePercent === undefined
+                    ? null
+                    : `경험 획득 ${chosenPersonality.experiencePercent}%`,
+                  chosenPersonality.dedicationPercent === undefined
+                    ? null
+                    : `공헌 획득 ${chosenPersonality.dedicationPercent}%`,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')
+              : '성격을 고르면 적용되는 효과를 볼 수 있습니다.'}
+          </p>
+        </div>
+      ) : null}
 
       <fieldset className={styles.stats} aria-describedby={problemsId}>
         <legend>

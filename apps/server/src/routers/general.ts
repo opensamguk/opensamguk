@@ -6,6 +6,8 @@ import {
   CREATION_ERRORS,
   DEFENSE_STANCE_FEATURE,
   DEFENSE_STANCE_KIND,
+  GENERAL_PERSONALITY_FEATURE,
+  generalPersonalityChoices,
   defenseStanceInput,
   creationBlock,
   effectiveWorldOptions,
@@ -36,6 +38,7 @@ const codes = {
   BAD_STATS: 'BAD_REQUEST',
   BAD_PORTRAIT: 'BAD_REQUEST',
   BAD_SEX: 'BAD_REQUEST',
+  BAD_PERSONALITY: 'BAD_REQUEST',
   BAD_HERITAGE: 'BAD_REQUEST',
   HERITAGE_INSUFFICIENT: 'CONFLICT',
   WORLD_FULL: 'BAD_REQUEST',
@@ -59,6 +62,7 @@ const creationEnvelope = worldInput.extend({
   politics: z.unknown().optional(),
   charm: z.unknown().optional(),
   sex: z.unknown().optional(),
+  personality: z.unknown().optional(),
   heritage: z.unknown().optional(),
   expectedUserId: z.uuid().optional(),
   portraitId: z.unknown(),
@@ -201,9 +205,11 @@ export const generalRouter = router({
           code: 'BAD_REQUEST',
           message: parsed.error.issues.some((issue) => issue.path[0] === 'sex')
             ? CREATION_ERRORS.BAD_SEX
-            : parsed.error.issues.some((issue) => issue.path[0] === 'heritage')
-              ? CREATION_ERRORS.BAD_HERITAGE
-              : parsed.error.message,
+            : parsed.error.issues.some((issue) => issue.path[0] === 'personality')
+              ? CREATION_ERRORS.BAD_PERSONALITY
+              : parsed.error.issues.some((issue) => issue.path[0] === 'heritage')
+                ? CREATION_ERRORS.BAD_HERITAGE
+                : parsed.error.message,
           cause: parsed.error,
         });
       const checked = validateGeneralCreation(
@@ -211,6 +217,7 @@ export const generalRouter = router({
         world.statRules,
         world.ruleFeatures.includes('lineage-v1'),
         world.ruleFeatures.includes('heritage-v1'),
+        world.ruleFeatures.includes(GENERAL_PERSONALITY_FEATURE),
       );
       if (!checked.ok) throw new TRPCError({ code: 'BAD_REQUEST', message: checked.message });
       const { portraitId } = checked.value;
@@ -285,6 +292,9 @@ export const generalRouter = router({
             ? { npcPlayEnabled: true as const }
             : {}),
           ...(world.ruleFeatures.includes('lineage-v1') ? { lineageEnabled: true as const } : {}),
+          ...(world.ruleFeatures.includes(GENERAL_PERSONALITY_FEATURE)
+            ? { personalities: generalPersonalityChoices }
+            : {}),
           ...(world.ruleFeatures.includes('nation-lifecycle-v1') ? { nationLifecycleEnabled: true as const } : {}),
           ...(world.ruleFeatures.includes('heritage-v1')
             ? {

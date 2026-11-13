@@ -399,7 +399,7 @@ export {
 
 export { INACTIVE_REMOVAL_FEATURE, inactiveRemovalTick } from './policy/inactiveRemoval';
 
-export { GENERAL_PERSONALITY_FEATURE, personalityEffects } from './general/personality';
+export { GENERAL_PERSONALITY_FEATURE, generalPersonalityChoices, personalityEffects } from './general/personality';
 
 export {
   GENERAL_PROFICIENCY_FEATURE,
