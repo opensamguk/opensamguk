@@ -1,7 +1,7 @@
 import { BALANCE } from '../balance';
 import { FIVE_STAT_KEYS, fiveStatsSchema, type FiveStats } from '../general/fiveStats';
 import type { WorldView } from '../model/world';
-import { withEquipmentBonus } from '../equipment/stats';
+import { commandConditionStats } from '../general/condition';
 
 type General = WorldView['generals'][number];
 type LegacyStat = 'leadership' | 'strength' | 'intel';
@@ -13,7 +13,7 @@ export function commandFiveStats(view: WorldView, general: General): FiveStats |
 
 function commandScores(view: WorldView, general: General): FiveStats | null {
   const stats = commandFiveStats(view, general);
-  return stats ? withEquipmentBonus(view, general.id, stats) : null;
+  return stats ? commandConditionStats(view, general, stats) : null;
 }
 
 export function domesticStatScore(view: WorldView, general: General, key: string, legacy: LegacyStat): number {

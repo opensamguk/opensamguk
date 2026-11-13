@@ -58,17 +58,30 @@ export function GeneralInfo({
   const summary = useWorldSummary(worldId).data;
   const merit = useMyMerit(worldId);
   const board = equipment?.kind === 'ready' && equipment.data.generalId === g.id ? equipment.data : null;
-  const stat = (key: 'leadership' | 'strength' | 'intel') =>
-    board && board.bonus[key] > 0 ? (
+  const condition = g.condition;
+  const stat = (key: 'leadership' | 'strength' | 'intel') => {
+    const injured = condition?.injuredStats[key] ?? g[key];
+    const leadershipBonus = key === 'leadership' ? (condition?.leadershipBonus ?? 0) : 0;
+    const equipmentBonus = board?.bonus[key] ?? 0;
+    const applied = injured + leadershipBonus + equipmentBonus;
+    const details = [
+      injured !== g[key] ? `부상 ${n(g[key])} → ${n(injured)}` : null,
+      leadershipBonus > 0 ? `관직 +${n(leadershipBonus)}` : null,
+      equipmentBonus > 0 ? `장비 +${n(equipmentBonus)}` : null,
+    ].filter(Boolean);
+    return details.length > 0 ? (
       <span>
-        <strong>{n(board.stats[key])}</strong>
-        <small className={styles.statNote}>
-          기본 {n(board.baseStats[key])} + 장비 {board.bonus[key]}
-        </small>
+        <strong className={injured !== g[key] ? styles.ageWarning : undefined}>{n(applied)}</strong>
+        <small className={styles.statNote}>{details.join(' · ')}</small>
       </span>
     ) : (
-      n(board?.stats[key] ?? g[key])
+      n(applied)
     );
+  };
+  const age = displayedAge(g, summary);
+  const retirementAge = condition?.retirementAge ?? 70;
+  const ageStyle =
+    age < retirementAge * 0.75 ? styles.ageNormal : age < retirementAge ? styles.ageWarning : styles.ageHigh;
   return (
     <div className={styles.general} data-general-id={g.id}>
       <div className={styles.head}>
@@ -102,7 +115,7 @@ export function GeneralInfo({
                 { label: '매력', value: n(g.charm) },
               ]
             : []),
-          { label: '나이', value: `${displayedAge(g, summary)}세` },
+          { label: '나이', value: <span className={ageStyle}>{age}세</span> },
           // 성격·특기는 시나리오 장수만 값이 있다. 효과 설명은 규칙이 생긴 뒤에 붙인다 (INT-25).
           { label: '성격', value: g.personality || '—' },
           { label: '특기', value: g.special || '—' },

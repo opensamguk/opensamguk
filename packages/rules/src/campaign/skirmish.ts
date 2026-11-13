@@ -2,7 +2,8 @@ import type { Rng } from '@opensamguk/shared';
 import { BALANCE } from '../balance';
 import { simulateBattle, type BattleForce, type BattleInput } from '../battle/simulate';
 import { FIVE_STAT_KEYS, fiveStatsSchema } from '../general/fiveStats';
-import { fiveStatsBattleModifiers } from '../general/fiveStatsBattle';
+import { battleModifiersForEffectiveStats, fiveStatsBattleModifiers } from '../general/fiveStatsBattle';
+import { commandConditionStats, GENERAL_CONDITION_FEATURE } from '../general/condition';
 import { collectModifiers, type BattleModifiers } from '../modifiers';
 import { cloneWorld } from '../model/clone';
 import type { DeepReadonly, WorldState, WorldView } from '../model/world';
@@ -37,10 +38,12 @@ function modifiers(state: WorldState, row: CampaignUnitState): BattleModifiers {
   const commander = state.generals[row.commanderId]!;
   const stats = fiveStatsSchema.parse(Object.fromEntries(FIVE_STAT_KEYS.map((key) => [key, commander[key]])));
   const equipment = state.ruleFeatures?.includes('equipment-v1') ? equipmentBonus(state, commander.id) : undefined;
-  const base = fiveStatsBattleModifiers(
-    stats,
-    equipment ? { leadership: equipment.leadership, strength: equipment.strength } : undefined,
-  );
+  const base = state.ruleFeatures?.includes(GENERAL_CONDITION_FEATURE)
+    ? battleModifiersForEffectiveStats(commandConditionStats(state, commander, stats))
+    : fiveStatsBattleModifiers(
+        stats,
+        equipment ? { leadership: equipment.leadership, strength: equipment.strength } : undefined,
+      );
   return {
     dealt: [...collectModifiers(state, commander.id, { stage: 'battle.dealt', commandKey: 'attack' }), ...base.dealt],
     taken: [...collectModifiers(state, commander.id, { stage: 'battle.taken', commandKey: 'attack' }), ...base.taken],
