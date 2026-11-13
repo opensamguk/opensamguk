@@ -97,6 +97,10 @@
     "target": "general"
   },
   {
+    "key": "troop_gather",
+    "target": "general"
+  },
+  {
     "key": "wander",
     "target": "general"
   }

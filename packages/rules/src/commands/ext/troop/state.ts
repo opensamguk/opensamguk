@@ -40,26 +40,28 @@ const record = z.strictObject({
   name: z.string().refine((name) => troopName(name) === name),
   members: z.array(id),
 });
-const slice = z.strictObject({ troops: z.record(z.string().regex(/^[1-9]\d*$/), record) }).refine(({ troops }) => {
-  const assigned = new Set<number>();
-  for (const [key, row] of Object.entries(troops)) {
-    if (key !== String(row.leaderId) || assigned.has(row.leaderId)) return false;
-    assigned.add(row.leaderId);
-    let previous = 0;
-    for (const memberId of row.members) {
-      if (memberId <= previous || assigned.has(memberId)) return false;
-      assigned.add(memberId);
-      previous = memberId;
+function troopSchema() {
+  return z.strictObject({ troops: z.record(z.string(), record) }).refine(({ troops }) => {
+    const assigned = new Set<number>();
+    for (const [key, row] of Object.entries(troops)) {
+      if (key !== String(row.leaderId) || assigned.has(row.leaderId)) return false;
+      assigned.add(row.leaderId);
+      let previous = 0;
+      for (const memberId of row.members) {
+        if (memberId <= previous || assigned.has(memberId)) return false;
+        assigned.add(memberId);
+        previous = memberId;
+      }
     }
-  }
-  return true;
-});
-export type TroopSlice = z.infer<typeof slice>;
+    return true;
+  });
+}
+export type TroopSlice = z.infer<ReturnType<typeof troopSchema>>;
 export const troopSlice = {
   key: 'troop',
   create: () => ({ troops: {} }),
-  clone: (value: DeepReadonly<JsonValue>): TroopSlice => slice.parse(value),
-  validate: (value: unknown): value is TroopSlice => slice.safeParse(value).success,
+  clone: (value: DeepReadonly<JsonValue>): TroopSlice => troopSchema().parse(value),
+  validate: (value: unknown): value is TroopSlice => troopSchema().safeParse(value).success,
 } satisfies ExtSlice;
 
 export function reconcileTroops(view: WorldView, source: DeepReadonly<TroopSlice>): TroopSlice {
@@ -77,7 +79,7 @@ export function reconcileTroops(view: WorldView, source: DeepReadonly<TroopSlice
 
 export function readTroops(view: WorldView) {
   if (!view.ruleFeatures?.includes(TROOP_FEATURE)) return undefined;
-  const parsed = slice.parse(view.ext?.troop);
+  const parsed = troopSchema().parse(view.ext?.troop);
   return reconcileTroops(view, parsed);
 }
 
