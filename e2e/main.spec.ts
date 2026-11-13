@@ -254,7 +254,9 @@ test.describe('장수가 있는 계정', () => {
     await editor(page).getByRole('button', { name: '선택 해제' }).click();
     await row(page, 4).click();
     await pick(page, '이동');
-    await expect(editor(page).getByRole('combobox', { name: '대상 도시' })).toHaveValue(String(enemy.key));
+    await expect(
+      page.getByRole('radiogroup', { name: '대상 도시' }).getByRole('radio', { name: new RegExp(`^${enemy.name}`) }),
+    ).toHaveAttribute('aria-checked', 'true');
     await expect(row(page, 4)).toContainText('휴식');
     await editor(page).getByRole('button', { name: '4번 칸에 넣기', exact: true }).click();
     await expect(row(page, 4)).toContainText(enemy.name);

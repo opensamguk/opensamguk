@@ -5,6 +5,7 @@ import {
   effectiveWorldOptions,
   parsePreset,
   nowTick,
+  officerTitle,
   scenarioIdentitySchema,
   toGameDate,
   parseResourceKey,
@@ -43,6 +44,7 @@ export const lobbyRouter = router({
               preset: true,
               runtimeOptions: true,
               replayFormat: true,
+              ruleFeatures: true,
               scenarioKey: true,
               startYear: true,
               clockMode: true,
@@ -59,7 +61,20 @@ export const lobbyRouter = router({
           const mine = ctx.user
             ? await tx.general.findMany({
                 where: { worldId: { in: ids }, userId: ctx.user.id },
-                select: { worldId: true, id: true, name: true, nation: { select: { name: true } } },
+                select: {
+                  worldId: true,
+                  id: true,
+                  name: true,
+                  portraitId: true,
+                  officerLevel: true,
+                  leadership: true,
+                  strength: true,
+                  intel: true,
+                  politics: true,
+                  charm: true,
+                  nation: { select: { name: true, color: true } },
+                  city: { select: { name: true } },
+                },
               })
             : [];
           const pending = ctx.user
@@ -108,7 +123,23 @@ export const lobbyRouter = router({
                 ? { npcPlayEnabled: true as const }
                 : {}),
               myGeneral: general
-                ? { id: general.id, name: general.name, nationName: general.nation?.name ?? null }
+                ? {
+                    id: general.id,
+                    name: general.name,
+                    nationName: general.nation?.name ?? null,
+                    nationColor: general.nation?.color ?? null,
+                    portraitId: general.portraitId,
+                    officerTitle: officerTitle(general.officerLevel) ?? (general.nation ? '장수' : '재야'),
+                    cityName: general.city.name,
+                    stats: {
+                      leadership: general.leadership,
+                      strength: general.strength,
+                      intel: general.intel,
+                      ...(world.ruleFeatures.includes('five-stats')
+                        ? { politics: general.politics ?? 0, charm: general.charm ?? 0 }
+                        : {}),
+                    },
+                  }
                 : null,
               createBlockedReason:
                 creationBlock({

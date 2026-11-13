@@ -10,6 +10,9 @@ import { useTRPC } from '../trpc';
 import { DisabledReason } from '../ui/DisabledReason';
 import { EmptyState, ErrorState, LoadingState } from '../ui/States';
 import { Tag } from '../ui/Tag';
+import { NationBadge } from '../ui/NationBadge';
+import { Portrait } from '../portrait/Portrait';
+import { displayName } from '../turns/targets';
 import type { LobbyNotice, LobbyWorld } from './contract';
 import { lobbyAction, metaText, myGeneralText, shortDate, STATUS_LABEL } from './lobbyView';
 import styles from './LobbyPage.module.css';
@@ -153,11 +156,48 @@ function WorldCard({ world, loggedIn }: { world: LobbyWorld; loggedIn: boolean }
         </div>
         <p className={styles.meta}>{metaText(world).join(' · ')}</p>
         <div className={styles.cardFoot}>
-          <span className={world.myGeneral ? undefined : styles.muted}>{myGeneralText(world.myGeneral)}</span>
+          {world.myGeneral ? (
+            <MyGeneral general={world.myGeneral} />
+          ) : (
+            <span className={styles.muted}>{myGeneralText(world.myGeneral)}</span>
+          )}
           <WorldAction world={world} loggedIn={loggedIn} />
         </div>
       </article>
     </li>
+  );
+}
+
+// 로비 카드의 내 장수 (D-085). 얼굴과 소속·관직·능력치를 함께 보인다.
+// 서버가 아직 주지 않는 값은 칸을 그리지 않는다 (INT-25 PR 4, lobby.list 응답 확장 대기).
+type MyGeneralInfo = NonNullable<LobbyWorld['myGeneral']>;
+function MyGeneral({ general }: { general: MyGeneralInfo }) {
+  const name = displayName(general.name);
+  const stats = general.stats;
+  return (
+    <div className={styles.myGeneral}>
+      <Portrait id={general.portraitId ?? null} name={name} variant="icon" shape="round" className={styles.myFace} />
+      <div className={styles.myInfo}>
+        <span className={styles.myName}>
+          {name}
+          {general.officerTitle ? <span className={styles.muted}> · {general.officerTitle}</span> : null}
+        </span>
+        <span className={styles.myMeta}>
+          <NationBadge
+            name={general.nationName ?? '재야'}
+            color={general.nationName ? (general.nationColor ?? null) : null}
+          />
+          {general.cityName ? <span>{general.cityName}</span> : null}
+        </span>
+        {stats ? (
+          <span className={`num ${styles.myStats}`}>
+            통 {stats.leadership} · 무 {stats.strength} · 지 {stats.intel}
+            {stats.politics !== undefined ? ` · 정 ${stats.politics}` : ''}
+            {stats.charm !== undefined ? ` · 매 ${stats.charm}` : ''}
+          </span>
+        ) : null}
+      </div>
+    </div>
   );
 }
 

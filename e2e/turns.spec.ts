@@ -353,9 +353,8 @@ test.describe('예턴 편집', () => {
     const { world } = await openEditor(page);
     await row(page, 1).click();
     await pick(page, '이동');
-    const city = editor(page).getByRole('combobox', { name: '대상 도시' });
     await expect(editor(page).getByRole('button', { name: '1번 칸에 넣기 (사용 불가)' })).toBeVisible();
-    await city.selectOption({ label: '낙양' });
+    await page.getByRole('radiogroup', { name: '대상 도시' }).getByRole('radio', { name: /^낙양/ }).click();
     await editor(page).getByRole('button', { name: '1번 칸에 넣기', exact: true }).click();
     await expect(row(page, 1)).toContainText('이동');
     await expect(row(page, 1)).toContainText('낙양');

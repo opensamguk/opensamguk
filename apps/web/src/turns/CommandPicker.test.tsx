@@ -9,6 +9,15 @@ import type { EquipmentBoard } from '../equipment/useEquipment';
 
 afterEach(cleanup);
 
+// 인자 입력 화면(INT-25)은 대상을 목록의 radio로 고른다.
+const pickIn = (group: string, name: RegExp) =>
+  fireEvent.click(within(screen.getByRole('radiogroup', { name: group })).getByRole('radio', { name }));
+const checkedIn = (group: string) =>
+  within(screen.getByRole('radiogroup', { name: group }))
+    .queryAllByRole('radio')
+    .find((radio) => radio.getAttribute('aria-checked') === 'true' || (radio as HTMLInputElement).checked);
+const crewValue = () => (checkedIn('병종') as HTMLInputElement | undefined)?.value ?? '';
+
 function equipmentBoard(): EquipmentBoard {
   const stats = { leadership: 40, strength: 100, intel: 40, politics: 40, charm: 55 };
   return {
@@ -180,9 +189,11 @@ it('필수 인자는 카드 설명과 입력에서 같고 도시를 고른 뒤 �
   fireEvent.click(screen.getByRole('button', { name: /^1번 칸에 넣기\s*\(사용 불가\)$/ }));
   expect(screen.getByRole('note').textContent).toBe('대상 도시 칸을 채우세요.');
   expect(input.onPut).not.toHaveBeenCalled();
-  fireEvent.change(screen.getByRole('combobox', { name: '대상 도시' }), { target: { value: '3' } });
+  pickIn('대상 도시', /^진류/);
   fireEvent.click(screen.getByRole('button', { name: '1번 칸에 넣기' }));
   expect(input.onPut).toHaveBeenCalledWith({ commandKey: 'move', args: { cityKey: 3 }, explicit: true });
+  // 넣으면 입력 화면을 닫는다.
+  expect(screen.queryByTestId('command-args-screen')).toBeNull();
 });
 
 it('저장 불가 사유가 있으면 카드·넣기·검색 Enter로도 입력을 보내지 않는다', () => {
@@ -253,6 +264,9 @@ it('도시 수비병과 부곡 훈련의 카드 설명은 고른 schema 갈래�
     explicit: true,
   });
   input.onPut.mockClear();
+  // 넣으면 입력 화면이 닫히므로 도시 수비병 갈래를 다시 고른 상태에서 서버 schema가 바뀌는 경우를 본다.
+  fireEvent.click(screen.getByRole('radio', { name: '훈련' }));
+  fireEvent.change(screen.getByRole('combobox', { name: '훈련·사기 대상' }), { target: { value: 'city' } });
   view.rerender(<CommandPicker {...input} commands={[{ ...train, argsSchema: empty }]} />);
   expect(screen.getByText('군사 · 입력 형식 확인 필요')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: /^1번 칸에 넣기\s*\(사용 불가\)$/ }));
@@ -286,7 +300,7 @@ it('대상 장수를 이름으로 고르는 칸은 카드·입력·누락 안내
   fireEvent.click(card);
   fireEvent.click(screen.getByRole('button', { name: /^1번 칸에 넣기\s*\(사용 불가\)$/ }));
   expect(screen.getByRole('note').textContent).toBe('대상 장수 칸을 채우세요.');
-  fireEvent.change(screen.getByRole('combobox', { name: '대상 장수' }), { target: { value: '7' } });
+  pickIn('대상 장수', /^조운/);
   fireEvent.click(screen.getByRole('button', { name: '1번 칸에 넣기' }));
   expect(input.onPut).toHaveBeenCalledWith({ commandKey: 'nation_appoint', args: { generalId: 7 }, explicit: true });
 });
@@ -326,15 +340,15 @@ it('서버 목록에서 빠졌다가 다시 온 명령은 옛 선택과 입력�
   const input = props();
   const view = render(<CommandPicker {...input} />);
   fireEvent.click(screen.getByRole('radio', { name: '이동' }));
-  fireEvent.change(screen.getByRole('combobox', { name: '대상 도시' }), { target: { value: '3' } });
+  pickIn('대상 도시', /^진류/);
   view.rerender(<CommandPicker {...input} commands={commands.filter((c) => c.key !== 'move')} />);
   view.rerender(<CommandPicker {...input} />);
   expect((screen.getByRole('radio', { name: '이동' }) as HTMLInputElement).checked).toBe(false);
-  expect(screen.queryByRole('combobox', { name: '대상 도시' })).toBeNull();
+  expect(screen.queryByRole('radiogroup', { name: '대상 도시' })).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: /^1번 칸에 넣기\s*\(사용 불가\)$/ }));
   expect(screen.getByRole('note').textContent).toBe('명령을 고르세요.');
   fireEvent.click(screen.getByRole('radio', { name: '이동' }));
-  expect((screen.getByRole('combobox', { name: '대상 도시' }) as HTMLSelectElement).value).toBe('');
+  expect(checkedIn('대상 도시')).toBeUndefined();
   expect(input.onPut).not.toHaveBeenCalled();
 });
 
@@ -394,8 +408,7 @@ it('T4-86 AC-P2-26 병종 칸은 월드 병종표로 고르고 병종표를 불�
   const input = props({ commands: [recruit, ...commands], units: worldUnits(undefined), unitNote: '불러오는 중' });
   const view = render(<CommandPicker {...input} />);
   fireEvent.click(screen.getByRole('radio', { name: '징병' }));
-  const crew = () => screen.getByRole('combobox', { name: '병종' }) as HTMLSelectElement;
-  expect([...crew().options].map((option) => option.textContent)).toEqual(['고르세요']);
+  expect(within(screen.getByRole('radiogroup', { name: '병종' })).queryAllByRole('radio')).toHaveLength(0);
   expect(screen.getByRole('note').textContent).toBe('불러오는 중');
   fireEvent.click(screen.getByRole('radio', { name: '농지 개간' }));
   fireEvent.click(screen.getByRole('button', { name: '1번 칸에 넣기' }));
@@ -405,19 +418,23 @@ it('T4-86 AC-P2-26 병종 칸은 월드 병종표로 고르고 병종표를 불�
   const loaded = worldUnits(TEST_UNIT_SET);
   view.rerender(<CommandPicker {...input} units={loaded} unitNote={null} defaultCrewType={1300} />);
   fireEvent.click(screen.getByRole('radio', { name: '징병' }));
-  expect([...crew().options].map((option) => option.value)).toEqual(['1100', '1200', '1300']);
-  expect(crew().value).toBe('1300');
+  expect(
+    within(screen.getByRole('radiogroup', { name: '병종' }))
+      .getAllByRole('radio')
+      .map((radio) => (radio as HTMLInputElement).value),
+  ).toEqual(['1100', '1200', '1300']);
+  expect(crewValue()).toBe('1300');
   view.rerender(<CommandPicker {...input} units={loaded} unitNote={null} defaultCrewType={1000} />);
   fireEvent.click(screen.getByRole('radio', { name: '농지 개간' }));
   fireEvent.click(screen.getByRole('radio', { name: '징병' }));
-  expect(crew().value).toBe('1100');
+  expect(crewValue()).toBe('1100');
   const noDefault = worldUnits({ ...TEST_UNIT_SET, defaultCrewTypeId: 1000 });
   view.rerender(<CommandPicker {...input} units={noDefault} unitNote={null} defaultCrewType={undefined} />);
   fireEvent.click(screen.getByRole('radio', { name: '농지 개간' }));
   fireEvent.click(screen.getByRole('radio', { name: '징병' }));
-  expect(crew().value).toBe('1100');
+  expect(crewValue()).toBe('1100');
   // 모집 조건이 있는 1300도 고르고 넣을 수 있다. 지금 조건 판정은 서버 사전 검사가 한다.
-  fireEvent.change(crew(), { target: { value: '1300' } });
+  pickIn('병종', /기병/);
   fireEvent.change(screen.getByRole('spinbutton', { name: '수량' }), { target: { value: '100' } });
   fireEvent.click(screen.getByRole('button', { name: '1번 칸에 넣기' }));
   expect(input.onPut).toHaveBeenLastCalledWith({

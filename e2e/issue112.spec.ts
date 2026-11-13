@@ -68,12 +68,15 @@ test('좁은 메인 명령 칸에서 긴 인자와 긴 대상 도시 이름에�
   await row(page, 1).click();
   await pick(page, '모병');
   await editor(page).getByRole('spinbutton', { name: '수량' }).fill('1000000');
-  await editor(page).getByRole('combobox', { name: '병종' }).selectOption('1100');
+  await page.getByRole('radiogroup', { name: '병종' }).locator('input[value="1100"]').check();
   await editor(page).getByRole('button', { name: '1번 칸에 넣기', exact: true }).click();
   await editor(page).getByRole('button', { name: '선택 해제' }).click();
   await row(page, 2).click();
   await pick(page, '이동');
-  await editor(page).getByRole('combobox', { name: '대상 도시' }).selectOption({ label: longest.name });
+  await page
+    .getByRole('radiogroup', { name: '대상 도시' })
+    .getByRole('radio', { name: new RegExp(`^${longest.name}`) })
+    .click();
   await editor(page).getByRole('button', { name: '2번 칸에 넣기', exact: true }).click();
   await expect(row(page, 1)).toContainText('모병');
   await expect(row(page, 1)).toContainText('수량 1000000');

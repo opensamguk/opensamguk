@@ -20,7 +20,7 @@ import { DisabledReason } from '../ui/DisabledReason';
 import { EmptyState, ErrorState, LoadingState } from '../ui/States';
 import { errorCode, retryUnlessClientError } from './apiError';
 import { describeArgs, type ArgNames } from './args';
-import { useWorldUnits } from '../game/queries';
+import { useWorldRules, useWorldUnits } from '../game/queries';
 import { CommandPicker, type CommandInfo } from './CommandPicker';
 import { useEquipment } from '../equipment/useEquipment';
 import {
@@ -235,6 +235,18 @@ function Editor<S extends DisplaySlot>({
     if (needsRecruitmentRefresh)
       void queryClient.invalidateQueries({ queryKey: trpc.resources.worldRules.queryKey({ worldId }) });
   }, [needsRecruitmentRefresh, city?.key, queryClient, trpc, worldId]);
+  const rules = useWorldRules(worldId);
+  const argContext = useMemo(
+    () => ({
+      map: map.data,
+      here: home.data?.general.cityKey ?? null,
+      ownNationId: home.data?.general.nationId ?? null,
+      wallet: home.data ? { gold: home.data.general.gold, rice: home.data.general.rice } : undefined,
+      unitSet: rules.data?.unitSet,
+      recruitment: rules.data && 'recruitment' in rules.data ? rules.data.recruitment : undefined,
+    }),
+    [map.data, home.data, rules.data],
+  );
   const names: ArgNames = useMemo(
     () => ({
       city: (key: number) => cities.find((c) => c.key === key)?.name,
@@ -632,6 +644,7 @@ function Editor<S extends DisplaySlot>({
           onSave={(turn) => onPut(turn, true)}
           cityChoicesFor={cityChoicesFor}
           precheck={source.precheck}
+          argContext={argContext}
         />
       )}
 

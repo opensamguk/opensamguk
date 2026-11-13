@@ -15,6 +15,17 @@ import { generalsText, lobbyAction, metaText, myGeneralText, startedText, STATUS
 
 afterEach(cleanup);
 
+const myGeneral = {
+  id: 7,
+  name: '조운',
+  nationName: '공손찬',
+  portraitId: 5,
+  nationColor: '#112233',
+  officerTitle: '장수',
+  cityName: '북평',
+  stats: { leadership: 90, strength: 97, intel: 75, politics: 60, charm: 80 },
+};
+
 // AppRouter의 lobby.worlds 응답 모양을 따른 월드 하나. D-025 승인 전 응답이라 maxHumanGenerals 키가 없다.
 const world = (extra: Partial<LobbyWorld> = {}): LobbyWorld => ({
   id: '00000000-0000-4000-8000-000000000001',
@@ -65,14 +76,14 @@ describe('카드 글자', () => {
   });
 
   it('내 장수는 이름과 국가, 재야면 재야, 없으면 내 장수 없음', () => {
-    expect(myGeneralText({ id: 1, name: '조운', nationName: '공손찬' })).toBe('내 장수: 조운 (공손찬)');
-    expect(myGeneralText({ id: 1, name: '조운', nationName: null })).toBe('내 장수: 조운 (재야)');
+    expect(myGeneralText(myGeneral)).toBe('내 장수: 조운 (공손찬)');
+    expect(myGeneralText({ ...myGeneral, nationName: null })).toBe('내 장수: 조운 (재야)');
     expect(myGeneralText(null)).toBe('내 장수 없음');
   });
 });
 
 describe('버튼 고르기 (T2-04 버튼 표 5줄)', () => {
-  const mine = { id: 7, name: '조운', nationName: '공손찬' };
+  const mine = myGeneral;
   it('로그인 · 내 장수 있음 · 이유 없음 → 들어가기', () => {
     expect(lobbyAction(true, { myGeneral: mine, createBlockedReason: null })).toEqual({ kind: 'enter' });
   });
@@ -112,7 +123,7 @@ describe('월드 카드', { timeout: 30_000 }, () => {
       <WorldList
         loggedIn
         worlds={[
-          world({ myGeneral: { id: 7, name: '조운', nationName: '공손찬' } }),
+          world({ myGeneral: myGeneral }),
           world({
             id: '00000000-0000-4000-8000-000000000002',
             name: '2월드',
@@ -129,7 +140,9 @@ describe('월드 카드', { timeout: 30_000 }, () => {
     expect(within(first).getByText('진행 중').getAttribute('data-tone')).toBe('accent');
     expect(within(first).getByText('정규')).toBeTruthy();
     expect(within(first).getByText('군웅할거(191) · 193년 4월 · 턴 60분 · 장수 34 · 시작 10/18')).toBeTruthy();
-    expect(within(first).getByText('내 장수: 조운 (공손찬)')).toBeTruthy();
+    // 내 장수는 얼굴(원형 icon)과 이름·소속으로 보인다 (D-085).
+    expect(within(first).getByRole('img', { name: '조운' })).toBeTruthy();
+    expect(within(first).getByText('공손찬')).toBeTruthy();
     expect(within(first).getByRole('link', { name: '들어가기' }).getAttribute('href')).toBe(
       '/w/00000000-0000-4000-8000-000000000001',
     );
