@@ -15,7 +15,7 @@ import { generalsText, lobbyAction, metaText, myGeneralText, startedText, STATUS
 
 afterEach(cleanup);
 
-const myGeneral = {
+const myGeneral: NonNullable<LobbyWorld['myGeneral']> = {
   id: 7,
   name: '조운',
   nationName: '공손찬',

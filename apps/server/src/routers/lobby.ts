@@ -5,6 +5,8 @@ import {
   effectiveWorldOptions,
   parsePreset,
   nowTick,
+  isLocalOffice,
+  localOfficeTitle,
   officerTitle,
   scenarioIdentitySchema,
   toGameDate,
@@ -129,7 +131,10 @@ export const lobbyRouter = router({
                     nationName: general.nation?.name ?? null,
                     nationColor: general.nation?.color ?? null,
                     portraitId: general.portraitId,
-                    officerTitle: officerTitle(general.officerLevel) ?? (general.nation ? '장수' : '재야'),
+                    officerTitle:
+                      world.ruleFeatures.includes('office-effects') && isLocalOffice(general.officerLevel)
+                        ? localOfficeTitle(general.officerLevel)
+                        : (officerTitle(general.officerLevel) ?? (general.nation ? '장수' : '재야')),
                     cityName: general.city.name,
                     stats: {
                       leadership: general.leadership,
