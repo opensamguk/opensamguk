@@ -1,3 +1,4 @@
+import { domesticSpecialtyFor } from '../../../general/domesticSpecialty';
 // core2026 df6c926 packages/logic/src/actions/turn/general/strategyCommand.ts의 계략 확률·피해 공식을 옮겼다.
 // MIT (c) 2025 devsam. resources/NOTICE.md.
 import { z } from 'zod';
@@ -113,7 +114,8 @@ export function stratagemProbability(
   const nation = general.nationId === null ? undefined : view.nations[general.nationId];
   const bonus = nationPhilosophy(view, nation?.philosophy)?.stratagem ?? 0;
   const base = (STRATAGEM.BASE_PROBABILITY + attack - defence) / stratagemDistance(view, general.cityKey, cityKey);
-  return Math.min(STRATAGEM.MAX_PROBABILITY, Math.max(0, base + bonus));
+  const specialty = domesticSpecialtyFor(view, general, 'stratagem')?.successBonus ?? 0;
+  return Math.min(STRATAGEM.MAX_PROBABILITY, Math.max(0, base + bonus + specialty));
 }
 
 // 폐허의 내림으로 최대치가 0이 된 새 월드만 비율을 0으로 읽는다. 기존 공식은 보존한다.
