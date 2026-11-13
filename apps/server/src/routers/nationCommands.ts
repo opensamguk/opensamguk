@@ -18,6 +18,19 @@ import { commandInput } from '../game/slots';
 import { commandAvailability } from '../game/commandAvailability';
 import { describeCommand } from './commands';
 
+const nationGroups: Readonly<Record<string, 'rest' | 'personnel' | 'diplomacy' | 'special'>> = {
+  nation_rest: 'rest',
+  nation_assign: 'personnel',
+  nation_reward: 'personnel',
+  nation_seize: 'personnel',
+  nation_aid: 'diplomacy',
+  nation_break_pact: 'diplomacy',
+  nation_declare: 'diplomacy',
+  nation_pact: 'diplomacy',
+  nation_peace: 'diplomacy',
+  nation_capital: 'special',
+};
+
 async function actorCommands(tx: Parameters<typeof requireWorld>[0], worldId: string, userId: string) {
   const world = await requireWorld(tx, worldId);
   const actor = await requireGeneral(tx, worldId, userId);
@@ -53,6 +66,10 @@ export const nationCommandsRouter = router({
         const availableMonth = key ? Math.max(cooldown?.strategicUntil ?? 0, cooldown?.commands[key] ?? 0) : 0;
         return {
           ...describeCommand(def),
+          group:
+            def.category === 'strategy'
+              ? 'strategy'
+              : (nationGroups[def.key] ?? (def.key.startsWith('nation_research_') ? 'special' : 'other')),
           ...(key
             ? {
                 cooldown: {
