@@ -1,8 +1,15 @@
 import { TRPCError } from '@trpc/server';
-import { estimateTaxIncome, nowTick, TICKS_PER_MONTH, toGameDate, WANDERING_MONTH_LIMIT } from '@opensamguk/rules';
+import {
+  BALANCE,
+  estimateTaxIncome,
+  nowTick,
+  TICKS_PER_MONTH,
+  toGameDate,
+  WANDERING_MONTH_LIMIT,
+} from '@opensamguk/rules';
 import { protectedProcedure, router } from '../trpc';
 import { entityKey, readWorld, viewerGeneral, worldClock, worldInput } from '../queries';
-import { garrisonGeneralInfo, mapCity, nationInfo, visibility } from '../visibility';
+import { cityInfo, garrisonGeneralInfo, mapCity, nationInfo, visibility } from '../visibility';
 import { readView } from '../game/queries';
 
 export const nationRouter = router({
@@ -62,8 +69,10 @@ export const nationRouter = router({
         ...nationInfo(nation, { cityCount: settlements.length, generalCount: generals.length }, viewer),
         philosophy: nation.philosophy,
         population: settlements.reduce((sum, city) => sum + city.population, 0),
+        populationMax: settlements.reduce((sum, city) => sum + city.populationMax, 0),
+        ...(ownNation ? { salaryRate: BALANCE.MONTHLY_SALARY_RATE } : {}),
         ...(financeEstimate ? { financeEstimate } : {}),
-        cities: cities.map(mapCity),
+        cities: cities.map((city) => (ownNation ? cityInfo(city, viewer) : mapCity(city))),
         generals: generals.map((general) => garrisonGeneralInfo(general, viewer, units)),
       };
     }),

@@ -63,9 +63,17 @@ export const worldRouter = router({
     });
     return { worlds };
   }),
-  summary: protectedProcedure
-    .input(worldInput)
-    .query(({ ctx, input }) => readWorld(ctx.db, input.worldId, async (_tx, world) => worldSummary(world, ctx.now))),
+  summary: protectedProcedure.input(worldInput).query(({ ctx, input }) =>
+    readWorld(ctx.db, input.worldId, async (tx, world) => ({
+      ...worldSummary(world, ctx.now),
+      quota: {
+        humans: await tx.general.count({
+          where: { worldId: input.worldId, userId: { not: null }, removedAt: null },
+        }),
+        max: null,
+      },
+    })),
+  ),
   map: protectedProcedure.input(worldInput).query(({ ctx, input }) =>
     readWorld(ctx.db, input.worldId, async (tx) => {
       const cities = await tx.city.findMany({ where: { worldId: input.worldId }, orderBy: { cityKey: 'asc' } });

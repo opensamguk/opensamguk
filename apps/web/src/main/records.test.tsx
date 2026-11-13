@@ -21,6 +21,7 @@ const running: WorldSummary = {
   msPerTick: 6,
   turnTermMinutes: 1,
   truce: null,
+  quota: { humans: 0, max: null },
 };
 
 const ended = (): WorldSummary => ({
@@ -42,6 +43,7 @@ const ended = (): WorldSummary => ({
   msPerTick: 6,
   turnTermMinutes: 1,
   truce: null,
+  quota: { humans: 0, max: null },
 });
 
 const items = [{ id: 'log-1', tick: 119_999, commandKey: 'farm', kind: 'success', text: '농지를 개간했다' }];
