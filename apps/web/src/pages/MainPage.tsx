@@ -466,7 +466,7 @@ export function MainPage() {
 }
 
 // 국가·내 장수 메뉴 (INT-25, 원작 국가 메뉴 2줄). 메인에서 옮긴 전용 화면과 기존 화면으로 한 번에 간다.
-function MainMenu({
+export function MainMenu({
   worldId,
   nationId,
   campaignEnabled,

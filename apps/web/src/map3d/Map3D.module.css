@@ -194,3 +194,48 @@
     min-height: 44px;
   }
 }
+
+/* 지도 바탕 화면 (INT-29). 판이 부모를 꽉 채우고 배율 단추는 오른쪽 아래에 떠 있다. */
+.stage {
+  position: relative;
+  height: 100%;
+  gap: 0;
+}
+.stage .frame {
+  height: 100%;
+  aspect-ratio: auto;
+  max-height: none;
+}
+.stageTools {
+  position: absolute;
+  right: var(--stage-tools-right, 16px);
+  bottom: var(--stage-tools-bottom, 56px);
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+.stageTools .zoom {
+  flex-direction: column;
+}
+.stageTools .zoom button {
+  min-width: 44px;
+  min-height: 44px;
+  color: #efe4cc;
+  background: rgb(28 21 15 / 92%);
+  border: 1px solid #b8954f;
+}
+.stageTools .zoom output {
+  padding: 2px 6px;
+  font-size: var(--text-xs);
+  color: #efe4cc;
+  background: rgb(28 21 15 / 80%);
+}
+.stageTools select {
+  max-width: 200px;
+}
+/* 거점 고르기 상자는 배율 단추 위에 둔다(아래쪽 기록 띠와 겹치지 않게). */
+.stageTools > :last-child {
+  order: -1;
+}
