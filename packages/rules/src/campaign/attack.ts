@@ -1,9 +1,12 @@
+import { logPartsToText, type LogPart } from '@opensamguk/shared';
+import { commandLog } from '../commands/support';
+import { logSentence, nationPart, generalPart, cityPart, numPart, textPart } from '../commands/logging';
 import { z } from 'zod';
 import type { Rng } from '@opensamguk/shared';
 import { BALANCE } from '../balance';
 import { canDefend } from '../battle/defenders';
 import { TICKS_PER_MONTH } from '../clock/constants';
-import { fail, positive, relation, removeNation, success } from '../commands/support';
+import { fail, positive, relation, removeNation } from '../commands/support';
 import type { Actor, CommandDef, CommandResult } from '../commands/types';
 import { cloneWorld } from '../model/clone';
 import type { WorldView } from '../model/world';
@@ -97,7 +100,7 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
   const cityDefense = () => (cityResources ? state.cityResources!.cities[String(cityKey)]!.garrison : []);
   const alive = (unit: CampaignUnitState) => unit.troops > 0 && unit.atmos > 0;
   const get = (id: number) => state.campaign!.units.find((unit) => unit.id === id)!;
-  const rounds: string[] = [],
+  const rounds: LogPart[][] = [],
     reports: NonNullable<CommandResult['reports']> = [];
   const battleAwards: NonNullable<CommandResult['battleAwards']> = [];
   const battleOutcomes: NonNullable<CommandResult['battleOutcomes']> = [];
@@ -112,7 +115,12 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
       state = outcome.state;
       attackerFirstVolleyUsed ||= outcome.attackerFirstVolleyFired === true;
       const name = openingSkirmish ? '성벽 선제 교전' : '성벽 교전';
-      rounds.push(`부곡${attackerId} ${name}: 공격 ${get(attackerId).troops}명, 성벽 ${state.cities[cityKey]!.wall}`);
+      rounds.push([
+        textPart(`부곡${attackerId} ${name}: 공격 `),
+        numPart(get(attackerId).troops),
+        textPart('명, 성벽 '),
+        numPart(state.cities[cityKey]!.wall),
+      ]);
     };
     const wallFirst =
       state.cities[cityKey]!.wall > 0 &&
@@ -139,12 +147,29 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
         battleAwards.push({ generalId: defenderCommander, wins: 1, captures: 0 });
         if (reputation) battleOutcomes.push({ winnerId: defenderCommander, loserId: attackerCommander });
       }
-      const text = `${state.generals[attackerCommander]!.name} 부곡${attackerId} 대 ${state.generals[defenderCommander]!.name} 부곡${defenderId}: 공격 ${a.troops}명, 수비 ${d.troops}명`;
-      rounds.push(text);
+      const parts: LogPart[] = [
+        generalPart(state.generals[attackerCommander]!),
+        textPart(` 부곡${attackerId} 대 `),
+        generalPart(state.generals[defenderCommander]!),
+        textPart(` 부곡${defenderId}: 공격 `),
+        numPart(a.troops),
+        textPart('명, 수비 '),
+        numPart(d.troops),
+        textPart('명'),
+      ];
+      rounds.push(parts);
       // BattleLog의 (worldId,tick,attackerId,generalId) 키당 한 행으로 저장한다.
       const report = reports.find((row) => row.generalId === defenderCommander);
-      if (report) report.text += `; ${text}`;
-      else reports.push({ generalId: defenderCommander, text });
+      if (report) {
+        report.parts!.push(textPart('; '), ...parts);
+        report.text = logPartsToText(report.parts!);
+      } else
+        reports.push({
+          generalId: defenderCommander,
+          defenderId: defenderCommander,
+          cityKey,
+          ...logSentence([...parts]),
+        });
       if (alive(d)) break;
     }
     if (defendingIds.some((id) => alive(get(id)))) continue;
@@ -163,7 +188,7 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
       );
       state = outcome.state;
       attackerFirstVolleyUsed ||= outcome.attackerFirstVolleyFired === true;
-      rounds.push(outcome.text);
+      rounds.push([textPart(outcome.text)]);
       if (cityDefense().some((row) => row.crewType === crewType && row.troops > 0 && row.atmos > 0)) break;
     }
     if (cityDefense().some((row) => row.troops > 0 && row.atmos > 0)) continue;
@@ -181,7 +206,7 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
     if (cityResources) {
       const outcome = disbandCityGarrison(state, cityKey);
       state = outcome.state;
-      rounds.push(outcome.text);
+      rounds.push([textPart(outcome.text)]);
     }
     battleAwards.push({ generalId: ownerId, wins: 0, captures: 1 });
     const city = state.cities[cityKey]!;
@@ -200,27 +225,44 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
           for (const neutralized of Object.values(state.cities).filter((row) => row.nationId === defendingNation)) {
             const ended = disbandCityGarrison(state, neutralized.cityKey);
             state = ended.state;
-            if (ended.troops) rounds.push(ended.text);
+            if (ended.troops) rounds.push([textPart(ended.text)]);
           }
         }
         removeNation(state, defendingNation);
-        history.push({ nationId: defendingNation, text: `${nation.name} 멸망, 소속 장수 재야` });
+        history.push({
+          nationId: defendingNation,
+          ...logSentence([nationPart(nation), textPart(' 멸망, 소속 장수 재야')]),
+        });
       } else if (nation.capitalCityKey === cityKey) {
         nation.capitalCityKey = remaining[0]!.cityKey;
-        history.push({ nationId: defendingNation, text: `${nation.name} 수도 함락, ${remaining[0]!.name} 천도` });
+        history.push({
+          nationId: defendingNation,
+          ...logSentence([nationPart(nation), textPart(' 수도 함락, '), cityPart(remaining[0]!), textPart(' 천도')]),
+        });
       }
     }
     refreshSupply(state);
     state = followCampaignCommanders(view, state);
   }
   const troops = attackingIds.reduce((sum, id) => sum + get(id).troops, 0);
-  const summary = `${state.generals[ownerId]!.name} ${state.cities[cityKey]!.name} ${captured ? '점령' : '점령 실패'}: 병력 ${troops}명`;
-  for (const report of reports) report.text += `, ${captured ? '점령' : '수비 유지'}`;
-  history.push({ nationId, text: `${rounds.join('; ')}; ${summary}` });
-  if (defendingNation !== null) history.push({ nationId: defendingNation, text: summary });
+  const summaryParts: LogPart[] = [
+    generalPart(state.generals[ownerId]!),
+    textPart(' '),
+    cityPart(state.cities[cityKey]!),
+    textPart(` ${captured ? '점령' : '점령 실패'}: 병력 `),
+    numPart(troops),
+    textPart('명'),
+  ];
+
+  for (const report of reports) {
+    report.parts!.push(textPart(`, ${captured ? '점령' : '수비 유지'}`));
+    report.text = logPartsToText(report.parts!);
+  }
+  history.push({ nationId, ...logSentence([...rounds.flatMap((line) => [...line, textPart('; ')]), ...summaryParts]) });
+  if (defendingNation !== null) history.push({ nationId: defendingNation, ...logSentence(summaryParts) });
   readCampaignState(state.campaign, state);
   return {
-    ...success(`${rounds.join('\n')}\n${summary}`),
+    logs: [...rounds, summaryParts].map((parts) => commandLog(parts)),
     effects: [{ kind: 'world', state }],
     reports,
     history,

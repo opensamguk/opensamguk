@@ -1,3 +1,4 @@
+import { actPart, numPart, textPart, destination } from './logging';
 import { z } from 'zod';
 import { BALANCE } from '../balance';
 import { defineCommand, fail, noArgs, ownCity, positive, success } from './support';
@@ -42,7 +43,16 @@ const recruits = (forced: boolean) =>
       general.crewType = args.crewType;
       city.population -= args.amount;
       if (forced) city.trust = Math.max(0, city.trust - BALANCE.CONSCRIPT_TRUST_LOSS);
-      return success(`${forced ? '징병' : '모병'}: ${args.amount}명, 병력 ${general.crew}명`);
+      return success([
+        { t: 'crew', id: unit.id, name: unit.name },
+        textPart(' '),
+        numPart(args.amount),
+        textPart('명을 '),
+        actPart(forced ? 'conscript' : 'recruit', forced ? '징병' : '모병'),
+        textPart('했습니다. 병력 '),
+        numPart(general.crew),
+        textPart('명입니다.'),
+      ]);
     },
   });
 const drill = (morale: boolean) =>
@@ -64,7 +74,12 @@ const drill = (morale: boolean) =>
       general.gold -= BALANCE.DRILL_COST;
       const field = morale ? 'atmos' : 'train';
       general[field] = Math.min(100, general[field] + drillGain(state, general, morale));
-      return success(`${morale ? '사기진작' : '훈련'}: ${general[field]}`);
+      return success([
+        actPart(morale ? 'morale' : 'train', morale ? '사기진작' : '훈련'),
+        textPart('했습니다. 현재 수치 '),
+        numPart(general[field]),
+        textPart('입니다.'),
+      ]);
     },
   });
 export const militaryCommands = [
@@ -93,7 +108,7 @@ export const militaryCommands = [
     change(state, actor, args) {
       const general = state.generals[actor.generalId]!;
       general.cityKey = args.cityKey;
-      return success(`${state.cities[args.cityKey]!.name} 이동`);
+      return success(destination(state.cities[args.cityKey]!, '이동'));
     },
   }),
   defineCommand({
@@ -112,7 +127,7 @@ export const militaryCommands = [
     change(state, actor) {
       const general = state.generals[actor.generalId]!;
       general.cityKey = state.nations[general.nationId!]!.capitalCityKey!;
-      return success(`${state.cities[general.cityKey]!.name} 귀환`);
+      return success(destination(state.cities[general.cityKey]!, '귀환'));
     },
   }),
   defineCommand({
@@ -129,7 +144,7 @@ export const militaryCommands = [
       general.crew = 0;
       general.train = 0;
       general.atmos = 0;
-      return success('소집해제');
+      return success([actPart('dismiss', '소집해제'), textPart('했습니다.')]);
     },
   }),
 ];

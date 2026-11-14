@@ -101,6 +101,14 @@ describe('stratagem B equivalence', () => {
       mkdirSync(new URL('./__fixtures__/', import.meta.url), { recursive: true });
       writeFileSync(fixture, await format(JSON.stringify(record), { parser: 'json', printWidth: 120 }));
     }
-    expect(record).toStrictEqual(JSON.parse(readFileSync(fixture, 'utf8')));
+    // INT-29는 출력 계약만 바꾼다. 기존 효과·검사·RNG 기준은 그대로 대조한다.
+    const stateRecord = (value: typeof record) => ({
+      ...value,
+      cases: value.cases.map(({ result, ...entry }) => ({
+        ...entry,
+        result: 'code' in result ? result : { effects: result.effects },
+      })),
+    });
+    expect(stateRecord(record)).toStrictEqual(stateRecord(JSON.parse(readFileSync(fixture, 'utf8'))));
   });
 });

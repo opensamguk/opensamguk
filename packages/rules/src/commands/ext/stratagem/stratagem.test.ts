@@ -132,12 +132,12 @@ it.each([['security'], ['commerce', 'agriculture'], ['security', 'commerce', 'ag
 describe('stratagem success seed goldens', () => {
   for (const golden of goldens)
     it(golden.key, () => {
-      expect(run(golden.key)).toEqual({
+      expect(run(golden.key)).toMatchObject({
         effects: [
           ...growth(269, 179),
           ...golden.fields.map((field, i) => ({ kind: 'city', id: 2, field, op: 'add', value: -golden.values[i]! })),
         ],
-        logs: [{ kind: 'success', text: `${golden.name} 성공: 도시2 ${golden.amounts}, 장수 0명 부상` }],
+        logs: [{ kind: 'success', text: `도시2 대상 ${golden.name} 성공: ${golden.amounts}, 장수 0명 부상` }],
         reports: [],
         history: [
           { nationId: 2, text: `도시2: ${golden.name}${golden.key === 'incite' ? '으로' : '로'} ${golden.amounts}` },
@@ -145,7 +145,7 @@ describe('stratagem success seed goldens', () => {
       });
     });
   it('plunder', () => {
-    expect(run('plunder')).toEqual({
+    expect(run('plunder')).toMatchObject({
       effects: [
         ...growth(269, 179),
         { kind: 'nation', id: 2, field: 'gold', op: 'add', value: -447 },
@@ -155,7 +155,7 @@ describe('stratagem success seed goldens', () => {
         { kind: 'general', id: 1, field: 'gold', op: 'add', value: 134 },
         { kind: 'general', id: 1, field: 'rice', op: 'add', value: 196 },
       ],
-      logs: [{ kind: 'success', text: '탈취 성공: 도시2 금 447, 쌀 653 획득' }],
+      logs: [{ kind: 'success', text: '도시2 대상 탈취 성공: 금 447, 쌀 653 획득' }],
       history: [{ nationId: 2, text: '도시2: 금 447, 쌀 653 도난' }],
     });
   });
@@ -176,9 +176,9 @@ describe.each(stratagemCommands)('$key shared contract', (def) => {
         return real.int(min, max);
       },
     };
-    expect(run(def.key, world(), rng)).toEqual({
+    expect(run(def.key, world(), rng)).toMatchObject({
       effects: growth(53, 40),
-      logs: [{ kind: 'success', text: `${def.name} 실패: 도시2` }],
+      logs: [{ kind: 'failure', text: `도시2 대상 ${def.name} 시도가 실패했습니다.` }],
     });
     expect(calls).toEqual(['next', 'int(1,100)', 'int(1,70)']);
     expect(real.next()).toBe(0.9833635643590242);
@@ -452,7 +452,7 @@ it('injuries process only active target nation defenders in id order and preserv
     { kind: 'city', id: 2, field: 'commerce', op: 'add', value: -100 },
   ]);
   expect(result.reports).toEqual([5, 9].map((generalId) => ({ generalId, text: '도시2: 계략으로 다쳤습니다.' })));
-  expect(result.logs[0]!.text).toBe('화계 성공: 도시2 농업 800, 상업 100 감소, 장수 2명 부상');
+  expect(result.logs[0]!.text).toBe('도시2 대상 화계 성공: 농업 800, 상업 100 감소, 장수 2명 부상');
   const after = applyEffects(state, result.effects);
   expect(after.generals[5]!.injury).toBe(85);
   expect(after.generals[9]!.injury).toBe(80);

@@ -1,3 +1,4 @@
+import { actPart, textPart, nationPart, generalPart } from './logging';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import { z } from 'zod';
 import { BALANCE } from '../balance';
@@ -47,9 +48,20 @@ const establish = (uprising: boolean) =>
       delete meta.offers[general.id];
       state.cities[general.cityKey]!.nationId = id;
       refreshSupply(state);
+      const { text, parts } = success([
+        generalPart(general),
+        textPart(' '),
+        nationPart(state.nations[id]!),
+        textPart(' 건국'),
+      ]).logs[0]!;
       return {
-        ...success(`${args.name} ${uprising ? '거병' : '건국'}`),
-        history: [{ nationId: id, text: `${general.name} ${args.name} 건국` }],
+        ...success([
+          nationPart(state.nations[id]!),
+          textPart(' '),
+          actPart(uprising ? 'uprising' : 'found', uprising ? '거병' : '건국'),
+          textPart('했습니다.'),
+        ]),
+        history: [{ nationId: id, text, ...(parts ? { parts } : {}) }],
       };
     },
   });
@@ -90,7 +102,7 @@ const join = (random: boolean) =>
       general.officerLevel = 1;
       general.cityKey = nation.capitalCityKey!;
       if (state.commandMeta) delete state.commandMeta.offers[general.id];
-      return success(`${nation.name} 임관`);
+      return success([nationPart(nation), textPart(' 소속으로 '), actPart('join', '임관'), textPart('했습니다.')]);
     },
   });
 export const personnelCommands = [
@@ -112,7 +124,7 @@ export const personnelCommands = [
       const general = state.generals[actor.generalId]!;
       general.nationId = null;
       general.officerLevel = 0;
-      return success('하야');
+      return success([actPart('resign', '하야'), textPart('했습니다.')]);
     },
   }),
   defineCommand({
@@ -131,7 +143,12 @@ export const personnelCommands = [
     change(state, actor, args) {
       const nationId = state.generals[actor.generalId]!.nationId!;
       commandMeta(state).offers[args.generalId] = nationId;
-      return success(`${state.generals[args.generalId]!.name} 등용 제안`);
+      return success([
+        generalPart(state.generals[args.generalId]!),
+        textPart('에게 '),
+        actPart('invite', '등용 제안'),
+        textPart('을 보냈습니다.'),
+      ]);
     },
   }),
   defineCommand({
@@ -157,7 +174,12 @@ export const personnelCommands = [
       general.cityKey = nation.capitalCityKey!;
       general.officerLevel = 1;
       delete state.commandMeta!.offers[general.id];
-      return success(`${nation.name} 등용 수락`);
+      return success([
+        nationPart(nation),
+        textPart('의 '),
+        actPart('accept_invite', '등용 제안'),
+        textPart('을 수락했습니다.'),
+      ]);
     },
   }),
 ];

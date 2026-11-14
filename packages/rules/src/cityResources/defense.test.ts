@@ -115,7 +115,7 @@ describe('AC-INT-18A 실제 도시 수비병·군량·점령', () => {
     const state = applyEffects(world, result.effects);
     expect(state.cities[2]!.nationId).toBe(2);
     expect(state.cityResources!.cities['2']!.garrison[0]!.troops).toBeGreaterThan(0);
-    expect(result.logs[0]!.text).toContain('점령 실패');
+    expect(result.logs.map((log) => log.text).join('\n')).toContain('점령 실패');
   });
   it('부곡 다음 도시 병종 다음 성벽을 교전하고 금·쌀을 같은 도시에 남긴다', () => {
     const world = fixture();
@@ -134,7 +134,7 @@ describe('AC-INT-18A 실제 도시 수비병·군량·점령', () => {
     world.cities[2]!.wall = 1;
     const result = campaignAttack.execute(deepFreeze(world), actor, { cityKey: 2 }, rng());
     const state = applyEffects(world, result.effects),
-      text = result.logs[0]!.text;
+      text = result.logs.map((log) => log.text).join('\n');
     expect(text.indexOf('대 ' + world.generals[2]!.name)).toBeLessThan(text.indexOf('대 도시 병종'));
     expect(text.indexOf('대 도시 병종')).toBeLessThan(text.indexOf('성벽 교전'));
     expect(state.cities[2]!.nationId).toBe(1);

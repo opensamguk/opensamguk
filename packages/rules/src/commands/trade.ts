@@ -1,3 +1,5 @@
+import { commandLog } from './support';
+import { cityPart, actPart, numPart, textPart } from './logging';
 // D16, T2-07의 2026-10-24 승인 식. v1 군량매매의 이식이 아니다.
 import { z } from 'zod';
 import { TICKS_PER_MONTH } from '../clock/constants';
@@ -117,7 +119,18 @@ export const trade: CommandDef<TradeArgs> = {
         { kind: 'general', id: general.id, field: 'experience', op: 'add', value: 10 },
         { kind: 'general', id: general.id, field: 'dedication', op: 'add', value: 15 },
       ],
-      logs: [{ kind: 'success', text: `${target.name} 교역: 국고 금 ${Math.round(income)}, 쌀 ${Math.round(income)}` }],
+      logs: [
+        commandLog([
+          cityPart(target),
+          textPart(' '),
+          actPart('trade', '교역'),
+          textPart('으로 국고 금 '),
+          numPart(Math.round(income)),
+          textPart(', 쌀 '),
+          numPart(Math.round(income)),
+          textPart('을 얻었습니다.'),
+        ]),
+      ],
     };
   },
 };

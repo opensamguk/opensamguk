@@ -1,3 +1,5 @@
+import { commandLog } from '../../support';
+import { cityPart, textPart, actPart, logSentence } from '../../logging';
 import { cloneWorld } from '../../../model/clone';
 import type { WorldState, WorldView } from '../../../model/world';
 import type { CommandDef } from '../../types';
@@ -37,11 +39,24 @@ export function makeSpyCommand(clone: (view: WorldView) => WorldState = cloneWor
             : `첩보: ${city.name} 소문만 들었습니다`;
       return {
         effects: [{ kind: 'world', state }],
-        logs: [{ kind: 'success', text }],
+        logs: [
+          commandLog([
+            actPart('spy', '첩보'),
+            textPart(': '),
+            cityPart(city),
+            textPart(text.slice(text.indexOf(city.name) + city.name.length)),
+          ]),
+        ],
         ...(city.nationId === null
           ? {}
           : {
-              history: [{ nationId: city.nationId, kind: 'intel', text: `${city.name}: 누군가 이 도시를 살폈습니다` }],
+              history: [
+                {
+                  nationId: city.nationId,
+                  kind: 'intel',
+                  ...logSentence([cityPart(city), textPart(': 누군가 이 도시를 살폈습니다')]),
+                },
+              ],
             }),
       };
     },
