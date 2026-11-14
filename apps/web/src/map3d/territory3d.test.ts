@@ -29,6 +29,9 @@ describe('territoryTiles', () => {
     );
     expect(count(tiles.owner, 1)).toBeGreaterThan(count(tiles.owner, 2));
     expect(reachOf(8)).toBeGreaterThan(reachOf(1));
+    // 이(4, 이민족 본거)는 종류 코드라 소(5)보다 넓다. 진(2)은 소보다 좁다.
+    expect(reachOf(4)).toBeGreaterThan(reachOf(5));
+    expect(reachOf(2)).toBeLessThan(reachOf(5));
   });
 
   it('무대 안 땅은 빈 칸 없이 채우고 무대 밖 판 가장자리만 오지로 둔다', () => {

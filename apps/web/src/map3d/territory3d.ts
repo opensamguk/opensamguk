@@ -32,12 +32,17 @@ export function fromTile(u: number, v: number, canvas: { width: number; height: 
   return { x: (qu - qv) * Math.SQRT1_2 + canvas.width / 2, y: (qu + qv) * Math.SQRT1_2 + canvas.height / 2 };
 }
 
-/** 도시 규모별로 영지가 닿는 거리(칸 수). 작은 성 약 2.6칸, 큰 성 약 5.8칸. */
 /** 무대 너비: 가장 가까운 거점에서 땅길로 이 칸 수(약 340km)보다 멀면 오지다. */
 export const STAGE = 12;
 
+// 단계 코드 0~4는 크기가 아니라 원작의 거점 종류다(0 무, 1 수, 2 진, 3 관, 4 이). 5~9가 크기(소·중·대·특·경)다.
+// 영지 넓이는 종류를 크기 순위로 바꿔 정한다(D-092). 이민족 본거(이)는 초원·산지를 다스리므로 대만큼 넓다.
+const REACH_RANK = [1, 1.5, 2, 2, 7, 5, 6, 7, 8, 9] as const;
+
+/** 도시 단계별로 영지가 닿는 거리(칸 수). 진 약 3.1칸, 소 약 4.5칸, 이·대 약 5.4칸, 경 약 6.3칸. */
 export function reachOf(level: number) {
-  return 2.2 + Math.min(Math.max(level, 1), 8) * 0.45;
+  const rank = REACH_RANK[Math.min(Math.max(Math.round(level), 0), 9)] ?? 5;
+  return 2.2 + rank * 0.45;
 }
 
 const hex = (color: string | null): [number, number, number] => {
