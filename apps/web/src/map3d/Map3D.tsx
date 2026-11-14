@@ -328,8 +328,14 @@ export default function Map3D({
         scene.loadSiteModels(modelBase.replace(/\/$/, ''), MODEL_NAMES).then(() => invalidateRef.current()),
       );
     // 개발 미리보기: ?painted=<그림 주소>&prect=x0,y0,x1,y1(캔버스 좌표)이면 구운 그림 지도를 그 구역에 씌운다(INT-27 그림 지도 굽기 시험).
-    const paintedUrl = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('painted') : null;
-    const paintedRect = new URLSearchParams(window.location.search).get('prect')?.split(',').map(Number);
+    // 주소에 painted가 없으면 개발 모형 주소의 전국 그림(painted/national.png, 캔버스 전체)을 쓴다.
+    const paintedUrl = import.meta.env.DEV
+      ? (new URLSearchParams(window.location.search).get('painted') ??
+        (modelBase ? `${modelBase.replace(/\/$/, '')}/painted/national.png` : null))
+      : null;
+    const paintedRect = (new URLSearchParams(window.location.search).get('prect') ?? '0,0,1400,1000')
+      .split(',')
+      .map(Number);
     if (paintedUrl && paintedRect?.length === 4 && paintedRect.every(Number.isFinite))
       void scene
         .loadPaintedRegion(paintedUrl, paintedRect as [number, number, number, number])

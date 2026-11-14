@@ -70,11 +70,27 @@ type Site = PublicGeography['sites'][number];
 export type AnchorSite = Site & { anchorKey: number };
 
 // 위에서 내려다보는 각도(수평에서 55°). 화면 위쪽이 북쪽이다.
-export const ELEVATION = (35 * Math.PI) / 180;
+/**
+ * 2D 그림 지도(INT-27, 사용자 2026-11-14 "바로 전환"): 사용자 참고 지도는 3D 지형이 아니라 위에서 본 평평한 그림 한 장이다.
+ * 땅은 평평하게 두고, 카메라는 위에서 똑바로 내려다보며, 땅 색은 구운·그린 그림을 조명 없이 그대로 쓴다.
+ */
+export const FLAT_MAP = true;
+export const ELEVATION = FLAT_MAP ? Math.PI / 2 : (35 * Math.PI) / 180;
 /** 지형 명암 법선의 높이 배율(실제 높이는 그대로). */
 const RELIEF_SHADE = 2.4;
 /** 영지 칸 한 변(지도 단위). 칸은 45° 돌려 놓아 비스듬히 보면 마름모다. */
 export const TILE = 8;
+
+/** 2D 지도 거점 그림 한 장: 정사각 그림 한 변(px), 바닥 가운데 픽셀(왼쪽 위 기준), 바닥 마름모 가로(px), 원래 너비·키. */
+type SiteSprite = {
+  texture: Texture;
+  size: number;
+  anchor: [number, number];
+  basePx: number;
+  /** Blender로 찍은 모형 그림만: 원래 너비·키(높은 모형을 줄일 때). 그린 그림에는 없다. */
+  width?: number;
+  height?: number;
+};
 const NEUTRAL = '#d6d0c4';
 const TERRAIN_TEXTURES = ['grass', 'field', 'dirt', 'forest', 'rock', 'cliff', 'snow', 'sand'] as const;
 /** 노멀맵을 쓰는 질감(땅 결·바위 결). 표본기 수를 아끼려고 둘만 쓴다. */
@@ -92,7 +108,7 @@ float segmentDistance(vec2 p, vec2 a, vec2 b) {
   return length(p - a - ab * t);
 }
 vec3 drawRoads(vec3 base, vec2 xz) {
-  vec2 q = vec2(xz.x + xz.y, xz.y - xz.x) * ${Math.SQRT1_2} / ${TILE.toFixed(1)};
+  vec2 q = vec2(xz.x * 0.5 + xz.y, xz.y - xz.x * 0.5) / ${TILE.toFixed(1)};
   vec2 cell = floor(q);
   vec2 f = fract(q);
   float pxTile = max(fwidth(q).x, fwidth(q).y);
@@ -158,7 +174,7 @@ vec4 tileAt(vec2 cell) {
 }
 bool hasNation(vec4 tile) { return tile.a > 0.0 && dot(tile.rgb, vec3(1.0)) > 0.0; }
 vec3 territoryColor(vec3 base, vec2 xz) {
-  vec2 q = vec2(xz.x + xz.y, xz.y - xz.x) * ${Math.SQRT1_2} / ${TILE.toFixed(1)};
+  vec2 q = vec2(xz.x * 0.5 + xz.y, xz.y - xz.x * 0.5) / ${TILE.toFixed(1)};
   vec2 cell = floor(q);
   vec2 f = fract(q);
   vec2 fw = fwidth(q);
@@ -284,6 +300,9 @@ export class MapScene {
   /** 받아 둔 GLB 거점 모형(이름 → 거리 단계별 기하·재질). 개발 미리보기(?models=)와 승인 모형이 채운다. */
   private modelSet = new Map<string, Array<{ geometry: BufferGeometry; material: Mesh['material']; box: Box3 }>>();
   private siteModelMeshes: Array<{ lod: number; mesh: InstancedMesh }> = [];
+  private spriteSet = new Map<string, SiteSprite>();
+  /** 2D 지도: 거점 id → 이름판을 그림 꼭대기로 올릴 지도 거리. */
+  private labelLift = new Map<string, number>();
   /** 지금 화면 확대 단계(1 전체 ~ 4 크게). 이름판 배율에 쓴다. */
   tier: ZoomTier = 1;
   // 모형 윤곽선 재질: 뒷면만, 법선 방향으로 부풀린다(모형 크기 대비 약 1.2%).
@@ -377,6 +396,10 @@ transformed += normalize(normal) * 0.012;`,
     const depth = heights ? decodeDepth(heights, grid.columns, grid.rows) : null;
     this.field = metres ? heightFieldFromMetres(grid, metres, depth) : heightField(grid);
     this.flattenSitePads(map);
+    // 2D 그림 지도: 땅은 평평하게(물 칸만 물높이 아래로 둬 바다·호수가 보이게).
+    if (FLAT_MAP)
+      for (let i = 0; i < this.field.length; i++)
+        this.field[i] = this.field[i]! <= WATER_LEVEL ? WATER_LEVEL - 0.6 : 0.02;
 
     // 하늘빛(위)과 땅에서 되비치는 흙빛(아래). 해가 낮아 능선의 명암이 또렷하다.
     // 화풍 규격(style.ts): 하늘빛 채움 하나 + 해 하나. 그늘에 바탕색의 약 45%가 남는다.
@@ -565,7 +588,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, mix(vec3(0.93, 0.94, 0.96), sampleTex(t
 if (vGround.y > 0.0) diffuseColor.rgb = territoryColor(diffuseColor.rgb, vGround.xz);
 // 육로는 칸 직선(drawRoads) 대신 곡선 띠 메시로 그린다(사용자 2026-11-14: 길이 부자연스럽다). 칸 길 자료는 규칙용으로 남긴다.
 // 오지(무대 밖 땅): 색을 빼고 어둡게 해 게임 무대 밖임을 보인다.
-if (vGround.y > 0.05 && tileAt(floor(vec2(vGround.x + vGround.z, vGround.z - vGround.x) * ${Math.SQRT1_2} / ${TILE.toFixed(1)})).a == 0.0) {
+if (vGround.y > 0.05 && tileAt(floor(vec2(vGround.x * 0.5 + vGround.z, vGround.z - vGround.x * 0.5) / ${TILE.toFixed(1)})).a == 0.0) {
   float grey = dot(diffuseColor.rgb, vec3(0.3, 0.55, 0.15));
   diffuseColor.rgb = mix(diffuseColor.rgb, vec3(grey) * 0.72, 0.65);
 }`,
@@ -573,7 +596,7 @@ if (vGround.y > 0.05 && tileAt(floor(vec2(vGround.x + vGround.z, vGround.z - vGr
         .replace(
           '#include <opaque_fragment>',
           // 그림 구역은 명암이 구워져 있어 실시간 조명을 거의 빼고 그림 색을 그대로 낸다(조명 10%만 남긴다).
-          `outgoingLight = mix(outgoingLight, diffuseColor.rgb, pIn * 0.9);\n#include <opaque_fragment>`,
+          `outgoingLight = mix(outgoingLight, diffuseColor.rgb, pIn * ${FLAT_MAP ? '1.0' : '0.9'});\n#include <opaque_fragment>`,
         )
         .replace(
           '#include <tonemapping_fragment>',
@@ -1200,6 +1223,10 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
    * 모형마다 메시 하나(Rodin 결과)를 기대하며, 여럿이면 첫 메시를 쓴다.
    */
   async loadSiteModels(base: string, names: readonly string[]) {
+    if (FLAT_MAP) {
+      await this.loadSiteSprites(base, names);
+      return;
+    }
     await Promise.all(
       names.map(async (name) => {
         try {
@@ -1218,6 +1245,32 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     this.placeSiteModels();
   }
 
+  /**
+   * 2D 그림 지도의 거점 그림(스프라이트)을 받는다. `<base>/sprites/sprites.json`에 그림마다 크기·바닥 가운데
+   * 픽셀·바닥 마름모 가로 픽셀이 있고, 그림은 Rodin 모형을 격자와 같은 각도(방위 45°, 고도 30°)로 미리 찍은 것이다.
+   */
+  private async loadSiteSprites(base: string, names: readonly string[]) {
+    const response = await fetch(`${base}/sprites/sprites.json`, { cache: 'no-cache' });
+    if (!response.ok) return;
+    const meta = (await response.json()) as Record<string, Omit<SiteSprite, 'texture'>>;
+    const loader = new TextureLoader();
+    await Promise.all(
+      names
+        .filter((name) => meta[name])
+        .map(async (name) => {
+          try {
+            const texture = await loader.loadAsync(`${base}/sprites/${name}.png`);
+            texture.colorSpace = SRGBColorSpace;
+            texture.anisotropy = 4;
+            this.spriteSet.set(name, { ...meta[name]!, texture });
+          } catch {
+            // 없는 그림은 건너뛴다.
+          }
+        }),
+    );
+    this.placeSiteModels();
+  }
+
   // 받은 모형을 거점마다 세운다. 같은 모형·같은 거리 단계는 하나의 복제 묶음(InstancedMesh)으로 그린다.
   // 모형이 선 거점이 있으면 임시 상자 모형은 감춘다(고리는 둔다).
   private placeSiteModels() {
@@ -1226,8 +1279,10 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
       mesh.dispose();
     }
     this.siteModelMeshes = [];
-    if (!this.lastSites || this.modelSet.size === 0) return;
-    const available = new Set(this.modelSet.keys());
+    this.labelLift.clear();
+    const source: ReadonlyMap<string, unknown> = FLAT_MAP ? this.spriteSet : this.modelSet;
+    if (!this.lastSites || source.size === 0) return;
+    const available = new Set(source.keys());
     const groups = new Map<string, AnchorSite[]>();
     for (const site of this.lastSites.anchors) {
       const level = this.lastSites.cityByKey.get(site.anchorKey)?.level;
@@ -1242,46 +1297,48 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     const moveMatrix = new Matrix4();
     const turn = new Matrix4().makeRotationY(Math.PI / 4);
     const tint = new Color();
-    for (const [name, sites] of groups) {
-      const lods = this.modelSet.get(name)!;
-      lods.forEach(({ geometry, material, box }, lod) => {
-        const mesh = new InstancedMesh(geometry, material, sites.length);
-        const width = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) || 1;
-        sites.forEach((site, index) => {
-          const level = this.lastSites!.cityByKey.get(site.anchorKey)?.level;
-          // 모형은 영지 칸 한 칸 안에 든다. 거점이 놓인 칸의 가운데에 세우고 단계별 비율로 칸을 채운다.
-          const footprint = TILE * tileFill(site.kind, level);
-          // 발자국에 맞추되 키는 발자국을 넘지 않게 묶는다(관문 바위처럼 높은 모형이 탑처럼 솟지 않게).
-          const height = box.max.y - box.min.y || 1;
-          const scale = Math.min(footprint / width, (footprint * 0.55) / height);
-          const centre = this.tileCentre(site.position.x, site.position.y);
-          const base = this.world(centre.x, centre.y);
-          const cx = (box.min.x + box.max.x) / 2;
-          const cz = (box.min.z + box.max.z) / 2;
-          // 가운데를 원점에 두고 키우고, 45° 돌려 성벽이 마름모 영지 칸과 나란하게 한 뒤 거점 자리로 옮긴다.
-          matrix
-            .makeTranslation(-cx, -box.min.y, -cz)
-            .premultiply(scaleMatrix.makeScale(scale, scale, scale))
-            .premultiply(turn)
-            .premultiply(moveMatrix.makeTranslation(base.x, base.y - 0.25, base.z));
-          mesh.setMatrixAt(index, matrix);
-          mesh.setColorAt(index, tint.set(regionTint(this.lastSites!.cityByKey.get(site.anchorKey)?.region)));
+    if (FLAT_MAP) this.placeSiteSprites(groups);
+    else
+      for (const [name, sites] of groups) {
+        const lods = this.modelSet.get(name)!;
+        lods.forEach(({ geometry, material, box }, lod) => {
+          const mesh = new InstancedMesh(geometry, material, sites.length);
+          const width = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) || 1;
+          sites.forEach((site, index) => {
+            const level = this.lastSites!.cityByKey.get(site.anchorKey)?.level;
+            // 모형은 영지 칸 한 칸 안에 든다. 거점이 놓인 칸의 가운데에 세우고 단계별 비율로 칸을 채운다.
+            const footprint = TILE * tileFill(site.kind, level);
+            // 발자국에 맞추되 키는 발자국을 넘지 않게 묶는다(관문 바위처럼 높은 모형이 탑처럼 솟지 않게).
+            const height = box.max.y - box.min.y || 1;
+            const scale = Math.min(footprint / width, (footprint * 0.55) / height);
+            const centre = this.tileCentre(site.position.x, site.position.y);
+            const base = this.world(centre.x, centre.y);
+            const cx = (box.min.x + box.max.x) / 2;
+            const cz = (box.min.z + box.max.z) / 2;
+            // 가운데를 원점에 두고 키우고, 45° 돌려 성벽이 마름모 영지 칸과 나란하게 한 뒤 거점 자리로 옮긴다.
+            matrix
+              .makeTranslation(-cx, -box.min.y, -cz)
+              .premultiply(scaleMatrix.makeScale(scale, scale, scale))
+              .premultiply(turn)
+              .premultiply(moveMatrix.makeTranslation(base.x, base.y - 0.25, base.z));
+            mesh.setMatrixAt(index, matrix);
+            mesh.setColorAt(index, tint.set(regionTint(this.lastSites!.cityByKey.get(site.anchorKey)?.region)));
+          });
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
+          mesh.visible = lod === 2;
+          this.scene.add(mesh);
+          this.siteModelMeshes.push({ lod, mesh });
+          // 카툰 윤곽선: 가까이 보는 두 단계(0·1)만. 같은 기하를 법선 방향으로 조금 부풀린 뒷면을 짙게 칠한다.
+          if (lod < 2) {
+            const outline = new InstancedMesh(geometry, this.outlineMaterial, sites.length);
+            outline.instanceMatrix.copy(mesh.instanceMatrix);
+            outline.visible = false;
+            this.scene.add(outline);
+            this.siteModelMeshes.push({ lod, mesh: outline });
+          }
         });
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        mesh.visible = lod === 2;
-        this.scene.add(mesh);
-        this.siteModelMeshes.push({ lod, mesh });
-        // 카툰 윤곽선: 가까이 보는 두 단계(0·1)만. 같은 기하를 법선 방향으로 조금 부풀린 뒷면을 짙게 칠한다.
-        if (lod < 2) {
-          const outline = new InstancedMesh(geometry, this.outlineMaterial, sites.length);
-          outline.instanceMatrix.copy(mesh.instanceMatrix);
-          outline.visible = false;
-          this.scene.add(outline);
-          this.siteModelMeshes.push({ lod, mesh: outline });
-        }
-      });
-    }
+      }
     // 영지 고리도 모형 크기·칸 가운데에 맞춘다.
     const ringMesh = this.rings[0] as InstancedMesh | undefined;
     if (ringMesh) {
@@ -1350,8 +1407,45 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     return this.grid.cells[row * this.grid.columns + column]!;
   }
 
+  // 2D 그림 지도: 거점 그림을 평평한 판으로 깐다(위에서 보는 카메라라 판이 곧 화면의 그림이다).
+  // 그림의 바닥 마름모가 영지 칸 마름모(가로 2·TILE)에 단계별 비율로 맞게 키우고, 바닥 가운데를 칸 가운데에 둔다.
+  // 남쪽(화면 아래) 그림이 북쪽 그림을 덮도록 남쪽일수록 조금 높이 둔다.
+  private placeSiteSprites(groups: Map<string, AnchorSite[]>) {
+    const matrix = new Matrix4();
+    const tint = new Color();
+    const plane = new PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+    for (const [name, sites] of groups) {
+      const sprite = this.spriteSet.get(name)!;
+      const material = new MeshBasicMaterial({ map: sprite.texture, alphaTest: 0.35, alphaToCoverage: true });
+      const mesh = new InstancedMesh(plane, material, sites.length);
+      // 높은 모형(관문 바위 등)은 키가 바닥 너비의 0.55배를 넘지 않게 함께 줄인다(3D 때와 같은 규칙).
+      const squeeze = sprite.width && sprite.height ? Math.min(1, (0.55 * sprite.width) / sprite.height) : 1;
+      sites.forEach((site, index) => {
+        const level = this.lastSites!.cityByKey.get(site.anchorKey)?.level;
+        const perPx = ((2 * TILE * tileFill(site.kind, level)) / sprite.basePx) * squeeze;
+        const side = sprite.size * perPx;
+        const centre = this.tileCentre(site.position.x, site.position.y);
+        const x = centre.x - this.canvasSize.width / 2 + (sprite.size / 2 - sprite.anchor[0]) * perPx;
+        const z = centre.y - this.canvasSize.height / 2 + (sprite.size / 2 - sprite.anchor[1]) * perPx;
+        const lift = 2 + centre.y / this.canvasSize.height;
+        matrix.makeScale(side, 1, side).setPosition(x, lift, z);
+        mesh.setMatrixAt(index, matrix);
+        mesh.setColorAt(index, tint.set(regionTint(this.lastSites!.cityByKey.get(site.anchorKey)?.region)));
+        this.labelLift.set(site.id, sprite.anchor[1] * perPx * 0.92);
+      });
+      this.scene.add(mesh);
+      this.siteModelMeshes.push({ lod: -1, mesh });
+    }
+  }
+
   /** 이름판을 붙일 3D 자리: 모형을 쓰면 칸 가운데 모형 꼭대기, 아니면 임시 상자 모형 위. */
   labelAnchor(site: AnchorSite, level: number | undefined) {
+    const lift = this.labelLift.get(site.id);
+    if (FLAT_MAP && lift !== undefined) {
+      // 위에서 보는 2D 지도: 높이는 화면에 드러나지 않으니 그림 꼭대기만큼 화면 위(북쪽)로 올린다.
+      const centre = this.tileCentre(site.position.x, site.position.y);
+      return this.world(centre.x, centre.y - lift, 3);
+    }
     if (this.siteModelMeshes.length) {
       const centre = this.tileCentre(site.position.x, site.position.y);
       return this.world(centre.x, centre.y, TILE * tileFill(site.kind, level) * 0.45);
@@ -1615,7 +1709,11 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     camera.top = this.height / 2;
     camera.bottom = -this.height / 2;
     const distance = 1000;
-    camera.position.set(state.x, Math.sin(ELEVATION) * distance, state.z + Math.cos(ELEVATION) * distance);
+    if (FLAT_MAP) {
+      // 위에서 똑바로 내려다본다. 화면 위쪽이 북쪽(−z).
+      camera.up.set(0, 0, -1);
+      camera.position.set(state.x, distance, state.z);
+    } else camera.position.set(state.x, Math.sin(ELEVATION) * distance, state.z + Math.cos(ELEVATION) * distance);
     camera.lookAt(state.x, 0, state.z);
     camera.zoom = state.zoom || 1;
     camera.updateProjectionMatrix();
@@ -1628,8 +1726,9 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     const hazeTier = zoomTier(this.width / (state.zoom || 1));
     const haze = [0, 0.1, 0.18, 0.26, 0.32][hazeTier] ?? 0.2;
     const fog = this.scene.fog as Fog;
-    fog.near = near;
-    fog.far = near + (topDepth - near) / haze;
+    // 2D 그림 지도는 모든 땅이 같은 깊이라 깊이 안개를 쓰지 않는다.
+    fog.near = FLAT_MAP ? 1e6 : near;
+    fog.far = FLAT_MAP ? 2e6 : near + (topDepth - near) / haze;
     // 그림자 범위는 보이는 지도만큼. 멀리서 볼 때는 그림자 해상도가 모자라 그림자를 끈다.
     const span = Math.max(this.width, this.height) / (state.zoom || 1);
     this.sun.castShadow = span < 420;
@@ -1649,7 +1748,7 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     this.tier = zoomTier(this.width / (state.zoom || 1));
     if (this.siteModelMeshes.length) {
       const lod = TIER_LOD[this.tier];
-      for (const entry of this.siteModelMeshes) entry.mesh.visible = entry.lod === lod;
+      for (const entry of this.siteModelMeshes) if (entry.lod >= 0) entry.mesh.visible = entry.lod === lod;
     }
     this.waterTime.value = performance.now() / 1000;
     if (this.painterly) this.paint.render(this.renderer, this.scene, camera);

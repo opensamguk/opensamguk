@@ -117,9 +117,10 @@ export function planTileRoutes(
     const goalU = route.to % columns;
     const goalV = Math.floor(route.to / columns);
     const heuristic = (index: number) => {
-      const du = Math.abs((index % columns) - goalU);
-      const dv = Math.abs(Math.floor(index / columns) - goalV);
-      return (Math.max(du, dv) + (Math.SQRT2 - 1) * Math.min(du, dv)) * 0.5;
+      // 2:1 마름모 칸의 실제 곧은 거리(칸 한 변 단위) × 최소 칸 비용 0.5. 언제나 실제 비용 이하라 최단 경로가 보장된다.
+      const su = (index % columns) - goalU;
+      const sv = Math.floor(index / columns) - goalV;
+      return Math.hypot(su - sv, (su + sv) / 2) * 0.5;
     };
     const heap: Array<[number, number]> = [];
     const push = (item: [number, number]) => {
@@ -168,7 +169,8 @@ export function planTileRoutes(
         const next = nv * columns + nu;
         if (!passable(next)) continue;
         if (du !== 0 && dv !== 0 && !passable(v * columns + nu) && !passable(nv * columns + u)) continue;
-        const length = du !== 0 && dv !== 0 ? Math.SQRT2 : 1;
+        // 2:1 마름모 칸 사이 실제 거리(칸 한 변 단위).
+        const length = Math.hypot(du - dv, (du + dv) / 2);
         const total = cost[index]! + step(next) * length;
         if (total < cost[next]!) {
           cost[next] = total;

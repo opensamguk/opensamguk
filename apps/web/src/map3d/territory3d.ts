@@ -22,14 +22,16 @@ export type TerritoryTiles = {
 export function toTile(x: number, y: number, canvas: { width: number; height: number }, tile: number) {
   const wx = x - canvas.width / 2;
   const wz = y - canvas.height / 2;
-  return { u: ((wx + wz) * Math.SQRT1_2) / tile, v: ((wz - wx) * Math.SQRT1_2) / tile };
+  // 2:1 마름모 칸(INT-27 2D 그림 지도, 사용자 참고 그림의 격자 각도 ±26.6°): 가로 대각선 2T, 세로 대각선 T.
+  // 넓이는 예전 45° 정사각 칸과 같은 T²이다.
+  return { u: wx / (2 * tile) + wz / tile, v: wz / tile - wx / (2 * tile) };
 }
 
 /** 돌린 칸 좌표(칸 단위) → 지도 좌표. */
 export function fromTile(u: number, v: number, canvas: { width: number; height: number }, tile: number) {
   const qu = u * tile;
   const qv = v * tile;
-  return { x: (qu - qv) * Math.SQRT1_2 + canvas.width / 2, y: (qu + qv) * Math.SQRT1_2 + canvas.height / 2 };
+  return { x: qu - qv + canvas.width / 2, y: (qu + qv) / 2 + canvas.height / 2 };
 }
 
 /** 지도 판을 덮는 돌린 칸 격자의 시작 칸과 크기. 영지 칸·칸 길이 같은 격자를 쓴다. */
@@ -152,15 +154,17 @@ export function territoryTiles(
     cost[index] = 0;
     push([0, index, which, 0]);
   });
+  // 2:1 마름모 칸의 이웃까지 실제 거리(칸 한 변 T 단위): 변 이웃 √5/2, 세로 이웃(u·v 같이) 1, 가로 이웃(u·v 반대) 2.
+  const side = Math.sqrt(5) / 2;
   const steps: Array<[number, number, number]> = [
-    [1, 0, 1],
-    [-1, 0, 1],
-    [0, 1, 1],
-    [0, -1, 1],
-    [1, 1, Math.SQRT2],
-    [1, -1, Math.SQRT2],
-    [-1, 1, Math.SQRT2],
-    [-1, -1, Math.SQRT2],
+    [1, 0, side],
+    [-1, 0, side],
+    [0, 1, side],
+    [0, -1, side],
+    [1, 1, 1],
+    [1, -1, 2],
+    [-1, 1, 2],
+    [-1, -1, 1],
   ];
   while (heap.length) {
     const [score, index, which, walked] = pop();
