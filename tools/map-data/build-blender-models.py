@@ -19,6 +19,10 @@ def slot(name):
     if material is None:
         material = bpy.data.materials.new(name)
         material.diffuse_color = (*SLOTS[name], 1)
+        material.use_nodes = True
+        shader = material.node_tree.nodes.get('Principled BSDF')
+        shader.inputs['Base Color'].default_value = (*SLOTS[name], 1)
+        shader.inputs['Roughness'].default_value = .32 if name == 'water' else .77
     return material
 
 def finish(obj, material):
@@ -198,6 +202,7 @@ def combine(parts, name):
     bpy.ops.object.join()
     bpy.context.scene.cursor.location = (0, 0, 0)
     bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
     primary.name = name
     return primary
 
@@ -290,13 +295,18 @@ def export_detail(out, capital):
     bpy.context.view_layer.update()
     data = {obj.data for obj in bpy.context.scene.objects if obj.type == 'MESH'}
     for datum in data:
-        datum.calc_loop_triangles()
         assert datum.uv_layers, datum.name
-    count = sum(len(datum.loop_triangles) for datum in data)
+    # Measure evaluated meshes once per linked prototype, including the wall bevel.
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    objects = {obj.data: obj for obj in bpy.context.scene.objects if obj.type == 'MESH'}
+    evaluated = [obj.evaluated_get(depsgraph).data for obj in objects.values()]
+    for datum in evaluated:
+        datum.calc_loop_triangles()
+    count = sum(len(datum.loop_triangles) for datum in evaluated)
     assert count <= 150_000, count
     bpy.ops.export_scene.gltf(filepath=str(out), export_format='GLB', export_yup=True,
                               export_texcoords=True, export_normals=True,
-                              export_materials='EXPORT', export_gpu_instances=True)
+                              export_materials='EXPORT', export_apply=True, export_gpu_instances=True)
     print(f'D-094 {homes} courtyard residences; {count} unique mesh triangles')
 
 
