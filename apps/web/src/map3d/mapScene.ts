@@ -168,8 +168,17 @@ vec3 territoryColor(vec3 base, vec2 xz) {
   vec3 color = base;
   // 멀리서 볼수록 나라 색을 진하게 칠해 천하 판도가 한눈에 읽힌다. 가까이서는 지형이 보이게 옅게.
   float far = smoothstep(0.04, 0.22, pxTile);
-  // 나라 색은 곱해서 칠한다(지형 명암이 살아 있게, 참고 시안의 천하 전도처럼). 멀리서 볼수록 진하게.
-  if (hasNation(own)) color = mix(color, color * (own.rgb * 1.5 + 0.15), mix(0.28, 0.62, far));
+  // 나라 색은 밝기 보존 착색이다(코에이 삼국지14 관찰, INT-27): 지형의 밝기는 두고 색조·채도만 나라 색으로 바꾼다.
+  // 곱하기 칠은 산·그늘이 검게 죽었다. 멀리 볼수록 착색을 진하게, 지형 대비는 낮춰 지도 모드로 넘어간다.
+  if (hasNation(own)) {
+    float lum = dot(color, vec3(0.299, 0.587, 0.114));
+    float flatL = mix(lum, 0.5 + (lum - 0.5) * 0.55, far);
+    vec3 tint = own.rgb / max(dot(own.rgb, vec3(0.299, 0.587, 0.114)), 0.08);
+    vec3 tinted = clamp(tint * flatL, 0.0, 1.0);
+    // 물(청록, 파랑이 빨강보다 뚜렷이 큰 색)은 칠하지 않는다. 가까이 볼수록 옅게(코에이 근경은 거의 칠하지 않는다).
+    float wet = smoothstep(0.06, 0.18, color.b - color.r);
+    color = mix(color, tinted, mix(0.14, 0.72, far) * (1.0 - wet));
+  }
   float edge = min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y));
   // 칸 격자는 칸이 화면에서 약 60px 넘게 보일 때만(확대 3·4단계). 그보다 멀면 국경·나라 색만 남긴다.
   float grid = (1.0 - smoothstep(0.0, pxTile * 1.1, edge)) * (1.0 - smoothstep(0.012, 0.02, pxTile));
@@ -184,6 +193,17 @@ vec3 territoryColor(vec3 base, vec2 xz) {
   dist[1] = 1.0 - f.x;
   dist[2] = f.y;
   dist[3] = 1.0 - f.y;
+  // 국경 안쪽 빛번짐: 다른 나라(또는 빈 땅)와 맞닿은 변에서 칸 안쪽으로 나라 색이 밝게 번진다.
+  if (hasNation(own)) {
+    float glow = 0.0;
+    for (int k = 0; k < 4; k++) {
+      vec4 other = sides[k];
+      bool foreign = distance(own.rgb, other.rgb) > 0.01 || other.a == 0.0;
+      if (foreign) glow = max(glow, 1.0 - smoothstep(0.0, mix(0.32, 0.5, far), dist[k]));
+    }
+    glow *= glow;
+    color = mix(color, clamp(own.rgb * 1.25 + 0.12, 0.0, 1.0), glow * 0.45);
+  }
   for (int k = 0; k < 4; k++) {
     vec4 other = sides[k];
     if (own.a == 0.0 && other.a == 0.0) continue;
@@ -273,7 +293,7 @@ export class MapScene {
       shader.vertexShader = shader.vertexShader.replace(
         '#include <begin_vertex>',
         `#include <begin_vertex>
-transformed += normalize(objectNormal) * 0.012;`,
+transformed += normalize(normal) * 0.012;`,
       );
     };
     return material;
@@ -369,8 +389,8 @@ transformed += normalize(objectNormal) * 0.012;`,
     sun.shadow.bias = -0.0004;
     sun.shadow.normalBias = 0.4;
     this.scene.add(sun, sun.target);
-    // 대기 원근감: 화면 위쪽(먼 북쪽)이 엷게 흐려진다.
-    this.scene.fog = new Fog('#c3cfd8', 1150, 2100);
+    // 대기 원근감: 화면 위쪽(먼 곳)이 엷게 흐려진다. 범위는 매 프레임 보이는 화면에 맞춘다(render).
+    this.scene.fog = new Fog('#cdd5d2', 1150, 2100);
 
     this.scene.add(this.terrain(palette, metres));
     // 지도 밖까지 이어지는 먼바다. 가장 깊은 바닥보다 아래에 둬 지도 안의 물·바닥을 가리지 않는다.
@@ -1613,6 +1633,16 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     camera.zoom = state.zoom || 1;
     camera.updateProjectionMatrix();
     camera.updateMatrixWorld();
+    // 안개(코에이 관찰, INT-27): 화면 가운데 조금 위부터 위 끝까지 옅어진다. 가까이 볼수록 진하게(위 끝 약 32%),
+    // 전체 지도에서는 약 10%. 직교 카메라라 화면 위로 v만큼 먼 땅은 깊이가 v / tan(고도각)만큼 깊다.
+    const halfV = this.height / 2 / (state.zoom || 1);
+    const topDepth = distance + halfV / Math.tan(ELEVATION);
+    const near = distance + (halfV * 0.15) / Math.tan(ELEVATION);
+    const hazeTier = zoomTier(this.width / (state.zoom || 1));
+    const haze = [0, 0.1, 0.18, 0.26, 0.32][hazeTier] ?? 0.2;
+    const fog = this.scene.fog as Fog;
+    fog.near = near;
+    fog.far = near + (topDepth - near) / haze;
     // 그림자 범위는 보이는 지도만큼. 멀리서 볼 때는 그림자 해상도가 모자라 그림자를 끈다.
     const span = Math.max(this.width, this.height) / (state.zoom || 1);
     this.sun.castShadow = span < 420;
