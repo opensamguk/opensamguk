@@ -2,7 +2,6 @@
 // react-three-fiber는 쓰지 않는다. 그 패키지 정보(외부 주소)가 번들에 들어가 공개 자산 검사에 걸리고,
 // three 전체를 묶어 덩어리가 커진다. 필요한 부품만 가져온다.
 import {
-  AmbientLight,
   Box3,
   DataTexture,
   NearestFilter,
@@ -15,7 +14,6 @@ import {
   IcosahedronGeometry,
   CylinderGeometry,
   DoubleSide,
-  ACESFilmicToneMapping,
   Fog,
   PCFShadowMap,
   DirectionalLight,
@@ -26,7 +24,6 @@ import {
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
-  MeshToonMaterial,
   BackSide,
   Object3D,
   OrthographicCamera,
@@ -36,9 +33,11 @@ import {
   Vector3,
   WebGLRenderer,
   Vector4,
+  NoToneMapping,
 } from 'three';
-import { loadGlbMesh, toonGradient } from './glbMesh';
+import { loadGlbMesh } from './glbMesh';
 import { PaintPass } from './paintPass';
+import { GradePass, STYLE, styleMaterial } from './style';
 import { RepeatWrapping, TextureLoader, type Texture } from 'three';
 import { pickModel, regionTint, TIER_LOD, tileFill, zoomTier, type ZoomTier } from './siteModels';
 import type { PublicGeography } from '@opensamguk/shared';
@@ -288,7 +287,7 @@ export class MapScene {
   tier: ZoomTier = 1;
   // 모형 윤곽선 재질: 뒷면만, 법선 방향으로 부풀린다(모형 크기 대비 약 1.2%).
   private readonly outlineMaterial = (() => {
-    const material = new MeshBasicMaterial({ color: '#2a1d12', side: BackSide });
+    const material = new MeshBasicMaterial({ color: STYLE.outline, side: BackSide });
     material.onBeforeCompile = (shader) => {
       shader.vertexShader = shader.vertexShader.replace(
         '#include <begin_vertex>',
@@ -316,7 +315,7 @@ transformed += normalize(normal) * 0.012;`,
   readonly routeLines = new Map<string, Array<{ x: number; y: number }>>();
   private width = 1;
   private height = 1;
-  private readonly sun = new DirectionalLight('#ffe9cc', 3.8);
+  private readonly sun = new DirectionalLight(STYLE.sunColor, STYLE.sunIntensity);
   /** 물결 셰이더의 시각(초). 그릴 때마다 옮긴다. */
   private readonly waterTime = { value: 0 };
   /** 영지 칸 자료(셰이더): 칸마다 소유국 색(RGB)과 도시 번호(A). setSites가 채운다. */
@@ -345,6 +344,7 @@ transformed += normalize(normal) * 0.012;`,
   };
   /** 그림 후처리(유화 붓 터치). 화면이 뭉개져서 기본은 끈다(사용자 2026-11-14). 그림 느낌은 질감·모형으로 낸다. */
   readonly paint = new PaintPass();
+  private readonly grade = new GradePass();
   painterly = false;
 
   constructor(
@@ -366,9 +366,8 @@ transformed += normalize(normal) * 0.012;`,
   ) {
     this.renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    // 영화식 색조 보정과 부드러운 그림자. 저사양(좁은 화면)은 그림자 해상도를 줄인다.
-    this.renderer.toneMapping = ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.12;
+    // 색 보정은 화면 전체에 한 번(style.ts GradePass). 장면은 톤매핑 없이 선형으로 그린다. 저사양(좁은 화면)은 그림자 해상도를 줄인다.
+    this.renderer.toneMapping = NoToneMapping;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = PCFShadowMap;
     this.canvasSize = map.canvas;
@@ -379,8 +378,8 @@ transformed += normalize(normal) * 0.012;`,
     this.flattenSitePads(map);
 
     // 하늘빛(위)과 땅에서 되비치는 흙빛(아래). 해가 낮아 능선의 명암이 또렷하다.
-    this.scene.add(new HemisphereLight('#dfe6ea', '#5a4a34', 0.38));
-    this.scene.add(new AmbientLight('#ffffff', 0.04));
+    // 화풍 규격(style.ts): 하늘빛 채움 하나 + 해 하나. 그늘에 바탕색의 약 45%가 남는다.
+    this.scene.add(new HemisphereLight(STYLE.skyColor, STYLE.groundColor, STYLE.skyIntensity));
     // 해는 북서쪽 낮은 각도. 그림자 카메라는 보이는 범위를 따라 옮긴다(render).
     const sun = this.sun;
     sun.castShadow = true;
@@ -390,7 +389,7 @@ transformed += normalize(normal) * 0.012;`,
     sun.shadow.normalBias = 0.4;
     this.scene.add(sun, sun.target);
     // 대기 원근감: 화면 위쪽(먼 곳)이 엷게 흐려진다. 범위는 매 프레임 보이는 화면에 맞춘다(render).
-    this.scene.fog = new Fog('#cdd5d2', 1150, 2100);
+    this.scene.fog = new Fog(STYLE.fogColor, 1150, 2100);
 
     this.scene.add(this.terrain(palette, metres));
     // 지도 밖까지 이어지는 먼바다. 가장 깊은 바닥보다 아래에 둬 지도 안의 물·바닥을 가리지 않는다.
@@ -438,7 +437,7 @@ transformed += normalize(normal) * 0.012;`,
     for (let i = 0; i < position.count; i++) position.setY(i, this.field[i]!);
     // 카툰풍 지형: 빛을 세 단계로 끊는다(사용자 2026-11-14). 색·무늬는 아래 셰이더가 정한다.
     // 지형은 그림처럼 사실적인 명암(참고 시안·삼국지 시리즈 분위기). 계단 명암(카툰)은 모형에만 쓴다.
-    const material = new MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 });
+    const material = styleMaterial({ vertexColors: true, roughness: 1, metalness: 0 });
     // 질감 그림(D-090)이 오기 전까지 셰이더로 사실감을 낸다. 모두 월드 좌표 잡음이라 칸 경계가 드러나지 않는다.
     // - 산: 능선 잡음으로 낸 잔 기복(법선)과, 경사면 바위·고도 눈을 화소마다 다시 칠한다.
     // - 바닷가: 물높이 바로 위는 모래, 물 아래는 바닥 흙. 해안선이 칸이 아니라 높이 0 선을 따른다.
@@ -700,7 +699,7 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
       const { color, width, opacity } = style[mode]!;
       return new Mesh(
         this.ribbon(lines, width, mode === 'SEA' ? 0.2 : 0.35),
-        new MeshStandardMaterial({
+        styleMaterial({
           color,
           roughness: 0.95,
           side: DoubleSide,
@@ -812,7 +811,7 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     }
     const roadEdge = new Mesh(
       this.ribbon(landLines, 0.78, 0.1),
-      new MeshStandardMaterial({
+      styleMaterial({
         color: '#5b4630',
         roughness: 1,
         depthWrite: false,
@@ -825,7 +824,7 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     roadEdge.renderOrder = 1;
     const roadFill = new Mesh(
       this.ribbon(landLines, 0.5, 0.12),
-      new MeshStandardMaterial({
+      styleMaterial({
         color: '#cdb487',
         roughness: 1,
         side: DoubleSide,
@@ -917,11 +916,7 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
       close();
     }
     if (bridges.length) {
-      const deck = new InstancedMesh(
-        new BoxGeometry(1, 1, 1),
-        new MeshToonMaterial({ color: '#7a5634', gradientMap: toonGradient() }),
-        bridges.length,
-      );
+      const deck = new InstancedMesh(new BoxGeometry(1, 1, 1), styleMaterial({ color: '#7a5634' }), bridges.length);
       const matrix = new Matrix4();
       const holder = new Object3D();
       bridges.forEach(({ x, y, angle, length }, n) => {
@@ -975,7 +970,7 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
         this.ribbon(lines, 3.0, 0.06),
         // 겹치는 물길(합류·급한 굽이)에서 반투명이 두 번 칠해져 이음매가 보였다. 둘 다 불투명으로 둔다.
         // 강둑은 깊이를 쓰지 않아 물 띠를 덮지 못한다(비탈에서 둑이 물 위로 올라와 얼룩졌다).
-        new MeshStandardMaterial({
+        styleMaterial({
           color: '#8e9062',
           roughness: 0.9,
           side: DoubleSide,
@@ -1042,12 +1037,12 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     const kinds = spots.map((spot, index) => conifer(spot, index));
     const needles = new InstancedMesh(
       new ConeGeometry(0.75, 2.8, 7).translate(0, 1.5, 0),
-      new MeshStandardMaterial({ roughness: 0.9 }),
+      styleMaterial({ roughness: 0.9 }),
       kinds.filter(Boolean).length,
     );
     const leaves = new InstancedMesh(
       new IcosahedronGeometry(1, 0).scale(1, 0.85, 1).translate(0, 1.25, 0),
-      new MeshStandardMaterial({ roughness: 0.85, flatShading: true }),
+      styleMaterial({ roughness: 0.85, flatShading: true }),
       kinds.length - kinds.filter(Boolean).length,
     );
     const holder = new Object3D();
@@ -1094,7 +1089,7 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     // 성 받침: 성벽보다 조금 넓은 흙 단. 모형이 비탈에 묻히지 않고 놓인 것처럼 보인다.
     const plinths = new InstancedMesh(
       new BoxGeometry(1, 1, 1),
-      new MeshStandardMaterial({ color: '#8f7a58', roughness: 0.95 }),
+      styleMaterial({ color: '#8f7a58', roughness: 0.95 }),
       anchors.length,
     );
     // 영지 고리: 모든 도시 둘레에 소유국 색 고리(주인 없으면 옅은 회색). 고른 거점의 붉은 고리는 따로 둔다.
@@ -1103,20 +1098,12 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
       new MeshBasicMaterial({ transparent: true, opacity: 0.85, depthWrite: false }),
       anchors.length,
     );
-    const walls = new InstancedMesh(new BoxGeometry(1, 1, 1), new MeshStandardMaterial({ roughness: 0.85 }), parts);
-    const towers = new InstancedMesh(
-      new CylinderGeometry(0.5, 0.6, 1, 6),
-      new MeshStandardMaterial({ roughness: 0.85 }),
-      parts,
-    );
-    const keeps = new InstancedMesh(
-      new BoxGeometry(1, 1, 1),
-      new MeshStandardMaterial({ roughness: 0.8 }),
-      anchors.length,
-    );
+    const walls = new InstancedMesh(new BoxGeometry(1, 1, 1), styleMaterial({ roughness: 0.85 }), parts);
+    const towers = new InstancedMesh(new CylinderGeometry(0.5, 0.6, 1, 6), styleMaterial({ roughness: 0.85 }), parts);
+    const keeps = new InstancedMesh(new BoxGeometry(1, 1, 1), styleMaterial({ roughness: 0.8 }), anchors.length);
     const roofs = new InstancedMesh(
       new ConeGeometry(0.75, 1, 4),
-      new MeshStandardMaterial({ roughness: 0.6 }),
+      styleMaterial({ roughness: 0.6 }),
       anchors.length * 5,
     );
     const matrix = new Matrix4();
@@ -1479,12 +1466,8 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
       mesh.geometry.dispose();
     }
     const squads = entries.reduce((sum, entry) => sum + Math.min(entry.count, 6), 0);
-    const bodies = new InstancedMesh(
-      new BoxGeometry(1, 1, 1),
-      new MeshStandardMaterial({ roughness: 0.8 }),
-      squads * 4,
-    );
-    const flags = new InstancedMesh(new BoxGeometry(1, 1, 1), new MeshStandardMaterial({ roughness: 0.6 }), squads * 2);
+    const bodies = new InstancedMesh(new BoxGeometry(1, 1, 1), styleMaterial({ roughness: 0.8 }), squads * 4);
+    const flags = new InstancedMesh(new BoxGeometry(1, 1, 1), styleMaterial({ roughness: 0.6 }), squads * 2);
     const matrix = new Matrix4();
     const color = new Color();
     let b = 0;
@@ -1533,8 +1516,8 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
       this.march = null;
     }
     if (!points || points.length < 2) return;
-    const mesh = new InstancedMesh(new BoxGeometry(1, 1, 1), new MeshStandardMaterial({ roughness: 0.8 }), 6);
-    const flags = new InstancedMesh(new BoxGeometry(1, 1, 1), new MeshStandardMaterial({ roughness: 0.6 }), 2);
+    const mesh = new InstancedMesh(new BoxGeometry(1, 1, 1), styleMaterial({ roughness: 0.8 }), 6);
+    const flags = new InstancedMesh(new BoxGeometry(1, 1, 1), styleMaterial({ roughness: 0.6 }), 2);
     const tint = new Color(color);
     for (let i = 0; i < 6; i++) mesh.setColorAt(i, tint.clone().multiplyScalar(0.6));
     flags.setColorAt(0, new Color('#4a3a28'));
@@ -1618,6 +1601,7 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     this.renderer.setSize(this.width, this.height, false);
     const ratio = this.renderer.getPixelRatio();
     this.paint.setSize(Math.round(this.width * ratio), Math.round(this.height * ratio));
+    this.grade.setSize(Math.round(this.width * ratio), Math.round(this.height * ratio));
   }
 
   /** 카메라를 놓고 그린다. 정사영 카메라의 확대(zoom)는 화면 px당 지도 단위의 역수다. */
@@ -1656,7 +1640,7 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
       shadow.far = 2000;
       shadow.updateProjectionMatrix();
       this.sun.target.position.set(state.x, 0, state.z);
-      this.sun.position.set(state.x - 500, 380, state.z - 300);
+      this.sun.position.set(state.x + STYLE.sunOffset[0], STYLE.sunOffset[1], state.z + STYLE.sunOffset[2]);
     }
     // 거점 모형 거리 단계: 특 도시 한 변(약 16단위)이 화면에서 몇 px인지로 정한다.
     this.tier = zoomTier(this.width / (state.zoom || 1));
@@ -1666,7 +1650,7 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     }
     this.waterTime.value = performance.now() / 1000;
     if (this.painterly) this.paint.render(this.renderer, this.scene, camera);
-    else this.renderer.render(this.scene, camera);
+    else this.grade.render(this.renderer, this.scene, camera);
   }
 
   /** 3D 위치의 화면 좌표(px). */
@@ -1684,6 +1668,7 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
       else material?.dispose();
     });
     this.paint.dispose();
+    this.grade.dispose();
     this.renderer.dispose();
   }
 }

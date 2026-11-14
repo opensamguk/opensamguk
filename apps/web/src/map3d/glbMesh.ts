@@ -14,6 +14,7 @@ import {
   Texture,
   Vector3,
 } from 'three';
+import { STYLE_RAMP } from './style';
 
 type Gltf = {
   nodes?: Array<{
@@ -142,7 +143,7 @@ async function texture(gltf: Gltf, bin: ArrayBuffer, index: number | undefined, 
  * 금속 질감은 반사 환경이 없는 지도에서 검게 보이므로 금속은 끄고 거칠기만 쓴다.
  */
 /** 카툰풍 명암 계단(사용자 2026-11-14: 아이콘처럼 카툰 풍). 빛을 네 단계로 끊는다. */
-export function toonGradient(steps: readonly number[] = [90, 150, 215, 255]) {
+export function toonGradient(steps: readonly number[] = STYLE_RAMP) {
   const texture = new DataTexture(Uint8Array.from(steps), steps.length, 1, RedFormat);
   texture.minFilter = NearestFilter;
   texture.magFilter = NearestFilter;
