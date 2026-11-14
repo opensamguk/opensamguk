@@ -19,8 +19,10 @@ import numpy as np
 from PIL import Image
 
 W = 512  # 자리 하나의 화면 가로(px)
-WALL = W * 1.08  # 성벽 토막(두 자리 길이) 그림 가로
-GATE = W * 1.3  # 성문 토막 그림 가로
+WALL_H = W * 0.42  # 성벽: 밑선에서 여장 위 끝까지 높이
+GATE_H = W * 0.95  # 성문: 밑선에서 문루 지붕 끝까지 높이
+PLINTH_H = W * 0.07  # 받침 옆면 두께
+FEATHER = 28  # 성벽 토막 이음매를 섞는 너비(px)
 TOWER = W * 0.95  # 모서리 누각 그림 가로
 
 LEVELS = {
@@ -57,6 +59,33 @@ def scaled(im, width):
     return im.resize((max(1, round(im.size[0] * s)), max(1, round(im.size[1] * s))), Image.Resampling.LANCZOS)
 
 
+def strip(path, slope, cut=0.12):
+    """성벽·받침 토막을 이어 붙일 수 있게 바로잡는다(사용자 2026-11-14: "성벽이 끊겨보인다니까?").
+
+    그린 토막은 기울기가 격자(±0.5)와 조금 다르고 양 끝에 마감면이 있다. 밑선 기울기를 재서 격자 기울기로
+    기울여 맞추고(세로 밀기), 양 끝을 잘라 낸다. 그러면 같은 토막을 격자선을 따라 빈틈없이 이을 수 있다.
+    돌려주는 것: (토막 그림, 왼쪽 끝 열의 밑선 높이, 밑선에서 위 끝까지 높이).
+    """
+    im = keyed(path)
+    a = np.asarray(im)[..., 3] > 128
+    h, w = a.shape
+    xs, yb, yt = [], [], []
+    for x in range(int(w * 0.15), int(w * 0.85)):
+        rows = np.nonzero(a[:, x])[0]
+        if len(rows):
+            xs.append(x)
+            yb.append(rows.max())
+            yt.append(rows.min())
+    fit_a, fit_b = np.polyfit(xs, yb, 1)
+    k = slope - fit_a
+    off = max(0.0, -k * w)
+    height = int(h + abs(k) * w + 2)
+    sheared = im.transform((w, height), Image.Transform.AFFINE, (1, 0, 0, -k, 1, -off), resample=Image.Resampling.BICUBIC)
+    c0, c1 = int(w * cut), int(w * (1 - cut))
+    piece = sheared.crop((c0, 0, c1, height))
+    return piece, slope * c0 + fit_b + off, float(np.median(np.array(yb) - np.array(yt)))
+
+
 def compose(parts, name, cfg, out):
     n, mat = cfg['n'], cfg['mat']
     rng = random.Random(name)
@@ -74,6 +103,42 @@ def compose(parts, name, cfg, out):
 
     canvas = Image.new('RGBA', (width, height), (0, 0, 0, 0))
     placed = []
+
+    def run(part, slope, x0, y0, x1, target_h, tag):
+        """(x0, y0)에서 기울기 slope로 x1까지 토막을 빈틈없이 잇는다. target_h는 밑선에서 위 끝까지 높이."""
+        piece, base, tall = strip(os.path.join(parts, f'{part}.png'), slope)
+        sc = target_h / tall
+        piece = piece.resize((max(1, round(piece.size[0] * sc)), max(1, round(piece.size[1] * sc))), Image.Resampling.LANCZOS)
+        base *= sc
+        # 이음매: FEATHER px 겹치고 뒤 토막 왼쪽을 서서히 비치게 해 세로 줄이 보이지 않게 섞는다.
+        feather = min(FEATHER, piece.size[0] // 4)
+        ramp = np.ones(piece.size[0])
+        ramp[:feather] = np.linspace(0, 1, feather)
+        faded = np.asarray(piece).copy()
+        faded[..., 3] = (faded[..., 3] * ramp[None, :]).astype(np.uint8)
+        faded = Image.fromarray(faded, 'RGBA')
+        step = piece.size[0] - feather
+        x = x0
+        first = True
+        while x < x1 - 0.5:
+            span = min(piece.size[0], int(np.ceil(x1 - x)) + 1)
+            chunk = (piece if first else faded).crop((0, 0, span, piece.size[1]))
+            first = False
+            y = y0 + slope * (x - x0)
+            canvas.alpha_composite(chunk, (int(round(x)), int(round(y - base))))
+            x += step
+        placed.append({'part': part, 'run': [round(x0, 1), round(y0, 1), round(x1, 1)], 'slope': slope, 'h': round(target_h, 1), **tag})
+
+    def gate_at(part, slope, xc, yc, target_h, tag):
+        """성문 토막 하나를 가운데 xc에서 밑선이 격자선(기울기 slope, (xc, yc) 지남)에 닿게 놓는다."""
+        piece, base, tall = strip(os.path.join(parts, f'{part}.png'), slope, cut=0.0)
+        sc = target_h / tall
+        piece = piece.resize((max(1, round(piece.size[0] * sc)), max(1, round(piece.size[1] * sc))), Image.Resampling.LANCZOS)
+        base *= sc
+        x = xc - piece.size[0] / 2
+        y = yc + slope * (x - xc)
+        canvas.alpha_composite(piece, (int(round(x)), int(round(y - base))))
+        placed.append({'part': part, 'x': round(xc, 1), 'y': round(yc, 1), 'h': round(target_h, 1), **tag})
 
     def put(part, x, y, bbox_width, anchor='bottom', tag=None):
         im = scaled(keyed(os.path.join(parts, f'{part}.png')), bbox_width)
@@ -95,13 +160,9 @@ def compose(parts, name, cfg, out):
 
     # 2. 뒤쪽 성벽: 왼쪽 위 변(L→T)과 오른쪽 위 변(T→R).
     lx, ly = cx - n * half, top + n * quarter
-    # 성벽 토막 하나 = 두 자리 길이(그래야 성벽이 집보다 높다). n은 짝수.
-    for k in range(0, n, 2):
-        x0, y0 = lx + k * half, ly - k * quarter
-        put(f'wall-{mat}-back-left', x0, y0, WALL, 'bottom-left', {'edge': 'back-left', 'k': k})
-    for k in range(0, n, 2):
-        x1, y1 = cx + (k + 2) * half, top + (k + 2) * quarter
-        put(f'wall-{mat}-back-right', x1, y1, WALL, 'bottom-right', {'edge': 'back-right', 'k': k})
+    rx = cx + n * half
+    run(f'wall-{mat}-back-left', -0.5, lx, ly, cx, WALL_H, {'edge': 'back-left'})
+    run(f'wall-{mat}-back-right', 0.5, cx, top, rx, WALL_H, {'edge': 'back-right'})
 
     # 3. 안쪽 건물. 가운데 큰 건물, 두 문으로 가는 큰길(가운데 줄)은 비운다.
     mid = n // 2
@@ -141,25 +202,16 @@ def compose(parts, name, cfg, out):
 
     # 4. 앞쪽 받침·성벽·성문: 왼쪽 아래 변(L→B), 오른쪽 아래 변(B→R).
     bx, by = cx, top + n * half
-    for k in range(n):
-        x1, y1 = lx + (k + 1) * half, ly + (k + 1) * quarter
-        put('plinth-left', x1, y1 + W * 0.09, half * 1.04, 'bottom-right', {'edge': 'plinth-left', 'k': k})
-    for k in range(n):
-        x0, y0 = bx + k * half, by - k * quarter
-        put('plinth-right', x0, y0 + W * 0.09, half * 1.04, 'bottom-left', {'edge': 'plinth-right', 'k': k})
-    gate = (mid // 2) * 2
-    for k in range(0, n, 2):
-        x1, y1 = lx + (k + 2) * half, ly + (k + 2) * quarter
-        if k == gate:
-            put(f'gate-{mat}-front-left', x1 + quarter * 0.1, y1 + 6, GATE, 'bottom-right', {'edge': 'front-left', 'k': k, 'gate': True})
-        else:
-            put(f'wall-{mat}-front-left', x1, y1, WALL, 'bottom-right', {'edge': 'front-left', 'k': k})
-    for k in range(0, n, 2):
-        x0, y0 = bx + k * half, by - k * quarter
-        if k == n - 2 - gate:
-            put(f'gate-{mat}-front-right', x0 - quarter * 0.1, y0 + 6, GATE, 'bottom-left', {'edge': 'front-right', 'k': k, 'gate': True})
-        else:
-            put(f'wall-{mat}-front-right', x0, y0, WALL, 'bottom-left', {'edge': 'front-right', 'k': k})
+    # 받침은 성벽 밑선 아래로 내려온다: 받침 그림 위 끝이 격자선에 오게 밑선을 PLINTH_H만큼 내린다.
+    run('plinth-left', 0.5, lx, ly + PLINTH_H, bx, PLINTH_H, {'edge': 'plinth-left'})
+    run('plinth-right', -0.5, bx, by + PLINTH_H, rx, PLINTH_H, {'edge': 'plinth-right'})
+    run(f'wall-{mat}-front-left', 0.5, lx, ly, bx, WALL_H, {'edge': 'front-left'})
+    run(f'wall-{mat}-front-right', -0.5, bx, by, rx, WALL_H, {'edge': 'front-right'})
+    # 성문은 앞쪽 두 변의 가운데(큰길 끝)에 성벽 위로 얹는다.
+    gx = lx + (mid + 0.5) * half
+    gate_at(f'gate-{mat}-front-left', 0.5, gx, ly + (gx - lx) * 0.5, GATE_H, {'edge': 'front-left', 'gate': True})
+    gx = bx + (n - mid - 0.5) * half
+    gate_at(f'gate-{mat}-front-right', -0.5, gx, by - (gx - bx) * 0.5, GATE_H, {'edge': 'front-right', 'gate': True})
 
     # 5. 모서리 누각: 위·왼쪽·오른쪽·아래 꼭짓점(뒤에서 앞 순서).
     for x, y in ((cx, top), (lx, ly), (cx + n * half, ly), (bx, by)) if cfg['towers'] else ():
