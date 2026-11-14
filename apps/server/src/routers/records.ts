@@ -1,3 +1,5 @@
+import { readLogParts } from '@opensamguk/shared';
+import { reputationRecord, nationHistoryEvents } from '../recordParts';
 import type { Prisma } from '@opensamguk/db';
 import { TRPCError } from '@trpc/server';
 import { rankGenerals, reputationEventSchema, toGameDate } from '@opensamguk/rules';
@@ -21,6 +23,7 @@ const generalInput = worldInput.extend({ cursor: z.string().min(1).max(256).opti
 const activityInput = generalInput.extend({ scope: z.enum(['all', 'world']).default('all') });
 const activityCursor = z.tuple([recordTick, z.enum(['reputation', 'nation']), recordId]);
 const nationEventKind = z.enum(['found', 'fall', 'declare', 'capture']);
+const nationHistoryCursor = z.tuple([recordTick, z.number().int().nonnegative()]);
 const battleCursor = z.tuple([recordTick, entityKey]);
 
 async function recordPortraits(tx: Prisma.TransactionClient, worldId: string, ids: number[]) {
@@ -30,6 +33,18 @@ async function recordPortraits(tx: Prisma.TransactionClient, worldId: string, id
     select: { id: true, portraitId: true },
   });
   return new Map(generals.map(({ id, portraitId }) => [id, portraitId]));
+}
+
+// 전환 중 구 서버의 필드 생략도 클라이언트 타입에서 허용한다.
+function battleMetadata(
+  row: { defenderId: number | null; cityKey: number | null },
+  portraits: Map<number, number | null>,
+): { defenderId?: number | null; defenderPortraitId?: number | null; cityKey?: number | null } {
+  return {
+    defenderId: row.defenderId,
+    defenderPortraitId: row.defenderId === null ? null : (portraits.get(row.defenderId) ?? null),
+    cityKey: row.cityKey,
+  };
 }
 
 const seasonInput = worldInput.extend({ by: z.enum(['dedication', 'experience', 'merit']).default('dedication') });
@@ -47,19 +62,29 @@ export const recordsRouter = router({
         },
         orderBy: [{ tick: 'desc' }, { attackerId: 'desc' }],
         take: 31,
-        select: { tick: true, attackerId: true, text: true },
+        select: {
+          tick: true,
+          attackerId: true,
+          text: true,
+          parts: true,
+          partsVersion: true,
+          defenderId: true,
+          cityKey: true,
+        },
       });
       const page = rows.slice(0, 30);
       const portraits = await recordPortraits(
         tx,
         input.worldId,
-        page.map(({ attackerId }) => attackerId),
+        page.flatMap(({ attackerId, defenderId }) => (defenderId === null ? [attackerId] : [attackerId, defenderId])),
       );
       const items = page.map((row) => ({
         tick: row.tick,
         attackerId: row.attackerId,
         portraitId: portraits.get(row.attackerId) ?? null,
         text: row.text,
+        ...readLogParts(row.parts, row.partsVersion),
+        ...battleMetadata(row, portraits),
         gameDate: toGameDate(world.startYear, row.tick),
       }));
       const last = items.at(-1);
@@ -105,30 +130,28 @@ export const recordsRouter = router({
         where: { worldId: input.worldId, ...before('nation') },
         orderBy: [{ tick: 'desc' }, { id: 'desc' }],
         take: 31,
-        select: { id: true, tick: true, kind: true, text: true },
+        select: { id: true, tick: true, kind: true, text: true, parts: true, partsVersion: true },
       });
       const reputation = rows.map((row) => {
         const { id, generalName, nationId, nationName, nationColor, cityKey, cityName, ...event } = row;
-        return {
-          id: id.toString(),
-          source: 'reputation' as const,
-          ...reputationEventSchema.parse({
-            ...event,
-            data: {
-              name: generalName,
-              nation: nationId === null ? null : { id: nationId, name: nationName, color: nationColor },
-              city: cityKey === null ? null : { cityKey, name: cityName },
-            },
-          }),
-        };
+        const parsed = reputationEventSchema.parse({
+          ...event,
+          data: {
+            name: generalName,
+            nation: nationId === null ? null : { id: nationId, name: nationName, color: nationColor },
+            city: cityKey === null ? null : { cityKey, name: cityName },
+          },
+        });
+        return { id: id.toString(), source: 'reputation' as const, ...parsed, ...reputationRecord(parsed) };
       });
-      const nation = news.map(({ id, tick, kind, text }) => ({
+      const nation = news.map(({ id, tick, kind, text, parts, partsVersion }) => ({
         source: 'nation' as const,
         id: id.toString(),
         tick,
         ...toGameDate(world.startYear, tick),
         kind: nationEventKind.parse(kind),
         text,
+        ...readLogParts(parts, partsVersion),
       }));
       // 각 원장은 이미 같은 tick에서 id 내림차순이다. 같은 tick은 평판 원장을 먼저 읽는다.
       const sorted = [...reputation, ...nation].sort((a, b) => b.tick - a.tick);
@@ -208,6 +231,42 @@ export const recordsRouter = router({
         items,
         nextCursor: logs.length > 30 ? encodeRecordCursor([items.at(-1)!.tick, items.at(-1)!.id]) : null,
       };
+    }),
+  ),
+  nationEvents: protectedProcedure.input(generalInput).query(({ ctx, input }) =>
+    readWorld(ctx.db, input.worldId, async (tx, world) => {
+      const general = await requireGeneral(tx, input.worldId, ctx.user.id);
+      const cursor = input.cursor === undefined ? null : decodeRecordCursor(input.cursor, nationHistoryCursor);
+      if (general.nationId === null) return { items: [], nextCursor: null };
+      const rows = await tx.nationHistory.findMany({
+        where: {
+          worldId: input.worldId,
+          nationId: general.nationId,
+          data: { path: ['events'], not: [] },
+          ...(cursor ? { tick: { lte: cursor[0] } } : {}),
+        },
+        orderBy: { tick: 'desc' },
+        take: 32,
+        select: { tick: true, data: true },
+      });
+      const events = rows.flatMap((row) =>
+        nationHistoryEvents(row.data)
+          .filter((event) => !cursor || row.tick < cursor[0] || event.ordinal < cursor[1])
+          .sort((a, b) => b.ordinal - a.ordinal)
+          .map(({ ordinal, ...event }) => ({
+            id: `${row.tick}:${ordinal}`,
+            tick: row.tick,
+            ...toGameDate(world.startYear, row.tick),
+            ...event,
+            ordinal,
+          })),
+      );
+      const items = events.slice(0, 30).map(({ ordinal, ...event }) => {
+        void ordinal;
+        return event;
+      });
+      const last = events[Math.min(events.length, 30) - 1];
+      return { items, nextCursor: events.length > 30 && last ? encodeRecordCursor([last.tick, last.ordinal]) : null };
     }),
   ),
   nation: protectedProcedure.input(recordsInput).query(({ ctx, input }) =>

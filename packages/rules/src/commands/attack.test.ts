@@ -27,7 +27,7 @@ describe('AC-P2-24 공성 병종의 성벽선제', () => {
       rngFor('che-wall-first', wall),
     );
     if ('code' in result) throw Error(result.message);
-    const rounds = result.logs[0]!.text.split('\n');
+    const rounds = result.logs.map((log) => log.text);
     expect(rounds[0]!.includes('성벽 선제 교전')).toBe(wall > 0);
     expect(rounds.findIndex((text) => text.includes('성벽 교전'))).toBe(wall === 0 ? 2 : wall === 1 ? -1 : 3);
     expect(result.reports?.map(({ generalId }) => generalId)).toEqual([2, 3]);
@@ -221,61 +221,61 @@ describe('T4-33 출병 추출 전 골든', () => {
           "calls": 6,
           "name": "수비 둘과 성벽, 마지막 도시 멸망",
           "next": 0.5024574538692832,
-          "sha256": "bdbf8afb0f0fdd00e7552f4f7c8eb1f215953ad8efe7ece016ec8fe4ff08d8f1",
+          "sha256": "9a5910fa724e3779a06f5527a42ccfe3870013c5271728fde214fd676f01107d",
         },
         {
           "calls": 6,
           "name": "동률 수비의 ID 순서",
           "next": 0.8002542273607105,
-          "sha256": "bdbf8afb0f0fdd00e7552f4f7c8eb1f215953ad8efe7ece016ec8fe4ff08d8f1",
+          "sha256": "9a5910fa724e3779a06f5527a42ccfe3870013c5271728fde214fd676f01107d",
         },
         {
           "calls": 20,
           "name": "열 페이즈 뒤 양쪽 생존",
           "next": 0.7206481471657753,
-          "sha256": "fd504e3f3f0c510459979a067904e6444dfe6ac156f0a83009dae0eab9eff792",
+          "sha256": "ae456d217645d06411f3eb76ce230c36599619204429e856ad12305ed66340b7",
         },
         {
           "calls": 0,
           "name": "공격군 기아로 전투 전 사기 소진",
           "next": 0.3639177978038788,
-          "sha256": "a3e9c0e93881e02eb1d308ba10624b97bdcec5b4918fd1003fcf899c5b9039b2",
+          "sha256": "fa3073242a98837b6d48fd54f1b31bb7d376d073a06b5536f1547431b45ad655",
         },
         {
           "calls": 4,
           "name": "수비군 기아로 전투 전 사기 소진",
           "next": 0.08207402820698917,
-          "sha256": "e352ea8b51a23395971227e60bfa12e2637fc8b1b127e2dbf70999b71b6bcea3",
+          "sha256": "10f7e15eabcb0f6f446717305667437feb10de875613fa647a4179b837b5172f",
         },
         {
           "calls": 2,
           "name": "병력 하나씩 동시 전멸",
           "next": 0.2810764138121158,
-          "sha256": "26cc44f7ad3bde6aa0885d433f1752c13c227d1dd09b3e161a86774d3a7ef4f5",
+          "sha256": "88305a9f7de0f622e0f0db70a0c2bb19f856ded509e4c2a4f8e0b7874fa44f55",
         },
         {
           "calls": 20,
           "name": "양쪽 사기 동시 소진",
           "next": 0.45156482700258493,
-          "sha256": "0437ca955c67d3e1c24a4f4dd70cb03343d0076244661a90d11c6c21e948b310",
+          "sha256": "8b5e011d09853bf1387a4a98910efd68c3bd8697f780ce9fbc1c9a3464f07364",
         },
         {
           "calls": 20,
           "name": "수비 없는 성벽과 방어 보정",
           "next": 0.6770514904055744,
-          "sha256": "20869a40036d986fcff0a33777e0cbb65235a590cb88331ae8dff807056946ad",
+          "sha256": "6d26ae8b3ac47aae4216a3d81fcfcbcd5667b3330572228ab83e6c661412abbb",
         },
         {
           "calls": 12,
           "name": "병종 상성과 양국 기술",
           "next": 0.6161481768358499,
-          "sha256": "c86c6d8d62008e996a6c099ca507d1cc58972c89a9e53fedb50bf8ad25b71878",
+          "sha256": "5f12f48a4087c47f8e1e17df83e98c098832182b9a5e3c7d94958af591f4bd42",
         },
         {
           "calls": 0,
           "name": "수비와 성벽이 없는 도시",
           "next": 0.1679761114064604,
-          "sha256": "279d6dd3923889890198aa0c27dad93b55711d11c9548f3f3b253788c4abf303",
+          "sha256": "47fb3be424c3c766165b66a7e04f621b9b306b8ed1d5d1ac8c553b18a168ea1c",
         },
         {
           "calls": 0,
@@ -293,13 +293,13 @@ describe('T4-33 출병 추출 전 골든', () => {
           "calls": 6,
           "name": "수도 함락과 같은 인구 도시 천도",
           "next": 0.9483208600431681,
-          "sha256": "983dc1766037f66ba2471c70a7e8f5a790d0ffae5959dba5aea52f95689d0419",
+          "sha256": "629a4a528ca5946172d856d5ade0fa900fe4fd3781ff4a52ed71d97ebe9880a9",
         },
         {
           "calls": 2,
           "name": "훈련 미달과 미등장 수비 제외",
           "next": 0.46699898410588503,
-          "sha256": "ceaae56ab653b62f5c4d99ee8590d57976dbcfc62aa2246f8b03fa1333d8878f",
+          "sha256": "6fa0887e7ea265dfeb3fdfe029d7b8a43e2c1ada4256e6193e482b8d1e28097c",
         },
       ]
     `);

@@ -1,5 +1,5 @@
 import { expect } from 'vitest';
-import { rngFor } from '@opensamguk/shared';
+import { logPartsSchema, logPartsToText, rngFor } from '@opensamguk/shared';
 import type { WorldState } from '../model/world';
 import { commandWorld, testUnits } from '../../test/commandFixture';
 import { applyEffects } from './effects';
@@ -112,7 +112,7 @@ Object.assign(commandCases, {
       expect(a.nations[2]).toBeUndefined();
       expect(a.generals[2]).toMatchObject({ nationId: null, officerLevel: 0 });
       expect(r.reports?.map((e) => e.generalId)).toEqual([2, 3]);
-      expect(r.logs[0]!.text).toContain('성벽');
+      expect(r.logs.map((log) => log.text).join('\n')).toContain('성벽');
     },
   },
   move: {
@@ -386,6 +386,11 @@ export function verifySuccess(key: string) {
   expect(state).toEqual(before);
   test.verify(applyEffects(state, result.effects), before, result);
   expect(result.logs.length).toBeGreaterThan(0);
+  for (const log of result.logs) {
+    expect(logPartsSchema.safeParse(log.parts).success).toBe(true);
+    expect(log.text).toBe(logPartsToText(log.parts!));
+    expect(log.text).not.toMatch(/[\r\n]/);
+  }
 }
 export function verifyFailure(key: string) {
   const test = commandCases[key]!;

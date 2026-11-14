@@ -532,7 +532,10 @@ it.each([false, true])(
     const basis = ((home.commerce + partner.commerce) / 2) * 0.05;
     if (atWar) {
       expect(income).toBe(0);
-      expect(after.logs.at(-1)!.text).toBe('BAD_STATE: 교전 중인 국가와는 교역할 수 없습니다.');
+      expect(after.logs.at(-1)).toMatchObject({
+        code: 'BAD_STATE',
+        text: '교전 중인 국가와는 교역할 수 없습니다.',
+      });
     } else {
       expect(income).toBeGreaterThanOrEqual(Math.round(basis * 0.9));
       expect(income).toBeLessThanOrEqual(Math.round(basis * 1.1));
@@ -587,7 +590,8 @@ it.each([false, true])(
         generalId: 1,
         commandKey: 'trade',
         kind: 'failure',
-        text: 'BAD_STATE: 교역 조약이 없거나 만료되었습니다.',
+        code: 'BAD_STATE',
+        text: '교역 조약이 없거나 만료되었습니다.',
       });
       expect(denied.replay.state.nations).toEqual(expired.replay.state.nations);
       expect(denied.replay.state.cities).toEqual(expired.replay.state.cities);

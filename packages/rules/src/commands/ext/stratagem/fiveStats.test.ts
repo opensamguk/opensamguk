@@ -85,7 +85,7 @@ describe('AC-INT-17 기본 계략의 5능력치 어댑터', () => {
     expect(execute().logs[0]!.text).toContain('파괴 성공');
     state.generals[1]!.intel = 70;
     state.generals[1]!.strength = 100;
-    expect(execute().logs[0]!.text).toContain('파괴 실패');
+    expect(execute().logs[0]!.text).toContain('파괴 시도가 실패');
   });
 
   it.each(stratagemCommands)('$key의 비용·피해·성공/실패 난수 순서는 기존 규칙과 같다', (command) => {

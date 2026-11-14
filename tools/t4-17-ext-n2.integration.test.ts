@@ -1,3 +1,4 @@
+import { commandLogLines } from '../apps/engine/src/logParts';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
@@ -7,6 +8,9 @@ import { afterAll, beforeAll, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import {
   TICKS_PER_MONTH,
+  runGeneralTurn,
+  resolverForPreset,
+  toWorldState,
   type CommandResult,
   type Failure,
   type WorldInit,
@@ -55,6 +59,8 @@ const commandKeys = ['sabotage', 'incite', 'plunder'] as const;
 type CommandKey = (typeof commandKeys)[number];
 type CaseKey = 'success' | 'badTargetOwnCity' | 'probabilityMiss';
 type FixedCase = {
+  seed: string;
+  options: { policy: 'none' };
   initial: WorldInit;
   command: { commandKey: string; args: { cityKey: number }; explicit: true };
   expected: {
@@ -277,28 +283,42 @@ async function assertFixedTurn(f: Fixture) {
   });
   expect(queue).toHaveLength(30);
   expect(queue.every((turn, slot) => turn.slot === slot && turn.commandKey === 'rest' && !turn.explicit)).toBe(true);
-  const result = f.value.expected.result;
+  const result = runGeneralTurn(
+    toWorldState(f.value.initial),
+    { generalId: 1, tick: 100, unitSet: f.value.initial.unitSet },
+    f.value.command,
+    f.value.seed,
+    f.value.options,
+    resolverForPreset(fixed.preset),
+  ).result;
   const failed = 'code' in result;
   expect(
     await db.generalLog.findMany({
       where: { worldId: f.worldId },
-      select: { generalId: true, tick: true, commandKey: true, kind: true, text: true },
+      orderBy: { ordinal: 'asc' },
+      select: { generalId: true, tick: true, commandKey: true, kind: true, text: true, code: true, ordinal: true },
     }),
-  ).toEqual([
-    {
+  ).toEqual(
+    commandLogLines(result).map((line, ordinal) => ({
       generalId: 1,
       tick: 100,
       commandKey: f.commandKey,
-      kind: failed ? 'failure' : 'success',
-      text: failed ? `${result.code}: ${result.message}` : result.logs.map((log) => log.text).join('\n'),
-    },
-  ]);
+      kind: line.kind,
+      text: line.text,
+      code: 'code' in line ? line.code : null,
+      ordinal,
+    })),
+  );
   expect(await db.battleLog.findMany({ where: { worldId: f.worldId }, orderBy: { generalId: 'asc' } })).toEqual(
     (failed ? [] : (result.reports ?? [])).map((report) => ({
       worldId: f.worldId,
       tick: 100,
       attackerId: 1,
       ...report,
+      parts: report.parts ?? null,
+      partsVersion: report.parts ? 1 : null,
+      defenderId: null,
+      cityKey: null,
     })),
   );
   const recorded = (await rpc('records.general', { worldId: f.worldId }, f.alice.cookie)).data as {
@@ -306,17 +326,16 @@ async function assertFixedTurn(f: Fixture) {
     nextCursor: string | null;
   };
   expect(recorded).toMatchObject({
-    items: [
-      {
-        tick: 100,
-        commandKey: f.commandKey,
-        kind: failed ? 'failure' : 'success',
-        text: failed ? `${result.code}: ${result.message}` : result.logs.map((log) => log.text).join('\n'),
-      },
-    ],
+    items: commandLogLines(result).map((line) => ({
+      tick: 100,
+      commandKey: f.commandKey,
+      kind: line.kind,
+      text: line.text,
+      code: 'code' in line ? line.code : null,
+    })),
     nextCursor: null,
   });
-  expect(recorded.items).toHaveLength(1);
+  expect(recorded.items).toHaveLength(commandLogLines(result).length);
   if (f.value.expected.nationTransfer) {
     const transfer = f.value.expected.nationTransfer;
     expect(await db.nation.findUniqueOrThrow({ where: { worldId_id: { worldId: f.worldId, id: 2 } } })).toMatchObject({
@@ -336,12 +355,14 @@ async function assertFixedTurn(f: Fixture) {
   const events = failed ? [] : (result.history ?? []);
   expect(history).toHaveLength(events.length);
   for (const event of events)
-    expect(history).toContainEqual({
-      worldId: f.worldId,
-      tick: 100,
-      nationId: event.nationId,
-      data: { events: [event.text] },
-    });
+    expect(history).toContainEqual(
+      expect.objectContaining({
+        worldId: f.worldId,
+        tick: 100,
+        nationId: event.nationId,
+        data: expect.objectContaining({ events: [event.text] }),
+      }),
+    );
 }
 
 async function worker(worldId: string, phase: 'saved' | 'beforeCommit' | 'committed') {

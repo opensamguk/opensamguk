@@ -1,3 +1,4 @@
+import { readLogParts } from '@opensamguk/shared';
 import { publicGeographySchema } from '@opensamguk/shared';
 import type { Prisma } from '@opensamguk/db';
 import {
@@ -239,6 +240,9 @@ export function nationInfo(nation: Nation, counts: { cityCount: number; generalC
 }
 
 export const logSelect = {
+  parts: true,
+  partsVersion: true,
+  code: true,
   id: true,
   tick: true,
   commandKey: true,
@@ -253,6 +257,8 @@ export function logInfo(log: Prisma.GeneralLogGetPayload<{ select: typeof logSel
     commandKey: log.commandKey,
     kind: log.kind,
     text: log.text,
+    ...readLogParts(log.parts, log.partsVersion),
+    code: log.code,
     createdAt: log.createdAt.toISOString(),
   };
 }

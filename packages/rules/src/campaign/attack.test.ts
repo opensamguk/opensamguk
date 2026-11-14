@@ -39,7 +39,7 @@ describe('AC-P2-24 공성 부곡의 성벽선제', () => {
     const unitSet = structuredClone(testUnits);
     unitSet.crewTypes.find(({ id }) => id === world.campaign!.units[0]!.crewType)!.effects = ['wallFirst'];
     const { result, state } = run(world, { ...actor, unitSet });
-    const rounds = result.logs[0]!.text.split('\n');
+    const rounds = result.logs.map((log) => log.text);
     expect(rounds[0]!.includes('성벽 선제 교전')).toBe(wall > 0);
     expect(rounds.findIndex((text) => text.includes('성벽 교전'))).toBe(wall === 0 ? 3 : wall === 1 ? -1 : 4);
     expect(rounds.findIndex((text) => text.includes('대 도시 병종1100'))).toBe(wall === 0 ? 2 : 3);

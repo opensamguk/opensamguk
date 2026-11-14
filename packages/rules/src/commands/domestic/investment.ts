@@ -1,3 +1,5 @@
+import { commandLog } from '../support';
+import { actPart, numPart, textPart } from '../logging';
 import { z } from 'zod';
 import { BALANCE } from '../../balance';
 import type { WorldView } from '../../model/world';
@@ -141,7 +143,23 @@ function makeInvestmentWithCollector(spec: Spec, collect: typeof collectModifier
           { kind: 'general', id: general.id, field: 'experience', op: 'add', value: Math.round(score * 0.7) },
           { kind: 'general', id: general.id, field: 'dedication', op: 'add', value: points },
         ],
-        logs: [{ kind: 'success', text: `${spec.name}: ${spec.field === 'trust' ? change.toFixed(1) : change}` }],
+        logs: [
+          commandLog([
+            actPart(spec.key, spec.name),
+            textPart(' 작업으로 '),
+            numPart(change, spec.field === 'trust' ? 1 : 0),
+            textPart(' 상승했습니다.'),
+            ...(critical < 0.2
+              ? [
+                  {
+                    t: 'tone' as const,
+                    v: critical < 0.1 ? ('good' as const) : ('bad' as const),
+                    parts: [textPart(critical < 0.1 ? ' 대성공했습니다.' : ' 성과가 저조했습니다.')],
+                  },
+                ]
+              : []),
+          ]),
+        ],
       };
     },
   };

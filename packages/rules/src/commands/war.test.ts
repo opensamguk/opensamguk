@@ -33,7 +33,7 @@ describe('AC-M1-15 전투 시나리오', () => {
     const a = execute(initial, 1, 'attack', { cityKey: 2 });
     expect(a).toEqual(execute(initial, 1, 'attack', { cityKey: 2 }));
     expect(a.result.reports?.map((r) => r.generalId)).toEqual([2, 3]);
-    const text = a.result.logs[0]!.text;
+    const text = a.result.logs.map((log) => log.text).join('\n');
     expect(text.indexOf('장수2')).toBeLessThan(text.indexOf('장수3'));
     expect(text.indexOf('장수3')).toBeLessThan(text.indexOf('성벽'));
     expect(a.state.nations[2]).toBeUndefined();
@@ -52,7 +52,7 @@ describe('AC-M1-15 전투 시나리오', () => {
     expect(next.result.reports?.map((r) => r.generalId)).toEqual([2]);
     expect(next.state.cities[2]).toEqual(state.cities[2]);
     expect(next.state.generals[1]!.cityKey).toBe(1);
-    expect(next.result.logs[0]!.text).toContain('점령 실패');
+    expect(next.result.logs.map((log) => log.text).join('\n')).toContain('점령 실패');
   });
   it('훈련·사기 미달과 미등장 수비를 제외하고 군량0이면 사기가 급감한다', () => {
     const state = commandWorld();
@@ -102,7 +102,7 @@ describe('AC-M1-16 점령과 보급', () => {
     expect(captured.state.cities[4]!.supplied).toBe(true);
     expect(captured.state.cities[5]!.supplied).toBe(false);
     expect(captured.state.nationTurns).toBeUndefined();
-    expect(captured.result.history?.filter((h) => h.text.includes('천도'))).toEqual([
+    expect(captured.result.history?.filter((h) => h.text.includes('천도'))).toMatchObject([
       { nationId: 2, text: `국가2 수도 함락, 도시${capital} 천도` },
     ]);
     expect(captured).toEqual(execute(supplied, 1, 'attack', { cityKey: 2 }));
@@ -121,7 +121,7 @@ describe('AC-M1-16 점령과 보급', () => {
     expect(rng.next()).toBe(referenceRng.next());
     const counterattack = execute(captured.state, 2, 'attack', { cityKey: 2 });
     expect(counterattack.state.cities[2]!.nationId).toBe(2);
-    expect(counterattack.result.logs[0]!.text).toContain('도시2 점령:');
+    expect(counterattack.result.logs.map((log) => log.text).join('\n')).toContain('도시2 점령:');
     const monthly = runMonthly(counterattack.state, 10000, rngFor('capital-month')).state;
     expect(monthly.cities[3]!.agriculture).toBe(100);
     expect(monthly.cities[5]!.agriculture).toBe(90);

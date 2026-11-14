@@ -336,9 +336,13 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
         tick: due,
         commandKey: expected === 'CANCELLED' ? before.turns[recipientId]![0]!.commandKey : saved.command.commandKey,
       },
+      orderBy: { ordinal: 'asc' },
     });
-    expect(logs).toHaveLength(1);
-    expect(logs[0]!.kind).toBe(resolved.status === 'FAILED' ? 'failure' : 'success');
+    expect(logs.length).toBeGreaterThan(0);
+    expect(new Set(logs.map((row) => row.sequence)).size).toBe(1);
+    expect(logs.map((row) => row.ordinal)).toEqual(Array.from({ length: logs.length }, (_, i) => i));
+    expect(logs.every((row) => row.kind === (resolved.status === 'FAILED' ? 'failure' : 'success'))).toBe(true);
+    expect(logs.every((row) => !/[\r\n]/.test(row.text))).toBe(true);
     const unchanged = hashState(after);
     await advance(due);
     expect(hashState(await snapshot())).toBe(unchanged);

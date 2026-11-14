@@ -1,3 +1,5 @@
+import { logSentence, actPart, cityPart, numPart, textPart } from '../../logging';
+import { commandLog } from '../../support';
 // core2026 df6c926 packages/logic/src/actions/turn/general/strategyCommand.ts의 계략 확률·피해 공식을 옮겼다.
 // MIT (c) 2025 devsam. resources/NOTICE.md.
 import { z } from 'zod';
@@ -172,7 +174,7 @@ export function executeStratagem(
           op: 'set',
           value: Math.round(defender[field] * 0.98),
         });
-      reports.push({ generalId: defender.id, text: `${city.name}: 계략으로 다쳤습니다.` });
+      reports.push({ generalId: defender.id, ...logSentence([cityPart(city), textPart(': 계략으로 다쳤습니다.')]) });
     }
   }
   const damage: Effect[] = [];
@@ -225,25 +227,71 @@ export function executeStratagem(
     ...injuries,
     ...damage,
   ];
-  if (!success) return { effects, logs: [{ kind: 'success', text: `${spec.name} 실패: ${city.name}` }] };
+  if (!success)
+    return {
+      effects,
+      logs: [
+        commandLog(
+          [
+            cityPart(city),
+            textPart(' 대상 '),
+            actPart(spec.key, spec.name),
+            textPart(' 시도가 '),
+            { t: 'tone', v: 'bad', parts: [textPart('실패했습니다.')] },
+          ],
+          'failure',
+        ),
+      ],
+    };
   const amounts = spec.fields
-    ? `${spec.labels![0]} ${primary}, ${spec.labels![1]} ${spec.key === 'incite' ? secondary.toFixed(1) : secondary} 감소`
-    : `금 ${Math.round(primary)}, 쌀 ${Math.round(secondary)}`;
+    ? [
+        textPart(`${spec.labels![0]} `),
+        numPart(primary),
+        textPart(`, ${spec.labels![1]} `),
+        numPart(secondary, spec.key === 'incite' ? 1 : 0),
+        textPart(' 감소'),
+      ]
+    : [textPart('금 '), numPart(Math.round(primary)), textPart(', 쌀 '), numPart(Math.round(secondary))];
   return {
     effects,
     logs: [
       {
-        kind: 'success',
-        text: `${spec.name} 성공: ${city.name} ${amounts}${spec.fields ? `, 장수 ${reports.length}명 부상` : ' 획득'}`,
+        ...commandLog([
+          cityPart(city),
+          textPart(' 대상 '),
+          actPart(spec.key, spec.name),
+          { t: 'tone', v: 'good', parts: [textPart(' 성공: ')] },
+          ...(spec.fields
+            ? [
+                textPart(`${spec.labels![0]} `),
+                numPart(primary),
+                textPart(`, ${spec.labels![1]} `),
+                numPart(secondary, spec.key === 'incite' ? 1 : 0),
+                textPart(' 감소, 장수 '),
+                numPart(reports.length),
+                textPart('명 부상'),
+              ]
+            : [
+                textPart('금 '),
+                numPart(Math.round(primary)),
+                textPart(', 쌀 '),
+                numPart(Math.round(secondary)),
+                textPart(' 획득'),
+              ]),
+        ]),
       },
     ],
     ...(spec.fields ? { reports } : {}),
     history: [
       {
         nationId: city.nationId!,
-        text: spec.fields
-          ? `${city.name}: ${spec.name}${spec.key === 'incite' ? '으로' : '로'} ${amounts}`
-          : `${city.name}: ${amounts} 도난`,
+        ...logSentence([
+          cityPart(city),
+          textPart(': '),
+          ...(spec.fields ? [actPart(spec.key, spec.name), textPart(spec.key === 'incite' ? '으로 ' : '로 ')] : []),
+          ...amounts,
+          ...(spec.fields ? [] : [textPart(' 도난')]),
+        ]),
       },
     ],
   };

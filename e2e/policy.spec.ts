@@ -384,13 +384,15 @@ test('5 소속 장수의 빈 칸은 엔진 턴에서 권농 방침의 농지 개
   const logs = await myLogs(world);
   const cityAfter = await myCity(world);
   evidence.db = { logs, cityAfter, clock: await readWorld(world) };
-  expect(logs).toHaveLength(1);
-  expect(logs[0]).toMatchObject({ tick: HUMAN_TURN, commandKey: 'farm', kind: 'success' });
-  expect(logs[0]!.text).toMatch(/^기본 방침\(권농\)으로 농지 개간\n농지 개간: \d+$/);
+  expect(logs).toMatchObject([
+    { tick: HUMAN_TURN, commandKey: 'farm', kind: 'success', text: '기본 방침(권농)으로 농지 개간' },
+    { tick: HUMAN_TURN, commandKey: 'farm', kind: 'success', text: expect.stringMatching(/^농지 개간: \d+$/) },
+  ]);
 
   await page.reload();
-  await expect(records(page)).toHaveCount(1);
-  await expect(records(page).first()).toContainText('기본 방침(권농)으로 농지 개간');
+  await expect(records(page)).toHaveCount(2);
+  await expect(records(page).nth(0)).toContainText('기본 방침(권농)으로 농지 개간');
+  await expect(records(page).nth(1)).toContainText(/^.*농지 개간: \d+$/);
   await expect(records(page).first()).toHaveAttribute('data-log-kind', 'success');
   // 1번 칸은 당겨진 직접 휴식, 나머지는 빈 칸이다.
   await expect(row(page, 1)).not.toHaveAttribute('data-empty', 'true');
@@ -434,7 +436,7 @@ test('6 재야 장수의 빈 칸은 방침 명령이 실패하면 휴식하고 �
   expect(second).toContainEqual({ generalId: HUMAN_ID, tick: HUMAN_TURN + 10_000, commandKey: 'rest' });
   expect(afterSecond).toEqual([
     { tick: HUMAN_TURN, commandKey: 'rest', kind: 'success', text: '기본 방침 실패: 국가에 소속되어야 합니다. → 휴식' },
-    { tick: HUMAN_TURN + 10_000, commandKey: 'rest', kind: 'success', text: '휴식' },
+    { tick: HUMAN_TURN + 10_000, commandKey: 'rest', kind: 'success', text: '휴식했습니다.' },
   ]);
 
   await page.reload();

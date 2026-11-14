@@ -1,3 +1,5 @@
+import { commandLog } from '../../support';
+import { cityPart, textPart, actPart, logSentence } from '../../logging';
 import { cloneWorld } from '../../../model/clone';
 import type { WorldState, WorldView } from '../../../model/world';
 import type { CommandDef } from '../../types';
@@ -29,19 +31,25 @@ export function makeSpyCommand(clone: (view: WorldView) => WorldState = cloneWor
       for (const nationId of Object.keys(intel)) if (!state.nations[Number(nationId)]) delete intel[nationId];
       (intel[String(general.nationId)] ??= {})[String(cityKey)] = record;
       const city = state.cities[cityKey]!;
-      const text =
+      const message =
         record.level === 1
-          ? `첩보: ${city.name} 정보를 많이 얻었습니다`
+          ? ' 정보를 많이 얻었습니다'
           : record.level === 2
-            ? `첩보: ${city.name} 정보를 어느 정도 얻었습니다`
-            : `첩보: ${city.name} 소문만 들었습니다`;
+            ? ' 정보를 어느 정도 얻었습니다'
+            : ' 소문만 들었습니다';
       return {
         effects: [{ kind: 'world', state }],
-        logs: [{ kind: 'success', text }],
+        logs: [commandLog([actPart('spy', '첩보'), textPart(': '), cityPart(city), textPart(message)])],
         ...(city.nationId === null
           ? {}
           : {
-              history: [{ nationId: city.nationId, kind: 'intel', text: `${city.name}: 누군가 이 도시를 살폈습니다` }],
+              history: [
+                {
+                  nationId: city.nationId,
+                  kind: 'intel',
+                  ...logSentence([cityPart(city), textPart(': 누군가 이 도시를 살폈습니다')]),
+                },
+              ],
             }),
       };
     },

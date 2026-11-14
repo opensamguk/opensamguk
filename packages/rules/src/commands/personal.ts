@@ -1,3 +1,4 @@
+import { actPart, numPart, textPart } from './logging';
 import { z } from 'zod';
 import { BALANCE } from '../balance';
 import { defineCommand, fail, noArgs, ownCity, positive, success } from './support';
@@ -17,7 +18,7 @@ export const personalCommands = [
       const g = state.generals[actor.generalId]!;
       g.gold -= BALANCE.HEAL_COST;
       g.injury = Math.max(0, g.injury - BALANCE.HEAL_GAIN);
-      return success(`요양: 부상 ${g.injury}`);
+      return success([actPart('heal', '요양'), textPart('했습니다. 부상 '), numPart(g.injury), textPart('입니다.')]);
     },
   }),
   defineCommand({
@@ -42,7 +43,13 @@ export const personalCommands = [
       const delta = args.buy ? args.amount : -args.amount;
       g.gold -= delta;
       g.rice += delta;
-      return success(`군량 ${args.buy ? '매입' : '매각'}: ${args.amount}`);
+      return success([
+        textPart('군량 '),
+        numPart(args.amount),
+        textPart('을 '),
+        actPart('trade_rice', args.buy ? '매입' : '매각'),
+        textPart('했습니다.'),
+      ]);
     },
   }),
   defineCommand({
@@ -62,7 +69,13 @@ export const personalCommands = [
       g[args.resource] -= args.amount;
       state.nations[g.nationId!]![args.resource] += args.amount;
       g.dedication += args.amount;
-      return success(`헌납: ${args.resource === 'gold' ? '금' : '쌀'} ${args.amount}`);
+      return success([
+        textPart(args.resource === 'gold' ? '금 ' : '쌀 '),
+        numPart(args.amount),
+        textPart('을 '),
+        actPart('donate', '헌납'),
+        textPart('했습니다.'),
+      ]);
     },
   }),
 ];

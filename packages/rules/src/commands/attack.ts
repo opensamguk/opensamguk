@@ -1,3 +1,6 @@
+import { logPartsToText, type LogPart } from '@opensamguk/shared';
+import { logSentence, nationPart, generalPart, cityPart, numPart, textPart } from './logging';
+import { commandLog } from './support';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import { z } from 'zod';
 import { BALANCE } from '../balance';
@@ -6,7 +9,7 @@ import { canDefend } from '../battle/defenders';
 import type { CommandResult } from './types';
 import type { InitialGeneral } from '../world/bootstrap';
 import { refreshSupply } from '../supply';
-import { defineCommand, fail, positive, relation, removeNation, success } from './support';
+import { defineCommand, fail, positive, relation, removeNation } from './support';
 import { collectModifiers, collectModifiersWith, type ModifierProvider } from '../modifiers';
 
 type Force = Pick<InitialGeneral, 'crew' | 'crewType' | 'train' | 'atmos' | 'rice'>;
@@ -69,11 +72,11 @@ function makeAttack(collect: typeof collectModifiers) {
             d.activeFromYear <= state.startYear + Math.floor((actor.tick ?? 0) / (12 * 10000)),
         )
         .sort((a, b) => b.crew - a.crew || a.id - b.id);
-      const reports: { generalId: number; text: string }[] = [];
+      const reports: NonNullable<CommandResult['reports']> = [];
       const battleAwards: NonNullable<CommandResult['battleAwards']> = [];
       const battleOutcomes: NonNullable<CommandResult['battleOutcomes']> = [];
       const reputation = state.ruleFeatures?.includes('reputation-v1');
-      const rounds: string[] = [];
+      const rounds: LogPart[][] = [];
       let attackerFirstVolleyUsed = false;
       const wallFirst =
         defenders.length > 0 &&
@@ -105,7 +108,7 @@ function makeAttack(collect: typeof collectModifiers) {
         Object.assign(g, battle.attacker);
         city.wall = battle.defender.crew;
         const name = openingSkirmish ? '성벽 선제 교전' : '성벽 교전';
-        rounds.push(`${name}: 공격 ${g.crew}명, 성벽 ${city.wall}`);
+        rounds.push([textPart(`${name}: 공격 `), numPart(g.crew), textPart('명, 성벽 '), numPart(city.wall)]);
       };
       if (wallFirst) fightWall(true);
       let cleared = g.crew > 0 && g.atmos > 0;
@@ -144,9 +147,24 @@ function makeAttack(collect: typeof collectModifiers) {
           battleAwards.push({ generalId: defender.id, wins: 1, captures: 0 });
           if (reputation) battleOutcomes.push({ winnerId: defender.id, loserId: g.id });
         }
-        const text = `${g.name} 대 ${defender.name}: 공격 ${g.crew}명, 수비 ${defender.crew}명`;
-        rounds.push(text);
-        reports.push({ generalId: defender.id, text });
+        const parts: LogPart[] = [
+          generalPart(g),
+          textPart(' 대 '),
+          generalPart(defender),
+          textPart(': 공격 '),
+          numPart(g.crew),
+          textPart('명, 수비 '),
+          numPart(defender.crew),
+          textPart('명'),
+        ];
+        rounds.push(parts);
+        reports.push({
+          generalId: defender.id,
+          defenderId: defender.id,
+          cityKey: city.cityKey,
+          text: logPartsToText(parts),
+          parts: [...parts],
+        });
         if (g.crew <= 0 || g.atmos <= 0 || (defender.crew > 0 && defender.atmos > 0)) {
           cleared = false;
           break;
@@ -154,7 +172,7 @@ function makeAttack(collect: typeof collectModifiers) {
       }
       if (cleared && (!wallFirst || city.wall > 0)) fightWall();
       const captured = cleared && city.wall === 0 && g.crew > 0 && g.atmos > 0;
-      const history: { nationId: number; text: string }[] = [];
+      const history: NonNullable<CommandResult['history']> = [];
       if (captured) {
         battleAwards.push({ generalId: g.id, wins: 0, captures: 1 });
         city.nationId = attackingNation;
@@ -162,7 +180,7 @@ function makeAttack(collect: typeof collectModifiers) {
         city.security = Math.round(city.security * BALANCE.CAPTURE_SECURITY_FACTOR);
         city.trust = Math.max(0, city.trust - BALANCE.CAPTURE_TRUST_LOSS);
         g.cityKey = city.cityKey;
-        let relocated: { nationId: number; text: string } | undefined;
+        let relocated: NonNullable<CommandResult['history']>[number] | undefined;
         if (defendingNation !== null) {
           const nation = state.nations[defendingNation]!;
           const remaining = Object.values(state.cities)
@@ -170,22 +188,42 @@ function makeAttack(collect: typeof collectModifiers) {
             .sort((a, b) => b.population - a.population || a.cityKey - b.cityKey);
           if (!remaining.length) {
             removeNation(state, defendingNation);
-            history.push({ nationId: defendingNation, text: `${nation.name} 멸망, 소속 장수 재야` });
+            history.push({
+              nationId: defendingNation,
+              ...logSentence([nationPart(nation), textPart(' 멸망, 소속 장수 재야')]),
+            });
           } else if (nation.capitalCityKey === city.cityKey) {
             const capital = remaining[0]!;
             nation.capitalCityKey = capital.cityKey;
-            relocated = { nationId: defendingNation, text: `${nation.name} 수도 함락, ${capital.name} 천도` };
+            relocated = {
+              nationId: defendingNation,
+              ...logSentence([nationPart(nation), textPart(' 수도 함락, '), cityPart(capital), textPart(' 천도')]),
+            };
           }
         }
         refreshSupply(state);
         if (relocated) history.push(relocated);
       }
-      const summary = `${g.name} ${city.name} ${captured ? '점령' : '점령 실패'}: 병력 ${g.crew}명`;
-      for (const report of reports) report.text += `, ${captured ? '점령' : '수비 유지'}`;
-      history.push({ nationId: attackingNation, text: `${rounds.join('; ')}; ${summary}` });
-      if (defendingNation !== null) history.push({ nationId: defendingNation, text: summary });
+      const summaryParts: LogPart[] = [
+        generalPart(g),
+        textPart(' '),
+        cityPart(city),
+        textPart(` ${captured ? '점령' : '점령 실패'}: 병력 `),
+        numPart(g.crew),
+        textPart('명'),
+      ];
+
+      for (const report of reports) {
+        report.parts!.push(textPart(`, ${captured ? '점령' : '수비 유지'}`));
+        report.text = logPartsToText(report.parts!);
+      }
+      history.push({
+        nationId: attackingNation,
+        ...logSentence([...rounds.flatMap((line) => [...line, textPart('; ')]), ...summaryParts]),
+      });
+      if (defendingNation !== null) history.push({ nationId: defendingNation, ...logSentence(summaryParts) });
       return {
-        ...success(`${rounds.join('\n')}\n${summary}`),
+        logs: [...rounds, summaryParts].map((parts) => commandLog(parts)),
         reports,
         history,
         battleAwards,

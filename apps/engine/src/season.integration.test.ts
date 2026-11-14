@@ -74,7 +74,9 @@ async function checkEnd(worldId: string, reason: 'END_YEAR' | 'UNIFIED') {
   if (reason === 'UNIFIED') {
     expect(value.archive).toHaveLength(1);
     expect(archive.months).toHaveLength(0);
-    expect(value.logs).toHaveLength(1);
+    expect(value.logs.length).toBeGreaterThan(0);
+    expect(new Set(value.logs.map((log) => log.sequence)).size).toBe(1);
+    expect(value.logs.map((log) => log.ordinal).sort((a, b) => a - b)).toEqual(value.logs.map((_, ordinal) => ordinal));
     expect(value.logs[0]?.text).toContain('점령');
     expect(result.winnerName).toBeTruthy();
     expect(result.winnerColor).toBeTruthy();

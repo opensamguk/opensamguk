@@ -90,6 +90,9 @@ model World {
 }
 
 model PublicNationEvent {
+  parts        Json?
+  partsVersion Int?
+
   id       BigInt @id @default(autoincrement())
   worldId  String
   sequence Int
@@ -384,36 +387,36 @@ model Nation {
 }
 
 model City {
-  worldId          String
-  cityKey          Int
-  kind             String?
-  name             String
-  level            Int
-  region           Int
-  x                Float
-  y                Float
-  connections      Int[]
-  nationId         Int?
-  population       Int
-  populationMax    Int
-  agriculture      Int
-  agricultureMax   Int
-  commerce         Int
-  commerceMax      Int
-  security         Int
-  securityMax      Int
-  defence          Int
-  defenceMax       Int
-  wall             Int
-  wallMax          Int
-  trust            Float
-  supplied         Boolean
-  world            World       @relation(fields: [worldId], references: [id], onDelete: Cascade)
-  nation           Nation?     @relation("OwnedCities", fields: [worldId, nationId], references: [worldId, id], onDelete: NoAction)
-  capitalOf        Nation[]    @relation("Capital")
-  generals         General[]
-  appointedOfficers General[] @relation("CityOffice")
-  operationTargets Operation[]
+  worldId           String
+  cityKey           Int
+  kind              String?
+  name              String
+  level             Int
+  region            Int
+  x                 Float
+  y                 Float
+  connections       Int[]
+  nationId          Int?
+  population        Int
+  populationMax     Int
+  agriculture       Int
+  agricultureMax    Int
+  commerce          Int
+  commerceMax       Int
+  security          Int
+  securityMax       Int
+  defence           Int
+  defenceMax        Int
+  wall              Int
+  wallMax           Int
+  trust             Float
+  supplied          Boolean
+  world             World       @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  nation            Nation?     @relation("OwnedCities", fields: [worldId, nationId], references: [worldId, id], onDelete: NoAction)
+  capitalOf         Nation[]    @relation("Capital")
+  generals          General[]
+  appointedOfficers General[]   @relation("CityOffice")
+  operationTargets  Operation[]
 
   @@id([worldId, cityKey])
   @@unique([worldId, name])
@@ -548,6 +551,10 @@ model GeneralTurn {
 }
 
 model GeneralLog {
+  parts        Json?
+  partsVersion Int?
+  code         String?
+
   id         BigInt   @id @default(autoincrement())
   worldId    String
   generalId  Int
@@ -596,6 +603,11 @@ model NationOfficeTurn {
 }
 
 model BattleLog {
+  parts        Json?
+  partsVersion Int?
+  defenderId   Int?
+  cityKey      Int?
+
   worldId    String
   tick       Int
   attackerId Int
@@ -654,10 +666,10 @@ model User {
 }
 
 model AccountPortrait {
-  id      Int    @id @default(autoincrement())
-  userId  String @unique
-  png     Bytes
-  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     Int    @id @default(autoincrement())
+  userId String @unique
+  png    Bytes
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model ResourceEditorGrant {

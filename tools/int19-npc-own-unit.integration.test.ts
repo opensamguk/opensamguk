@@ -228,9 +228,12 @@ async function executeOrder(id: number, expected: 'EXECUTED' | 'RESOLVED' = 'EXE
   expect(after.turns[npcId]!.slice(0, 29)).toEqual(before.turns[npcId]!.slice(1));
   const logs = await db.generalLog.findMany({
     where: { worldId, generalId: npcId, tick: due, commandKey: saved.command.commandKey },
+    orderBy: { ordinal: 'asc' },
   });
-  expect(logs).toHaveLength(1);
-  expect(logs[0]!.kind).toBe(resolved.status === 'FAILED' ? 'failure' : 'success');
+  expect(logs.length).toBeGreaterThan(0);
+  expect(new Set(logs.map((row) => row.sequence)).size).toBe(1);
+  expect(logs.map((row) => row.ordinal)).toEqual(Array.from({ length: logs.length }, (_, i) => i));
+  expect(logs.every((row) => row.kind === (resolved.status === 'FAILED' ? 'failure' : 'success'))).toBe(true);
   return { after, status: resolved.status };
 }
 async function account(): Promise<Account> {

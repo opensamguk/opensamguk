@@ -383,7 +383,12 @@ describe('T2-02 HTTP·엔진·재시작', () => {
       await advance(worldId, 100);
       expect(
         await db.generalLog.findFirstOrThrow({ where: { worldId, generalId: 1 }, orderBy: { id: 'desc' } }),
-      ).toMatchObject({ kind: 'failure', text: expect.stringContaining('PROTECTED') });
+      ).toMatchObject({
+        kind: 'failure',
+        code: 'PROTECTED',
+        text: expect.stringContaining('초반 보호 기간'),
+        partsVersion: 1,
+      });
       const snapshot = hashState(await db.$transaction((tx) => loadReplayState(tx, worldId)));
       expect(worker(worldId)).toMatchObject({
         beforeHash: snapshot,

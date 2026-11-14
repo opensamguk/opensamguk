@@ -76,6 +76,7 @@ export function readRegistryKeys(root) {
 export function readExtensionRegistryKeys(root) {
   const entry = resolve(root, 'packages/rules/src/commands/ext/registry.ts');
   const support = resolve(root, 'packages/rules/src/commands/support.ts');
+  const logging = resolve(root, 'packages/rules/src/commands/logging.ts');
   const modules = new Map();
   const active = new Set();
   // 고정 의존성 zod의 스키마 생성만 신뢰한다. 임의 패키지·콜백 실행 API는 허용하지 않는다.
@@ -128,7 +129,28 @@ export function readExtensionRegistryKeys(root) {
         if (!clause) fail(file, '부작용 import는 읽을 수 없다');
         if (clause.isTypeOnly) continue;
         // 개별 type import만 있더라도 import {}가 남아 모듈을 초기화할 수 있다.
-        imports.push(statement.moduleSpecifier);
+        // 로그 함수는 명령 본문에서만 호출한다. 초기화 식에서 호출하면 기존 분석기가 거절한다.
+        const logHelpers =
+          file === support
+            ? ['logPartsToText']
+            : file === logging
+              ? ['koreanParticle', 'logDisplayName', 'logPartsToText']
+              : [];
+        const sharedLogImport =
+          ts.isStringLiteral(statement.moduleSpecifier) && statement.moduleSpecifier.text === '@opensamguk/shared';
+        if (sharedLogImport) {
+          const named = clause.namedBindings;
+          if (
+            logHelpers.length === 0 ||
+            clause.name ||
+            !named ||
+            !ts.isNamedImports(named) ||
+            !named.elements.every(
+              (item) => item.isTypeOnly || logHelpers.includes((item.propertyName ?? item.name).text),
+            )
+          )
+            fail(file, '허용된 로그 순수 함수만 shared에서 읽을 수 있다');
+        } else imports.push(statement.moduleSpecifier);
         if (clause.name) put(bindings, clause.name.text, fromModule(statement.moduleSpecifier, 'default'));
         const named = clause.namedBindings;
         if (named && ts.isNamespaceImport(named))

@@ -236,7 +236,8 @@ describe('AC-M1-10 턴 실행, 실제 PostgreSQL', () => {
     );
     expect(await db.generalLog.findFirst({ where: { worldId } })).toMatchObject({
       kind: 'failure',
-      text: expect.stringContaining('NO_GOLD'),
+      code: 'NO_GOLD',
+      text: '금이 부족합니다.',
     });
   });
 
@@ -252,7 +253,7 @@ describe('AC-M1-10 턴 실행, 실제 PostgreSQL', () => {
     expect(await general(worldId)).toMatchObject({ gold: 1000, nextTurnTick: 10_500 });
     expect(await db.generalLog.findFirst({ where: { worldId } })).toMatchObject({
       kind: 'failure',
-      text: expect.stringContaining(kind === 'missing-command' ? 'UNKNOWN_COMMAND' : 'BAD_ARGS'),
+      code: kind === 'missing-command' ? 'UNKNOWN_COMMAND' : 'BAD_ARGS',
     });
   });
 

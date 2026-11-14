@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { Rng } from '@opensamguk/shared';
+import type { LogPart, Rng } from '@opensamguk/shared';
 import type { WorldView } from '../model/world';
 import type { Effect } from './effects';
 import type { UnitSetResource } from '../world/resources';
@@ -40,16 +40,17 @@ export interface Failure {
   message: string;
 }
 export interface LogEntry {
-  kind: 'success';
+  kind: 'success' | 'failure';
   text: string;
+  parts?: LogPart[];
 }
 export interface CommandResult {
   effects: Effect[];
   logs: LogEntry[];
-  reports?: { generalId: number; text: string }[];
+  reports?: { generalId: number; text: string; parts?: LogPart[]; defenderId?: number; cityKey?: number }[];
   // 실제로 해결한 공격의 점령 전 대상이다. 알림·보고용이며 상태에는 넣지 않는다.
   attackTarget?: { cityKey: number; defendingNationId: number | null };
-  history?: { nationId: number; text: string; kind?: 'intel' }[];
+  history?: { nationId: number; text: string; parts?: LogPart[]; kind?: 'intel' }[];
   // 순위용 집계 이벤트이며 재생 상태에는 넣지 않는다.
   battleAwards?: { generalId: number; wins: number; captures: number }[];
   battleOutcomes?: { winnerId: number; loserId: number }[];

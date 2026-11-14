@@ -389,7 +389,7 @@ it.each(['장수', '부곡', '두 번째 부곡'] as const)('%s 출병에서 정
   }
   const command = kind === '장수' ? attack : campaignAttack;
   const result = command.execute(world, actor, target, rng);
-  const rounds = result.logs[0]!.text.split('\n');
+  const rounds = result.logs.map((log) => log.text);
   const openingCount = kind === '두 번째 부곡' ? 2 : 1;
   expect(rounds.filter((text) => text.includes('성벽 선제 교전'))).toHaveLength(openingCount);
   expect(rounds.filter((text) => text.includes('성벽 교전'))).toHaveLength(1);

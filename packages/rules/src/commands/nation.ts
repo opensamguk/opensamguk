@@ -1,3 +1,4 @@
+import { generalPart, nationPart, cityPart, actPart, numPart, textPart, logSentence } from './logging';
 import { z } from 'zod';
 import { BALANCE } from '../balance';
 import { TICKS_PER_MONTH } from '../clock/constants';
@@ -27,9 +28,13 @@ const resourceTransfer = (seize: boolean) =>
       const delta = seize ? -args.amount : args.amount;
       nation[args.resource] -= delta;
       target[args.resource] += delta;
-      return success(
-        `${target.name} ${seize ? '몰수' : '포상'}: ${args.resource === 'gold' ? '금' : '쌀'} ${args.amount}`,
-      );
+      return success([
+        generalPart(target),
+        textPart(' '),
+        actPart(seize ? 'nation_seize' : 'nation_reward', seize ? '몰수' : '포상'),
+        textPart(`: ${args.resource === 'gold' ? '금' : '쌀'} `),
+        numPart(args.amount),
+      ]);
     },
   });
 type Proposal = 'peace' | 'pact' | 'break' | 'aid';
@@ -91,12 +96,19 @@ const proposal = (kind: Proposal) =>
         }
       }
       const quantity = kind === 'aid' ? ` ${args.resource === 'gold' ? '금' : '쌀'} ${args.amount}` : '';
-      const text = `${nation.name} → ${other.name} ${proposals[kind].name}${quantity}: ${other.isNpc ? (accepted ? '수락' : '거절') : '응답 대기'}`;
+      const sentence = logSentence([
+        nationPart(nation),
+        textPart(' → '),
+        nationPart(other),
+        textPart(' '),
+        actPart(proposals[kind].key, proposals[kind].name),
+        textPart(`${quantity}: ${other.isNpc ? (accepted ? '수락' : '거절') : '응답 대기'}`),
+      ]);
       return {
-        ...success(text),
+        ...success(sentence.parts),
         history: [
-          { nationId: nation.id, text },
-          { nationId: other.id, text },
+          { nationId: nation.id, ...sentence },
+          { nationId: other.id, ...sentence },
         ],
       };
     },
@@ -109,7 +121,7 @@ export const nationCommands = [
     target: 'nation',
     args: noArgs,
     check: () => null,
-    change: () => success('국가 휴식'),
+    change: () => success([textPart('국가 '), actPart('nation_rest', '휴식')]),
   }),
   resourceTransfer(false),
   resourceTransfer(true),
@@ -129,7 +141,13 @@ export const nationCommands = [
     change(state, _actor, args) {
       const g = state.generals[args.generalId]!;
       g.cityKey = args.cityKey;
-      return success(`${g.name} ${state.cities[args.cityKey]!.name} 발령`);
+      return success([
+        generalPart(g),
+        textPart(' '),
+        cityPart(state.cities[args.cityKey]!),
+        textPart(' '),
+        actPart('nation_assign', '발령'),
+      ]);
     },
   }),
   defineCommand({
@@ -148,7 +166,7 @@ export const nationCommands = [
     change(state, actor, args) {
       state.nations[state.generals[actor.generalId]!.nationId!]!.capitalCityKey = args.cityKey;
       refreshSupply(state);
-      return success(`${state.cities[args.cityKey]!.name} 천도`);
+      return success([cityPart(state.cities[args.cityKey]!), textPart(' '), actPart('nation_capital', '천도')]);
     },
   }),
   defineCommand({
@@ -173,12 +191,18 @@ export const nationCommands = [
         untilTick: (actor.tick ?? 0) + BALANCE.DECLARE_MONTHS * TICKS_PER_MONTH,
       });
       state.diplomacies.sort((a, b) => a.nationA - b.nationA || a.nationB - b.nationB);
-      const text = `${state.nations[id]!.name} → ${state.nations[args.nationId]!.name} 선전포고`;
+      const sentence = logSentence([
+        nationPart(state.nations[id]!),
+        textPart(' → '),
+        nationPart(state.nations[args.nationId]!),
+        textPart(' '),
+        actPart('nation_declare', '선전포고'),
+      ]);
       return {
-        ...success(text),
+        ...success(sentence.parts),
         history: [
-          { nationId: id, text },
-          { nationId: args.nationId, text },
+          { nationId: id, ...sentence },
+          { nationId: args.nationId, ...sentence },
         ],
       };
     },

@@ -236,9 +236,20 @@ describe('T2-11 / AC-M2-15 실제 HTTP 저장과 엔진 반영', () => {
     ).toMatchObject({
       nationId: 1,
     });
-    expect(await db.generalLog.findMany({ where: { worldId: f.worldId, generalId: 1 } })).toMatchObject([
-      { tick: planned.tick, commandKey: 'attack', kind: 'success' },
-    ]);
+    const lines = await db.generalLog.findMany({
+      where: { worldId: f.worldId, generalId: 1 },
+      orderBy: { ordinal: 'asc' },
+    });
+    expect(lines).toMatchObject(
+      Array.from({ length: 4 }, (_, ordinal) => ({
+        tick: planned.tick,
+        commandKey: 'attack',
+        kind: 'success',
+        ordinal,
+      })),
+    );
+    expect(new Set(lines.map(({ sequence }) => sequence)).size).toBe(1);
+    expect(lines.every(({ text }) => !/[\r\n]/.test(text))).toBe(true);
     const after = await rpc('turns.get', { worldId: f.worldId }, f.commander.cookie);
     expect(after.revision).toBe(saved.revision + 1);
     expect(after.slots.slice(0, 29)).toEqual(saved.slots.slice(1));
@@ -365,9 +376,20 @@ describe('T2-11 / AC-M2-15 실제 HTTP 저장과 엔진 반영', () => {
     expect(removalOrder).toEqual(['archive', 'clear-capital', 'delete']);
     const world = await db.world.findUniqueOrThrow({ where: { id: f.worldId } });
     expect(world).toMatchObject({ status: 'RUNNING', clockTick: 100, actionSequence: before.actionSequence + 1 });
-    expect(await db.generalLog.findMany({ where: { worldId: f.worldId, generalId: 1 } })).toMatchObject([
-      { tick: 100, commandKey: 'attack', kind: 'success' },
-    ]);
+    const lines = await db.generalLog.findMany({
+      where: { worldId: f.worldId, generalId: 1 },
+      orderBy: { ordinal: 'asc' },
+    });
+    expect(lines).toMatchObject(
+      Array.from({ length: 4 }, (_, ordinal) => ({
+        tick: 100,
+        commandKey: 'attack',
+        kind: 'success',
+        ordinal,
+      })),
+    );
+    expect(new Set(lines.map(({ sequence }) => sequence)).size).toBe(1);
+    expect(lines.every(({ text }) => !/[\r\n]/.test(text))).toBe(true);
     expect(
       await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId: f.worldId, cityKey: 2 } } }),
     ).toMatchObject({
