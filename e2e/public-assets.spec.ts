@@ -31,6 +31,7 @@ interface PublicBuildMeta {
   images: { file: string; source: string | null; sha256: string }[];
   remoteImages: { source: string; url: string; sha256: string }[];
   textures: PublicBuildMeta['remoteImages'];
+  models: PublicBuildMeta['remoteImages'];
   files: Record<string, string>;
 }
 
@@ -175,7 +176,7 @@ async function watch(page: Page): Promise<Seen> {
     const url = new URL(route.request().url());
     if (
       url.origin !== origin &&
-      ![...meta.remoteImages, ...meta.textures].some((image) => image.url === url.href) &&
+      ![...meta.remoteImages, ...meta.textures, ...meta.models].some((image) => image.url === url.href) &&
       !isPortrait(url.href)
     ) {
       seen.external.push(url.href);
@@ -192,7 +193,11 @@ async function watch(page: Page): Promise<Seen> {
   page.on('response', (response: Response) => {
     const request = response.request();
     const url = new URL(request.url());
-    if (!ASSET_TYPES.has(request.resourceType()) && !meta.textures.some(({ url }) => url === response.url())) return;
+    if (
+      !ASSET_TYPES.has(request.resourceType()) &&
+      ![...meta.textures, ...meta.models].some(({ url }) => url === response.url())
+    )
+      return;
     if (url.pathname.startsWith('/trpc') || url.pathname.startsWith('/sse')) return;
     seen.pending.push(
       response.body().then((body) => {
@@ -225,7 +230,9 @@ function expectOnlyDistAssets(seen: Seen) {
       expect(asset.type, asset.path).toBe('image');
     } else if (asset.path.startsWith('https://')) {
       expect(asset.path, '승인 base 밖 초상 경로').not.toContain('/portraits/');
-      const approved = [...meta.remoteImages, ...meta.textures].find((image) => image.url === asset.path);
+      const approved = [...meta.remoteImages, ...meta.textures, ...meta.models].find(
+        (image) => image.url === asset.path,
+      );
       expect(approved, asset.path).toBeDefined();
       expect(asset.sha256, asset.path).toBe(approved!.sha256);
     } else {
@@ -242,9 +249,17 @@ test('dist에는 이미지 바이트가 없고 승인한 고정 주소와 해시
     bundledImages: { source: string; sha256: string }[];
     mapImages: { source: string; sha256: string }[];
     textures: { source: string; sha256: string }[];
+    models: { source: string; sha256: string }[];
   };
   expect(meta.textures).toEqual(
     approved.textures.map(({ source, sha256 }) => ({
+      source,
+      sha256,
+      url: meta.imageBaseUrl + '/public/' + source,
+    })),
+  );
+  expect(meta.models).toEqual(
+    approved.models.map(({ source, sha256 }) => ({
       source,
       sha256,
       url: meta.imageBaseUrl + '/public/' + source,
@@ -363,6 +378,38 @@ test('고정 질감 경로에서 브라우저가 1024 WebP를 읽는다', async 
     return { dimensions, hash };
   }, texture.url);
   expect(result).toEqual({ dimensions: [1024, 1024], hash: texture.sha256 });
+  await Promise.all(seen.pending);
+  expectOnlyDistAssets(seen);
+});
+
+test('고정 모형 경로에서 브라우저가 UV를 포함한 GLB 2.0을 읽는다', async ({ page }) => {
+  const seen = await watch(page);
+  const csp = readFileSync(join(repoRoot, 'deploy/security.caddy'), 'utf8').match(/connect-src [^;]+/)![0];
+  await page.route(origin + '/login', async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({ response, headers: { ...response.headers(), 'content-security-policy': csp } });
+  });
+  await page.goto(origin + '/login', { waitUntil: 'networkidle' });
+  const model = meta.models.find(({ source }) => source === 'map3d/models/pass-lod0.glb')!;
+  const result = await page.evaluate(async (url) => {
+    const response = await fetch(url, { credentials: 'omit' });
+    if (!response.ok) throw new Error('Model fetch failed');
+    const bytes = await response.arrayBuffer();
+    const header = new DataView(bytes);
+    const decoder = new TextDecoder();
+    const content = decoder.decode(bytes.slice(20, 20 + header.getUint32(12, true)));
+    const model = JSON.parse(content) as {
+      meshes: { primitives: { attributes: { TEXCOORD_0?: number } }[] }[];
+    };
+    return {
+      magic: decoder.decode(bytes.slice(0, 4)),
+      version: header.getUint32(4, true),
+      hasUV: model.meshes.every(({ primitives }) =>
+        primitives.every(({ attributes }) => attributes.TEXCOORD_0 !== undefined),
+      ),
+    };
+  }, model.url);
+  expect(result).toEqual({ magic: 'glTF', version: 2, hasUV: true });
   await Promise.all(seen.pending);
   expectOnlyDistAssets(seen);
 });

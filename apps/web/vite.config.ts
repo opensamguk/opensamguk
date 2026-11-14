@@ -82,8 +82,14 @@ function publicBuildMeta(imageBaseUrl: string): Plugin {
         }
         const manifest = JSON.parse(await readFile(join(repoRoot, 'manifest/public-assets.json'), 'utf8')) as {
           textures?: { source: string; sha256: string }[];
+          models?: { source: string; sha256: string }[];
         };
         const textures = (manifest.textures ?? []).map(({ source, sha256 }) => ({
+          source,
+          sha256,
+          url: imageBaseUrl + '/public/' + source,
+        }));
+        const models = (manifest.models ?? []).map(({ source, sha256 }) => ({
           source,
           sha256,
           url: imageBaseUrl + '/public/' + source,
@@ -95,6 +101,7 @@ function publicBuildMeta(imageBaseUrl: string): Plugin {
           images,
           remoteImages: PUBLIC_IMAGES,
           textures,
+          models,
           files,
         };
         await writeFile(join(outDir, PUBLIC_BUILD_META), `${JSON.stringify(meta, null, 2)}\n`);

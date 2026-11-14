@@ -10,9 +10,12 @@ const projectRoot = fileURLToPath(new URL('../../', import.meta.url));
 const fallbackSource = 'apps/web/src/portrait/fallback.svg';
 const metadataName = 'public-build.json';
 const textureDirectory = '/public/map3d/textures/';
+const modelDirectory = '/public/map3d/models/';
+const modelSource = /^map3d\/models\/[a-z][a-z0-9-]*\.glb$/;
 const textureSource = /^map3d\/textures\/[a-z][a-z0-9-]*\.webp$/;
 const imageExtension = /\.(?:png|jpe?g|webp|gif|svg|avif|ico|bmp|apng|tiff?)$/i;
-const assetExtension = /\.(?:png|jpe?g|webp|gif|svg|avif|ico|bmp|apng|tiff?|woff2?|ttf|otf|[cm]?js|css)(?:[?#].*)?$/i;
+const assetExtension =
+  /\.(?:png|jpe?g|webp|gif|svg|avif|ico|bmp|apng|tiff?|woff2?|ttf|otf|glb|[cm]?js|css)(?:[?#].*)?$/i;
 const digestPattern = /^[0-9a-f]{64}$/;
 const digest = (value: Uint8Array | string) => createHash('sha256').update(value).digest('hex');
 const record = (value: unknown): value is Record<string, unknown> =>
@@ -33,6 +36,7 @@ interface Manifest {
   bundledImages: ApprovedImage[];
   mapImages?: ApprovedImage[];
   textures?: ApprovedImage[];
+  models?: ApprovedImage[];
 }
 interface Metadata {
   schema: number;
@@ -77,20 +81,26 @@ function manifestFrom(value: unknown): Manifest {
     value.bundledImages[0].source !== fallbackSource ||
     typeof value.bundledImages[0].sha256 !== 'string' ||
     !digestPattern.test(value.bundledImages[0].sha256) ||
-    (value.textures !== undefined &&
-      (value.delivery !== 'external' ||
-        value.portraitPolicy !== 'remote' ||
-        !Array.isArray(value.textures) ||
-        value.textures.length === 0 ||
-        new Set(value.textures.map((entry) => (record(entry) ? entry.source : null))).size !== value.textures.length ||
-        !value.textures.every(
-          (entry) =>
-            record(entry) &&
-            typeof entry.source === 'string' &&
-            textureSource.test(entry.source) &&
-            typeof entry.sha256 === 'string' &&
-            digestPattern.test(entry.sha256),
-        ))) ||
+    [
+      [value.textures, textureSource],
+      [value.models, modelSource],
+    ].some(
+      ([entries, pattern]) =>
+        entries !== undefined &&
+        (value.delivery !== 'external' ||
+          value.portraitPolicy !== 'remote' ||
+          !Array.isArray(entries) ||
+          entries.length === 0 ||
+          new Set(entries.map((entry) => (record(entry) ? entry.source : null))).size !== entries.length ||
+          !entries.every(
+            (entry) =>
+              record(entry) &&
+              typeof entry.source === 'string' &&
+              (pattern as RegExp).test(entry.source) &&
+              typeof entry.sha256 === 'string' &&
+              digestPattern.test(entry.sha256),
+          )),
+    ) ||
     (value.mapImages !== undefined &&
       (!Array.isArray(value.mapImages) ||
         value.mapImages.length !== APPROVED_MAP_IMAGES.length ||
@@ -248,12 +258,13 @@ export function inspectAssetText(
   const inspect = (value: string, resource = false) => {
     if (approvedUrls.has(value)) return;
     if (/data\s*:\s*image\//i.test(value)) fail('inline-image', value);
-    if (/opensamguk-images|\/?portraits\/|\/?map3d\/textures\//i.test(value)) {
+    if (/opensamguk-images|\/?portraits\/|\/?map3d\/(?:textures|models)\//i.test(value)) {
       // 경로 틀 조각('/portraits/')은 값 전체가 같을 때만 승인이다. 다른 문자열 안에서 지우지 않는다.
       const remainder = [...approvedUrls]
         .filter((url) => /^https?:\/\//i.test(url))
         .reduce((text, url) => text.replaceAll(url, ''), value);
-      if (/\/?map3d\/textures\//i.test(remainder)) fail('texture-path', value);
+      if (/\/?map3d\/models\//i.test(remainder)) fail('model-path', value);
+      else if (/\/?map3d\/textures\//i.test(remainder)) fail('texture-path', value);
       else if (/opensamguk-images|\/?portraits\//i.test(remainder)) fail('portrait-path', value);
     }
     if (resource && /^(?:data|blob|javascript|file|ftp):/i.test(value.trim())) fail('resource-scheme', value);
@@ -426,7 +437,15 @@ async function checkExternalAssets(root: string, dist: string, raw: Record<strin
   }));
   if (JSON.stringify(metadata.textures ?? []) !== JSON.stringify(expectedTextures))
     failures.push('public-build.json: texture-catalog: build texture list does not match manifest');
-  if (textures.length && !githubRawPortraitBase.test(textureBase))
+  const models = manifest.models ?? [];
+  const expectedModels = models.map(({ source, sha256 }) => ({
+    source,
+    sha256,
+    url: textureBase + '/public/' + source,
+  }));
+  if (JSON.stringify(metadata.models ?? []) !== JSON.stringify(expectedModels))
+    failures.push('public-build.json: model-catalog: build model list does not match manifest');
+  if ((textures.length || models.length) && !githubRawPortraitBase.test(textureBase))
     failures.push('manifest/public-assets.json: texture-base: 전체 커밋 SHA로 고정한 이미지 주소가 필요합니다.');
   if (textures.length) {
     const names = JSON.parse(await readFile(resolve(root, 'apps/web/src/map3d/textureNames.json'), 'utf8'));
@@ -434,6 +453,11 @@ async function checkExternalAssets(root: string, dist: string, raw: Record<strin
       JSON.stringify(names) !== JSON.stringify(textures.map(({ source }) => source.slice('map3d/textures/'.length, -5)))
     )
       failures.push('textureNames.json: texture-catalog: 승인 목록과 질감 이름이 다릅니다.');
+  }
+  if (models.length) {
+    const names = JSON.parse(await readFile(resolve(root, 'apps/web/src/map3d/modelNames.json'), 'utf8'));
+    if (JSON.stringify(names) !== JSON.stringify(models.map(({ source }) => source.slice('map3d/models/'.length, -4))))
+      failures.push('modelNames.json: model-catalog: approved model names do not match manifest');
   }
   const meta = metadataFrom({ ...metadata, schema: 1 }, portraitBases);
   if (meta.images.length) failures.push('public-build.json: image-set: 이미지 바이트는 게임 배포에 넣지 않습니다.');
@@ -443,6 +467,8 @@ async function checkExternalAssets(root: string, dist: string, raw: Record<strin
     failures.push('docs/product/decisions.md: missing-decision: D-087');
   if (textures.length && !/^## D-090[. ]/m.test(decisions))
     failures.push('docs/product/decisions.md: missing-decision: D-090');
+  if (models.length && !/^## D-091[. ]/m.test(decisions))
+    failures.push('docs/product/decisions.md: missing-decision: D-091');
   const csp = await readFile(resolve(root, 'deploy/security.caddy'), 'utf8');
   const imageSources = [...csp.matchAll(/img-src\s+([^;"\r\n]+)/g)];
   if (
@@ -451,9 +477,12 @@ async function checkExternalAssets(root: string, dist: string, raw: Record<strin
   )
     failures.push('deploy/security.caddy: image-csp: 승인한 이미지 출처 하나만 허용합니다.');
   failures.push(...portraitBaseFailures(portraitBases, imageSources[0]?.[1]?.trim().split(/\s+/) ?? []));
-  if (textures.length) {
+  if (textures.length || models.length) {
     const connect = [...csp.matchAll(/connect-src\s+([^;"\r\n]+)/g)];
-    const expectedSource = textureBase + textureDirectory;
+    const expectedSource = [
+      ...(textures.length ? [textureBase + textureDirectory] : []),
+      ...(models.length ? [textureBase + modelDirectory] : []),
+    ].join(' ');
     if (connect.length !== 1 || connect[0]![1]!.trim() !== `'self' ${expectedSource}`)
       failures.push('deploy/security.caddy: texture-csp: 고정 질감 경로가 connect-src와 다릅니다.');
   }
@@ -465,9 +494,11 @@ async function checkExternalAssets(root: string, dist: string, raw: Record<strin
   const urls = new Set([
     ...expected.map((image) => image.url),
     ...expectedTextures.map((image) => image.url),
+    ...expectedModels.map((model) => model.url),
     ...portraitBases,
     ...(portraitBases.length ? ['/portraits/'] : []),
     ...(textures.length ? [textureDirectory, textureBase + textureDirectory] : []),
+    ...(models.length ? [modelDirectory, textureBase + modelDirectory] : []),
   ]);
   for (const file of actual) {
     const bytes = await readFile(resolve(dist, file));
