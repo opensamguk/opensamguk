@@ -58,7 +58,7 @@ describe('resolveImageBaseUrl', () => {
     expect(resolveImageBaseUrl(undefined)).toBe(DEFAULT_IMAGE_BASE_URL);
     expect(resolveImageBaseUrl('  ')).toBe(DEFAULT_IMAGE_BASE_URL);
     expect(DEFAULT_IMAGE_BASE_URL).toBe(
-      'https://raw.githubusercontent.com/opensamguk/opensamguk-images/8d96c8d5d3ba2b7c6e4f208730a2ac4bd2366da4',
+      'https://raw.githubusercontent.com/opensamguk/opensamguk-images/88e34b48208ed701454a7fa657deaa6750ff5ea6',
     );
   });
 

@@ -12,7 +12,7 @@ import { PORTRAIT_VARIANTS, type PortraitVariant } from './portraitUrl';
 
 const VARIANTS = Object.keys(PORTRAIT_VARIANTS) as PortraitVariant[];
 const PINNED_BASE =
-  'https://raw.githubusercontent.com/opensamguk/opensamguk-images/8d96c8d5d3ba2b7c6e4f208730a2ac4bd2366da4';
+  'https://raw.githubusercontent.com/opensamguk/opensamguk-images/88e34b48208ed701454a7fa657deaa6750ff5ea6';
 
 beforeEach(() => {
   vi.stubEnv('MODE', 'public');

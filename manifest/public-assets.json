@@ -2,7 +2,7 @@
   "decision": "D-087",
   "portraitPolicy": "remote",
   "remoteImageBases": [
-    "https://raw.githubusercontent.com/opensamguk/opensamguk-images/8d96c8d5d3ba2b7c6e4f208730a2ac4bd2366da4"
+    "https://raw.githubusercontent.com/opensamguk/opensamguk-images/88e34b48208ed701454a7fa657deaa6750ff5ea6"
   ],
   "externalAssetOrigins": [],
   "portraitVariants": ["portrait", "icon", "thumb"],
@@ -1339,15 +1339,15 @@
     },
     {
       "source": "map3d/models/pass-lod0.glb",
-      "sha256": "4c87585bb51e6701e9e68b75b45595e75dae49e5488aa1b60d26aa13b2204e61"
+      "sha256": "efecc32b5b5b5d255b99df0f31bdc0f7e65b330f56d1aaf5c88720183f9f2f20"
     },
     {
       "source": "map3d/models/pass-lod1.glb",
-      "sha256": "52cd06dcac8d65e8833b87211096bea79152fbb5582986b3045047ecab567421"
+      "sha256": "2bedfb41ceff84d80d617861463eacd4041ae6821d4cbc86c22e1d067d4e2951"
     },
     {
       "source": "map3d/models/pass-lod2.glb",
-      "sha256": "a829369d79a01a7f6d7fa7925835dad286372ffb3e607bef4639855e5e56047b"
+      "sha256": "26ea43fd6473489ab3100c0af4d46e4459207315a8149e0649532660f48b61f1"
     },
     {
       "source": "map3d/models/port-lod0.glb",
