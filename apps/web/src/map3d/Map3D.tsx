@@ -43,6 +43,8 @@ export type Map3DProps = {
   /** 처음 열 때 이 거점을 가운데 두고 focusZoom배로 확대한다 (인자 입력 화면). */
   focusKey?: number | null | undefined;
   focusZoom?: number | undefined;
+  /** 지도 바탕 화면(INT-29): 판이 화면을 꽉 채우고(빈 띠 없이), 배율 단추는 오른쪽 아래 떠 있는 줄, 도움말은 뺀다. */
+  stage?: boolean | undefined;
 };
 
 export default function Map3D({
@@ -57,6 +59,7 @@ export default function Map3D({
   fill = false,
   focusKey = null,
   focusZoom = 3,
+  stage = false,
 }: Map3DProps) {
   const basemap = basemapForOperationalMap(map);
   const grid = useTerrainGrid(basemap?.pixels, basemap?.palette);
@@ -167,7 +170,9 @@ export default function Map3D({
   // 화면 크기에 맞춰 처음 배율을 정한다. focus가 있으면 그 거점을 가운데 두고 확대한다.
   const fitTo = (width: number, height: number) => {
     const c = control.current;
-    const fit = Math.min(width / map.canvas.width, height / (map.canvas.height * Math.sin(ELEVATION)));
+    // 지도 바탕 화면은 판이 화면을 덮게(빈 띠 없이) 맞춘다. 그 밖에는 지도 전체가 보이게 맞춘다.
+    const fitOf = stage ? Math.max : Math.min;
+    const fit = fitOf(width / map.canvas.width, height / (map.canvas.height * Math.sin(ELEVATION)));
     const first = c.fit === 0;
     c.zoom = first ? fit : (c.zoom / c.fit) * fit;
     c.fit = fit;
@@ -384,8 +389,8 @@ export default function Map3D({
   }, [anchors, focusKey, map.routes, model, moved, myNationId, ready, selectedKey]);
   const hovered = hover ? model.siteById.get(hover.siteId) : undefined;
   return (
-    <div className={fill ? `${styles.wrap} ${styles.wrapFill}` : styles.wrap}>
-      <div className={styles.toolbar}>
+    <div className={[styles.wrap, fill ? styles.wrapFill : '', stage ? styles.stage : ''].filter(Boolean).join(' ')}>
+      <div className={stage ? styles.stageTools : styles.toolbar}>
         <div className={styles.zoom} role="group" aria-label="지도 배율">
           <button type="button" aria-label="지도 확대" disabled={factor >= MAX_ZOOM_FACTOR} onClick={() => zoomBy(1.5)}>
             확대
@@ -491,7 +496,7 @@ export default function Map3D({
         ) : null}
         {stats ? <p ref={statLine} className={styles.stats} data-testid="map-3d-stats" /> : null}
       </div>
-      <p className={styles.help}>드래그나 방향키로 이동 · 휠이나 +/−로 확대 · 거점 이름을 눌러 선택</p>
+      {stage ? null : <p className={styles.help}>드래그나 방향키로 이동 · 휠이나 +/−로 확대 · 거점 이름을 눌러 선택</p>}
     </div>
   );
 }
