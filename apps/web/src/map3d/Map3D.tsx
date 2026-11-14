@@ -15,7 +15,7 @@ import { basemapForOperationalMap } from '../main/operationalGeography';
 import { useTerrainGrid } from '../main/TerrainTileLayer';
 import type { DrawnNation } from '../main/siteMarkers';
 import type { MapGeneral } from '../main/mapGeneralList';
-import { buildMapModel, describeSite, mapLabel, type ModelCity } from '../main/mapModel';
+import { buildMapModel, describeSite, mapLabel, SITE_SHORT_LABELS, type ModelCity } from '../main/mapModel';
 import { MapSiteChooser, MapTooltip, tooltipPlacement } from '../main/MapParts';
 import { compactLabels, siteSize, type HeightData, type LabelBox } from './terrain3d';
 import { ELEVATION, MapScene } from './mapScene';
@@ -120,8 +120,8 @@ export default function Map3D({
           id: site.id,
           x,
           y: y - 12,
-          width: site.name.length * 13 + 12,
-          height: 24,
+          width: site.name.length * 12 + 10,
+          height: 40,
           priority:
             (site.anchorKey === chosen ? 1000 : 0) +
             (site.anchorKey === home ? 900 : 0) +
@@ -444,7 +444,6 @@ export default function Map3D({
                     key={site.id}
                     type="button"
                     className={`${styles.site} ${view.selected ? styles.selected : ''} ${view.mine ? styles.mine : ''}`}
-                    style={view.nation && !view.selected ? { borderLeft: `6px solid ${view.nation.color}` } : undefined}
                     data-site-id={site.id}
                     data-site-kind={site.kind}
                     data-city-key={site.anchorKey}
@@ -462,6 +461,18 @@ export default function Map3D({
                     }}
                     onPointerLeave={() => setHover((old) => (old?.siteId === site.id ? null : old))}
                   >
+                    {/* 깃발: 소유국 이름 첫 글자(주인 없는 도시는 '무', 관문·항구는 종류 글자). 이름은 깃발 아래 판에. */}
+                    <span
+                      className={styles.flag}
+                      style={{ background: view.nation?.color ?? '#7d776b' }}
+                      aria-hidden="true"
+                    >
+                      {view.nation
+                        ? view.nation.name.slice(0, 1)
+                        : site.kind === 'CITY'
+                          ? '무'
+                          : SITE_SHORT_LABELS[site.kind].slice(0, 1)}
+                    </span>
                     <span className={styles.name}>{view.plate}</span>
                   </button>
                 );

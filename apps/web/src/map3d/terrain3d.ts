@@ -146,8 +146,8 @@ export type HeightData = {
   depthRows?: number;
   maxDepth?: number;
 };
-// 지도 1단위가 약 3.5km라 실제 비율이면 산이 거의 보이지 않는다. 9km가 약 24단위가 되게 과장한다.
-export const UNITS_PER_METRE = 40 / 9000;
+// 지도 1단위가 약 3.5km라 실제 비율이면 산이 거의 보이지 않는다. 9km가 60단위(약 1:2.6 과장 기준의 1.5배)가 되게 크게 과장해 산세가 또렷하다.
+export const UNITS_PER_METRE = 60 / 9000;
 
 export function decodeMetres(height: HeightData): Float32Array {
   const binary = atob(height.data);

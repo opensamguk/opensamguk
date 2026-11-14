@@ -3,6 +3,10 @@
 // three 전체를 묶어 덩어리가 커진다. 필요한 부품만 가져온다.
 import {
   AmbientLight,
+  DataTexture,
+  NearestFilter,
+  SRGBColorSpace,
+  Vector2,
   BoxGeometry,
   BufferGeometry,
   Color,
@@ -30,10 +34,11 @@ import {
   WebGLRenderer,
 } from 'three';
 import type { PublicGeography } from '@opensamguk/shared';
-import { roadWalks, waterLanes, type Terrain } from '../main/terrainTiles';
+import { roadWalks, TERRAINS, waterLanes, type Terrain } from '../main/terrainTiles';
 import { ROAD_CELL } from '../main/roadPixels';
 import { bounds as riverBounds, lines as riverData } from './data/rivers';
 import { along, cellsToPoints, simplify } from './routes3d';
+import { territoryTiles } from './territory3d';
 import type { DrawnNation } from '../main/siteMarkers';
 import type { ModelCity } from '../main/mapModel';
 import {
@@ -55,8 +60,63 @@ type Site = PublicGeography['sites'][number];
 export type AnchorSite = Site & { anchorKey: number };
 
 // 위에서 내려다보는 각도(수평에서 55°). 화면 위쪽이 북쪽이다.
-export const ELEVATION = (55 * Math.PI) / 180;
+export const ELEVATION = (45 * Math.PI) / 180;
+/** 영지 칸 한 변(지도 단위). 칸은 45° 돌려 놓아 비스듬히 보면 마름모다. */
+export const TILE = 8;
 const NEUTRAL = '#d6d0c4';
+const LAKE = TERRAINS.indexOf('lake');
+
+// 영지 칸 그리기. 월드 xz를 45° 돌린 칸 좌표로 바꿔 칸 자료를 읽고,
+// - 가는 칸 격자(멀리서는 흐린다)와 소유국 색 옅은 칠,
+// - 이웃 칸과 도시가 다르면 금빛 도시 경계, 나라가 다르면 굵은 나라색 국경을 긋는다.
+const TERRITORY_GLSL = `
+vec4 tileAt(vec2 cell) {
+  vec2 uv = (cell - uTileOrigin + 0.5) / uTileCount;
+  if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) return vec4(0.0);
+  return texture2D(uTerritory, uv);
+}
+bool hasNation(vec4 tile) { return tile.a > 0.0 && dot(tile.rgb, vec3(1.0)) > 0.0; }
+vec3 territoryColor(vec3 base, vec2 xz) {
+  vec2 q = vec2(xz.x + xz.y, xz.y - xz.x) * ${Math.SQRT1_2} / ${TILE.toFixed(1)};
+  vec2 cell = floor(q);
+  vec2 f = fract(q);
+  vec2 fw = fwidth(q);
+  float pxTile = max(fw.x, fw.y);
+  vec4 own = tileAt(cell);
+  vec3 color = base;
+  // 멀리서 볼수록 나라 색을 진하게 칠해 천하 판도가 한눈에 읽힌다. 가까이서는 지형이 보이게 옅게.
+  float far = smoothstep(0.04, 0.22, pxTile);
+  if (hasNation(own)) color = mix(color, own.rgb, mix(0.16, 0.42, far));
+  float edge = min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y));
+  float grid = (1.0 - smoothstep(0.0, pxTile * 1.1, edge)) * (1.0 - smoothstep(0.05, 0.12, pxTile));
+  color = mix(color, vec3(1.0, 0.97, 0.86), grid * (own.a > 0.0 ? 0.16 : 0.08));
+  vec4 sides[4];
+  sides[0] = tileAt(cell + vec2(-1.0, 0.0));
+  sides[1] = tileAt(cell + vec2(1.0, 0.0));
+  sides[2] = tileAt(cell + vec2(0.0, -1.0));
+  sides[3] = tileAt(cell + vec2(0.0, 1.0));
+  float dist[4];
+  dist[0] = f.x;
+  dist[1] = 1.0 - f.x;
+  dist[2] = f.y;
+  dist[3] = 1.0 - f.y;
+  for (int k = 0; k < 4; k++) {
+    vec4 other = sides[k];
+    if (own.a == 0.0 && other.a == 0.0) continue;
+    bool nation = distance(own.rgb, other.rgb) > 0.01 || ((own.a > 0.0) != (other.a > 0.0));
+    bool city = abs(own.a - other.a) > 0.001;
+    if (!nation && !city) continue;
+    // 주인 없는 땅끼리의 도시 경계는 긋지 않는다(빈 땅이 금줄로 어지럽지 않게).
+    if (!nation && !hasNation(own) && !hasNation(other)) continue;
+    float width = nation ? 2.6 : 1.3;
+    float line = 1.0 - smoothstep(pxTile * width * 0.5, pxTile * (width * 0.5 + 1.0), dist[k]);
+    vec3 ink = vec3(0.93, 0.8, 0.5);
+    if (nation) ink = hasNation(own) ? own.rgb : hasNation(other) ? other.rgb : ink;
+    color = mix(color, ink, line * (nation ? 0.95 : mix(0.7, 0.35, far)));
+  }
+  return color;
+}`;
+
 const WALL = '#cbbd9e';
 
 // 지형·물 셰이더가 함께 쓰는 잡음. hash2·noise2·fbm은 부드러운 얼룩, ridged는 산 능선처럼 날 선 기복이다.
@@ -98,6 +158,13 @@ export class MapScene {
   private readonly sun = new DirectionalLight('#fff0d6', 3);
   /** 물결 셰이더의 시각(초). 그릴 때마다 옮긴다. */
   private readonly waterTime = { value: 0 };
+  /** 영지 칸 자료(셰이더): 칸마다 소유국 색(RGB)과 도시 번호(A). setSites가 채운다. */
+  private readonly territory = {
+    map: { value: new DataTexture(new Uint8Array(4), 1, 1) },
+    origin: { value: new Vector2() },
+    count: { value: new Vector2(1, 1) },
+  };
+  private rings: Mesh[] = [];
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -141,7 +208,7 @@ export class MapScene {
     sun.shadow.normalBias = 0.4;
     this.scene.add(sun, sun.target);
     // 대기 원근감: 화면 위쪽(먼 북쪽)이 엷게 흐려진다.
-    this.scene.fog = new Fog('#c3cfd8', 980, 1700);
+    this.scene.fog = new Fog('#c3cfd8', 1150, 2100);
 
     this.scene.add(this.terrain(palette, metres));
     // 지도 밖까지 이어지는 먼바다. 가장 깊은 바닥보다 아래에 둬 지도 안의 물·바닥을 가리지 않는다.
@@ -185,12 +252,19 @@ export class MapScene {
     // - 산: 능선 잡음으로 낸 잔 기복(법선)과, 경사면 바위·고도 눈을 화소마다 다시 칠한다.
     // - 바닷가: 물높이 바로 위는 모래, 물 아래는 바닥 흙. 해안선이 칸이 아니라 높이 0 선을 따른다.
     // - 평야: 가까이 볼 때만 논밭 조각보 무늬(멀리서는 흐려 물결무늬가 생기지 않게).
+    const territory = this.territory;
     material.onBeforeCompile = (shader) => {
+      shader.uniforms.uTerritory = territory.map;
+      shader.uniforms.uTileOrigin = territory.origin;
+      shader.uniforms.uTileCount = territory.count;
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', `#include <common>\nvarying vec3 vGround;\nvarying vec3 vUp;`)
         .replace('#include <begin_vertex>', `#include <begin_vertex>\nvGround = position;\nvUp = normal;`);
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', `#include <common>\nvarying vec3 vGround;\nvarying vec3 vUp;\n${TERRAIN_NOISE}`)
+        .replace(
+          '#include <common>',
+          `#include <common>\nvarying vec3 vGround;\nvarying vec3 vUp;\nuniform sampler2D uTerritory;\nuniform vec2 uTileOrigin;\nuniform vec2 uTileCount;\n${TERRAIN_NOISE}\n${TERRITORY_GLSL}`,
+        )
         .replace(
           '#include <color_fragment>',
           `#include <color_fragment>
@@ -239,8 +313,14 @@ float slope = 1.0 - normalize(vUp + vec3(-g.x, 0.0, -g.y) * 0.6).y;
 float rock = smoothstep(0.16, 0.42, slope + (grain - 0.5) * 0.12) * step(0.3, vGround.y);
 vec3 rockColor = mix(vec3(0.42, 0.39, 0.35), vec3(0.55, 0.5, 0.44), grain);
 diffuseColor.rgb = mix(diffuseColor.rgb, rockColor, rock * 0.85);
-float snow = smoothstep(19.0, 23.0, vGround.y + (grain - 0.5) * 3.0) * (1.0 - smoothstep(0.45, 0.75, slope));
-diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.94, 0.96), snow);`,
+float snow = smoothstep(${(4300 * UNITS_PER_METRE).toFixed(2)}, ${(5200 * UNITS_PER_METRE).toFixed(2)}, vGround.y + (grain - 0.5) * ${(650 * UNITS_PER_METRE).toFixed(2)}) * (1.0 - smoothstep(0.45, 0.75, slope));
+diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.94, 0.96), snow);
+if (vGround.y > 0.0) diffuseColor.rgb = territoryColor(diffuseColor.rgb, vGround.xz);
+// 오지(무대 밖 땅): 색을 빼고 어둡게 해 게임 무대 밖임을 보인다.
+if (vGround.y > 0.05 && tileAt(floor(vec2(vGround.x + vGround.z, vGround.z - vGround.x) * ${Math.SQRT1_2} / ${TILE.toFixed(1)})).a == 0.0) {
+  float grey = dot(diffuseColor.rgb, vec3(0.3, 0.55, 0.15));
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(grey) * 0.72, 0.65);
+}`,
         );
     };
     const mesh = new Mesh(geometry, material);
@@ -260,7 +340,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.94, 0.96), snow);`,
       metres[i] = this.field[i]! > 0 ? 0 : Math.max(depth?.[i] ?? 0, below);
     }
     geometry.setAttribute('aDepth', new Float32BufferAttribute(metres, 1));
-    const material = new MeshStandardMaterial({ roughness: 0.18, metalness: 0, transparent: true });
+    const material = new MeshStandardMaterial({ roughness: 0.3, metalness: 0, transparent: true });
     const time = this.waterTime;
     material.onBeforeCompile = (shader) => {
       shader.uniforms.uTime = time;
@@ -279,7 +359,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.94, 0.96), snow);`,
           '#include <color_fragment>',
           `#include <color_fragment>
 float d = sqrt(max(vDepth, 0.0) / 3000.0);
-vec3 water = mix(vec3(0.20, 0.50, 0.50), vec3(0.08, 0.30, 0.42), smoothstep(0.02, 0.2, d));
+vec3 water = mix(vec3(0.13, 0.42, 0.44), vec3(0.06, 0.25, 0.37), smoothstep(0.02, 0.2, d));
 water = mix(water, vec3(0.03, 0.12, 0.24), smoothstep(0.2, 0.7, d));
 float foamNoise = fbm(vSea * 1.6 + vec2(uTime * 0.05, 0.0));
 float foam = (1.0 - smoothstep(0.0, 4.0, vDepth)) * smoothstep(0.45, 0.7, foamNoise);
@@ -292,7 +372,7 @@ diffuseColor.a = mix(0.45, 0.97, smoothstep(0.0, 30.0, vDepth));`,
 vec2 w = vSea * 0.9 + vec2(uTime * 0.08, uTime * 0.05);
 float e2 = 0.1;
 float w0 = fbm(w);
-vec2 wg = vec2(fbm(w + vec2(e2, 0.0)) - w0, fbm(w + vec2(0.0, e2)) - w0) / e2 * 0.12;
+vec2 wg = vec2(fbm(w + vec2(e2, 0.0)) - w0, fbm(w + vec2(0.0, e2)) - w0) / e2 * 0.06;
 normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
         );
     };
@@ -391,19 +471,37 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
         return move({ x: x!, y: y! });
       }),
     );
-    return new Mesh(
-      this.ribbon(lines, 1.4, 0.15),
+    // 강둑(옅은 풀빛 모래)을 넓게 깔고 그 위에 청록 물 띠를 얹는다.
+    const group = new Object3D();
+    group.add(
+      new Mesh(
+        this.ribbon(lines, 4.2, 0.1),
+        new MeshStandardMaterial({
+          color: '#b9c08f',
+          roughness: 0.9,
+          side: DoubleSide,
+          transparent: true,
+          opacity: 0.7,
+          polygonOffset: true,
+          polygonOffsetFactor: -1,
+        }),
+      ),
+    );
+    const water = new Mesh(
+      this.ribbon(lines, 2.6, 0.16),
       new MeshStandardMaterial({
-        color: '#3d7488',
+        color: '#3f8f94',
         roughness: 0.2,
         metalness: 0,
         transparent: true,
-        opacity: 0.9,
+        opacity: 0.92,
         side: DoubleSide,
         polygonOffset: true,
-        polygonOffsetFactor: -1,
+        polygonOffsetFactor: -2,
       }),
     );
+    group.add(water);
+    return group;
   }
 
   // 숲: 숲·구릉 칸에 나무를 촘촘히 흩뿌린다. 높은 곳·북쪽은 바늘잎나무(뾰족), 낮은 남쪽은 넓은잎나무(둥근 수관)다.
@@ -467,11 +565,24 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     cityByKey: ReadonlyMap<number, ModelCity>,
     nationById: ReadonlyMap<number, DrawnNation>,
   ) {
-    for (const mesh of this.models) {
+    for (const mesh of [...this.models, ...this.rings]) {
       this.scene.remove(mesh);
       mesh.geometry.dispose();
     }
+    this.setTerritory(anchors, cityByKey, nationById);
     const parts = anchors.length * 4;
+    // 성 받침: 성벽보다 조금 넓은 흙 단. 모형이 비탈에 묻히지 않고 놓인 것처럼 보인다.
+    const plinths = new InstancedMesh(
+      new BoxGeometry(1, 1, 1),
+      new MeshStandardMaterial({ color: '#8f7a58', roughness: 0.95 }),
+      anchors.length,
+    );
+    // 영지 고리: 모든 도시 둘레에 소유국 색 고리(주인 없으면 옅은 회색). 고른 거점의 붉은 고리는 따로 둔다.
+    const rings = new InstancedMesh(
+      new RingGeometry(0.88, 1, 48).rotateX(-Math.PI / 2),
+      new MeshBasicMaterial({ transparent: true, opacity: 0.85, depthWrite: false }),
+      anchors.length,
+    );
     const walls = new InstancedMesh(new BoxGeometry(1, 1, 1), new MeshStandardMaterial({ roughness: 0.85 }), parts);
     const towers = new InstancedMesh(
       new CylinderGeometry(0.5, 0.6, 1, 6),
@@ -507,6 +618,13 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
       const tint = nation?.color ?? NEUTRAL;
       const { side, height } = siteSize(site.kind, city?.level);
       const base = this.world(site.position.x, site.position.y);
+      const pad = site.kind === 'PASS' ? side * 1.9 : side * 1.35;
+      matrix.makeScale(pad, 1.2, site.kind === 'PASS' ? side * 0.7 : pad).setPosition(base.x, base.y - 0.3, base.z);
+      plinths.setMatrixAt(index, matrix);
+      const ringSize = side * (site.kind === 'PASS' ? 1.25 : 1.15);
+      matrix.makeScale(ringSize, 1, ringSize).setPosition(base.x, base.y + 0.35, base.z);
+      rings.setMatrixAt(index, matrix);
+      rings.setColorAt(index, color.set(nation?.color ?? '#9d968a'));
       const half = side / 2;
       const thick = Math.max(side * 0.1, 0.6);
       const towerSize = thick * 2.2;
@@ -555,12 +673,74 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     walls.count = w;
     towers.count = t;
     roofs.count = r;
-    this.models = [walls, towers, keeps, roofs];
+    this.models = [plinths, walls, towers, keeps, roofs];
     for (const mesh of this.models) {
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       this.scene.add(mesh);
     }
+    this.rings = [rings];
+    this.scene.add(rings);
+  }
+
+  // 영지 칸 자료를 셰이더 질감으로 올린다. 도시만 영지를 갖고, 관문·항구·전장은 갖지 않는다.
+  private setTerritory(
+    anchors: readonly AnchorSite[],
+    cityByKey: ReadonlyMap<number, ModelCity>,
+    nationById: ReadonlyMap<number, DrawnNation>,
+  ) {
+    const cities = anchors
+      .filter((site) => site.kind === 'CITY')
+      .map((site) => {
+        const city = cityByKey.get(site.anchorKey);
+        const nation = city?.nationId == null ? undefined : nationById.get(city.nationId);
+        return {
+          key: site.anchorKey,
+          x: site.position.x,
+          y: site.position.y,
+          level: city?.level ?? 3,
+          color: nation?.color ?? null,
+        };
+      });
+    const tiles = territoryTiles(
+      cities,
+      this.canvasSize,
+      TILE,
+      (x, y) => groundAt(this.field, this.grid, this.canvasSize, x, y) > 0 && this.rawGround(x, y) > 0.05,
+      (x, y) => this.cellAt(x, y) === LAKE,
+    );
+    const texture = new DataTexture(tiles.data, tiles.columns, tiles.rows);
+    texture.magFilter = NearestFilter;
+    texture.minFilter = NearestFilter;
+    texture.colorSpace = SRGBColorSpace;
+    texture.needsUpdate = true;
+    this.territory.map.value.dispose();
+    this.territory.map.value = texture;
+    this.territory.origin.value.set(tiles.originX, tiles.originY);
+    this.territory.count.value.set(tiles.columns, tiles.rows);
+  }
+
+  /** 지도 좌표가 놓인 지형 칸 종류 번호. */
+  private cellAt(x: number, y: number) {
+    const column = Math.min(
+      Math.max(Math.floor((x / this.canvasSize.width) * this.grid.columns), 0),
+      this.grid.columns - 1,
+    );
+    const row = Math.min(Math.max(Math.floor((y / this.canvasSize.height) * this.grid.rows), 0), this.grid.rows - 1);
+    return this.grid.cells[row * this.grid.columns + column]!;
+  }
+
+  /** 물높이로 자르지 않은 땅 높이(가장 가까운 칸). 바다 칸을 가려낼 때 쓴다. */
+  private rawGround(x: number, y: number) {
+    const column = Math.min(
+      Math.max(Math.round((x / this.canvasSize.width) * (this.grid.columns - 1)), 0),
+      this.grid.columns - 1,
+    );
+    const row = Math.min(
+      Math.max(Math.round((y / this.canvasSize.height) * (this.grid.rows - 1)), 0),
+      this.grid.rows - 1,
+    );
+    return this.field[row * this.grid.columns + column]!;
   }
 
   /**
