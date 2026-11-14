@@ -1,3 +1,4 @@
+import { territoryGridSchema } from '@opensamguk/shared';
 import { z } from 'zod';
 
 const id = z.string().regex(/^[a-z][a-z0-9:_-]{0,63}$/);
@@ -71,6 +72,7 @@ export const operationalMapSchema = z
     defaults: z.strictObject({ trust: z.number().min(0).max(100), supplyState: z.union([z.literal(0), z.literal(1)]) }),
     sites: z.array(site).min(1).max(500),
     routes: z.array(route).max(2000),
+    territory: territoryGridSchema.optional(),
   })
   .superRefine((map, context) => {
     const fail = (path: PropertyKey[], message: string) => context.addIssue({ code: 'custom', path, message });
@@ -110,6 +112,9 @@ export const operationalMapSchema = z
       }
     });
     if (!map.sites.some((row) => row.kind === 'CITY')) fail(['sites'], '경제 도시가 하나 이상 필요합니다.');
+    const cityKeys = new Set(map.sites.flatMap((site) => (site.kind === 'CITY' ? [site.anchorKey] : [])));
+    if (map.territory?.owner.some((key) => key !== -1 && !cityKeys.has(key)))
+      fail(['territory', 'owner'], 'Unknown territory city key.');
     const routes = new Set<string>();
     map.routes.forEach((edge, index) => {
       const path = ['routes', index];

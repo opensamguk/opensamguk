@@ -13,6 +13,7 @@ import {
 import type { StatRules, UnitSetResource } from './resources';
 import { legacyCheCrewRegionsMatch, unitSetRegionSchemeMatches } from './crewRegions';
 import type { WorldState, WorldExt } from '../model/world';
+import { createMapTerritory } from './map/territory';
 import { operationalMapSchema, type OperationalMapResource } from './map/operational';
 import { operationalAnchors } from './map/anchors';
 import { validateMap } from './validate/map';
@@ -340,7 +341,11 @@ export function buildInitialWorld(input: {
         }
       : {}),
     ...(scaled.record ? { cityScale: scaled.record } : {}),
-    ...(operational ? { operationalMap: operational } : {}),
+    ...(operational
+      ? {
+          operationalMap: createMapTerritory(operational, new Map(map.cities.map(({ id, level }) => [id, level]))),
+        }
+      : {}),
     ...(operational && scenario.openingCityProfile ? { openingCityProfile: scenario.openingCityProfile } : {}),
     ...(scenario.lastNationRecruitmentLockYear === undefined
       ? {}

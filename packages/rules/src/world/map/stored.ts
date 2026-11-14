@@ -68,5 +68,6 @@ export function operationalMapDisplay(map: OperationalMapResource) {
       ...(site.kind === 'PORT' ? { parentCityId: site.parentCityId } : {}),
     })),
     routes: map.routes,
+    ...(map.territory ? { territory: map.territory } : {}),
   };
 }

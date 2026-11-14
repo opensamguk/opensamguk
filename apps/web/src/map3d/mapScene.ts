@@ -38,7 +38,7 @@ import { roadWalks, TERRAINS, waterLanes, type Terrain } from '../main/terrainTi
 import { ROAD_CELL } from '../main/roadPixels';
 import { bounds as riverBounds, lines as riverData } from './data/rivers';
 import { along, cellsToPoints, simplify } from './routes3d';
-import { territoryTiles } from './territory3d';
+import { colorTerritory, territoryTiles } from './territory3d';
 import type { DrawnNation } from '../main/siteMarkers';
 import type { ModelCity } from '../main/mapModel';
 import {
@@ -159,6 +159,7 @@ export class MapScene {
   /** 물결 셰이더의 시각(초). 그릴 때마다 옮긴다. */
   private readonly waterTime = { value: 0 };
   /** 영지 칸 자료(셰이더): 칸마다 소유국 색(RGB)과 도시 번호(A). setSites가 채운다. */
+  private readonly savedTerritory: PublicGeography['territory'];
   private readonly territory = {
     map: { value: new DataTexture(new Uint8Array(4), 1, 1) },
     origin: { value: new Vector2() },
@@ -191,6 +192,7 @@ export class MapScene {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = PCFShadowMap;
     this.canvasSize = map.canvas;
+    this.savedTerritory = map.territory;
     this.grid = grid;
     const metres = heights ? decodeMetres(heights) : null;
     const depth = heights ? decodeDepth(heights, grid.columns, grid.rows) : null;
@@ -702,13 +704,15 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
           color: nation?.color ?? null,
         };
       });
-    const tiles = territoryTiles(
-      cities,
-      this.canvasSize,
-      TILE,
-      (x, y) => groundAt(this.field, this.grid, this.canvasSize, x, y) > 0 && this.rawGround(x, y) > 0.05,
-      (x, y) => this.cellAt(x, y) === LAKE,
-    );
+    const tiles = this.savedTerritory
+      ? colorTerritory(this.savedTerritory, cities)
+      : territoryTiles(
+          cities,
+          this.canvasSize,
+          TILE,
+          (x, y) => groundAt(this.field, this.grid, this.canvasSize, x, y) > 0 && this.rawGround(x, y) > 0.05,
+          (x, y) => this.cellAt(x, y) === LAKE,
+        );
     const texture = new DataTexture(tiles.data, tiles.columns, tiles.rows);
     texture.magFilter = NearestFilter;
     texture.minFilter = NearestFilter;
