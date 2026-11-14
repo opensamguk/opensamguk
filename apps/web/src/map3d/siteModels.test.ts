@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lodForPixels, pickModel } from './siteModels';
+import { lodForPixels, pickModel, tileFill } from './siteModels';
 
 // INT-27 D-094: 거점 종류·단계별 모형 고르기와 거리 단계.
 describe('pickModel', () => {
@@ -30,5 +30,14 @@ describe('lodForPixels', () => {
     expect(lodForPixels(300)).toBe(0);
     expect(lodForPixels(80)).toBe(1);
     expect(lodForPixels(20)).toBe(2);
+  });
+});
+
+describe('tileFill', () => {
+  it('모형은 칸 한 칸 안에 들고 큰 도시일수록 칸을 더 채운다', () => {
+    const levels = [2, 5, 6, 7, 8, 9].map((level) => tileFill('CITY', level));
+    expect(levels.every((fill) => fill > 0 && fill <= 1)).toBe(true);
+    expect([...levels].sort((a, b) => a - b)).toEqual(levels);
+    expect(tileFill('CITY', 9)).toBeGreaterThan(tileFill('CITY', 8));
   });
 });

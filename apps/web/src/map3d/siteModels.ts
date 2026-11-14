@@ -33,4 +33,17 @@ export function lodForPixels(px: number): 0 | 1 | 2 {
   return 2;
 }
 
+/**
+ * 모형이 영지 칸 한 칸(한 변 TILE)을 얼마나 채우는지(사용자 2026-11-14: 크기는 1칸 안).
+ * 클수록 칸을 꽉 채운다. 경 96%, 특 90%, 대 84%, 중 78%, 소 72%, 진·수 60%.
+ */
+export function tileFill(kind: SiteKind, level: number | undefined): number {
+  if (kind === 'PASS') return 0.85;
+  if (kind === 'PORT') return 0.6;
+  if (kind === 'FIELD') return 0.55;
+  const step = level ?? 5;
+  const byLevel = [0.5, 0.6, 0.6, 0.6, 0.72, 0.72, 0.78, 0.84, 0.9, 0.96];
+  return byLevel[Math.min(Math.max(Math.round(step), 0), 9)] ?? 0.72;
+}
+
 export const MODEL_NAMES = ['city-9', 'capital', 'city-7', 'city-6', 'city-5', 'pass', 'camp', 'houses'] as const;

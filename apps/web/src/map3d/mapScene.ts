@@ -35,13 +35,13 @@ import {
   WebGLRenderer,
 } from 'three';
 import { loadGlbMesh } from './glbMesh';
-import { lodForPixels, pickModel } from './siteModels';
+import { lodForPixels, pickModel, tileFill } from './siteModels';
 import type { PublicGeography } from '@opensamguk/shared';
 import { roadWalks, TERRAINS, waterLanes, type Terrain } from '../main/terrainTiles';
 import { ROAD_CELL } from '../main/roadPixels';
 import { bounds as riverBounds, lines as riverData } from './data/rivers';
 import { along, cellsToPoints, simplify } from './routes3d';
-import { territoryTiles } from './territory3d';
+import { fromTile, territoryTiles, toTile } from './territory3d';
 import type { DrawnNation } from '../main/siteMarkers';
 import type { ModelCity } from '../main/mapModel';
 import {
@@ -749,12 +749,13 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
         const width = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) || 1;
         sites.forEach((site, index) => {
           const level = this.lastSites!.cityByKey.get(site.anchorKey)?.level;
-          const { side } = siteSize(site.kind, level);
-          const footprint = side * (site.kind === 'PASS' ? 1.9 : 1.35);
+          // 모형은 영지 칸 한 칸 안에 든다. 거점이 놓인 칸의 가운데에 세우고 단계별 비율로 칸을 채운다.
+          const footprint = TILE * tileFill(site.kind, level);
           // 발자국에 맞추되 키는 발자국을 넘지 않게 묶는다(관문 바위처럼 높은 모형이 탑처럼 솟지 않게).
           const height = box.max.y - box.min.y || 1;
           const scale = Math.min(footprint / width, (footprint * 0.55) / height);
-          const base = this.world(site.position.x, site.position.y);
+          const centre = this.tileCentre(site.position.x, site.position.y);
+          const base = this.world(centre.x, centre.y);
           const cx = (box.min.x + box.max.x) / 2;
           const cz = (box.min.z + box.max.z) / 2;
           // 가운데를 원점에 두고 키우고, 45° 돌려 성벽이 마름모 영지 칸과 나란하게 한 뒤 거점 자리로 옮긴다.
@@ -771,6 +772,21 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
         this.scene.add(mesh);
         this.siteModelMeshes.push({ lod, mesh });
       });
+    }
+    // 영지 고리도 모형 크기·칸 가운데에 맞춘다.
+    const ringMesh = this.rings[0] as InstancedMesh | undefined;
+    if (ringMesh) {
+      const placed = new Set([...groups.values()].flat().map((site) => site.id));
+      this.lastSites.anchors.forEach((site, index) => {
+        if (!placed.has(site.id)) return;
+        const level = this.lastSites!.cityByKey.get(site.anchorKey)?.level;
+        const centre = this.tileCentre(site.position.x, site.position.y);
+        const base = this.world(centre.x, centre.y);
+        const radius = TILE * tileFill(site.kind, level) * 0.78;
+        matrix.makeScale(radius, 1, radius).setPosition(base.x, base.y + 0.35, base.z);
+        ringMesh.setMatrixAt(index, matrix);
+      });
+      ringMesh.instanceMatrix.needsUpdate = true;
     }
     const covered = [...groups.values()].reduce((sum, list) => sum + list.length, 0);
     const allCovered = covered === this.lastSites.anchors.length;
@@ -822,6 +838,12 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     );
     const row = Math.min(Math.max(Math.floor((y / this.canvasSize.height) * this.grid.rows), 0), this.grid.rows - 1);
     return this.grid.cells[row * this.grid.columns + column]!;
+  }
+
+  /** 지도 좌표가 든 영지 칸의 가운데(지도 좌표). */
+  private tileCentre(x: number, y: number) {
+    const { u, v } = toTile(x, y, this.canvasSize, TILE);
+    return fromTile(Math.floor(u) + 0.5, Math.floor(v) + 0.5, this.canvasSize, TILE);
   }
 
   /** 물높이로 자르지 않은 땅 높이(가장 가까운 칸). 바다 칸을 가려낼 때 쓴다. */
