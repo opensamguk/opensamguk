@@ -2,11 +2,15 @@ import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { PUBLIC_IMAGES } from '../../packages/shared/src/publicImages';
+import manifest from '../../manifest/public-assets.json' with { type: 'json' };
+import { resolveImageBaseUrl } from '../../apps/web/src/portrait/imageBase';
 import toolImages from '../../packages/shared/src/toolImageCatalog.json' with { type: 'json' };
 
 /** 원격 CDN 바이트를 확인하며 게임 빌드는 네트워크 없이 검사한다. */
 export async function verifyRemoteImages() {
-  const remaining = [...PUBLIC_IMAGES, ...toolImages];
+  const base = resolveImageBaseUrl(undefined);
+  const textures = manifest.textures.map(({ source, sha256 }) => ({ source, sha256, url: base + '/public/' + source }));
+  const remaining = [...PUBLIC_IMAGES, ...toolImages, ...textures];
   let checked = 0;
   await Promise.all(
     Array.from({ length: 4 }, async () => {
@@ -17,6 +21,7 @@ export async function verifyRemoteImages() {
           !response.ok ||
           new URL(response.url).origin !== new URL(image.url).origin ||
           !response.headers.get('content-type')?.startsWith('image/') ||
+          (image.source.startsWith('map3d/textures/') && response.headers.get('content-type') !== 'image/webp') ||
           response.headers.get('access-control-allow-origin') !== '*' ||
           createHash('sha256').update(bytes).digest('hex') !== image.sha256
         )

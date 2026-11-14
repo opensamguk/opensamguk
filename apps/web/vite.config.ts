@@ -80,7 +80,23 @@ function publicBuildMeta(imageBaseUrl: string): Plugin {
             images.push({ file, source: null, sha256: digest });
           }
         }
-        const meta = { schema: 2, mode: PUBLIC_MODE, imageBaseUrl, images, remoteImages: PUBLIC_IMAGES, files };
+        const manifest = JSON.parse(await readFile(join(repoRoot, 'manifest/public-assets.json'), 'utf8')) as {
+          textures?: { source: string; sha256: string }[];
+        };
+        const textures = (manifest.textures ?? []).map(({ source, sha256 }) => ({
+          source,
+          sha256,
+          url: imageBaseUrl + '/public/' + source,
+        }));
+        const meta = {
+          schema: 2,
+          mode: PUBLIC_MODE,
+          imageBaseUrl,
+          images,
+          remoteImages: PUBLIC_IMAGES,
+          textures,
+          files,
+        };
         await writeFile(join(outDir, PUBLIC_BUILD_META), `${JSON.stringify(meta, null, 2)}\n`);
       },
     },

@@ -2,7 +2,7 @@
   "decision": "D-087",
   "portraitPolicy": "remote",
   "remoteImageBases": [
-    "https://raw.githubusercontent.com/opensamguk/opensamguk-images/48163bd1ce8d54c54c94fb5484b05f9db9e50c62"
+    "https://raw.githubusercontent.com/opensamguk/opensamguk-images/88e34b48208ed701454a7fa657deaa6750ff5ea6"
   ],
   "externalAssetOrigins": [],
   "portraitVariants": ["portrait", "icon", "thumb"],
@@ -401,5 +401,279 @@
   "delivery": "external",
   "imageRevision": "b7efb438b70058aefdfa2fbc4693ca7db259bbc6",
   "imageBaseUrl": "https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6",
-  "svgImageBaseUrl": "https://rawcdn.githack.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6"
+  "svgImageBaseUrl": "https://rawcdn.githack.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6",
+  "textures": [
+    {
+      "source": "map3d/textures/cloth-ao.webp",
+      "sha256": "d2d9df13833a2bcc0bbe82f70e7d6637669d3a7ad89c13e8c917919b0de0bede"
+    },
+    {
+      "source": "map3d/textures/cloth-normal.webp",
+      "sha256": "825269a06ed9b397dfe143f9d17f0d72f3ab30a42375c554b3c4c3b674ae9e16"
+    },
+    {
+      "source": "map3d/textures/cloth-roughness.webp",
+      "sha256": "8729f56ed15cc0e431bf3b16077f899d5eecbc1941eda7432ca20d735678b42b"
+    },
+    {
+      "source": "map3d/textures/cloth.webp",
+      "sha256": "4f2fc232e6e3f6009cf0b679d9bba3b818da4353ada5d051170aca1e100b2142"
+    },
+    {
+      "source": "map3d/textures/crop-ao.webp",
+      "sha256": "437a3c7804bdacd628b48da0af62bb801f874cace1e6987ae7a527e8b713c531"
+    },
+    {
+      "source": "map3d/textures/crop-normal.webp",
+      "sha256": "8b2a6a243afaabd541d2e266a38bad4d32aa8e07845bd8cb0122ceff8e3ce704"
+    },
+    {
+      "source": "map3d/textures/crop-roughness.webp",
+      "sha256": "ebfef92cb61e0bd810fbb9a09e00dad75ff984337a8225e37b2314534ae3198e"
+    },
+    {
+      "source": "map3d/textures/crop.webp",
+      "sha256": "f33d50304c0c1e397cc3a2cf3973d3a69d2fd092cfbce10cacd679956c5a07d6"
+    },
+    {
+      "source": "map3d/textures/dirt-ao.webp",
+      "sha256": "fdc447fbee2a9049a3121458d229d8db46450a0c2fbcdc09605d74bc90d43956"
+    },
+    {
+      "source": "map3d/textures/dirt-normal.webp",
+      "sha256": "1016d58e09425797b68076ba652a34886372e8333ce9bb77474b5500b5b85e45"
+    },
+    {
+      "source": "map3d/textures/dirt-roughness.webp",
+      "sha256": "3ff1f71c55de0557aa4353118c693ef9d3c5110400aa7c8a75c257a44dcdd7df"
+    },
+    {
+      "source": "map3d/textures/dirt.webp",
+      "sha256": "05d4e75e66657fd1b372a46d51d5cb41fc405d033463fcf419f2f2cc4f67e54a"
+    },
+    {
+      "source": "map3d/textures/earth-ao.webp",
+      "sha256": "e9e548bdcb308beddc474c9409441ba955c9b059e2b62fd5184b144c3ef68beb"
+    },
+    {
+      "source": "map3d/textures/earth-normal.webp",
+      "sha256": "54b995cc710ebc5ab48a47e9b81db830d0720c5aa216b4fb336e3974c0f71cdb"
+    },
+    {
+      "source": "map3d/textures/earth-roughness.webp",
+      "sha256": "7e8b385fa609bc2ae8fb70d61c68c22e02289789613e3e8ff92116e2ff5fdefe"
+    },
+    {
+      "source": "map3d/textures/earth.webp",
+      "sha256": "bd2cb72871f3562cfb2cc05f5ca3f227894565dc97ff730914593d6ab08f79af"
+    },
+    {
+      "source": "map3d/textures/field-dry-ao.webp",
+      "sha256": "c86bc4ff67c092ac11f88a0b5388bb95178daad45b13a4117bf3f9b7c9b59f31"
+    },
+    {
+      "source": "map3d/textures/field-dry-normal.webp",
+      "sha256": "0cb962488a390daa210e5429a3423eadfbbb74282ffa475b7d0f0ce23bea2c9c"
+    },
+    {
+      "source": "map3d/textures/field-dry-roughness.webp",
+      "sha256": "c632755db8120f7e5feb47f1fb69096a7c4dd911378a61078c9ea6655be0d68a"
+    },
+    {
+      "source": "map3d/textures/field-dry.webp",
+      "sha256": "769ebf88d0323d3574d8797b7f3889776ecdab40f19c99d492c252829e666315"
+    },
+    {
+      "source": "map3d/textures/field-wet-ao.webp",
+      "sha256": "40f89c6c56abb14e1f290689ea8f919219c77121f3159b27b212dc069af23298"
+    },
+    {
+      "source": "map3d/textures/field-wet-normal.webp",
+      "sha256": "2ea2ade3dab816a3a4e11067c8d5a36b1ee3e077e72fa44ab0e7687c25ffd6bb"
+    },
+    {
+      "source": "map3d/textures/field-wet-roughness.webp",
+      "sha256": "9058b25c7347ad4ebcfd2e53eb28f420b8af5e68ed7f8cae350588ae2111ae16"
+    },
+    {
+      "source": "map3d/textures/field-wet.webp",
+      "sha256": "79baea2cdae83aed6784e195b8552538701f47a737bd12cd39bc57d89e6ede9a"
+    },
+    {
+      "source": "map3d/textures/forest-floor-ao.webp",
+      "sha256": "3649bb79849de8285c5e7044dccb50bf180c7af72009a283571f45746939d5ea"
+    },
+    {
+      "source": "map3d/textures/forest-floor-normal.webp",
+      "sha256": "d7acd4808ef5ff112504e1cc2196ec0b022894085fce573e06e8d962d011165a"
+    },
+    {
+      "source": "map3d/textures/forest-floor-roughness.webp",
+      "sha256": "a5b8c25c1082f75b36ed5ef223782e5634a6789cbb5fb5708c9014eeb419a785"
+    },
+    {
+      "source": "map3d/textures/forest-floor.webp",
+      "sha256": "2edee27f34dbcf14ad119724ec4e7e87bb9543c0d7413b5fbdc259bac2a4e806"
+    },
+    {
+      "source": "map3d/textures/glazed-tile-ao.webp",
+      "sha256": "c85f5cb4bb899da8fe6ab58322c0138c3c8c408a58a26bad17b1e5d775240c11"
+    },
+    {
+      "source": "map3d/textures/glazed-tile-normal.webp",
+      "sha256": "b417f6114c5b5bea49378e1f15dce22a1bfd60e42d6fa104ff7486c5352e679a"
+    },
+    {
+      "source": "map3d/textures/glazed-tile-roughness.webp",
+      "sha256": "1861ba0187934af7c0f55b44ddcb81cf89eaa2eccff5a254445a38ed0fd218e8"
+    },
+    {
+      "source": "map3d/textures/glazed-tile.webp",
+      "sha256": "06177c88959742ba55a945dbd3608ea4166e39bf628f77ddbbe9d7f4a959f9dc"
+    },
+    {
+      "source": "map3d/textures/grass-ao.webp",
+      "sha256": "2c0a8d5e8616e82960a9a9563fd51cb5a1d483e85c240f57f8b942c057a994da"
+    },
+    {
+      "source": "map3d/textures/grass-normal.webp",
+      "sha256": "76ea7224e31914446d848b5d140fc6f855ed3923dbf07020b416531b96f3a43e"
+    },
+    {
+      "source": "map3d/textures/grass-roughness.webp",
+      "sha256": "28646a3daf4f46d1baaea23abec689bae9767282a4a8887b16eecc10ac8262fa"
+    },
+    {
+      "source": "map3d/textures/grass.webp",
+      "sha256": "a201a8d5e40a0390e1e998505b4359a28886d4eca85a9e709278016c7856c6bb"
+    },
+    {
+      "source": "map3d/textures/loess-ao.webp",
+      "sha256": "93af7f3f8ed53846edfa6fe06399637dce591952977d8a25b625be5429ef456a"
+    },
+    {
+      "source": "map3d/textures/loess-normal.webp",
+      "sha256": "e59267fe6859da79f44cf2086e53f54dd3b406082615a31206c48a08007a1cd2"
+    },
+    {
+      "source": "map3d/textures/loess-roughness.webp",
+      "sha256": "728298c903b1e35d9554e83b3f707e568c8dad384becc6c5d5bc3d38bb82b18a"
+    },
+    {
+      "source": "map3d/textures/loess.webp",
+      "sha256": "fcad95a672e98cbabb238996542861fd69e0e59c4f608ce5f6c5caaeab82d5b8"
+    },
+    {
+      "source": "map3d/textures/plaster-ao.webp",
+      "sha256": "31e0e8866bdb47275c369274c3dd00efef8f15050e76da888cba49a99b4e6336"
+    },
+    {
+      "source": "map3d/textures/plaster-normal.webp",
+      "sha256": "f88fc08313f6511e48de9c8375292d4bafa8e4f699ad87467c40c086765276b6"
+    },
+    {
+      "source": "map3d/textures/plaster-roughness.webp",
+      "sha256": "9b53ce22c59faa76bfc61a30761220b7865d5177fd1a85337644632fab28b0b1"
+    },
+    {
+      "source": "map3d/textures/plaster.webp",
+      "sha256": "326eb692f5161ff7937e97acdd5968c5a6995a43687e3c8fedd1032337bd664a"
+    },
+    {
+      "source": "map3d/textures/rock-ao.webp",
+      "sha256": "a58645693182667b61a9602ea62ce1046e214851929cb35e7ef0558e6d934dc1"
+    },
+    {
+      "source": "map3d/textures/rock-normal.webp",
+      "sha256": "c71d8bf047b017de077313ee3357115e5c7e390586d650851a685288ecef2abe"
+    },
+    {
+      "source": "map3d/textures/rock-roughness.webp",
+      "sha256": "2c321a46d1189454013f48f71acb3d0f7481e5d70b0789af97877fad481906ea"
+    },
+    {
+      "source": "map3d/textures/rock.webp",
+      "sha256": "1801fe802a86946e1ddc328cbea9fa6ed341a5d46a2d41225b68802d40cf6f2d"
+    },
+    {
+      "source": "map3d/textures/sand-ao.webp",
+      "sha256": "1f5b7f7cf5387246dae72ff2595c05e43926cd94f09b2340a2ccfd3693074158"
+    },
+    {
+      "source": "map3d/textures/sand-normal.webp",
+      "sha256": "e1a62c135e1fffc9b6b46f4d08d2ea44d3908698a3de403355d1bd871b7e0221"
+    },
+    {
+      "source": "map3d/textures/sand-roughness.webp",
+      "sha256": "93be75b71af867300cb6740249e3ac7cad72d5b1934e8a20850368398fe539d6"
+    },
+    {
+      "source": "map3d/textures/sand.webp",
+      "sha256": "eb76b7350505fbfffc2b23da0a514b0cf8bbe56fd4516c8f9a989b7ad4d5c80e"
+    },
+    {
+      "source": "map3d/textures/snow-ao.webp",
+      "sha256": "b6147ea0bd950eb37cc3a1ec7111d934936bc1fa55573fce8e22785034b2ceb3"
+    },
+    {
+      "source": "map3d/textures/snow-normal.webp",
+      "sha256": "b6deb73dcba92cf306e5b1918fe59bb7d013dcd917d278fd6927ae802a7b855a"
+    },
+    {
+      "source": "map3d/textures/snow-roughness.webp",
+      "sha256": "fb61a149e108cc045f66347c7f5e2d02caf542b583cd91a192269add2e492f86"
+    },
+    {
+      "source": "map3d/textures/snow.webp",
+      "sha256": "8c8e9e462069a2bebf5f1d3077315fd4b7678aebf40dfd7a5dc495c045bd99fe"
+    },
+    {
+      "source": "map3d/textures/stone-ao.webp",
+      "sha256": "a2a70879b616c473b6e7634b1c492e24f872d3bc1a511a4e9ee47c848d40b44a"
+    },
+    {
+      "source": "map3d/textures/stone-normal.webp",
+      "sha256": "6e7bfea16090234c7cf0b082ef4c80c19da74fe1ca1cbdda430fb0110404a2d4"
+    },
+    {
+      "source": "map3d/textures/stone-roughness.webp",
+      "sha256": "781870406e1b1771068461e234a36800855050d38199939ed19474954698e0bf"
+    },
+    {
+      "source": "map3d/textures/stone.webp",
+      "sha256": "7d5a057a9b0d7078d783709b723c6693d2996e0f87089ba214572ad594bb46bd"
+    },
+    {
+      "source": "map3d/textures/tile-ao.webp",
+      "sha256": "f20598a2484fdc6796154c32ef0fb12547ed208ddfc61b22fd0458262beafd24"
+    },
+    {
+      "source": "map3d/textures/tile-normal.webp",
+      "sha256": "a2ce270169bcb54e655de6fda73e3adff1e6015ef23ef1e080e8075013dc0668"
+    },
+    {
+      "source": "map3d/textures/tile-roughness.webp",
+      "sha256": "bd6974207c42c58aab63ac089359be52b180c076e1ad7bd21277cd866ccf82d3"
+    },
+    {
+      "source": "map3d/textures/tile.webp",
+      "sha256": "360bfbe1ad8b978239452b1aad9b72c9694dafef587c62655c645361abbcf40a"
+    },
+    {
+      "source": "map3d/textures/wood-ao.webp",
+      "sha256": "9a514667a7548c5152e66ddb26b66179d5b02aef7275ea0e4ff0aa8cdb710716"
+    },
+    {
+      "source": "map3d/textures/wood-normal.webp",
+      "sha256": "2c17640c76261b4123d72ef8a2f404d5e90624851a4bb5ebd893ead34539f7af"
+    },
+    {
+      "source": "map3d/textures/wood-roughness.webp",
+      "sha256": "e0cfdc56b45d0dcaa1cf63bd9a898df850a9226430d4b97e5995c3a0bc687684"
+    },
+    {
+      "source": "map3d/textures/wood.webp",
+      "sha256": "b0cbb87c2d0b61a5ac146d23330596a665e611211a1d1ec8f6a620d9c18157bc"
+    }
+  ]
 }
