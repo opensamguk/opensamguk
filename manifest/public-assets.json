@@ -2,7 +2,7 @@
   "decision": "D-087",
   "portraitPolicy": "remote",
   "remoteImageBases": [
-    "https://raw.githubusercontent.com/opensamguk/opensamguk-images/88e34b48208ed701454a7fa657deaa6750ff5ea6"
+    "https://raw.githubusercontent.com/opensamguk/opensamguk-images/7c90399e0e935e47e592f4aeb9680ac12c8f4156"
   ],
   "externalAssetOrigins": [],
   "portraitVariants": ["portrait", "icon", "thumb"],
@@ -674,6 +674,100 @@
     {
       "source": "map3d/textures/wood.webp",
       "sha256": "b0cbb87c2d0b61a5ac146d23330596a665e611211a1d1ec8f6a620d9c18157bc"
+    }
+  ],
+  "sprites": [
+    {
+      "source": "map3d/sprites/barracks.webp",
+      "sha256": "e269863d17286ee8965b840d144e5a2cbc3836226d87ed942ee660e02c9acf5b"
+    },
+    {
+      "source": "map3d/sprites/camp.webp",
+      "sha256": "554359211c8973b190cd0ed42af15ec3acd86f6051b36a8f3a41837ca1944181"
+    },
+    {
+      "source": "map3d/sprites/city-grand-capital.webp",
+      "sha256": "5222cc97dfcb5929907f34a487bb3b8660989bbe55b151c44e931c8b426d82ac"
+    },
+    {
+      "source": "map3d/sprites/city-grand.webp",
+      "sha256": "f38589187262c25167127d76d06f0340e6ec39cef625d42504b3276c1c6369df"
+    },
+    {
+      "source": "map3d/sprites/city-imperial-capital.webp",
+      "sha256": "8fc4cfb28c6ab86ffaa2d9976b7af819877ece47642a9294cb77909d5459c57d"
+    },
+    {
+      "source": "map3d/sprites/city-imperial.webp",
+      "sha256": "5c726b740851516ad3ec4168a28f9d9e063b72c5cc45f04d3a15a87d8bdb1ebf"
+    },
+    {
+      "source": "map3d/sprites/city-large-capital.webp",
+      "sha256": "ca5c37ab98941cff420764ad28c8b3488eedf5959c750ce88c56f988cdbcb3c7"
+    },
+    {
+      "source": "map3d/sprites/city-large.webp",
+      "sha256": "76f82add41bb5d14f61bd4a9c743cd755e71f5a83ef95abebd49123275ccfe14"
+    },
+    {
+      "source": "map3d/sprites/city-medium-capital.webp",
+      "sha256": "65c33014fb23bd45054d58c53abf75f2f399321481a29ae277c2f09ac832bd67"
+    },
+    {
+      "source": "map3d/sprites/city-medium.webp",
+      "sha256": "8bf00128c54f1fd53748179a2cce371e3d5ad3ef2209d77a4e5e1aead7b750a4"
+    },
+    {
+      "source": "map3d/sprites/city-small-capital.webp",
+      "sha256": "d488f3ee410fb51ca09e6d78ff06f0510463e64933cdb6bdf312558f6a477183"
+    },
+    {
+      "source": "map3d/sprites/city-small.webp",
+      "sha256": "c48c049a3b41b0dc6590942e324165905216ad74be414267ab527500f3e021c0"
+    },
+    {
+      "source": "map3d/sprites/farm.webp",
+      "sha256": "39487e50558b4b3d07d997f810ea0bdf13abf583104626d6dc17f6f2e11eb186"
+    },
+    {
+      "source": "map3d/sprites/granary.webp",
+      "sha256": "eed39348084acd23ef89734b56c3c8eb49e69b386cfb206766b8ef1281514066"
+    },
+    {
+      "source": "map3d/sprites/houses.webp",
+      "sha256": "427c878303306d3fe933d63ad4bf44d861ab6a05026b95e85b838f69e1c2c627"
+    },
+    {
+      "source": "map3d/sprites/market.webp",
+      "sha256": "e02a6d4660f47760012fb8b46f403417cd625e1532ca6aca343122b1af24aebd"
+    },
+    {
+      "source": "map3d/sprites/mountain-pass.webp",
+      "sha256": "bdc5ddc070067279de125652c2e934cb10bc7f3bf13399b8b1e1e8b62c9b0adb"
+    },
+    {
+      "source": "map3d/sprites/nomad-camp.webp",
+      "sha256": "f2fe52dea4be8a774512f7c1bcb271a81bbfc0429968340c92534de4955de18c"
+    },
+    {
+      "source": "map3d/sprites/port.webp",
+      "sha256": "48a27be0661a3658d0ccfde54e230dfae9e209ec09af50c05e752f54feb514f2"
+    },
+    {
+      "source": "map3d/sprites/shrine.webp",
+      "sha256": "6424c794801a93db235935aef77f9b334fdca2b5708f0f6d722df4e9c5b327a8"
+    },
+    {
+      "source": "map3d/sprites/town-fort.webp",
+      "sha256": "87f0fea836ce6bb6ccab60ff5f54a5ab549c0536356b1d06efce0902b2bea550"
+    },
+    {
+      "source": "map3d/sprites/watchtower.webp",
+      "sha256": "ed5c14acb77acb301bec60df3a539578c7ee9a74064dfc69ee7db0fee4803fb9"
+    },
+    {
+      "source": "map3d/sprites/water-fort.webp",
+      "sha256": "f7fcf2e6b01aad6bd2ea21d79b638d67875e3701ec24c4e6625b1e98c226329a"
     }
   ]
 }

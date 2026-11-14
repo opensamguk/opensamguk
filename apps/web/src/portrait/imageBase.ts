@@ -3,7 +3,7 @@
 // 이미지 서버(T2-15) 전 기본값. jsDelivr의 50MB 패키지 제한을 피하고 같은 고정 커밋의 원본을 읽는다.
 // 공개 빌드도 같은 값을 쓴다 (D-087). 바꾸면 manifest/public-assets.json의 remoteImageBases도 같이 고친다.
 export const DEFAULT_IMAGE_BASE_URL =
-  'https://raw.githubusercontent.com/opensamguk/opensamguk-images/88e34b48208ed701454a7fa657deaa6750ff5ea6';
+  'https://raw.githubusercontent.com/opensamguk/opensamguk-images/7c90399e0e935e47e592f4aeb9680ac12c8f4156';
 
 // 비었으면 기본값. 끝의 /는 떼어 경로를 붙일 때 //가 생기지 않게 한다.
 export function resolveImageBaseUrl(raw: string | undefined): string {

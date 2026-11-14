@@ -10,7 +10,8 @@ import toolImages from '../../packages/shared/src/toolImageCatalog.json' with { 
 export async function verifyRemoteImages() {
   const base = resolveImageBaseUrl(undefined);
   const textures = manifest.textures.map(({ source, sha256 }) => ({ source, sha256, url: base + '/public/' + source }));
-  const remaining = [...PUBLIC_IMAGES, ...toolImages, ...textures];
+  const sprites = manifest.sprites.map(({ source, sha256 }) => ({ source, sha256, url: base + '/public/' + source }));
+  const remaining = [...PUBLIC_IMAGES, ...toolImages, ...textures, ...sprites];
   let checked = 0;
   await Promise.all(
     Array.from({ length: 4 }, async () => {
@@ -21,7 +22,8 @@ export async function verifyRemoteImages() {
           !response.ok ||
           new URL(response.url).origin !== new URL(image.url).origin ||
           !response.headers.get('content-type')?.startsWith('image/') ||
-          (image.source.startsWith('map3d/textures/') && response.headers.get('content-type') !== 'image/webp') ||
+          (/^map3d\/(textures|sprites)\//.test(image.source) &&
+            response.headers.get('content-type') !== 'image/webp') ||
           response.headers.get('access-control-allow-origin') !== '*' ||
           createHash('sha256').update(bytes).digest('hex') !== image.sha256
         )

@@ -1,0 +1,163 @@
+{
+  "barracks": {
+    "width": 2048,
+    "height": 1349,
+    "anchorPx": [1024, 1336],
+    "footprintMapUnits": 8,
+    "pixelsPerMapUnit": 253.0
+  },
+  "camp": {
+    "width": 2048,
+    "height": 1826,
+    "anchorPx": [1024, 1813],
+    "footprintMapUnits": 10,
+    "pixelsPerMapUnit": 202.4
+  },
+  "city-grand-capital": {
+    "width": 3072,
+    "height": 2797,
+    "anchorPx": [1536, 2784],
+    "footprintMapUnits": 26,
+    "pixelsPerMapUnit": 117.2308
+  },
+  "city-grand": {
+    "width": 3072,
+    "height": 1952,
+    "anchorPx": [1536, 1939],
+    "footprintMapUnits": 26,
+    "pixelsPerMapUnit": 117.2308
+  },
+  "city-imperial-capital": {
+    "width": 3072,
+    "height": 1999,
+    "anchorPx": [1536, 1986],
+    "footprintMapUnits": 30,
+    "pixelsPerMapUnit": 101.6
+  },
+  "city-imperial": {
+    "width": 3072,
+    "height": 1990,
+    "anchorPx": [1536, 1977],
+    "footprintMapUnits": 30,
+    "pixelsPerMapUnit": 101.6
+  },
+  "city-large-capital": {
+    "width": 2048,
+    "height": 1353,
+    "anchorPx": [1024, 1340],
+    "footprintMapUnits": 21,
+    "pixelsPerMapUnit": 96.381
+  },
+  "city-large": {
+    "width": 2048,
+    "height": 1332,
+    "anchorPx": [1024, 1319],
+    "footprintMapUnits": 21,
+    "pixelsPerMapUnit": 96.381
+  },
+  "city-medium-capital": {
+    "width": 2048,
+    "height": 1335,
+    "anchorPx": [1024, 1322],
+    "footprintMapUnits": 17,
+    "pixelsPerMapUnit": 119.0588
+  },
+  "city-medium": {
+    "width": 2048,
+    "height": 1463,
+    "anchorPx": [1024, 1450],
+    "footprintMapUnits": 17,
+    "pixelsPerMapUnit": 119.0588
+  },
+  "city-small-capital": {
+    "width": 2048,
+    "height": 1834,
+    "anchorPx": [1024, 1821],
+    "footprintMapUnits": 13,
+    "pixelsPerMapUnit": 155.6923
+  },
+  "city-small": {
+    "width": 2048,
+    "height": 1847,
+    "anchorPx": [1024, 1834],
+    "footprintMapUnits": 13,
+    "pixelsPerMapUnit": 155.6923
+  },
+  "farm": {
+    "width": 2048,
+    "height": 1338,
+    "anchorPx": [1024, 1325],
+    "footprintMapUnits": 8,
+    "pixelsPerMapUnit": 253.0
+  },
+  "granary": {
+    "width": 2048,
+    "height": 1339,
+    "anchorPx": [1024, 1326],
+    "footprintMapUnits": 8,
+    "pixelsPerMapUnit": 253.0
+  },
+  "houses": {
+    "width": 2048,
+    "height": 1372,
+    "anchorPx": [1024, 1359],
+    "footprintMapUnits": 8,
+    "pixelsPerMapUnit": 253.0
+  },
+  "market": {
+    "width": 2048,
+    "height": 1317,
+    "anchorPx": [1024, 1304],
+    "footprintMapUnits": 8,
+    "pixelsPerMapUnit": 253.0
+  },
+  "mountain-pass": {
+    "width": 2048,
+    "height": 1876,
+    "anchorPx": [1024, 1863],
+    "footprintMapUnits": 16,
+    "pixelsPerMapUnit": 126.5
+  },
+  "nomad-camp": {
+    "width": 2048,
+    "height": 1532,
+    "anchorPx": [1024, 1519],
+    "footprintMapUnits": 21,
+    "pixelsPerMapUnit": 96.381
+  },
+  "port": {
+    "width": 2048,
+    "height": 1310,
+    "anchorPx": [1024, 1297],
+    "footprintMapUnits": 9,
+    "pixelsPerMapUnit": 224.8889
+  },
+  "shrine": {
+    "width": 2048,
+    "height": 1579,
+    "anchorPx": [1024, 1566],
+    "footprintMapUnits": 8,
+    "pixelsPerMapUnit": 253.0
+  },
+  "town-fort": {
+    "width": 2048,
+    "height": 1923,
+    "anchorPx": [1024, 1910],
+    "footprintMapUnits": 12,
+    "pixelsPerMapUnit": 168.6667
+  },
+  "watchtower": {
+    "width": 1768,
+    "height": 2048,
+    "anchorPx": [884, 2035],
+    "footprintMapUnits": 8,
+    "pixelsPerMapUnit": 218.0
+  },
+  "water-fort": {
+    "width": 2048,
+    "height": 1861,
+    "anchorPx": [1024, 1848],
+    "footprintMapUnits": 12,
+    "pixelsPerMapUnit": 168.6667
+  }
+}
