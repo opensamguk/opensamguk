@@ -191,8 +191,8 @@ export async function appendNationHistory(
       ...structured,
       { ordinal: events.length, kind: kind ?? 'command', visibility: 'nation', ...record },
     ],
-    events: [...events, text],
-    ...(kind === 'intel' ? { intelAlerts: [...alerts, text] } : {}),
+    events: [...events, record.text],
+    ...(kind === 'intel' ? { intelAlerts: [...alerts, record.text] } : {}),
   };
   await tx.nationHistory.upsert({
     where,

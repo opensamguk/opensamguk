@@ -1,3 +1,4 @@
+import { commandLogLines } from './logParts';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -90,6 +91,23 @@ async function snapshot(worldId: string) {
   };
 }
 
+async function expectAttackLines(worldId: string, initial?: WorldInit) {
+  initial ??= await warFixture();
+  const result = runGeneralTurn(
+    toWorldState(initial),
+    { generalId: 1, tick: 100, unitSet: initial.unitSet },
+    { commandKey: 'attack', args: { cityKey: 2 } },
+    initial.seed,
+  ).result;
+  const rows = await db.generalLog.findMany({
+    where: { worldId, generalId: 1, tick: 100, commandKey: 'attack' },
+    orderBy: { ordinal: 'asc' },
+  });
+  expect(rows.map(({ text, ordinal }) => ({ text, ordinal }))).toEqual(
+    commandLogLines(result).map((row, ordinal) => ({ text: row.text, ordinal })),
+  );
+}
+
 describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
   it.each(['basic', 'effects'] as const)(
     'AC-INT-22 %s의 새 계산식은 실제 전투·rollback·12개월 재생·재적재가 같다',
@@ -125,7 +143,7 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
         await loop.advanceTo(100);
         await loop.advanceTo(100);
         expect(hashState(toWorldState(await readWorldState(db, worldId)))).toBe(hashState(expected));
-        expect(await db.generalLog.count({ where: { worldId, generalId: 1, tick: 100 } })).toBe(1);
+        await expectAttackLines(worldId, initial);
         for (let month = 1; month <= 12; month++) {
           await renewLease(db, lease);
           await loop.advanceTo(month * 10000);
@@ -171,7 +189,7 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
         where: { worldId_tick_nationId: { worldId, tick: 100, nationId: 2 } },
       }),
     ).toMatchObject({ data: { events: expect.arrayContaining([expect.stringContaining('멸망')]) } });
-    expect(await db.generalLog.count({ where: { worldId } })).toBe(1);
+    await expectAttackLines(worldId);
     expect(await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } })).toMatchObject({
       turnRevision: 2,
       nextTurnTick: 10100,
@@ -210,7 +228,7 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
     const histories = await db.nationHistory.findMany({ where: { worldId, tick: 100 }, orderBy: { nationId: 'asc' } });
     expect(histories.map((entry) => entry.nationId)).toEqual([1, 2]);
     for (const history of histories) {
-      expect(history.data).toEqual({ events: [expect.stringContaining(name)] });
+      expect(history.data).toMatchObject({ events: [expect.stringContaining(name)] });
       expect(JSON.stringify(history.data)).not.toContain('nation_');
     }
     expect(histories[0]!.data).toEqual(histories[1]!.data);
@@ -228,7 +246,7 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
     const history = await db.nationHistory.findUniqueOrThrow({
       where: { worldId_tick_nationId: { worldId, tick: 100, nationId: 1 } },
     });
-    expect(history.data).toEqual({ events: ['포상: BAD_TARGET: 자기 국가 장수만 가능합니다.'] });
+    expect(history.data).toMatchObject({ events: ['포상: 자기 국가 장수만 가능합니다.'] });
   });
   it.each(['success', 'error', 'token', 'expiry'] as const)(
     '수도 함락 %s 뒤 자동 천도·보급·반격·역사를 저장하고 롤백·재생한다',

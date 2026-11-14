@@ -1,4 +1,5 @@
 import { commandLog } from './support';
+import { actPart, textPart } from './logging';
 import { z } from 'zod';
 import { BALANCE } from '../balance';
 import type { CommandDef, Failure } from './types';
@@ -16,12 +17,7 @@ export const rest: CommandDef = {
     if (!view.generals[actor.generalId]) throw new Error('장수가 없습니다.');
     return {
       effects: [{ kind: 'general', id: actor.generalId, field: 'injury', op: 'add', value: -BALANCE.REST_HEAL }],
-      logs: [
-        commandLog([
-          { t: 'act', key: 'rest', name: '휴식' },
-          { t: 'text', v: '했습니다.' },
-        ]),
-      ],
+      logs: [commandLog([actPart('rest', '휴식'), textPart('했습니다.')])],
     };
   },
 };

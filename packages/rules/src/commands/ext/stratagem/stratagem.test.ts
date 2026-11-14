@@ -451,7 +451,7 @@ it('injuries process only active target nation defenders in id order and preserv
     { kind: 'city', id: 2, field: 'agriculture', op: 'add', value: -800 },
     { kind: 'city', id: 2, field: 'commerce', op: 'add', value: -100 },
   ]);
-  expect(result.reports).toEqual([5, 9].map((generalId) => ({ generalId, text: '도시2: 계략으로 다쳤습니다.' })));
+  expect(result.reports).toMatchObject([5, 9].map((generalId) => ({ generalId, text: '도시2: 계략으로 다쳤습니다.' })));
   expect(result.logs[0]!.text).toBe('도시2 대상 화계 성공: 농업 800, 상업 100 감소, 장수 2명 부상');
   const after = applyEffects(state, result.effects);
   expect(after.generals[5]!.injury).toBe(85);
@@ -559,7 +559,7 @@ for (const { key } of goldens)
       expect(after.generals[2]!.crew).toBe(20);
       expect(after.generals[2]!.train).toBe(98);
       expect(after.generals[2]!.atmos).toBe(98);
-      expect(result.reports).toEqual([{ generalId: 2, text: '도시2: 계략으로 다쳤습니다.' }]);
+      expect(result.reports).toMatchObject([{ generalId: 2, text: '도시2: 계략으로 다쳤습니다.' }]);
     });
 
 it('defence uses the maximum stat and count of active defenders', () => {

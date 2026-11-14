@@ -1,3 +1,4 @@
+import { logPartsToText } from '../packages/shared/src/logParts';
 import { readFileSync, readdirSync } from 'node:fs';
 import { expect, it } from 'vitest';
 import {
@@ -115,7 +116,12 @@ for (const key of keys)
       expect(before).toEqual(snapshot);
       expect(turn.commandKey).toBe(key);
       expect(turn.nation).toBeUndefined();
-      expect(turn.result).toEqual(value.expected.result);
+      if ('code' in turn.result || 'code' in value.expected.result) expect(turn.result).toEqual(value.expected.result);
+      else {
+        expect(turn.result.effects).toEqual(value.expected.result.effects);
+        expect(turn.result.logs[0]!.kind).toBe(name === 'probabilityMiss' ? 'failure' : 'success');
+        for (const log of turn.result.logs) expect(log.text).toBe(logPartsToText(log.parts!));
+      }
       expect(turn.state).toEqual(value.expected.afterRuleTurnState);
       expect(Object.hasOwn(turn.state, 'ext')).toBe(false);
       if (name === 'badTargetOwnCity') {

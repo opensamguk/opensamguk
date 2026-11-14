@@ -31,22 +31,15 @@ export function makeSpyCommand(clone: (view: WorldView) => WorldState = cloneWor
       for (const nationId of Object.keys(intel)) if (!state.nations[Number(nationId)]) delete intel[nationId];
       (intel[String(general.nationId)] ??= {})[String(cityKey)] = record;
       const city = state.cities[cityKey]!;
-      const text =
+      const message =
         record.level === 1
-          ? `첩보: ${city.name} 정보를 많이 얻었습니다`
+          ? ' 정보를 많이 얻었습니다'
           : record.level === 2
-            ? `첩보: ${city.name} 정보를 어느 정도 얻었습니다`
-            : `첩보: ${city.name} 소문만 들었습니다`;
+            ? ' 정보를 어느 정도 얻었습니다'
+            : ' 소문만 들었습니다';
       return {
         effects: [{ kind: 'world', state }],
-        logs: [
-          commandLog([
-            actPart('spy', '첩보'),
-            textPart(': '),
-            cityPart(city),
-            textPart(text.slice(text.indexOf(city.name) + city.name.length)),
-          ]),
-        ],
+        logs: [commandLog([actPart('spy', '첩보'), textPart(': '), cityPart(city), textPart(message)])],
         ...(city.nationId === null
           ? {}
           : {

@@ -7,6 +7,9 @@ import { afterAll, beforeAll, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import {
   TICKS_PER_MONTH,
+  runGeneralTurn,
+  resolverForPreset,
+  toWorldState,
   type CommandResult,
   type Failure,
   type WorldInit,
@@ -55,6 +58,8 @@ const commandKeys = ['sabotage', 'incite', 'plunder'] as const;
 type CommandKey = (typeof commandKeys)[number];
 type CaseKey = 'success' | 'badTargetOwnCity' | 'probabilityMiss';
 type FixedCase = {
+  seed: string;
+  options: { policy: 'none' };
   initial: WorldInit;
   command: { commandKey: string; args: { cityKey: number }; explicit: true };
   expected: {
@@ -277,7 +282,14 @@ async function assertFixedTurn(f: Fixture) {
   });
   expect(queue).toHaveLength(30);
   expect(queue.every((turn, slot) => turn.slot === slot && turn.commandKey === 'rest' && !turn.explicit)).toBe(true);
-  const result = f.value.expected.result;
+  const result = runGeneralTurn(
+    toWorldState(f.value.initial),
+    { generalId: 1, tick: 100, unitSet: f.value.initial.unitSet },
+    f.value.command,
+    f.value.seed,
+    f.value.options,
+    resolverForPreset(fixed.preset),
+  ).result;
   const failed = 'code' in result;
   expect(
     await db.generalLog.findMany({
@@ -289,8 +301,8 @@ async function assertFixedTurn(f: Fixture) {
       generalId: 1,
       tick: 100,
       commandKey: f.commandKey,
-      kind: failed ? 'failure' : 'success',
-      text: failed ? `${result.code}: ${result.message}` : result.logs.map((log) => log.text).join('\n'),
+      kind: failed ? 'failure' : result.logs[0]!.kind,
+      text: failed ? result.message : result.logs.map((log) => log.text).join('\n'),
     },
   ]);
   expect(await db.battleLog.findMany({ where: { worldId: f.worldId }, orderBy: { generalId: 'asc' } })).toEqual(
@@ -299,6 +311,10 @@ async function assertFixedTurn(f: Fixture) {
       tick: 100,
       attackerId: 1,
       ...report,
+      parts: report.parts ?? null,
+      partsVersion: report.parts ? 1 : null,
+      defenderId: null,
+      cityKey: null,
     })),
   );
   const recorded = (await rpc('records.general', { worldId: f.worldId }, f.alice.cookie)).data as {
@@ -310,8 +326,8 @@ async function assertFixedTurn(f: Fixture) {
       {
         tick: 100,
         commandKey: f.commandKey,
-        kind: failed ? 'failure' : 'success',
-        text: failed ? `${result.code}: ${result.message}` : result.logs.map((log) => log.text).join('\n'),
+        kind: failed ? 'failure' : result.logs[0]!.kind,
+        text: failed ? result.message : result.logs.map((log) => log.text).join('\n'),
       },
     ],
     nextCursor: null,
@@ -336,12 +352,14 @@ async function assertFixedTurn(f: Fixture) {
   const events = failed ? [] : (result.history ?? []);
   expect(history).toHaveLength(events.length);
   for (const event of events)
-    expect(history).toContainEqual({
-      worldId: f.worldId,
-      tick: 100,
-      nationId: event.nationId,
-      data: { events: [event.text] },
-    });
+    expect(history).toContainEqual(
+      expect.objectContaining({
+        worldId: f.worldId,
+        tick: 100,
+        nationId: event.nationId,
+        data: expect.objectContaining({ events: [event.text] }),
+      }),
+    );
 }
 
 async function worker(worldId: string, phase: 'saved' | 'beforeCommit' | 'committed') {

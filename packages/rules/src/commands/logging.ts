@@ -10,13 +10,12 @@ export const cityPart = (city: { cityKey: number; name: string }): LeafPart => (
   key: city.cityKey,
   name: city.name,
 });
-export const nationPart = (nation: { id: number; name: string; color: string }): LeafPart => ({
+export const nationPart = ({ id, name, color }: { id: number; name: string; color: string }): LeafPart => ({
   t: 'nation',
-  ...nationSnapshot(nation),
+  id,
+  name,
+  color,
 });
-function nationSnapshot({ id, name, color }: { id: number; name: string; color: string }) {
-  return { id, name, color };
-}
 export const generalPart = (general: { id: number; name: string; userId: string | null }): LeafPart => ({
   t: 'general',
   id: general.id,
