@@ -124,3 +124,11 @@ core2026처럼 우리 서버에 이미지 경로를 둔다. 이미지 저장소�
 
 - 원작 이미지 풀 `icons/<n>.jpg`(2,335장)는 2026-08-17 이력 정리로 삭제되어 해당 URL은 404입니다.
 - 도시 아이콘과 아이소메트릭 자산은 2026-10-18에 삭제되었습니다.
+
+## INT-27 지형 높이
+
+`tools/map-data/build-heightmap.py`에 NOAA NCEI의 ETOPO 2022 GeoTIFF를 넘기면 각 지도 판의 `basemap.bounds`를 도트 격자에 맞춰 구역 평균으로 자른다. 운영판은 500×350, 삼10판은 700×500이다. 내려받는 주소와 실행법은 도구 첫머리에 있다.
+
+웹은 `publicImageUrl('apps/web/src/main/heightmap.png')`와 `publicImageUrl('apps/web/src/main/san10-heightmap.png')`으로 고정 주소를 얻는다. PNG의 16비트 회색조 값을 북쪽부터 행 순서대로 읽고 32768을 빼면 EGM2008 기준의 미터 값이다. 브라우저에서 캔버스의 8비트 픽셀로 읽으면 정밀도가 줄어든다. `fetch`로 PNG를 읽는 경우 Docker의 CSP `connect-src`에 해당 원본 출처도 필요하다.
+
+PNG 옆의 `heightmap.json`과 `san10-heightmap.json`에 원본·지도 좌표 파일·결과의 SHA-256을 적었다. [NOAA 원본과 사용 조건](https://www.ncei.noaa.gov/metadata/geoportal/rest/metadata/item/gov.noaa.ngdc.mgg.dem:etopo_2022/html)

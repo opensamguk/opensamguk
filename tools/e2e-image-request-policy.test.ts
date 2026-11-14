@@ -17,8 +17,8 @@ describe('조약 화면 시험의 외부 요청 판정', () => {
     expect(judge('blob:http://localhost:5173/x')).toBeNull();
   });
 
-  it('승인 이미지 97개의 고정 주소를 이미지로 읽을 때만 허용한다', () => {
-    expect(PUBLIC_IMAGES).toHaveLength(97);
+  it('승인 이미지 99개의 고정 주소를 이미지로 읽을 때만 허용한다', () => {
+    expect(PUBLIC_IMAGES).toHaveLength(99);
     for (const image of PUBLIC_IMAGES) expect(judge(image.url)).toBeNull();
   });
 

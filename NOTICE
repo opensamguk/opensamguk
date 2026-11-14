@@ -157,3 +157,10 @@ The art was generated for this project with Codex built-in image generation from
 tools/pixel-assets/build-pass-walls.py. Prompts and source hashes:
 opensamguk-images/public/art/sources.json. The basemap is rendered from Natural Earth (public domain) by
 tools/map-data/build-pixel-basemap.py; inputs and hashes: apps/web/src/main/pixel-basemap.json.
+
+INT-27 NOAA elevation data
+
+The 16-bit height PNGs under opensamguk-images/public/main are derived from
+NOAA National Centers for Environmental Information, ETOPO 2022 Global Relief
+Model (DOI: 10.25921/fd45-gt74), 60 arc-second ice surface GeoTIFF (CC0-1.0).
+The PNGs and adjacent JSON metadata were produced by tools/map-data/build-heightmap.py.

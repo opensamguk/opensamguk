@@ -22,6 +22,14 @@
       "source": "apps/web/src/main/san10-pixel-basemap.png"
     },
     {
+      "sha256": "bbf3372643d93d5602baa284bbc3b8987a4f2808d705bd1e7123bf9852cc03b9",
+      "source": "apps/web/src/main/heightmap.png"
+    },
+    {
+      "sha256": "8a31ae47f59998d4e97e5bdcb7ed1ee3c7e78a314f6ce46044831d929e292517",
+      "source": "apps/web/src/main/san10-heightmap.png"
+    },
+    {
       "sha256": "2b845afea434aa1cd75afe0fa54b19857ea1e577aa80dba9fea0fb8d23c93fb9",
       "source": "apps/web/src/art/flag/square-cloth.png"
     },
@@ -399,7 +407,7 @@
     }
   ],
   "delivery": "external",
-  "imageRevision": "b7efb438b70058aefdfa2fbc4693ca7db259bbc6",
-  "imageBaseUrl": "https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6",
-  "svgImageBaseUrl": "https://rawcdn.githack.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6"
+  "imageRevision": "0ca26e1ee266f32954b96a60a47a2edfaab66948",
+  "imageBaseUrl": "https://raw.githubusercontent.com/opensamguk/opensamguk-images/0ca26e1ee266f32954b96a60a47a2edfaab66948",
+  "svgImageBaseUrl": "https://rawcdn.githack.com/opensamguk/opensamguk-images/0ca26e1ee266f32954b96a60a47a2edfaab66948"
 }

@@ -13,15 +13,15 @@ import {
 import { createCampaignDraft } from './campaignSeed';
 import { basemap, unprojectGeographicPoint } from './geography';
 const reliefUrl =
-  'https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6/public/mapEditor/geodata/natural-earth-relief.webp';
+  'https://raw.githubusercontent.com/opensamguk/opensamguk-images/0ca26e1ee266f32954b96a60a47a2edfaab66948/public/mapEditor/geodata/natural-earth-relief.webp';
 const cityMarker =
-  'https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6/public/mapEditor/icons/city.png';
+  'https://raw.githubusercontent.com/opensamguk/opensamguk-images/0ca26e1ee266f32954b96a60a47a2edfaab66948/public/mapEditor/icons/city.png';
 const passMarker =
-  'https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6/public/mapEditor/icons/pass.png';
+  'https://raw.githubusercontent.com/opensamguk/opensamguk-images/0ca26e1ee266f32954b96a60a47a2edfaab66948/public/mapEditor/icons/pass.png';
 const portMarker =
-  'https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6/public/mapEditor/icons/port.png';
+  'https://raw.githubusercontent.com/opensamguk/opensamguk-images/0ca26e1ee266f32954b96a60a47a2edfaab66948/public/mapEditor/icons/port.png';
 const fieldMarker =
-  'https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6/public/mapEditor/icons/field.png';
+  'https://raw.githubusercontent.com/opensamguk/opensamguk-images/0ca26e1ee266f32954b96a60a47a2edfaab66948/public/mapEditor/icons/field.png';
 import styles from './CampaignMapEditor.module.css';
 
 type History = { map: CampaignDraft; past: CampaignDraft[]; future: CampaignDraft[] };
