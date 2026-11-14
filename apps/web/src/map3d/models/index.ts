@@ -1,4 +1,11 @@
-import { BoxGeometry, BufferGeometry, ExtrudeGeometry, Float32BufferAttribute, Shape } from 'three';
+import {
+  BoxGeometry,
+  BufferGeometry,
+  ExtrudeGeometry,
+  Float32BufferAttribute,
+  IcosahedronGeometry,
+  Shape,
+} from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 export type Slot = 'stone' | 'earth' | 'wood' | 'roof' | 'tile' | 'cloth' | 'field' | 'crop' | 'water' | 'flag';
@@ -19,6 +26,8 @@ export type ModelKind =
   | 'granary'
   | 'shrine';
 
+export const CITY_PLINTH_SCALE = 1.35;
+
 type Point = [number, number, number];
 
 class Model {
@@ -37,6 +46,12 @@ class Model {
     const geometry = indexed.toNonIndexed();
     indexed.dispose();
     this.add(slot, geometry.translate(x, y + height / 2, z));
+  }
+
+  rock(x: number, z: number, width: number, height: number, depth: number, angle: number) {
+    const geometry = new IcosahedronGeometry(1, [2, 1, 0][this.lod]!);
+    geometry.scale(width, height, depth).rotateY(angle).translate(x, height, z);
+    this.add('rock', geometry);
   }
 
   roof(slot: Slot, x: number, y: number, z: number, width: number, depth: number, rise: number, hipped = true) {
@@ -104,7 +119,7 @@ class Model {
     geometry.setAttribute('uv', new Float32BufferAttribute(uv, 2));
     geometry.computeVertexNormals();
     this.add(slot, geometry.translate(x, y, z));
-    if (this.lod !== 2 && (slot === 'tile' || slot === 'roof')) {
+    if (this.lod !== 2 && (slot === 'tile' || slot === 'roof' || slot === 'glazed-tile')) {
       const ridge = Math.min(width, depth) * 0.06;
       this.box(slot, x, y + rise - ridge / 2, z, width * ridgeRatio, ridge, ridge);
     }
@@ -149,7 +164,7 @@ function hall(
   width: number,
   depth: number,
   height: number,
-  roof: 'roof' | 'tile' = 'tile',
+  roof: 'roof' | 'tile' | 'glazed-tile' = 'tile',
 ) {
   model.box('plaster', x, y, z, width, height, depth);
   if (model.lod === 0) {
@@ -216,46 +231,49 @@ function curtain(
   }
 }
 
-function city(model: Model, level: CityLevel, wall: Wall) {
+function city(model: Model, level: CityLevel, wall: Wall, capital: boolean) {
   const side = 0.64 + (level - 1) * 0.032;
   const edge = side / 2;
-  const height = [0.075, 0.13, 0.185][wall]!;
+  const height = [0.075, 0.13, 0.185][wall]! * (level < 4 ? 0.7 : level < 6 ? 0.85 : 1);
   const thickness = [0.06, 0.078, 0.1][wall]!;
-  const slot = wall === 0 ? 'earth' : 'stone';
-  curtain(model, slot, 0, -edge, side + thickness, thickness, height);
+  const slot = level < 4 ? 'earth' : 'stone';
+  const plinth = 0.028;
+  model.box('earth', 0, 0, 0, 1, plinth, 1);
+  const fort = new Model(model.lod);
+  curtain(fort, slot, 0, -edge, side + thickness, thickness, height);
   for (const x of [-edge, edge]) {
-    curtain(model, slot, x, 0, thickness, side, height);
+    curtain(fort, slot, x, 0, thickness, side, height);
     const span = edge - 0.12;
-    curtain(model, slot, Math.sign(x) * (0.12 + span / 2), edge, span, thickness, height);
+    curtain(fort, slot, Math.sign(x) * (0.12 + span / 2), edge, span, thickness, height);
   }
-  gate(model, 0, edge - 0.065, height, slot, wall === 2 || (wall === 1 && (level >= 4 || model.lod === 0)));
+  gate(fort, 0, edge - 0.065, height, slot, level >= 6 || (level >= 4 && wall >= 1));
   if (model.lod === 0 && level >= 4) {
     const inner = edge + 0.047;
     const outer = 0.495;
     const strip = outer - inner;
     const center = (outer + inner) / 2;
-    model.box('water', 0, 0, -center, outer * 2, 0.012, strip);
-    model.box('water', 0, 0, center, outer * 2, 0.012, strip);
-    for (const x of [-center, center]) model.box('water', x, 0, 0, strip, 0.012, inner * 2);
-    model.box('wood', 0, 0.012, center, 0.13, 0.02, strip + 0.009);
-    for (const x of [-0.057, 0.057]) model.box('wood', x, 0.032, center, 0.012, 0.019, strip + 0.009);
+    fort.box('water', 0, 0, -center, outer * 2, 0.012, strip);
+    fort.box('water', 0, 0, center, outer * 2, 0.012, strip);
+    for (const x of [-center, center]) fort.box('water', x, 0, 0, strip, 0.012, inner * 2);
+    fort.box('wood', 0, 0.012, center, 0.13, 0.02, strip + 0.009);
+    for (const x of [-0.057, 0.057]) fort.box('wood', x, 0.032, center, 0.012, 0.019, strip + 0.009);
   }
-  if (wall === 2) {
+  if (level >= 6 || (level >= 4 && wall === 2)) {
     for (const x of [-edge, edge]) {
       for (const z of [-edge, edge]) {
-        model.box('stone', x, 0, z, 0.13, height + 0.025, 0.13);
+        fort.box('stone', x, 0, z, 0.13, height + 0.025, 0.13);
         // At maximum city size the towers stay within the one-cell footprint.
-        if (model.lod !== 2) hall(model, x, height + 0.025, z, 0.088, 0.076, 0.055, 'roof');
+        if (model.lod !== 2) hall(fort, x, height + 0.025, z, 0.088, 0.076, 0.055, 'roof');
       }
     }
   }
 
   const keepWidth = 0.18 + level * 0.019;
   const keepHeight = 0.104 + level * 0.013;
-  model.box('stone', 0, 0, -0.15, keepWidth + 0.05, 0.032, 0.2);
-  hall(model, 0, 0.032, -0.15, keepWidth, 0.17, keepHeight, 'roof');
+  fort.box('stone', 0, 0, -0.15, keepWidth + 0.05, 0.032, 0.2);
+  hall(fort, 0, 0.032, -0.15, keepWidth, 0.17, keepHeight, capital ? 'glazed-tile' : 'roof');
   if (level >= 6 && model.lod !== 2)
-    hall(model, 0, 0.032 + keepHeight * 1.5, -0.15, keepWidth * 0.55, 0.11, 0.067, 'roof');
+    hall(fort, 0, 0.032 + keepHeight * 1.5, -0.15, keepWidth * 0.55, 0.11, 0.067, capital ? 'glazed-tile' : 'roof');
   const yards = [
     [-0.16, 0.04],
     [0.16, 0.04],
@@ -265,12 +283,20 @@ function city(model: Model, level: CityLevel, wall: Wall) {
     [0.26, -0.22],
     [-0.25, -0.09],
   ] as const;
-  for (const [x, z] of yards.slice(0, Math.min(level - 1, model.lod === 2 ? 3 : yards.length)))
-    hall(model, x, 0, z, 0.1, 0.086, 0.057);
+  for (const [x, z] of yards.slice(0, Math.min(level + 1, model.lod === 2 ? 3 : yards.length)))
+    hall(fort, x, 0, z, 0.1, 0.086, 0.057);
+  if (model.lod !== 2 && level >= 4) {
+    fort.box('road', 0, 0, 0.135, 0.028, 0.006, edge * 1.14);
+    for (const z of [0.122, 0.29]) fort.box('road', 0, 0.001, z, side * 0.79, 0.006, 0.023);
+    for (const x of [-0.22, 0.22]) fort.box('road', x, 0.001, 0.064, 0.02, 0.006, side * 0.68);
+  }
+  for (const { slot, geometry } of fort.finish()) model.add(slot, geometry.translate(0, plinth, 0));
 }
 
 function pass(model: Model) {
   for (const side of [-1, 1]) {
+    model.rock(side * 0.34, -0.105, 0.145, 0.24 + (side > 0 ? 0.05 : 0), 0.23, side * 0.18);
+    if (model.lod !== 2) model.rock(side * 0.36, 0.14, 0.12, 0.145, 0.16, side * 0.34);
     model.box('earth', side * 0.315, 0, 0, 0.37, 0.09, 0.27);
     curtain(model, 'stone', side * 0.31, 0, 0.36, 0.15, 0.24);
     model.box('stone', side * 0.435, 0.24, 0, 0.105, 0.085, 0.16);
@@ -416,9 +442,9 @@ const cityLevels = {
 } as const;
 
 /** Each call returns fresh, caller-owned geometry. Parts share the same origin and scale. */
-export function buildModel(kind: ModelKind, options?: { wall?: Wall; lod?: ModelLod }): ModelPart[] {
+export function buildModel(kind: ModelKind, options?: { wall?: Wall; lod?: ModelLod; capital?: boolean }): ModelPart[] {
   const model = new Model(options?.lod ?? 0);
   if (kind in buildings) buildings[kind as keyof typeof buildings](model);
-  else city(model, cityLevels[kind as keyof typeof cityLevels], options?.wall ?? 1);
+  else city(model, cityLevels[kind as keyof typeof cityLevels], options?.wall ?? 1, options?.capital ?? false);
   return model.finish();
 }

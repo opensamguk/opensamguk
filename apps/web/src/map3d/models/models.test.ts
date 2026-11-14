@@ -44,12 +44,14 @@ describe('INT-27 model geometry', () => {
     }
   });
 
-  it('uses earth for the low curtain wall and adds roofed towers to the high wall', () => {
+  it('uses rammed earth on small walls and a raised stone city with a glazed capital roof', () => {
     const low = buildModel('city-1', { wall: 0 });
-    const high = buildModel('city-1', { wall: 2 });
+    const high = buildModel('city-8', { wall: 2, capital: true });
     try {
       expect(low.some(({ slot }) => slot === 'earth')).toBe(true);
-      expect(high.some(({ slot }) => slot === 'earth')).toBe(false);
+      expect(high.find(({ slot }) => slot === 'earth')!.geometry.boundingBox!.max.y).toBeCloseTo(0.028);
+      expect(high.some(({ slot }) => slot === 'glazed-tile')).toBe(true);
+      expect(high.some(({ slot }) => slot === 'road')).toBe(true);
       const roofVertices = (parts: typeof low) =>
         parts.find(({ slot }) => slot === 'roof')!.geometry.getAttribute('position').count;
       expect(roofVertices(high)).toBeGreaterThan(roofVertices(low));
