@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { publicGeographySchema } from '@opensamguk/shared';
-import { operationalMapSchema } from './operational';
-import { createMapTerritory } from './territory';
-import { operationalMapDisplay, readOperationalMap } from './stored';
+import { publicGeographySchema } from '../packages/shared/src/index';
+import { operationalMapSchema } from '../packages/rules/src/world/map/operational';
+import { createMapTerritory } from '../packages/rules/src/world/map/territory';
+import { operationalMapDisplay, readOperationalMap } from '../packages/rules/src/world/map/stored';
 import { readFileSync } from 'node:fs';
 
 describe('INT-28 territory snapshot', () => {
   it.each(['integration', 'san10', 'san10-v2'])('%s keeps city ownership through storage', (id) => {
-    const file = new URL('../../../../../resources/map/' + id + '.json', import.meta.url);
+    const file = new URL('../resources/map/' + id + '.json', import.meta.url);
     const resource = operationalMapSchema.parse(JSON.parse(readFileSync(file, 'utf8')));
     const map = createMapTerritory(resource, new Map());
     const territory = map.territory!;
