@@ -109,6 +109,39 @@ export function pathPoints(
   return points;
 }
 
+/** 선을 점선 조각들로 자른다(dash 길이, gap 간격, 지도 단위). 물길 점선에 쓴다. */
+export function dashLine(points: readonly Point[], dash: number, gap: number): Point[][] {
+  const pieces: Point[][] = [];
+  let current: Point[] = [];
+  let drawing = true;
+  let left = dash;
+  for (let i = 1; i < points.length; i++) {
+    let a = points[i - 1]!;
+    const b = points[i]!;
+    let length = Math.hypot(b.x - a.x, b.y - a.y);
+    while (length > 0) {
+      const take = Math.min(left, length);
+      const t = take / length;
+      const next = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+      if (drawing) {
+        if (!current.length) current.push(a);
+        current.push(next);
+      }
+      left -= take;
+      length -= take;
+      a = next;
+      if (left <= 1e-9) {
+        if (drawing && current.length > 1) pieces.push(current);
+        current = [];
+        drawing = !drawing;
+        left = drawing ? dash : gap;
+      }
+    }
+  }
+  if (drawing && current.length > 1) pieces.push(current);
+  return pieces;
+}
+
 /** 점 목록 위의 거리 비율 t(0~1) 위치와 진행 방향(라디안). */
 export function along(points: readonly Point[], t: number): { x: number; y: number; angle: number } {
   if (points.length === 0) return { x: 0, y: 0, angle: 0 };

@@ -42,8 +42,9 @@ import type { PublicGeography } from '@opensamguk/shared';
 import { roadWalks, TERRAINS, waterLanes, type Terrain } from '../main/terrainTiles';
 import { ROAD_CELL } from '../main/roadPixels';
 import { bounds as riverBounds, lines as riverData } from './data/rivers';
-import { along, cellsToPoints, simplify } from './routes3d';
-import { fromTile, territoryTiles, toTile } from './territory3d';
+import { along, cellsToPoints, dashLine, simplify } from './routes3d';
+import { fromTile, territoryTiles, tileBounds, toTile } from './territory3d';
+import { DIRECTIONS, FLAG_BRIDGE, planTileRoutes, type RouteMode, type TileTerrain } from './tileRoutes';
 import type { DrawnNation } from '../main/siteMarkers';
 import type { ModelCity } from '../main/mapModel';
 import {
@@ -74,6 +75,49 @@ const LAKE = TERRAINS.indexOf('lake');
 // 영지 칸 그리기. 월드 xz를 45° 돌린 칸 좌표로 바꿔 칸 자료를 읽고,
 // - 가는 칸 격자(멀리서는 흐린다)와 소유국 색 옅은 칠,
 // - 이웃 칸과 도시가 다르면 금빛 도시 경계, 나라가 다르면 굵은 나라색 국경을 긋는다.
+const ROAD_GLSL = `// 칸 길(INT-27, 8방향): 칸 가운데에서 이어진 방향으로 길을 그린다. R 육로 방향 비트, B 표시(1 큰길, 2 다리, 4 나루, 8 거점 칸).
+const vec2 ROAD_DIRS[8] = vec2[8](vec2(1.0, 0.0), vec2(1.0, 1.0), vec2(0.0, 1.0), vec2(-1.0, 1.0), vec2(-1.0, 0.0), vec2(-1.0, -1.0), vec2(0.0, -1.0), vec2(1.0, -1.0));
+float segmentDistance(vec2 p, vec2 a, vec2 b) {
+  vec2 ab = b - a;
+  float t = clamp(dot(p - a, ab) / dot(ab, ab), 0.0, 1.0);
+  return length(p - a - ab * t);
+}
+vec3 drawRoads(vec3 base, vec2 xz) {
+  vec2 q = vec2(xz.x + xz.y, xz.y - xz.x) * ${Math.SQRT1_2} / ${TILE.toFixed(1)};
+  vec2 cell = floor(q);
+  vec2 f = fract(q);
+  float pxTile = max(fwidth(q).x, fwidth(q).y);
+  if (pxTile > 0.12) return base;
+  vec2 uv = (cell - uTileOrigin + 0.5) / uTileCount;
+  if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) return base;
+  vec4 road = texture2D(uRoads, uv);
+  int bits = int(road.r * 255.0 + 0.5);
+  int flags = int(road.b * 255.0 + 0.5);
+  if (bits == 0 || (flags & 8) != 0) return base;
+  float major = (flags & 1) != 0 ? 1.0 : 0.0;
+  float halfWidth = max(mix(0.07, 0.1, major), pxTile * 0.9);
+  float d = 10.0;
+  vec2 along = vec2(1.0, 0.0);
+  for (int k = 0; k < 8; k++) {
+    if (((bits >> k) & 1) == 0) continue;
+    vec2 tip = vec2(0.5) + ROAD_DIRS[k] * 0.5;
+    float dk = segmentDistance(f, vec2(0.5), tip);
+    if (dk < d) { d = dk; along = normalize(ROAD_DIRS[k]); }
+  }
+  float edge = pxTile * 0.8;
+  float paint = 1.0 - smoothstep(halfWidth - edge, halfWidth + edge, d);
+  vec3 dirt = vec3(0.70, 0.58, 0.40);
+  vec3 stone = vec3(0.76, 0.72, 0.63);
+  vec3 colour = mix(dirt, stone, major);
+  // 가까이 볼 때 바퀴 자국 두 줄과 길섶의 옅은 테.
+  float near = 1.0 - smoothstep(0.01, 0.03, pxTile);
+  float rut = (1.0 - smoothstep(0.0, edge + 0.006, abs(d - halfWidth * 0.45))) * near;
+  colour *= 1.0 - rut * 0.18;
+  float rim = (1.0 - smoothstep(halfWidth, halfWidth + edge * 3.0 + 0.02, d)) * (1.0 - paint);
+  vec3 result = mix(base, base * 0.86, rim * 0.6 * near);
+  return mix(result, colour, paint * 0.92);
+}`;
+
 const TERRITORY_GLSL = `
 vec4 tileAt(vec2 cell) {
   vec2 uv = (cell - uTileOrigin + 0.5) / uTileCount;
@@ -91,7 +135,8 @@ vec3 territoryColor(vec3 base, vec2 xz) {
   vec3 color = base;
   // 멀리서 볼수록 나라 색을 진하게 칠해 천하 판도가 한눈에 읽힌다. 가까이서는 지형이 보이게 옅게.
   float far = smoothstep(0.04, 0.22, pxTile);
-  if (hasNation(own)) color = mix(color, own.rgb, mix(0.16, 0.42, far));
+  // 나라 색은 곱해서 칠한다(지형 명암이 살아 있게, 참고 시안의 천하 전도처럼). 멀리서 볼수록 진하게.
+  if (hasNation(own)) color = mix(color, color * (own.rgb * 1.5 + 0.15), mix(0.28, 0.62, far));
   float edge = min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y));
   // 칸 격자는 칸이 화면에서 약 60px 넘게 보일 때만(확대 3·4단계). 그보다 멀면 국경·나라 색만 남긴다.
   float grid = (1.0 - smoothstep(0.0, pxTile * 1.1, edge)) * (1.0 - smoothstep(0.012, 0.02, pxTile));
@@ -184,10 +229,12 @@ transformed += normalize(objectNormal) * 0.012;`,
   readonly routeLines = new Map<string, Array<{ x: number; y: number }>>();
   private width = 1;
   private height = 1;
-  private readonly sun = new DirectionalLight('#fff0d6', 3.4);
+  private readonly sun = new DirectionalLight('#ffe9cc', 3.8);
   /** 물결 셰이더의 시각(초). 그릴 때마다 옮긴다. */
   private readonly waterTime = { value: 0 };
   /** 영지 칸 자료(셰이더): 칸마다 소유국 색(RGB)과 도시 번호(A). setSites가 채운다. */
+  /** 칸 길 자료(셰이더): 칸마다 R 육로 방향 비트, G 물길 방향 비트, B 표시. */
+  private readonly roadMap = { value: new DataTexture(new Uint8Array(4), 1, 1) };
   private readonly territory = {
     map: { value: new DataTexture(new Uint8Array(4), 1, 1) },
     origin: { value: new Vector2() },
@@ -226,8 +273,8 @@ transformed += normalize(objectNormal) * 0.012;`,
     this.field = metres ? heightFieldFromMetres(grid, metres, depth) : heightField(grid);
 
     // 하늘빛(위)과 땅에서 되비치는 흙빛(아래). 해가 낮아 능선의 명암이 또렷하다.
-    this.scene.add(new HemisphereLight('#dfe8ee', '#6a5a40', 0.5));
-    this.scene.add(new AmbientLight('#ffffff', 0.08));
+    this.scene.add(new HemisphereLight('#dfe6ea', '#5a4a34', 0.38));
+    this.scene.add(new AmbientLight('#ffffff', 0.04));
     // 해는 북서쪽 낮은 각도. 그림자 카메라는 보이는 범위를 따라 옮긴다(render).
     const sun = this.sun;
     sun.castShadow = true;
@@ -248,7 +295,7 @@ transformed += normalize(objectNormal) * 0.012;`,
     ocean.rotation.x = -Math.PI / 2;
     ocean.position.y = -9;
     this.scene.add(ocean, this.water(depth));
-    for (const mesh of this.roads(map)) this.scene.add(mesh);
+    for (const mesh of this.tileRoads(map)) this.scene.add(mesh);
     this.scene.add(this.rivers(bounds));
     this.scene.add(this.trees(map, metres));
   }
@@ -277,7 +324,8 @@ transformed += normalize(objectNormal) * 0.012;`,
     geometry.setAttribute('color', new Float32BufferAttribute(colors, 3));
     geometry.computeVertexNormals();
     // 카툰풍 지형: 빛을 세 단계로 끊는다(사용자 2026-11-14). 색·무늬는 아래 셰이더가 정한다.
-    const material = new MeshToonMaterial({ vertexColors: true, gradientMap: toonGradient([75, 150, 215, 255]) });
+    // 지형은 그림처럼 사실적인 명암(참고 시안·삼국지 시리즈 분위기). 계단 명암(카툰)은 모형에만 쓴다.
+    const material = new MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 });
     // 질감 그림(D-090)이 오기 전까지 셰이더로 사실감을 낸다. 모두 월드 좌표 잡음이라 칸 경계가 드러나지 않는다.
     // - 산: 능선 잡음으로 낸 잔 기복(법선)과, 경사면 바위·고도 눈을 화소마다 다시 칠한다.
     // - 바닷가: 물높이 바로 위는 모래, 물 아래는 바닥 흙. 해안선이 칸이 아니라 높이 0 선을 따른다.
@@ -287,13 +335,14 @@ transformed += normalize(objectNormal) * 0.012;`,
       shader.uniforms.uTerritory = territory.map;
       shader.uniforms.uTileOrigin = territory.origin;
       shader.uniforms.uTileCount = territory.count;
+      shader.uniforms.uRoads = this.roadMap;
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', `#include <common>\nvarying vec3 vGround;\nvarying vec3 vUp;`)
         .replace('#include <begin_vertex>', `#include <begin_vertex>\nvGround = position;\nvUp = normal;`);
       shader.fragmentShader = shader.fragmentShader
         .replace(
           '#include <common>',
-          `#include <common>\nvarying vec3 vGround;\nvarying vec3 vUp;\nuniform sampler2D uTerritory;\nuniform vec2 uTileOrigin;\nuniform vec2 uTileCount;\n${TERRAIN_NOISE}\n${TERRITORY_GLSL}`,
+          `#include <common>\nvarying vec3 vGround;\nvarying vec3 vUp;\nuniform sampler2D uTerritory;\nuniform vec2 uTileOrigin;\nuniform vec2 uTileCount;\nuniform sampler2D uRoads;\n${TERRAIN_NOISE}\n${TERRITORY_GLSL}\n${ROAD_GLSL}`,
         )
         .replace(
           '#include <color_fragment>',
@@ -305,7 +354,7 @@ float px = fwidth(vGround.x) + fwidth(vGround.z);
 float flatness = clamp(vUp.y, 0.0, 1.0);
 vec3 paint = diffuseColor.rgb;
 float luma = dot(paint, vec3(0.3, 0.55, 0.15));
-paint = mix(vec3(luma), paint, 1.12) * vec3(1.04, 1.0, 0.9);
+paint = mix(vec3(luma), paint, 0.95) * vec3(1.05, 1.0, 0.86);
 paint *= 0.93 + grain * 0.14 + (brush - 0.5) * 0.08;
 float cloud = smoothstep(0.56, 0.78, fbm(vGround.xz * 0.011 + vec2(3.1, 7.7)));
 paint *= 1.0 - cloud * 0.2;
@@ -329,24 +378,28 @@ if (vGround.y < -0.02) diffuseColor.rgb = mix(vec3(0.62, 0.58, 0.46), vec3(0.30,
           `#include <normal_fragment_maps>
 // 잔 기복: 능선 잡음의 기울기로 법선을 흔든다. 높고 가파를수록 세게, 평야는 거의 그대로.
 // 산세는 크게: 낮은 주파수 능선만 쓰고 평야는 거의 건드리지 않는다(그림체에서 자글자글함을 뺀다).
-float rugged = smoothstep(1.5, 10.0, vGround.y) * 0.8 + smoothstep(0.99, 0.9, vUp.y) * 0.3;
+// 산은 날카롭게 깎인 능선과 골짜기(두 겹 능선 잡음). 평야는 거의 건드리지 않는다.
+float rugged = smoothstep(1.2, 9.0, vGround.y) * 1.0 + smoothstep(0.99, 0.88, vUp.y) * 0.45;
 rugged *= 1.0 - smoothstep(0.35, 0.9, px);
 vec2 g = vec2(0.0);
 if (rugged > 0.01) {
-  float e = 0.2;
-  float h0 = ridged(vGround.xz * 0.09);
-  g = vec2(ridged((vGround.xz + vec2(e, 0.0)) * 0.09) - h0, ridged((vGround.xz + vec2(0.0, e)) * 0.09) - h0) / e;
-  g *= rugged * 1.6;
+  float e = 0.08;
+  float h0 = ridged(vGround.xz * 0.09) + ridged(vGround.xz * 0.33) * 0.45;
+  float hx = ridged((vGround.xz + vec2(e, 0.0)) * 0.09) + ridged((vGround.xz + vec2(e, 0.0)) * 0.33) * 0.45;
+  float hz = ridged((vGround.xz + vec2(0.0, e)) * 0.09) + ridged((vGround.xz + vec2(0.0, e)) * 0.33) * 0.45;
+  g = vec2(hx - h0, hz - h0) / e;
+  g *= rugged * 1.5;
   normal = normalize(normal + (viewMatrix * vec4(-g.x, 0.0, -g.y, 0.0)).xyz);
 }
 // 바위·눈은 흔든 법선의 경사와 고도로 화소마다 정한다.
 float slope = 1.0 - normalize(vUp + vec3(-g.x, 0.0, -g.y) * 0.6).y;
 float rock = smoothstep(0.16, 0.42, slope + (grain - 0.5) * 0.12) * step(0.3, vGround.y);
-vec3 rockColor = mix(vec3(0.42, 0.39, 0.35), vec3(0.55, 0.5, 0.44), grain);
+vec3 rockColor = mix(vec3(0.44, 0.39, 0.32), vec3(0.6, 0.54, 0.45), grain);
 diffuseColor.rgb = mix(diffuseColor.rgb, rockColor, rock * 0.85);
 float snow = smoothstep(${(4300 * UNITS_PER_METRE).toFixed(2)}, ${(5200 * UNITS_PER_METRE).toFixed(2)}, vGround.y + (grain - 0.5) * ${(650 * UNITS_PER_METRE).toFixed(2)}) * (1.0 - smoothstep(0.45, 0.75, slope));
 diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.94, 0.96), snow);
 if (vGround.y > 0.0) diffuseColor.rgb = territoryColor(diffuseColor.rgb, vGround.xz);
+if (vGround.y > -0.02) diffuseColor.rgb = drawRoads(diffuseColor.rgb, vGround.xz);
 // 오지(무대 밖 땅): 색을 빼고 어둡게 해 게임 무대 밖임을 보인다.
 if (vGround.y > 0.05 && tileAt(floor(vec2(vGround.x + vGround.z, vGround.z - vGround.x) * ${Math.SQRT1_2} / ${TILE.toFixed(1)})).a == 0.0) {
   float grey = dot(diffuseColor.rgb, vec3(0.3, 0.55, 0.15));
@@ -390,8 +443,8 @@ if (vGround.y > 0.05 && tileAt(floor(vec2(vGround.x + vGround.z, vGround.z - vGr
           '#include <color_fragment>',
           `#include <color_fragment>
 float d = sqrt(max(vDepth, 0.0) / 3000.0);
-vec3 water = mix(vec3(0.13, 0.42, 0.44), vec3(0.06, 0.25, 0.37), smoothstep(0.02, 0.2, d));
-water = mix(water, vec3(0.03, 0.12, 0.24), smoothstep(0.2, 0.7, d));
+vec3 water = mix(vec3(0.16, 0.58, 0.56), vec3(0.06, 0.3, 0.42), smoothstep(0.02, 0.2, d));
+water = mix(water, vec3(0.03, 0.14, 0.28), smoothstep(0.2, 0.7, d));
 float foamNoise = fbm(vSea * 1.6 + vec2(uTime * 0.05, 0.0));
 float foam = (1.0 - smoothstep(0.0, 4.0, vDepth)) * smoothstep(0.45, 0.7, foamNoise);
 diffuseColor.rgb = mix(water, vec3(0.92, 0.95, 0.95), foam * 0.7);
@@ -484,6 +537,137 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
         }),
       );
     });
+  }
+
+  // 칸 길(INT-27, 사용자 2026-11-14: 길은 타일대로, 8방향). 거점 사이 길을 영지 칸 경로로 바꿔 그린다.
+  // 육로는 지형 셰이더가 칸마다 그리고(uRoads), 강을 건너는 칸에는 판자 다리를 세운다.
+  // 수로·해로는 물 위 점선이다. 행군 연출(routeLines)도 칸 경로를 따른다. 칸 경로를 못 찾은 길만 예전 칸 길을 쓴다.
+  private tileRoads(map: PublicGeography) {
+    const bounds = tileBounds(this.canvasSize, TILE);
+    const { columns, rows, originX, originY } = bounds;
+    const centre = (index: number) =>
+      fromTile(originX + (index % columns) + 0.5, originY + Math.floor(index / columns) + 0.5, this.canvasSize, TILE);
+    const indexOf = (x: number, y: number) => {
+      const { u, v } = toTile(x, y, this.canvasSize, TILE);
+      return (Math.floor(v) - originY) * columns + (Math.floor(u) - originX);
+    };
+    const terrainAt = (index: number): TileTerrain => {
+      const { x, y } = centre(index);
+      if (x < 0 || y < 0 || x > this.canvasSize.width || y > this.canvasSize.height) return 'void';
+      const name = TERRAINS[this.cellAt(x, y)];
+      if (name === 'lake') return 'lake';
+      if (name === 'river') return 'river';
+      if (name === 'sea' || name === 'deepSea' || name === 'shallow' || this.rawGround(x, y) < 0) return 'sea';
+      if (name === 'highMountains' || name === 'snow') return 'peak';
+      if (name === 'mountains') return 'mountain';
+      if (name === 'hills' || name === 'forest') return 'rough';
+      return 'plain';
+    };
+    const lanes = waterLanes(map, this.grid as never);
+    const seaIds = new Set(lanes.map((lane) => lane.id));
+    const siteById = new Map(map.sites.map((site) => [site.id, site]));
+    const routes = map.routes.flatMap((route) => {
+      const from = siteById.get(route.from);
+      const to = siteById.get(route.to);
+      if (!route.enabled || !from || !to) return [];
+      const mode: RouteMode = seaIds.has(route.id) ? 'SEA' : (route.mode as RouteMode);
+      return [
+        {
+          id: route.id,
+          mode,
+          from: indexOf(from.position.x, from.position.y),
+          to: indexOf(to.position.x, to.position.y),
+        },
+      ];
+    });
+    const siteTiles = map.sites
+      .filter((site) => site.kind === 'CITY' || site.kind === 'PASS')
+      .map((site) => indexOf(site.position.x, site.position.y));
+    const plan = planTileRoutes(columns, rows, terrainAt, routes, siteTiles);
+    // 셰이더 질감: R 육로, G 물길, B 표시.
+    const data = new Uint8Array(columns * rows * 4);
+    for (let i = 0; i < columns * rows; i++) {
+      data[i * 4] = plan.land[i]!;
+      data[i * 4 + 1] = plan.water[i]!;
+      data[i * 4 + 2] = plan.flags[i]!;
+      data[i * 4 + 3] = 255;
+    }
+    const texture = new DataTexture(data, columns, rows);
+    texture.magFilter = NearestFilter;
+    texture.minFilter = NearestFilter;
+    texture.needsUpdate = true;
+    this.roadMap.value.dispose();
+    this.roadMap.value = texture;
+    // 칸 경로 → 행군 점 목록. 못 찾은 길은 예전 칸 길로.
+    const fallback = roadWalks(map, seaIds, () => 0, ROAD_CELL, this.grid as never);
+    for (const route of map.routes) {
+      const path = plan.paths.get(route.id);
+      if (path) {
+        const points = path.map(centre);
+        const from = siteById.get(route.from);
+        const to = siteById.get(route.to);
+        if (from) points[0] = from.position;
+        if (to) points[points.length - 1] = to.position;
+        this.routeLines.set(route.id, simplify(points));
+      } else {
+        const cells = fallback.get(route.id) ?? lanes.find((lane) => lane.id === route.id)?.cells;
+        if (cells) this.routeLines.set(route.id, simplify(cellsToPoints(cells)));
+      }
+    }
+    // 물길 점선: 수로는 옅은 물빛, 해로는 흰색.
+    const dashes: Record<'RIVER' | 'SEA', Array<Array<{ x: number; y: number }>>> = { RIVER: [], SEA: [] };
+    for (const route of routes) {
+      if (route.mode !== 'RIVER' && route.mode !== 'SEA') continue;
+      const line = this.routeLines.get(route.id);
+      if (line) dashes[route.mode].push(...dashLine(line, 1.4, 1.0));
+    }
+    const meshes: Mesh[] = (['RIVER', 'SEA'] as const).map(
+      (mode) =>
+        new Mesh(
+          this.ribbon(dashes[mode], 0.45, mode === 'SEA' ? 0.3 : 0.5),
+          new MeshBasicMaterial({
+            color: mode === 'SEA' ? '#f4f1e6' : '#d8eef0',
+            transparent: true,
+            opacity: 0.8,
+            side: DoubleSide,
+            depthWrite: false,
+          }),
+        ),
+    );
+    // 다리: 강 칸을 지나는 육로 칸에 판자 다리를 세운다(길 방향으로 눕힌 상자). 다리 모형이 오면 바꾼다.
+    const bridges: Array<{ index: number; angle: number }> = [];
+    for (let i = 0; i < columns * rows; i++) {
+      if (!(plan.flags[i]! & FLAG_BRIDGE) || !plan.land[i]) continue;
+      const k = [0, 1, 2, 3, 4, 5, 6, 7].find((bit) => plan.land[i]! & (1 << bit)) ?? 0;
+      const [du, dv] = DIRECTIONS[k]!;
+      // 칸 축(u, v)을 월드 (x, z)로: u = (+1, +1)/√2, v = (−1, +1)/√2.
+      const wx = (du - dv) * Math.SQRT1_2;
+      const wz = (du + dv) * Math.SQRT1_2;
+      bridges.push({ index: i, angle: Math.atan2(wz, wx) });
+    }
+    if (bridges.length) {
+      const deck = new InstancedMesh(
+        new BoxGeometry(1, 1, 1),
+        new MeshToonMaterial({ color: '#7a5634', gradientMap: toonGradient() }),
+        bridges.length,
+      );
+      const matrix = new Matrix4();
+      const holder = new Object3D();
+      bridges.forEach(({ index, angle }, n) => {
+        const { x, y } = centre(index);
+        const base = this.world(x, y, 0.45);
+        holder.position.copy(base);
+        holder.rotation.set(0, -angle, 0);
+        holder.scale.set(TILE * 1.05, 0.3, TILE * 0.18);
+        holder.updateMatrix();
+        matrix.copy(holder.matrix);
+        deck.setMatrixAt(n, matrix);
+      });
+      deck.castShadow = true;
+      deck.receiveShadow = true;
+      meshes.push(deck);
+    }
+    return meshes;
   }
 
   // 강: Natural Earth 강 선을 땅 위 물 띠로 그린다. 강 선은 통합 지도(1000×700) 좌표라

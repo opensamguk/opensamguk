@@ -32,6 +32,24 @@ export function fromTile(u: number, v: number, canvas: { width: number; height: 
   return { x: (qu - qv) * Math.SQRT1_2 + canvas.width / 2, y: (qu + qv) * Math.SQRT1_2 + canvas.height / 2 };
 }
 
+/** 지도 판을 덮는 돌린 칸 격자의 시작 칸과 크기. 영지 칸·칸 길이 같은 격자를 쓴다. */
+export function tileBounds(canvas: { width: number; height: number }, tile: number) {
+  const corners = [
+    toTile(0, 0, canvas, tile),
+    toTile(canvas.width, 0, canvas, tile),
+    toTile(0, canvas.height, canvas, tile),
+    toTile(canvas.width, canvas.height, canvas, tile),
+  ];
+  const originX = Math.floor(Math.min(...corners.map((c) => c.u)));
+  const originY = Math.floor(Math.min(...corners.map((c) => c.v)));
+  return {
+    originX,
+    originY,
+    columns: Math.ceil(Math.max(...corners.map((c) => c.u))) - originX,
+    rows: Math.ceil(Math.max(...corners.map((c) => c.v))) - originY,
+  };
+}
+
 /** 무대 너비: 가장 가까운 거점에서 땅길로 이 칸 수(약 340km)보다 멀면 오지다. */
 export const STAGE = 12;
 
