@@ -242,9 +242,9 @@ transformed += normalize(objectNormal) * 0.012;`,
     count: { value: new Vector2(1, 1) },
   };
   private rings: Mesh[] = [];
-  /** 그림 후처리(유화 붓 터치). 끄면 그냥 그린다. */
+  /** 그림 후처리(유화 붓 터치). 화면이 뭉개져서 기본은 끈다(사용자 2026-11-14). 그림 느낌은 질감·모형으로 낸다. */
   readonly paint = new PaintPass();
-  painterly = true;
+  painterly = false;
 
   constructor(
     canvas: HTMLCanvasElement,
