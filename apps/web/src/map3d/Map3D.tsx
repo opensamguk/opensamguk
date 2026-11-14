@@ -26,8 +26,8 @@ import styles from './Map3D.module.css';
 type DrawnCity = ModelCity;
 type Site = PublicGeography['sites'][number];
 
-// 성 한 칸이 화면의 큰 부분을 차지할 만큼 들어간다(사용자 2026-11-14: 참고 시안만큼 확대).
-const MAX_ZOOM_FACTOR = 40;
+// 칸 하나가 화면 높이 대부분을 차지할 만큼 들어간다(사용자 2026-11-14: 최대 확대는 칸 높이 하나가 화면 대부분).
+const MAX_ZOOM_FACTOR = 80;
 
 type Control = { x: number; z: number; zoom: number; fit: number; version: number };
 
