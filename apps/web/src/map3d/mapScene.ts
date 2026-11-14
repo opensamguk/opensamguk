@@ -90,6 +90,8 @@ type SiteSprite = {
   /** Blender로 찍은 모형 그림만: 원래 너비·키(높은 모형을 줄일 때). 그린 그림에는 없다. */
   width?: number;
   height?: number;
+  /** 가장 크게 볼 때 쓰는 고해상도 그림(`sprites/hd/<이름>.png`, 같은 틀을 키운 것)이 있는지. */
+  hd?: boolean;
 };
 const NEUTRAL = '#d6d0c4';
 const TERRAIN_TEXTURES = ['grass', 'field', 'dirt', 'forest', 'rock', 'cliff', 'snow', 'sand'] as const;
@@ -301,6 +303,12 @@ export class MapScene {
   private modelSet = new Map<string, Array<{ geometry: BufferGeometry; material: Mesh['material']; box: Box3 }>>();
   private siteModelMeshes: Array<{ lod: number; mesh: InstancedMesh }> = [];
   private spriteSet = new Map<string, SiteSprite>();
+  private waterMesh: Mesh | null = null;
+  private spriteBase = '';
+  /** 거점 그림 이름 → 그 그림의 재질과 그림이 놓인 지도 자리(고해상도 교체용). */
+  private spriteUses = new Map<string, { material: MeshBasicMaterial; spots: Array<{ x: number; z: number }> }>();
+  /** 고해상도 그림: 받는 중이면 null. */
+  private spriteHd = new Map<string, Texture | null>();
   /** 2D 지도: 거점 id → 이름판을 그림 꼭대기로 올릴 지도 거리. */
   private labelLift = new Map<string, number>();
   /** 지금 화면 확대 단계(1 전체 ~ 4 크게). 이름판 배율에 쓴다. */
@@ -419,11 +427,15 @@ transformed += normalize(normal) * 0.012;`,
     // 지도 밖까지 이어지는 먼바다. 가장 깊은 바닥보다 아래에 둬 지도 안의 물·바닥을 가리지 않는다.
     const ocean = new Mesh(
       new PlaneGeometry(map.canvas.width * 1.6, map.canvas.height * 1.6),
-      new MeshStandardMaterial({ color: '#0c2a42', roughness: 0.35 }),
+      // 2D 그림 지도는 그림의 먼바다 색(rgb 31,65,91)으로 잇는다.
+      FLAT_MAP
+        ? new MeshBasicMaterial({ color: '#1f415b' })
+        : new MeshStandardMaterial({ color: '#0c2a42', roughness: 0.35 }),
     );
     ocean.rotation.x = -Math.PI / 2;
     ocean.position.y = -9;
-    this.scene.add(ocean, this.water(depth));
+    this.waterMesh = this.water(depth);
+    this.scene.add(ocean, this.waterMesh);
     this.riverPolylines = this.riverLines(bounds);
     for (const mesh of this.tileRoads(map)) this.scene.add(mesh);
     this.scene.add(this.rivers());
@@ -1253,6 +1265,7 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     const response = await fetch(`${base}/sprites/sprites.json`, { cache: 'no-cache' });
     if (!response.ok) return;
     const meta = (await response.json()) as Record<string, Omit<SiteSprite, 'texture'>>;
+    this.spriteBase = base;
     const loader = new TextureLoader();
     await Promise.all(
       names
@@ -1280,6 +1293,10 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     }
     this.siteModelMeshes = [];
     this.labelLift.clear();
+    for (const texture of this.spriteHd.values()) texture?.dispose();
+    this.spriteHd.clear();
+    for (const use of this.spriteUses.values()) use.material.dispose();
+    this.spriteUses.clear();
     const source: ReadonlyMap<string, unknown> = FLAT_MAP ? this.spriteSet : this.modelSet;
     if (!this.lastSites || source.size === 0) return;
     const available = new Set(source.keys());
@@ -1418,6 +1435,8 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
       const sprite = this.spriteSet.get(name)!;
       const material = new MeshBasicMaterial({ map: sprite.texture, alphaTest: 0.35, alphaToCoverage: true });
       const mesh = new InstancedMesh(plane, material, sites.length);
+      const spots: Array<{ x: number; z: number }> = [];
+      this.spriteUses.set(name, { material, spots });
       // 높은 모형(관문 바위 등)은 키가 바닥 너비의 0.55배를 넘지 않게 함께 줄인다(3D 때와 같은 규칙).
       const squeeze = sprite.width && sprite.height ? Math.min(1, (0.55 * sprite.width) / sprite.height) : 1;
       sites.forEach((site, index) => {
@@ -1428,6 +1447,7 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
         const x = centre.x - this.canvasSize.width / 2 + (sprite.size / 2 - sprite.anchor[0]) * perPx;
         const z = centre.y - this.canvasSize.height / 2 + (sprite.size / 2 - sprite.anchor[1]) * perPx;
         const lift = 2 + centre.y / this.canvasSize.height;
+        spots.push({ x: centre.x - this.canvasSize.width / 2, z: centre.y - this.canvasSize.height / 2 });
         matrix.makeScale(side, 1, side).setPosition(x, lift, z);
         mesh.setMatrixAt(index, matrix);
         mesh.setColorAt(index, tint.set(regionTint(this.lastSites!.cityByKey.get(site.anchorKey)?.region)));
@@ -1437,6 +1457,53 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
       this.siteModelMeshes.push({ lod: -1, mesh });
     }
   }
+
+  /**
+   * 가장 크게 볼 때(확대 4단계) 화면 안에 있는 거점 그림만 고해상도로 바꾼다(사용자 2026-11-14: 성 그림이 화면을
+   * 가득 채울 수 있다). 고해상도 한 장이 GPU에서 수십 MB라 화면 밖·작게 볼 때는 내려놓는다.
+   */
+  private updateSpriteDetail(state: CameraState) {
+    if (!FLAT_MAP || !this.spriteUses.size) return;
+    const zoom = state.zoom || 1;
+    const halfW = this.width / 2 / zoom + TILE * 2;
+    const halfH = this.height / 2 / zoom + TILE * 2;
+    for (const [name, use] of this.spriteUses) {
+      const sprite = this.spriteSet.get(name);
+      if (!sprite?.hd) continue;
+      const wanted =
+        this.tier === 4 &&
+        use.spots.some((spot) => Math.abs(spot.x - state.x) < halfW && Math.abs(spot.z - state.z) < halfH);
+      const held = this.spriteHd.get(name);
+      if (wanted && held === undefined) {
+        this.spriteHd.set(name, null);
+        void new TextureLoader().loadAsync(`${this.spriteBase}/sprites/hd/${name}.png`).then(
+          (texture) => {
+            texture.colorSpace = SRGBColorSpace;
+            texture.anisotropy = 8;
+            if (!this.spriteHd.has(name)) {
+              texture.dispose();
+              return;
+            }
+            this.spriteHd.set(name, texture);
+            use.material.map = texture;
+            use.material.needsUpdate = true;
+            this.onDetail?.();
+          },
+          () => this.spriteHd.delete(name),
+        );
+      } else if (!wanted && held !== undefined) {
+        this.spriteHd.delete(name);
+        if (held) {
+          use.material.map = sprite.texture;
+          use.material.needsUpdate = true;
+          held.dispose();
+        }
+      }
+    }
+  }
+
+  /** 고해상도 그림을 다 받으면 다시 그리게 알린다(Map3D가 단다). */
+  onDetail: (() => void) | null = null;
 
   /** 이름판을 붙일 3D 자리: 모형을 쓰면 칸 가운데 모형 꼭대기, 아니면 임시 상자 모형 위. */
   labelAnchor(site: AnchorSite, level: number | undefined) {
@@ -1467,6 +1534,9 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     this.painted.map.value = texture;
     this.painted.rect.value.set(rect[0] - width / 2, rect[1] - height / 2, rect[2] - width / 2, rect[3] - height / 2);
     this.painted.on.value = 1;
+    // 2D 지도에서 그림이 지도 전체를 덮으면 바다·강도 그림에 그려져 있다. 실시간 물 판은 끈다.
+    if (FLAT_MAP && rect[0] <= 0 && rect[1] <= 0 && rect[2] >= width && rect[3] >= height && this.waterMesh)
+      this.waterMesh.visible = false;
   }
 
   async loadTerrainTextures(base: string) {
@@ -1746,6 +1816,7 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     }
     // 거점 모형 거리 단계: 특 도시 한 변(약 16단위)이 화면에서 몇 px인지로 정한다.
     this.tier = zoomTier(this.width / (state.zoom || 1));
+    this.updateSpriteDetail(state);
     if (this.siteModelMeshes.length) {
       const lod = TIER_LOD[this.tier];
       for (const entry of this.siteModelMeshes) if (entry.lod >= 0) entry.mesh.visible = entry.lod === lod;

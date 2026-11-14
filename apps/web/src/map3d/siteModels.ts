@@ -91,4 +91,16 @@ export function zoomTier(viewWidth: number): ZoomTier {
 export const TIER_LOD: Record<ZoomTier, 0 | 1 | 2> = { 1: 2, 2: 2, 3: 1, 4: 0 };
 export const TIER_LABEL_SCALE: Record<ZoomTier, number> = { 1: 0.9, 2: 1, 3: 1.4, 4: 2 };
 
-export const MODEL_NAMES = ['city-9', 'capital', 'city-7', 'city-6', 'city-5', 'pass', 'camp', 'houses'] as const;
+export const MODEL_NAMES = [
+  'city-9',
+  'capital',
+  'city-7',
+  'city-6',
+  'city-5',
+  'pass',
+  'camp',
+  'houses',
+  'port',
+  'water-fort',
+  'nomad-camp',
+] as const;
