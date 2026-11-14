@@ -9,6 +9,8 @@ import { APPROVED_MAP_IMAGES } from '../../packages/shared/src/publicMapImages';
 const projectRoot = fileURLToPath(new URL('../../', import.meta.url));
 const fallbackSource = 'apps/web/src/portrait/fallback.svg';
 const metadataName = 'public-build.json';
+const textureDirectory = '/public/map3d/textures/';
+const textureSource = /^map3d\/textures\/[a-z][a-z0-9-]*\.webp$/;
 const imageExtension = /\.(?:png|jpe?g|webp|gif|svg|avif|ico|bmp|apng|tiff?)$/i;
 const assetExtension = /\.(?:png|jpe?g|webp|gif|svg|avif|ico|bmp|apng|tiff?|woff2?|ttf|otf|[cm]?js|css)(?:[?#].*)?$/i;
 const digestPattern = /^[0-9a-f]{64}$/;
@@ -30,6 +32,7 @@ interface Manifest {
   portraitVariants: string[];
   bundledImages: ApprovedImage[];
   mapImages?: ApprovedImage[];
+  textures?: ApprovedImage[];
 }
 interface Metadata {
   schema: number;
@@ -74,6 +77,20 @@ function manifestFrom(value: unknown): Manifest {
     value.bundledImages[0].source !== fallbackSource ||
     typeof value.bundledImages[0].sha256 !== 'string' ||
     !digestPattern.test(value.bundledImages[0].sha256) ||
+    (value.textures !== undefined &&
+      (value.delivery !== 'external' ||
+        value.portraitPolicy !== 'remote' ||
+        !Array.isArray(value.textures) ||
+        value.textures.length === 0 ||
+        new Set(value.textures.map((entry) => (record(entry) ? entry.source : null))).size !== value.textures.length ||
+        !value.textures.every(
+          (entry) =>
+            record(entry) &&
+            typeof entry.source === 'string' &&
+            textureSource.test(entry.source) &&
+            typeof entry.sha256 === 'string' &&
+            digestPattern.test(entry.sha256),
+        ))) ||
     (value.mapImages !== undefined &&
       (!Array.isArray(value.mapImages) ||
         value.mapImages.length !== APPROVED_MAP_IMAGES.length ||
@@ -231,12 +248,13 @@ export function inspectAssetText(
   const inspect = (value: string, resource = false) => {
     if (approvedUrls.has(value)) return;
     if (/data\s*:\s*image\//i.test(value)) fail('inline-image', value);
-    if (/opensamguk-images|\/?portraits\//i.test(value)) {
+    if (/opensamguk-images|\/?portraits\/|\/?map3d\/textures\//i.test(value)) {
       // 경로 틀 조각('/portraits/')은 값 전체가 같을 때만 승인이다. 다른 문자열 안에서 지우지 않는다.
       const remainder = [...approvedUrls]
         .filter((url) => /^https?:\/\//i.test(url))
         .reduce((text, url) => text.replaceAll(url, ''), value);
-      if (/opensamguk-images|\/?portraits\//i.test(remainder)) fail('portrait-path', value);
+      if (/\/?map3d\/textures\//i.test(remainder)) fail('texture-path', value);
+      else if (/opensamguk-images|\/?portraits\//i.test(remainder)) fail('portrait-path', value);
     }
     if (resource && /^(?:data|blob|javascript|file|ftp):/i.test(value.trim())) fail('resource-scheme', value);
     const urls = [...value.matchAll(/https?:\/\/[^\s"'`<>)[\]{}\\]+/gi)].map((match) => match[0]);
@@ -399,12 +417,32 @@ async function checkExternalAssets(root: string, dist: string, raw: Record<strin
       ...failures,
       'public-build.json: metadata: 빌드에 쓴 VITE_IMAGE_BASE_URL이 manifest의 remoteImageBases에 없습니다.',
     ]);
+  const textureBase = String(metadata.imageBaseUrl);
+  const textures = manifest.textures ?? [];
+  const expectedTextures = textures.map(({ source, sha256 }) => ({
+    source,
+    sha256,
+    url: textureBase + '/public/' + source,
+  }));
+  if (JSON.stringify(metadata.textures ?? []) !== JSON.stringify(expectedTextures))
+    failures.push('public-build.json: texture-catalog: build texture list does not match manifest');
+  if (textures.length && !githubRawPortraitBase.test(textureBase))
+    failures.push('manifest/public-assets.json: texture-base: 전체 커밋 SHA로 고정한 이미지 주소가 필요합니다.');
+  if (textures.length) {
+    const names = JSON.parse(await readFile(resolve(root, 'apps/web/src/map3d/textureNames.json'), 'utf8'));
+    if (
+      JSON.stringify(names) !== JSON.stringify(textures.map(({ source }) => source.slice('map3d/textures/'.length, -5)))
+    )
+      failures.push('textureNames.json: texture-catalog: 승인 목록과 질감 이름이 다릅니다.');
+  }
   const meta = metadataFrom({ ...metadata, schema: 1 }, portraitBases);
   if (meta.images.length) failures.push('public-build.json: image-set: 이미지 바이트는 게임 배포에 넣지 않습니다.');
   const decisions = await readFile(resolve(root, 'docs/product/decisions.md'), 'utf8');
   if (!/^## D-060[. ]/m.test(decisions)) failures.push('docs/product/decisions.md: missing-decision: D-060');
   if (manifest.decision === 'D-087' && !/^## D-087[. ]/m.test(decisions))
     failures.push('docs/product/decisions.md: missing-decision: D-087');
+  if (textures.length && !/^## D-090[. ]/m.test(decisions))
+    failures.push('docs/product/decisions.md: missing-decision: D-090');
   const csp = await readFile(resolve(root, 'deploy/security.caddy'), 'utf8');
   const imageSources = [...csp.matchAll(/img-src\s+([^;"\r\n]+)/g)];
   if (
@@ -413,6 +451,12 @@ async function checkExternalAssets(root: string, dist: string, raw: Record<strin
   )
     failures.push('deploy/security.caddy: image-csp: 승인한 이미지 출처 하나만 허용합니다.');
   failures.push(...portraitBaseFailures(portraitBases, imageSources[0]?.[1]?.trim().split(/\s+/) ?? []));
+  if (textures.length) {
+    const connect = [...csp.matchAll(/connect-src\s+([^;"\r\n]+)/g)];
+    const expectedSource = textureBase + textureDirectory;
+    if (connect.length !== 1 || connect[0]![1]!.trim() !== `'self' ${expectedSource}`)
+      failures.push('deploy/security.caddy: texture-csp: 고정 질감 경로가 connect-src와 다릅니다.');
+  }
   const actual = (await fileNames(dist)).filter((name) => name !== metadataName);
   if (JSON.stringify(Object.keys(meta.files).sort()) !== JSON.stringify(actual))
     failures.push('public-build.json: file-set: 배포 파일 목록이 다릅니다.');
@@ -420,8 +464,10 @@ async function checkExternalAssets(root: string, dist: string, raw: Record<strin
   // D-087이면 초상 base와 경로 틀의 '/portraits/' 조각만 더 허용한다. 완성된 초상 주소 문자열은 여전히 거부한다.
   const urls = new Set([
     ...expected.map((image) => image.url),
+    ...expectedTextures.map((image) => image.url),
     ...portraitBases,
     ...(portraitBases.length ? ['/portraits/'] : []),
+    ...(textures.length ? [textureDirectory, textureBase + textureDirectory] : []),
   ]);
   for (const file of actual) {
     const bytes = await readFile(resolve(dist, file));

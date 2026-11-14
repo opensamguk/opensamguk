@@ -6,6 +6,12 @@ PNG·WebP는 GitHub raw의 전체 커밋 주소, SVG는 같은 커밋의 githack
 
 생성기 `tools/pixel-assets/`와 `tools/map-data/`는 `OPENSAMGUK_IMAGES_DIRECTORY`에 이미지 저장소 checkout의 절대 경로를 받아 그 `public/`에 쓴다. 지도 편집의 JSON·좌표·규칙 데이터는 게임 저장소에 유지한다. 새 그림을 게시할 때는 이미지 저장소 manifest·출처를 갱신하고 shared의 전체 커밋 URL·승인 해시·공개 자산 검사를 함께 바꾼다. 아래 초상·지도 기록은 각 결정 당시의 경로를 설명한다.
 
+## 3D 군략도 질감
+
+D-090의 기본색 질감은 글 프롬프트로 생성한 1024×1024 WebP 16종이다. 이미지 저장소의 `public/map3d/textures/sources.json`에 프롬프트와 생성 도구, 파일별 SHA-256을 기록했다.
+
+3D 화면의 `mapTextureUrl(name)`은 `VITE_IMAGE_BASE_URL` 뒤에 `/public/map3d/textures/<이름>.webp`를 붙인다. 기본 base는 초상과 질감이 함께 있는 고정 커밋을 가리킨다. 공개 배포에서 base를 바꿀 때는 `manifest/public-assets.json`의 `remoteImageBases`와 Caddy의 `connect-src`에 지정한 질감 경로를 함께 맞춘다.
+
 > 상태: 초안 v0.2 (2026-10-20 정리 반영) · 필요 시점: M1 (ID 규칙), M2 (이미지 서버), M3 (라이선스 관문) · 관련 결정: D-004, D-016
 > 관련 요구사항: FR-IMG-01~04 · 관련 AC: M1-20, M3-06
 
@@ -32,15 +38,13 @@ PNG·WebP는 GitHub raw의 전체 커밋 주소, SVG는 같은 커밋의 githack
 | thumb | `portraits/thumb/<id>.webp` | WebP | 48×68 |
 
 - 초상 URL = `VITE_IMAGE_BASE_URL` + `/portraits/<변형>/<id>.<확장자>`. base URL만 바꾸면 전부 교체됩니다 (FR-IMG-02).
-- 운영은 우리 이미지 서버가 이 저장소를 제공합니다 (D-016, T2-15). 이미지 서버가 생기기 전 개발 중에는
-  GitHub 원본 고정 커밋 주소 `https://raw.githubusercontent.com/opensamguk/opensamguk-images/48163bd1ce8d54c54c94fb5484b05f9db9e50c62`를 base URL로 씁니다.
+- 기본 base URL은 `apps/web/src/portrait/imageBase.ts`에서 관리한다.
 - 파일이 없으면 기본 이미지를 보여 줍니다 (FR-IMG-03). 기본 이미지는 생성 이미지가 생기기 전까지 코드로 그린 실루엣입니다 (T1-17).
 
 ### 화면의 해석 (T1-17)
 
 - 코드는 `apps/web/src/portrait/`에 있습니다. 주소는 `portraitUrl(id, variant)`, 화면 부품은 `<Portrait id name variant>`입니다.
-- `VITE_IMAGE_BASE_URL`이 비었거나 없으면 `https://raw.githubusercontent.com/opensamguk/opensamguk-images/48163bd1ce8d54c54c94fb5484b05f9db9e50c62`를 씁니다. 공개 빌드(`pnpm build:public`)도 같습니다 (D-087).
-  고정 대상은 이미지 저장소 정리 커밋 `48163bd`이며 태그가 아닌 커밋으로 고정합니다. 2026-10-20에 id 10002의 세 변형이 200으로 응답했습니다.
+- `VITE_IMAGE_BASE_URL`이 비었거나 없으면 초상과 질감이 있는 GitHub 원본 커밋을 사용한다. 공개 빌드(`pnpm build:public`)도 같은 기본값을 쓴다 (D-087, D-090).
 - 값의 앞뒤 공백과 끝의 `/`는 떼고 씁니다. 값은 빌드 때 화면에 박히므로 바꾸면 다시 빌드하거나 dev 서버를 다시 띄웁니다.
 - ID가 null이거나10001~11008 밖일 때, 파일을 못 불러왔을 때(`onError`) 기본 이미지를 씁니다. 보충11001~11008은 개발 모드에서만 원본을 읽으며 일반 빌드·공개 빌드는 기본 이미지를 씁니다.
   기본 이미지는 `fallback.svg` 실루엣 위에 장수 이름 첫 글자를 얹습니다. `alt`는 장수 이름입니다.

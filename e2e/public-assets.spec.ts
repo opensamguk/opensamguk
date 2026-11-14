@@ -30,6 +30,7 @@ interface PublicBuildMeta {
   imageBaseUrl: string;
   images: { file: string; source: string | null; sha256: string }[];
   remoteImages: { source: string; url: string; sha256: string }[];
+  textures: PublicBuildMeta['remoteImages'];
   files: Record<string, string>;
 }
 
@@ -172,7 +173,11 @@ async function watch(page: Page): Promise<Seen> {
   const seen: Seen = { external: [], api: [], assets: [], pending: [] };
   await page.route('**/*', (route) => {
     const url = new URL(route.request().url());
-    if (url.origin !== origin && !meta.remoteImages.some((image) => image.url === url.href) && !isPortrait(url.href)) {
+    if (
+      url.origin !== origin &&
+      ![...meta.remoteImages, ...meta.textures].some((image) => image.url === url.href) &&
+      !isPortrait(url.href)
+    ) {
       seen.external.push(url.href);
       return route.abort('blockedbyclient');
     }
@@ -187,7 +192,7 @@ async function watch(page: Page): Promise<Seen> {
   page.on('response', (response: Response) => {
     const request = response.request();
     const url = new URL(request.url());
-    if (!ASSET_TYPES.has(request.resourceType())) return;
+    if (!ASSET_TYPES.has(request.resourceType()) && !meta.textures.some(({ url }) => url === response.url())) return;
     if (url.pathname.startsWith('/trpc') || url.pathname.startsWith('/sse')) return;
     seen.pending.push(
       response.body().then((body) => {
@@ -220,7 +225,7 @@ function expectOnlyDistAssets(seen: Seen) {
       expect(asset.type, asset.path).toBe('image');
     } else if (asset.path.startsWith('https://')) {
       expect(asset.path, '승인 base 밖 초상 경로').not.toContain('/portraits/');
-      const approved = meta.remoteImages.find((image) => image.url === asset.path);
+      const approved = [...meta.remoteImages, ...meta.textures].find((image) => image.url === asset.path);
       expect(approved, asset.path).toBeDefined();
       expect(asset.sha256, asset.path).toBe(approved!.sha256);
     } else {
@@ -236,7 +241,15 @@ test('dist에는 이미지 바이트가 없고 승인한 고정 주소와 해시
   const approved = JSON.parse(readFileSync(join(repoRoot, 'manifest/public-assets.json'), 'utf8')) as {
     bundledImages: { source: string; sha256: string }[];
     mapImages: { source: string; sha256: string }[];
+    textures: { source: string; sha256: string }[];
   };
+  expect(meta.textures).toEqual(
+    approved.textures.map(({ source, sha256 }) => ({
+      source,
+      sha256,
+      url: meta.imageBaseUrl + '/public/' + source,
+    })),
+  );
   expect(meta.images).toEqual([]);
   expect(Object.keys(meta.files).filter((file) => /\.(png|svg|webp|jpe?g)$/.test(file))).toEqual([]);
   expect(meta.remoteImages).toHaveLength(approved.bundledImages.length + approved.mapImages.length);
@@ -327,4 +340,29 @@ test('고정 커밋의 SVG를 실제 브라우저가 CDN에서 읽는다', async
         asset.path === meta.remoteImages.find((image) => image.source === FALLBACK_SOURCE)!.url,
     ),
   ).toBe(true);
+});
+
+test('고정 질감 경로에서 브라우저가 1024 WebP를 읽는다', async ({ page }) => {
+  const seen = await watch(page);
+  const csp = readFileSync(join(repoRoot, 'deploy/security.caddy'), 'utf8').match(/connect-src [^;]+/)![0];
+  await page.route(origin + '/login', async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({ response, headers: { ...response.headers(), 'content-security-policy': csp } });
+  });
+  await page.goto(origin + '/login', { waitUntil: 'networkidle' });
+  const texture = meta.textures.find(({ source }) => source === 'map3d/textures/tile.webp')!;
+  const result = await page.evaluate(async (url) => {
+    const response = await fetch(url, { credentials: 'omit' });
+    if (!response.ok) throw new Error('Texture fetch failed');
+    const bytes = await response.arrayBuffer();
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    const hash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+    const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/webp' }));
+    const dimensions = [bitmap.width, bitmap.height];
+    bitmap.close();
+    return { dimensions, hash };
+  }, texture.url);
+  expect(result).toEqual({ dimensions: [1024, 1024], hash: texture.sha256 });
+  await Promise.all(seen.pending);
+  expectOnlyDistAssets(seen);
 });

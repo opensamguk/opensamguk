@@ -315,6 +315,38 @@ describe('T2-15 AC-INT-20 외부 이미지 배포', () => {
       await remote({ code: portraitCode('https://raw.githubusercontent.com/opensamguk/opensamguk-images/main') });
       await expect(checkPublicAssets({ root })).rejects.toThrow('external-url');
     });
+
+    it('D-090 accepts only the approved texture manifest and pinned CSP path', async () => {
+      const source = 'map3d/textures/tile.webp';
+      const sha256 = 'd'.repeat(64);
+      const directory = '/public/map3d/textures/';
+      await remote({
+        manifest: { textures: [{ source, sha256 }] },
+        meta: { textures: [{ source, sha256, url: portraitBase + '/public/' + source }] },
+        code:
+          portraitCode(portraitBase) +
+          'const material = (name) => ' +
+          JSON.stringify(portraitBase) +
+          " + '/public/map3d/textures/' + name + '.webp';",
+      });
+      await put('apps/web/src/map3d/textureNames.json', '["tile"]');
+      await put('docs/product/decisions.md', '## D-060 Images\n## D-087 Portraits\n## D-090 Textures\n');
+      const csp =
+        "Content-Security-Policy \"img-src 'self' https://raw.githubusercontent.com https://rawcdn.githack.com; connect-src 'self'";
+      await put('deploy/security.caddy', csp + ' ' + portraitBase + directory + ';"');
+      await expect(checkPublicAssets({ root })).resolves.toMatchObject({ images: 0 });
+      await put('deploy/security.caddy', csp + ' https://raw.githubusercontent.com;"');
+      await expect(checkPublicAssets({ root })).rejects.toThrow('texture-csp');
+    });
+    it.each(['/public/map3d/textures/unknown.webp', '/map3d/textures/unknown.webp'])(
+      'rejects hard-coded paths outside the approved list: %s',
+      (path) => {
+        expect(inspectAssetText('const x = ' + JSON.stringify(path), 'main.js', new Set())).toEqual(
+          expect.arrayContaining([expect.stringContaining('texture-path')]),
+        );
+      },
+    );
+
     it('D-087 결정 기록이 없으면 거부한다', async () => {
       await remote();
       await put('docs/product/decisions.md', '## D-031. 기본 SVG\n## D-060 이미지 분리\n');
