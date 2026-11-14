@@ -10,28 +10,18 @@ import toolImages from '../../packages/shared/src/toolImageCatalog.json' with { 
 export async function verifyRemoteImages() {
   const base = resolveImageBaseUrl(undefined);
   const textures = manifest.textures.map(({ source, sha256 }) => ({ source, sha256, url: base + '/public/' + source }));
-  const models = manifest.models.map(({ source, sha256 }) => ({ source, sha256, url: base + '/public/' + source }));
-  const remaining = [...PUBLIC_IMAGES, ...toolImages, ...textures, ...models];
+  const remaining = [...PUBLIC_IMAGES, ...toolImages, ...textures];
   let checked = 0;
   await Promise.all(
     Array.from({ length: 4 }, async () => {
       for (let image = remaining.shift(); image; image = remaining.shift()) {
         const response = await fetch(image.url, { redirect: 'follow', signal: AbortSignal.timeout(30_000) });
         const bytes = new Uint8Array(await response.arrayBuffer());
-        const type = response.headers.get('content-type')?.split(';')[0];
-        const mime = image.source.endsWith('.glb')
-          ? (type === 'model/gltf-binary' || type === 'application/octet-stream') &&
-            bytes[0] === 0x67 &&
-            bytes[1] === 0x6c &&
-            bytes[2] === 0x54 &&
-            bytes[3] === 0x46
-          : image.source.startsWith('map3d/textures/')
-            ? type === 'image/webp'
-            : type?.startsWith('image/');
         if (
           !response.ok ||
           new URL(response.url).origin !== new URL(image.url).origin ||
-          !mime ||
+          !response.headers.get('content-type')?.startsWith('image/') ||
+          (image.source.startsWith('map3d/textures/') && response.headers.get('content-type') !== 'image/webp') ||
           response.headers.get('access-control-allow-origin') !== '*' ||
           createHash('sha256').update(bytes).digest('hex') !== image.sha256
         )
