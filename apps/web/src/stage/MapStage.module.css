@@ -1,0 +1,386 @@
+/* 지도 바탕 게임 화면 (INT-29). 지도가 화면 전체 바탕이고 띠·판은 그 위에 뜬다.
+   띠와 판의 머리는 옻칠 빛 어두운 판에 금테, 판 몸통은 기존 정보 부품이 읽히도록 앱 바탕색을 쓴다. */
+.stage {
+  --stage-ink: #efe4cc;
+  --stage-muted: #c9b48a;
+  --stage-lacquer: rgb(24 18 12 / 95%);
+  --stage-gold: #b8954f;
+  --stage-top: 64px;
+  --stage-foot: 36px;
+  --stage-tools-right: 552px;
+  --stage-tools-bottom: 52px;
+
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  overflow: hidden;
+  color: var(--stage-ink);
+  background: #0c2a42;
+}
+.map {
+  position: absolute;
+  inset: 0;
+}
+.spacer {
+  flex: 1;
+}
+.muted {
+  color: var(--stage-muted);
+  font-size: var(--text-xs);
+}
+
+/* 위 띠: 내 장수가 맨 앞이다. */
+.top {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  height: var(--stage-top);
+  padding: 0 var(--space-3) 0 0;
+  background: linear-gradient(#2a2018, #17110b);
+  border-bottom: 2px solid #8a6a32;
+}
+.me {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 100%;
+  padding: 0 var(--space-4) 0 var(--space-3);
+  color: var(--stage-ink);
+  text-decoration: none;
+  background: linear-gradient(90deg, rgb(47 94 168 / 55%), rgb(47 94 168 / 0%));
+  border-right: 1px solid #5a4528;
+}
+.me:hover .meName {
+  text-decoration: underline;
+}
+.meFace {
+  position: relative;
+  display: inline-flex;
+  border: 2px solid #e8c77a;
+  border-radius: 50%;
+}
+.meNation,
+.nationMark {
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  color: #fff;
+  border: 1.5px solid #e8c77a;
+}
+.meNation {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: 20px;
+  height: 20px;
+  font-size: 11px;
+}
+.meText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.3;
+  min-width: 0;
+}
+.meLine {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+.meName {
+  font-size: 20px;
+  font-weight: 900;
+}
+.meTag {
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 900;
+  color: #1a140e;
+  background: #e8c77a;
+}
+.meStats {
+  font-size: var(--text-xs);
+  color: #d9cbb0;
+  white-space: nowrap;
+}
+.meStats b {
+  color: var(--stage-ink);
+}
+.nation {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--stage-ink);
+  text-decoration: none;
+}
+.nationMark {
+  width: 28px;
+  height: 28px;
+  font-size: 15px;
+}
+.clock {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.topButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--stage-ink);
+  text-decoration: none;
+  white-space: nowrap;
+  background: rgb(0 0 0 / 35%);
+  border: 1px solid #8a6a32;
+  cursor: pointer;
+}
+.count {
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: #b23a2a;
+}
+
+/* 메뉴: 위 띠 오른쪽 아래로 펼친다. */
+.menu {
+  position: absolute;
+  top: calc(var(--stage-top) + 8px);
+  right: var(--space-3);
+  z-index: 8;
+  width: min(420px, calc(100vw - 24px));
+  max-height: calc(100vh - var(--stage-top) - 60px);
+  overflow: auto;
+  padding: var(--space-3);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--stage-gold);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 45%);
+}
+.menuFoot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+.menuLink {
+  min-height: 36px;
+  padding: var(--space-1) var(--space-2);
+  color: var(--color-text);
+}
+
+/* 판: 왼쪽 "나와 휘하", 오른쪽 "내 예턴". 머리는 옻칠 빛, 몸통은 앱 바탕색. */
+.panel {
+  position: absolute;
+  top: calc(var(--stage-top) + 12px);
+  bottom: calc(var(--stage-foot) + 12px);
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--stage-gold);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 45%);
+}
+.panel[hidden] {
+  display: none;
+}
+.left {
+  left: 12px;
+  width: 360px;
+}
+.right {
+  right: 12px;
+  width: 530px;
+}
+.panelHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-2) 0 var(--space-3);
+  color: var(--stage-ink);
+  background: var(--stage-lacquer);
+  border-bottom: 1px solid #8a6a32;
+}
+.panelTitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 900;
+}
+.seal {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  font-size: 12px;
+  font-weight: 900;
+  background: #8a2414;
+}
+.sealBlue {
+  background: #2f5ea8;
+}
+.close {
+  min-width: 44px;
+  min-height: 36px;
+  padding: 0 var(--space-2);
+  font: inherit;
+  font-size: var(--text-xs);
+  color: var(--stage-ink);
+  background: transparent;
+  border: 1px solid #5a4528;
+  cursor: pointer;
+}
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: var(--space-2) var(--space-2) 0;
+  background: var(--stage-lacquer);
+}
+.tab {
+  flex: 1;
+  min-height: 36px;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--stage-ink);
+  background: transparent;
+  border: 1px solid #5a4528;
+  border-bottom: 0;
+  cursor: pointer;
+}
+.tab[aria-selected='true'] {
+  font-weight: 700;
+  color: #1a140e;
+  background: #e8c77a;
+  border-color: #e8c77a;
+}
+.panelBody {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-3);
+  color: var(--color-text);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* 판을 닫으면 가장자리에 여는 손잡이가 남는다. */
+.handle {
+  position: absolute;
+  top: calc(var(--stage-top) + 12px);
+  z-index: 4;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--stage-ink);
+  background: var(--stage-lacquer);
+  border: 1px solid var(--stage-gold);
+  cursor: pointer;
+}
+.handleLeft {
+  left: 12px;
+}
+.handleRight {
+  right: 12px;
+}
+
+/* 기록: 왼쪽 판 오른쪽 아래에 접힌 띠, 펼치면 위로 자란다. */
+.records {
+  position: absolute;
+  left: 384px;
+  bottom: calc(var(--stage-foot) + 12px);
+  z-index: 4;
+  width: min(460px, calc(100vw - 384px - 780px));
+  min-width: 300px;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--stage-gold);
+}
+.recordsOpen {
+  height: min(420px, calc(100vh - var(--stage-top) - var(--stage-foot) - 48px));
+}
+
+/* 맨 아래 상태 줄. */
+.status {
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  height: var(--stage-foot);
+  padding: 0 var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--stage-muted);
+  background: #120e0a;
+  border-top: 1px solid #5a4528;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.status b {
+  color: var(--stage-ink);
+}
+
+/* 오른쪽 판을 닫으면 지도 배율 단추를 화면 오른쪽 끝으로 옮긴다. */
+.stage:has(.right[hidden]) {
+  --stage-tools-right: 16px;
+}
+
+/* 좁은 화면: 위 띠는 내 장수만 크게, 판은 화면 폭을 거의 다 쓴다. */
+@media (max-width: 899px) {
+  .stage {
+    --stage-tools-right: 12px;
+  }
+  .nation,
+  .clock,
+  .meStats,
+  .legacy {
+    display: none;
+  }
+  .top {
+    gap: var(--space-2);
+  }
+  .me {
+    padding-right: var(--space-2);
+  }
+  .meLine .muted {
+    display: none;
+  }
+  .left,
+  .right {
+    left: 8px;
+    right: 8px;
+    width: auto;
+  }
+  .records {
+    left: 8px;
+    width: calc(100vw - 16px);
+    min-width: 0;
+  }
+  .handleLeft {
+    top: auto;
+    bottom: calc(var(--stage-foot) + 64px);
+    left: 8px;
+  }
+  .handleRight {
+    top: auto;
+    bottom: calc(var(--stage-foot) + 64px);
+    right: auto;
+    left: 140px;
+  }
+}
