@@ -39,8 +39,10 @@ describe('groundAt', () => {
     ]);
     const field = heightField(g, 0);
     const canvas = { width: 20, height: 20 };
-    expect(groundAt(field, g, canvas, 15, 2)).toBeCloseTo(TERRAIN_HEIGHT.mountains);
-    expect(groundAt(field, g, canvas, 5, 18)).toBe(WATER_LEVEL);
+    // 꼭짓점은 칸 경계가 아니라 지도 양 끝에 맞춘다(지형 판과 같은 기준).
+    expect(groundAt(field, g, canvas, 20, 0)).toBeCloseTo(TERRAIN_HEIGHT.mountains);
+    expect(groundAt(field, g, canvas, 10, 0)).toBeCloseTo((TERRAIN_HEIGHT.mountains + TERRAIN_HEIGHT.plains) / 2);
+    expect(groundAt(field, g, canvas, 0, 20)).toBe(WATER_LEVEL);
   });
 });
 

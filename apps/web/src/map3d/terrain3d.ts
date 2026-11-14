@@ -73,8 +73,9 @@ export function groundAt(
   x: number,
   y: number,
 ) {
-  const fx = Math.min(Math.max((x / canvas.width) * grid.columns - 0.5, 0), grid.columns - 1);
-  const fy = Math.min(Math.max((y / canvas.height) * grid.rows - 0.5, 0), grid.rows - 1);
+  // 지형 판의 꼭짓점 i는 지도 x = i × 너비 / (칸 수 - 1)에 있다(PlaneGeometry). 같은 기준으로 읽어야 길·모형이 땅에 묻히지 않는다.
+  const fx = Math.min(Math.max((x / canvas.width) * (grid.columns - 1), 0), grid.columns - 1);
+  const fy = Math.min(Math.max((y / canvas.height) * (grid.rows - 1), 0), grid.rows - 1);
   const x0 = Math.floor(fx);
   const y0 = Math.floor(fy);
   const x1 = Math.min(x0 + 1, grid.columns - 1);
@@ -106,11 +107,11 @@ export function cellColors(grid: TerrainCells, palette: Record<Terrain, string>,
 
 // 거점 모형 크기. 도시 규모(1 작음 ~ 8 특)에 따라 성벽 한 변과 높이를 키운다. 관문·항구·전장은 고정 크기다.
 export function siteSize(kind: 'CITY' | 'PASS' | 'PORT' | 'FIELD', level: number | undefined) {
-  if (kind === 'PASS') return { side: 8, height: 5 };
-  if (kind === 'PORT') return { side: 4.5, height: 2 };
-  if (kind === 'FIELD') return { side: 3.5, height: 1 };
+  if (kind === 'PASS') return { side: 6, height: 4 };
+  if (kind === 'PORT') return { side: 3.5, height: 1.6 };
+  if (kind === 'FIELD') return { side: 3, height: 1 };
   const step = Math.min(Math.max(level ?? 3, 1), 8);
-  return { side: 6 + step * 1.6, height: 2.5 + step * 0.5 };
+  return { side: 4 + step * 1, height: 2 + step * 0.4 };
 }
 
 export type LabelBox = { id: string; x: number; y: number; width: number; height: number; priority: number };

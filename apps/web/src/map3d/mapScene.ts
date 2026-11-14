@@ -8,16 +8,16 @@ import {
   Color,
   ConeGeometry,
   CylinderGeometry,
+  DoubleSide,
   DirectionalLight,
   Float32BufferAttribute,
   HemisphereLight,
   InstancedMesh,
-  LineBasicMaterial,
-  LineSegments,
   Matrix4,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
+  Object3D,
   OrthographicCamera,
   PlaneGeometry,
   RingGeometry,
@@ -26,7 +26,10 @@ import {
   WebGLRenderer,
 } from 'three';
 import type { PublicGeography } from '@opensamguk/shared';
-import type { Terrain } from '../main/terrainTiles';
+import { roadWalks, waterLanes, type Terrain } from '../main/terrainTiles';
+import { ROAD_CELL } from '../main/roadPixels';
+import { bounds as riverBounds, lines as riverData } from './data/rivers';
+import { along, cellsToPoints, simplify } from './routes3d';
 import type { DrawnNation } from '../main/siteMarkers';
 import type { ModelCity } from '../main/mapModel';
 import {
@@ -61,6 +64,15 @@ export class MapScene {
   private readonly grid: TerrainCells;
   private models: Mesh[] = [];
   private ring: Mesh | null = null;
+  private armies: Mesh[] = [];
+  private march: {
+    points: Array<{ x: number; y: number }>;
+    mesh: InstancedMesh;
+    flags: InstancedMesh;
+    trail: Mesh;
+  } | null = null;
+  /** 길 이름(route id)마다 지도 좌표의 점 목록. 행군 경로를 이을 때 쓴다. */
+  readonly routeLines = new Map<string, Array<{ x: number; y: number }>>();
   private width = 1;
   private height = 1;
 
@@ -71,7 +83,15 @@ export class MapScene {
       grid,
       heights,
       palette,
-    }: { map: PublicGeography; grid: TerrainCells; heights: HeightData | null; palette: Record<Terrain, string> },
+      bounds,
+    }: {
+      map: PublicGeography;
+      grid: TerrainCells;
+      heights: HeightData | null;
+      palette: Record<Terrain, string>;
+      /** 지도 판의 경위도 범위 [서, 남, 동, 북]. 강 선을 이 판 좌표로 옮길 때 쓴다. */
+      bounds: readonly number[];
+    },
   ) {
     this.renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -94,7 +114,8 @@ export class MapScene {
     water.rotation.x = -Math.PI / 2;
     water.position.y = -0.05;
     this.scene.add(water);
-    this.scene.add(this.roads(map));
+    for (const mesh of this.roads(map)) this.scene.add(mesh);
+    this.scene.add(this.rivers(bounds));
     this.scene.add(this.trees(map, metres));
   }
 
@@ -124,31 +145,107 @@ export class MapScene {
     return new Mesh(geometry, new MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 }));
   }
 
-  // 길: 거점 사이를 땅 위로 조금 띄운 선으로 잇는다. 지형을 따라 잘게 나눈다.
-  private roads(map: PublicGeography) {
-    const byId = new Map(map.sites.map((site) => [site.id, site]));
-    const points: number[] = [];
-    for (const route of map.routes) {
-      if (!route.enabled) continue;
-      const path = [route.from, ...(route.via ?? []), route.to]
-        .map((id) => byId.get(id))
-        .filter((s) => s !== undefined);
-      for (let i = 1; i < path.length; i++) {
-        const a = path[i - 1]!.position;
-        const b = path[i]!.position;
-        const steps = Math.max(2, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 4));
-        for (let s = 0; s < steps; s++) {
-          const t0 = s / steps;
-          const t1 = (s + 1) / steps;
-          const p0 = this.world(a.x + (b.x - a.x) * t0, a.y + (b.y - a.y) * t0, 0.4);
-          const p1 = this.world(a.x + (b.x - a.x) * t1, a.y + (b.y - a.y) * t1, 0.4);
-          points.push(p0.x, p0.y, p0.z, p1.x, p1.y, p1.z);
+  // 지형 위에 붙는 띠. 점마다 진행 방향에 수직으로 폭을 벌린다. 여러 줄을 한 기하로 모은다.
+  private ribbon(lines: ReadonlyArray<ReadonlyArray<{ x: number; y: number }>>, width: number, lift: number) {
+    const positions: number[] = [];
+    const indices: number[] = [];
+    for (const line of lines) {
+      if (line.length < 2) continue;
+      const start = positions.length / 3;
+      for (let i = 0; i < line.length; i++) {
+        const prev = line[Math.max(i - 1, 0)]!;
+        const next = line[Math.min(i + 1, line.length - 1)]!;
+        const dx = next.x - prev.x;
+        const dy = next.y - prev.y;
+        const length = Math.hypot(dx, dy) || 1;
+        const nx = (-dy / length) * (width / 2);
+        const ny = (dx / length) * (width / 2);
+        const point = line[i]!;
+        const left = this.world(point.x + nx, point.y + ny, lift);
+        const right = this.world(point.x - nx, point.y - ny, lift);
+        positions.push(left.x, left.y, left.z, right.x, right.y, right.z);
+        if (i > 0) {
+          const a = start + (i - 1) * 2;
+          indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
         }
       }
     }
     const geometry = new BufferGeometry();
-    geometry.setAttribute('position', new Float32BufferAttribute(points, 3));
-    return new LineSegments(geometry, new LineBasicMaterial({ color: '#7a5a34' }));
+    geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    return geometry;
+  }
+
+  // 길: SVG 지도와 같은 칸 길(산을 돌고 물을 짧게 건넌다)을 흙길 띠로, 다리·나루는 색을 달리한다.
+  // 바다·큰 강을 건너는 뱃길은 옅은 물길 띠로 그린다.
+  private roads(map: PublicGeography) {
+    const lanes = waterLanes(map, this.grid as never);
+    const laneIds = new Set(lanes.map((lane) => lane.id));
+    const walks = roadWalks(map, laneIds, () => 0, ROAD_CELL, this.grid as never);
+    const modes = new Map(map.routes.map((route) => [route.id, route.mode]));
+    const groups: Record<string, Array<Array<{ x: number; y: number }>>> = { LAND: [], BRIDGE: [], FORD: [], SEA: [] };
+    for (const [id, cells] of walks) {
+      const points = simplify(cellsToPoints(cells));
+      this.routeLines.set(id, points);
+      const mode = modes.get(id) ?? 'LAND';
+      (groups[mode === 'RIVER' ? 'SEA' : mode] ?? groups.LAND!).push(points);
+    }
+    for (const lane of lanes) {
+      const points = simplify(cellsToPoints(lane.cells));
+      this.routeLines.set(lane.id, points);
+      groups.SEA!.push(points);
+    }
+    const style: Record<string, { color: string; width: number; opacity?: number }> = {
+      LAND: { color: '#a07a48', width: 1.3 },
+      BRIDGE: { color: '#6b4a2b', width: 1.5 },
+      FORD: { color: '#c2ab7c', width: 1.3 },
+      SEA: { color: '#d7e6ee', width: 0.9, opacity: 0.55 },
+    };
+    return Object.entries(groups).map(([mode, lines]) => {
+      const { color, width, opacity } = style[mode]!;
+      return new Mesh(
+        this.ribbon(lines, width, mode === 'SEA' ? 0.2 : 0.35),
+        new MeshStandardMaterial({
+          color,
+          roughness: 0.95,
+          side: DoubleSide,
+          ...(opacity ? { transparent: true, opacity } : {}),
+          polygonOffset: true,
+          polygonOffsetFactor: -2,
+        }),
+      );
+    });
+  }
+
+  // 강: Natural Earth 강 선을 땅 위 물 띠로 그린다. 강 선은 통합 지도(1000×700) 좌표라
+  // 경위도로 되돌린 뒤 이 판의 범위로 옮긴다(둘 다 등장방형 도법이라 1차 변환이다).
+  private rivers(bounds: readonly number[]) {
+    const [w0, s0, e0, n0] = riverBounds as [number, number, number, number];
+    const [w1, s1, e1, n1] = bounds as [number, number, number, number];
+    const { width, height } = this.canvasSize;
+    const move = (point: { x: number; y: number }) => {
+      const lon = w0 + (point.x / 1000) * (e0 - w0);
+      const lat = n0 - (point.y / 700) * (n0 - s0);
+      return { x: ((lon - w1) / (e1 - w1)) * width, y: ((n1 - lat) / (n1 - s1)) * height };
+    };
+    const lines = riverData.split(';').map((line) =>
+      line.split(' ').map((pair) => {
+        const [x, y] = pair.split(',').map(Number);
+        return move({ x: x!, y: y! });
+      }),
+    );
+    return new Mesh(
+      this.ribbon(lines, 1.4, 0.15),
+      new MeshStandardMaterial({
+        color: '#3f7ba3',
+        roughness: 0.25,
+        metalness: 0.1,
+        side: DoubleSide,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+      }),
+    );
   }
 
   // 숲: 숲·구릉 칸에 낮은 다각형 나무를 흩뿌린다. 거점 자리 가까이는 비운다.
@@ -270,6 +367,122 @@ export class MapScene {
     roofs.count = r;
     this.models = [walls, towers, keeps, roofs];
     for (const mesh of this.models) this.scene.add(mesh);
+  }
+
+  /**
+   * 주둔 부대: 거점마다 장수 수만큼(많아야 6) 병사 대열과 소유국 색 깃발을 성 앞(남쪽)에 세운다.
+   * 병력 수는 공개 자료가 아니라 장수 수로 대열 수를 정한다.
+   */
+  setArmies(entries: ReadonlyArray<{ site: AnchorSite; level: number | undefined; count: number; color: string }>) {
+    for (const mesh of this.armies) {
+      this.scene.remove(mesh);
+      mesh.geometry.dispose();
+    }
+    const squads = entries.reduce((sum, entry) => sum + Math.min(entry.count, 6), 0);
+    const bodies = new InstancedMesh(
+      new BoxGeometry(1, 1, 1),
+      new MeshStandardMaterial({ roughness: 0.8 }),
+      squads * 4,
+    );
+    const flags = new InstancedMesh(new BoxGeometry(1, 1, 1), new MeshStandardMaterial({ roughness: 0.6 }), squads * 2);
+    const matrix = new Matrix4();
+    const color = new Color();
+    let b = 0;
+    let f = 0;
+    for (const entry of entries) {
+      const { side } = siteSize(entry.site.kind, entry.level);
+      const count = Math.min(entry.count, 6);
+      const body = color.set(entry.color).multiplyScalar(0.55).getHex();
+      for (let i = 0; i < count; i++) {
+        // 성 앞 반원에 대열을 늘어놓는다.
+        const angle = Math.PI * (0.15 + (0.7 * (i + 0.5)) / count);
+        const radius = side * 0.8 + 3;
+        const x = entry.site.position.x + Math.cos(angle) * radius;
+        const y = entry.site.position.y + Math.sin(angle) * radius;
+        for (let k = 0; k < 4; k++) {
+          const base = this.world(x + (k % 2) * 1.1 - 0.55, y + Math.floor(k / 2) * 1.1 - 0.55);
+          matrix.makeScale(0.7, 1.1, 0.7).setPosition(base.x, base.y + 0.55, base.z);
+          bodies.setMatrixAt(b, matrix);
+          bodies.setColorAt(b++, color.setHex(body));
+        }
+        const pole = this.world(x - 0.9, y - 0.9);
+        matrix.makeScale(0.15, 3.2, 0.15).setPosition(pole.x, pole.y + 1.6, pole.z);
+        flags.setMatrixAt(f, matrix);
+        flags.setColorAt(f++, color.set('#4a3a28'));
+        matrix.makeScale(1.4, 0.9, 0.12).setPosition(pole.x + 0.7, pole.y + 2.7, pole.z);
+        flags.setMatrixAt(f, matrix);
+        flags.setColorAt(f++, color.set(entry.color));
+      }
+    }
+    bodies.count = b;
+    flags.count = f;
+    this.armies = [bodies, flags];
+    for (const mesh of this.armies) this.scene.add(mesh);
+  }
+
+  /** 행군 대열: 점 목록(지도 좌표)을 따라 병사 다섯과 깃발이 걷는다. null이면 지운다. */
+  setMarch(points: Array<{ x: number; y: number }> | null, color: string) {
+    if (this.march) {
+      this.scene.remove(this.march.mesh, this.march.flags, this.march.trail);
+      this.march.mesh.geometry.dispose();
+      this.march.flags.geometry.dispose();
+      this.march.trail.geometry.dispose();
+      this.march = null;
+    }
+    if (!points || points.length < 2) return;
+    const mesh = new InstancedMesh(new BoxGeometry(1, 1, 1), new MeshStandardMaterial({ roughness: 0.8 }), 6);
+    const flags = new InstancedMesh(new BoxGeometry(1, 1, 1), new MeshStandardMaterial({ roughness: 0.6 }), 2);
+    const tint = new Color(color);
+    for (let i = 0; i < 6; i++) mesh.setColorAt(i, tint.clone().multiplyScalar(0.6));
+    flags.setColorAt(0, new Color('#4a3a28'));
+    flags.setColorAt(1, tint);
+    // 지나갈 길을 주홍 띠로 강조한다(인자 입력 화면의 경로 줄과 같은 색).
+    const trail = new Mesh(
+      this.ribbon([points], 1.8, 0.5),
+      new MeshBasicMaterial({ color: '#b23a2a', transparent: true, opacity: 0.85, side: DoubleSide }),
+    );
+    this.march = { points, mesh, flags, trail };
+    this.scene.add(trail, mesh, flags);
+    this.tick(0);
+  }
+
+  get marching() {
+    return this.march !== null;
+  }
+
+  /** 행군 대열을 시각 now(ms)의 자리로 옮긴다. 경로 한 바퀴는 길이에 비례해 3~8초다. */
+  tick(now: number) {
+    const march = this.march;
+    if (!march) return;
+    const length = march.points.reduce(
+      (sum, point, i) => (i ? sum + Math.hypot(point.x - march.points[i - 1]!.x, point.y - march.points[i - 1]!.y) : 0),
+      0,
+    );
+    const period = Math.min(Math.max(length * 40, 3000), 8000);
+    const t = (now % period) / period;
+    const holder = new Object3D();
+    for (let i = 0; i < 6; i++) {
+      const at = along(march.points, Math.max(t - i * 0.02, 0));
+      const base = this.world(at.x, at.y);
+      holder.position.set(base.x, base.y + 1.1, base.z);
+      holder.rotation.set(0, -at.angle, 0);
+      holder.scale.set(1.6, 2.2, 1.6);
+      holder.updateMatrix();
+      march.mesh.setMatrixAt(i, holder.matrix);
+    }
+    march.mesh.instanceMatrix.needsUpdate = true;
+    const head = along(march.points, t);
+    const pole = this.world(head.x, head.y);
+    holder.rotation.set(0, 0, 0);
+    holder.position.set(pole.x, pole.y + 3.5, pole.z);
+    holder.scale.set(0.3, 7, 0.3);
+    holder.updateMatrix();
+    march.flags.setMatrixAt(0, holder.matrix);
+    holder.position.set(pole.x + 1.5, pole.y + 6.2, pole.z);
+    holder.scale.set(3, 1.8, 0.2);
+    holder.updateMatrix();
+    march.flags.setMatrixAt(1, holder.matrix);
+    march.flags.instanceMatrix.needsUpdate = true;
   }
 
   /** 고른 거점 둘레의 붉은 고리. null이면 지운다. */

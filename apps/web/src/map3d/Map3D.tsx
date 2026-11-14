@@ -19,6 +19,7 @@ import { buildMapModel, describeSite, mapLabel, type ModelCity } from '../main/m
 import { MapSiteChooser, MapTooltip, tooltipPlacement } from '../main/MapParts';
 import { compactLabels, siteSize, type HeightData, type LabelBox } from './terrain3d';
 import { ELEVATION, MapScene } from './mapScene';
+import { pathPoints, routePath } from './routes3d';
 import styles from './Map3D.module.css';
 
 type DrawnCity = ModelCity;
@@ -135,6 +136,7 @@ export default function Map3D({
     frameRequest.current = 0;
     const scene = sceneRef.current;
     if (!scene) return;
+    scene.tick(performance.now());
     scene.render(control.current);
     placeLabels(scene);
     if (statLine.current) {
@@ -152,6 +154,10 @@ export default function Map3D({
       }
       // 측정할 때는 계속 그린다.
       frameRequest.current = requestAnimationFrame(draw);
+    } else if (scene.marching && !frameRequest.current) {
+      // 행군 대열이 걷는 동안은 계속 그린다. 움직임 줄이기 설정이면 멈춘 그림 한 장만 그린다.
+      if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)
+        frameRequest.current = requestAnimationFrame(draw);
     }
   };
   invalidateRef.current = () => {
@@ -290,8 +296,16 @@ export default function Map3D({
     const canvas = canvasRef.current;
     const box = frame.current;
     if (!ready || !canvas || !box || !grid || !basemap) return;
-    const scene = new MapScene(canvas, { map, grid, heights: usable, palette: basemap.palette });
+    const scene = new MapScene(canvas, {
+      map,
+      grid,
+      heights: usable,
+      palette: basemap.palette,
+      bounds: basemap.bounds,
+    });
     sceneRef.current = scene;
+    // 개발 서버에서만 장면을 들여다볼 수 있게 둔다.
+    if (import.meta.env.DEV) (window as unknown as { __map3d?: MapScene }).__map3d = scene;
     scene.setSites(latest.current.anchors, latest.current.model.cityByKey, latest.current.model.nationById);
     const resize = () => {
       scene.resize(box.clientWidth, box.clientHeight);
@@ -322,6 +336,52 @@ export default function Map3D({
     sceneRef.current?.setSelected(site, site ? model.cityByKey.get(site.anchorKey)?.level : undefined);
     invalidateRef.current();
   }, [anchors, model, selectedKey, ready]);
+
+  // 주둔 부대: 거점별 장수 수와 소유국 색.
+  useEffect(() => {
+    const entries = anchors.flatMap((site) => {
+      const count = model.generalsAt.get(site.anchorKey)?.length ?? 0;
+      if (!count) return [];
+      const city = model.cityByKey.get(site.anchorKey);
+      const nation = city?.nationId == null ? undefined : model.nationById.get(city.nationId);
+      return [{ site, level: city?.level, count, color: nation?.color ?? '#8a8070' }];
+    });
+    sceneRef.current?.setArmies(entries);
+    invalidateRef.current();
+  }, [anchors, model, ready]);
+
+  // 행군 연출: 인자 입력 화면처럼 출발 거점(focusKey)이 있으면 출발지에서 고른 거점까지 길을 따라 걷는다.
+  // 내 장수가 다른 거점으로 옮겨 가면(턴 결과) 이전 거점에서 새 거점까지 한 번 걷는다.
+  const previousHome = useRef(myCityKey);
+  const [moved, setMoved] = useState<{ from: number; to: number } | null>(null);
+  useEffect(() => {
+    const before = previousHome.current;
+    previousHome.current = myCityKey;
+    if (before === null || myCityKey === null || before === myCityKey) return;
+    setMoved({ from: before, to: myCityKey });
+    const timer = window.setTimeout(() => setMoved(null), 9000);
+    return () => window.clearTimeout(timer);
+  }, [myCityKey]);
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+    const ends =
+      focusKey !== null && selectedKey !== null && selectedKey !== focusKey
+        ? { from: focusKey, to: selectedKey }
+        : moved;
+    const from = ends ? anchors.find((site) => site.anchorKey === ends.from) : undefined;
+    const to = ends ? anchors.find((site) => site.anchorKey === ends.to) : undefined;
+    const path = from && to ? routePath(map.routes, from.id, to.id) : null;
+    const siteAt = (id: string) => model.siteById.get(id)?.position;
+    const points = path ? pathPoints(path, scene.routeLines, siteAt) : null;
+    const owner = from ? model.cityByKey.get(from.anchorKey)?.nationId : undefined;
+    const nationColor =
+      (myNationId != null ? model.nationById.get(myNationId)?.color : undefined) ??
+      (owner != null ? model.nationById.get(owner)?.color : undefined) ??
+      '#b23a2a';
+    scene.setMarch(points, nationColor);
+    invalidateRef.current();
+  }, [anchors, focusKey, map.routes, model, moved, myNationId, ready, selectedKey]);
   const hovered = hover ? model.siteById.get(hover.siteId) : undefined;
   return (
     <div className={fill ? `${styles.wrap} ${styles.wrapFill}` : styles.wrap}>
