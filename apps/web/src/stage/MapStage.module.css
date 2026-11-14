@@ -1,170 +1,279 @@
-/* 지도 바탕 게임 화면 (INT-29). 지도가 화면 전체 바탕이고 띠·판은 그 위에 뜬다.
-   띠와 판의 머리는 옻칠 빛 어두운 판에 금테, 판 몸통은 기존 정보 부품이 읽히도록 앱 바탕색을 쓴다. */
+/* 지도 바탕 게임 화면 (INT-29, 사용자 2026-11-14: 웹사이트가 아니라 게임처럼).
+   틀은 옻칠 빛 검붉은 판에 놋쇠 겹테와 모서리 장식, 몸통은 기존 정보 부품이 그대로 읽히는 한지 바탕(앱 토큰)이다.
+   지도가 화면 전체를 채우고 페이지는 스크롤되지 않는다. 모바일은 아래 탭 막대와 끌어올리는 서랍이다. */
 .stage {
-  --stage-ink: #efe4cc;
-  --stage-muted: #c9b48a;
-  --stage-lacquer: rgb(24 18 12 / 95%);
-  --stage-gold: #b8954f;
-  --stage-top: 64px;
-  --stage-foot: 36px;
-  --stage-tools-right: 552px;
-  --stage-tools-bottom: 52px;
+  --ink: #f1e6cc;
+  --muted: #cdb68a;
+  --lacquer: #1d140d;
+  --lacquer-2: #2b1d12;
+  --brass: #c9a35a;
+  --brass-dark: #7a5a26;
+  --hud: 68px;
+  --foot: 30px;
+  --dock: 68px;
+  --tabbar: 0px;
+  --stage-tools-right: 556px;
+  --stage-tools-bottom: calc(var(--foot) + 16px);
 
   position: fixed;
   inset: 0;
   z-index: 40;
   overflow: hidden;
-  color: var(--stage-ink);
+  color: var(--ink);
   background: #0c2a42;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
 }
+/* 지도는 자기 층에 가둔다. 지도 안 이름표(z-index)가 판·서랍 위로 올라오지 않게. */
 .map {
   position: absolute;
   inset: 0;
+  z-index: 0;
+  isolation: isolate;
 }
 .spacer {
   flex: 1;
 }
-.muted {
-  color: var(--stage-muted);
-  font-size: var(--text-xs);
+
+/* 놋쇠 겹테 틀: 바깥 검은 선 → 놋쇠 선 → 옻칠 → 안쪽 가는 놋쇠 선, 네 모서리에 ㄱ자 장식. */
+.frame {
+  position: absolute;
+  background: linear-gradient(var(--lacquer-2), var(--lacquer));
+  border: 2px solid var(--brass);
+  box-shadow:
+    0 0 0 1px #0b0704,
+    inset 0 0 0 2px var(--lacquer),
+    inset 0 0 0 3px var(--brass-dark),
+    0 14px 34px rgb(0 0 0 / 55%);
+}
+.frame::before {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  z-index: 1;
+  pointer-events: none;
+  --c: var(--brass);
+  background:
+    linear-gradient(var(--c), var(--c)) top left / 16px 3px,
+    linear-gradient(var(--c), var(--c)) top left / 3px 16px,
+    linear-gradient(var(--c), var(--c)) top right / 16px 3px,
+    linear-gradient(var(--c), var(--c)) top right / 3px 16px,
+    linear-gradient(var(--c), var(--c)) bottom left / 16px 3px,
+    linear-gradient(var(--c), var(--c)) bottom left / 3px 16px,
+    linear-gradient(var(--c), var(--c)) bottom right / 16px 3px,
+    linear-gradient(var(--c), var(--c)) bottom right / 3px 16px;
+  background-repeat: no-repeat;
 }
 
-/* 위 띠: 내 장수가 맨 앞이다. */
-.top {
+/* ---------- 위 HUD ---------- */
+.hud {
   position: absolute;
   inset: 0 0 auto;
-  z-index: 5;
+  z-index: 6;
   display: flex;
   align-items: center;
-  gap: var(--space-4);
-  height: var(--stage-top);
-  padding: 0 var(--space-3) 0 0;
-  background: linear-gradient(#2a2018, #17110b);
-  border-bottom: 2px solid #8a6a32;
+  gap: var(--space-3);
+  height: var(--hud);
+  padding: 0 var(--space-3) 0 var(--space-2);
+  background:
+    linear-gradient(rgb(255 220 150 / 6%), transparent 40%),
+    linear-gradient(#2c1e13, #140d08);
+  border-bottom: 2px solid var(--brass);
+  box-shadow: 0 1px 0 #0b0704, 0 6px 18px rgb(0 0 0 / 45%);
+}
+.seal {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  font-family: var(--font-title);
+  font-size: 32px;
+  font-weight: 900;
+  line-height: 1;
+  color: #fff8e6;
+  text-decoration: none;
+  text-shadow: 0 2px 0 rgb(0 0 0 / 45%);
+  background:
+    radial-gradient(circle at 30% 25%, rgb(255 255 255 / 22%), transparent 55%),
+    var(--seal, #8a2414);
+  border: 2px solid var(--brass);
+  box-shadow: 0 0 0 1px #0b0704, inset 0 0 0 2px rgb(0 0 0 / 30%);
+}
+.sealNone {
+  --seal: #4a4033;
 }
 .me {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  height: 100%;
-  padding: 0 var(--space-4) 0 var(--space-3);
-  color: var(--stage-ink);
+  gap: var(--space-2);
+  min-width: 0;
+  padding: 4px var(--space-3) 4px 4px;
+  color: var(--ink);
   text-decoration: none;
-  background: linear-gradient(90deg, rgb(47 94 168 / 55%), rgb(47 94 168 / 0%));
-  border-right: 1px solid #5a4528;
+  background: linear-gradient(90deg, rgb(201 163 90 / 18%), transparent);
+  border: 1px solid transparent;
 }
-.me:hover .meName {
-  text-decoration: underline;
+.me:hover {
+  border-color: var(--brass-dark);
 }
-.meFace {
-  position: relative;
+.face {
   display: inline-flex;
-  border: 2px solid #e8c77a;
+  flex: none;
+  border: 2px solid var(--brass);
   border-radius: 50%;
-}
-.meNation,
-.nationMark {
-  display: grid;
-  place-items: center;
-  font-weight: 900;
-  color: #fff;
-  border: 1.5px solid #e8c77a;
-}
-.meNation {
-  position: absolute;
-  right: -6px;
-  bottom: -6px;
-  width: 20px;
-  height: 20px;
-  font-size: 11px;
+  box-shadow: 0 0 0 2px #0b0704, 0 0 10px rgb(201 163 90 / 35%);
 }
 .meText {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  line-height: 1.3;
+  gap: 1px;
   min-width: 0;
+  line-height: 1.25;
 }
 .meLine {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  white-space: nowrap;
+  gap: 6px;
 }
 .meName {
-  font-size: 20px;
+  overflow: hidden;
+  font-size: 19px;
   font-weight: 900;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 0 #000;
 }
 .meTag {
-  padding: 0 6px;
+  padding: 0 5px;
   font-size: 11px;
   font-weight: 900;
-  color: #1a140e;
-  background: #e8c77a;
+  color: #1a120a;
+  background: var(--brass);
 }
-.meStats {
+.meSub {
+  overflow: hidden;
   font-size: var(--text-xs);
-  color: #d9cbb0;
+  color: var(--muted);
   white-space: nowrap;
-}
-.meStats b {
-  color: var(--stage-ink);
-}
-.nation {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--stage-ink);
-  text-decoration: none;
-}
-.nationMark {
-  width: 28px;
-  height: 28px;
-  font-size: 15px;
-}
-.clock {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.3;
-  white-space: nowrap;
-}
-.topButton {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-height: 44px;
-  padding: 0 var(--space-3);
-  font: inherit;
-  font-size: var(--text-sm);
-  color: var(--stage-ink);
-  text-decoration: none;
-  white-space: nowrap;
-  background: rgb(0 0 0 / 35%);
-  border: 1px solid #8a6a32;
-  cursor: pointer;
-}
-.count {
-  padding: 0 6px;
-  font-size: 11px;
-  font-weight: 700;
-  color: #fff;
-  background: #b23a2a;
+  text-overflow: ellipsis;
 }
 
-/* 메뉴: 위 띠 오른쪽 아래로 펼친다. */
-.menu {
+/* 날짜와 다음 턴 원형 시계 */
+.clock {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px var(--space-3);
+  background: rgb(0 0 0 / 30%);
+  border: 1px solid var(--brass-dark);
+}
+.ring {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, var(--lacquer) 54%, transparent 56%),
+    conic-gradient(var(--brass) var(--passed, 0deg), #3a2a18 0);
+  box-shadow: 0 0 0 1px #0b0704;
+}
+.clockText {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  font-size: var(--text-xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.clockText strong {
+  font-size: 15px;
+  color: var(--ink);
+}
+.clockText b {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 자원 */
+.resources {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+.res {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 8px;
+  font-size: var(--text-xs);
+  color: var(--muted);
+  white-space: nowrap;
+  background: rgb(0 0 0 / 35%);
+  border: 1px solid var(--brass-dark);
+}
+.res svg {
+  color: var(--brass);
+}
+.res b {
+  font-size: var(--text-sm);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 아이콘 단추(메시지·효과음·메뉴) */
+.iconButton {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  font: inherit;
+  color: var(--ink);
+  background: linear-gradient(#3a281a, #1c130c);
+  border: 1px solid var(--brass);
+  box-shadow: 0 0 0 1px #0b0704, inset 0 1px 0 rgb(255 230 180 / 15%);
+  cursor: pointer;
+  transition: transform 80ms, filter 120ms;
+}
+.iconButton:hover {
+  filter: brightness(1.25);
+}
+.iconButton:active {
+  transform: translateY(1px) scale(0.97);
+}
+.iconButton[aria-pressed='false'] {
+  color: var(--muted);
+}
+.badge {
   position: absolute;
-  top: calc(var(--stage-top) + 8px);
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  padding: 0 4px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 18px;
+  color: #fff;
+  background: #b0281a;
+  border: 1px solid #ffd27a;
+}
+
+/* 메뉴 */
+.menu {
+  top: calc(var(--hud) + 10px);
   right: var(--space-3);
-  z-index: 8;
-  width: min(420px, calc(100vw - 24px));
-  max-height: calc(100vh - var(--stage-top) - 60px);
+  z-index: 9;
+  width: min(440px, calc(100vw - 24px));
+  max-height: calc(100dvh - var(--hud) - var(--tabbar) - 40px);
   overflow: auto;
   padding: var(--space-3);
   color: var(--color-text);
   background: var(--color-surface);
-  border: 1px solid var(--stage-gold);
-  box-shadow: 0 12px 32px rgb(0 0 0 / 45%);
+  user-select: text;
 }
 .menuFoot {
   display: flex;
@@ -179,143 +288,152 @@
   padding: var(--space-1) var(--space-2);
   color: var(--color-text);
 }
+.menuSound {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  background: none;
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+}
 
-/* 판: 왼쪽 "나와 휘하", 오른쪽 "내 예턴". 머리는 옻칠 빛, 몸통은 앱 바탕색. */
-.panel {
+/* ---------- 데스크톱 왼쪽 아이콘 독 ---------- */
+.dock {
   position: absolute;
-  top: calc(var(--stage-top) + 12px);
-  bottom: calc(var(--stage-foot) + 12px);
+  top: calc(var(--hud) + 12px);
+  left: 10px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dockButton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 58px;
+  height: 58px;
+  padding: 0;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink);
+  background: radial-gradient(circle at 50% 30%, #3e2b1b, #160f09);
+  border: 2px solid var(--brass-dark);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px #0b0704, 0 4px 10px rgb(0 0 0 / 50%);
+  cursor: pointer;
+  transition: transform 80ms, border-color 120ms, filter 120ms;
+}
+.dockButton:hover {
+  border-color: var(--brass);
+  filter: brightness(1.2);
+}
+.dockButton:active {
+  transform: scale(0.95);
+}
+.dockButton[aria-pressed='true'] {
+  color: #1a120a;
+  background: radial-gradient(circle at 50% 30%, #f5d995, #b8893d);
+  border-color: #fff0c4;
+}
+
+/* ---------- 판 ---------- */
+.panel {
+  top: calc(var(--hud) + 12px);
+  bottom: calc(var(--foot) + 12px);
   z-index: 4;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: var(--color-surface);
-  border: 1px solid var(--stage-gold);
-  box-shadow: 0 10px 30px rgb(0 0 0 / 45%);
 }
 .panel[hidden] {
   display: none;
 }
 .left {
-  left: 12px;
-  width: 360px;
+  left: calc(10px + var(--dock) + 4px);
+  width: 372px;
 }
 .right {
   right: 12px;
   width: 530px;
 }
 .panelHead {
+  position: relative;
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: 44px;
-  padding: 0 var(--space-2) 0 var(--space-3);
-  color: var(--stage-ink);
-  background: var(--stage-lacquer);
-  border-bottom: 1px solid #8a6a32;
+  min-height: 46px;
+  padding: 0 6px 0 var(--space-3);
+  border-bottom: 1px solid var(--brass-dark);
+  background: linear-gradient(rgb(255 220 150 / 7%), transparent);
 }
 .panelTitle {
   margin: 0;
   font-size: 17px;
   font-weight: 900;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 0 #000;
 }
-.seal {
+.headIcon {
   display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
-  font-size: 12px;
-  font-weight: 900;
+  width: 28px;
+  height: 28px;
+  color: #fff3d6;
   background: #8a2414;
+  border: 1px solid var(--brass);
 }
-.sealBlue {
+.headIconBlue {
   background: #2f5ea8;
 }
 .close {
-  min-width: 44px;
-  min-height: 36px;
-  padding: 0 var(--space-2);
-  font: inherit;
-  font-size: var(--text-xs);
-  color: var(--stage-ink);
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  color: var(--ink);
   background: transparent;
-  border: 1px solid #5a4528;
+  border: 1px solid var(--brass-dark);
   cursor: pointer;
 }
-.tabs {
-  display: flex;
-  gap: 2px;
-  padding: var(--space-2) var(--space-2) 0;
-  background: var(--stage-lacquer);
+.close:hover {
+  border-color: var(--brass);
 }
-.tab {
-  flex: 1;
-  min-height: 36px;
-  font: inherit;
-  font-size: var(--text-sm);
-  color: var(--stage-ink);
-  background: transparent;
-  border: 1px solid #5a4528;
-  border-bottom: 0;
-  cursor: pointer;
-}
-.tab[aria-selected='true'] {
-  font-weight: 700;
-  color: #1a140e;
-  background: #e8c77a;
-  border-color: #e8c77a;
-}
+/* 몸통: 기존 정보 부품이 그대로 읽히게 앱 바탕(한지)을 쓴다. */
 .panelBody {
+  position: relative;
+  z-index: 2;
+  display: flex;
   flex: 1;
+  flex-direction: column;
+  gap: var(--space-3);
   min-height: 0;
+  margin: 4px;
   overflow: auto;
   padding: var(--space-3);
   color: var(--color-text);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-/* 판을 닫으면 가장자리에 여는 손잡이가 남는다. */
-.handle {
-  position: absolute;
-  top: calc(var(--stage-top) + 12px);
-  z-index: 4;
-  min-height: 44px;
-  padding: 0 var(--space-3);
-  font: inherit;
-  font-size: var(--text-sm);
-  font-weight: 700;
-  color: var(--stage-ink);
-  background: var(--stage-lacquer);
-  border: 1px solid var(--stage-gold);
-  cursor: pointer;
-}
-.handleLeft {
-  left: 12px;
-}
-.handleRight {
-  right: 12px;
-}
-
-/* 기록: 왼쪽 판 오른쪽 아래에 접힌 띠, 펼치면 위로 자란다. */
-.records {
-  position: absolute;
-  left: 384px;
-  bottom: calc(var(--stage-foot) + 12px);
-  z-index: 4;
-  width: min(460px, calc(100vw - 384px - 780px));
-  min-width: 300px;
-  display: flex;
-  flex-direction: column;
   background: var(--color-surface);
-  border: 1px solid var(--stage-gold);
-}
-.recordsOpen {
-  height: min(420px, calc(100vh - var(--stage-top) - var(--stage-foot) - 48px));
+  box-shadow: inset 0 0 0 1px var(--brass-dark);
+  user-select: text;
 }
 
-/* 맨 아래 상태 줄. */
+/* 서랍 손잡이(모바일만) */
+.grip {
+  display: none;
+}
+
+/* ---------- 모바일 탭 막대 (데스크톱에서는 감춤) ---------- */
+.tabbar {
+  display: none;
+}
+
+/* ---------- 상태 줄 ---------- */
 .status {
   position: absolute;
   inset: auto 0 0;
@@ -323,17 +441,17 @@
   display: flex;
   align-items: center;
   gap: var(--space-4);
-  height: var(--stage-foot);
+  height: var(--foot);
   padding: 0 var(--space-3);
   font-size: var(--text-xs);
-  color: var(--stage-muted);
-  background: #120e0a;
-  border-top: 1px solid #5a4528;
+  color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
+  background: linear-gradient(#1a120b, #0d0805);
+  border-top: 1px solid var(--brass-dark);
 }
 .status b {
-  color: var(--stage-ink);
+  color: var(--ink);
 }
 
 /* 오른쪽 판을 닫으면 지도 배율 단추를 화면 오른쪽 끝으로 옮긴다. */
@@ -341,46 +459,210 @@
   --stage-tools-right: 16px;
 }
 
-/* 좁은 화면: 위 띠는 내 장수만 크게, 판은 화면 폭을 거의 다 쓴다. */
+/* 중간 폭: 자원은 금·쌀만, 능력·병력 칩은 감춘다. */
+@media (max-width: 1400px) {
+  .resWide {
+    display: none;
+  }
+}
+
+/* ---------- 모바일: 모바일 게임처럼 ---------- */
 @media (max-width: 899px) {
   .stage {
-    --stage-tools-right: 12px;
+    --hud: 58px;
+    --foot: 0px;
+    --tabbar: calc(64px + env(safe-area-inset-bottom, 0px));
+    --stage-tools-right: 10px;
+    --stage-tools-bottom: calc(var(--tabbar) + 12px);
   }
-  .nation,
-  .clock,
-  .meStats,
-  .legacy {
-    display: none;
+  .stage:has(.right[hidden]) {
+    --stage-tools-right: 10px;
   }
-  .top {
+  .hud {
     gap: var(--space-2);
+    padding: env(safe-area-inset-top, 0px) 6px 0;
+    height: calc(var(--hud) + env(safe-area-inset-top, 0px));
   }
+  .seal {
+    width: 36px;
+    height: 36px;
+    font-size: 22px;
+  }
+  /* 좁은 폭에서도 이름은 남긴다: 이름이 남은 자리를 다 쓰고 말줄임으로 줄어든다. */
   .me {
-    padding-right: var(--space-2);
+    flex: 1 1 auto;
+    min-width: 72px;
+    padding: 2px 2px 2px 0;
+    background: none;
   }
-  .meLine .muted {
+  .face :global(img),
+  .face > * {
+    width: 36px;
+    height: 36px;
+  }
+  .meSub {
     display: none;
   }
-  .left,
-  .right {
-    left: 8px;
-    right: 8px;
-    width: auto;
+  .meName {
+    font-size: 15px;
   }
-  .records {
-    left: 8px;
-    width: calc(100vw - 16px);
+  .meTag {
+    display: none;
+  }
+  .clock {
+    gap: 4px;
+    padding: 2px 4px;
+  }
+  .ring {
+    width: 22px;
+    height: 22px;
+  }
+  .clockText {
+    font-size: 11px;
+  }
+  .clockText strong {
+    font-size: 12px;
+  }
+  .resources,
+  .dock,
+  .status {
+    display: none;
+  }
+  .iconButton {
+    width: 36px;
+    height: 36px;
+  }
+  /* 효과음 단추는 메뉴 안으로 옮긴다(이름 자리를 넓힌다). */
+  .soundHud {
+    display: none;
+  }
+  .menuSound {
+    display: inline-flex;
+  }
+  .menu {
+    top: calc(var(--hud) + env(safe-area-inset-top, 0px) + 8px);
+  }
+
+  .tabbar {
+    position: absolute;
+    inset: auto 0 0;
+    z-index: 7;
+    display: flex;
+    align-items: stretch;
+    height: var(--tabbar);
+    padding: 0 4px env(safe-area-inset-bottom, 0px);
+    background: linear-gradient(#2c1e13, #120b07);
+    border-top: 2px solid var(--brass);
+    box-shadow: 0 -6px 18px rgb(0 0 0 / 50%);
+  }
+  .tabButton {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
     min-width: 0;
+    padding: 0;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    background: none;
+    border: 0;
+    cursor: pointer;
   }
-  .handleLeft {
-    top: auto;
-    bottom: calc(var(--stage-foot) + 64px);
-    left: 8px;
+  .tabButton:active {
+    transform: scale(0.94);
   }
-  .handleRight {
+  .tabButton[aria-pressed='true'] {
+    color: #ffe2a0;
+  }
+  .tabButton[aria-pressed='true'] svg {
+    filter: drop-shadow(0 0 6px rgb(255 210 120 / 65%));
+  }
+  /* 가운데 예턴: 크게 튀어나온 둥근 단추 */
+  .tabMain {
+    flex: 1.2;
+  }
+  .tabMain svg {
+    box-sizing: content-box;
+    margin-top: -22px;
+    padding: 10px;
+    color: #1a120a;
+    background: radial-gradient(circle at 50% 30%, #f5d995, #b8893d);
+    border: 2px solid #fff0c4;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px #0b0704, 0 6px 14px rgb(0 0 0 / 55%);
+  }
+  .tabMain[aria-pressed='true'] {
+    color: #ffe2a0;
+  }
+
+  /* 판은 아래에서 올라오는 서랍. 반쯤(기본) ↔ 끝까지. */
+  .panel {
     top: auto;
-    bottom: calc(var(--stage-foot) + 64px);
-    right: auto;
-    left: 140px;
+    left: 0;
+    right: 0;
+    bottom: var(--tabbar);
+    width: auto;
+    height: 58dvh;
+    border-width: 2px 0 0;
+    animation: sheetIn 160ms ease-out;
+  }
+  .sheetFull .panel {
+    height: calc(100dvh - var(--hud) - env(safe-area-inset-top, 0px) - var(--tabbar));
+  }
+  .frame.panel::before {
+    display: none;
+  }
+  .grip {
+    position: relative;
+    z-index: 3;
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 22px;
+    padding: 0;
+    background: none;
+    border: 0;
+    cursor: grab;
+    touch-action: none;
+  }
+  .grip span {
+    width: 44px;
+    height: 5px;
+    background: var(--brass);
+    box-shadow: 0 0 0 1px #0b0704;
+  }
+  .panelHead {
+    min-height: 40px;
+  }
+  .panelBody {
+    margin: 0 4px 4px;
+  }
+  /* 서랍이 열리면 배율 단추를 서랍 위로 올린다. */
+  .sheetOpen {
+    --stage-tools-bottom: calc(var(--tabbar) + 58dvh + 10px);
+  }
+  .sheetFull {
+    --stage-tools-bottom: calc(var(--tabbar) + 12px);
+  }
+}
+
+@keyframes sheetIn {
+  from {
+    transform: translateY(24px);
+    opacity: 0.4;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none;
+  }
+  .iconButton,
+  .dockButton {
+    transition: none;
   }
 }
