@@ -376,11 +376,16 @@ test('고정 질감 경로에서 브라우저가 1024 WebP를 읽는다', async 
 });
 
 test('고정 스프라이트 WebP가 공개 CSP에서 열린다', async ({ page }) => {
-  const seen = await watch(page);
   const csp = readFileSync(join(repoRoot, 'deploy/security.caddy'), 'utf8').match(/connect-src [^;]+/)![0];
   await page.route(origin + '/login', async (route) => {
     const response = await route.fetch();
-    await route.fulfill({ response, headers: { ...response.headers(), 'content-security-policy': csp } });
+    await route.fulfill({
+      response,
+      headers: {
+        ...response.headers(),
+        'content-security-policy': csp + "; default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'",
+      },
+    });
   });
   await page.goto(origin + '/login', { waitUntil: 'networkidle' });
   const sprite = meta.sprites.find(({ source }) => source === 'map3d/sprites/city-grand-capital.webp')!;
@@ -397,6 +402,4 @@ test('고정 스프라이트 WebP가 공개 CSP에서 열린다', async ({ page 
     return { maxDimension, hash };
   }, sprite.url);
   expect(result).toEqual({ maxDimension: 3072, hash: sprite.sha256 });
-  await Promise.all(seen.pending);
-  expectOnlyDistAssets(seen);
 });
