@@ -9,6 +9,9 @@ import {
   ConeGeometry,
   CylinderGeometry,
   DoubleSide,
+  ACESFilmicToneMapping,
+  Fog,
+  PCFShadowMap,
   DirectionalLight,
   Float32BufferAttribute,
   HemisphereLight,
@@ -75,6 +78,7 @@ export class MapScene {
   readonly routeLines = new Map<string, Array<{ x: number; y: number }>>();
   private width = 1;
   private height = 1;
+  private readonly sun = new DirectionalLight('#fff1d8', 2.6);
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -95,16 +99,28 @@ export class MapScene {
   ) {
     this.renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    // 영화식 색조 보정과 부드러운 그림자. 저사양(좁은 화면)은 그림자 해상도를 줄인다.
+    this.renderer.toneMapping = ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = PCFShadowMap;
     this.canvasSize = map.canvas;
     this.grid = grid;
     const metres = heights ? decodeMetres(heights) : null;
     this.field = metres ? heightFieldFromMetres(grid, metres) : heightField(grid);
 
-    this.scene.add(new HemisphereLight('#f6f0e0', '#3e3222', 0.7));
-    this.scene.add(new AmbientLight('#ffffff', 0.15));
-    const sun = new DirectionalLight('#fff1d8', 2.8);
-    sun.position.set(-520, 360, -300);
-    this.scene.add(sun);
+    this.scene.add(new HemisphereLight('#f3ecdc', '#3a2f22', 0.75));
+    this.scene.add(new AmbientLight('#ffffff', 0.12));
+    // 해는 북서쪽 낮은 각도. 그림자 카메라는 보이는 범위를 따라 옮긴다(render).
+    const sun = this.sun;
+    sun.castShadow = true;
+    const small = Math.min(window.innerWidth, window.innerHeight) < 600;
+    sun.shadow.mapSize.set(small ? 1024 : 2048, small ? 1024 : 2048);
+    sun.shadow.bias = -0.0004;
+    sun.shadow.normalBias = 0.4;
+    this.scene.add(sun, sun.target);
+    // 대기 원근감: 화면 위쪽(먼 북쪽)이 엷게 흐려진다.
+    this.scene.fog = new Fog('#c9d3d6', 980, 1700);
 
     this.scene.add(this.terrain(palette, metres));
     const water = new Mesh(
@@ -142,7 +158,42 @@ export class MapScene {
     }
     geometry.setAttribute('color', new Float32BufferAttribute(colors, 3));
     geometry.computeVertexNormals();
-    return new Mesh(geometry, new MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 }));
+    const material = new MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
+    // 잔결 무늬: 질감 그림이 오기 전까지 월드 좌표 잡음으로 풀·흙의 얼룩과 결을 낸다(D-090 질감이 오면 바꾼다).
+    material.onBeforeCompile = (shader) => {
+      shader.vertexShader = shader.vertexShader
+        .replace(
+          '#include <common>',
+          `#include <common>
+varying vec3 vGround;`,
+        )
+        .replace(
+          '#include <begin_vertex>',
+          `#include <begin_vertex>
+vGround = position;`,
+        );
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          '#include <common>',
+          `#include <common>
+varying vec3 vGround;
+float hash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise2(vec2 p) {
+  vec2 i = floor(p); vec2 f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash2(i), hash2(i + vec2(1.0, 0.0)), u.x), mix(hash2(i + vec2(0.0, 1.0)), hash2(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+float fbm(vec2 p) { float v = 0.0; float a = 0.5; for (int k = 0; k < 4; k++) { v += a * noise2(p); p *= 2.03; a *= 0.5; } return v; }`,
+        )
+        .replace(
+          '#include <color_fragment>',
+          `#include <color_fragment>
+float grain = fbm(vGround.xz * 0.35) * 0.6 + fbm(vGround.xz * 2.2) * 0.4;
+diffuseColor.rgb *= 0.86 + grain * 0.28;`,
+        );
+    };
+    const mesh = new Mesh(geometry, material);
+    mesh.receiveShadow = true;
+    return mesh;
   }
 
   // 지형 위에 붙는 띠. 점마다 진행 방향에 수직으로 폭을 벌린다. 여러 줄을 한 기하로 모은다.
@@ -268,6 +319,7 @@ export class MapScene {
       const shade = cellNoise(index, 7);
       mesh.setColorAt(index, color.setRGB(0.16 + shade * 0.08, 0.3 + shade * 0.12, 0.14 + shade * 0.05));
     });
+    mesh.castShadow = true;
     return mesh;
   }
 
@@ -366,7 +418,11 @@ export class MapScene {
     towers.count = t;
     roofs.count = r;
     this.models = [walls, towers, keeps, roofs];
-    for (const mesh of this.models) this.scene.add(mesh);
+    for (const mesh of this.models) {
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      this.scene.add(mesh);
+    }
   }
 
   /**
@@ -417,7 +473,10 @@ export class MapScene {
     bodies.count = b;
     flags.count = f;
     this.armies = [bodies, flags];
-    for (const mesh of this.armies) this.scene.add(mesh);
+    for (const mesh of this.armies) {
+      mesh.castShadow = true;
+      this.scene.add(mesh);
+    }
   }
 
   /** 행군 대열: 점 목록(지도 좌표)을 따라 병사 다섯과 깃발이 걷는다. null이면 지운다. */
@@ -523,6 +582,21 @@ export class MapScene {
     camera.zoom = state.zoom || 1;
     camera.updateProjectionMatrix();
     camera.updateMatrixWorld();
+    // 그림자 범위는 보이는 지도만큼. 멀리서 볼 때는 그림자 해상도가 모자라 그림자를 끈다.
+    const span = Math.max(this.width, this.height) / (state.zoom || 1);
+    this.sun.castShadow = span < 420;
+    if (this.sun.castShadow) {
+      const shadow = this.sun.shadow.camera;
+      shadow.left = -span * 0.75;
+      shadow.right = span * 0.75;
+      shadow.top = span * 0.75;
+      shadow.bottom = -span * 0.75;
+      shadow.near = 1;
+      shadow.far = 2000;
+      shadow.updateProjectionMatrix();
+      this.sun.target.position.set(state.x, 0, state.z);
+      this.sun.position.set(state.x - 420, 520, state.z - 260);
+    }
     this.renderer.render(this.scene, camera);
   }
 
