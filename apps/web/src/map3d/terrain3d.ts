@@ -110,7 +110,8 @@ export function siteSize(kind: 'CITY' | 'PASS' | 'PORT' | 'FIELD', level: number
   if (kind === 'PASS') return { side: 6, height: 4 };
   if (kind === 'PORT') return { side: 3.5, height: 1.6 };
   if (kind === 'FIELD') return { side: 3, height: 1 };
-  const step = Math.min(Math.max(level ?? 3, 1), 8);
+  // 경(9)은 특(8)보다 한 칸 더 크다(사용자 2026-11-14: 경은 더 키울 수 있다).
+  const step = Math.min(Math.max(level ?? 3, 1), 9);
   return { side: 4 + step * 1, height: 2 + step * 0.4 };
 }
 

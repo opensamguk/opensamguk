@@ -3,6 +3,7 @@
 // three 전체를 묶어 덩어리가 커진다. 필요한 부품만 가져온다.
 import {
   AmbientLight,
+  Box3,
   DataTexture,
   NearestFilter,
   SRGBColorSpace,
@@ -33,6 +34,8 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three';
+import { loadGlbMesh } from './glbMesh';
+import { lodForPixels, pickModel } from './siteModels';
 import type { PublicGeography } from '@opensamguk/shared';
 import { roadWalks, TERRAINS, waterLanes, type Terrain } from '../main/terrainTiles';
 import { ROAD_CELL } from '../main/roadPixels';
@@ -143,6 +146,13 @@ export class MapScene {
   private readonly field: Float32Array;
   private readonly grid: TerrainCells;
   private models: Mesh[] = [];
+  /** 받아 둔 GLB 거점 모형(이름 → 거리 단계별 기하·재질). 개발 미리보기(?models=)와 승인 모형이 채운다. */
+  private modelSet = new Map<string, Array<{ geometry: BufferGeometry; material: Mesh['material']; box: Box3 }>>();
+  private siteModelMeshes: Array<{ lod: number; mesh: InstancedMesh }> = [];
+  private lastSites: {
+    anchors: readonly AnchorSite[];
+    cityByKey: ReadonlyMap<number, ModelCity>;
+  } | null = null;
   private ring: Mesh | null = null;
   private armies: Mesh[] = [];
   private march: {
@@ -155,7 +165,7 @@ export class MapScene {
   readonly routeLines = new Map<string, Array<{ x: number; y: number }>>();
   private width = 1;
   private height = 1;
-  private readonly sun = new DirectionalLight('#fff0d6', 3);
+  private readonly sun = new DirectionalLight('#fff0d6', 3.4);
   /** 물결 셰이더의 시각(초). 그릴 때마다 옮긴다. */
   private readonly waterTime = { value: 0 };
   /** 영지 칸 자료(셰이더): 칸마다 소유국 색(RGB)과 도시 번호(A). setSites가 채운다. */
@@ -187,7 +197,7 @@ export class MapScene {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     // 영화식 색조 보정과 부드러운 그림자. 저사양(좁은 화면)은 그림자 해상도를 줄인다.
     this.renderer.toneMapping = ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = 1.12;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = PCFShadowMap;
     this.canvasSize = map.canvas;
@@ -197,7 +207,7 @@ export class MapScene {
     this.field = metres ? heightFieldFromMetres(grid, metres, depth) : heightField(grid);
 
     // 하늘빛(위)과 땅에서 되비치는 흙빛(아래). 해가 낮아 능선의 명암이 또렷하다.
-    this.scene.add(new HemisphereLight('#d4e3f0', '#5a4a36', 0.6));
+    this.scene.add(new HemisphereLight('#dfe8ee', '#6a5a40', 0.5));
     this.scene.add(new AmbientLight('#ffffff', 0.08));
     // 해는 북서쪽 낮은 각도. 그림자 카메라는 보이는 범위를 따라 옮긴다(render).
     const sun = this.sun;
@@ -268,27 +278,27 @@ export class MapScene {
         .replace(
           '#include <color_fragment>',
           `#include <color_fragment>
-float grain = fbm(vGround.xz * 0.35) * 0.6 + fbm(vGround.xz * 2.2) * 0.4;
-diffuseColor.rgb *= 0.84 + grain * 0.3;
-float macro = fbm(vGround.xz * 0.02);
-diffuseColor.rgb *= mix(vec3(1.04, 1.0, 0.92), vec3(0.94, 1.0, 1.04), macro);
+// 그림체(사용자 참고 시안 2026-11-14): 잔결 대신 큰 붓자국 얼룩, 고르고 따뜻한 색, 구름 그림자, 짙은 나무 점.
+float grain = fbm(vGround.xz * 0.12) * 0.7 + fbm(vGround.xz * 0.9) * 0.3;
+float brush = fbm(vec2(vGround.x * 0.55 + vGround.z * 0.2, vGround.z * 0.07 - vGround.x * 0.03));
 float px = fwidth(vGround.x) + fwidth(vGround.z);
 float flatness = clamp(vUp.y, 0.0, 1.0);
-// 논밭 조각보: 지역마다 방향이 다른 밭 칸, 칸마다 다른 작물 빛, 얇은 두렁.
-float lowland = (1.0 - smoothstep(0.4, 3.0, vGround.y)) * smoothstep(0.985, 0.998, flatness) * step(0.25, vGround.y);
-float lush = smoothstep(-0.02, 0.06, diffuseColor.g - diffuseColor.r);
-float farm = lowland * lush * (1.0 - smoothstep(0.12, 0.35, px));
-if (farm > 0.001) {
-  float turn = hash2(floor(vGround.xz / 24.0)) * 1.57;
-  vec2 q = mat2(cos(turn), -sin(turn), sin(turn), cos(turn)) * vGround.xz;
-  vec2 size = vec2(1.6, 0.9);
-  vec2 cell = floor(q / size);
-  vec2 f = fract(q / size);
-  float crop = hash2(cell);
-  vec3 tint = crop < 0.3 ? vec3(1.08, 1.02, 0.78) : crop < 0.75 ? vec3(0.9, 1.04, 0.86) : vec3(0.98, 0.95, 0.86);
-  float edge = 1.0 - smoothstep(0.0, 0.06, min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y)));
-  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * tint * (1.0 - edge * 0.18), farm * 0.8);
-}
+vec3 paint = diffuseColor.rgb;
+float luma = dot(paint, vec3(0.3, 0.55, 0.15));
+paint = mix(vec3(luma), paint, 0.82) * vec3(1.05, 1.0, 0.88);
+paint *= 0.93 + grain * 0.14 + (brush - 0.5) * 0.08;
+float cloud = smoothstep(0.56, 0.78, fbm(vGround.xz * 0.011 + vec2(3.1, 7.7)));
+paint *= 1.0 - cloud * 0.2;
+float lush = smoothstep(-0.02, 0.06, paint.g - paint.r);
+float lowland = (1.0 - smoothstep(2.0, 9.0, vGround.y)) * step(0.25, vGround.y) * smoothstep(0.9, 0.97, flatness);
+vec2 tq = vGround.xz * 1.25;
+vec2 tc = floor(tq);
+vec2 tj = vec2(hash2(tc + 3.7), hash2(tc + 9.1)) - 0.5;
+float tdot = length(fract(tq) - 0.5 - tj * 0.5);
+float tdensity = smoothstep(0.42, 0.72, fbm(vGround.xz * 0.045 + 11.0)) * lowland * (0.4 + lush * 0.6);
+float tree = step(hash2(tc), tdensity * 0.7) * (1.0 - smoothstep(0.1, 0.19, tdot)) * (1.0 - smoothstep(0.18, 0.45, px));
+paint = mix(paint, vec3(0.15, 0.23, 0.11), tree * 0.85);
+diffuseColor.rgb = paint;
 // 바닷가 모래와 물 아래 바닥.
 float sand = (1.0 - smoothstep(0.08, 0.45, vGround.y + (grain - 0.5) * 0.2)) * step(-0.02, vGround.y) * smoothstep(0.9, 0.97, flatness);
 diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.80, 0.74, 0.58) * (0.9 + grain * 0.2), sand * 0.75);
@@ -298,14 +308,15 @@ if (vGround.y < -0.02) diffuseColor.rgb = mix(vec3(0.62, 0.58, 0.46), vec3(0.30,
           '#include <normal_fragment_maps>',
           `#include <normal_fragment_maps>
 // 잔 기복: 능선 잡음의 기울기로 법선을 흔든다. 높고 가파를수록 세게, 평야는 거의 그대로.
-float rugged = smoothstep(0.6, 8.0, vGround.y) * 0.9 + smoothstep(0.995, 0.93, vUp.y) * 0.5;
+// 산세는 크게: 낮은 주파수 능선만 쓰고 평야는 거의 건드리지 않는다(그림체에서 자글자글함을 뺀다).
+float rugged = smoothstep(1.5, 10.0, vGround.y) * 0.8 + smoothstep(0.99, 0.9, vUp.y) * 0.3;
 rugged *= 1.0 - smoothstep(0.35, 0.9, px);
 vec2 g = vec2(0.0);
 if (rugged > 0.01) {
-  float e = 0.12;
-  float h0 = ridged(vGround.xz * 0.22);
-  g = vec2(ridged((vGround.xz + vec2(e, 0.0)) * 0.22) - h0, ridged((vGround.xz + vec2(0.0, e)) * 0.22) - h0) / e;
-  g *= rugged * 2.2;
+  float e = 0.2;
+  float h0 = ridged(vGround.xz * 0.09);
+  g = vec2(ridged((vGround.xz + vec2(e, 0.0)) * 0.09) - h0, ridged((vGround.xz + vec2(0.0, e)) * 0.09) - h0) / e;
+  g *= rugged * 1.6;
   normal = normalize(normal + (viewMatrix * vec4(-g.x, 0.0, -g.y, 0.0)).xyz);
 }
 // 바위·눈은 흔든 법선의 경사와 고도로 화소마다 정한다.
@@ -433,9 +444,9 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
       groups.SEA!.push(points);
     }
     const style: Record<string, { color: string; width: number; opacity?: number }> = {
-      LAND: { color: '#a07a48', width: 1.3 },
-      BRIDGE: { color: '#6b4a2b', width: 1.5 },
-      FORD: { color: '#c2ab7c', width: 1.3 },
+      LAND: { color: '#8f7350', width: 0.8, opacity: 0.55 },
+      BRIDGE: { color: '#6b4a2b', width: 1.1, opacity: 0.8 },
+      FORD: { color: '#b9a57a', width: 0.8, opacity: 0.55 },
       SEA: { color: '#d7e6ee', width: 0.9, opacity: 0.55 },
     };
     return Object.entries(groups).map(([mode, lines]) => {
@@ -475,22 +486,22 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     const group = new Object3D();
     group.add(
       new Mesh(
-        this.ribbon(lines, 4.2, 0.1),
+        this.ribbon(lines, 3.2, 0.1),
         new MeshStandardMaterial({
-          color: '#b9c08f',
+          color: '#c3cc98',
           roughness: 0.9,
           side: DoubleSide,
           transparent: true,
-          opacity: 0.7,
+          opacity: 0.4,
           polygonOffset: true,
           polygonOffsetFactor: -1,
         }),
       ),
     );
     const water = new Mesh(
-      this.ribbon(lines, 2.6, 0.16),
+      this.ribbon(lines, 2.4, 0.16),
       new MeshStandardMaterial({
-        color: '#3f8f94',
+        color: '#3f9ea3',
         roughness: 0.2,
         metalness: 0,
         transparent: true,
@@ -681,6 +692,89 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     }
     this.rings = [rings];
     this.scene.add(rings);
+    this.lastSites = { anchors, cityByKey };
+    this.placeSiteModels();
+  }
+
+  /**
+   * GLB 거점 모형을 받는다. 파일은 `<base>/<이름>-lod<0|1|2>.glb`이고 없는 이름은 건너뛴다.
+   * 모형마다 메시 하나(Rodin 결과)를 기대하며, 여럿이면 첫 메시를 쓴다.
+   */
+  async loadSiteModels(base: string, names: readonly string[]) {
+    await Promise.all(
+      names.map(async (name) => {
+        try {
+          const lods = await Promise.all(
+            [0, 1, 2].map(async (lod) => {
+              const { geometry, material } = await loadGlbMesh(`${base}/${name}-lod${lod}.glb`);
+              return { geometry, material, box: geometry.boundingBox!.clone() };
+            }),
+          );
+          this.modelSet.set(name, lods);
+        } catch {
+          // 없는 모형은 건너뛴다(다음 후보나 임시 상자 모형을 쓴다).
+        }
+      }),
+    );
+    this.placeSiteModels();
+  }
+
+  // 받은 모형을 거점마다 세운다. 같은 모형·같은 거리 단계는 하나의 복제 묶음(InstancedMesh)으로 그린다.
+  // 모형이 선 거점이 있으면 임시 상자 모형은 감춘다(고리는 둔다).
+  private placeSiteModels() {
+    for (const { mesh } of this.siteModelMeshes) {
+      this.scene.remove(mesh);
+      mesh.dispose();
+    }
+    this.siteModelMeshes = [];
+    if (!this.lastSites || this.modelSet.size === 0) return;
+    const available = new Set(this.modelSet.keys());
+    const groups = new Map<string, AnchorSite[]>();
+    for (const site of this.lastSites.anchors) {
+      const level = this.lastSites.cityByKey.get(site.anchorKey)?.level;
+      const name = pickModel(site.kind, level, available);
+      if (!name) continue;
+      const list = groups.get(name) ?? [];
+      list.push(site);
+      groups.set(name, list);
+    }
+    const matrix = new Matrix4();
+    const scaleMatrix = new Matrix4();
+    const moveMatrix = new Matrix4();
+    const turn = new Matrix4().makeRotationY(Math.PI / 4);
+    for (const [name, sites] of groups) {
+      const lods = this.modelSet.get(name)!;
+      lods.forEach(({ geometry, material, box }, lod) => {
+        const mesh = new InstancedMesh(geometry, material, sites.length);
+        const width = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) || 1;
+        sites.forEach((site, index) => {
+          const level = this.lastSites!.cityByKey.get(site.anchorKey)?.level;
+          const { side } = siteSize(site.kind, level);
+          const footprint = side * (site.kind === 'PASS' ? 1.9 : 1.35);
+          // 발자국에 맞추되 키는 발자국을 넘지 않게 묶는다(관문 바위처럼 높은 모형이 탑처럼 솟지 않게).
+          const height = box.max.y - box.min.y || 1;
+          const scale = Math.min(footprint / width, (footprint * 0.55) / height);
+          const base = this.world(site.position.x, site.position.y);
+          const cx = (box.min.x + box.max.x) / 2;
+          const cz = (box.min.z + box.max.z) / 2;
+          // 가운데를 원점에 두고 키우고, 45° 돌려 성벽이 마름모 영지 칸과 나란하게 한 뒤 거점 자리로 옮긴다.
+          matrix
+            .makeTranslation(-cx, -box.min.y, -cz)
+            .premultiply(scaleMatrix.makeScale(scale, scale, scale))
+            .premultiply(turn)
+            .premultiply(moveMatrix.makeTranslation(base.x, base.y - 0.25, base.z));
+          mesh.setMatrixAt(index, matrix);
+        });
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.visible = lod === 2;
+        this.scene.add(mesh);
+        this.siteModelMeshes.push({ lod, mesh });
+      });
+    }
+    const covered = [...groups.values()].reduce((sum, list) => sum + list.length, 0);
+    const allCovered = covered === this.lastSites.anchors.length;
+    for (const mesh of this.models) mesh.visible = !allCovered;
   }
 
   // 영지 칸 자료를 셰이더 질감으로 올린다. 도시만 영지를 갖고, 관문·항구·전장은 갖지 않는다.
@@ -914,6 +1008,11 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
       shadow.updateProjectionMatrix();
       this.sun.target.position.set(state.x, 0, state.z);
       this.sun.position.set(state.x - 500, 380, state.z - 300);
+    }
+    // 거점 모형 거리 단계: 특 도시 한 변(약 16단위)이 화면에서 몇 px인지로 정한다.
+    if (this.siteModelMeshes.length) {
+      const lod = lodForPixels(16 * (state.zoom || 1));
+      for (const entry of this.siteModelMeshes) entry.mesh.visible = entry.lod === lod;
     }
     this.waterTime.value = performance.now() / 1000;
     this.renderer.render(this.scene, camera);

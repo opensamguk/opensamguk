@@ -311,6 +311,13 @@ export default function Map3D({
     sceneRef.current = scene;
     // 개발 서버에서만 장면을 들여다볼 수 있게 둔다.
     if (import.meta.env.DEV) (window as unknown as { __map3d?: MapScene }).__map3d = scene;
+    // 개발 미리보기: 주소에 ?models=<주소>를 주면 그 아래 GLB 거점 모형을 받아 세운다(INT-27 D-094).
+    // 공개 빌드에서는 승인한 원격 모형만 쓰므로 이 경로를 열지 않는다.
+    const modelBase = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('models') : null;
+    if (modelBase)
+      void import('./siteModels').then(({ MODEL_NAMES }) =>
+        scene.loadSiteModels(modelBase.replace(/\/$/, ''), MODEL_NAMES).then(() => invalidateRef.current()),
+      );
     scene.setSites(latest.current.anchors, latest.current.model.cityByKey, latest.current.model.nationById);
     const resize = () => {
       scene.resize(box.clientWidth, box.clientHeight);
