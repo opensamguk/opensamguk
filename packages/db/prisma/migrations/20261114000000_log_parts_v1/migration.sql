@@ -1,0 +1,3 @@
+ALTER TABLE "GeneralLog" ADD COLUMN "parts" JSONB, ADD COLUMN "partsVersion" INTEGER, ADD COLUMN "code" TEXT;
+ALTER TABLE "PublicNationEvent" ADD COLUMN "parts" JSONB, ADD COLUMN "partsVersion" INTEGER;
+ALTER TABLE "BattleLog" ADD COLUMN "parts" JSONB, ADD COLUMN "partsVersion" INTEGER, ADD COLUMN "defenderId" INTEGER, ADD COLUMN "cityKey" INTEGER;
