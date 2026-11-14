@@ -81,15 +81,17 @@ it('같은 트랜잭션의 이전 상태를 넘기면 재조회 없이 기존과
     args: [
       {
         data: expect.arrayContaining([
-          { worldId, ...at, kind: 'fall', text: `${before.nations[2]!.name} 멸망` },
+          expect.objectContaining({ worldId, ...at, kind: 'fall', text: `${before.nations[2]!.name} 멸망` }),
           ...Object.values(before.cities)
             .filter((city) => city.nationId === 2)
-            .map((city) => ({
-              worldId,
-              ...at,
-              kind: 'capture',
-              text: `${before.nations[1]!.name}의 ${city.name} 점령`,
-            })),
+            .map((city) =>
+              expect.objectContaining({
+                worldId,
+                ...at,
+                kind: 'capture',
+                text: `${before.nations[1]!.name}의 ${city.name} 점령`,
+              }),
+            ),
         ]),
       },
     ],

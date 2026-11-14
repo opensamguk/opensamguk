@@ -183,7 +183,12 @@ async function appendLineageHistory(
   next: WorldView,
   at: { tick: number; sequence: number },
 ) {
-  let ordinal = 0;
+  const last = await tx.generalLog.findFirst({
+    where: { worldId, sequence: at.sequence },
+    orderBy: { ordinal: 'desc' },
+    select: { ordinal: true },
+  });
+  let ordinal = (last?.ordinal ?? -1) + 1;
   for (const event of lineagePublicEvents(before, next)) {
     for (const generalId of event.generalIds)
       await tx.generalLog.create({

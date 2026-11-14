@@ -1,4 +1,5 @@
-import { publicMapConfig } from '@opensamguk/shared';
+import { commandLogLines } from './logParts';
+import { publicMapConfig, readLogParts } from '@opensamguk/shared';
 import { worldClock } from './world/truce';
 import { persistPublicMap } from './publicMap';
 import type { Prisma, PrismaClient } from '@opensamguk/db';
@@ -343,6 +344,12 @@ export class TurnLoop {
             modern,
             slots,
           });
+          const commandLines = commandLogLines(result);
+          // ID 내림차순 커서를 유지하면서 같은 명령의 0번 줄부터 읽는다.
+          for (const [ordinal, line] of [...commandLines.entries()].reverse())
+            await tx.generalLog.create({
+              data: { worldId, generalId: due.id, tick: due.nextTurnTick, sequence, commandKey, ordinal, ...line },
+            });
           await persistEffects(
             tx,
             worldId,
@@ -381,26 +388,14 @@ export class TurnLoop {
             if (!('code' in national)) await persistCommandReports(tx, worldId, due.nextTurnTick, due.id, national);
             if ('code' in national || !national.history?.some((entry) => entry.nationId === nationId)) {
               const name = engineResolver(world).resolver.get(turn.nation.commandKey)?.name ?? '국가 명령';
-              await appendNationHistory(
-                tx,
-                worldId,
-                due.nextTurnTick,
-                nationId,
-                `${name}: ${'code' in national ? `${national.code}: ${national.message}` : national.logs.map((log) => log.text).join('\n')}`,
-              );
+              for (const log of commandLogLines(national))
+                await appendNationHistory(tx, worldId, due.nextTurnTick, nationId, `${name}: ${log.text}`, undefined, [
+                  { t: 'act', key: turn.nation.commandKey, name },
+                  { t: 'text', v: ': ' },
+                  ...(readLogParts('parts' in log ? log.parts : null, 1).parts ?? [{ t: 'text', v: log.text }]),
+                ]);
             }
           }
-          await tx.generalLog.create({
-            data: {
-              worldId,
-              generalId: due.id,
-              tick: due.nextTurnTick,
-              sequence,
-              commandKey,
-              kind: failed ? 'failure' : 'success',
-              text: failed ? `${result.code}: ${result.message}` : result.logs.map((log) => log.text).join('\n'),
-            },
-          });
           await shiftTurns(tx, worldId, due.id, { ...world, actionSequence: sequence }, slots);
           const updated = await tx.general.updateMany({
             where: { worldId, id: due.id, nextTurnTick: due.nextTurnTick, turnRevision: actor.turnRevision },

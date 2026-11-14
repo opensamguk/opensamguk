@@ -59,6 +59,7 @@ const paths = [
   'records.battles',
   'records.activity',
   'records.nation',
+  'records.nationEvents',
   'records.world',
   'records.season',
   'intel.records',
