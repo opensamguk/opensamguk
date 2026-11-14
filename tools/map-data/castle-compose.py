@@ -23,15 +23,17 @@ WALL_H = W * 0.42  # 성벽: 밑선에서 여장 위 끝까지 높이
 GATE_H = W * 0.95  # 성문: 밑선에서 문루 지붕 끝까지 높이
 PLINTH_H = W * 0.07  # 받침 옆면 두께
 FEATHER = 28  # 성벽 토막 이음매를 섞는 너비(px)
-TOWER = W * 0.95  # 모서리 누각 그림 가로
+TOWER = W * 0.6  # 옛 모서리 망루 그림 가로(각루 그림이 없을 때)
+CORNER = W * 0.62  # 모서리 각루 그림 가로
 
 LEVELS = {
     # 경 > 특 > 대 > 중 > 소. 중·소는 크기가 같고 집이 드물다. 소(흙성)는 참고 그림(강하)처럼 누각이 없다.
-    'city-9': {'n': 10, 'mat': 'stone', 'core': 'palace-gold', 'empty': 0.1, 'towers': True},
-    'capital': {'n': 8, 'mat': 'stone', 'core': 'palace-gold', 'empty': 0.12, 'towers': True},
-    'city-7': {'n': 6, 'mat': 'stone', 'core': 'hall-grey', 'empty': 0.15, 'towers': True},
-    'city-6': {'n': 6, 'mat': 'stone', 'core': None, 'empty': 0.4, 'towers': True},
-    'city-5': {'n': 6, 'mat': 'earth', 'core': None, 'empty': 0.5, 'towers': False},
+    # 홀수 자리라 한 자리 폭 큰길이 정확히 가운데를 지나 네 변 한가운데 성문으로 간다. 가운데 건물은 큰길이 만나는 곳.
+    'city-9': {'n': 11, 'mat': 'stone', 'core': 'palace-gold', 'core_size': 3, 'empty': 0.08, 'towers': True},
+    'capital': {'n': 9, 'mat': 'stone', 'core': 'palace-gold', 'core_size': 3, 'empty': 0.1, 'towers': True},
+    'city-7': {'n': 7, 'mat': 'stone', 'core': 'hall-grey', 'core_size': 1, 'empty': 0.12, 'towers': True},
+    'city-6': {'n': 5, 'mat': 'stone', 'core': None, 'core_size': 0, 'empty': 0.2, 'towers': True},
+    'city-5': {'n': 5, 'mat': 'earth', 'core': None, 'core_size': 0, 'empty': 0.3, 'towers': False},
 }
 
 
@@ -59,7 +61,7 @@ def scaled(im, width):
     return im.resize((max(1, round(im.size[0] * s)), max(1, round(im.size[1] * s))), Image.Resampling.LANCZOS)
 
 
-def strip(path, slope, cut=0.12):
+def strip(path, slope, cut=0.12, measure=(0.15, 0.85)):
     """성벽·받침 토막을 이어 붙일 수 있게 바로잡는다(사용자 2026-11-14: "성벽이 끊겨보인다니까?").
 
     그린 토막은 기울기가 격자(±0.5)와 조금 다르고 양 끝에 마감면이 있다. 밑선 기울기를 재서 격자 기울기로
@@ -70,6 +72,7 @@ def strip(path, slope, cut=0.12):
     a = np.asarray(im)[..., 3] > 128
     h, w = a.shape
     xs, yb, yt = [], [], []
+    # 밑선 기울기는 가운데에서 재고, 높이는 measure 구간(성문은 양 끝 성벽 부분)에서 잰다.
     for x in range(int(w * 0.15), int(w * 0.85)):
         rows = np.nonzero(a[:, x])[0]
         if len(rows):
@@ -83,7 +86,12 @@ def strip(path, slope, cut=0.12):
     sheared = im.transform((w, height), Image.Transform.AFFINE, (1, 0, 0, -k, 1, -off), resample=Image.Resampling.BICUBIC)
     c0, c1 = int(w * cut), int(w * (1 - cut))
     piece = sheared.crop((c0, 0, c1, height))
-    return piece, slope * c0 + fit_b + off, float(np.median(np.array(yb) - np.array(yt)))
+    hs = []
+    for x in range(int(w * measure[0]), int(w * measure[1])):
+        rows = np.nonzero(a[:, x])[0]
+        if len(rows):
+            hs.append(rows.max() - rows.min())
+    return piece, slope * c0 + fit_b + off, float(np.median(hs))
 
 
 def compose(parts, name, cfg, out):
@@ -129,9 +137,9 @@ def compose(parts, name, cfg, out):
             x += step
         placed.append({'part': part, 'run': [round(x0, 1), round(y0, 1), round(x1, 1)], 'slope': slope, 'h': round(target_h, 1), **tag})
 
-    def gate_at(part, slope, xc, yc, target_h, tag):
+    def gate_at(part, slope, xc, yc, target_h, tag, measure=(0.15, 0.85)):
         """성문 토막 하나를 가운데 xc에서 밑선이 격자선(기울기 slope, (xc, yc) 지남)에 닿게 놓는다."""
-        piece, base, tall = strip(os.path.join(parts, f'{part}.png'), slope, cut=0.0)
+        piece, base, tall = strip(os.path.join(parts, f'{part}.png'), slope, cut=0.02, measure=measure)
         sc = target_h / tall
         piece = piece.resize((max(1, round(piece.size[0] * sc)), max(1, round(piece.size[1] * sc))), Image.Resampling.LANCZOS)
         base *= sc
@@ -163,14 +171,17 @@ def compose(parts, name, cfg, out):
     rx = cx + n * half
     run(f'wall-{mat}-back-left', -0.5, lx, ly, cx, WALL_H, {'edge': 'back-left'})
     run(f'wall-{mat}-back-right', 0.5, cx, top, rx, WALL_H, {'edge': 'back-right'})
+    # 뒤쪽 두 변의 성문(안쪽 면 그림이 있을 때만).
+    for edge, slope, (ex, ey) in (('back-left', -0.5, (cx - n * quarter, top + n * quarter / 2)), ('back-right', 0.5, (cx + n * quarter, top + n * quarter / 2))):
+        if os.path.exists(os.path.join(parts, f'gatewall-{mat}-{edge}.png')):
+            gate_at(f'gatewall-{mat}-{edge}', slope, ex, ey, WALL_H, {'edge': edge, 'gate': True}, measure=(0.02, 0.12))
 
     # 3. 안쪽 건물. 가운데 큰 건물, 두 문으로 가는 큰길(가운데 줄)은 비운다.
     mid = n // 2
-    taken = set()
-    core = cfg['core']
-    if core:
-        ci, cj = mid - 1, mid - 1
-        taken |= {(ci, cj), (ci + 1, cj), (ci, cj + 1), (ci + 1, cj + 1)}
+    core, cs = cfg['core'], cfg['core_size']
+    r = cs // 2
+    taken = {(i, j) for i in range(mid - r, mid + r + 1) for j in range(mid - r, mid + r + 1)} if core else set()
+    # 큰길: 성 가운데를 지나는 한 자리 폭 십자길. 네 변 한가운데의 성문으로 이어진다.
     streets = {(i, j) for i in range(n) for j in range(n) if i == mid or j == mid}
     if mat == 'stone':
         pool = ['house-1', 'house-2', 'house-3', 'house-4', 'house-5', 'house-6', 'house-1', 'house-3', 'house-4']
@@ -187,15 +198,16 @@ def compose(parts, name, cfg, out):
             if roll < cfg['empty']:
                 continue  # 빈 마당
             part = rng.choice(extras) if roll < cfg['empty'] + 0.18 else rng.choice(pool)
-            if (i == mid + 1 or j == mid + 1 or i == mid - 1 or j == mid - 1) and mat == 'stone' and rng.random() < 0.35:
+            if (abs(i - mid) == 1 or abs(j - mid) == 1) and mat == 'stone' and rng.random() < 0.35:
                 part = 'shop-row'  # 큰길가 점포
             items.append((i + j, i, j, part, 1))
     if core:
-        items.append((2 * (mid - 1) + 2, mid - 1, mid - 1, core, 2))
+        items.append((2 * mid, mid, mid, core, cs))
     for _, i, j, part, size in sorted(items):
-        if size == 2:
-            x, y = centre(i + 0.5, j + 0.5)
-            put(part, x, y + half, W * 2 * 0.9, tag={'i': i, 'j': j, 'size': 2})
+        if part == core and size:
+            # 가운데 건물: size 자리를 차지(1자리 관아는 조금 크게).
+            x, y = centre(i, j)
+            put(part, x, y + quarter * size, W * max(size * 0.9, 1.35), tag={'i': i, 'j': j, 'size': size})
         else:
             x, y = centre(i, j)
             put(part, x, y + quarter, W * 0.9, tag={'i': i, 'j': j, 'size': 1})
@@ -208,14 +220,21 @@ def compose(parts, name, cfg, out):
     run(f'wall-{mat}-front-left', 0.5, lx, ly, bx, WALL_H, {'edge': 'front-left'})
     run(f'wall-{mat}-front-right', -0.5, bx, by, rx, WALL_H, {'edge': 'front-right'})
     # 성문은 앞쪽 두 변의 가운데(큰길 끝)에 성벽 위로 얹는다.
-    gx = lx + (mid + 0.5) * half
-    gate_at(f'gate-{mat}-front-left', 0.5, gx, ly + (gx - lx) * 0.5, GATE_H, {'edge': 'front-left', 'gate': True})
-    gx = bx + (n - mid - 0.5) * half
-    gate_at(f'gate-{mat}-front-right', -0.5, gx, by - (gx - bx) * 0.5, GATE_H, {'edge': 'front-right', 'gate': True})
+    # 성문은 각 변 한가운데(십자길 끝). 성벽에 박힌 성문 그림(gatewall-*)이 있으면 그것을 쓴다:
+    # 양 끝이 성벽이라 높이는 양 끝에서 재 성벽 높이에 맞춘다.
+    for edge, slope, (ex, ey) in (('front-left', 0.5, (lx + n * quarter, ly + n * quarter / 2)), ('front-right', -0.5, (bx + n * quarter, by - n * quarter / 2))):
+        wall_gate = os.path.join(parts, f'gatewall-{mat}-{edge}.png')
+        if os.path.exists(wall_gate):
+            gate_at(f'gatewall-{mat}-{edge}', slope, ex, ey, WALL_H, {'edge': edge, 'gate': True}, measure=(0.02, 0.12))
+        else:
+            gate_at(f'gate-{mat}-{edge}', slope, ex, ey, GATE_H, {'edge': edge, 'gate': True})
 
     # 5. 모서리 누각: 위·왼쪽·오른쪽·아래 꼭짓점(뒤에서 앞 순서).
     for x, y in ((cx, top), (lx, ly), (cx + n * half, ly), (bx, by)) if cfg['towers'] else ():
-        put(f'tower-{mat}', x, y + quarter * 0.6, TOWER, tag={'corner': True})
+        if os.path.exists(os.path.join(parts, f'corner-{mat}.png')):
+            put(f'corner-{mat}', x, y + quarter * 0.35, CORNER, tag={'corner': True})
+        else:
+            put(f'tower-{mat}', x, y + quarter * 0.45, TOWER, tag={'corner': True})
 
     os.makedirs(os.path.join(out, 'hd'), exist_ok=True)
     # 정사각 틀로 맞춘다(아래쪽 받침 꼭짓점이 기준).
