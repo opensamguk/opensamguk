@@ -133,6 +133,7 @@ export function capitalCity(world: PolicyWorld) {
 export function ownLogAt(world: PolicyWorld, tick: number) {
   return world.hold.db.generalLog.findMany({
     where: { worldId: world.id, generalId: world.generalId, tick },
+    orderBy: { ordinal: 'asc' },
     select: { tick: true, commandKey: true, kind: true, text: true },
   });
 }

@@ -110,7 +110,7 @@ it('개인 기록의 null·미지원 버전과 같은 tick 페이지를 보존�
       {
         worldId,
         generalId: 1,
-        tick: 600,
+        tick: 599,
         commandKey: 'rest',
         kind: 'success',
         text: '미지원',

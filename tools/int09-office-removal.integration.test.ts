@@ -181,11 +181,16 @@ describe('AC-INT-09 국가 멸망과 직책 저장의 원자적 순서', () => {
       cityKey: 2,
     });
     expect(await db.removedNation.count({ where: { worldId, nationId: 2 } })).toBe(1);
-    expect(
-      await db.generalLog.count({
-        where: { worldId, generalId: 1, tick: 240001, commandKey: 'attack', kind: 'success' },
-      }),
-    ).toBe(1);
+    const lines = await db.generalLog.findMany({
+      where: { worldId, generalId: 1, tick: 240001, commandKey: 'attack' },
+      orderBy: { ordinal: 'asc' },
+    });
+    expect(lines.map(({ ordinal, kind }) => ({ ordinal, kind }))).toEqual([
+      { ordinal: 0, kind: 'success' },
+      { ordinal: 1, kind: 'success' },
+    ]);
+    expect(new Set(lines.map(({ sequence }) => sequence)).size).toBe(1);
+    expect(lines.every(({ text }) => !/[\r\n]/.test(text))).toBe(true);
     const result = await db.worldResult.findUniqueOrThrow({ where: { worldId } });
     expect(result.reason).toBe('UNIFIED');
     expect(result.finalStateHash).toBe(hashState(await snapshot(worldId)));

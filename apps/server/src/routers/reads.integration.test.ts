@@ -298,6 +298,13 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       score: REPUTATION_POINTS.domestic,
       tick: 1,
       data: { name: '공개 장수 31', nation: null, city: null },
+      text: '공개 장수 31 내정 목표를 채웠다.',
+      parts: [
+        { t: 'general', id: 31, name: '공개 장수 31' },
+        { t: 'text', v: '' },
+        { t: 'text', v: ' 내정 목표를 채웠다.' },
+      ],
+      partsVersion: 1,
     });
     const next = await query('records.activity', { worldId: world, cursor: first.data.nextCursor });
     expect(next.data.items).toEqual([

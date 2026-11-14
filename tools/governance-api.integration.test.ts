@@ -423,7 +423,7 @@ describe('AC-P2-31 실제 HTTP 황실 접수·동의·경제', () => {
     expect(blocked.state.nations[lower]).toBeDefined();
     expect(
       await db.generalLog.findFirst({ where: { worldId, tick, generalId: world.ruler.id, commandKey: 'attack' } }),
-    ).toMatchObject({ kind: 'failure', text: `VASSAL_BOUND: ${bound}` });
+    ).toMatchObject({ kind: 'failure', code: 'VASSAL_BOUND', text: bound, partsVersion: 1 });
     const refused = await db.nationHistory.findMany({ where: { worldId, tick, nationId: upper } });
     expect(refused).toMatchObject([{ data: { events: [`선전포고: VASSAL_BOUND: ${bound}`] } }]);
 

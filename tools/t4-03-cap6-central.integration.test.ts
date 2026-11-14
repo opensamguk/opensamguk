@@ -1041,10 +1041,20 @@ it('P23 실제 휴식·방침·정복 턴 앞뒤의 treaties는 깊이 같고 �
     const before = (await db.$transaction((tx) => loadWorld(tx, f.worldId))).treaties;
     await (await loopFor(f.worldId)).advanceTo(1000);
     expect((await db.$transaction((tx) => loadWorld(tx, f.worldId))).treaties).toEqual(before);
-    expect(await db.generalLog.count({ where: { worldId: f.worldId, generalId: 1, tick: 1000 } })).toBe(1);
-    expect(
-      await db.generalLog.findFirstOrThrow({ where: { worldId: f.worldId, generalId: 1, tick: 1000 } }),
-    ).toMatchObject({ commandKey: modern ? 'farm' : 'rest' });
+    const logs = await db.generalLog.findMany({
+      where: { worldId: f.worldId, generalId: 1, tick: 1000 },
+      orderBy: { ordinal: 'asc' },
+    });
+    expect(logs).toHaveLength(modern ? 2 : 1);
+    expect(logs.map(({ commandKey, ordinal, kind }) => ({ commandKey, ordinal, kind }))).toEqual(
+      Array.from({ length: modern ? 2 : 1 }, (_, ordinal) => ({
+        commandKey: modern ? 'farm' : 'rest',
+        ordinal,
+        kind: 'success',
+      })),
+    );
+    if (modern) expect(logs[0]!.text).toBe('기본 방침(권농)으로 농지 개간');
+    expect(logs.at(-1)!.text).toMatch(modern ? /^농지 개간: \d+$/ : /^휴식$/);
   }
   const initial = commandInitial();
   // 도시 2 점령이 통일 조건을 채우도록 P23 사본의 중립 도시를 생성 전에 배정한다.

@@ -271,7 +271,7 @@ export function myGeneral(world: PolicyWorld) {
 export function myLogs(world: PolicyWorld) {
   return world.hold.db.generalLog.findMany({
     where: { worldId: world.id, generalId: world.generalId },
-    orderBy: { tick: 'asc' },
+    orderBy: [{ tick: 'asc' }, { ordinal: 'asc' }],
     select: { tick: true, commandKey: true, kind: true, text: true },
   });
 }

@@ -1,3 +1,4 @@
+import { commandLogLines } from '../apps/engine/src/logParts';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
@@ -269,17 +270,20 @@ async function assertFixedTurn(f: Fixture) {
   expect(
     await db.generalLog.findMany({
       where: { worldId: f.worldId },
-      select: { generalId: true, tick: true, commandKey: true, kind: true, text: true },
+      orderBy: { ordinal: 'asc' },
+      select: { generalId: true, tick: true, commandKey: true, kind: true, text: true, code: true, ordinal: true },
     }),
-  ).toEqual([
-    {
+  ).toEqual(
+    commandLogLines(result).map((line, ordinal) => ({
       generalId: 1,
       tick: 100,
       commandKey: 'fire_attack',
-      kind: failed ? 'failure' : result.logs[0]!.kind,
-      text: failed ? result.message : result.logs.map((log) => log.text).join('\n'),
-    },
-  ]);
+      kind: line.kind,
+      text: line.text,
+      code: 'code' in line ? line.code : null,
+      ordinal,
+    })),
+  );
   expect(await db.battleLog.findMany({ where: { worldId: f.worldId }, orderBy: { generalId: 'asc' } })).toEqual(
     (failed ? [] : (result.reports ?? [])).map((report) => ({
       worldId: f.worldId,

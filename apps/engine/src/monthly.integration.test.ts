@@ -118,9 +118,29 @@ describe('AC-M1-12 실제 PostgreSQL 월 경계', () => {
     expect((await db.nationHistory.findUniqueOrThrow({ where })).data).toEqual({
       ...nation,
       events: ['정산 전 사건', '정산 전 두 번째 사건'],
+      structuredEvents: ['정산 전 사건', '정산 전 두 번째 사건'].map((text, ordinal) => ({
+        ordinal,
+        kind: 'command',
+        visibility: 'nation',
+        text,
+        parts: null,
+        partsVersion: null,
+      })),
     });
     await db.$transaction((tx) => appendNationHistory(tx, worldId, 10000, 1, '정산 후 사건'));
-    const expected = { ...nation, events: ['정산 전 사건', '정산 전 두 번째 사건', '정산 후 사건'] };
+    const events = ['정산 전 사건', '정산 전 두 번째 사건', '정산 후 사건'];
+    const expected = {
+      ...nation,
+      events,
+      structuredEvents: events.map((text, ordinal) => ({
+        ordinal,
+        kind: 'command',
+        visibility: 'nation',
+        text,
+        parts: null,
+        partsVersion: null,
+      })),
+    };
     expect((await db.nationHistory.findUniqueOrThrow({ where })).data).toEqual(expected);
     await loop.advanceTo(10000);
     expect((await db.nationHistory.findUniqueOrThrow({ where })).data).toEqual(expected);

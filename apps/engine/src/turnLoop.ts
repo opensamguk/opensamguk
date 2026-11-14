@@ -1,5 +1,5 @@
-import { commandLogLines } from './logParts';
-import { publicMapConfig, readLogParts } from '@opensamguk/shared';
+import { commandLogLines, nationCommandLogLines } from './logParts';
+import { publicMapConfig } from '@opensamguk/shared';
 import { worldClock } from './world/truce';
 import { persistPublicMap } from './publicMap';
 import type { Prisma, PrismaClient } from '@opensamguk/db';
@@ -388,12 +388,8 @@ export class TurnLoop {
             if (!('code' in national)) await persistCommandReports(tx, worldId, due.nextTurnTick, due.id, national);
             if ('code' in national || !national.history?.some((entry) => entry.nationId === nationId)) {
               const name = engineResolver(world).resolver.get(turn.nation.commandKey)?.name ?? '국가 명령';
-              for (const log of commandLogLines(national))
-                await appendNationHistory(tx, worldId, due.nextTurnTick, nationId, `${name}: ${log.text}`, undefined, [
-                  { t: 'act', key: turn.nation.commandKey, name },
-                  { t: 'text', v: ': ' },
-                  ...(readLogParts('parts' in log ? log.parts : null, 1).parts ?? [{ t: 'text', v: log.text }]),
-                ]);
+              for (const log of nationCommandLogLines(turn.nation.commandKey, name, national))
+                await appendNationHistory(tx, worldId, due.nextTurnTick, nationId, log.text, undefined, log.parts);
             }
           }
           await shiftTurns(tx, worldId, due.id, { ...world, actionSequence: sequence }, slots);

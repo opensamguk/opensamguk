@@ -328,11 +328,17 @@ async function verifyLogs(client: PgClient, db: ReturnType<typeof createDb>) {
     code: '23505',
     constraint: 'GeneralLog_worldId_generalId_tick_turn_key',
   });
-  await db.generalLog.create({ data: { ...log, sequence: 10 } });
-  await db.generalLog.create({ data: { ...log, sequence: 10, ordinal: 1 } });
-  await db.generalLog.create({ data: { ...log, sequence: 11 } });
-  await db.generalLog.create({ data: { ...log, generalId: 2, sequence: 10 } });
-  await db.generalLog.create({ data: { ...log, worldId: 'two', sequence: 10 } });
+  await db.generalLog.create({ data: { ...log, sequence: 10 }, select: { sequence: true, ordinal: true } });
+  await db.generalLog.create({ data: { ...log, sequence: 10, ordinal: 1 }, select: { sequence: true, ordinal: true } });
+  await db.generalLog.create({ data: { ...log, sequence: 11 }, select: { sequence: true, ordinal: true } });
+  await db.generalLog.create({
+    data: { ...log, generalId: 2, sequence: 10 },
+    select: { sequence: true, ordinal: true },
+  });
+  await db.generalLog.create({
+    data: { ...log, worldId: 'two', sequence: 10 },
+    select: { sequence: true, ordinal: true },
+  });
   await expect(insert(client, 'GeneralLog', { ...log, tick: 999, sequence: 10 })).rejects.toMatchObject({
     code: '23505',
     constraint: 'GeneralLog_worldId_generalId_sequence_ordinal_key',
@@ -374,7 +380,10 @@ async function verifyLogs(client: PgClient, db: ReturnType<typeof createDb>) {
           })
         ).count,
       ).toBe(1);
-      await tx.generalLog.create({ data: { ...log, sequence: 30, commandKey: 'offer.cancel' } });
+      await tx.generalLog.create({
+        data: { ...log, sequence: 30, commandKey: 'offer.cancel' },
+        select: { sequence: true, ordinal: true },
+      });
       throw new Error('저장 롤백 시험');
     }),
   ).rejects.toThrow('저장 롤백 시험');

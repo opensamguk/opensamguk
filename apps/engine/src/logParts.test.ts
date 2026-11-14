@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { commandLogLines, storedLog } from './logParts';
+import { commandLogLines, nationCommandLogLines, storedLog } from './logParts';
 import { logPartsToText } from '@opensamguk/shared';
 
 it('명령 불가 코드는 본문과 분리하고 지원 버전으로 저장한다', () => {
@@ -9,6 +9,42 @@ it('명령 불가 코드는 본문과 분리하고 지원 버전으로 저장한
       code: 'NO_GOLD',
       text: '금이 부족합니다.',
       parts: [{ t: 'text', v: '금이 부족합니다.' }],
+      partsVersion: 1,
+    },
+  ]);
+});
+
+it.each(['PROTECTED', 'VASSAL_BOUND'] as const)(
+  '국가 명령 실패 %s는 기존 사건 본문과 조각에 코드를 보존한다',
+  (code) => {
+    const message = '선전포고할 수 없습니다.';
+    const [row] = nationCommandLogLines('nation_declare', '선전포고', { code, message });
+    expect(row).toEqual({
+      text: `선전포고: ${code}: ${message}`,
+      parts: [
+        { t: 'act', key: 'nation_declare', name: '선전포고' },
+        { t: 'text', v: `: ${code}: ` },
+        { t: 'text', v: message },
+      ],
+      partsVersion: 1,
+    });
+  },
+);
+
+it('국가 명령 성공은 코드를 붙이지 않고 기존 조각을 보존한다', () => {
+  expect(
+    nationCommandLogLines('nation_rest', '대기', {
+      effects: [],
+      logs: [{ kind: 'success', text: '대기', parts: [{ t: 'act', key: 'nation_rest', name: '대기' }] }],
+    }),
+  ).toEqual([
+    {
+      text: '대기: 대기',
+      parts: [
+        { t: 'act', key: 'nation_rest', name: '대기' },
+        { t: 'text', v: ': ' },
+        { t: 'act', key: 'nation_rest', name: '대기' },
+      ],
       partsVersion: 1,
     },
   ]);

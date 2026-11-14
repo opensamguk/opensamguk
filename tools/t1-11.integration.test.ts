@@ -662,7 +662,7 @@ it('AC-M1-14 내정 8종과 휴식은 실제 예약·프로세스 재시작·월
     const spec = domestic.find((row) => row.commandKey === commandKey);
     const general = committed.state.generals[id]!;
     expect(general.gold).toBe(accepted ? 1000 - (spec?.cost ?? 0) : 0);
-    if (!accepted) expect(logs[index]!.text).toContain('NO_GOLD');
+    if (!accepted) expect(logs[index]!.code).toBe('NO_GOLD');
     else if (!spec) expect(general.injury).toBeLessThan(ruler.injury);
     else if (spec.field === 'tech') expect(committed.state.nations[1]!.tech).toBeGreaterThan(initial.nations[0]!.tech);
     else expect(committed.state.cities[1]![spec.field]).toBeGreaterThan(initial.cities[0]![spec.field]);
@@ -754,7 +754,7 @@ describe('T1-11 군사 명령 API·엔진 결합', () => {
         where: { worldId, generalId: 1, tick: 100, sequence: beforeTurn.actionSequence + 1 },
       });
       expect(log).toMatchObject({ commandKey, kind: accepted ? 'success' : 'failure' });
-      if (!accepted) expect(log.text).toContain(preview.data.code);
+      if (!accepted) expect(log.code).toBe(preview.data.code);
       const general = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
       const city = await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId, cityKey: 3 } } });
       if (accepted && commandKey !== 'attack') {
@@ -1032,7 +1032,7 @@ describe('T1-11 30칸·revision·경합·재검사', () => {
       where: { worldId, generalId: 1, tick: 100, sequence: beforeTurn.actionSequence + 1 },
     });
     expect(log).toMatchObject({ kind: 'failure', commandKey: 'farm' });
-    expect(log.text).toContain('NO_GOLD');
+    expect(log.code).toBe('NO_GOLD');
     expect(await db.inputEvent.count({ where: { worldId } })).toBe(1);
   });
 });

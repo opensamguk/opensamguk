@@ -879,7 +879,13 @@ it.each([
     const state = (await snapshot(f.id)).state;
     expect(
       await db.generalLog.count({
-        where: { worldId: f.id, generalId: enemy.actorId, tick, commandKey: 'attack', text: { contains: '함정' } },
+        where: {
+          worldId: f.id,
+          generalId: enemy.actorId,
+          tick,
+          commandKey: 'attack',
+          text: { contains: '함정에 걸려' },
+        },
       }),
     ).toBe(trigger ? 1 : 0);
     expect(state.cities[3]!.nationId).toBe(trigger ? f.nationId : 2);
@@ -926,7 +932,7 @@ it('AC-P2-23 설치 이전에 예정된 지연 출병에는 새 함정을 소급
   await advance(f.id, tick + 1);
   expect(
     await db.generalLog.count({
-      where: { worldId: f.id, generalId: enemy.actorId, tick, commandKey: 'attack', text: { contains: '함정' } },
+      where: { worldId: f.id, generalId: enemy.actorId, tick, commandKey: 'attack', text: { contains: '함정에 걸려' } },
     }),
   ).toBe(0);
   expect((await snapshot(f.id)).state.cities[3]!.nationId).toBe(2);
@@ -1009,7 +1015,9 @@ it.each([
       expect(after.state.cities[3]!.nationId).toBe(2);
       expect(after.state.stratagemCards!.nations[f.nationId]).toBeUndefined();
       expect(
-        await db.generalLog.count({ where: { worldId: f.id, commandKey: 'attack', tick, text: { contains: '함정' } } }),
+        await db.generalLog.count({
+          where: { worldId: f.id, commandKey: 'attack', tick, text: { contains: '함정에 걸려' } },
+        }),
       ).toBe(1);
     }
     await cardProcessProbe(f.id, 'RECOVER', boundary);
@@ -1077,14 +1085,20 @@ for (const key of ['fire_attack', 'sabotage', 'incite', 'plunder'] as const)
       expect(cards.nations[f.nationId]!.hand).toHaveLength(2);
       await advance(f.id, ready.state.generals[f.actorId]!.nextTurnTick);
       const after = (await snapshot(f.id)).state.stratagemCards!;
-      const logs = await db.generalLog.findMany({ where: { worldId: f.id, generalId: f.actorId, commandKey: key } });
-      expect(logs).toHaveLength(1);
+      const logs = await db.generalLog.findMany({
+        where: { worldId: f.id, generalId: f.actorId, commandKey: key },
+        orderBy: { ordinal: 'asc' },
+      });
+      expect(logs.length).toBeGreaterThan(0);
+      expect(new Set(logs.map((row) => row.sequence)).size).toBe(1);
+      expect(logs.map((row) => row.ordinal)).toEqual(Array.from({ length: logs.length }, (_, i) => i));
+      expect(logs.every((row) => !/[\r\n]/.test(row.text))).toBe(true);
       if (available) {
         expect(after.nations[f.nationId]!.hand).toEqual([key]);
         expect(after.revision).toBe(cards.revision + 1);
       } else {
         expect(after).toEqual(cards);
-        expect(logs[0]!.text).toContain('이 계략 패가 없습니다.');
+        expect(logs).toMatchObject([{ kind: 'failure', code: 'NO_SCHEME_CARD', text: '이 계략 패가 없습니다.' }]);
       }
       await replay(f.id);
     }, 60000);

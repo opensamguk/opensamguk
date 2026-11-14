@@ -663,7 +663,11 @@ it('AC-M3-14 같은 tick의 실제 턴과 맡기 로그는 어느 순서에도 �
     await advance(worldId, 100);
     expect((await waiting).data).toEqual({ status: 'possessed', generalId: 1 });
     const logs = await db.generalLog.findMany({ where: { worldId, generalId: 1, tick: 100 }, orderBy: { id: 'desc' } });
-    expect(logs.filter((row) => row.kind === 'success' || row.kind === 'failure')).toHaveLength(1);
+    const turnLines = logs.filter((row) => row.kind === 'success' || row.kind === 'failure');
+    expect(turnLines.length).toBeGreaterThan(0);
+    expect(new Set(turnLines.map((row) => row.sequence)).size).toBe(1);
+    expect(turnLines.map((row) => row.ordinal)).toEqual(Array.from({ length: turnLines.length }, (_, i) => i));
+    expect(turnLines.every((row) => !/[\r\n]/.test(row.text))).toBe(true);
     expect(logs.filter((row) => row.kind === 'possess')).toHaveLength(1);
     const records = await call<{ items: Array<{ id: string; tick: number; kind: string }> }>(
       'records.general',

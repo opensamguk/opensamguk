@@ -1,4 +1,4 @@
-import { logPartsRecord } from '@opensamguk/shared';
+import { logPartsRecord, readLogParts } from '@opensamguk/shared';
 import type { Prisma } from '@opensamguk/db';
 import type { CommandResult, Failure } from '@opensamguk/rules';
 
@@ -18,4 +18,15 @@ export function commandLogLines(result: CommandResult | Failure) {
       .filter(Boolean)
       .map((text) => ({ kind: log.kind, text }));
   });
+}
+
+export function nationCommandLogLines(commandKey: string, name: string, result: CommandResult | Failure) {
+  const prefix = ': ' + ('code' in result ? `${result.code}: ` : '');
+  return commandLogLines(result).map((log) =>
+    storedLog(`${name}${prefix}${log.text}`, [
+      { t: 'act', key: commandKey, name },
+      { t: 'text', v: prefix },
+      ...(readLogParts('parts' in log ? log.parts : null, 1).parts ?? [{ t: 'text', v: log.text }]),
+    ]),
+  );
 }
