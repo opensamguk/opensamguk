@@ -47,7 +47,7 @@ import { ROAD_CELL } from '../main/roadPixels';
 import { bounds as riverBounds, lines as riverData } from './data/rivers';
 import { along, cellsToPoints, dashLine, simplify } from './routes3d';
 import { fromTile, territoryTiles, tileBounds, toTile } from './territory3d';
-import { DIRECTIONS, FLAG_BRIDGE, planTileRoutes, type RouteMode, type TileTerrain } from './tileRoutes';
+import { planTileRoutes, type RouteMode, type TileTerrain } from './tileRoutes';
 import type { DrawnNation } from '../main/siteMarkers';
 import type { ModelCity } from '../main/mapModel';
 import {
@@ -316,6 +316,7 @@ transformed += normalize(objectNormal) * 0.012;`,
     TERRAIN_NORMALS.map((name) => [name, { value: new DataTexture(new Uint8Array([128, 128, 255, 255]), 1, 1) }]),
   ) as Record<(typeof TERRAIN_NORMALS)[number], { value: DataTexture | Texture }>;
   private readonly textureOn = { value: 0 };
+  private riverPolylines: Array<Array<{ x: number; y: number }>> = [];
   /** 구운 그림 지도(INT-27): 그림, 덮는 구역(월드 x0, z0, x1, z1), 켬. 그 구역은 실시간 조명 대신 그림의 명암을 쓴다. */
   private readonly painted = {
     map: { value: new DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1) as DataTexture | Texture },
@@ -380,8 +381,9 @@ transformed += normalize(objectNormal) * 0.012;`,
     ocean.rotation.x = -Math.PI / 2;
     ocean.position.y = -9;
     this.scene.add(ocean, this.water(depth));
+    this.riverPolylines = this.riverLines(bounds);
     for (const mesh of this.tileRoads(map)) this.scene.add(mesh);
-    this.scene.add(this.rivers(bounds));
+    this.scene.add(this.rivers());
     this.scene.add(this.trees(map, metres));
   }
 
@@ -541,7 +543,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, rockColor, rock * 0.85 * (1.0 - pIn));
 float snow = smoothstep(${(4300 * UNITS_PER_METRE).toFixed(2)}, ${(5200 * UNITS_PER_METRE).toFixed(2)}, vGround.y + (grain - 0.5) * ${(650 * UNITS_PER_METRE).toFixed(2)}) * (1.0 - smoothstep(0.45, 0.75, slope));
 diffuseColor.rgb = mix(diffuseColor.rgb, mix(vec3(0.93, 0.94, 0.96), sampleTex(t_snow, vGround.xz) * 1.05, uTexOn * 0.7), snow * (1.0 - pIn));
 if (vGround.y > 0.0) diffuseColor.rgb = territoryColor(diffuseColor.rgb, vGround.xz);
-if (vGround.y > -0.02) diffuseColor.rgb = drawRoads(diffuseColor.rgb, vGround.xz);
+// 육로는 칸 직선(drawRoads) 대신 곡선 띠 메시로 그린다(사용자 2026-11-14: 길이 부자연스럽다). 칸 길 자료는 규칙용으로 남긴다.
 // 오지(무대 밖 땅): 색을 빼고 어둡게 해 게임 무대 밖임을 보인다.
 if (vGround.y > 0.05 && tileAt(floor(vec2(vGround.x + vGround.z, vGround.z - vGround.x) * ${Math.SQRT1_2} / ${TILE.toFixed(1)})).a == 0.0) {
   float grey = dot(diffuseColor.rgb, vec3(0.3, 0.55, 0.15));
@@ -766,6 +768,53 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
         if (cells) this.routeLines.set(route.id, simplify(cellsToPoints(cells)));
       }
     }
+    // 육로: 칸 경로를 곡선으로 다듬어 땅에 붙는 두 겹 띠로 그린다(어두운 테두리 + 흙색 길).
+    // 성·관문 칸의 모형 자리 안쪽은 잘라 길이 모형을 뚫지 않게 한다.
+    const siteCentres = map.sites
+      .filter((site) => site.kind === 'CITY' || site.kind === 'PASS')
+      .map((site) => this.tileCentre(site.position.x, site.position.y));
+    const cut = TILE * 0.42;
+    const landLines: Array<Array<{ x: number; y: number }>> = [];
+    for (const route of routes) {
+      if (route.mode === 'RIVER' || route.mode === 'SEA') continue;
+      const line = this.routeLines.get(route.id);
+      if (!line || line.length < 2) continue;
+      const smooth = smoothLine(line, 0.6);
+      let piece: Array<{ x: number; y: number }> = [];
+      for (const point of smooth) {
+        const inside = siteCentres.some((c) => Math.hypot(point.x - c.x, point.y - c.y) < cut);
+        if (inside) {
+          if (piece.length > 1) landLines.push(piece);
+          piece = [];
+        } else piece.push(point);
+      }
+      if (piece.length > 1) landLines.push(piece);
+    }
+    const roadEdge = new Mesh(
+      this.ribbon(landLines, 0.78, 0.1),
+      new MeshStandardMaterial({
+        color: '#5b4630',
+        roughness: 1,
+        depthWrite: false,
+        side: DoubleSide,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -4,
+      }),
+    );
+    roadEdge.renderOrder = 1;
+    const roadFill = new Mesh(
+      this.ribbon(landLines, 0.5, 0.12),
+      new MeshStandardMaterial({
+        color: '#cdb487',
+        roughness: 1,
+        side: DoubleSide,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -6,
+      }),
+    );
+    roadFill.renderOrder = 2;
     // 물길 점선: 수로는 옅은 물빛, 해로는 흰색.
     const dashes: Record<'RIVER' | 'SEA', Array<Array<{ x: number; y: number }>>> = { RIVER: [], SEA: [] };
     for (const route of routes) {
@@ -787,15 +836,65 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
         ),
     );
     // 다리: 강 칸을 지나는 육로 칸에 판자 다리를 세운다(길 방향으로 눕힌 상자). 다리 모형이 오면 바꾼다.
-    const bridges: Array<{ index: number; angle: number }> = [];
-    for (let i = 0; i < columns * rows; i++) {
-      if (!(plan.flags[i]! & FLAG_BRIDGE) || !plan.land[i]) continue;
-      const k = [0, 1, 2, 3, 4, 5, 6, 7].find((bit) => plan.land[i]! & (1 << bit)) ?? 0;
-      const [du, dv] = DIRECTIONS[k]!;
-      // 칸 축(u, v)을 월드 (x, z)로: u = (+1, +1)/√2, v = (−1, +1)/√2.
-      const wx = (du - dv) * Math.SQRT1_2;
-      const wz = (du + dv) * Math.SQRT1_2;
-      bridges.push({ index: i, angle: Math.atan2(wz, wx) });
+    // 다리: 곡선 길이 강 띠를 실제로 건너는 구간마다 하나. 자리·방향·길이를 그 구간에서 정한다.
+    // 강을 따라 나란히 가는 길에는 다리를 놓지 않는다: 길이 강과 35° 넘게 엇갈리고 짧게 건너는 구간만.
+    const wet = new Map<string, Array<{ x: number; y: number; dx: number; dy: number }>>();
+    const key = (x: number, y: number) => `${Math.floor(x / 4)},${Math.floor(y / 4)}`;
+    for (const line of this.riverPolylines)
+      line.forEach((point, i) => {
+        const a = line[Math.max(i - 1, 0)]!;
+        const b = line[Math.min(i + 1, line.length - 1)]!;
+        const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+        const k = key(point.x, point.y);
+        const list = wet.get(k) ?? [];
+        list.push({ x: point.x, y: point.y, dx: (b.x - a.x) / len, dy: (b.y - a.y) / len });
+        wet.set(k, list);
+      });
+    const nearRiver = (x: number, y: number) => {
+      let best: { dx: number; dy: number } | null = null;
+      let bestD = 1.25;
+      for (let dx = -1; dx <= 1; dx++)
+        for (let dy = -1; dy <= 1; dy++)
+          for (const point of wet.get(`${Math.floor(x / 4) + dx},${Math.floor(y / 4) + dy}`) ?? []) {
+            const d = Math.hypot(point.x - x, point.y - y);
+            if (d < bestD) {
+              bestD = d;
+              best = point;
+            }
+          }
+      return best;
+    };
+    const bridges: Array<{ x: number; y: number; angle: number; length: number }> = [];
+    for (const line of landLines) {
+      let run: Array<{ x: number; y: number; dx: number; dy: number }> = [];
+      const close = () => {
+        if (run.length > 0) {
+          const first = run[0]!;
+          const last = run[run.length - 1]!;
+          const span = Math.hypot(last.x - first.x, last.y - first.y);
+          const across =
+            span < 0.01 ? 1 : Math.abs(((last.x - first.x) * run[0]!.dy - (last.y - first.y) * run[0]!.dx) / span);
+          // across = sin(길과 강 사이 각). 0.57 ≈ 35°. 나란히 가는 길(across 작음)이나 너무 긴 구간은 건너뛴다.
+          if (across < 0.57 || span > 5) {
+            run = [];
+            return;
+          }
+          const length = Math.max(Math.hypot(last.x - first.x, last.y - first.y), 0.6) + 2.2;
+          bridges.push({
+            x: (first.x + last.x) / 2,
+            y: (first.y + last.y) / 2,
+            angle: Math.atan2(last.y - first.y, last.x - first.x),
+            length,
+          });
+        }
+        run = [];
+      };
+      for (const point of line) {
+        const river = nearRiver(point.x, point.y);
+        if (river) run.push({ x: point.x, y: point.y, dx: river.dx, dy: river.dy });
+        else close();
+      }
+      close();
     }
     if (bridges.length) {
       const deck = new InstancedMesh(
@@ -805,12 +904,11 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
       );
       const matrix = new Matrix4();
       const holder = new Object3D();
-      bridges.forEach(({ index, angle }, n) => {
-        const { x, y } = centre(index);
-        const base = this.world(x, y, 0.45);
+      bridges.forEach(({ x, y, angle, length }, n) => {
+        const base = this.world(x, y, 0.3);
         holder.position.copy(base);
         holder.rotation.set(0, -angle, 0);
-        holder.scale.set(TILE * 1.05, 0.3, TILE * 0.18);
+        holder.scale.set(length, 0.22, 0.7);
         holder.updateMatrix();
         matrix.copy(holder.matrix);
         deck.setMatrixAt(n, matrix);
@@ -819,12 +917,14 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
       deck.receiveShadow = true;
       meshes.push(deck);
     }
+    meshes.push(roadEdge, roadFill);
     return meshes;
   }
 
   // 강: Natural Earth 강 선을 땅 위 물 띠로 그린다. 강 선은 통합 지도(1000×700) 좌표라
   // 경위도로 되돌린 뒤 이 판의 범위로 옮긴다(둘 다 등장방형 도법이라 1차 변환이다).
-  private rivers(bounds: readonly number[]) {
+  // 강 선(캔버스 좌표): 원 자료를 다듬어 촘촘히 다시 찍은 선. 강 띠와 다리 자리가 함께 쓴다.
+  private riverLines(bounds: readonly number[]) {
     const [w0, s0, e0, n0] = riverBounds as [number, number, number, number];
     const [w1, s1, e1, n1] = bounds as [number, number, number, number];
     const { width, height } = this.canvasSize;
@@ -843,6 +943,11 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
         }),
       ),
     );
+    return lines;
+  }
+
+  private rivers() {
+    const lines = this.riverPolylines;
     // 강둑(옅은 풀빛 모래)을 넓게 깔고 그 위에 청록 물 띠를 얹는다.
     const group = new Object3D();
     group.add(
