@@ -420,7 +420,8 @@ test('정식191년 메인·예턴 메뉴 이동·초점·375~1440px·30초 재�
       );
     });
     await retry.click();
-    await expect(page.getByTestId('operational-world-map')).toBeVisible();
+    // 다시 받은 지도 자료를 그리는 데 CI에서 5초를 넘긴 적이 있다(PR #674 2차 실행). 오류 안내와 같은 20초를 준다.
+    await expect(page.getByTestId('operational-world-map')).toBeVisible({ timeout: 20_000 });
     await page.unroute('**/trpc/**');
     // 같은 HTTP 배치의 다른 조회도 중단될 수 있다. 새 문서에서 저장한 목록과 선택 도시를 다시 확인한다.
     await page.reload();
