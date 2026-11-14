@@ -453,7 +453,7 @@ float tdot = length(fract(tq) - 0.5 - tj * 0.5);
 float tdensity = smoothstep(0.42, 0.72, fbm(vGround.xz * 0.045 + 11.0)) * lowland * (0.4 + lush * 0.6);
 float tree = step(hash2(tc), tdensity * 0.7) * (1.0 - smoothstep(0.1, 0.19, tdot)) * (1.0 - smoothstep(0.18, 0.45, px));
 paint = mix(paint, vec3(0.15, 0.23, 0.11), tree * 0.85);
-// 질감(CC0 항공 사진): 두 크기로 섞어 반복 무늬를 깨고, 질감 밝기 결을 칸 색에 입힌다. 가까이 볼수록 질감이 주가 된다.
+// 질감(CC0 항공 사진): 두 크기로 섞어 반복 무늬를 깬다. 질감 밝기 결은 칸 색에 입힌다. 가까이 볼수록 질감이 주가 된다.
 float texW = uTexOn * (1.0 - smoothstep(0.25, 0.9, px));
 if (texW > 0.001) {
   vec3 ground = sampleTex(t_grass, vGround.xz);
