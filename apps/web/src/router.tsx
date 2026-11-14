@@ -22,6 +22,7 @@ import { NotificationSettingsPage } from './notifications/NotificationSettingsPa
 import { DevUiPage } from './pages/DevUiPage';
 import { LoginPage } from './pages/LoginPage';
 import { MainPage } from './pages/MainPage';
+import { MapStage } from './stage/MapStage';
 import { CampaignPage, GovernancePage, MePage } from './pages/MyPages';
 import { SignupPage } from './pages/SignupPage';
 import { NationTurnsPage } from './personnel/NationTurnsPage';
@@ -298,11 +299,19 @@ const mainSearch = (search: Record<string, unknown>): { city?: number } => {
   const city = Number(search.city);
   return Number.isInteger(city) && city > 0 && city <= 2_147_483_647 ? { city } : {};
 };
+// 메인은 ?ui=map이면 지도 바탕 게임 화면(INT-29 1단계)으로 연다. 다른 값·없음은 지금 메인이다.
+const worldMainSearch = (search: Record<string, unknown>): { city?: number; ui?: 'map' } => ({
+  ...mainSearch(search),
+  ...(search.ui === 'map' ? { ui: 'map' as const } : {}),
+});
 const worldIndexRoute = createRoute({
   getParentRoute: () => worldRoute,
   path: '/',
-  validateSearch: mainSearch,
-  component: MainPage,
+  validateSearch: worldMainSearch,
+  component: function WorldMainRoute() {
+    const { ui } = worldIndexRoute.useSearch();
+    return ui === 'map' ? <MapStage /> : <MainPage />;
+  },
 });
 
 // 아래 주소는 직접 접근·새로고침 호환용 보조 화면이다. 핵심 조작은 메인에서 한다 (소유자 UI 정정 2026-10-21).

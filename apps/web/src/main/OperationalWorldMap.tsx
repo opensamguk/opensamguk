@@ -7,21 +7,13 @@ import { RoadPixelLayer, WaterLaneLayer } from './RoadPixelLayer';
 import { TerrainTileLayer, useTerrainGrid } from './TerrainTileLayer';
 import { roadWalks, showTiles, waterLanes } from './terrainTiles';
 import { ROAD_CELL, passNeighbours } from './roadPixels';
-import {
-  CAPITAL_MARK,
-  isCapital,
-  levelName,
-  markerBox,
-  markerGates,
-  markerUnits,
-  passAxis,
-  type DrawnNation,
-} from './siteMarkers';
+import { markerBox, markerGates, markerUnits, passAxis, type DrawnNation } from './siteMarkers';
 import type { SiteGate } from './terrainTiles';
 import { basemapForOperationalMap } from './operationalGeography';
 import { mapTapTargets, tapCandidates, type MapView } from './mapTapTargets';
-import { MapGenerals } from './MapGenerals';
-import { generalsByCity, type MapGeneral } from './mapGeneralList';
+import type { MapGeneral } from './mapGeneralList';
+import { buildMapModel, describeSite, mapLabel, SITE_KIND_LABELS } from './mapModel';
+import { MapSiteChooser, MapTooltip, tooltipPlacement } from './MapParts';
 import styles from './OperationalWorldMap.module.css';
 
 type MapData = PublicGeography;
@@ -33,9 +25,7 @@ type DrawnCity = Pick<MapCity, 'key' | 'name' | 'kind' | 'x' | 'y' | 'nationId' 
   level?: number;
 };
 type View = MapView;
-const labels = { CITY: '도시', PASS: '관문', PORT: '항구 시설', FIELD: '전장 표시' };
-// 툴팁 오른쪽 위의 한 글자 표기. 도시는 규모(특·대·중·소 …)를 쓴다.
-const shortLabels = { CITY: '도시', PASS: '관', PORT: '항', FIELD: '전장' };
+const labels = SITE_KIND_LABELS;
 // 가장 깊이 확대한 보기 너비(지도 단위). 가장 큰 표식(경 13단위)도 화면 하나에 거의 차게 보인다.
 export const MIN_VIEW_WIDTH = 8;
 const clamp = (view: View, canvas: MapData['canvas']): View => ({
@@ -101,33 +91,8 @@ export function matchesOperationalGeography(map: MapData, cities: readonly Drawn
   });
 }
 
-// 지도 거점 고르기의 소속 구분 (INT-25, 원작 현재 도시 화면의 도시선택 `본국`·`타국`·`공백지`).
-export type ChooserTag = '본국' | '타국' | '공백지' | '기록 없음';
-const CHOOSER_ORDER: readonly ChooserTag[] = ['본국', '타국', '공백지', '기록 없음'];
-
-export function chooserTag(
-  city: Pick<DrawnCity, 'nationId' | 'recorded'> | undefined,
-  myNationId: number | null,
-): ChooserTag {
-  if (!city || city.recorded === false) return '기록 없음';
-  if (city.nationId === null) return '공백지';
-  return myNationId !== null && city.nationId === myNationId ? '본국' : '타국';
-}
-
-// 거점을 소속별로 묶는다. 본국을 먼저 두고 묶음 안에서는 지도 자료 순서를 지킨다. 빈 묶음은 뺀다.
-export function chooserGroups<T extends { anchorKey?: number | undefined }>(
-  anchors: readonly T[],
-  cityByKey: ReadonlyMap<number, Pick<DrawnCity, 'nationId' | 'recorded'>>,
-  myNationId: number | null,
-): Array<{ tag: ChooserTag; sites: T[] }> {
-  return CHOOSER_ORDER.map((tag) => ({
-    tag,
-    sites: anchors.filter(
-      (site) =>
-        chooserTag(site.anchorKey === undefined ? undefined : cityByKey.get(site.anchorKey), myNationId) === tag,
-    ),
-  })).filter((group) => group.sites.length > 0);
-}
+// 거점 고르기 묶음은 지도 모형(mapModel)에 있다. 기존 호출부를 위해 여기서도 내보낸다.
+export { chooserGroups, chooserTag, type ChooserTag } from './mapModel';
 
 export function OperationalWorldMap({
   cities,
@@ -288,16 +253,8 @@ export function OperationalWorldMap({
     );
   }, [selectedX, selectedY]);
   if (!validGeography || !basemap) return <p role="alert">지도 판이 맞지 않습니다. 지도를 다시 불러오세요.</p>;
-  const cityByKey = new Map(cities.map((city) => [city.key, city]));
-  const nationById = new Map(nations.map((nation) => [nation.id, nation]));
-  const siteById = new Map(map.sites.map((site) => [site.id, site]));
-  const generalsAt = generalsByCity(generals);
-  // 항구는 켜진 물길이 타고 내리는 자리일 때만 그린다. 물길이 없는 판(SAN10)의 항구 시설은 숨긴다.
-  const usedPorts = new Set(
-    map.routes.flatMap((route) => (route.enabled && route.mode === 'RIVER' ? (route.portIds ?? []) : [])),
-  );
-  const drawnSites = map.sites.filter((site) => site.kind !== 'PORT' || usedPorts.has(site.id));
-  const anchors = map.sites.filter((site) => site.kind === 'CITY' || site.kind === 'PASS');
+  const model = buildMapModel({ map, cities, nations, generals });
+  const { cityByKey, siteById, drawnSites, anchors } = model;
   const tapTargets = layout.mobile && onSelect ? mapTapTargets(cities, view, layout) : [];
   const targetByKey = new Map(tapTargets.map((target) => [target.key, target]));
   // 화면 px / 지도 단위. 크기를 아직 못 읽었으면 0이고 표식은 네모로 줄인다.
@@ -424,32 +381,12 @@ export function OperationalWorldMap({
           <output aria-label="현재 지도 배율">{(whole.width / view.width).toFixed(1)}배</output>
         </div>
         {onSelect && (
-          <label className={styles.selector}>
-            지도 거점
-            <select
-              value={selectedKey ?? ''}
-              onChange={(event) => choose(Number(event.target.value), map.id !== 'san10')}
-            >
-              <option value="" disabled>
-                도시·관문 선택
-              </option>
-              {myNationId === undefined
-                ? anchors.map((site) => (
-                    <option key={site.id} value={site.anchorKey}>
-                      {site.name} ({labels[site.kind]})
-                    </option>
-                  ))
-                : chooserGroups(anchors, cityByKey, myNationId).map((group) => (
-                    <optgroup key={group.tag} label={group.tag}>
-                      {group.sites.map((site) => (
-                        <option key={site.id} value={site.anchorKey}>
-                          {site.name} ({labels[site.kind]}) · {group.tag}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-            </select>
-          </label>
+          <MapSiteChooser
+            model={model}
+            selectedKey={selectedKey}
+            myNationId={myNationId}
+            onChoose={(key) => choose(key, map.id !== 'san10')}
+          />
         )}
       </div>
       <svg
@@ -458,7 +395,7 @@ export function OperationalWorldMap({
         className={fill ? `${styles.map} ${styles.mapFill}` : styles.map}
         style={fill ? undefined : { aspectRatio: `${whole.width}/${whole.height}` }}
         role="group"
-        aria-label={`중원 지도, 도시 ${anchors.filter((site) => site.kind === 'CITY').length}개, 관문 ${anchors.filter((site) => site.kind === 'PASS').length}개`}
+        aria-label={mapLabel(model)}
         data-testid="world-map"
         tabIndex={0}
         onKeyDown={(event) => {
@@ -593,29 +530,7 @@ export function OperationalWorldMap({
             })}
         </g>
         {drawnSites.map((site) => {
-          const city = site.anchorKey === undefined ? undefined : cityByKey.get(site.anchorKey);
-          const nation = city?.nationId == null ? undefined : nationById.get(city.nationId);
-          const mine = city?.key === myCityKey;
-          const selected = city?.key === selectedKey;
-          const parent = site.kind === 'PORT' ? siteById.get(site.parentCityId!) : undefined;
-          const grade = site.kind === 'CITY' ? levelName(city?.level) : undefined;
-          const capital = city !== undefined && isCapital(city, nation);
-          const plate = `${capital ? CAPITAL_MARK : ''}${site.name}${city?.ruin ? ' (폐허)' : ''}`;
-          const label = [
-            site.name,
-            grade ? `${grade} ${labels[site.kind]}` : labels[site.kind],
-            city?.regionName ?? null,
-            city?.recorded === false ? '기록 없음' : (nation?.name ?? (city ? '공백지' : null)),
-            capital ? '수도' : null,
-            parent ? `${parent.name} 소속` : null,
-            mine ? '내 위치' : null,
-            city?.ruin ? `폐허 복구 ${city.ruin.percent}%` : null,
-            city?.supplied === false && city.nationId !== null ? '보급 끊김' : null,
-            // 풍선(aria-hidden)의 장수 얼굴·이름과 같은 정보를 장수 수로 읽게 한다.
-            city && generalsAt.get(city.key) ? `장수 ${generalsAt.get(city.key)!.length}명` : null,
-          ]
-            .filter(Boolean)
-            .join(', ');
+          const { city, nation, mine, selected, plate, label } = describeSite(model, site, { myCityKey, selectedKey });
           const action = city && onSelect ? () => choose(city.key) : undefined;
           const target = city ? targetByKey.get(city.key) : undefined;
           const level = site.kind === 'CITY' ? city?.level : undefined;
@@ -720,54 +635,12 @@ export function OperationalWorldMap({
         ? (() => {
             const site = siteById.get(hover.siteId);
             if (!site) return null;
-            const city = site.anchorKey === undefined ? undefined : cityByKey.get(site.anchorKey);
-            const nation = city?.nationId == null ? undefined : nationById.get(city.nationId);
-            const parent = site.kind === 'PORT' ? siteById.get(site.parentCityId!) : undefined;
-            const grade = site.kind === 'CITY' ? levelName(city?.level) : undefined;
-            const owner = city?.recorded === false ? '기록 없음' : (nation?.name ?? (city ? '공백지' : null));
-            const notes = [
-              city && isCapital(city, nation) ? '수도' : null,
-              parent ? `${parent.name} 소속` : null,
-              city?.key === myCityKey ? '내 위치' : null,
-              city?.ruin ? `폐허 복구 ${city.ruin.percent}%` : null,
-              city?.supplied === false && city.nationId !== null ? '보급 끊김' : null,
-            ].filter((note): note is string => note !== null);
-            // 커서 오른쪽 아래에 띄우되 지도 밖으로 나가면 왼쪽·위로 넘긴다.
-            const right = hover.x > layout.width - 200;
-            const below = hover.y < 120;
             return (
-              <div
-                className={styles.tooltip}
-                data-testid="map-tooltip"
-                aria-hidden="true"
-                style={{
-                  left: right ? undefined : hover.x + 14,
-                  right: right ? Math.max(0, layout.width - hover.x + 14) : undefined,
-                  top: below ? hover.y + 18 : undefined,
-                  bottom: below ? undefined : Math.max(0, (frame.current?.clientHeight ?? 0) - hover.y + 10),
-                }}
-              >
-                <p className={styles.tooltipTitle}>
-                  <span>{site.name}</span>
-                  {/* 원작 도시 제목처럼 지역·규모를 함께 쓴다 (【 하북 · 특 】). */}
-                  <span className={styles.tooltipGrade}>
-                    {city?.regionName ? `${city.regionName} · ` : ''}
-                    {grade ?? shortLabels[site.kind]}
-                  </span>
-                </p>
-                {owner ? (
-                  <p className={styles.tooltipOwner}>
-                    <span className={styles.tooltipSwatch} style={{ background: nation?.color ?? '#d6d0c4' }} />
-                    {owner}
-                  </p>
-                ) : null}
-                {notes.map((note) => (
-                  <p key={note} className={styles.tooltipNote}>
-                    {note}
-                  </p>
-                ))}
-                {city ? <MapGenerals generals={generalsAt.get(city.key) ?? []} /> : null}
-              </div>
+              <MapTooltip
+                view={describeSite(model, site, { myCityKey, selectedKey })}
+                model={model}
+                style={tooltipPlacement(hover, { width: layout.width, height: frame.current?.clientHeight ?? 0 })}
+              />
             );
           })()
         : null}

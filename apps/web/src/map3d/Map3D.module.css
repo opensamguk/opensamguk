@@ -1,0 +1,241 @@
+/* 3D 군략도 시제품 (INT-27 0단계). SVG 지도와 같은 10:7 판에 캔버스와 DOM 이름판 층을 겹친다. */
+.frame {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  /* 천하 전도는 가로로 긴 판(2:1)이다. 45° 시점에서 중원 지도 전체가 꽉 찬다. */
+  aspect-ratio: 2/1;
+  max-height: 720px;
+  overflow: hidden;
+  background: #0c2a42;
+  touch-action: none;
+  user-select: none;
+}
+.fill {
+  height: 100%;
+  aspect-ratio: auto;
+  max-height: none;
+}
+.canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--color-banner-text, #f4ecd8);
+  font-size: var(--text-sm);
+}
+.overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+/* 거점 표시: 나라 글자 깃발(깃대 포함)과 그 아래 옻칠 빛 이름판. 단추 하나가 둘을 세로로 묶는다. */
+.site {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: auto;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: #f6eedc;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  cursor: pointer;
+  white-space: nowrap;
+  visibility: hidden;
+}
+.flag {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 2px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  color: #fff;
+  border: 1.5px solid rgb(255 255 255 / 88%);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 55%);
+  text-shadow: 0 1px 1px rgb(0 0 0 / 45%);
+}
+.flag::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  width: 2px;
+  height: 7px;
+  margin-left: -1px;
+  background: #3b2f22;
+}
+.site:disabled {
+  cursor: default;
+}
+.site:focus-visible {
+  outline: 2px solid var(--color-accent, #b23a2a);
+  outline-offset: 1px;
+}
+.selected .name {
+  color: #fff;
+  background: #b23a2a;
+  border-color: #fff;
+}
+.mine .name {
+  box-shadow:
+    0 0 0 2px #f4ecd8,
+    0 0 0 3px #221d17;
+}
+.name {
+  margin-top: 7px;
+  padding: 0 5px;
+  font-size: 11px;
+  line-height: 17px;
+  color: #f6eedc;
+  background: rgb(34 26 18 / 80%);
+  border: 1px solid rgb(201 164 92 / 85%);
+  pointer-events: none;
+}
+.stats {
+  position: absolute;
+  right: var(--space-2);
+  top: var(--space-2);
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+  color: #f4ecd8;
+  background: rgb(34 29 23 / 80%);
+}
+/* 겹쳐서 줄인 이름판: 작은 점만 남기고 초점·마우스를 올리면 이름을 다시 보인다. */
+/* 겹친 거점은 이름판을 접고 작은 깃발만 남긴다. */
+.site[data-compact='true'] .name {
+  display: none;
+}
+.site[data-compact='true'] .flag {
+  min-width: 14px;
+  height: 14px;
+  font-size: 9px;
+}
+.site[data-compact='true']:hover,
+.site[data-compact='true']:focus-visible {
+  z-index: 2;
+}
+.site[data-compact='true']:hover .name,
+.site[data-compact='true']:focus-visible .name {
+  display: block;
+}
+/* 1단계: SVG 지도와 같은 배율 단추·거점 고르기 줄과 도움말 (INT-27). */
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.wrapFill {
+  height: 100%;
+}
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+.zoom {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.zoom button {
+  min-width: 44px;
+  min-height: 36px;
+  padding: 0 var(--space-2);
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  background: var(--color-surface-raised, var(--color-surface));
+  border: 2px solid var(--color-ink);
+  border-radius: 0;
+  cursor: pointer;
+}
+.zoom button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.zoom output {
+  font-size: var(--text-sm);
+}
+.frame:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+.help {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+@media (max-width: 767px) {
+  .zoom button {
+    min-height: 44px;
+  }
+}
+
+/* 지도 바탕 화면 (INT-29). 판이 부모를 꽉 채우고 배율 단추는 오른쪽 아래에 떠 있다. */
+.stage {
+  position: relative;
+  height: 100%;
+  gap: 0;
+}
+.stage .frame {
+  height: 100%;
+  aspect-ratio: auto;
+  max-height: none;
+}
+.stageTools {
+  position: absolute;
+  right: var(--stage-tools-right, 16px);
+  bottom: var(--stage-tools-bottom, 56px);
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+.stageTools .zoom {
+  flex-direction: column;
+}
+.stageTools .zoom button {
+  min-width: 44px;
+  min-height: 44px;
+  color: #efe4cc;
+  background: rgb(28 21 15 / 92%);
+  border: 1px solid #b8954f;
+}
+.stageTools .zoom output {
+  padding: 2px 6px;
+  font-size: var(--text-xs);
+  color: #efe4cc;
+  background: rgb(28 21 15 / 80%);
+}
+.stageTools select {
+  max-width: 200px;
+}
+/* 거점 고르기 상자는 배율 단추 위에 둔다(아래쪽 기록 띠와 겹치지 않게). */
+.stageTools > :last-child {
+  order: -1;
+}

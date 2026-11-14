@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router';
 import { Portrait } from '../portrait/Portrait';
 import { useInfiniteQuery, type QueryKey } from '@tanstack/react-query';
 import { retryUnlessClientError, errorCode } from '../game/errors';
@@ -9,6 +10,7 @@ import { NationBadge } from '../ui/NationBadge';
 import { EmptyState, LoadingState } from '../ui/States';
 import { Tag } from '../ui/Tag';
 import { ValueDelta } from '../ui/ValueDelta';
+import { LogKindIcon, Rich, TextEntityScope } from '../text/RichText';
 import { worldEvents } from './infoView';
 import {
   activityKey,
@@ -16,11 +18,10 @@ import {
   battleKey,
   battleText,
   flattenPages,
-  groupByMonth,
   reviewLines,
   worldTimeline,
   yearbookSummary,
-  type FeedMonth,
+  type FeedLine,
   type WorldItem,
 } from './RecordsFeed';
 import styles from './Records.module.css';
@@ -40,6 +41,25 @@ type Clock = Pick<WorldSummary, 'startYear' | 'gameDate' | 'nowTick' | 'msPerTic
 const dateOf = (tick: number, clock: Clock) => (clock ? formatYearMonth(tickDate(tick, clock)) : '—');
 const logDateOf = (tick: number, clock: Clock) => (clock ? formatYearMonth(personalLogDate(tick, clock)) : '—');
 const n = (value: number) => value.toLocaleString('ko-KR');
+// 메인 기록 칸은 원작처럼 최신 15줄만 보이고, 이어 보기는 기록 화면에서 한다(devsam 동등성, LOG-DIFF.md).
+export const MAIN_RECORD_LINES = 15;
+// 개인 기록 줄 끝의 작은 시각(원작 <1>HH:MM</>).
+const clockOf = (iso: string | undefined) => {
+  if (!iso) return null;
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime())
+    ? null
+    : date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+};
+type RecordTab = 'general' | 'activity' | 'world' | 'battles' | 'nation';
+// 메인에서 기록 화면으로 이어 보는 링크(더 보기 단추 대신).
+function MoreLink({ worldId, tab }: { worldId: string; tab: RecordTab }) {
+  return (
+    <Link to="/w/$worldId/records" params={{ worldId }} search={{ tab }} className={styles.more}>
+      기록 화면에서 더 보기
+    </Link>
+  );
+}
 
 // 기록 조회. tRPC의 infiniteQueryOptions는 입력에 direction을 덧붙이는데 서버의 기록 입력은 strict라 거부한다.
 // 그래서 커서만 넣어 직접 부르고, 쿼리 키는 같은 procedure 아래에 둬 records 무효화에 함께 걸리게 한다.
@@ -129,12 +149,17 @@ export function RecordList({
     if (errorCode(query.error) === 'NOT_FOUND' && kind !== 'world') return <NoGeneral worldId={worldId} />;
     return <QueryError error={query.error} notFound="월드를 찾을 수 없습니다" onRetry={() => void query.refetch()} />;
   }
-  const body = renderRecords(kind, query.data.pages, clock, nations, cities, compact, worldLines);
+  const pages = compact
+    ? [{ items: query.data.pages.flatMap((page) => page.items).slice(0, MAIN_RECORD_LINES) }]
+    : query.data.pages;
+  const body = renderRecords(kind, pages, clock, nations, cities, compact, worldLines);
   return (
-    <div className={compact ? `${styles.records} ${styles.compact}` : styles.records} data-record-kind={kind}>
-      {body ?? <EmptyState title={emptyText[kind]} />}
-      <MoreButton query={query} />
-    </div>
+    <TextEntityScope worldId={worldId}>
+      <div className={compact ? `${styles.records} ${styles.compact}` : styles.records} data-record-kind={kind}>
+        {body ?? <EmptyState title={emptyText[kind]} />}
+        {compact ? <MoreLink worldId={worldId} tab={kind} /> : <MoreButton query={query} />}
+      </div>
+    </TextEntityScope>
   );
 }
 
@@ -202,6 +227,7 @@ interface GeneralItem {
   commandKey: string;
   kind: string;
   text: string;
+  createdAt?: string;
 }
 interface NationItem {
   tick: number;
@@ -218,8 +244,17 @@ export function GeneralLogList({ items, clock }: { items: readonly GeneralItem[]
       {items.map((item) => (
         <li key={item.id} className={styles.line} data-log-kind={item.kind}>
           <span className={`num ${styles.date}`}>{logDateOf(item.tick, clock)}</span>
+          <LogKindIcon kind={item.kind} />
           {item.kind === 'failure' ? <Tag tone="danger">실패</Tag> : null}
-          <span className={styles.text}>{item.text}</span>
+          <span className={styles.text}>
+            {/* 기록 글은 자기 칸에 둔다. 뒤의 시각과 글자가 섞이지 않아 글 그대로 찾을 수 있다(e2e messages). */}
+            <span>
+              <Rich text={item.text} />
+            </span>
+            {clockOf(item.createdAt) ? (
+              <small className={`num ${styles.clock}`}>{clockOf(item.createdAt)}</small>
+            ) : null}
+          </span>
         </li>
       ))}
     </ol>
@@ -338,7 +373,8 @@ export function WorldHistoryList({
                     className={styles.event}
                     data-testid={line.startsWith('월단평:') ? 'world-review-headline' : undefined}
                   >
-                    {line}
+                    {line.startsWith('월단평:') ? <LogKindIcon kind="review" /> : null}
+                    <Rich text={line} />
                   </span>
                 ))}
               </span>
@@ -367,31 +403,46 @@ export function WorldHistoryList({
 }
 
 // 달마다 묶은 사건 글줄. 장수 동향은 줄 앞에 소속 국가 이름표를 붙인다.
-function FeedList({ months, testId }: { months: readonly FeedMonth[]; testId: string }) {
+function FeedList({
+  lines,
+  testId,
+  monthOnly = false,
+}: {
+  lines: readonly FeedLine[];
+  testId: string;
+  // 장수 동향은 원작처럼 달만(3월), 중원 정세는 해와 달(184년 3월)을 줄 앞에 쓴다.
+  monthOnly?: boolean;
+}) {
   return (
     <ol className={styles.lines} data-testid={testId}>
-      {months.map((month) => (
-        <li key={month.key} className={styles.yearbook} data-feed-month={`${month.year}-${month.month}`}>
+      {lines.map((line) => (
+        <li
+          key={line.key}
+          className={styles.line}
+          data-feed-source={line.source}
+          data-feed-kind={line.kind}
+          data-testid={line.source === 'review' ? 'world-review-headline' : undefined}
+        >
           <span className={`num ${styles.date}`}>
-            {month.year}년 {month.month}월
+            {monthOnly ? `${line.month}월` : `${line.year}년 ${line.month}월`}
           </span>
-          <span className={styles.events}>
-            {month.lines.map((line) => (
-              <span
-                key={line.key}
-                className={styles.event}
-                data-feed-source={line.source}
-                data-feed-kind={line.kind}
-                data-testid={line.source === 'review' ? 'world-review-headline' : undefined}
-              >
-                {line.portrait ? (
-                  <Portrait id={line.portrait.id} name={line.portrait.name} variant="icon" size={20} decorative />
-                ) : null}
-                {line.nation ? <NationBadge name={line.nation.name} color={line.nation.color} /> : null}
-                {line.nation ? ' ' : null}
-                {line.text}
-              </span>
-            ))}
+          <LogKindIcon kind={line.kind} />
+          <span className={styles.text}>
+            {line.nation ? <NationBadge name={line.nation.name} color={line.nation.color} /> : null}
+            {line.nation ? ' ' : null}
+            <Rich
+              text={line.text}
+              actor={
+                line.portrait
+                  ? {
+                      kind: 'general',
+                      name: line.portrait.name,
+                      portraitId: line.portrait.id,
+                      color: line.nation?.color ?? null,
+                    }
+                  : undefined
+              }
+            />
           </span>
         </li>
       ))}
@@ -409,14 +460,16 @@ export function ActivityFeed({ worldId, compact = false }: { worldId: string; co
     return <QueryError error={query.error} notFound="월드를 찾을 수 없습니다" onRetry={() => void query.refetch()} />;
   const lines = flattenPages(query.data.pages, activityKey).map(activityLine);
   return (
-    <div className={feedClass(compact)} data-record-kind="activity">
-      {lines.length > 0 ? (
-        <FeedList months={groupByMonth(lines)} testId="activity-feed" />
-      ) : (
-        <EmptyState title="장수 동향이 아직 없습니다" />
-      )}
-      <MoreButton query={query} />
-    </div>
+    <TextEntityScope worldId={worldId}>
+      <div className={feedClass(compact)} data-record-kind="activity">
+        {lines.length > 0 ? (
+          <FeedList lines={compact ? lines.slice(0, MAIN_RECORD_LINES) : lines} testId="activity-feed" monthOnly />
+        ) : (
+          <EmptyState title="장수 동향이 아직 없습니다" />
+        )}
+        {compact ? <MoreLink worldId={worldId} tab="activity" /> : <MoreButton query={query} />}
+      </div>
+    </TextEntityScope>
   );
 }
 
@@ -448,25 +501,27 @@ export function WorldFeed({
   );
   const latest = months[0];
   return (
-    <div className={feedClass(compact)} data-record-kind="world-events">
-      {lines.length > 0 ? (
-        <FeedList months={groupByMonth(lines)} testId="world-feed" />
-      ) : compact && latest ? (
-        <ol className={styles.lines}>
-          <li className={styles.yearbook}>
-            <span className={`num ${styles.date}`}>
-              {latest.year}년 {latest.month}월
-            </span>
-            <span className={styles.text}>{yearbookSummary(latest)}</span>
-          </li>
-        </ol>
-      ) : compact && yearbook.isPending ? (
-        <LoadingState />
-      ) : (
-        <EmptyState title="중원 정세 사건이 아직 없습니다" />
-      )}
-      <MoreButton query={events} />
-    </div>
+    <TextEntityScope worldId={worldId}>
+      <div className={feedClass(compact)} data-record-kind="world-events">
+        {lines.length > 0 ? (
+          <FeedList lines={compact ? lines.slice(0, MAIN_RECORD_LINES) : lines} testId="world-feed" />
+        ) : compact && latest ? (
+          <ol className={styles.lines}>
+            <li className={styles.yearbook}>
+              <span className={`num ${styles.date}`}>
+                {latest.year}년 {latest.month}월
+              </span>
+              <span className={styles.text}>{yearbookSummary(latest)}</span>
+            </li>
+          </ol>
+        ) : compact && yearbook.isPending ? (
+          <LoadingState />
+        ) : (
+          <EmptyState title="중원 정세 사건이 아직 없습니다" />
+        )}
+        {compact ? <MoreLink worldId={worldId} tab="world" /> : <MoreButton query={events} />}
+      </div>
+    </TextEntityScope>
   );
 }
 
@@ -480,23 +535,26 @@ export function BattleList({ worldId }: { worldId: string }) {
   }
   const items = flattenPages(query.data.pages, battleKey);
   return (
-    <div className={styles.records} data-record-kind="battles">
-      {items.length > 0 ? (
-        <ol className={styles.lines}>
-          {items.map((item) => (
-            <li key={battleKey(item)} className={styles.line} data-battle-tick={item.tick}>
-              <span className={`num ${styles.date}`}>{formatYearMonth(item.gameDate)}</span>
-              <span className={styles.text}>
-                <Portrait id={item.portraitId} name="공격 장수" variant="icon" size={20} decorative />{' '}
-                {battleText(item.text)}
-              </span>
-            </li>
-          ))}
-        </ol>
-      ) : (
-        <EmptyState title="전투 기록이 아직 없습니다" />
-      )}
-      <MoreButton query={query} />
-    </div>
+    <TextEntityScope worldId={worldId}>
+      <div className={styles.records} data-record-kind="battles">
+        {items.length > 0 ? (
+          <ol className={styles.lines}>
+            {items.map((item) => (
+              <li key={battleKey(item)} className={styles.line} data-battle-tick={item.tick}>
+                <span className={`num ${styles.date}`}>{formatYearMonth(item.gameDate)}</span>
+                <span className={styles.text}>
+                  <LogKindIcon kind="battle" />
+                  <Portrait id={item.portraitId} name="공격 장수" variant="icon" size={20} decorative />{' '}
+                  <Rich text={battleText(item.text)} />
+                </span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <EmptyState title="전투 기록이 아직 없습니다" />
+        )}
+        <MoreButton query={query} />
+      </div>
+    </TextEntityScope>
   );
 }

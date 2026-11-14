@@ -1,5 +1,5 @@
 import type { PublicGeography } from '@opensamguk/shared';
-import { useRef, useState } from 'react';
+import { lazy, Suspense, useMemo, useRef, useState } from 'react';
 import { OperationalWorldMap } from './OperationalWorldMap';
 import { CAPITAL_MARK, isCapital, levelName, type DrawnNation } from './siteMarkers';
 import { readableTextColor } from '../ui/color';
@@ -8,6 +8,26 @@ import { MapGenerals } from './MapGenerals';
 import { generalsByCity, generalsText, type MapGeneral } from './mapGeneralList';
 import tooltipStyles from './OperationalWorldMap.module.css';
 import styles from './WorldMap.module.css';
+
+// 3D 군략도 시제품 (INT-27 0단계, D-089). 지연 로드라 첫 화면 번들에 들어가지 않는다.
+const Map3D = lazy(() => import('../map3d/Map3D'));
+
+// 주소에 ?map=3d가 있고 WebGL2가 될 때만 3D로 그린다. 아니면 지금 SVG 지도다.
+export function wants3dMap(): boolean {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return false;
+  if (new URLSearchParams(window.location.search).get('map') !== '3d') return false;
+  return hasWebgl2();
+}
+
+/** WebGL2가 되는 기기인지. 지도 바탕 화면(INT-29)은 주소와 상관없이 되면 3D로 그린다. */
+export function hasWebgl2(): boolean {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return false;
+  try {
+    return document.createElement('canvas').getContext('webgl2') !== null;
+  } catch {
+    return false;
+  }
+}
 
 // 지도 좌표계. che 지도의 도시 좌표(25~680, 20~480)를 그대로 쓴다.
 export const MAP_WIDTH = 700;
@@ -71,6 +91,7 @@ export function WorldMap({
   fill = false,
   focusKey = null,
   generals,
+  stage = false,
 }: {
   cities: readonly DrawnCity[];
   nations: readonly DrawnNation[];
@@ -85,10 +106,31 @@ export function WorldMap({
   fill?: boolean;
   // 운영 지도에서 처음 열 때 가운데 둘 거점 (인자 입력 화면, INT-25).
   focusKey?: number | null;
+  /** 지도 바탕 화면(INT-29). WebGL2가 되면 주소와 상관없이 3D로, 화면을 꽉 채워 그린다. */
+  stage?: boolean;
 }) {
   // 장수를 받은 고전 지도는 마우스를 올린 도시의 풍선을 띄운다 (운영 지도 풍선과 같은 모양, INT-26).
   const [hover, setHover] = useState<{ key: number; x: number; y: number } | null>(null);
   const frame = useRef<HTMLDivElement>(null);
+  const use3d = useMemo(() => (stage ? hasWebgl2() : wants3dMap()), [stage]);
+  if (operationalMap && use3d)
+    return (
+      <Suspense fallback={<p role="status">3D 지도를 불러오는 중입니다</p>}>
+        <Map3D
+          cities={cities}
+          nations={nations}
+          map={operationalMap}
+          myCityKey={myCityKey}
+          myNationId={myNationId}
+          selectedKey={selectedKey}
+          onSelect={onSelect}
+          generals={generals}
+          fill={fill}
+          focusKey={focusKey}
+          stage={stage}
+        />
+      </Suspense>
+    );
   if (operationalMap)
     return (
       <OperationalWorldMap
