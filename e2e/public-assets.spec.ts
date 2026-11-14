@@ -198,6 +198,7 @@ async function watch(page: Page): Promise<Seen> {
       ![...meta.textures, ...meta.sprites].some(({ url }) => url === response.url())
     )
       return;
+    if (meta.sprites.some((sprite) => sprite.url === response.url())) return; // Browser hashes sprite bytes before decoding.
     if (url.pathname.startsWith('/trpc') || url.pathname.startsWith('/sse')) return;
     seen.pending.push(
       response.body().then((body) => {
@@ -383,15 +384,19 @@ test('고정 스프라이트 WebP가 공개 CSP에서 열린다', async ({ page 
   });
   await page.goto(origin + '/login', { waitUntil: 'networkidle' });
   const sprite = meta.sprites.find(({ source }) => source === 'map3d/sprites/city-grand-capital.webp')!;
-  const maxDimension = await page.evaluate(async (url) => {
+  const result = await page.evaluate(async (url) => {
     const response = await fetch(url, { credentials: 'omit' });
     if (!response.ok) throw new Error('Sprite fetch failed');
-    const bitmap = await createImageBitmap(await response.blob());
+    const bytes = await response.arrayBuffer();
+    const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), (byte) =>
+      byte.toString(16).padStart(2, '0'),
+    ).join('');
+    const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/webp' }));
     const maxDimension = Math.max(bitmap.width, bitmap.height);
     bitmap.close();
-    return maxDimension;
+    return { maxDimension, hash };
   }, sprite.url);
-  expect(maxDimension).toBeGreaterThanOrEqual(3072);
+  expect(result).toEqual({ maxDimension: 3072, hash: sprite.sha256 });
   await Promise.all(seen.pending);
   expectOnlyDistAssets(seen);
 });

@@ -87,6 +87,7 @@ function manifestFrom(value: unknown): Manifest {
       ([entries, pattern]) =>
         entries !== undefined &&
         (value.delivery !== 'external' ||
+          value.portraitPolicy !== 'remote' ||
           !Array.isArray(entries) ||
           entries.length === 0 ||
           new Set(entries.map((entry) => (record(entry) ? entry.source : null))).size !== entries.length ||
@@ -98,7 +99,17 @@ function manifestFrom(value: unknown): Manifest {
               typeof entry.sha256 === 'string' &&
               digestPattern.test(entry.sha256),
           )),
-    )
+    ) ||
+    (value.mapImages !== undefined &&
+      (!Array.isArray(value.mapImages) ||
+        value.mapImages.length !== APPROVED_MAP_IMAGES.length ||
+        !value.mapImages.every(
+          (entry, index) =>
+            record(entry) &&
+            entry.source === APPROVED_MAP_IMAGES[index] &&
+            typeof entry.sha256 === 'string' &&
+            digestPattern.test(entry.sha256),
+        )))
   ) {
     throw new PublicAssetsError([
       'manifest/public-assets.json: decision-policy: D-031·D-087의 공개 이미지 승인 목록이 아닙니다.',
