@@ -1,0 +1,81 @@
+/* 이름 효과 (INT-29). 줄 높이를 거의 바꾸지 않게 아이콘은 1em 안팎으로 둔다. */
+.general,
+.nation,
+.city {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  vertical-align: -2px;
+  white-space: nowrap;
+}
+.general :global(img),
+.general > :first-child {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1.5px var(--tint);
+}
+.general b,
+.nation b {
+  font-weight: 800;
+}
+.general b {
+  border-bottom: 2px solid var(--tint);
+  line-height: 1.15;
+}
+.nation i {
+  flex: none;
+  width: 0.8em;
+  height: 0.8em;
+  background: var(--tint);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 55%), inset 0 0 0 1px rgb(255 255 255 / 25%);
+}
+.city {
+  gap: 2px;
+  text-decoration: underline dotted var(--tint);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+.city svg {
+  flex: none;
+  color: var(--tint);
+}
+.num {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.up {
+  color: var(--color-success);
+}
+.down {
+  color: var(--color-danger);
+}
+
+/* 기록 줄 앞 종류 아이콘 */
+.kind {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 4px;
+  vertical-align: -5px;
+  color: #fff8e6;
+  border: 1px solid rgb(0 0 0 / 45%);
+}
+.war {
+  background: #8a2414;
+}
+.good {
+  background: #2f6e5e;
+}
+.bad {
+  background: #4a4033;
+}
+.state {
+  background: #a8822f;
+}
+.calm {
+  background: #3c5a78;
+}

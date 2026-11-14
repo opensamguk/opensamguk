@@ -12,7 +12,9 @@
   --foot: 30px;
   --dock: 68px;
   --tabbar: 0px;
-  --stage-tools-right: 556px;
+  /* 오른쪽 판 폭: 왼쪽 판(372)·독과 겹치지 않을 만큼만 줄어든다. */
+  --right-width: min(530px, calc(100vw - 372px - var(--dock) - 44px));
+  --stage-tools-right: calc(var(--right-width) + 26px);
   --stage-tools-bottom: calc(var(--foot) + 16px);
 
   position: fixed;
@@ -359,7 +361,7 @@
 }
 .right {
   right: 12px;
-  width: 530px;
+  width: var(--right-width);
 }
 .panelHead {
   position: relative;

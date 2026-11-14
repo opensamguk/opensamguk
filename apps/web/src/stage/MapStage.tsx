@@ -29,7 +29,7 @@ import { Portrait } from '../portrait/Portrait';
 import { TurnEditor } from '../turns/TurnEditor';
 import { useTRPC } from '../trpc';
 import { EmptyState, LoadingState } from '../ui/States';
-import { StageIcon, type StageIconName } from './stageIcons';
+import { StageIcon, type StageIconName } from '../ui/GameIcon';
 import { useStageSound } from './stageSound';
 import styles from './MapStage.module.css';
 
@@ -204,7 +204,8 @@ export function MapStage() {
       ) : (
         <EmptyState title="지도에서 도시를 고르세요" />
       );
-    if (key === 'nation') return withHome((home) => <NationInfo worldId={worldId} nation={home.nation} cities={cities} />);
+    if (key === 'nation')
+      return withHome((home) => <NationInfo worldId={worldId} nation={home.nation} cities={cities} />);
     return <MainRecords worldId={worldId} clock={summary.data} nations={nations} cities={cities} />;
   };
   const active = PANELS.find((item) => item.key === panel) ?? null;
@@ -456,7 +457,12 @@ export function MapStage() {
             내 예턴{name ? ` · ${name}` : ''}
           </h2>
           <span className={styles.spacer} />
-          <button type="button" className={styles.close} aria-label="내 예턴 판 닫기" onClick={narrow ? closeSheet : toggleTurns}>
+          <button
+            type="button"
+            className={styles.close}
+            aria-label="내 예턴 판 닫기"
+            onClick={narrow ? closeSheet : toggleTurns}
+          >
             <StageIcon name="close" size={18} />
           </button>
         </div>
@@ -484,7 +490,12 @@ export function MapStage() {
             <span>{item.label}</span>
           </button>
         ))}
-        <button type="button" className={`${styles.tabButton} ${styles.tabMain}`} aria-pressed={turnsOpen} onClick={toggleTurns}>
+        <button
+          type="button"
+          className={`${styles.tabButton} ${styles.tabMain}`}
+          aria-pressed={turnsOpen}
+          onClick={toggleTurns}
+        >
           <StageIcon name="turns" size={28} />
           <span>예턴</span>
         </button>

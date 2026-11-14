@@ -24,7 +24,15 @@ function writeEnabled(on: boolean) {
 }
 
 // 음 하나: 주파수에서 끝 주파수로 미끄러지며 짧게 사라진다.
-function tone(ctx: AudioContext, at: number, from: number, to: number, length: number, type: OscillatorType, volume: number) {
+function tone(
+  ctx: AudioContext,
+  at: number,
+  from: number,
+  to: number,
+  length: number,
+  type: OscillatorType,
+  volume: number,
+) {
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
   osc.type = type;
