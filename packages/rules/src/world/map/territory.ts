@@ -1,6 +1,6 @@
 import { assignTerritory, toTile, type TerritorySeed } from '@opensamguk/shared';
 import type { OperationalMapResource } from './operational';
-import landMasks from './territoryLand.json';
+import landMasks from './territoryLand.json' with { type: 'json' };
 
 const TILE = 8;
 function landFor(map: Pick<OperationalMapResource, 'canvas' | 'basemap'>) {
