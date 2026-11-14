@@ -33,7 +33,7 @@ LEVELS = {
     'capital': {'n': 9, 'mat': 'stone', 'core': 'palace-gold', 'core_size': 3, 'empty': 0.1, 'towers': True},
     'city-7': {'n': 7, 'mat': 'stone', 'core': 'hall-grey', 'core_size': 1, 'empty': 0.12, 'towers': True},
     'city-6': {'n': 5, 'mat': 'stone', 'core': None, 'core_size': 0, 'empty': 0.2, 'towers': True},
-    'city-5': {'n': 5, 'mat': 'earth', 'core': None, 'core_size': 0, 'empty': 0.3, 'towers': False},
+    'city-5': {'n': 5, 'mat': 'earth', 'core': None, 'core_size': 0, 'empty': 0.3, 'towers': True},
 }
 
 
@@ -94,7 +94,7 @@ def strip(path, slope, cut=0.12, measure=(0.15, 0.85)):
     return piece, slope * c0 + fit_b + off, float(np.median(hs))
 
 
-def compose(parts, name, cfg, out):
+def compose(parts, name, cfg, out, walls_only=False):
     n, mat = cfg['n'], cfg['mat']
     rng = random.Random(name)
     half = W / 2
@@ -168,10 +168,10 @@ def compose(parts, name, cfg, out):
             k += 1
         placed.append({'part': part, 'edge': edge, 'run': [round(xa, 1), round(xb, 1)], 'h': round(target_h, 1)})
 
-    def gate_piece(part, edge, xc, target_h, measure):
+    def gate_piece(part, edge, xc, target_h, measure, cut=0.02):
         """성문 토막을 변 edge 위 가운데 xc에 놓고 가로 범위를 돌려준다."""
         x0, y0, slope, depth_of = edges[edge]
-        piece, base, tall = strip(os.path.join(parts, f'{part}.png'), slope, cut=0.02, measure=measure)
+        piece, base, tall = strip(os.path.join(parts, f'{part}.png'), slope, cut=cut, measure=measure)
         sc = target_h / tall
         piece = piece.resize((max(1, round(piece.size[0] * sc)), max(1, round(piece.size[1] * sc))), Image.Resampling.LANCZOS)
         base *= sc
@@ -207,7 +207,8 @@ def compose(parts, name, cfg, out):
     spans = {}
     for edge in ('back-left', 'back-right', 'front-left', 'front-right'):
         if os.path.exists(os.path.join(parts, f'gatewall-{mat}-{edge}.png')):
-            spans[edge] = gate_piece(f'gatewall-{mat}-{edge}', edge, mids[edge], WALL_H, (0.02, 0.12))
+            # 성문 그림 양 끝의 성벽 마감면을 잘라 내고, 높이는 끝 바로 안쪽 성벽 부분에서 재 이웃 성벽과 맞춘다.
+            spans[edge] = gate_piece(f'gatewall-{mat}-{edge}', edge, mids[edge], WALL_H, (0.12, 0.22), cut=0.1)
         elif edge.startswith('front'):
             spans[edge] = gate_piece(f'gate-{mat}-{edge}', edge, mids[edge], GATE_H, (0.15, 0.85))
 
@@ -226,8 +227,10 @@ def compose(parts, name, cfg, out):
             if b > a:
                 run(mat_part, edge, a, b, WALL_H)
 
-    # 5. 안쪽 건물. 가운데 큰 건물, 네 성문으로 가는 큰길은 비운다.
+    # 5. 안쪽 건물. 가운데 큰 건물, 네 성문으로 가는 큰길은 비운다(--walls-only면 건너뛴다).
     mid = n // 2
+    if walls_only:
+        cfg = {**cfg, 'empty': 1.1, 'core': None}
     core, cs = cfg['core'], cfg['core_size']
     r = cs // 2
     taken = {(i, j) for i in range(mid - r, mid + r + 1) for j in range(mid - r, mid + r + 1)} if core else set()
@@ -279,12 +282,14 @@ def compose(parts, name, cfg, out):
 
 
 def main():
-    parts, out = sys.argv[1], sys.argv[2]
-    names = sys.argv[3:] or list(LEVELS)
+    args = [a for a in sys.argv[1:] if not a.startswith('--')]
+    walls_only = '--walls-only' in sys.argv
+    parts, out = args[0], args[1]
+    names = args[2:] or list(LEVELS)
     meta_path = os.path.join(out, 'sprites.json')
     meta = json.load(open(meta_path)) if os.path.exists(meta_path) else {}
     for name in names:
-        meta[name] = compose(parts, name, LEVELS[name], out)
+        meta[name] = compose(parts, name, LEVELS[name], out, walls_only)
         print(name, meta[name])
     json.dump(meta, open(meta_path, 'w'), indent=1)
 
