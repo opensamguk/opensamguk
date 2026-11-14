@@ -394,10 +394,12 @@ test('정식191년 메인·예턴 메뉴 이동·초점·375~1440px·30초 재�
     expect(saved[29]).toMatchObject({ slot: 29, commandKey: 'farm' });
 
     // 실제 조회 실패와 장수 없음은 구분하고, 복구한 뒤 같은 막대를 쓸 수 있다.
-    let failMap = true;
     await page.route('**/trpc/**', async (route) => {
-      if (failMap && route.request().url().includes('world.map')) await route.abort('failed');
-      else await route.continue();
+      if (route.request().url().includes('world.map')) {
+        const retryClicked = await page.evaluate(() => document.documentElement.dataset.mapRetryClicked === 'true');
+        if (!retryClicked) return route.abort('failed');
+      }
+      await route.continue();
     });
     await page.reload();
     const mapPanel = page.getByRole('region', { name: '지도', exact: true });
@@ -407,7 +409,16 @@ test('정식191년 메인·예턴 메뉴 이동·초점·375~1440px·30초 재�
     await expect(mapPanel.getByRole('alert')).toContainText('불러오지 못했습니다', { timeout: 20_000 });
     const retry = mapPanel.getByRole('button', { name: '다시 시도', exact: true });
     await expect(retry).toBeVisible();
-    failMap = false;
+    // 자동 재조회는 계속 막고, 실제 클릭 뒤 처음 나가는 지도 요청부터 복구한다.
+    await retry.evaluate((button) => {
+      button.addEventListener(
+        'click',
+        () => {
+          document.documentElement.dataset.mapRetryClicked = 'true';
+        },
+        { once: true },
+      );
+    });
     await retry.click();
     await expect(page.getByTestId('operational-world-map')).toBeVisible();
     await page.unroute('**/trpc/**');
