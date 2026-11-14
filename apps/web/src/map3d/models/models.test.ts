@@ -1,17 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { buildModel, type ModelKind } from './index';
+import { buildModel, type ModelKind, type ModelLod } from './index';
 
 const cities = ['city-1', 'city-2', 'city-3', 'city-4', 'city-5', 'city-6', 'city-7', 'city-8'] as const;
 const buildings = ['farm', 'market', 'watchtower', 'barracks', 'houses', 'granary', 'shrine'] as const;
-const cases = [
-  ...cities.flatMap((kind) => ([0, 1, 2] as const).map((wall) => ({ kind, wall, budget: 1500 }))),
-  ...(['pass', 'port', 'camp'] as const).map((kind) => ({ kind, wall: 1 as const, budget: 800 })),
-  ...buildings.map((kind) => ({ kind, wall: 1 as const, budget: 300 })),
-] satisfies { kind: ModelKind; wall: 0 | 1 | 2; budget: number }[];
+const kinds = [
+  ...cities.flatMap((kind) => ([0, 1, 2] as const).map((wall) => ({ kind, wall }))),
+  ...(['pass', 'port', 'camp', ...buildings] as const).map((kind) => ({ kind, wall: 1 as const })),
+] satisfies { kind: ModelKind; wall: 0 | 1 | 2 }[];
+const cases = kinds.flatMap((entry) =>
+  ([0, 1, 2] as const).map((lod) => ({ ...entry, lod, budget: [25000, 3000, 400][lod]! })),
+);
 
 describe('INT-27 model geometry', () => {
-  it.each(cases)('$kind wall=$wall fits its footprint and triangle budget', ({ kind, wall, budget }) => {
-    const parts = buildModel(kind, { wall });
+  it.each(cases)('$kind wall=$wall lod=$lod fits its footprint and triangle budget', ({ kind, wall, lod, budget }) => {
+    const parts = buildModel(kind, { wall, lod });
     try {
       expect(new Set(parts.map(({ slot }) => slot)).size).toBe(parts.length);
       let lowest = Infinity;
@@ -26,6 +28,11 @@ describe('INT-27 model geometry', () => {
         expect(bounds.min.y).toBeGreaterThanOrEqual(-1e-6);
         expect(bounds.max.y).toBeGreaterThan(0);
         expect(geometry.getAttribute('normal').count).toBe(positions.count);
+        const uv = geometry.getAttribute('uv');
+        expect(uv.itemSize).toBe(2);
+        expect(uv.count).toBe(positions.count);
+        expect(uv.array.every(Number.isFinite)).toBe(true);
+        expect(uv.array.some((value) => value !== 0)).toBe(true);
         lowest = Math.min(lowest, bounds.min.y);
         triangles += (geometry.index?.count ?? positions.count) / 3;
       }
@@ -49,5 +56,16 @@ describe('INT-27 model geometry', () => {
     } finally {
       [...low, ...high].forEach(({ geometry }) => geometry.dispose());
     }
+  });
+  it.each(kinds)('$kind wall=$wall simplifies at every distance', ({ kind, wall }) => {
+    const triangles = (lod: ModelLod) => {
+      const parts = buildModel(kind, { lod, wall });
+      const count = parts.reduce((sum, { geometry }) => sum + geometry.getAttribute('position').count / 3, 0);
+      parts.forEach(({ geometry }) => geometry.dispose());
+      return count;
+    };
+    const mid = triangles(1);
+    expect(triangles(0)).toBeGreaterThan(mid);
+    expect(mid).toBeGreaterThan(triangles(2));
   });
 });

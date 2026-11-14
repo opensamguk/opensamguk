@@ -1,9 +1,10 @@
-import { BoxGeometry, BufferGeometry, Float32BufferAttribute } from 'three';
+import { BoxGeometry, BufferGeometry, ExtrudeGeometry, Float32BufferAttribute, Shape } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 export type Slot = 'stone' | 'earth' | 'wood' | 'roof' | 'tile' | 'cloth' | 'field' | 'crop' | 'water' | 'flag';
 export type ModelPart = { slot: Slot; geometry: BufferGeometry };
 type CityLevel = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+export type ModelLod = 0 | 1 | 2;
 type Wall = 0 | 1 | 2;
 export type ModelKind =
   | `city-${CityLevel}`
@@ -23,6 +24,8 @@ type Point = [number, number, number];
 class Model {
   private readonly parts = new Map<Slot, BufferGeometry[]>();
 
+  constructor(readonly lod: ModelLod) {}
+
   add(slot: Slot, geometry: BufferGeometry) {
     const group = this.parts.get(slot);
     if (group) group.push(geometry);
@@ -33,47 +36,97 @@ class Model {
     const indexed = new BoxGeometry(width, height, depth);
     const geometry = indexed.toNonIndexed();
     indexed.dispose();
-    geometry.deleteAttribute('uv');
     this.add(slot, geometry.translate(x, y + height / 2, z));
   }
 
   roof(slot: Slot, x: number, y: number, z: number, width: number, depth: number, rise: number, hipped = true) {
     const halfWidth = width / 2;
     const halfDepth = depth / 2;
-    const eave: Point[] = [
-      [-halfWidth, rise * 0.1, -halfDepth],
-      [halfWidth, rise * 0.1, -halfDepth],
-      [halfWidth, rise * 0.1, halfDepth],
-      [-halfWidth, rise * 0.1, halfDepth],
-    ];
-    // A shallow eave and a steeper upper slope keep the roof legible at map scale.
-    const shoulder: Point[] = [
-      [-halfWidth * 0.81, rise * 0.25, -halfDepth * 0.72],
-      [halfWidth * 0.81, rise * 0.25, -halfDepth * 0.72],
-      [halfWidth * 0.81, rise * 0.25, halfDepth * 0.72],
-      [-halfWidth * 0.81, rise * 0.25, halfDepth * 0.72],
-    ];
-    const ridgeWest: Point = [-halfWidth * (hipped ? 0.54 : 0.81), rise, 0];
-    const ridgeEast: Point = [halfWidth * (hipped ? 0.54 : 0.81), rise, 0];
+    const bands = [9, 4, 1][this.lod]!;
+    const segments = [12, 2, 1][this.lod]!;
+    const ridgeRatio = hipped ? 0.54 : 1;
     const vertices: number[] = [];
-    const triangle = (a: Point, b: Point, c: Point) => vertices.push(...a, ...b, ...c);
+    const uv: number[] = [];
+    const triangle = (a: Point, b: Point, c: Point) => {
+      for (const point of [a, b, c]) {
+        vertices.push(...point);
+        uv.push(0.5 + point[0] / width, 0.5 + point[2] / depth);
+      }
+    };
     const quad = (a: Point, b: Point, c: Point, d: Point) => {
       triangle(a, b, c);
       triangle(a, c, d);
     };
-    for (let i = 0; i < 4; i++) {
-      const next = (i + 1) % 4;
-      quad(eave[i]!, shoulder[i]!, shoulder[next]!, eave[next]!);
+    const ring = (t: number): Point[] => {
+      const w = halfWidth * (1 - (1 - ridgeRatio) * t);
+      const d = halfDepth * (1 - t);
+      return [
+        [-w, 0, -d],
+        [w, 0, -d],
+        [w, 0, d],
+        [-w, 0, d],
+      ];
+    };
+    const point = (side: number, u: number, t: number): Point => {
+      const corners = ring(t);
+      const a = corners[side]!;
+      const b = corners[(side + 1) % 4]!;
+      const lift = this.lod === 2 ? 0 : 0.19 * (2 * u - 1) ** 4 * (1 - t) ** 3;
+      return [a[0] + (b[0] - a[0]) * u, rise * (0.08 + 0.92 * t ** 1.65 + lift), a[2] + (b[2] - a[2]) * u];
+    };
+    for (let side = 0; side < 4; side++) {
+      for (let row = 0; row < bands; row++) {
+        const t0 = row / bands;
+        const t1 = (row + 1) / bands;
+        for (let col = 0; col < segments; col++) {
+          const u0 = col / segments;
+          const u1 = (col + 1) / segments;
+          const a = point(side, u0, t0);
+          const b = point(side, u0, t1);
+          const c = point(side, u1, t1);
+          const d = point(side, u1, t0);
+          if (row === bands - 1 && side % 2 === 1) triangle(a, b, d);
+          else quad(a, b, c, d);
+        }
+      }
     }
-    quad(shoulder[0]!, ridgeWest, ridgeEast, shoulder[1]!);
-    triangle(shoulder[1]!, ridgeEast, shoulder[2]!);
-    quad(shoulder[2]!, ridgeEast, ridgeWest, shoulder[3]!);
-    triangle(shoulder[3]!, ridgeWest, shoulder[0]!);
+    for (let side = 0; this.lod !== 2 && side < 4; side++) {
+      for (let col = 0; col < segments; col++) {
+        const a = point(side, col / segments, 0);
+        const b = point(side, (col + 1) / segments, 0);
+        quad([a[0], 0, a[2]], a, b, [b[0], 0, b[2]]);
+      }
+    }
+    const eave = ring(0);
     quad(eave[0]!, eave[1]!, eave[2]!, eave[3]!);
     const geometry = new BufferGeometry();
     geometry.setAttribute('position', new Float32BufferAttribute(vertices, 3));
+    geometry.setAttribute('uv', new Float32BufferAttribute(uv, 2));
     geometry.computeVertexNormals();
     this.add(slot, geometry.translate(x, y, z));
+    if (this.lod !== 2 && (slot === 'tile' || slot === 'roof')) {
+      const ridge = Math.min(width, depth) * 0.06;
+      this.box(slot, x, y + rise - ridge / 2, z, width * ridgeRatio, ridge, ridge);
+    }
+  }
+
+  arch(slot: 'stone' | 'earth', x: number, z: number, height: number, depth: number) {
+    const radius = 0.073;
+    const spring = height * 0.46;
+    const steps = this.lod === 0 ? 20 : 8;
+    const path = new Shape();
+    path.moveTo(-0.155, 0);
+    path.lineTo(-radius, 0);
+    for (let i = 0; i <= steps; i++) {
+      const angle = Math.PI * (1 - i / steps);
+      path.lineTo(radius * Math.cos(angle), spring + height * 0.32 * Math.sin(angle));
+    }
+    path.lineTo(radius, 0);
+    path.lineTo(0.155, 0);
+    path.lineTo(0.155, height);
+    path.lineTo(-0.155, height);
+    path.closePath();
+    this.add(slot, new ExtrudeGeometry(path, { depth, bevelEnabled: false }).translate(x, 0, z - depth / 2));
   }
 
   finish(): ModelPart[] {
@@ -98,7 +151,17 @@ function hall(
   height: number,
   roof: 'roof' | 'tile' = 'tile',
 ) {
-  model.box('wood', x, y, z, width, height, depth);
+  model.box('plaster', x, y, z, width, height, depth);
+  if (model.lod === 0) {
+    const post = Math.min(width, depth) * 0.075;
+    for (const side of [-1, 1]) {
+      for (const column of [-0.45, 0, 0.45]) {
+        model.box('wood', x + width * column, y, z + (side * depth) / 2, post, height, post);
+      }
+      model.box('wood', x, y + height * 0.79, z + (side * depth) / 2, width * 1.06, height * 0.16, post);
+    }
+    model.box('wood', x, y, z + depth / 2, width * 0.22, height * 0.61, post * 1.25);
+  }
   model.roof(roof, x, y + height, z, width * 1.18, depth * 1.28, height * 0.66);
 }
 
@@ -108,9 +171,49 @@ function flag(model: Model, x: number, y: number, z: number, height: number) {
 }
 
 function gate(model: Model, x: number, z: number, height: number, slot: 'stone' | 'earth', tower: boolean) {
-  for (const offset of [-0.11, 0.11]) model.box(slot, x + offset, 0, z, 0.09, height, 0.18);
-  model.box(slot, x, height * 0.74, z, 0.16, height * 0.26, 0.18);
-  if (tower) hall(model, x, height, z, 0.27, 0.18, 0.082, 'roof');
+  if (model.lod === 2) {
+    for (const offset of [-0.11, 0.11]) model.box(slot, x + offset, 0, z, 0.09, height, 0.18);
+    model.box(slot, x, height * 0.74, z, 0.16, height * 0.26, 0.18);
+  } else {
+    model.arch(slot, x, z, height, 0.18);
+  }
+  if (tower) {
+    hall(model, x, height, z, 0.27, 0.18, 0.082, 'roof');
+    if (model.lod !== 2) hall(model, x, height + 0.123, z, 0.18, 0.111, 0.064, 'roof');
+  }
+}
+
+function curtain(
+  model: Model,
+  slot: 'stone' | 'earth',
+  x: number,
+  z: number,
+  width: number,
+  depth: number,
+  height: number,
+) {
+  model.box(slot, x, 0, z, width, height, depth);
+  if (model.lod === 2) return;
+  const across = width > depth;
+  const length = across ? width : depth;
+  const teeth = Math.max(2, Math.round(length / (model.lod === 0 ? 0.034 : 0.082)));
+  for (let i = 0; i < teeth; i++) {
+    const step = length / teeth;
+    const offset = (i + 0.5) * step - length / 2;
+    model.box(
+      slot,
+      x + (across ? offset : 0),
+      height,
+      z + (across ? 0 : offset),
+      across ? step * 0.58 : 0.024,
+      0.018,
+      across ? 0.024 : step * 0.58,
+    );
+  }
+  if (slot === 'earth' && model.lod === 0) {
+    for (const y of [0.2, 0.4, 0.6, 0.8])
+      model.box('earth', x, y * height, z, across ? width : width + 0.004, 0.004, across ? depth + 0.004 : depth);
+  }
 }
 
 function city(model: Model, level: CityLevel, wall: Wall) {
@@ -119,19 +222,30 @@ function city(model: Model, level: CityLevel, wall: Wall) {
   const height = [0.075, 0.13, 0.185][wall]!;
   const thickness = [0.06, 0.078, 0.1][wall]!;
   const slot = wall === 0 ? 'earth' : 'stone';
-  model.box(slot, 0, 0, -edge, side + thickness, height, thickness);
+  curtain(model, slot, 0, -edge, side + thickness, thickness, height);
   for (const x of [-edge, edge]) {
-    model.box(slot, x, 0, 0, thickness, height, side);
+    curtain(model, slot, x, 0, thickness, side, height);
     const span = edge - 0.12;
-    model.box(slot, Math.sign(x) * (0.12 + span / 2), 0, edge, span, height, thickness);
+    curtain(model, slot, Math.sign(x) * (0.12 + span / 2), edge, span, thickness, height);
   }
-  gate(model, 0, edge - 0.065, height, slot, wall === 2 || (wall === 1 && level >= 4));
+  gate(model, 0, edge - 0.065, height, slot, wall === 2 || (wall === 1 && (level >= 4 || model.lod === 0)));
+  if (model.lod === 0 && level >= 4) {
+    const inner = edge + 0.047;
+    const outer = 0.495;
+    const strip = outer - inner;
+    const center = (outer + inner) / 2;
+    model.box('water', 0, 0, -center, outer * 2, 0.012, strip);
+    model.box('water', 0, 0, center, outer * 2, 0.012, strip);
+    for (const x of [-center, center]) model.box('water', x, 0, 0, strip, 0.012, inner * 2);
+    model.box('wood', 0, 0.012, center, 0.13, 0.02, strip + 0.009);
+    for (const x of [-0.057, 0.057]) model.box('wood', x, 0.032, center, 0.012, 0.019, strip + 0.009);
+  }
   if (wall === 2) {
     for (const x of [-edge, edge]) {
       for (const z of [-edge, edge]) {
         model.box('stone', x, 0, z, 0.13, height + 0.025, 0.13);
         // At maximum city size the towers stay within the one-cell footprint.
-        hall(model, x, height + 0.025, z, 0.088, 0.076, 0.055, 'roof');
+        if (model.lod !== 2) hall(model, x, height + 0.025, z, 0.088, 0.076, 0.055, 'roof');
       }
     }
   }
@@ -140,7 +254,8 @@ function city(model: Model, level: CityLevel, wall: Wall) {
   const keepHeight = 0.104 + level * 0.013;
   model.box('stone', 0, 0, -0.15, keepWidth + 0.05, 0.032, 0.2);
   hall(model, 0, 0.032, -0.15, keepWidth, 0.17, keepHeight, 'roof');
-  if (level >= 6) hall(model, 0, 0.032 + keepHeight * 1.5, -0.15, keepWidth * 0.55, 0.11, 0.067, 'roof');
+  if (level >= 6 && model.lod !== 2)
+    hall(model, 0, 0.032 + keepHeight * 1.5, -0.15, keepWidth * 0.55, 0.11, 0.067, 'roof');
   const yards = [
     [-0.16, 0.04],
     [0.16, 0.04],
@@ -150,13 +265,14 @@ function city(model: Model, level: CityLevel, wall: Wall) {
     [0.26, -0.22],
     [-0.25, -0.09],
   ] as const;
-  for (const [x, z] of yards.slice(0, level - 1)) hall(model, x, 0, z, 0.1, 0.086, 0.057);
+  for (const [x, z] of yards.slice(0, Math.min(level - 1, model.lod === 2 ? 3 : yards.length)))
+    hall(model, x, 0, z, 0.1, 0.086, 0.057);
 }
 
 function pass(model: Model) {
   for (const side of [-1, 1]) {
     model.box('earth', side * 0.315, 0, 0, 0.37, 0.09, 0.27);
-    model.box('stone', side * 0.31, 0.09, 0, 0.36, 0.15, 0.15);
+    curtain(model, 'stone', side * 0.31, 0, 0.36, 0.15, 0.24);
     model.box('stone', side * 0.435, 0.24, 0, 0.105, 0.085, 0.16);
   }
   gate(model, 0, 0, 0.24, 'stone', true);
@@ -183,7 +299,6 @@ function port(model: Model) {
       .rotateY(Math.PI / 4)
       .translate(x, 0.0335, z + 0.103 * size);
     prow.dispose();
-    geometry.deleteAttribute('uv');
     model.add('wood', geometry);
   }
   model.box('wood', 0.02, 0.051, 0.22, 0.015, 0.19, 0.015);
@@ -209,11 +324,23 @@ function camp(model: Model) {
     model.roof('cloth', x, 0.079, z, 0.23, 0.22, 0.13, false);
   }
   flag(model, -0.075, 0.022, -0.035, 0.36);
+  if (model.lod !== 2) {
+    const x = 0.34;
+    const z = 0.31;
+    for (const dx of [-0.048, 0.048]) {
+      for (const dz of [-0.044, 0.044]) model.box('wood', x + dx, 0.022, z + dz, 0.018, 0.19, 0.018);
+    }
+    model.box('wood', x, 0.148, z, 0.116, 0.029, 0.105);
+    model.roof('wood', x, 0.212, z, 0.14, 0.13, 0.048);
+  }
 }
 
 function farm(model: Model) {
   for (const x of [-0.25, 0.22]) {
     model.box('field', x, 0, -0.095, 0.42, 0.028, 0.65);
+    if (model.lod !== 2) {
+      for (const edge of [-0.413, 0.223]) model.box('earth', x, 0.028, edge, 0.42, 0.018, 0.012);
+    }
     for (const row of [-0.135, -0.045, 0.045, 0.135]) {
       model.box('crop', x + row, 0.028, -0.095, 0.035, 0.024, 0.58);
     }
@@ -289,8 +416,8 @@ const cityLevels = {
 } as const;
 
 /** Each call returns fresh, caller-owned geometry. Parts share the same origin and scale. */
-export function buildModel(kind: ModelKind, options?: { wall?: Wall }): ModelPart[] {
-  const model = new Model();
+export function buildModel(kind: ModelKind, options?: { wall?: Wall; lod?: ModelLod }): ModelPart[] {
+  const model = new Model(options?.lod ?? 0);
   if (kind in buildings) buildings[kind as keyof typeof buildings](model);
   else city(model, cityLevels[kind as keyof typeof cityLevels], options?.wall ?? 1);
   return model.finish();
