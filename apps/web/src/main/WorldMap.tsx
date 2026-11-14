@@ -112,9 +112,12 @@ export function WorldMap({
           nations={nations}
           map={operationalMap}
           myCityKey={myCityKey}
+          myNationId={myNationId}
           selectedKey={selectedKey}
           onSelect={onSelect}
+          generals={generals}
           fill={fill}
+          focusKey={focusKey}
         />
       </Suspense>
     );

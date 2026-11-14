@@ -1,5 +1,5 @@
-// 3D 군략도의 지형 자료 (INT-27 0단계, D-089). 도트 바탕의 지형 칸(16종)에서 높이와 색을 만든다.
-// 0단계는 DEM 없이 지형 종류로 높이를 정한다. 1단계에서 ETOPO 2022 높이 자료로 바꾼다(INT-27 설계).
+// 3D 군략도의 지형 자료 (INT-27, D-089). 도트 바탕의 지형 칸(16종)과 실제 높이 자료로 높이와 색을 만든다.
+// 높이 자료(heights/*.ts)가 있으면 실제 높이를 쓰고, 없으면 지형 종류로 높이를 정한다(0단계 방식).
 import { TERRAINS, type Terrain } from '../main/terrainTiles';
 
 export type TerrainCells = { cells: Int8Array; columns: number; rows: number };
@@ -130,4 +130,185 @@ export function compactLabels(boxes: readonly LabelBox[]): Set<string> {
     else placed.push(box);
   }
   return compact;
+}
+
+// 실제 높이 자료 (tools/map-data/build-height-field.py). 칸마다 1바이트, 0은 해수면 이하,
+// 나머지는 round(sqrt(m / maxMetres) * 255)다. 높이 과장 배율은 지도 단위 1당 미터다.
+export type HeightData = { columns: number; rows: number; maxMetres: number; data: string };
+// 지도 1단위가 약 3.5km라 실제 비율이면 산이 거의 보이지 않는다. 9km가 약 24단위가 되게 과장한다.
+export const UNITS_PER_METRE = 40 / 9000;
+
+export function decodeMetres(height: HeightData): Float32Array {
+  const binary = atob(height.data);
+  const metres = new Float32Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    const value = binary.charCodeAt(i) / 255;
+    metres[i] = value * value * height.maxMetres;
+  }
+  return metres;
+}
+
+// 실제 높이로 칸 높이를 만든다. 물 칸(지형 종류)은 물높이 아래로, 땅 칸은 물높이 위로 둔다. 한 번 평균을 내 모서리를 다듬는다.
+export function heightFieldFromMetres(grid: TerrainCells, metres: Float32Array): Float32Array {
+  const { cells, columns, rows } = grid;
+  const raw = new Float32Array(columns * rows);
+  for (let i = 0; i < raw.length; i++)
+    raw[i] = isOpenWater(cells[i]!) ? WATER_LEVEL - 1.2 : Math.max(metres[i]! * UNITS_PER_METRE, WATER_LEVEL + 0.15);
+  const field = new Float32Array(raw.length);
+  for (let y = 0; y < rows; y++)
+    for (let x = 0; x < columns; x++) {
+      let sum = 0;
+      let count = 0;
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= columns || ny >= rows) continue;
+          sum += raw[ny * columns + nx]!;
+          count++;
+        }
+      const index = y * columns + x;
+      const water = isOpenWater(cells[index]!);
+      field[index] = water ? Math.min(sum / count, WATER_LEVEL - 0.2) : Math.max(sum / count, WATER_LEVEL + 0.1);
+    }
+  return field;
+}
+
+// 바다·호수처럼 물높이 아래로 내리는 칸. 강은 땅 높이를 따르고 색으로만 그린다(칸 모양 도랑이 생기지 않게).
+const OPEN_WATER = new Set<Terrain>(['deepSea', 'sea', 'shallow', 'lake']);
+export function isOpenWater(index: number) {
+  const terrain = TERRAINS[index];
+  return terrain !== undefined && OPEN_WATER.has(terrain);
+}
+
+const mix = (a: readonly number[], b: readonly number[], t: number) =>
+  [0, 1, 2].map((i) => a[i]! + (b[i]! - a[i]!) * t) as [number, number, number];
+const ROCK = [0.46, 0.42, 0.36] as const;
+const SNOW = [0.94, 0.94, 0.92] as const;
+const SHORE = [0.84, 0.78, 0.6] as const;
+
+// 높이별 땅 색(낮은 평야 → 구릉 → 산 → 고원). 지형 종류 색과 반씩 섞어 칸 경계가 덜 보이게 한다.
+const RAMP: Array<[number, [number, number, number]]> = [
+  [0, [0.56, 0.66, 0.38]],
+  [300, [0.6, 0.66, 0.4]],
+  [900, [0.58, 0.58, 0.38]],
+  [1800, [0.55, 0.49, 0.36]],
+  [3200, [0.5, 0.44, 0.36]],
+  [4600, [0.62, 0.58, 0.52]],
+];
+function ramp(metres: number): [number, number, number] {
+  for (let i = 1; i < RAMP.length; i++) {
+    const [top, color] = RAMP[i]!;
+    if (metres <= top) {
+      const [bottom, from] = RAMP[i - 1]!;
+      return mix(from, color, (metres - bottom) / (top - bottom));
+    }
+  }
+  return RAMP[RAMP.length - 1]![1];
+}
+
+// 실제 게임처럼 보이는 지형 색. 지형 종류 색과 높이별 색을 섞고, 경사가 가파르면 바위색, 높으면 눈,
+// 바닷가는 모래색을 섞는다. 마지막에 땅 칸끼리 두 번 평균을 내 도트 경계를 풀어 준다.
+export function realisticColors(
+  grid: TerrainCells,
+  palette: Record<Terrain, string>,
+  field: Float32Array,
+  metres: Float32Array | null,
+): Float32Array {
+  const { cells, columns, rows } = grid;
+  const rgb = TERRAINS.map((terrain) => {
+    const hex = palette[terrain].replace('#', '');
+    return [0, 2, 4].map((offset) => parseInt(hex.slice(offset, offset + 2), 16) / 255) as [number, number, number];
+  });
+  let colors = new Float32Array(columns * rows * 3);
+  const at = (x: number, y: number) =>
+    field[Math.min(Math.max(y, 0), rows - 1) * columns + Math.min(Math.max(x, 0), columns - 1)]!;
+  for (let y = 0; y < rows; y++)
+    for (let x = 0; x < columns; x++) {
+      const i = y * columns + x;
+      let color: [number, number, number] = rgb[cells[i]!] ?? [0.5, 0.5, 0.5];
+      if (!isOpenWater(cells[i]!)) {
+        const height = metres ? metres[i]! : field[i]! / UNITS_PER_METRE;
+        if (!isWater(cells[i]!)) color = mix(color, ramp(height), metres ? 0.55 : 0.2);
+        const slope = Math.hypot(at(x + 1, y) - at(x - 1, y), at(x, y + 1) - at(x, y - 1)) / 2;
+        color = mix(color, ROCK, Math.min(Math.max((slope - 0.8) / 3, 0), 0.7));
+        color = mix(color, SNOW, Math.min(Math.max((height - 4800) / 1200, 0), 0.9));
+        let shore = false;
+        for (let dy = -1; dy <= 1 && !shore; dy++)
+          for (let dx = -1; dx <= 1 && !shore; dx++) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx >= 0 && ny >= 0 && nx < columns && ny < rows && isOpenWater(cells[ny * columns + nx]!)) shore = true;
+          }
+        if (shore && height < 120) color = mix(color, SHORE, 0.45);
+      }
+      colors[i * 3] = color[0];
+      colors[i * 3 + 1] = color[1];
+      colors[i * 3 + 2] = color[2];
+    }
+  // 땅 칸끼리만 평균을 낸다(물·땅 경계는 또렷하게 둔다).
+  for (let pass = 0; pass < 2; pass++) {
+    const next = new Float32Array(colors);
+    for (let y = 0; y < rows; y++)
+      for (let x = 0; x < columns; x++) {
+        const i = y * columns + x;
+        const open = isOpenWater(cells[i]!);
+        const sum = [0, 0, 0];
+        let count = 0;
+        for (let dy = -1; dy <= 1; dy++)
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx < 0 || ny < 0 || nx >= columns || ny >= rows) continue;
+            const j = ny * columns + nx;
+            if (isOpenWater(cells[j]!) !== open) continue;
+            sum[0]! += colors[j * 3]!;
+            sum[1]! += colors[j * 3 + 1]!;
+            sum[2]! += colors[j * 3 + 2]!;
+            count++;
+          }
+        next[i * 3] = sum[0]! / count;
+        next[i * 3 + 1] = sum[1]! / count;
+        next[i * 3 + 2] = sum[2]! / count;
+      }
+    colors = next;
+  }
+  return colors;
+}
+
+// 칸 번호로 정하는 0~1 난수(같은 지도면 늘 같다). 나무 자리처럼 고정된 흩뿌림에 쓴다.
+export function cellNoise(index: number, salt = 0) {
+  let h = (index * 374761393 + salt * 668265263) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
+}
+
+const FOREST_DENSITY: Partial<Record<Terrain, number>> = { forest: 0.9, hills: 0.35, grassland: 0.08, mountains: 0.25 };
+
+// 숲 칸에 나무 자리를 흩뿌린다. 칸 하나에 많아야 두 그루, 높은 산(4000m 위)에는 심지 않는다.
+export function treeSpots(
+  grid: TerrainCells,
+  canvas: { width: number; height: number },
+  metres: Float32Array | null,
+  limit = 14000,
+): Array<{ x: number; y: number; scale: number }> {
+  const spots: Array<{ x: number; y: number; scale: number }> = [];
+  const cellW = canvas.width / grid.columns;
+  const cellH = canvas.height / grid.rows;
+  for (let i = 0; i < grid.cells.length && spots.length < limit; i++) {
+    const terrain = TERRAINS[grid.cells[i]!];
+    const density = terrain ? (FOREST_DENSITY[terrain] ?? 0) : 0;
+    if (!density || (metres && metres[i]! > 4000)) continue;
+    for (let n = 0; n < 2; n++) {
+      if (cellNoise(i, n) > density) continue;
+      const column = i % grid.columns;
+      const row = Math.floor(i / grid.columns);
+      spots.push({
+        x: (column + cellNoise(i, n + 10)) * cellW,
+        y: (row + cellNoise(i, n + 20)) * cellH,
+        scale: 1.1 + cellNoise(i, n + 30) * 0.8,
+      });
+    }
+  }
+  return spots;
 }

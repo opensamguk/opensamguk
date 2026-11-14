@@ -71,24 +71,6 @@
 .name {
   pointer-events: none;
 }
-.controls {
-  position: absolute;
-  left: var(--space-3);
-  bottom: var(--space-3);
-  display: flex;
-  gap: var(--space-1);
-}
-.controls button {
-  min-width: 44px;
-  min-height: 44px;
-  font: inherit;
-  font-size: var(--title-sm, 18px);
-  color: var(--color-text, #221d17);
-  background: var(--color-surface, #f4ecd8);
-  border: 2px solid var(--color-ink, #221d17);
-  border-radius: 0;
-  cursor: pointer;
-}
 .stats {
   position: absolute;
   right: var(--space-2);
@@ -116,4 +98,58 @@
 .site[data-compact='true']:hover .name,
 .site[data-compact='true']:focus-visible .name {
   display: inline;
+}
+/* 1단계: SVG 지도와 같은 배율 단추·거점 고르기 줄과 도움말 (INT-27). */
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.wrapFill {
+  height: 100%;
+}
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+.zoom {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.zoom button {
+  min-width: 44px;
+  min-height: 36px;
+  padding: 0 var(--space-2);
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  background: var(--color-surface-raised, var(--color-surface));
+  border: 2px solid var(--color-ink);
+  border-radius: 0;
+  cursor: pointer;
+}
+.zoom button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.zoom output {
+  font-size: var(--text-sm);
+}
+.frame:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+.help {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+@media (max-width: 767px) {
+  .zoom button {
+    min-height: 44px;
+  }
 }
