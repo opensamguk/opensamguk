@@ -2,7 +2,6 @@
 // 고르기·이름판은 3D 위에 띄운 DOM 단추라 키보드·화면 낭독·E2E 선택자(data-city-key)가 SVG 지도와 같다.
 // 읽기 이름·풍선·지도 거점 고르기는 SVG 지도와 같은 지도 모형(main/mapModel)과 부품(main/MapParts)을 쓴다.
 // 지연 로드 덩어리라 첫 화면 번들에 들어가지 않는다. 주소에 ?map=3d가 있고 WebGL2가 될 때만 쓴다(WorldMap).
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import {
   useEffect,
   useMemo,
@@ -10,21 +9,7 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
-  type RefObject,
 } from 'react';
-import {
-  BoxGeometry,
-  BufferGeometry,
-  Color,
-  ConeGeometry,
-  CylinderGeometry,
-  Float32BufferAttribute,
-  InstancedMesh,
-  Matrix4,
-  PlaneGeometry,
-  Vector3,
-  type OrthographicCamera,
-} from 'three';
 import type { PublicGeography } from '@opensamguk/shared';
 import { basemapForOperationalMap } from '../main/operationalGeography';
 import { useTerrainGrid } from '../main/TerrainTileLayer';
@@ -32,31 +17,13 @@ import type { DrawnNation } from '../main/siteMarkers';
 import type { MapGeneral } from '../main/mapGeneralList';
 import { buildMapModel, describeSite, mapLabel, type ModelCity } from '../main/mapModel';
 import { MapSiteChooser, MapTooltip, tooltipPlacement } from '../main/MapParts';
-import {
-  compactLabels,
-  decodeMetres,
-  groundAt,
-  heightField,
-  heightFieldFromMetres,
-  realisticColors,
-  siteSize,
-  treeSpots,
-  cellNoise,
-  type HeightData,
-  type LabelBox,
-  type TerrainCells,
-} from './terrain3d';
+import { compactLabels, siteSize, type HeightData, type LabelBox } from './terrain3d';
+import { ELEVATION, MapScene } from './mapScene';
 import styles from './Map3D.module.css';
 
 type DrawnCity = ModelCity;
 type Site = PublicGeography['sites'][number];
 
-// 위에서 내려다보는 각도(수평에서 55°). 화면 위쪽이 북쪽이다.
-const ELEVATION = (55 * Math.PI) / 180;
-// 높이 과장 배율. 지형 높이(지도 단위)에 곱한다.
-const HEIGHT_SCALE = 1;
-const NEUTRAL = '#d6d0c4';
-const WALL = '#cbbd9e';
 const MAX_ZOOM_FACTOR = 12;
 
 type Control = { x: number; z: number; zoom: number; fit: number; version: number };
@@ -122,6 +89,89 @@ export default function Map3D({
     [model],
   );
   const focusSite = focusKey === null ? undefined : anchors.find((site) => site.anchorKey === focusKey);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const sceneRef = useRef<MapScene | null>(null);
+  const frameRequest = useRef(0);
+  const frames = useRef({ count: 0, since: 0, first: 0 });
+  // 그릴 때마다 이름판에 쓰는 값. 렌더 함수가 늘 최신 값을 보게 ref로 둔다.
+  const latest = useRef({ anchors, model, selectedKey, myCityKey });
+  latest.current = { anchors, model, selectedKey, myCityKey };
+
+  // 이름판·고르기 단추를 거점의 화면 위치로 옮긴다. 겹치는 이름판은 중요도 순으로 작은 점으로 줄인다.
+  const placeLabels = (scene: MapScene) => {
+    const box = frame.current;
+    if (!box) return;
+    const { anchors: sites, model: current, selectedKey: chosen, myCityKey: home } = latest.current;
+    const buttons = overlay.current?.querySelectorAll<HTMLButtonElement>('button[data-site-id]') ?? [];
+    const byId = new Map(sites.map((site) => [site.id, site]));
+    const boxes: LabelBox[] = [];
+    for (const button of buttons) {
+      const site = byId.get(button.dataset.siteId!);
+      if (!site) continue;
+      const city = current.cityByKey.get(site.anchorKey);
+      const { height } = siteSize(site.kind, city?.level);
+      const { x, y } = scene.project(scene.world(site.position.x, site.position.y, height * 1.8 + 2));
+      const inside = x > -40 && x < box.clientWidth + 40 && y > -20 && y < box.clientHeight + 20;
+      button.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`;
+      button.style.visibility = inside ? 'visible' : 'hidden';
+      if (inside)
+        boxes.push({
+          id: site.id,
+          x,
+          y: y - 12,
+          width: site.name.length * 13 + 12,
+          height: 24,
+          priority:
+            (site.anchorKey === chosen ? 1000 : 0) +
+            (site.anchorKey === home ? 900 : 0) +
+            (site.kind === 'CITY' ? (city?.level ?? 1) * 10 : site.kind === 'PASS' ? 25 : 0),
+        });
+    }
+    const compact = compactLabels(boxes);
+    for (const button of buttons) button.dataset.compact = compact.has(button.dataset.siteId!) ? 'true' : 'false';
+  };
+
+  const draw = () => {
+    frameRequest.current = 0;
+    const scene = sceneRef.current;
+    if (!scene) return;
+    scene.render(control.current);
+    placeLabels(scene);
+    if (statLine.current) {
+      const f = frames.current;
+      const now = performance.now();
+      if (!f.first) {
+        f.first = now - started.current;
+        f.since = now;
+      }
+      f.count++;
+      if (now - f.since >= 1000) {
+        statLine.current.textContent = `fps ${Math.round((f.count * 1000) / (now - f.since))} · 첫 프레임 ${Math.round(f.first)}ms · 거점 ${latest.current.anchors.length} · 길 ${map.routes.length}`;
+        f.count = 0;
+        f.since = now;
+      }
+      // 측정할 때는 계속 그린다.
+      frameRequest.current = requestAnimationFrame(draw);
+    }
+  };
+  invalidateRef.current = () => {
+    if (!frameRequest.current) frameRequest.current = requestAnimationFrame(draw);
+  };
+
+  // 화면 크기에 맞춰 처음 배율을 정한다. focus가 있으면 그 거점을 가운데 두고 확대한다.
+  const fitTo = (width: number, height: number) => {
+    const c = control.current;
+    const fit = Math.min(width / map.canvas.width, height / (map.canvas.height * Math.sin(ELEVATION)));
+    const first = c.fit === 0;
+    c.zoom = first ? fit : (c.zoom / c.fit) * fit;
+    c.fit = fit;
+    if (first && focusSite) {
+      c.x = focusSite.position.x - map.canvas.width / 2;
+      c.z = focusSite.position.y - map.canvas.height / 2;
+      c.zoom = fit * focusZoom;
+    }
+    changed();
+  };
 
   const changed = () => {
     const c = control.current;
@@ -234,6 +284,44 @@ export default function Map3D({
 
   const ready = grid !== null && basemap !== null && heights !== undefined;
   const usable = heights && grid && heights.columns === grid.columns && heights.rows === grid.rows ? heights : null;
+
+  // 장면 만들기: 지형·높이 자료가 준비되면 한 번 만든다. 크기는 ResizeObserver로 따라간다.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const box = frame.current;
+    if (!ready || !canvas || !box || !grid || !basemap) return;
+    const scene = new MapScene(canvas, { map, grid, heights: usable, palette: basemap.palette });
+    sceneRef.current = scene;
+    scene.setSites(latest.current.anchors, latest.current.model.cityByKey, latest.current.model.nationById);
+    const resize = () => {
+      scene.resize(box.clientWidth, box.clientHeight);
+      fitTo(box.clientWidth, box.clientHeight);
+    };
+    resize();
+    const observer = new ResizeObserver(resize);
+    observer.observe(box);
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frameRequest.current);
+      frameRequest.current = 0;
+      sceneRef.current = null;
+      scene.dispose();
+    };
+    // 지형·높이 자료가 바뀔 때만 새로 만든다.
+  }, [ready, grid, usable, map]);
+
+  // 소유국·규모가 바뀌면 거점 모형을 다시 짓는다.
+  useEffect(() => {
+    sceneRef.current?.setSites(anchors, model.cityByKey, model.nationById);
+    invalidateRef.current();
+  }, [anchors, model]);
+
+  // 고른 거점 고리와 이름판 우선순위.
+  useEffect(() => {
+    const site = anchors.find((entry) => entry.anchorKey === selectedKey) ?? null;
+    sceneRef.current?.setSelected(site, site ? model.cityByKey.get(site.anchorKey)?.level : undefined);
+    invalidateRef.current();
+  }, [anchors, model, selectedKey, ready]);
   const hovered = hover ? model.siteById.get(hover.siteId) : undefined;
   return (
     <div className={fill ? `${styles.wrap} ${styles.wrapFill}` : styles.wrap}>
@@ -283,33 +371,7 @@ export default function Map3D({
         onPointerCancel={() => (drag.current = null)}
       >
         {ready ? (
-          <Canvas
-            className={styles.canvas}
-            orthographic
-            frameloop={stats ? 'always' : 'demand'}
-            dpr={[1, 2]}
-            camera={{ near: -4000, far: 4000, position: [0, 100, 100] }}
-            gl={{ antialias: true }}
-          >
-            <Scene
-              grid={grid}
-              heights={usable}
-              palette={basemap.palette}
-              map={map}
-              anchors={anchors}
-              cityByKey={model.cityByKey}
-              nationById={model.nationById}
-              selectedKey={selectedKey}
-              myCityKey={myCityKey}
-              focus={focusSite ? { site: focusSite, zoom: focusZoom } : null}
-              control={control}
-              overlay={overlay}
-              statLine={stats ? statLine : null}
-              started={started}
-              onInvalidate={(invalidate) => (invalidateRef.current = invalidate)}
-              onFit={() => setFactor(control.current.zoom / control.current.fit)}
-            />
-          </Canvas>
+          <canvas ref={canvasRef} className={styles.canvas} />
         ) : (
           <p className={styles.loading}>지형을 불러오는 중입니다</p>
         )}
@@ -360,320 +422,5 @@ export default function Map3D({
       </div>
       <p className={styles.help}>드래그나 방향키로 이동 · 휠이나 +/−로 확대 · 거점 이름을 눌러 선택</p>
     </div>
-  );
-}
-
-function Scene({
-  grid,
-  heights,
-  palette,
-  map,
-  anchors,
-  cityByKey,
-  nationById,
-  selectedKey,
-  myCityKey,
-  focus,
-  control,
-  overlay,
-  statLine,
-  started,
-  onInvalidate,
-  onFit,
-}: {
-  grid: TerrainCells;
-  heights: HeightData | null;
-  palette: NonNullable<ReturnType<typeof basemapForOperationalMap>>['palette'];
-  map: PublicGeography;
-  anchors: ReadonlyArray<Site & { anchorKey: number }>;
-  cityByKey: ReadonlyMap<number, DrawnCity>;
-  nationById: ReadonlyMap<number, DrawnNation>;
-  selectedKey: number | null;
-  myCityKey: number | null;
-  focus: { site: Site; zoom: number } | null;
-  control: RefObject<Control>;
-  overlay: RefObject<HTMLDivElement | null>;
-  statLine: RefObject<HTMLParagraphElement | null> | null;
-  started: RefObject<number>;
-  onInvalidate: (invalidate: () => void) => void;
-  onFit: () => void;
-}) {
-  const { camera, size, invalidate } = useThree();
-  const canvas = map.canvas;
-  const metres = useMemo(() => (heights ? decodeMetres(heights) : null), [heights]);
-  const field = useMemo(() => (metres ? heightFieldFromMetres(grid, metres) : heightField(grid)), [grid, metres]);
-  useEffect(() => onInvalidate(invalidate), [invalidate, onInvalidate]);
-
-  // 지형: 칸 하나에 꼭짓점 하나. 위가 북쪽(z 음수)이다. 색은 sRGB라 그리기 전에 선형으로 바꾼다.
-  const terrain = useMemo(() => {
-    const geometry = new PlaneGeometry(canvas.width, canvas.height, grid.columns - 1, grid.rows - 1);
-    geometry.rotateX(-Math.PI / 2);
-    const position = geometry.getAttribute('position');
-    for (let i = 0; i < position.count; i++) position.setY(i, field[i]! * HEIGHT_SCALE);
-    const colors = realisticColors(grid, palette, field, metres);
-    const linear = new Color();
-    for (let i = 0; i < colors.length; i += 3) {
-      linear.setRGB(colors[i]!, colors[i + 1]!, colors[i + 2]!).convertSRGBToLinear();
-      colors[i] = linear.r;
-      colors[i + 1] = linear.g;
-      colors[i + 2] = linear.b;
-    }
-    geometry.setAttribute('color', new Float32BufferAttribute(colors, 3));
-    geometry.computeVertexNormals();
-    return geometry;
-  }, [canvas.height, canvas.width, field, grid, metres, palette]);
-
-  const ground = (x: number, y: number) => groundAt(field, grid, canvas, x, y) * HEIGHT_SCALE;
-  const world = (x: number, y: number, lift = 0) =>
-    new Vector3(x - canvas.width / 2, ground(x, y) + lift, y - canvas.height / 2);
-
-  // 숲: 숲·구릉 칸에 낮은 다각형 나무를 흩뿌린다. 거점 자리 가까이는 비운다.
-  const trees = useMemo(() => {
-    const clear = anchors.map((site) => site.position);
-    const spots = treeSpots(grid, canvas, metres).filter(
-      (spot) => !clear.some((at) => Math.abs(at.x - spot.x) < 9 && Math.abs(at.y - spot.y) < 9),
-    );
-    const mesh = new InstancedMesh(new ConeGeometry(0.9, 2.6, 6).translate(0, 1.3, 0), undefined, spots.length);
-    const matrix = new Matrix4();
-    const color = new Color();
-    spots.forEach((spot, index) => {
-      const base = world(spot.x, spot.y);
-      matrix.makeScale(spot.scale, spot.scale, spot.scale).setPosition(base.x, base.y, base.z);
-      mesh.setMatrixAt(index, matrix);
-      const shade = cellNoise(index, 7);
-      mesh.setColorAt(index, color.setRGB(0.16 + shade * 0.08, 0.3 + shade * 0.12, 0.14 + shade * 0.05));
-    });
-    return mesh;
-  }, [anchors, canvas, field, grid, metres]);
-
-  // 거점 모형: 도시는 네모 성벽과 네 모서리 망루, 가운데 본전과 소유국 색 지붕. 관문은 성문 벽과 양쪽 망루.
-  const models = useMemo(() => {
-    const parts = anchors.length * 4;
-    const walls = new InstancedMesh(new BoxGeometry(1, 1, 1), undefined, parts);
-    const towers = new InstancedMesh(new CylinderGeometry(0.5, 0.6, 1, 6), undefined, parts);
-    const keeps = new InstancedMesh(new BoxGeometry(1, 1, 1), undefined, anchors.length);
-    const roofs = new InstancedMesh(new ConeGeometry(0.75, 1, 4), undefined, anchors.length * 5);
-    const matrix = new Matrix4();
-    const color = new Color();
-    let w = 0;
-    let t = 0;
-    let r = 0;
-    const roof = (x: number, y: number, z: number, side: number, height: number, tint: string) => {
-      matrix
-        .makeRotationY(Math.PI / 4)
-        .scale(new Vector3(side, height, side))
-        .setPosition(x, y + height / 2, z);
-      roofs.setMatrixAt(r, matrix);
-      roofs.setColorAt(r++, color.set(tint));
-    };
-    anchors.forEach((site, index) => {
-      const city = cityByKey.get(site.anchorKey);
-      const nation = city?.nationId == null ? undefined : nationById.get(city.nationId);
-      const tint = nation?.color ?? NEUTRAL;
-      const { side, height } = siteSize(site.kind, city?.level);
-      const base = world(site.position.x, site.position.y);
-      const half = side / 2;
-      const thick = Math.max(side * 0.1, 0.6);
-      const towerSize = thick * 2.2;
-      const sides =
-        site.kind === 'PASS'
-          ? [{ dx: 0, dz: 0, sx: side * 1.6, sz: thick * 1.6 }]
-          : [
-              { dx: 0, dz: -half, sx: side, sz: thick },
-              { dx: 0, dz: half, sx: side, sz: thick },
-              { dx: -half, dz: 0, sx: thick, sz: side },
-              { dx: half, dz: 0, sx: thick, sz: side },
-            ];
-      for (const wall of sides) {
-        matrix.makeScale(wall.sx, height, wall.sz).setPosition(base.x + wall.dx, base.y + height / 2, base.z + wall.dz);
-        walls.setMatrixAt(w, matrix);
-        walls.setColorAt(w++, color.set(WALL));
-      }
-      const corners =
-        site.kind === 'PASS'
-          ? [
-              [-side * 0.8, 0],
-              [side * 0.8, 0],
-            ]
-          : [
-              [-half, -half],
-              [half, -half],
-              [-half, half],
-              [half, half],
-            ];
-      for (const [dx, dz] of corners) {
-        const towerHeight = height * 1.5;
-        matrix
-          .makeScale(towerSize, towerHeight, towerSize)
-          .setPosition(base.x + dx!, base.y + towerHeight / 2, base.z + dz!);
-        towers.setMatrixAt(t, matrix);
-        towers.setColorAt(t++, color.set(WALL));
-        roof(base.x + dx!, base.y + towerHeight, base.z + dz!, towerSize * 1.5, towerSize * 0.9, tint);
-      }
-      const keepSide = site.kind === 'PASS' ? side * 0.5 : side * 0.45;
-      const keepHeight = height * (site.kind === 'PASS' ? 1.2 : 1.7);
-      matrix.makeScale(keepSide, keepHeight, keepSide).setPosition(base.x, base.y + keepHeight / 2, base.z);
-      keeps.setMatrixAt(index, matrix);
-      keeps.setColorAt(index, color.set('#e9dfc8'));
-      roof(base.x, base.y + keepHeight, base.z, keepSide * 1.45, keepSide * 0.7, tint);
-    });
-    walls.count = w;
-    towers.count = t;
-    roofs.count = r;
-    return { walls, towers, keeps, roofs };
-    // world는 field·grid·canvas에서 나온다.
-  }, [anchors, cityByKey, nationById, field, grid, canvas]);
-
-  // 길: 거점 사이 직선을 땅 위로 조금 띄운다(0단계). 지형을 따라 휘는 띠는 2단계에서 그린다.
-  const roads = useMemo(() => {
-    const byId = new Map(map.sites.map((site) => [site.id, site]));
-    const points: number[] = [];
-    for (const route of map.routes) {
-      if (!route.enabled) continue;
-      const path = [route.from, ...(route.via ?? []), route.to]
-        .map((id) => byId.get(id))
-        .filter((s) => s !== undefined);
-      for (let i = 1; i < path.length; i++) {
-        const a = path[i - 1]!.position;
-        const b = path[i]!.position;
-        const steps = Math.max(2, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 4));
-        for (let s = 0; s < steps; s++) {
-          const t0 = s / steps;
-          const t1 = (s + 1) / steps;
-          const p0 = world(a.x + (b.x - a.x) * t0, a.y + (b.y - a.y) * t0, 0.4);
-          const p1 = world(a.x + (b.x - a.x) * t1, a.y + (b.y - a.y) * t1, 0.4);
-          points.push(p0.x, p0.y, p0.z, p1.x, p1.y, p1.z);
-        }
-      }
-    }
-    const geometry = new BufferGeometry();
-    geometry.setAttribute('position', new Float32BufferAttribute(points, 3));
-    return geometry;
-  }, [map, field, grid, canvas]);
-
-  const selected = anchors.find((site) => site.anchorKey === selectedKey);
-  // 고른 거점이 바뀌면 이름판 우선순위가 바뀐다.
-  useEffect(() => {
-    control.current.version++;
-    invalidate();
-  }, [control, invalidate, selectedKey]);
-  const selectedAt = selected ? world(selected.position.x, selected.position.y, 0.3) : null;
-
-  // 처음에는 지도 전체가 화면에 들어오게 둔다. focus가 있으면 그 거점을 가운데 두고 확대한다.
-  useEffect(() => {
-    if (!size.width || !size.height) return;
-    const c = control.current;
-    const fitWidth = size.width / canvas.width;
-    const fitHeight = size.height / (canvas.height * Math.sin(ELEVATION));
-    const fit = Math.min(fitWidth, fitHeight);
-    const first = c.fit === 0;
-    c.zoom = first ? fit : (c.zoom / c.fit) * fit;
-    c.fit = fit;
-    if (first && focus) {
-      c.x = focus.site.position.x - canvas.width / 2;
-      c.z = focus.site.position.y - canvas.height / 2;
-      c.zoom = fit * focus.zoom;
-    }
-    c.version++;
-    onFit();
-    invalidate();
-    // 화면 크기가 바뀔 때만 다시 맞춘다.
-  }, [size.width, size.height]);
-
-  const seen = useRef(-1);
-  const frames = useRef({ count: 0, since: performance.now(), first: 0 });
-  const point = useMemo(() => new Vector3(), []);
-  useFrame(() => {
-    const c = control.current;
-    const ortho = camera as OrthographicCamera;
-    if (seen.current !== c.version) {
-      const distance = 1000;
-      ortho.position.set(c.x, Math.sin(ELEVATION) * distance, c.z + Math.cos(ELEVATION) * distance);
-      ortho.lookAt(c.x, 0, c.z);
-      ortho.zoom = c.zoom || 1;
-      ortho.updateProjectionMatrix();
-      ortho.updateMatrixWorld();
-      seen.current = c.version;
-      // 이름판·고르기 단추를 거점의 화면 위치로 옮긴다. 겹치는 이름판은 중요도 순으로 작은 점으로 줄인다.
-      const buttons = overlay.current?.querySelectorAll<HTMLButtonElement>('button[data-site-id]') ?? [];
-      const byId = new Map(anchors.map((site) => [site.id, site]));
-      const boxes: LabelBox[] = [];
-      for (const button of buttons) {
-        const site = byId.get(button.dataset.siteId!);
-        if (!site) continue;
-        const city = cityByKey.get(site.anchorKey);
-        const { height } = siteSize(site.kind, city?.level);
-        const at = world(site.position.x, site.position.y, height + 2);
-        point.copy(at).project(ortho);
-        const x = ((point.x + 1) / 2) * size.width;
-        const y = ((1 - point.y) / 2) * size.height;
-        const inside = x > -40 && x < size.width + 40 && y > -20 && y < size.height + 20;
-        button.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`;
-        button.style.visibility = inside ? 'visible' : 'hidden';
-        if (inside)
-          boxes.push({
-            id: site.id,
-            x,
-            y: y - 12,
-            width: site.name.length * 13 + 12,
-            height: 24,
-            priority:
-              (site.anchorKey === selectedKey ? 1000 : 0) +
-              (site.anchorKey === myCityKey ? 900 : 0) +
-              (site.kind === 'CITY' ? (city?.level ?? 1) * 10 : site.kind === 'PASS' ? 25 : 0),
-          });
-      }
-      const compact = compactLabels(boxes);
-      for (const button of buttons) button.dataset.compact = compact.has(button.dataset.siteId!) ? 'true' : 'false';
-    }
-    if (statLine?.current) {
-      const f = frames.current;
-      if (!f.first) f.first = performance.now() - started.current;
-      f.count++;
-      const now = performance.now();
-      if (now - f.since >= 1000) {
-        statLine.current.textContent = `fps ${Math.round((f.count * 1000) / (now - f.since))} · 첫 프레임 ${Math.round(f.first)}ms · 거점 ${anchors.length} · 길 ${map.routes.length}`;
-        f.count = 0;
-        f.since = now;
-      }
-    }
-  });
-
-  return (
-    <>
-      <hemisphereLight args={['#f6f0e0', '#3e3222', 0.7]} />
-      <directionalLight position={[-520, 360, -300]} intensity={2.8} color="#fff1d8" />
-      <mesh geometry={terrain}>
-        <meshStandardMaterial vertexColors roughness={0.95} metalness={0} />
-      </mesh>
-      <mesh rotation-x={-Math.PI / 2} position-y={-0.05}>
-        <planeGeometry args={[canvas.width * 1.6, canvas.height * 1.6]} />
-        <meshStandardMaterial color="#2f5f80" roughness={0.3} metalness={0.15} transparent opacity={0.9} />
-      </mesh>
-      <lineSegments geometry={roads}>
-        <lineBasicMaterial color="#7a5a34" />
-      </lineSegments>
-      <primitive object={trees}>
-        <meshStandardMaterial attach="material" roughness={0.9} />
-      </primitive>
-      <primitive object={models.walls}>
-        <meshStandardMaterial attach="material" roughness={0.85} />
-      </primitive>
-      <primitive object={models.towers}>
-        <meshStandardMaterial attach="material" roughness={0.85} />
-      </primitive>
-      <primitive object={models.keeps}>
-        <meshStandardMaterial attach="material" roughness={0.8} />
-      </primitive>
-      <primitive object={models.roofs}>
-        <meshStandardMaterial attach="material" roughness={0.6} />
-      </primitive>
-      {selectedAt ? (
-        <mesh rotation-x={-Math.PI / 2} position={selectedAt}>
-          <ringGeometry args={[7, 9, 32]} />
-          <meshBasicMaterial color="#b23a2a" />
-        </mesh>
-      ) : null}
-    </>
   );
 }
