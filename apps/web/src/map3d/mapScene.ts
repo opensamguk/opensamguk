@@ -219,14 +219,20 @@ float ridged(vec2 p) {
 export type CameraState = { x: number; z: number; zoom: number };
 
 /** 물길 선 다듬기: 차이킨 깎기 두 번으로 모서리를 둥글게 하고, step 간격 이하로 다시 찍는다. */
-export function smoothLine(points: ReadonlyArray<{ x: number; y: number }>, step = 0.8): Array<{ x: number; y: number }> {
+export function smoothLine(
+  points: ReadonlyArray<{ x: number; y: number }>,
+  step = 0.8,
+): Array<{ x: number; y: number }> {
   let line = points.slice();
   for (let pass = 0; pass < 2 && line.length > 2; pass++) {
     const next = [line[0]!];
     for (let i = 0; i < line.length - 1; i++) {
       const a = line[i]!;
       const b = line[i + 1]!;
-      next.push({ x: a.x * 0.75 + b.x * 0.25, y: a.y * 0.75 + b.y * 0.25 }, { x: a.x * 0.25 + b.x * 0.75, y: a.y * 0.25 + b.y * 0.75 });
+      next.push(
+        { x: a.x * 0.75 + b.x * 0.25, y: a.y * 0.75 + b.y * 0.25 },
+        { x: a.x * 0.25 + b.x * 0.75, y: a.y * 0.25 + b.y * 0.75 },
+      );
     }
     next.push(line[line.length - 1]!);
     line = next;
@@ -397,7 +403,8 @@ transformed += normalize(objectNormal) * 0.012;`,
     geometry.setAttribute('biome', new Float32BufferAttribute(biomeWeights(this.grid), 3));
     // 명암용 법선은 높이를 RELIEF_SHADE배 키워 구한다(사용자 참고 시안 2026-11-14: 깎아 낸 듯한 음영 지형).
     // 실제 높이는 낮게 둬 거점을 가리지 않고, 빛과 그늘만 가파른 산처럼 떨어지게 한다.
-    for (let i = 0; i < position.count; i++) position.setY(i, Math.max(this.field[i]!, 0) * RELIEF_SHADE + Math.min(this.field[i]!, 0));
+    for (let i = 0; i < position.count; i++)
+      position.setY(i, Math.max(this.field[i]!, 0) * RELIEF_SHADE + Math.min(this.field[i]!, 0));
     geometry.computeVertexNormals();
     for (let i = 0; i < position.count; i++) position.setY(i, this.field[i]!);
     // 카툰풍 지형: 빛을 세 단계로 끊는다(사용자 2026-11-14). 색·무늬는 아래 셰이더가 정한다.
@@ -1249,7 +1256,6 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
         }
     }
   }
-
 
   /** 지도 좌표가 든 영지 칸의 가운데(지도 좌표). */
   private tileCentre(x: number, y: number) {

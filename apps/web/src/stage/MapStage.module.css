@@ -77,11 +77,11 @@
   gap: var(--space-3);
   height: var(--hud);
   padding: 0 var(--space-3) 0 var(--space-2);
-  background:
-    linear-gradient(rgb(255 220 150 / 6%), transparent 40%),
-    linear-gradient(#2c1e13, #140d08);
+  background: linear-gradient(rgb(255 220 150 / 6%), transparent 40%), linear-gradient(#2c1e13, #140d08);
   border-bottom: 2px solid var(--brass);
-  box-shadow: 0 1px 0 #0b0704, 0 6px 18px rgb(0 0 0 / 45%);
+  box-shadow:
+    0 1px 0 #0b0704,
+    0 6px 18px rgb(0 0 0 / 45%);
 }
 .seal {
   display: grid;
@@ -96,11 +96,11 @@
   color: #fff8e6;
   text-decoration: none;
   text-shadow: 0 2px 0 rgb(0 0 0 / 45%);
-  background:
-    radial-gradient(circle at 30% 25%, rgb(255 255 255 / 22%), transparent 55%),
-    var(--seal, #8a2414);
+  background: radial-gradient(circle at 30% 25%, rgb(255 255 255 / 22%), transparent 55%), var(--seal, #8a2414);
   border: 2px solid var(--brass);
-  box-shadow: 0 0 0 1px #0b0704, inset 0 0 0 2px rgb(0 0 0 / 30%);
+  box-shadow:
+    0 0 0 1px #0b0704,
+    inset 0 0 0 2px rgb(0 0 0 / 30%);
 }
 .sealNone {
   --seal: #4a4033;
@@ -124,7 +124,9 @@
   flex: none;
   border: 2px solid var(--brass);
   border-radius: 50%;
-  box-shadow: 0 0 0 2px #0b0704, 0 0 10px rgb(201 163 90 / 35%);
+  box-shadow:
+    0 0 0 2px #0b0704,
+    0 0 10px rgb(201 163 90 / 35%);
 }
 .meText {
   display: flex;
@@ -237,9 +239,13 @@
   color: var(--ink);
   background: linear-gradient(#3a281a, #1c130c);
   border: 1px solid var(--brass);
-  box-shadow: 0 0 0 1px #0b0704, inset 0 1px 0 rgb(255 230 180 / 15%);
+  box-shadow:
+    0 0 0 1px #0b0704,
+    inset 0 1px 0 rgb(255 230 180 / 15%);
   cursor: pointer;
-  transition: transform 80ms, filter 120ms;
+  transition:
+    transform 80ms,
+    filter 120ms;
 }
 .iconButton:hover {
   filter: brightness(1.25);
@@ -326,9 +332,14 @@
   background: radial-gradient(circle at 50% 30%, #3e2b1b, #160f09);
   border: 2px solid var(--brass-dark);
   border-radius: 50%;
-  box-shadow: 0 0 0 1px #0b0704, 0 4px 10px rgb(0 0 0 / 50%);
+  box-shadow:
+    0 0 0 1px #0b0704,
+    0 4px 10px rgb(0 0 0 / 50%);
   cursor: pointer;
-  transition: transform 80ms, border-color 120ms, filter 120ms;
+  transition:
+    transform 80ms,
+    border-color 120ms,
+    filter 120ms;
 }
 .dockButton:hover {
   border-color: var(--brass);
@@ -595,7 +606,9 @@
     background: radial-gradient(circle at 50% 30%, #f5d995, #b8893d);
     border: 2px solid #fff0c4;
     border-radius: 50%;
-    box-shadow: 0 0 0 2px #0b0704, 0 6px 14px rgb(0 0 0 / 55%);
+    box-shadow:
+      0 0 0 2px #0b0704,
+      0 6px 14px rgb(0 0 0 / 55%);
   }
   .tabMain[aria-pressed='true'] {
     color: #ffe2a0;
