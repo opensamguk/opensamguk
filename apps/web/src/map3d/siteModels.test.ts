@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lodForPixels, pickModel, tileFill } from './siteModels';
+import { lodForPixels, pickModel, regionTint, TIER_LOD, tileFill, zoomTier } from './siteModels';
 
 // INT-27 D-094: 거점 종류·단계별 모형 고르기와 거리 단계.
 describe('pickModel', () => {
@@ -39,5 +39,24 @@ describe('tileFill', () => {
     expect(levels.every((fill) => fill > 0 && fill <= 1)).toBe(true);
     expect([...levels].sort((a, b) => a - b)).toEqual(levels);
     expect(tileFill('CITY', 9)).toBeGreaterThan(tileFill('CITY', 8));
+  });
+});
+
+describe('regionTint', () => {
+  it('지역마다 다른 색, 모르는 지역은 흰색', () => {
+    expect(regionTint(9)).not.toBe(regionTint(8));
+    expect(regionTint(undefined)).toBe('#ffffff');
+    expect(regionTint(99)).toBe('#ffffff');
+  });
+});
+
+describe('zoomTier', () => {
+  it('보이는 지도 폭으로 네 단계를 나누고 가까울수록 자세한 모형', () => {
+    expect(zoomTier(1400)).toBe(1);
+    expect(zoomTier(400)).toBe(2);
+    expect(zoomTier(150)).toBe(3);
+    expect(zoomTier(40)).toBe(4);
+    expect(TIER_LOD[4]).toBe(0);
+    expect(TIER_LOD[1]).toBe(2);
   });
 });

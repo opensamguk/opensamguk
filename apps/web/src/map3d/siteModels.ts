@@ -46,4 +46,49 @@ export function tileFill(kind: SiteKind, level: number | undefined): number {
   return byLevel[Math.min(Math.max(Math.round(step), 0), 9)] ?? 0.72;
 }
 
+/**
+ * 지역 색(사용자 2026-11-14: 지역별로 무늬·색을 다르게). 같은 모형에 은은하게 곱하는 색이다.
+ * 삼10 지도 지역 번호: 1 사례, 2 예주, 3 기주, 4 연주, 5 서주, 6 청주, 7 형주, 8 양주(강남), 9 익주(파촉),
+ * 10 남중, 11 양주(서량), 12 병주, 13 유주, 14 교주, 15 한반도·왜, 16 이민족.
+ */
+const REGION_TINT: Record<number, string> = {
+  1: '#ffffff',
+  2: '#fff3e2',
+  3: '#f4e2c2',
+  4: '#f7ead4',
+  5: '#eef0fb',
+  6: '#edf4ee',
+  7: '#eef6e4',
+  8: '#f3f7ff',
+  9: '#f7dfd2',
+  10: '#e6f0d8',
+  11: '#f1ddb8',
+  12: '#ebe2d0',
+  13: '#e5eaf2',
+  14: '#f3eacd',
+  15: '#e7eadf',
+  16: '#efe3cf',
+};
+
+/** 지역 번호의 모형 색(모르는 지역은 흰색, 곧 원래 색). */
+export function regionTint(region: number | undefined): string {
+  return (region !== undefined && REGION_TINT[region]) || '#ffffff';
+}
+
+/**
+ * 화면 확대 단계(사용자 2026-11-14). 화면에 보이는 지도 폭(지도 단위)으로 정해 화면 크기와 상관없이 같은 느낌이다.
+ * 1 확대 안 함(천하 전체) · 2 중간(몇 개 주) · 3 어느 정도(성 4~5개) · 4 크게(성 하나가 크게).
+ */
+export type ZoomTier = 1 | 2 | 3 | 4;
+export function zoomTier(viewWidth: number): ZoomTier {
+  if (viewWidth <= 70) return 4;
+  if (viewWidth <= 200) return 3;
+  if (viewWidth <= 600) return 2;
+  return 1;
+}
+
+/** 단계별 모형 거리 단계(0 자세함 ~ 2 단순)와 이름판 배율. */
+export const TIER_LOD: Record<ZoomTier, 0 | 1 | 2> = { 1: 2, 2: 2, 3: 1, 4: 0 };
+export const TIER_LABEL_SCALE: Record<ZoomTier, number> = { 1: 0.9, 2: 1, 3: 1.4, 4: 2 };
+
 export const MODEL_NAMES = ['city-9', 'capital', 'city-7', 'city-6', 'city-5', 'pass', 'camp', 'houses'] as const;

@@ -302,6 +302,9 @@ export function realisticColors(
       if (!isOpenWater(cells[i]!)) {
         const height = metres ? metres[i]! : field[i]! / UNITS_PER_METRE;
         if (!isWater(cells[i]!)) color = mix(color, ramp(height), metres ? 0.55 : 0.2);
+        // 강 칸은 땅색으로 칠한다. 강은 물 띠로 따로 그리므로 칸을 파랗게 칠하면 강가 평야에 파란 얼룩이 남는다.
+        else if (TERRAINS[cells[i]!] === 'river')
+          color = mix(rgb[TERRAINS.indexOf('plains')] ?? color, ramp(height), 0.55);
         const slope = Math.hypot(at(x + 1, y) - at(x - 1, y), at(x, y + 1) - at(x, y - 1)) / 2;
         color = mix(color, ROCK, Math.min(Math.max((slope - 0.8) / 3, 0), 0.7));
         color = mix(color, SNOW, Math.min(Math.max((height - 4800) / 1200, 0), 0.9));

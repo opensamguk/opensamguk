@@ -4,8 +4,11 @@
 import {
   BufferAttribute,
   BufferGeometry,
+  DataTexture,
   Matrix4,
-  MeshStandardMaterial,
+  MeshToonMaterial,
+  NearestFilter,
+  RedFormat,
   Quaternion,
   SRGBColorSpace,
   Texture,
@@ -138,7 +141,17 @@ async function texture(gltf: Gltf, bin: ArrayBuffer, index: number | undefined, 
  * 주소의 GLB에서 첫 메시를 읽어 기하(마디 변환 적용)와 재질을 만든다.
  * 금속 질감은 반사 환경이 없는 지도에서 검게 보이므로 금속은 끄고 거칠기만 쓴다.
  */
-export async function loadGlbMesh(url: string): Promise<{ geometry: BufferGeometry; material: MeshStandardMaterial }> {
+/** 카툰풍 명암 계단(사용자 2026-11-14: 아이콘처럼 카툰 풍). 빛을 네 단계로 끊는다. */
+export function toonGradient(steps: readonly number[] = [90, 150, 215, 255]) {
+  const texture = new DataTexture(Uint8Array.from(steps), steps.length, 1, RedFormat);
+  texture.minFilter = NearestFilter;
+  texture.magFilter = NearestFilter;
+  texture.generateMipmaps = false;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+export async function loadGlbMesh(url: string): Promise<{ geometry: BufferGeometry; material: MeshToonMaterial }> {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`모형을 받지 못했습니다 (${response.status})`);
   const { json, bin } = parseGlb(await response.arrayBuffer());
@@ -166,13 +179,8 @@ export async function loadGlbMesh(url: string): Promise<{ geometry: BufferGeomet
     texture(json, bin, source?.pbrMetallicRoughness?.metallicRoughnessTexture?.index, false),
     texture(json, bin, source?.occlusionTexture?.index, false),
   ]);
-  const material = new MeshStandardMaterial({
-    map,
-    normalMap,
-    roughnessMap,
-    aoMap,
-    metalness: 0,
-    roughness: 0.9,
-  });
+  // 카툰풍: 금속·거칠기 대신 계단 명암으로 그린다(거칠기 그림은 쓰지 않는다).
+  void roughnessMap;
+  const material = new MeshToonMaterial({ map, normalMap, aoMap, gradientMap: toonGradient() });
   return { geometry, material };
 }

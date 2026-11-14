@@ -26,6 +26,8 @@ import {
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
+  MeshToonMaterial,
+  BackSide,
   Object3D,
   OrthographicCamera,
   PlaneGeometry,
@@ -34,8 +36,8 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three';
-import { loadGlbMesh } from './glbMesh';
-import { lodForPixels, pickModel, tileFill } from './siteModels';
+import { loadGlbMesh, toonGradient } from './glbMesh';
+import { pickModel, regionTint, TIER_LOD, tileFill, zoomTier, type ZoomTier } from './siteModels';
 import type { PublicGeography } from '@opensamguk/shared';
 import { roadWalks, TERRAINS, waterLanes, type Terrain } from '../main/terrainTiles';
 import { ROAD_CELL } from '../main/roadPixels';
@@ -63,7 +65,7 @@ type Site = PublicGeography['sites'][number];
 export type AnchorSite = Site & { anchorKey: number };
 
 // 위에서 내려다보는 각도(수평에서 55°). 화면 위쪽이 북쪽이다.
-export const ELEVATION = (45 * Math.PI) / 180;
+export const ELEVATION = (35 * Math.PI) / 180;
 /** 영지 칸 한 변(지도 단위). 칸은 45° 돌려 놓아 비스듬히 보면 마름모다. */
 export const TILE = 8;
 const NEUTRAL = '#d6d0c4';
@@ -91,7 +93,8 @@ vec3 territoryColor(vec3 base, vec2 xz) {
   float far = smoothstep(0.04, 0.22, pxTile);
   if (hasNation(own)) color = mix(color, own.rgb, mix(0.16, 0.42, far));
   float edge = min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y));
-  float grid = (1.0 - smoothstep(0.0, pxTile * 1.1, edge)) * (1.0 - smoothstep(0.05, 0.12, pxTile));
+  // 칸 격자는 칸이 화면에서 약 60px 넘게 보일 때만(확대 3·4단계). 그보다 멀면 국경·나라 색만 남긴다.
+  float grid = (1.0 - smoothstep(0.0, pxTile * 1.1, edge)) * (1.0 - smoothstep(0.012, 0.02, pxTile));
   color = mix(color, vec3(1.0, 0.97, 0.86), grid * (own.a > 0.0 ? 0.16 : 0.08));
   vec4 sides[4];
   sides[0] = tileAt(cell + vec2(-1.0, 0.0));
@@ -149,6 +152,22 @@ export class MapScene {
   /** 받아 둔 GLB 거점 모형(이름 → 거리 단계별 기하·재질). 개발 미리보기(?models=)와 승인 모형이 채운다. */
   private modelSet = new Map<string, Array<{ geometry: BufferGeometry; material: Mesh['material']; box: Box3 }>>();
   private siteModelMeshes: Array<{ lod: number; mesh: InstancedMesh }> = [];
+  /** 지금 화면 확대 단계(1 전체 ~ 4 크게). 이름판 배율에 쓴다. */
+  tier: ZoomTier = 1;
+  // 모형 윤곽선 재질: 뒷면만, 법선 방향으로 부풀린다(모형 크기 대비 약 1.2%).
+  private readonly outlineMaterial = (() => {
+    const material = new MeshBasicMaterial({ color: '#2a1d12', side: BackSide });
+    material.onBeforeCompile = (shader) => {
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+transformed += normalize(objectNormal) * 0.012;`,
+      );
+    };
+    return material;
+  })();
+  /** 마지막으로 고른 거점(모형이 늦게 오면 고리를 칸 크기로 다시 그린다). */
+  private selectedArgs: [AnchorSite | null, number | undefined] = [null, undefined];
   private lastSites: {
     anchors: readonly AnchorSite[];
     cityByKey: ReadonlyMap<number, ModelCity>;
@@ -257,7 +276,8 @@ export class MapScene {
     }
     geometry.setAttribute('color', new Float32BufferAttribute(colors, 3));
     geometry.computeVertexNormals();
-    const material = new MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
+    // 카툰풍 지형: 빛을 세 단계로 끊는다(사용자 2026-11-14). 색·무늬는 아래 셰이더가 정한다.
+    const material = new MeshToonMaterial({ vertexColors: true, gradientMap: toonGradient([75, 150, 215, 255]) });
     // 질감 그림(D-090)이 오기 전까지 셰이더로 사실감을 낸다. 모두 월드 좌표 잡음이라 칸 경계가 드러나지 않는다.
     // - 산: 능선 잡음으로 낸 잔 기복(법선)과, 경사면 바위·고도 눈을 화소마다 다시 칠한다.
     // - 바닷가: 물높이 바로 위는 모래, 물 아래는 바닥 흙. 해안선이 칸이 아니라 높이 0 선을 따른다.
@@ -285,7 +305,7 @@ float px = fwidth(vGround.x) + fwidth(vGround.z);
 float flatness = clamp(vUp.y, 0.0, 1.0);
 vec3 paint = diffuseColor.rgb;
 float luma = dot(paint, vec3(0.3, 0.55, 0.15));
-paint = mix(vec3(luma), paint, 0.82) * vec3(1.05, 1.0, 0.88);
+paint = mix(vec3(luma), paint, 1.12) * vec3(1.04, 1.0, 0.9);
 paint *= 0.93 + grain * 0.14 + (brush - 0.5) * 0.08;
 float cloud = smoothstep(0.56, 0.78, fbm(vGround.xz * 0.011 + vec2(3.1, 7.7)));
 paint *= 1.0 - cloud * 0.2;
@@ -742,6 +762,7 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     const scaleMatrix = new Matrix4();
     const moveMatrix = new Matrix4();
     const turn = new Matrix4().makeRotationY(Math.PI / 4);
+    const tint = new Color();
     for (const [name, sites] of groups) {
       const lods = this.modelSet.get(name)!;
       lods.forEach(({ geometry, material, box }, lod) => {
@@ -765,12 +786,21 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
             .premultiply(turn)
             .premultiply(moveMatrix.makeTranslation(base.x, base.y - 0.25, base.z));
           mesh.setMatrixAt(index, matrix);
+          mesh.setColorAt(index, tint.set(regionTint(this.lastSites!.cityByKey.get(site.anchorKey)?.region)));
         });
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         mesh.visible = lod === 2;
         this.scene.add(mesh);
         this.siteModelMeshes.push({ lod, mesh });
+        // 카툰 윤곽선: 가까이 보는 두 단계(0·1)만. 같은 기하를 법선 방향으로 조금 부풀린 뒷면을 짙게 칠한다.
+        if (lod < 2) {
+          const outline = new InstancedMesh(geometry, this.outlineMaterial, sites.length);
+          outline.instanceMatrix.copy(mesh.instanceMatrix);
+          outline.visible = false;
+          this.scene.add(outline);
+          this.siteModelMeshes.push({ lod, mesh: outline });
+        }
       });
     }
     // 영지 고리도 모형 크기·칸 가운데에 맞춘다.
@@ -783,11 +813,12 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
         const centre = this.tileCentre(site.position.x, site.position.y);
         const base = this.world(centre.x, centre.y);
         const radius = TILE * tileFill(site.kind, level) * 0.78;
-        matrix.makeScale(radius, 1, radius).setPosition(base.x, base.y + 0.35, base.z);
+        matrix.makeScale(radius, 1, radius).setPosition(base.x, base.y + 0.7, base.z);
         ringMesh.setMatrixAt(index, matrix);
       });
       ringMesh.instanceMatrix.needsUpdate = true;
     }
+    if (this.selectedArgs[0]) this.setSelected(...this.selectedArgs);
     const covered = [...groups.values()].reduce((sum, list) => sum + list.length, 0);
     const allCovered = covered === this.lastSites.anchors.length;
     for (const mesh of this.models) mesh.visible = !allCovered;
@@ -838,6 +869,16 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     );
     const row = Math.min(Math.max(Math.floor((y / this.canvasSize.height) * this.grid.rows), 0), this.grid.rows - 1);
     return this.grid.cells[row * this.grid.columns + column]!;
+  }
+
+  /** 이름판을 붙일 3D 자리: 모형을 쓰면 칸 가운데 모형 꼭대기, 아니면 임시 상자 모형 위. */
+  labelAnchor(site: AnchorSite, level: number | undefined) {
+    if (this.siteModelMeshes.length) {
+      const centre = this.tileCentre(site.position.x, site.position.y);
+      return this.world(centre.x, centre.y, TILE * tileFill(site.kind, level) * 0.45);
+    }
+    const { height } = siteSize(site.kind, level);
+    return this.world(site.position.x, site.position.y, height * 1.8 + 2);
   }
 
   /** 지도 좌표가 든 영지 칸의 가운데(지도 좌표). */
@@ -980,19 +1021,24 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
 
   /** 고른 거점 둘레의 붉은 고리. null이면 지운다. */
   setSelected(site: AnchorSite | null, level: number | undefined) {
+    this.selectedArgs = [site, level];
     if (this.ring) {
       this.scene.remove(this.ring);
       this.ring.geometry.dispose();
       this.ring = null;
     }
     if (!site) return;
-    const { side } = siteSize(site.kind, level);
+    // 모형을 쓰면 칸 크기에 맞춘 고리, 아니면 임시 상자 모형 크기의 고리.
+    const modelled = this.siteModelMeshes.length > 0;
+    const radius = modelled ? TILE * tileFill(site.kind, level) * 0.86 : siteSize(site.kind, level).side * 0.85;
+    const width = modelled ? 0.7 : 2;
     const ring = new Mesh(
-      new RingGeometry(side * 0.85, side * 0.85 + 2, 40),
-      new MeshBasicMaterial({ color: '#b23a2a' }),
+      new RingGeometry(radius, radius + width, 48),
+      new MeshBasicMaterial({ color: '#b23a2a', depthWrite: false }),
     );
     ring.rotation.x = -Math.PI / 2;
-    ring.position.copy(this.world(site.position.x, site.position.y, 0.3));
+    const centre = modelled ? this.tileCentre(site.position.x, site.position.y) : site.position;
+    ring.position.copy(this.world(centre.x, centre.y, 0.8));
     this.ring = ring;
     this.scene.add(ring);
   }
@@ -1032,8 +1078,9 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
       this.sun.position.set(state.x - 500, 380, state.z - 300);
     }
     // 거점 모형 거리 단계: 특 도시 한 변(약 16단위)이 화면에서 몇 px인지로 정한다.
+    this.tier = zoomTier(this.width / (state.zoom || 1));
     if (this.siteModelMeshes.length) {
-      const lod = lodForPixels(16 * (state.zoom || 1));
+      const lod = TIER_LOD[this.tier];
       for (const entry of this.siteModelMeshes) entry.mesh.visible = entry.lod === lod;
     }
     this.waterTime.value = performance.now() / 1000;

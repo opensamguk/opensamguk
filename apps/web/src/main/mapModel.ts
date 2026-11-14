@@ -8,6 +8,8 @@ import { CAPITAL_MARK, isCapital, levelName, type DrawnNation } from './siteMark
 export type MapSite = PublicGeography['sites'][number];
 export type ModelCity = Pick<MapCity, 'key' | 'name' | 'kind' | 'x' | 'y' | 'nationId' | 'ruin'> & {
   regionName?: string | null | undefined;
+  /** 지역 번호(삼10 지도 1~16). 3D 모형의 지역 색에 쓴다. */
+  region?: number | undefined;
   supplied?: boolean;
   recorded?: boolean;
   level?: number;

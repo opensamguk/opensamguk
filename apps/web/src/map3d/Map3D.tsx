@@ -17,7 +17,8 @@ import type { DrawnNation } from '../main/siteMarkers';
 import type { MapGeneral } from '../main/mapGeneralList';
 import { buildMapModel, describeSite, mapLabel, SITE_SHORT_LABELS, type ModelCity } from '../main/mapModel';
 import { MapSiteChooser, MapTooltip, tooltipPlacement } from '../main/MapParts';
-import { compactLabels, siteSize, type HeightData, type LabelBox } from './terrain3d';
+import { compactLabels, type HeightData, type LabelBox } from './terrain3d';
+import { TIER_LABEL_SCALE } from './siteModels';
 import { ELEVATION, MapScene } from './mapScene';
 import { pathPoints, routePath } from './routes3d';
 import styles from './Map3D.module.css';
@@ -25,7 +26,8 @@ import styles from './Map3D.module.css';
 type DrawnCity = ModelCity;
 type Site = PublicGeography['sites'][number];
 
-const MAX_ZOOM_FACTOR = 12;
+// 성 한 칸이 화면의 큰 부분을 차지할 만큼 들어간다(사용자 2026-11-14: 참고 시안만큼 확대).
+const MAX_ZOOM_FACTOR = 40;
 
 type Control = { x: number; z: number; zoom: number; fit: number; version: number };
 
@@ -109,22 +111,24 @@ export default function Map3D({
     const buttons = overlay.current?.querySelectorAll<HTMLButtonElement>('button[data-site-id]') ?? [];
     const byId = new Map(sites.map((site) => [site.id, site]));
     const boxes: LabelBox[] = [];
+    const labelScale = TIER_LABEL_SCALE[scene.tier];
     for (const button of buttons) {
       const site = byId.get(button.dataset.siteId!);
       if (!site) continue;
       const city = current.cityByKey.get(site.anchorKey);
-      const { height } = siteSize(site.kind, city?.level);
-      const { x, y } = scene.project(scene.world(site.position.x, site.position.y, height * 1.8 + 2));
+      const { x, y } = scene.project(scene.labelAnchor(site, city?.level));
       const inside = x > -40 && x < box.clientWidth + 40 && y > -20 && y < box.clientHeight + 20;
-      button.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`;
+      // 확대 단계에 따라 이름판을 키운다(크게 볼 때 2배).
+      button.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%) scale(${labelScale})`;
+      button.style.transformOrigin = '50% 100%';
       button.style.visibility = inside ? 'visible' : 'hidden';
       if (inside)
         boxes.push({
           id: site.id,
           x,
           y: y - 12,
-          width: site.name.length * 12 + 10,
-          height: 40,
+          width: (site.name.length * 12 + 10) * labelScale,
+          height: 40 * labelScale,
           priority:
             (site.anchorKey === chosen ? 1000 : 0) +
             (site.anchorKey === home ? 900 : 0) +
