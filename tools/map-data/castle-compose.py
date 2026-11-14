@@ -1,0 +1,199 @@
+"""INT-27 성 조립: Codex가 그린 성 부품(마젠타 배경)을 2:1 마름모 자리 격자에 놓아 큰 성 그림을 만든다.
+
+python -I castle-compose.py <parts_dir> <out_dir> [name ...]
+
+사용자 2026-11-14: "성 스프라이트가 화면을 가득 채워야 할 수도 있어. 한 그리드 안의 세세한 무언가 행동이라던지도 들어야 할 수 있어."
+성 한 장을 조각으로 다시 그리면 조각마다 배치가 달라져 잇지 못했다. 그래서 부품을 자리 단위로 놓는다.
+
+- 성은 한 변 N자리 마름모. 자리 하나는 화면 가로 W px, 세로 W/2 px 마름모다.
+- 그리는 순서(화가 순서): 바닥 → 뒤쪽 성벽 → 안쪽 건물(깊이 순) → 앞쪽 받침·성벽·성문 → 모서리 누각.
+- 결과: <out>/hd/<name>.png(큰 그림), <out>/<name>.png(1024 줄인 그림, 같은 틀), <out>/<name>.layout.json(자리마다 놓은 부품).
+  게임 안 조립(집마다 짓기·불타기)도 같은 배치 정보를 쓴다.
+"""
+import json
+import os
+import random
+import sys
+
+import numpy as np
+from PIL import Image
+
+W = 512  # 자리 하나의 화면 가로(px)
+WALL = W * 1.08  # 성벽 토막(두 자리 길이) 그림 가로
+GATE = W * 1.3  # 성문 토막 그림 가로
+TOWER = W * 0.95  # 모서리 누각 그림 가로
+
+LEVELS = {
+    # 경 > 특 > 대 > 중 > 소. 중·소는 크기가 같고 집이 드물다. 소(흙성)는 참고 그림(강하)처럼 누각이 없다.
+    'city-9': {'n': 10, 'mat': 'stone', 'core': 'palace-gold', 'empty': 0.1, 'towers': True},
+    'capital': {'n': 8, 'mat': 'stone', 'core': 'palace-gold', 'empty': 0.12, 'towers': True},
+    'city-7': {'n': 6, 'mat': 'stone', 'core': 'hall-grey', 'empty': 0.15, 'towers': True},
+    'city-6': {'n': 6, 'mat': 'stone', 'core': None, 'empty': 0.4, 'towers': True},
+    'city-5': {'n': 6, 'mat': 'earth', 'core': None, 'empty': 0.5, 'towers': False},
+}
+
+
+def keyed(path, cache={}):
+    """마젠타 배경을 알파로 바꾸고 불투명 영역으로 잘라 (그림, 가로) 를 돌려준다."""
+    if path in cache:
+        return cache[path]
+    a = np.asarray(Image.open(path).convert('RGB')).astype(np.float64)
+    mag = np.clip((np.minimum(a[..., 0], a[..., 2]) - a[..., 1]) / 255.0, 0, 1)
+    alpha = np.clip((0.62 - mag) / 0.3, 0, 1)
+    spill = np.clip(np.minimum(a[..., 0], a[..., 2]) - a[..., 1], 0, None) * (1 - alpha)
+    rgb = a.copy()
+    rgb[..., 0] -= spill
+    rgb[..., 2] -= spill
+    ys, xs = np.nonzero(alpha > 0.5)
+    x0, x1, y0, y1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
+    rgba = np.dstack([np.clip(rgb, 0, 255), alpha * 255])[y0:y1, x0:x1].astype(np.uint8)
+    im = Image.fromarray(rgba, 'RGBA')
+    cache[path] = im
+    return im
+
+
+def scaled(im, width):
+    s = width / im.size[0]
+    return im.resize((max(1, round(im.size[0] * s)), max(1, round(im.size[1] * s))), Image.Resampling.LANCZOS)
+
+
+def compose(parts, name, cfg, out):
+    n, mat = cfg['n'], cfg['mat']
+    rng = random.Random(name)
+    half = W / 2
+    quarter = W / 4
+    margin_top = int(W * 1.6)  # 누각·문루가 위로 솟는 여유
+    width = int(n * W + W)
+    height = int(margin_top + n * half + W * 0.6)
+    cx = width / 2
+    top = margin_top
+
+    def centre(i, j):
+        """자리 (i, j)의 마름모 가운데. i는 위 꼭짓점에서 오른쪽 아래로, j는 왼쪽 아래로."""
+        return cx + (i - j) * half, top + (i + j + 1) * quarter
+
+    canvas = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+    placed = []
+
+    def put(part, x, y, bbox_width, anchor='bottom', tag=None):
+        im = scaled(keyed(os.path.join(parts, f'{part}.png')), bbox_width)
+        if anchor == 'bottom':
+            ox, oy = x - im.size[0] / 2, y - im.size[1]
+        elif anchor == 'bottom-right':
+            ox, oy = x - im.size[0], y - im.size[1]
+        else:  # bottom-left
+            ox, oy = x, y - im.size[1]
+        canvas.alpha_composite(im, (int(round(ox)), int(round(oy))))
+        placed.append({'part': part, 'x': round(x, 1), 'y': round(y, 1), 'w': round(bbox_width, 1), 'anchor': anchor, **(tag or {})})
+
+    # 1. 바닥: 성 안 자리마다 돌판(흙성은 흙 마당).
+    ground = 'ground-paved' if mat == 'stone' else 'ground-earth'
+    for i in range(n):
+        for j in range(n):
+            x, y = centre(i, j)
+            put(ground, x, y + quarter + 2, W * 1.02, tag={'i': i, 'j': j, 'layer': 'ground'})
+
+    # 2. 뒤쪽 성벽: 왼쪽 위 변(L→T)과 오른쪽 위 변(T→R).
+    lx, ly = cx - n * half, top + n * quarter
+    # 성벽 토막 하나 = 두 자리 길이(그래야 성벽이 집보다 높다). n은 짝수.
+    for k in range(0, n, 2):
+        x0, y0 = lx + k * half, ly - k * quarter
+        put(f'wall-{mat}-back-left', x0, y0, WALL, 'bottom-left', {'edge': 'back-left', 'k': k})
+    for k in range(0, n, 2):
+        x1, y1 = cx + (k + 2) * half, top + (k + 2) * quarter
+        put(f'wall-{mat}-back-right', x1, y1, WALL, 'bottom-right', {'edge': 'back-right', 'k': k})
+
+    # 3. 안쪽 건물. 가운데 큰 건물, 두 문으로 가는 큰길(가운데 줄)은 비운다.
+    mid = n // 2
+    taken = set()
+    core = cfg['core']
+    if core:
+        ci, cj = mid - 1, mid - 1
+        taken |= {(ci, cj), (ci + 1, cj), (ci, cj + 1), (ci + 1, cj + 1)}
+    streets = {(i, j) for i in range(n) for j in range(n) if i == mid or j == mid}
+    if mat == 'stone':
+        pool = ['house-1', 'house-2', 'house-3', 'house-4', 'house-5', 'house-6', 'house-1', 'house-3', 'house-4']
+        extras = ['shop-row', 'granary-small', 'barracks-small', 'tree-1', 'tree-2']
+    else:
+        pool = ['house-earth-1', 'house-earth-2', 'house-earth-3']
+        extras = ['granary-small', 'tree-1', 'tree-2']
+    items = []
+    for i in range(n):
+        for j in range(n):
+            if (i, j) in taken or (i, j) in streets:
+                continue
+            roll = rng.random()
+            if roll < cfg['empty']:
+                continue  # 빈 마당
+            part = rng.choice(extras) if roll < cfg['empty'] + 0.18 else rng.choice(pool)
+            if (i == mid + 1 or j == mid + 1 or i == mid - 1 or j == mid - 1) and mat == 'stone' and rng.random() < 0.35:
+                part = 'shop-row'  # 큰길가 점포
+            items.append((i + j, i, j, part, 1))
+    if core:
+        items.append((2 * (mid - 1) + 2, mid - 1, mid - 1, core, 2))
+    for _, i, j, part, size in sorted(items):
+        if size == 2:
+            x, y = centre(i + 0.5, j + 0.5)
+            put(part, x, y + half, W * 2 * 0.9, tag={'i': i, 'j': j, 'size': 2})
+        else:
+            x, y = centre(i, j)
+            put(part, x, y + quarter, W * 0.9, tag={'i': i, 'j': j, 'size': 1})
+
+    # 4. 앞쪽 받침·성벽·성문: 왼쪽 아래 변(L→B), 오른쪽 아래 변(B→R).
+    bx, by = cx, top + n * half
+    for k in range(n):
+        x1, y1 = lx + (k + 1) * half, ly + (k + 1) * quarter
+        put('plinth-left', x1, y1 + W * 0.09, half * 1.04, 'bottom-right', {'edge': 'plinth-left', 'k': k})
+    for k in range(n):
+        x0, y0 = bx + k * half, by - k * quarter
+        put('plinth-right', x0, y0 + W * 0.09, half * 1.04, 'bottom-left', {'edge': 'plinth-right', 'k': k})
+    gate = (mid // 2) * 2
+    for k in range(0, n, 2):
+        x1, y1 = lx + (k + 2) * half, ly + (k + 2) * quarter
+        if k == gate:
+            put(f'gate-{mat}-front-left', x1 + quarter * 0.1, y1 + 6, GATE, 'bottom-right', {'edge': 'front-left', 'k': k, 'gate': True})
+        else:
+            put(f'wall-{mat}-front-left', x1, y1, WALL, 'bottom-right', {'edge': 'front-left', 'k': k})
+    for k in range(0, n, 2):
+        x0, y0 = bx + k * half, by - k * quarter
+        if k == n - 2 - gate:
+            put(f'gate-{mat}-front-right', x0 - quarter * 0.1, y0 + 6, GATE, 'bottom-left', {'edge': 'front-right', 'k': k, 'gate': True})
+        else:
+            put(f'wall-{mat}-front-right', x0, y0, WALL, 'bottom-left', {'edge': 'front-right', 'k': k})
+
+    # 5. 모서리 누각: 위·왼쪽·오른쪽·아래 꼭짓점(뒤에서 앞 순서).
+    for x, y in ((cx, top), (lx, ly), (cx + n * half, ly), (bx, by)) if cfg['towers'] else ():
+        put(f'tower-{mat}', x, y + quarter * 0.6, TOWER, tag={'corner': True})
+
+    os.makedirs(os.path.join(out, 'hd'), exist_ok=True)
+    # 정사각 틀로 맞춘다(아래쪽 받침 꼭짓점이 기준).
+    bbox = canvas.getbbox()
+    assert bbox
+    crop = canvas.crop(bbox)
+    ox, oy = 4, 4
+    framed = Image.new('RGBA', (crop.size[0] + 8, crop.size[1] + 8), (0, 0, 0, 0))
+    framed.alpha_composite(crop, (ox, oy))
+    framed.save(os.path.join(out, 'hd', f'{name}.png'), optimize=True)
+    side = framed.size[0]
+    small = framed.resize((1024, round(framed.size[1] * 1024 / side)), Image.Resampling.LANCZOS)
+    small.save(os.path.join(out, f'{name}.png'), optimize=True)
+    # 바닥 마름모: 가로 n·W, 아래 꼭짓점 (bx, by + 받침 두께).
+    k = side / 1024
+    base_px = n * W / k
+    anchor = [((bx - bbox[0]) + ox) / k, ((by - n * quarter - bbox[1]) + oy) / k]
+    json.dump({'n': n, 'slot': W, 'placed': placed}, open(os.path.join(out, f'{name}.layout.json'), 'w'), indent=0)
+    return {'size': [small.size[0], small.size[1]], 'anchor': [round(anchor[0], 1), round(anchor[1], 1)], 'basePx': round(base_px, 1), 'hd': True}
+
+
+def main():
+    parts, out = sys.argv[1], sys.argv[2]
+    names = sys.argv[3:] or list(LEVELS)
+    meta_path = os.path.join(out, 'sprites.json')
+    meta = json.load(open(meta_path)) if os.path.exists(meta_path) else {}
+    for name in names:
+        meta[name] = compose(parts, name, LEVELS[name], out)
+        print(name, meta[name])
+    json.dump(meta, open(meta_path, 'w'), indent=1)
+
+
+main()

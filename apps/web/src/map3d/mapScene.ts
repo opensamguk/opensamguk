@@ -84,7 +84,8 @@ export const TILE = 8;
 /** 2D 지도 거점 그림 한 장: 정사각 그림 한 변(px), 바닥 가운데 픽셀(왼쪽 위 기준), 바닥 마름모 가로(px), 원래 너비·키. */
 type SiteSprite = {
   texture: Texture;
-  size: number;
+  /** 그림 크기(px). 정사각이면 한 변, 아니면 [가로, 세로](조립한 성 그림). */
+  size: number | [number, number];
   anchor: [number, number];
   basePx: number;
   /** Blender로 찍은 모형 그림만: 원래 너비·키(높은 모형을 줄일 때). 그린 그림에는 없다. */
@@ -1442,13 +1443,13 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
       sites.forEach((site, index) => {
         const level = this.lastSites!.cityByKey.get(site.anchorKey)?.level;
         const perPx = ((2 * TILE * tileFill(site.kind, level)) / sprite.basePx) * squeeze;
-        const side = sprite.size * perPx;
+        const [w, h] = typeof sprite.size === 'number' ? [sprite.size, sprite.size] : sprite.size;
         const centre = this.tileCentre(site.position.x, site.position.y);
-        const x = centre.x - this.canvasSize.width / 2 + (sprite.size / 2 - sprite.anchor[0]) * perPx;
-        const z = centre.y - this.canvasSize.height / 2 + (sprite.size / 2 - sprite.anchor[1]) * perPx;
+        const x = centre.x - this.canvasSize.width / 2 + (w / 2 - sprite.anchor[0]) * perPx;
+        const z = centre.y - this.canvasSize.height / 2 + (h / 2 - sprite.anchor[1]) * perPx;
         const lift = 2 + centre.y / this.canvasSize.height;
         spots.push({ x: centre.x - this.canvasSize.width / 2, z: centre.y - this.canvasSize.height / 2 });
-        matrix.makeScale(side, 1, side).setPosition(x, lift, z);
+        matrix.makeScale(w * perPx, 1, h * perPx).setPosition(x, lift, z);
         mesh.setMatrixAt(index, matrix);
         mesh.setColorAt(index, tint.set(regionTint(this.lastSites!.cityByKey.get(site.anchorKey)?.region)));
         this.labelLift.set(site.id, sprite.anchor[1] * perPx * 0.92);
