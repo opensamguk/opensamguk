@@ -8,7 +8,7 @@ PNG·WebP는 GitHub raw의 전체 커밋 주소, SVG는 같은 커밋의 githack
 
 ## 3D 군략도 질감
 
-D-090의 기본색 질감은 글 프롬프트로 생성한 1024×1024 WebP 16종이다. 이미지 저장소의 `public/map3d/textures/sources.json`에 프롬프트와 생성 도구, 파일별 SHA-256을 기록했다.
+D-090의 기본색 질감은 글 프롬프트로 생성한 1024×1024 WebP 17종이다. 이미지 저장소의 `public/map3d/textures/sources.json`에 프롬프트와 생성 도구, 파일별 SHA-256을 기록했다. 각 기본색에는 같은 이름 뒤에 `-normal`, `-roughness`, `-ao`를 붙인 세 장이 있다. 노멀은 +Y 접선 공간이고, 세 장은 기본색의 명도에서 주기 경계를 유지해 근사한 선형 데이터다.
 
 3D 화면의 `mapTextureUrl(name)`은 `VITE_IMAGE_BASE_URL` 뒤에 `/public/map3d/textures/<이름>.webp`를 붙인다. 기본 base는 초상과 질감이 함께 있는 고정 커밋을 가리킨다. 공개 배포에서 base를 바꿀 때는 `manifest/public-assets.json`의 `remoteImageBases`와 Caddy의 `connect-src`에 지정한 질감 경로를 함께 맞춘다.
 

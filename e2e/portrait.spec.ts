@@ -17,7 +17,7 @@ const FALLBACK_URL = publicImageUrl(FALLBACK_SOURCE);
 const FALLBACK_SHA256 = PUBLIC_IMAGES.find((image) => image.source === FALLBACK_SOURCE)!.sha256;
 
 const DEFAULT_BASE =
-  'https://raw.githubusercontent.com/opensamguk/opensamguk-images/947cee861126310596c4342b5e785332d9644264';
+  'https://raw.githubusercontent.com/opensamguk/opensamguk-images/9ac9f688406105e9ff84db9aa164eea6d4ee99ba';
 const ALT_BASE = 'http://images-b.opensamguk.test/set-b';
 const webDir = fileURLToPath(new URL('../apps/web/', import.meta.url));
 const vitePackage = createRequire(join(webDir, 'package.json')).resolve('vite/package.json');
