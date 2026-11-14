@@ -116,6 +116,13 @@ T2-15·AC-M2-08의 선택 파일 `deploy/compose.tunnel.yml`은 기본 Compose�
 
 리허설에서 server만 `docker restart`한 뒤 Caddy가 이전 network namespace에 남는 것을 확인했다. server를 직접 재시작했다면 Caddy와 cloudflared도 재시작하고 healthz·SSE를 다시 확인한다. Compose로 server를 재생성할 때도 namespace를 공유하는 서비스가 함께 재생성되는지 확인한다.
 
+같은 고장이 도커 데몬 부팅에서도 일어난다. 데몬은 컨테이너를 복원할 때 Compose의 `depends_on`을 보지 않으므로, `network_mode: service:server`인 Caddy·cloudflared가 server보다 먼저 떠서 사라진 namespace에 묶일 수 있다. 이때 컨테이너는 Up을 유지하고 cloudflared는 `network is unreachable`을 반복하므로 재시작 정책으로도 복구되지 않는다. 2026-11-14 운영에서 실제로 발생했다. `tools/tunnel-namespace-guard.ps1`이 이 상태를 찾아 공유 측만 다시 붙인다. 배포 드라이버와 같은 `OPENSAMGUK_RELEASE_COMPOSE_CONFIG`를 읽는다. 도커가 자동 시작되는 호스트에서는 로그온 예약 작업으로 등록한다. `-CheckOnly`는 고치지 않고 상태만 보고하며, 끊겨 있으면 1로 끝난다.
+
+```sh
+pwsh -NoProfile -File tools/tunnel-namespace-guard.ps1 -CheckOnly
+pwsh -NoProfile -File tools/tunnel-namespace-guard.ps1
+```
+
 ```sh
 docker compose --env-file /secure/production.env -f deploy/compose.tunnel.yml config --quiet
 docker compose --env-file /secure/production.env -f deploy/compose.tunnel.yml up -d --wait postgres
