@@ -1,11 +1,108 @@
 import fs from 'node:fs';
 import { NO_LIFE, LATE, LINEAGE, ABSORB } from './ledger.mjs';
 import { IFS } from './ifs.mjs';
+import { DIPLO } from './diplomacy.mjs';
+import { verify } from './diplo-verify.mjs';
 import { REPO as W, S, RETINUE_CHECK } from './paths.mjs';
 const R = process.env.CORE2026_DIR;
 if (!R) throw new Error('CORE2026_DIR에 core2026 저장소(c81d304) 경로를 지정하세요.');
 const load = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 const hsg = load(`${S}/data/hsg-clean.json`);
+// 모드 실제 값: 시나리오별 도시 소유 표와 확장 인물 행(hsg_event_state의 CX44·OFX1)
+const MODX = load(`${S}/data/mod-ext.json`);
+const MODSTAT = { extRows: 0, extAdded: 0, renamed: [] };
+{
+  const FIXN = { 독발수기: '독발수기능', 아달라이: '아달라이사금' };
+  const full = (n) => {
+    if (FIXN[n]) return FIXN[n];
+    if (n.length >= 4) {
+      const c = hsg.dict.filter((x) => x.startsWith(n) && x !== n);
+      if (c.length === 1) return c[0];
+      if (n.endsWith('이사')) return n + '금';
+    }
+    return n;
+  };
+  for (const s of hsg.scen) {
+    const m = MODX[s.file];
+    if (!m) throw new Error('mod-ext 없음 ' + s.file);
+    m.names.forEach((n, i) => {
+      if (n !== hsg.cities[i][0]) throw new Error(`도시 이름 불일치 ${s.file} ${i} ${n} ${hsg.cities[i][0]}`);
+    });
+    s.own = m.own;
+    s.xrows = m.rows.map((r) => {
+      MODSTAT.extRows++;
+      const nm = full(r[0]);
+      if (nm !== r[0] && !MODSTAT.renamed.includes(`${r[0]}→${nm}`)) MODSTAT.renamed.push(`${r[0]}→${nm}`);
+      return [nm, r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8]];
+    });
+  }
+  console.log('MODX', JSON.stringify(MODSTAT));
+}
+const KLIN = {
+  고국천왕: 'gog',
+  산상왕: 'gog',
+  동천왕: 'gog',
+  중천왕: 'gog',
+  서천왕: 'gog',
+  위구태: 'by',
+  간위거: 'by',
+  마여: 'by',
+  의려: 'by',
+  초고왕: 'bj',
+  구수왕: 'bj',
+  고이왕: 'bj',
+  아달라이사금: 'sr',
+  벌휴이사금: 'sr',
+  나해이사금: 'sr',
+  조분이사금: 'sr',
+  첨해이사금: 'sr',
+  미추이사금: 'sr',
+  수로왕: 'gy',
+  거등왕: 'gy',
+  마품왕: 'gy',
+  히미코: 'wa',
+  이요: 'wa',
+  히미쿠코: 'guno',
+};
+const PNAME = { gog: '고구려', by: '부여', bj: '백제', sr: '신라', gy: '가야', wa: '왜', guno: '구노국' };
+const REIGN = {
+  gog: [
+    [179, null],
+    [197, '고국천왕'],
+    [227, '산상왕'],
+    [248, '동천왕'],
+    [270, '중천왕'],
+    [999, '서천왕'],
+  ],
+  by: [
+    [230, '위구태'],
+    [245, '간위거'],
+    [285, '마여'],
+    [999, '의려'],
+  ],
+  bj: [
+    [214, '초고왕'],
+    [234, '구수왕'],
+    [999, '고이왕'],
+  ],
+  sr: [
+    [185, '아달라이사금'],
+    [196, '벌휴이사금'],
+    [230, '나해이사금'],
+    [247, '조분이사금'],
+    [262, '첨해이사금'],
+    [999, '미추이사금'],
+  ],
+  gy: [
+    [199, '수로왕'],
+    [253, '거등왕'],
+    [999, '마품왕'],
+  ],
+  wa: [
+    [248, '히미코'],
+    [999, '이요'],
+  ],
+};
 const san = load(`${W}/resources/map/san10.json`);
 const basemap = load(`${W}/apps/web/src/main/san10-basemap.json`);
 const roster = load(`${S}/roster-merged.json`);
@@ -617,6 +714,15 @@ console.log(
 );
 console.log('roads total', edges.size, 'kept', keptRoads, 'gen', gen, 'joined', joined, 'components', comps().length);
 const nb = new Map(sites.map((s) => [s.name, []]));
+const MODSITE = hsg.cities.map(([n]) => sites.find((x) => x.modName === n) ?? null);
+console.log(
+  'MODSITE',
+  MODSITE.filter(Boolean).length,
+  'of',
+  MODSITE.length,
+  'non-mod sites',
+  sites.filter((x) => !x.modName).length,
+);
 for (const k of edges.keys()) {
   const [a, b] = k.split('|');
   nb.get(a).push(b);
@@ -734,6 +840,7 @@ const SPELL = {
 const tableRoster = [];
 let tableMatched = 0;
 const allTable = load(`${S}/data/hsg-all.json`);
+for (const p of [...allTable, ...(ext.people ?? [])]) if (p.name === '아달라이') p.name = '아달라이사금';
 const tableToR = new Map();
 for (const p of allTable) {
   if (p.name === '독발수기') p.name = '독발수기능';
@@ -949,6 +1056,157 @@ for (const s of hsg.scen)
     r.stats = row[7];
     rowMap.set(key, r);
   }
+// 확장 인물(번호 700 이상)은 모드 인물 번호로 명단에 잇는다. 번호는 DLL 인물 표 번호와 같다.
+const PIDREC = new Map();
+const PIDSTAT = { split: 0 };
+{
+  const okStats = (v) => v && v.length === 5 && v.every((x) => x > 0 && x <= 120);
+  const isAct = (r) => r[2] === 0 || r[2] === 1 || r[2] === 2;
+  const prelim = new Map();
+  const births = new Map();
+  const active = new Set();
+  for (const s of hsg.scen)
+    for (const r of s.xrows) {
+      if (isAct(r)) active.add(r[8]);
+      if (r[4] && r[4] !== 185) {
+        if (!births.has(r[8])) births.set(r[8], new Map());
+        const b = births.get(r[8]);
+        b.set(r[4], (b.get(r[4]) ?? 0) + 1);
+      }
+      if (!prelim.has(r[8])) prelim.set(r[8], tableToR.get(r[8]) ?? lookup(r[0], r[4]) ?? null);
+    }
+  // 한 판 안에서 같은 명단 인물에 활동 인물 둘이 걸리면 번호가 큰 쪽을 다른 사람으로 본다.
+  const needSplit = new Set();
+  for (const s of hsg.scen) {
+    const m = MODX[s.file];
+    const owner = new Map();
+    for (const r of m.n24) {
+      if (!isAct(r)) continue;
+      const rec = rowMap.get(`${r[0]}|${r[4]}`);
+      if (rec && !owner.has(rec.id)) owner.set(rec.id, r[8]);
+    }
+    for (const r of s.xrows) {
+      if (!isAct(r)) continue;
+      const rec = prelim.get(r[8]);
+      if (!rec) continue;
+      if (owner.has(rec.id) && owner.get(rec.id) !== r[8]) needSplit.add(r[8]);
+      else owner.set(rec.id, r[8]);
+    }
+  }
+  let split = 0,
+    viaTable = 0,
+    viaName = 0,
+    fresh = 0;
+  for (const s of hsg.scen)
+    for (const r of s.xrows) {
+      const pid = r[8];
+      if (PIDREC.has(pid)) continue;
+      let rec = prelim.get(pid);
+      if (rec) {
+        if (tableToR.get(pid) === rec) viaTable++;
+        else viaName++;
+      }
+      if (rec && needSplit.has(pid)) {
+        rec = null;
+        split++;
+      }
+      if (!rec) {
+        const b = births.get(pid);
+        const birth = b ? [...b.entries()].sort((p, q) => q[1] - p[1])[0][0] : r[4];
+        rec = {
+          id: nextId++,
+          name: r[0],
+          kanji: '',
+          birth,
+          death: null,
+          debut: r[3],
+          lifeSource: '모드',
+          hasZ: false,
+          tier: 2,
+          chain: null,
+        };
+        extra.push(rec);
+        put(rec);
+        fresh++;
+      }
+      rec.inMod = true;
+      if (okStats(r[7]) && (active.has(pid) || !okStats(rec.stats))) rec.stats = r[7];
+      PIDREC.set(pid, rec);
+    }
+  PIDSTAT.split = needSplit.size;
+  console.log('SPLIT', [...needSplit].map((p) => `${p}:${PIDREC.get(p).name}`).join(' '));
+  console.log('PIDREC', PIDREC.size, 'viaTable', viaTable, 'viaName', viaName, 'split', split, 'fresh', fresh);
+}
+// 세력색
+const NAMU_KEY = {
+  cao: '#2424E9',
+  shu: '#367805',
+  wu: '#CA0533',
+  gsz: '#F76E19',
+  xu: '#CDE4AC',
+  dong: '#595959',
+  lu: '#333333',
+  zx: '#AE546F',
+  ma: '#785011',
+  hansui: '#7B6300',
+  man: '#B25759',
+  yuan: '#E5BD11',
+  yuantan: '#D9799F',
+  ys: '#D7789B',
+  yi: '#190571',
+  jing: '#72B9C1',
+  hj: '#E78C11',
+  han: '#D1B159',
+  liaodong: '#CCB7D8',
+  kr: '#C5417A',
+  gz: '#24938D',
+  jiao: '#A73649',
+  ybh: '#7A6633',
+  wl: '#9D9D9D',
+  ld: '#7186D1',
+  liuyao: '#055B9E',
+  ly: '#5B1143',
+  zl: '#80DA75',
+  zy: '#592805',
+  hs: '#403A7D',
+  dingy: '#910560',
+  hf: '#811E2C',
+};
+const NAMU_NAME = { 장제: '#AE546F', 원담: '#D9799F', 이각: '#595959' };
+const MODRULER = new Map();
+for (const c of load(`${S}/data/mod-colors.json`).names) {
+  const rec = c.pid >= 700 ? PIDREC.get(c.pid) : rowMap.get(`${c.name}|${c.birth}`);
+  if (rec) MODRULER.set(`${c.file}|${c.slot}`, rec.name);
+}
+const MODCOLORS = load(`${S}/data/mod-colors.json`);
+const MODALLY = load(`${S}/data/mod-ally.json`);
+const MODREL = load(`${S}/data/mod-rel.json`);
+const DIPERR = [];
+const DIPCLAIM = new Map();
+const DIPMISS = new Set();
+const MODCOL = new Map();
+{
+  const votes = new Map();
+  for (const c of MODCOLORS.names) {
+    if (c.file === 15 || c.file === 30) continue;
+    const rec = c.pid >= 700 ? PIDREC.get(c.pid) : rowMap.get(`${c.name}|${c.birth}`);
+    if (!rec) continue;
+    if (!votes.has(rec.name)) votes.set(rec.name, new Map());
+    const v = votes.get(rec.name);
+    v.set(c.hex, (v.get(c.hex) ?? 0) + 1);
+  }
+  for (const [n, v] of votes) MODCOL.set(n, [...v.entries()].sort((a, c) => c[1] - a[1])[0][0]);
+}
+// 나무위키에 있으면 그 색, 없으면 후삼국지 색(그 판 그 칸의 값 → 같은 군주가 다른 판에서 쓴 값), 그래도 없으면 자동
+const factionColor = (name, key, y, fid, file, sameRuler) => {
+  if (NAMU_NAME[name]) return [NAMU_NAME[name], '나무위키'];
+  if (key === 'qm') return [y < 189 ? '#F8C0C0' : '#A084E0', '나무위키'];
+  if (NAMU_KEY[key]) return [NAMU_KEY[key], '나무위키'];
+  const slot = sameRuler ? MODCOLORS.slots[file]?.[fid] : null;
+  if (slot) return [slot, '후삼국지'];
+  if (MODCOL.has(name)) return [MODCOL.get(name), '후삼국지'];
+  return null;
+};
 const nameCount = {};
 for (const [n, v] of names) nameCount[n] = v.length;
 for (const r of [...roster, ...tableRoster, ...extra])
@@ -1127,20 +1385,6 @@ const COLOR = {
 };
 
 // ── 4. 시나리오 ─────────────────────────────────────────
-const SHORT = {
-  8: ['유비', '12개 도시 지배'],
-  9: ['조조', '26개 도시 지배'],
-  10: ['원소', '26개 도시 지배'],
-  11: ['원술', '24개 도시 지배'],
-  12: ['손권', '36개 도시 지배'],
-  13: ['마초', '34개 도시 지배'],
-  14: ['제갈량', '22개 도시 지배'],
-  19: ['공손찬', '오환 포함 8도시 지배'],
-  20: ['손책', '허창 포함 8도시 지배'],
-  21: ['조조', '원담·원희·원상 사망'],
-  22: ['강유', '장안·서량·강·성도 지배'],
-  23: ['제갈탄', '황제(조모) 옹립'],
-};
 const IFID = new Set([15, 27, 28, 29, 30]);
 const PREMISE = {
   1: '태평도가 일어나고 조정과 지방 군벌이 맞선다.',
@@ -1150,7 +1394,7 @@ const PREMISE = {
   5: '조조가 북방을 마무리하고 유비가 융중을 찾는다.',
   6: '유비가 한중을 얻고 관우가 형주에서 북진을 준비한다.',
   7: '제갈량의 마지막 북벌. 위수 남쪽에서 사마의와 맞선다.',
-  8: '유비가 의용군으로 시작하는 짧은 판.',
+  8: '유비가 의용군으로 시작하는 판.',
   9: '헌제를 맞아 허로 옮기는 조조의 판.',
   10: '원소와 공손찬이 하북을 두고 다툰다.',
   11: '원술이 황제를 칭하고 천하의 적이 된다.',
@@ -1161,8 +1405,8 @@ const PREMISE = {
   16: '동탁이 죽은 뒤 장안이 흔들리고 군웅이 움직인다.',
   17: '적벽 뒤 형주를 둘러싼 세 세력의 재편.',
   18: '유비가 죽고 제갈량이 어린 황제를 맡는다.',
-  19: '공손찬이 기주를 노리는 짧은 판.',
-  20: '손책이 허도를 치려는 순간을 잡은 짧은 판.',
+  19: '공손찬이 기주를 노리는 판.',
+  20: '손책이 허도를 치려는 순간을 잡은 판.',
   21: '원소가 죽고 아들들이 갈라선다.',
   22: '강유가 북벌을 이어가는 후기 판.',
   23: '제갈탄이 수춘에서 사마소에 맞선다.',
@@ -1219,6 +1463,16 @@ LINKS.sort((a, c) => (RANK[a.basis] ?? 3) - (RANK[c.basis] ?? 3));
 console.log('links', LINKS.length);
 const result = [];
 const specErrors = [];
+const MERGED = [];
+const SPECFIX = {
+  s0185: { drop: { 한수: ['포한'], 하진: ['진'] } },
+  s0188: { drop: { 하진: ['진'] }, absorb: { 포신: '하진', 원유: '하진', 초화: '하진' } },
+  x0189a: { drop: { 하진: ['진'] }, absorb: { 포신: '하진', 원유: '하진', 초화: '하진' } },
+  x0195a: { drop: { 조조: ['진'] } },
+  s0199: { drop: { 원소: ['어양'] } },
+  x0200a: { drop: { 조인: ['동해'] } },
+  x0209a: { absorb: { 오거: '유비' } },
+};
 const applySpec = (sp, { owner, placed, facInfo, facRow, y, fills }) => {
   const err = (m) => specErrors.push(`${sp.id}: ${m}`);
   const siteN = (n) => (siteBy.has(n) ? n : [...siteBy.values()].find((x) => x.modName === n || x.sanName === n)?.name);
@@ -1249,6 +1503,18 @@ const applySpec = (sp, { owner, placed, facInfo, facRow, y, fills }) => {
     const r = pickAt(d.ruler, y);
     if (!r) {
       err('newFactions: 인물 없음 ' + d.ruler);
+      continue;
+    }
+    const same = [...facInfo.values()].find((f) => f.ruler === r.id);
+    if (same) {
+      same.name = d.name ?? same.name;
+      const cs = siteN(d.capital);
+      if (cs) {
+        owner.set(cs, same.fid);
+        const rp = placed.get(r.id);
+        if (rp) rp.city = cs;
+      }
+      MERGED.push(`${sp.id}:${same.name}`);
       continue;
     }
     const fid = nf++;
@@ -1385,9 +1651,14 @@ const build = (s, opt = {}) => {
   const facRow = new Map();
   const deadRuler = new Map();
   const placed = new Map();
-  for (const row of s.rows) {
+  for (const row of [...s.rows, ...s.xrows]) {
     const [n, st, st2, , birth, fac, city] = row;
-    const r = rowMap.get(`${n}|${birth}`);
+    const r = row[8] != null ? PIDREC.get(row[8]) : rowMap.get(`${n}|${birth}`);
+    if (!r) continue;
+    {
+      const prev = placed.get(r.id);
+      if (prev && prev.fac >= 0 && !(st2 === 0 && fac < 64 && st === 0)) continue;
+    }
     if (st2 === 5 || st2 === 3) {
       if (!reviveSet.has(r.name)) continue;
     }
@@ -1442,6 +1713,37 @@ const build = (s, opt = {}) => {
       placed.set(c.id, { fac: f, city: placed.get(ru.id)?.city ?? '', src: '승계', rank: 0 });
     }
   }
+  // 한반도·왜·부여는 시대에 맞는 군주로 바꾼다(시간을 옮긴 판만). 땅은 모드 표를 그대로 쓴다.
+  if (shift)
+    for (const [key, tbl] of Object.entries(REIGN)) {
+      let f = [...facRow].find(([, ru]) => KLIN[ru.name] === key)?.[0];
+      let city = f !== undefined ? placed.get(facRow.get(f).id)?.city : undefined;
+      if (f === undefined) {
+        const d = [...deadRuler].find(([, d0]) => KLIN[d0.r.name] === key);
+        if (d) {
+          f = d[0];
+          const st = d[1].city < 250 ? MODSITE[d[1].city] : null;
+          city = st?.name ?? '';
+        }
+      }
+      if (f === undefined) continue;
+      const nm = tbl.find(([to]) => y < to)?.[1] ?? null;
+      const cur = facRow.get(f);
+      if (cur && cur.name === nm) continue;
+      if (cur) {
+        const p = placed.get(cur.id);
+        if (p) {
+          if (lifeOK(cur, y)) p.rank = 2;
+          else placed.delete(cur.id);
+        }
+        facRow.delete(f);
+      }
+      const c = nm ? pickAt(nm, y) : null;
+      if (c) {
+        facRow.set(f, c);
+        placed.set(c.id, { fac: f, city: city ?? '', src: '승계', rank: 0 });
+      }
+    }
   const facIds = [...new Set([...placed.values()].map((p) => p.fac).filter((f) => f >= 0))]
     .filter((f) => facRow.has(f))
     .sort((a, b) => a - b);
@@ -1454,304 +1756,94 @@ const build = (s, opt = {}) => {
   const facInfo = new Map(
     facIds.map((f) => {
       const ru = facRow.get(f);
-      const key = LIN2[ru.name] ?? `f${f}:${ru.name}`;
-      return [f, { fid: f, key, name: ru.name, ruler: ru.id, rulerLabel: ru.label, color: COLOR[key] ?? hue(f + 3) }];
+      const key = LIN2[ru.name] ?? KLIN[ru.name] ?? `f${f}:${ru.name}`;
+      return [
+        f,
+        {
+          fid: f,
+          key,
+          name: PNAME[key] ?? ru.name,
+          ruler: ru.id,
+          rulerLabel: ru.label,
+          color: COLOR[key] ?? hue(f + 3),
+        },
+      ];
     }),
   );
-  // 소유: 그 도시 인물의 최다 세력
-  const counts = new Map();
-  for (const p of placed.values())
-    if (p.fac >= 0 && p.city) {
-      if (!counts.has(p.city)) counts.set(p.city, new Map());
-      const c = counts.get(p.city);
-      c.set(p.fac, (c.get(p.fac) ?? 0) + (p.rank <= 1 ? 3 : 1));
-    }
+  // 소유: 모드 시나리오의 도시 표(N24 51곳 + 확장 199곳)를 그대로 쓴다. 공백지는 공백지로 둔다.
   const owner = new Map();
-  for (const [c, m] of counts) owner.set(c, [...m.entries()].sort((a, b) => b[1] - a[1])[0][0]);
-  // 인물 없는 거점: 도로 이웃이 한 세력으로 모이면 그 세력 소유로 추정(외국·이민족 제외)
   const fills = new Set();
-  const free = (st) => !owner.has(st.name) && st.region !== 15 && st.region !== 16;
-  for (let round = 0; round < 3; round++) {
-    const add = [];
+  s.own.forEach((f, i) => {
+    if (f < 0 || !facInfo.has(f)) return;
+    const st = MODSITE[i];
+    if (st) owner.set(st.name, f);
+  });
+  // 시나리오별 덮어쓰기(IF)
+  opt.patch?.({ owner, placed, facInfo, facRow, facIds, y, pickAt, sites, COLOR, fills });
+  if (opt.spec) applySpec(opt.spec, { owner, placed, facInfo, facRow, y, fills });
+  // 모드에 없는 거점(SAN10 유지·전장)은 길로 가장 가까운 모드 도시를 따른다. 그 도시가 공백지면 같이 공백지다.
+  {
+    const blankSet = new Set(
+      (opt.spec?.blank ?? []).map((n) =>
+        siteBy.has(n) ? n : [...siteBy.values()].find((x) => x.modName === n || x.sanName === n)?.name,
+      ),
+    );
+    const pending = [];
     for (const st of sites) {
-      if (!free(st)) continue;
-      const c = new Map();
-      for (const n of nb.get(st.name)) {
-        const o = owner.get(n);
-        if (o !== undefined) c.set(o, (c.get(o) ?? 0) + 1);
+      if (st.modName || owner.has(st.name) || blankSet.has(st.name)) continue;
+      const seen = new Set([st.name]);
+      let layer = [st.name],
+        hit = [];
+      while (layer.length && !hit.length) {
+        const next = [];
+        for (const c of layer)
+          for (const n of nb.get(c) ?? []) {
+            if (seen.has(n)) continue;
+            seen.add(n);
+            const t = siteBy.get(n);
+            if (!t) continue;
+            if (t.modName) hit.push(t);
+            else next.push(n);
+          }
+        layer = next;
       }
-      const top = [...c.entries()].sort((a, b) => b[1] - a[1]);
-      if (
-        top.length &&
-        (top.length === 1 || top[0][1] > top[1][1]) &&
-        top[0][1] >= ((st.src === 'SAN10' || st.src === '전장') && round ? 1 : 2)
-      )
-        add.push([st.name, top[0][0]]);
+      if (!hit.length) continue;
+      hit.sort((p, q) => Math.hypot(p.x - st.x, p.y - st.y) - Math.hypot(q.x - st.x, q.y - st.y));
+      const f = owner.get(hit[0].name);
+      if (f !== undefined) pending.push([st.name, f]);
     }
-    for (const [n, f] of add) {
+    for (const [n, f] of pending) {
       owner.set(n, f);
       fills.add(n);
     }
   }
-  // 본토의 빈 거점을 채운다. 순서: 연대별 주 지배 표 → 주의 대세 → 도로로 가까운 큰 세력 → 남은 곳은 가까운 세력.
-  // 영웅 집결 판은 일부러 빈 땅에서 시작하므로 그대로 둔다. 이민족·동이 땅과 낙랑·대방은 채우지 않는다.
-  const KEEP_EMPTY = /영웅\s*집결/.test(opt.title ?? s.title ?? '');
-  const NOFILL = new Set(['낙랑', '대방', '기리영']);
-  const NOGROW = new Set(['hj', 'qiang', 'hun', 'xianbei', 'wuhuan', 'shanyue', 'di']);
-  const LIAODONG = new Set(['양평', '서안평', '평곽', '답씨', '망평', '현도', '고현']);
-  const mainland = (st) => st.region !== 15 && st.region !== 16 && !NOFILL.has(st.name);
-  const fidBy = (k) => [...facInfo.values()].find((f) => f.key === k)?.fid;
-  const sovereign = (st) => {
-    const r = st.region;
-    if (y <= 189 && fidBy('han') !== undefined) return 'han';
-    if (y >= 207 && [1, 2, 3, 4, 5, 6, 12].includes(r)) return 'cao';
-    if (r === 13 && y >= 207) return LIAODONG.has(st.name) && y < 238 ? 'liaodong' : 'cao';
-    if (r === 11 && y >= 214) return 'cao';
-    if (r === 9 || r === 10) {
-      if (y >= 263) return 'cao';
-      if (y >= 220 && (st.name === '방릉' || st.name === '상용')) return 'cao';
-      if (y >= 215) return 'shu';
-    }
-    if (r === 14 && y < 226 && fidBy('jiao') !== undefined) return 'jiao';
-    if (r === 14 && y >= 210) return 'wu';
-    return null;
-  };
-  const fillMainland = () => {
-    if (KEEP_EMPTY) return;
-    for (const st of sites) {
-      if (!mainland(st) || owner.has(st.name)) continue;
-      const k = sovereign(st);
-      const f = k ? fidBy(k) : undefined;
-      if (f !== undefined) {
-        owner.set(st.name, f);
-        fills.add(st.name);
-      }
-    }
-    const held = new Map();
-    for (const st of sites) {
-      if (!mainland(st)) continue;
-      const f = owner.get(st.name);
-      if (f !== undefined) held.set(f, (held.get(f) ?? 0) + 1);
-    }
-    const major = (f) => (held.get(f) ?? 0) >= 4 && facInfo.has(f) && !NOGROW.has(facInfo.get(f).key);
-    const growable = (f) => facInfo.has(f) && !NOGROW.has(facInfo.get(f).key);
-    const byRegion = new Map();
-    for (const st of sites) {
-      if (!mainland(st)) continue;
-      const f = owner.get(st.name);
-      if (f === undefined || !major(f)) continue;
-      if (!byRegion.has(st.region)) byRegion.set(st.region, new Map());
-      const m = byRegion.get(st.region);
-      m.set(f, (m.get(f) ?? 0) + 1);
-    }
-    for (const st of sites) {
-      if (!mainland(st) || owner.has(st.name)) continue;
-      const m = byRegion.get(st.region);
-      if (!m) continue;
-      const tot = [...m.values()].reduce((a, c) => a + c, 0);
-      const top = [...m.entries()].sort((a, c) => c[1] - a[1] || a[0] - c[0])[0];
-      if (tot >= 2 && top[1] / tot >= 0.7) {
-        owner.set(st.name, top[0]);
-        fills.add(st.name);
-      }
-    }
-    for (const pass of [major, growable]) {
-      let frontier = sites.filter((st) => mainland(st) && owner.has(st.name) && pass(owner.get(st.name)));
-      while (frontier.length) {
-        const next = new Map();
-        for (const st of frontier)
-          for (const n of nb.get(st.name)) {
-            const t = siteBy.get(n);
-            if (!t || !mainland(t) || owner.has(n)) continue;
-            if (!next.has(n)) next.set(n, new Map());
-            const m = next.get(n);
-            const f = owner.get(st.name);
-            m.set(f, (m.get(f) ?? 0) + 1);
-          }
-        frontier = [];
-        for (const [n, m] of next) {
-          const f = [...m.entries()].sort((a, c) => c[1] - a[1] || a[0] - c[0])[0][0];
-          owner.set(n, f);
-          fills.add(n);
-          frontier.push(siteBy.get(n));
-        }
-      }
-    }
-  };
-  fillMainland();
-  // 끊긴 영토는 공백지 2곳까지 잇는다(D-053)
-  for (const [fid] of facInfo) {
-    const rp = placed.get(facInfo.get(fid).ruler);
-    const cap = rp?.city && owner.get(rp.city) === fid ? rp.city : [...owner].find(([, f]) => f === fid)?.[0];
-    if (!cap) continue;
-    for (let g = 0; g < 8; g++) {
-      const seen = new Set([cap]);
-      const q = [cap];
-      while (q.length)
-        for (const n of nb.get(q.shift()))
-          if (!seen.has(n) && owner.get(n) === fid) {
-            seen.add(n);
-            q.push(n);
-          }
-      const out = [...owner].filter(([c, f]) => f === fid && !seen.has(c)).map(([c]) => c);
-      if (!out.length) break;
-      let done = false;
-      for (const st of out) {
-        const prev = new Map([[st, null]]);
-        const qq = [st];
-        let hit = null;
-        while (qq.length && !hit) {
-          const c = qq.shift();
-          for (const n of nb.get(c)) {
-            if (prev.has(n)) continue;
-            if (seen.has(n)) {
-              prev.set(n, c);
-              hit = n;
-              break;
-            }
-            if (!owner.has(n) && siteBy.get(n).region !== 15 && siteBy.get(n).region !== 16) {
-              prev.set(n, c);
-              qq.push(n);
-            }
-          }
-        }
-        if (!hit) continue;
-        const path = [];
-        for (let c = prev.get(hit); c && c !== st; c = prev.get(c)) path.push(c);
-        if (path.length && path.length <= 3) {
-          for (const c of path) {
-            owner.set(c, fid);
-            fills.add(c);
-          }
-          done = true;
-          break;
-        }
-      }
-      if (!done) break;
-    }
-  }
-  // 한반도·왜·부여 국가 (시대별 군주)
+  // 땅이 하나도 없는 세력은 세우지 않는다. 사람은 재야로 둔다.
+  const dissolved = [];
   {
-    const reign = (t) => t.find(([to]) => y < to)?.[1] ?? null;
-    const siteName = (n) =>
-      siteBy.has(n) ? n : [...siteBy.values()].find((x) => x.modName === n || x.sanName === n)?.name;
-    const POLITY = [
-      [
-        'gog',
-        '고구려',
-        reign([
-          [179, null],
-          [197, '고국천왕'],
-          [227, '산상왕'],
-          [248, '동천왕'],
-          [270, '중천왕'],
-          [999, '서천왕'],
-        ]),
-        '국내성',
-        ['졸본', '부조', '옥저', '북옥저', '환도성', '비류수', '양맥 골짜기'],
-      ],
-      [
-        'by',
-        '부여',
-        reign([
-          [230, '위구태'],
-          [245, '간위거'],
-          [285, '마여'],
-          [999, '의려'],
-        ]),
-        '부여',
-        y < 220 ? ['읍루'] : [],
-      ],
-      ['ye', '동예', '불내예후', '동예', ['맥국', '불이', '화려']],
-      ['mahan', '마한', '진왕', '목지국', ['건마국', '모로비리', '신미', '주호']],
-      [
-        'bj',
-        '백제',
-        reign([
-          [214, '초고왕'],
-          [234, '구수왕'],
-          [999, '고이왕'],
-        ]),
-        '백제국',
-        [],
-      ],
-      [
-        'sr',
-        '신라',
-        reign([
-          [196, '벌휴이사금'],
-          [230, '나해이사금'],
-          [247, '조분이사금'],
-          [262, '첨해이사금'],
-          [999, '미추이사금'],
-        ]),
-        '사로국',
-        [
-          '우시산',
-          '근기',
-          ...(y >= 185 ? ['조문'] : []),
-          ...(y >= 231 ? ['감문'] : []),
-          ...(y >= 236 ? ['골벌'] : []),
-          ...(y >= 249 ? ['사벌'] : []),
-        ],
-      ],
-      [
-        'gy',
-        '가야',
-        reign([
-          [199, '수로왕'],
-          [253, '거등왕'],
-          [999, '마품왕'],
-        ]),
-        '구야국',
-        ['안야', '고자미동', '초팔', '다벌'],
-      ],
-      [
-        'wa',
-        '왜',
-        y < 189 ? null : y < 248 ? '히미코' : '이요',
-        '야마타이국',
-        ['이도국', '노국', '불미국', '말로국', '일지국', '대마국', '이사국', '파리국', '지유국', '투마국'],
-      ],
-      ['guno', '구노국', y < 189 ? null : '히미쿠코', '구노', []],
-    ];
-    let pf = 200;
-    for (const [key, nameP, rulerName, cap, cs] of POLITY) {
-      pf++;
-      if (!rulerName) continue;
-      const r = pickAt(rulerName, y);
-      const capS = siteName(cap);
-      if (!r || !capS) {
-        console.log('POLITY MISSING', key, rulerName, cap);
-        continue;
-      }
-      facRow.set(pf, r);
-      facInfo.set(pf, { fid: pf, key, name: nameP, ruler: r.id, rulerLabel: r.label, color: COLOR[key] });
-      for (const c of [cap, ...cs]) {
-        const n = siteName(c);
-        if (n) owner.set(n, pf);
-        else console.log('POLITY CITY?', c);
-      }
-      placed.set(r.id, { fac: pf, city: capS, src: '지정', rank: 0 });
-    }
-    // 낙랑·대방: 군현 소유자
-    const fidOfKey = (k) => [...facInfo.values()].find((f) => f.key === k)?.fid;
-    const commander = fidOfKey(y >= 238 ? 'cao' : y >= 190 ? 'liaodong' : 'han');
-    if (commander !== undefined) {
-      owner.set('낙랑', commander);
-      if (y >= 204 && siteBy.has('대방')) {
-        owner.set('대방', commander);
-        owner.set('기리영', commander);
-      }
+    const held = new Set(owner.values());
+    for (const [fid, fi] of [...facInfo]) {
+      if (held.has(fid)) continue;
+      dissolved.push(fi.name);
+      facInfo.delete(fid);
+      facRow.delete(fid);
+      for (const p of placed.values())
+        if (p.fac === fid) {
+          p.fac = -1;
+          p.rank = 3;
+        }
     }
   }
-  // 시나리오별 덮어쓰기(IF)
-  opt.patch?.({ owner, placed, facInfo, facRow, facIds, y, pickAt, sites, COLOR, fills });
-  if (opt.spec) applySpec(opt.spec, { owner, placed, facInfo, facRow, y, fills });
-  fillMainland();
-  // 기리영은 대방군의 영이라 대방을 따라간다
-  if (owner.has('대방')) owner.set('기리영', owner.get('대방'));
-  else owner.delete('기리영');
+  // 세력색: 나무위키 상징색 → 후삼국지 색 번호 표 → 후삼국지 화면 근사 → 자동
+  for (const fi of facInfo.values()) {
+    const nm = byId.get(fi.ruler)?.name;
+    const k = LIN2[nm] ?? KLIN[nm] ?? fi.key;
+    const mr = MODRULER.get(`${s.file}|${fi.fid}`);
+    const c = factionColor(nm, k, y, fi.fid, s.file, mr === nm || (KLIN[mr] === k && k !== undefined));
+    if (c) {
+      fi.color = c[0];
+      fi.colorSrc = c[1];
+    } else fi.colorSrc = '자동';
+  }
   // 수도
   const list = [...facInfo.values()];
   for (const fi of list) {
@@ -1795,44 +1887,11 @@ const build = (s, opt = {}) => {
         fb++;
       }
     }
-  // 남은 월경지: 군주 없는 조각은 둘러싼 세력에 넘기거나 공백지로 돌리고, 인물은 수도로 옮긴다
   const moved = [];
-  for (const fi of list) {
-    if (!fi.capital) continue;
-    const seen = new Set([fi.capital]);
-    const q = [fi.capital];
-    while (q.length)
-      for (const n of nb.get(q.shift()) ?? [])
-        if (!seen.has(n) && owner.get(n) === fi.fid) {
-          seen.add(n);
-          q.push(n);
-        }
-    for (const c of [...owner].filter(([n, f]) => f === fi.fid && !seen.has(n)).map(([n]) => n)) {
-      if (c === '낙랑' || c === '대방' || c === '기리영') continue;
-      const around = new Map();
-      for (const n of nb.get(c)) {
-        const o = owner.get(n);
-        if (o !== undefined && o !== fi.fid) around.set(o, (around.get(o) ?? 0) + 1);
-      }
-      const top = [...around.entries()].sort((a, d) => d[1] - a[1])[0];
-      if (top && facInfo.has(top[0])) {
-        owner.set(c, top[0]);
-        moved.push(`${c}: ${fi.name} → ${facInfo.get(top[0]).name}`);
-      } else {
-        owner.delete(c);
-        moved.push(`${c}: ${fi.name} → 공백지`);
-      }
-      for (const p of placed.values())
-        if (p.fac === fi.fid && p.city === c) {
-          p.city = fi.capital;
-          p.auto = 1;
-        }
-    }
-    fi.cities = [...owner].filter(([, f]) => f === fi.fid).map(([n]) => n);
-  }
   for (const fi of list) fi.cities = [...owner].filter(([, f]) => f === fi.fid).map(([n]) => n);
   // 검사
   const issues = [];
+  for (const n of dissolved) issues.push({ k: '땅이 없어 뺀 세력', v: n });
   for (const fi of list) {
     if (!fi.cities.length) issues.push({ k: '도시 없는 세력', v: fi.name });
     if (!fi.cities.length) continue;
@@ -1852,25 +1911,6 @@ const build = (s, opt = {}) => {
       });
     const cap = siteBy.get(fi.capital);
     if (cap && cap.kind === 'P') issues.push({ k: '수도가 관문', v: `${fi.name}: ${fi.capital}` });
-  }
-  if (!KEEP_EMPTY) {
-    let frontier = sites.filter((st) => mainland(st) && owner.has(st.name) && facInfo.has(owner.get(st.name)));
-    while (frontier.length) {
-      const next = new Map();
-      for (const st of frontier)
-        for (const n of nb.get(st.name)) {
-          const t = siteBy.get(n);
-          if (!t || !mainland(t) || owner.has(n)) continue;
-          if (!next.has(n)) next.set(n, owner.get(st.name));
-        }
-      frontier = [];
-      for (const [n, f] of next) {
-        owner.set(n, f);
-        fills.add(n);
-        facInfo.get(f).cities?.push?.(n);
-        frontier.push(siteBy.get(n));
-      }
-    }
   }
   const idx = new Map(list.map((f, i) => [f.fid, i]));
   // 휘하 트리: 기록된 관계 → 같은 도시의 태수 → 군주 순. 직속 명망 30 안에서 아래로 내린다.
@@ -1976,6 +2016,75 @@ const build = (s, opt = {}) => {
     rule: [...basisOf.values()].filter((v) => v === '규칙').length,
     overflow,
   };
+  // 외교: 판별 지정이 먼저이고, 모드 판은 모드 값(동맹 칸, 적대 수치 70 이상)을 더한다.
+  const DIP = [];
+  {
+    const oid = opt.id ?? `n${String(s.file).padStart(2, '0')}`;
+    const seen = new Map();
+    const add = (a, c, kind, src, quiet) => {
+      if (a === c || a < 0 || c < 0) return;
+      const k = a < c ? `${a}|${c}` : `${c}|${a}`;
+      const prev = seen.get(k);
+      if (prev) {
+        if (prev[2] !== kind && !quiet) DIPERR.push(`${oid}: ${list[a].name}-${list[c].name} 동맹·전쟁 겹침`);
+        return;
+      }
+      const row = [Math.min(a, c), Math.max(a, c), kind, src];
+      seen.set(k, row);
+      DIP.push(row);
+    };
+    const byName = (n) => list.findIndex((f) => f.name === n || byId.get(f.ruler)?.name === n);
+    const extra = DIPLO[oid] ?? {};
+    for (const [kind, rows] of [
+      ['A', extra.A ?? []],
+      ['W', extra.W ?? []],
+    ])
+      for (const [a, c, src] of rows) {
+        const ia = byName(a),
+          ic = byName(c);
+        if (ia < 0 || ic < 0) {
+          DIPERR.push(`${oid}: 세력 없음 ${ia < 0 ? a : c}`);
+          continue;
+        }
+        add(ia, ic, kind, src ?? '추정');
+      }
+    if (!opt.id) {
+      for (const [a, c] of MODALLY[s.file] ?? [])
+        if (idx.has(a) && idx.has(c)) add(idx.get(a), idx.get(c), 'A', '모드', true);
+      for (const [a, c] of MODREL[s.file]?.war ?? [])
+        if (idx.has(a) && idx.has(c)) add(idx.get(a), idx.get(c), 'W', '모드', true);
+    }
+    // 추정으로 넣은 것은 사료 대조 결과로 근거를 바꾼다
+    for (const row of DIP) {
+      const na = list[row[0]].name,
+        nc = list[row[1]].name;
+      let cite = '';
+      if (row[3] === '추정') {
+        const v = verify(row[2], na, nc, oid);
+        if (v) {
+          row[3] = v[0];
+          cite = v[1];
+        } else DIPMISS.add(`${row[2]}|${na}·${nc}`);
+      } else if (row[3] !== '모드') {
+        const v = verify(row[2], na, nc, oid);
+        if (v && v[0] === row[3]) cite = v[1];
+        else DIPMISS.add(`글 없음 ${row[2]}|${na}·${nc}|${row[3]}`);
+      }
+      const key = `${row[2]}|${[na, nc].sort((p, q) => p.localeCompare(q, 'ko')).join('·')}|${row[3]}`;
+      if (!DIPCLAIM.has(key))
+        DIPCLAIM.set(key, {
+          kind: row[2],
+          pair: [na, nc].sort((p, q) => p.localeCompare(q, 'ko')).join('·'),
+          src: row[3],
+          cite,
+          scen: [],
+        });
+      const c = DIPCLAIM.get(key);
+      if (cite && !c.cite) c.cite = cite;
+      c.scen.push(`${y}`);
+    }
+    DIP.sort((p, q) => (p[2] < q[2] ? -1 : p[2] > q[2] ? 1 : p[0] - q[0] || p[1] - q[1]));
+  }
   const out = {
     id: opt.id ?? `n${String(s.file).padStart(2, '0')}`,
     file: opt.id ? null : s.file,
@@ -1985,7 +2094,6 @@ const build = (s, opt = {}) => {
     title: opt.title ?? s.title,
     desc: opt.desc ?? null,
     premise: opt.premise ?? PREMISE[s.file],
-    short: opt.id ? null : (SHORT[s.file] ?? null),
     divergence: opt.divergence ?? null,
     source: opt.source ?? null,
     factions: list.map((f) => ({
@@ -1993,10 +2101,12 @@ const build = (s, opt = {}) => {
       ruler: f.ruler,
       rulerLabel: f.rulerLabel,
       color: f.color,
+      colorSrc: f.colorSrc,
       capital: f.capital,
       cities: f.cities,
       count: officers.filter((o) => o[1] === idx.get(f.fid)).length,
     })),
+    diplomacy: DIP,
     owner: Object.fromEntries([...owner].filter(([, f]) => idx.has(f)).map(([c, f]) => [c, idx.get(f)])),
     owned: owner.size,
     inferred: [...fills],
@@ -2022,6 +2132,20 @@ const specPath = `${S}/data/ai/scenarios.json`;
 if (fs.existsSync(specPath)) {
   const specs = load(specPath);
   for (const sp of specs.scenarios) {
+    const fx = SPECFIX[sp.id];
+    if (fx) {
+      for (const [f, l] of Object.entries(fx.drop ?? {})) {
+        const cur = sp.cities?.[f];
+        if (!cur) throw new Error(`SPECFIX ${sp.id} ${f}`);
+        for (const c of l) {
+          if (!cur.includes(c)) throw new Error(`SPECFIX ${sp.id} ${f} ${c}`);
+        }
+        sp.cities[f] = cur.filter((c) => !l.includes(c));
+      }
+      if (fx.absorb) sp.absorb = { ...(sp.absorb ?? {}), ...fx.absorb };
+    }
+    if (sp.id === 's0247' && !(sp.newFactions ?? []).some((f) => f.name === '구노국'))
+      sp.newFactions = [...(sp.newFactions ?? []), { ruler: '히미쿠코', name: '구노국', key: 'guno', capital: '구노' }];
     if (sp.rulers && sp.year >= 224 && sp.year < 263)
       for (const [o, n] of Object.entries(sp.rulers))
         if (['장완', '비의', '비위'].includes(n)) {
@@ -2050,7 +2174,15 @@ if (fs.existsSync(specPath)) {
   }
   const descs = specs.descriptions ?? {};
   for (const r of result) if (descs[r.id]) r.desc = descs[r.id];
+  for (const r of result)
+    if (r.desc)
+      r.desc = r.desc
+        .replace(' 짧게 하북의 승자를 가리는 판이다.', ' 하북의 승자를 가리는 판이다.')
+        .replace('조조의 뒤를 치는 짧고 빠른 판이고', '조조의 뒤를 치는 판이고');
 }
+console.log('MERGED', MERGED.join(' '));
+console.log('DIPERR', DIPERR.length, DIPERR.join(' ; '));
+console.log('DIPMISS', DIPMISS.size, [...DIPMISS].join(' ; '));
 console.log('SPECERR', specErrors.length, specErrors.slice(0, 40).join(' ; '));
 result.sort((a, b) => a.year - b.year || a.month - b.month);
 
@@ -2093,6 +2225,7 @@ const data = {
     r.statSrc ?? '',
   ]),
   scenarios: result,
+  dipClaims: [...DIPCLAIM.values()].map((c) => ({ ...c, scen: [...new Set(c.scen)].sort() })),
   map: {
     fixes,
     conflicts,
@@ -2120,6 +2253,7 @@ const data = {
     offLand: offLand.length,
   },
   coverage: {
+    split: PIDSTAT.split,
     allTable: allTable.length,
     ai: { a: (AI('A') ?? []).length, g: gLinks.length },
     table: tableRoster.length,
@@ -2269,7 +2403,16 @@ fs.writeFileSync(
           null,
         ];
       }),
-      diplomacy: [],
+      diplomacy: (() => {
+        const num = new Map();
+        let k = 0;
+        x.factions.forEach((f, i) => {
+          if (f.capital) num.set(i, ++k);
+        });
+        return x.diplomacy
+          .filter(([a, c]) => num.has(a) && num.has(c))
+          .map(([a, c, kind]) => [num.get(a), num.get(c), kind === 'W' ? 0 : 7, kind === 'W' ? 0 : 24]);
+      })(),
     })),
   }),
 );
