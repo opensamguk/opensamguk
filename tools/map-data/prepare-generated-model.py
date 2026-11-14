@@ -7,15 +7,32 @@ import bpy
 from mathutils import Vector
 
 
+RODIN_TRIANGLE_BUDGETS = (80_000, 24_000, 6_000)
+RODIN_TEXTURE_LIMIT = 2048
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('source', type=Path)
     parser.add_argument('output', type=Path)
     parser.add_argument('--rotate', type=float, default=0, help='Degrees around the vertical axis')
+    parser.add_argument('--rodin-map', action='store_true', help='Export the INT-27 map budgets and render LOD0')
+    parser.add_argument('--name', help='Output stem (defaults to the source stem)')
     args = parser.parse_args(sys.argv[sys.argv.index('--') + 1:])
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.ops.import_scene.gltf(filepath=str(args.source))
     scene = bpy.context.scene
+    name = args.name or args.source.stem
+    if Path(name).name != name:
+        parser.error('Output name must be a file stem')
+    if args.rodin_map:
+        for image in bpy.data.images:
+            width, height = image.size
+            longest = max(width, height)
+            if longest > RODIN_TEXTURE_LIMIT:
+                image.scale(max(1, round(width * RODIN_TEXTURE_LIMIT / longest)),
+                            max(1, round(height * RODIN_TEXTURE_LIMIT / longest)))
+                image.pack()
     meshes = [obj for obj in scene.objects if obj.type == 'MESH']
     if not meshes:
         raise ValueError('No mesh in GLB')
@@ -40,7 +57,8 @@ def main():
     for obj in meshes:
         obj.data.calc_loop_triangles()
         triangles += len(obj.data.loop_triangles)
-    for lod, budget in enumerate((150_000, 45_000, 10_000)):
+    budgets = RODIN_TRIANGLE_BUDGETS if args.rodin_map else (150_000, 45_000, 10_000)
+    for lod, budget in enumerate(budgets):
         ratio = min(1, budget / triangles)
         modifiers = []
         if ratio < 1:
@@ -48,16 +66,31 @@ def main():
                 modifier = obj.modifiers.new('LOD', 'DECIMATE')
                 modifier.ratio = ratio
                 modifiers.append((obj, modifier))
-        bpy.ops.export_scene.gltf(filepath=str(args.output / f'{args.source.stem}-lod{lod}.glb'),
+        bpy.ops.export_scene.gltf(filepath=str(args.output / f'{name}-lod{lod}.glb'),
                                   export_format='GLB', export_apply=True)
         for obj, modifier in modifiers:
             obj.modifiers.remove(modifier)
 
-    bpy.ops.object.camera_add(location=(0, -1.6, 1.73))
+    aim = Vector((0, 0, .13))
+    frame_width = 1.83
+    if args.rodin_map:
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        bpy.ops.import_scene.gltf(filepath=str(args.output / f'{name}-lod0.glb'))
+        scene = bpy.context.scene
+        bpy.context.view_layer.update()
+        corners = [obj.matrix_world @ Vector(corner)
+                   for obj in scene.objects if obj.type == 'MESH'
+                   for corner in obj.bound_box]
+        # Project onto the vertical axis of the south-facing, 45-degree camera.
+        projected = [(corner.y + corner.z) * 2**-.5 for corner in corners]
+        low, high = min(projected), max(projected)
+        aim.z = (low + high) * 2**-.5
+        frame_width = max(1.53, (high - low) * (1920 / 1080) / .88)
+    bpy.ops.object.camera_add(location=aim + Vector((0, -1.6, 1.6)))
     camera = bpy.context.object
-    camera.rotation_euler = (Vector((0, 0, .13)) - camera.location).to_track_quat('-Z', 'Y').to_euler()
+    camera.rotation_euler = (aim - camera.location).to_track_quat('-Z', 'Y').to_euler()
     camera.data.type = 'ORTHO'
-    camera.data.ortho_scale = 1.83
+    camera.data.ortho_scale = frame_width
     scene.camera = camera
     scene.world = bpy.data.worlds.new('Preview')
     scene.world.use_nodes = True
@@ -74,7 +107,7 @@ def main():
     scene.render.resolution_x = 1920
     scene.render.resolution_y = 1080
     scene.render.resolution_percentage = 100
-    scene.render.filepath = str(args.output / (args.source.stem + '-1920x1080.png'))
+    scene.render.filepath = str(args.output / (name + '-1920x1080.png'))
     bpy.ops.render.render(write_still=True)
 
 
