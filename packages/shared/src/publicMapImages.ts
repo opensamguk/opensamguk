@@ -3,6 +3,8 @@
 export const APPROVED_MAP_IMAGES = [
   'apps/web/src/main/pixel-basemap.png',
   'apps/web/src/main/san10-pixel-basemap.png',
+  'apps/web/src/main/heightmap.png',
+  'apps/web/src/main/san10-heightmap.png',
   'apps/web/src/art/flag/square-cloth.png',
   'apps/web/src/art/flag/square.png',
   'apps/web/src/art/flag/tall-cloth.png',

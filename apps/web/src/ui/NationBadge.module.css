@@ -23,13 +23,13 @@
 }
 .flag::before {
   background: currentColor;
-  -webkit-mask: url('https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6/public/art/flag/square-cloth.png')
+  -webkit-mask: url('https://raw.githubusercontent.com/opensamguk/opensamguk-images/0ca26e1ee266f32954b96a60a47a2edfaab66948/public/art/flag/square-cloth.png')
     0 0 / 100% 100% no-repeat;
-  mask: url('https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6/public/art/flag/square-cloth.png')
+  mask: url('https://raw.githubusercontent.com/opensamguk/opensamguk-images/0ca26e1ee266f32954b96a60a47a2edfaab66948/public/art/flag/square-cloth.png')
     0 0 / 100% 100% no-repeat;
 }
 .flag::after {
-  background: url('https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6/public/art/flag/square.png')
+  background: url('https://raw.githubusercontent.com/opensamguk/opensamguk-images/0ca26e1ee266f32954b96a60a47a2edfaab66948/public/art/flag/square.png')
     0 0 / 100% 100% no-repeat;
 }
 .name {
