@@ -172,13 +172,27 @@ def watch(x,z,y,scale,lod):
 
 def building(kind,lod):
     if kind=='pass':
-        for side in (-1,1):
-            bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=(3,2,1)[lod],radius=1,location=(side*.34,.07,.22))
-            rock=bpy.context.object
-            rock.scale=(.15,.29,.22 if side<0 else .31)
-            rock.location.z=rock.scale.z
-            finish(rock,'rock')
-            wall('stone',side*.32,0,0,.33,.16,.166,lod)
+        for side in (-1, 1):
+            subdivisions = (3, 2, 1)[lod]
+            peaks = ((.35, .02, .16, .29, .37),)
+            if lod < 2:
+                peaks += ((.39, -.13, .10, .21, .27), (.38, .22, .11, .17, .21))
+            for index, (offset, north, width, depth, height) in enumerate(peaks):
+                bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=subdivisions, radius=1)
+                rock = bpy.context.object
+                for vertex in rock.data.vertices:
+                    x, y, z = vertex.co
+                    elevation = (z + 1) / 2
+                    ridge = math.sin(11 * x + 6 * y + 7 * z + index + side)
+                    ledge = math.cos(17 * elevation + 2 * y + index)
+                    taper = 1.10 - .58 * elevation + .10 * ridge + .07 * ledge
+                    vertex.co = (
+                        side * (offset + .026 * elevation) + .82 * width * x * taper,
+                        north + .91 * depth * y * taper,
+                        max(0, height * (1.16 * elevation - .16) + .023 * ridge * elevation),
+                    )
+                finish(rock, 'rock')
+            wall('stone', side * .30, 0, 0, .295, .16, .166, lod)
         gate('stone',0,0,.166,lod,True)
     elif kind in ('camp','nomad-camp'):
         box('earth',0,0,0,.94,.89,.02)
