@@ -31,6 +31,7 @@ interface PublicBuildMeta {
   images: { file: string; source: string | null; sha256: string }[];
   remoteImages: { source: string; url: string; sha256: string }[];
   textures: PublicBuildMeta['remoteImages'];
+  sprites: PublicBuildMeta['remoteImages'];
   files: Record<string, string>;
 }
 
@@ -175,7 +176,7 @@ async function watch(page: Page): Promise<Seen> {
     const url = new URL(route.request().url());
     if (
       url.origin !== origin &&
-      ![...meta.remoteImages, ...meta.textures].some((image) => image.url === url.href) &&
+      ![...meta.remoteImages, ...meta.textures, ...meta.sprites].some((image) => image.url === url.href) &&
       !isPortrait(url.href)
     ) {
       seen.external.push(url.href);
@@ -192,7 +193,11 @@ async function watch(page: Page): Promise<Seen> {
   page.on('response', (response: Response) => {
     const request = response.request();
     const url = new URL(request.url());
-    if (!ASSET_TYPES.has(request.resourceType()) && !meta.textures.some(({ url }) => url === response.url())) return;
+    if (
+      !ASSET_TYPES.has(request.resourceType()) &&
+      ![...meta.textures, ...meta.sprites].some(({ url }) => url === response.url())
+    )
+      return;
     if (url.pathname.startsWith('/trpc') || url.pathname.startsWith('/sse')) return;
     seen.pending.push(
       response.body().then((body) => {
@@ -225,7 +230,9 @@ function expectOnlyDistAssets(seen: Seen) {
       expect(asset.type, asset.path).toBe('image');
     } else if (asset.path.startsWith('https://')) {
       expect(asset.path, '승인 base 밖 초상 경로').not.toContain('/portraits/');
-      const approved = [...meta.remoteImages, ...meta.textures].find((image) => image.url === asset.path);
+      const approved = [...meta.remoteImages, ...meta.textures, ...meta.sprites].find(
+        (image) => image.url === asset.path,
+      );
       expect(approved, asset.path).toBeDefined();
       expect(asset.sha256, asset.path).toBe(approved!.sha256);
     } else {
@@ -363,6 +370,28 @@ test('고정 질감 경로에서 브라우저가 1024 WebP를 읽는다', async 
     return { dimensions, hash };
   }, texture.url);
   expect(result).toEqual({ dimensions: [1024, 1024], hash: texture.sha256 });
+  await Promise.all(seen.pending);
+  expectOnlyDistAssets(seen);
+});
+
+test('고정 스프라이트 WebP가 공개 CSP에서 열린다', async ({ page }) => {
+  const seen = await watch(page);
+  const csp = readFileSync(join(repoRoot, 'deploy/security.caddy'), 'utf8').match(/connect-src [^;]+/)![0];
+  await page.route(origin + '/login', async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({ response, headers: { ...response.headers(), 'content-security-policy': csp } });
+  });
+  await page.goto(origin + '/login', { waitUntil: 'networkidle' });
+  const sprite = meta.sprites.find(({ source }) => source === 'map3d/sprites/city-grand-capital.webp')!;
+  const maxDimension = await page.evaluate(async (url) => {
+    const response = await fetch(url, { credentials: 'omit' });
+    if (!response.ok) throw new Error('Sprite fetch failed');
+    const bitmap = await createImageBitmap(await response.blob());
+    const maxDimension = Math.max(bitmap.width, bitmap.height);
+    bitmap.close();
+    return maxDimension;
+  }, sprite.url);
+  expect(maxDimension).toBeGreaterThanOrEqual(3072);
   await Promise.all(seen.pending);
   expectOnlyDistAssets(seen);
 });
