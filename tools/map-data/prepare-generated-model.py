@@ -36,7 +36,12 @@ def main():
     root.location = (-centre.x / side, -centre.y / side, -minimum.z / side)
     bpy.context.view_layer.update()
     args.output.mkdir(parents=True, exist_ok=True)
-    for lod, ratio in enumerate((1, .28, .075)):
+    triangles = 0
+    for obj in meshes:
+        obj.data.calc_loop_triangles()
+        triangles += len(obj.data.loop_triangles)
+    for lod, budget in enumerate((150_000, 45_000, 10_000)):
+        ratio = min(1, budget / triangles)
         modifiers = []
         if ratio < 1:
             for obj in meshes:
