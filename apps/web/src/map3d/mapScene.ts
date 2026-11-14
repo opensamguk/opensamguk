@@ -37,6 +37,7 @@ import {
   WebGLRenderer,
 } from 'three';
 import { loadGlbMesh, toonGradient } from './glbMesh';
+import { PaintPass } from './paintPass';
 import { pickModel, regionTint, TIER_LOD, tileFill, zoomTier, type ZoomTier } from './siteModels';
 import type { PublicGeography } from '@opensamguk/shared';
 import { roadWalks, TERRAINS, waterLanes, type Terrain } from '../main/terrainTiles';
@@ -241,6 +242,9 @@ transformed += normalize(objectNormal) * 0.012;`,
     count: { value: new Vector2(1, 1) },
   };
   private rings: Mesh[] = [];
+  /** 그림 후처리(유화 붓 터치). 끄면 그냥 그린다. */
+  readonly paint = new PaintPass();
+  painterly = true;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -1234,6 +1238,8 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     this.width = Math.max(width, 1);
     this.height = Math.max(height, 1);
     this.renderer.setSize(this.width, this.height, false);
+    const ratio = this.renderer.getPixelRatio();
+    this.paint.setSize(Math.round(this.width * ratio), Math.round(this.height * ratio));
   }
 
   /** 카메라를 놓고 그린다. 정사영 카메라의 확대(zoom)는 화면 px당 지도 단위의 역수다. */
@@ -1271,7 +1277,8 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
       for (const entry of this.siteModelMeshes) entry.mesh.visible = entry.lod === lod;
     }
     this.waterTime.value = performance.now() / 1000;
-    this.renderer.render(this.scene, camera);
+    if (this.painterly) this.paint.render(this.renderer, this.scene, camera);
+    else this.renderer.render(this.scene, camera);
   }
 
   /** 3D 위치의 화면 좌표(px). */
@@ -1288,6 +1295,7 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
       if (Array.isArray(material)) material.forEach((item) => item.dispose());
       else material?.dispose();
     });
+    this.paint.dispose();
     this.renderer.dispose();
   }
 }
