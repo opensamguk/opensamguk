@@ -35,6 +35,7 @@ import {
   Scene,
   Vector3,
   WebGLRenderer,
+  Vector4,
 } from 'three';
 import { loadGlbMesh, toonGradient } from './glbMesh';
 import { PaintPass } from './paintPass';
@@ -315,6 +316,12 @@ transformed += normalize(objectNormal) * 0.012;`,
     TERRAIN_NORMALS.map((name) => [name, { value: new DataTexture(new Uint8Array([128, 128, 255, 255]), 1, 1) }]),
   ) as Record<(typeof TERRAIN_NORMALS)[number], { value: DataTexture | Texture }>;
   private readonly textureOn = { value: 0 };
+  /** 구운 그림 지도(INT-27): 그림, 덮는 구역(월드 x0, z0, x1, z1), 켬. 그 구역은 실시간 조명 대신 그림의 명암을 쓴다. */
+  private readonly painted = {
+    map: { value: new DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1) as DataTexture | Texture },
+    rect: { value: new Vector4(0, 0, 1, 1) },
+    on: { value: 0 },
+  };
   /** 그림 후처리(유화 붓 터치). 화면이 뭉개져서 기본은 끈다(사용자 2026-11-14). 그림 느낌은 질감·모형으로 낸다. */
   readonly paint = new PaintPass();
   painterly = false;
@@ -423,6 +430,9 @@ transformed += normalize(objectNormal) * 0.012;`,
       for (const name of TERRAIN_TEXTURES) shader.uniforms[`t_${name}`] = this.terrainTextures[name];
       for (const name of TERRAIN_NORMALS) shader.uniforms[`n_${name}`] = this.terrainNormals[name];
       shader.uniforms.uTexOn = this.textureOn;
+      shader.uniforms.uPainted = this.painted.map;
+      shader.uniforms.uPaintedRect = this.painted.rect;
+      shader.uniforms.uPaintedOn = this.painted.on;
       shader.vertexShader = shader.vertexShader
         .replace(
           '#include <common>',
@@ -435,7 +445,7 @@ transformed += normalize(objectNormal) * 0.012;`,
       shader.fragmentShader = shader.fragmentShader
         .replace(
           '#include <common>',
-          `#include <common>\nvarying vec3 vGround;\nvarying vec3 vUp;\nuniform sampler2D uTerritory;\nuniform vec2 uTileOrigin;\nuniform vec2 uTileCount;\nuniform sampler2D uRoads;\nuniform sampler2D t_grass;\nuniform sampler2D t_field;\nuniform sampler2D t_dirt;\nuniform sampler2D t_forest;\nuniform sampler2D t_rock;\nuniform sampler2D t_cliff;\nuniform sampler2D t_snow;\nuniform sampler2D t_sand;\nuniform sampler2D n_grass;\nuniform sampler2D n_rock;\nuniform float uTexOn;\nvarying vec3 vBiome;\n${TERRAIN_NOISE}\n${TEXTURE_GLSL}\n${TERRITORY_GLSL}\n${ROAD_GLSL}`,
+          `#include <common>\nvarying vec3 vGround;\nvarying vec3 vUp;\nuniform sampler2D uTerritory;\nuniform vec2 uTileOrigin;\nuniform vec2 uTileCount;\nuniform sampler2D uRoads;\nuniform sampler2D t_grass;\nuniform sampler2D t_field;\nuniform sampler2D t_dirt;\nuniform sampler2D t_forest;\nuniform sampler2D t_rock;\nuniform sampler2D t_cliff;\nuniform sampler2D t_snow;\nuniform sampler2D t_sand;\nuniform sampler2D n_grass;\nuniform sampler2D n_rock;\nuniform float uTexOn;\nuniform sampler2D uPainted;\nuniform vec4 uPaintedRect;\nuniform float uPaintedOn;\nvarying vec3 vBiome;\n${TERRAIN_NOISE}\n${TEXTURE_GLSL}\n${TERRITORY_GLSL}\n${ROAD_GLSL}`,
         )
         .replace(
           '#include <color_fragment>',
@@ -476,7 +486,23 @@ diffuseColor.rgb = paint;
 float sand = (1.0 - smoothstep(0.08, 0.45, vGround.y + (grain - 0.5) * 0.2)) * step(-0.02, vGround.y) * smoothstep(0.9, 0.97, flatness);
 vec3 sandColour = mix(vec3(0.80, 0.74, 0.58) * (0.9 + grain * 0.2), sampleTex(t_sand, vGround.xz) * 1.1, uTexOn * 0.8);
 diffuseColor.rgb = mix(diffuseColor.rgb, sandColour, sand * 0.75);
-if (vGround.y < -0.02) diffuseColor.rgb = mix(vec3(0.62, 0.58, 0.46), vec3(0.30, 0.33, 0.30), smoothstep(-0.05, -2.0, vGround.y)) * (0.85 + grain * 0.3);`,
+if (vGround.y < -0.02) diffuseColor.rgb = mix(vec3(0.62, 0.58, 0.46), vec3(0.30, 0.33, 0.30), smoothstep(-0.05, -2.0, vGround.y)) * (0.85 + grain * 0.3);
+// 구운 그림 지도: 구역 안은 그림 색(명암 포함)으로 바꾼다. 가장자리 2%는 부드럽게 섞는다.
+vec2 pUv = (vGround.xz - uPaintedRect.xy) / (uPaintedRect.zw - uPaintedRect.xy);
+vec2 pEdge = min(pUv, 1.0 - pUv);
+float pIn = uPaintedOn * smoothstep(0.0, 0.02, min(pEdge.x, pEdge.y));
+if (pIn > 0.0) {
+  vec3 pc = texture2D(uPainted, vec2(pUv.x, 1.0 - pUv.y)).rgb;
+  // 가까이 볼 때만 세부 질감의 밝기 결을 얹는다(그림 해상도가 모자란 만큼). 색은 그림 색을 지킨다.
+  float dW = uTexOn * (1.0 - smoothstep(0.08, 0.45, px));
+  if (dW > 0.001) {
+    float steepP = smoothstep(0.95, 0.75, vUp.y);
+    vec3 dt = mix(sampleTex(t_grass, vGround.xz), sampleTex(t_rock, vGround.xz), steepP);
+    float dl = dot(dt, vec3(0.3, 0.55, 0.15));
+    pc *= mix(1.0, clamp(dl / 0.32, 0.7, 1.3), dW * 0.6);
+  }
+  diffuseColor.rgb = mix(diffuseColor.rgb, pc, pIn);
+}`,
         )
         .replace(
           '#include <normal_fragment_maps>',
@@ -488,7 +514,8 @@ float rugged = smoothstep(1.2, 9.0, vGround.y) * 1.0 + smoothstep(0.99, 0.88, vU
 // 질감이 있으면 잡음 기복은 끈다(가까이서 녹은 덩어리처럼 보였다, 사용자 2026-11-14). 노멀맵 결이 맡는다.
 // 능선 잡음은 중간 줌(칸이 작을 때)만, 더 가까이(px < 약 0.15)는 노멀맵 결로 넘긴다.
 float texDetail = uTexOn * (1.0 - smoothstep(0.07, 0.16, px));
-rugged *= (1.0 - smoothstep(0.35, 0.9, px)) * (1.0 - texDetail);
+rugged *= (1.0 - smoothstep(0.35, 0.9, px)) * (1.0 - texDetail) * (1.0 - pIn);
+texDetail *= 1.0 - pIn;
 vec2 g = vec2(0.0);
 if (rugged > 0.01) {
   float e = 0.08;
@@ -510,9 +537,9 @@ float slope = 1.0 - normalize(vUp + vec3(-g.x, 0.0, -g.y) * 0.6).y;
 float rock = smoothstep(0.16, 0.42, slope + (grain - 0.5) * 0.12) * step(0.3, vGround.y);
 vec3 rockColor = mix(vec3(0.44, 0.39, 0.32), vec3(0.6, 0.54, 0.45), grain);
 rockColor = mix(rockColor, mix(sampleTex(t_rock, vGround.xz), sampleTex(t_cliff, vGround.xz * 0.7), smoothstep(0.35, 0.6, slope)) * 1.05, uTexOn * 0.85);
-diffuseColor.rgb = mix(diffuseColor.rgb, rockColor, rock * 0.85);
+diffuseColor.rgb = mix(diffuseColor.rgb, rockColor, rock * 0.85 * (1.0 - pIn));
 float snow = smoothstep(${(4300 * UNITS_PER_METRE).toFixed(2)}, ${(5200 * UNITS_PER_METRE).toFixed(2)}, vGround.y + (grain - 0.5) * ${(650 * UNITS_PER_METRE).toFixed(2)}) * (1.0 - smoothstep(0.45, 0.75, slope));
-diffuseColor.rgb = mix(diffuseColor.rgb, mix(vec3(0.93, 0.94, 0.96), sampleTex(t_snow, vGround.xz) * 1.05, uTexOn * 0.7), snow);
+diffuseColor.rgb = mix(diffuseColor.rgb, mix(vec3(0.93, 0.94, 0.96), sampleTex(t_snow, vGround.xz) * 1.05, uTexOn * 0.7), snow * (1.0 - pIn));
 if (vGround.y > 0.0) diffuseColor.rgb = territoryColor(diffuseColor.rgb, vGround.xz);
 if (vGround.y > -0.02) diffuseColor.rgb = drawRoads(diffuseColor.rgb, vGround.xz);
 // 오지(무대 밖 땅): 색을 빼고 어둡게 해 게임 무대 밖임을 보인다.
@@ -520,6 +547,16 @@ if (vGround.y > 0.05 && tileAt(floor(vec2(vGround.x + vGround.z, vGround.z - vGr
   float grey = dot(diffuseColor.rgb, vec3(0.3, 0.55, 0.15));
   diffuseColor.rgb = mix(diffuseColor.rgb, vec3(grey) * 0.72, 0.65);
 }`,
+        )
+        .replace(
+          '#include <opaque_fragment>',
+          // 그림 구역은 명암이 구워져 있어 실시간 조명을 거의 빼고 그림 색을 그대로 낸다(조명 10%만 남긴다).
+          `outgoingLight = mix(outgoingLight, diffuseColor.rgb, pIn * 0.9);\n#include <opaque_fragment>`,
+        )
+        .replace(
+          '#include <tonemapping_fragment>',
+          // 그림 구역은 톤매핑을 거치지 않는다(그림 색이 바래지 않게).
+          `vec3 preTone = gl_FragColor.rgb;\n#include <tonemapping_fragment>\ngl_FragColor.rgb = mix(gl_FragColor.rgb, preTone, pIn);`,
         );
     };
     const mesh = new Mesh(geometry, material);
@@ -837,6 +874,26 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
       }),
     );
     group.add(water);
+    // 구운 그림 지도 구역 안에서는 강을 그림이 그린다. 띠는 그 구역에서 감춘다.
+    for (const mesh of group.children as Mesh[]) {
+      const material = mesh.material as MeshStandardMaterial;
+      material.onBeforeCompile = (shader) => {
+        shader.uniforms.uPaintedRect = this.painted.rect;
+        shader.uniforms.uPaintedOn = this.painted.on;
+        shader.vertexShader = shader.vertexShader
+          .replace('#include <common>', '#include <common>\nvarying vec2 vRiverXZ;')
+          .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRiverXZ = position.xz;');
+        shader.fragmentShader = shader.fragmentShader
+          .replace(
+            '#include <common>',
+            '#include <common>\nvarying vec2 vRiverXZ;\nuniform vec4 uPaintedRect;\nuniform float uPaintedOn;',
+          )
+          .replace(
+            '#include <clipping_planes_fragment>',
+            '#include <clipping_planes_fragment>\nif (uPaintedOn > 0.5 && all(greaterThan(vRiverXZ, uPaintedRect.xy)) && all(lessThan(vRiverXZ, uPaintedRect.zw))) discard;',
+          );
+      };
+    }
     // 둑을 먼저 그리고 물을 그 위에 그린다.
     group.children[0]!.renderOrder = -1;
     return group;
@@ -1192,6 +1249,17 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
    * 지형 질감을 받는다(개발 미리보기 ?models=<주소>의 <주소>/textures, 공개 배포는 승인 원격 주소).
    * 다 받으면 uTexOn을 켠다.
    */
+  /** 구운 그림 지도 한 구역을 씌운다(개발 미리보기). rect는 캔버스 좌표 [x0, y0, x1, y1](위 = 북). */
+  async loadPaintedRegion(url: string, rect: [number, number, number, number]) {
+    const texture = await new TextureLoader().loadAsync(url);
+    texture.colorSpace = SRGBColorSpace;
+    texture.anisotropy = 8;
+    const { width, height } = this.canvasSize;
+    this.painted.map.value = texture;
+    this.painted.rect.value.set(rect[0] - width / 2, rect[1] - height / 2, rect[2] - width / 2, rect[3] - height / 2);
+    this.painted.on.value = 1;
+  }
+
   async loadTerrainTextures(base: string) {
     const loader = new TextureLoader();
     await Promise.all(

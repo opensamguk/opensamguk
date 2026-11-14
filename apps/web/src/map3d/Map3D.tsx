@@ -327,6 +327,14 @@ export default function Map3D({
       void import('./siteModels').then(({ MODEL_NAMES }) =>
         scene.loadSiteModels(modelBase.replace(/\/$/, ''), MODEL_NAMES).then(() => invalidateRef.current()),
       );
+    // 개발 미리보기: ?painted=<그림 주소>&prect=x0,y0,x1,y1(캔버스 좌표)이면 구운 그림 지도를 그 구역에 씌운다(INT-27 그림 지도 굽기 시험).
+    const paintedUrl = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('painted') : null;
+    const paintedRect = new URLSearchParams(window.location.search).get('prect')?.split(',').map(Number);
+    if (paintedUrl && paintedRect?.length === 4 && paintedRect.every(Number.isFinite))
+      void scene
+        .loadPaintedRegion(paintedUrl, paintedRect as [number, number, number, number])
+        .then(() => invalidateRef.current())
+        .catch(() => undefined);
     scene.setSites(latest.current.anchors, latest.current.model.cityByKey, latest.current.model.nationById);
     const resize = () => {
       scene.resize(box.clientWidth, box.clientHeight);
