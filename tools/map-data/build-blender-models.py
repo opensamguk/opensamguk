@@ -162,6 +162,144 @@ def city(level, strength, lod, capital):
             box('water',sign*mid,0,y,strip,inner*2,.006)
         box('wood',0,mid,y+.006,.11,strip+.010,.015)
 
+def detail_wall(x, z, length, across, tower_height):
+    # Alternate the bond so continuous mortar joints do not run up the wall.
+    verts, faces, uv = [], [], []
+    courses = 31
+    step = length / courses
+    for row in range(14):
+        for col in range(courses):
+            offset = -length / 2 + (col + .5 + (row % 2) / 3) * step
+            relief = .003 + .001 * math.cos(col * 7.1 + row * 13.7)
+            y = .027 + row * tower_height / 14
+            height = tower_height / 14 * .90
+            bx, bz = (x + offset, z) if across else (x, z + offset)
+            w, d = (step * .95, relief) if across else (relief, step * .95)
+            first = len(verts)
+            corners = ((-1, -1), (1, -1), (1, 1), (-1, 1))
+            for h in (0, height):
+                for u, v in corners:
+                    verts.append((bx + u * w / 2, y + h, bz + v * d / 2))
+                    uv.append(((offset + length / 2 + u * step / 2) * 6, (y + h) * 6))
+            faces += [tuple(first + j for j in face) for face in
+                      ((3, 2, 1, 0), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7))]
+    brick_mesh = mesh('stone', verts, faces, uv)
+    bevel = brick_mesh.modifiers.new('Rounded masonry edges', 'BEVEL')
+    bevel.width = .00045
+    bevel.segments = 1
+
+
+def combine(parts, name):
+    bpy.ops.object.select_all(action='DESELECT')
+    for part in parts:
+        part.select_set(True)
+    primary = parts[0]
+    bpy.context.view_layer.objects.active = primary
+    bpy.ops.object.join()
+    bpy.context.scene.cursor.location = (0, 0, 0)
+    bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
+    primary.name = name
+    return primary
+
+
+def house_prototype(variant):
+    before = set(bpy.context.scene.objects)
+    width = .023 + variant * .002
+    hall(-width * .12, 0, 0, width, .012, .012, 1)
+    hall(width * .12, .011, 0, width * .58, .008, .009, 1)
+    box('stone', 0, .005, 0, .036, .033, .0015)
+    return combine(sorted(set(bpy.context.scene.objects) - before, key=lambda obj: obj.name), f'courtyard-{variant}')
+
+
+def city_detail(capital):
+    base = .027
+    edge = .414
+    thickness = .057
+    wall_height = .092
+    box('earth', 0, 0, 0, 1, 1, base)
+    for side in (-1, 1):
+        wall('stone', side * edge, 0, base, thickness, edge * 2, wall_height, 0)
+        detail_wall(side * (edge + thickness / 2), 0, edge * 2, False, wall_height)
+        wall('stone', side * .260, edge, base, .312, thickness, wall_height, 0)
+        detail_wall(side * .260, edge + thickness / 2, .308, True, wall_height)
+        wall('stone', 0, side * .460, base, .96, .029, .008, 2)
+    wall('stone', 0, -edge, base, edge * 2, thickness, wall_height, 0)
+    detail_wall(0, -edge - thickness / 2, edge * 2, True, wall_height)
+    gate('stone', edge - .021, base, wall_height, 0, False)
+    for floor, (w, d, h) in enumerate(((.257, .141, .043), (.207, .121, .040), (.154, .099, .031))):
+        hall(0, edge - .026, base + wall_height + floor * .065, w, d, h, 0, 'roof')
+    for x in (-edge, edge):
+        for z in (-edge, edge):
+            box('stone', x, z, base, .086, .085, .131)
+            hall(x, z, base + .131, .079, .075, .033, 0, 'roof')
+            hall(x, z, base + .184, .053, .051, .024, 0, 'roof')
+    for x in (-.465, .465):
+        box('water', x, 0, base + .002, .043, .96, .004)
+    for z in (-.463, .479):
+        box('water', 0, z, base + .002, .96, .036, .004)
+    box('wood', 0, .463, base + .012, .080, .071, .012)
+    for x in (-.041, .041):
+        box('wood', x, .463, base + .029, .006, .068, .006)
+    for x in (-.205, 0, .205):
+        box('road', x, 0, base, .018, .77, .002)
+    for z in (-.210, 0, .210):
+        box('road', 0, z, base, .77, .015, .002)
+    palace = 'glazed-tile' if capital else 'roof'
+    box('stone', 0, -.183, base, .193, .206, .012)
+    hall(0, -.205, base + .012, .132, .064, .038, 0, palace)
+    hall(0, -.205, base + .070, .087, .043, .031, 0, palace)
+    for x in (-.067, .067):
+        hall(x, -.132, base + .013, .039, .077, .028, 0, palace)
+    prototypes = [house_prototype(variant) for variant in range(4)]
+    neighbourhood = bpy.data.objects.new('residential-districts', None)
+    bpy.context.collection.objects.link(neighbourhood)
+    homes = 0
+    for row in range(18):
+        z = (row - 8.5) * .042
+        for col in range(18):
+            x = (col - 8.5) * .042
+            if col in (3, 8, 9, 14) or row in (3, 8, 9, 14) or (abs(x) < .108 and -.30 < z < -.075):
+                continue
+            prototype = prototypes[(row * 3 + col) % 4]
+            home = bpy.data.objects.new(f'residence-{homes:03}', prototype.data)
+            bpy.context.collection.objects.link(home)
+            home.location = (x, -z, base)
+            home.rotation_euler.z = math.pi * ((row + col) % 2)
+            home.parent = neighbourhood
+            homes += 1
+    for prototype in prototypes:
+        bpy.data.objects.remove(prototype, do_unlink=True)
+    for i in range(27):
+        x = -.366 + (i % 9) * .090
+        z = (-.23, .006, .23)[i // 9]
+        box('wood', x, z, base, .004, .004, .017)
+        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2, radius=.012, location=(x, -z, base + .017))
+        crown = bpy.context.object
+        crown.scale = (.84, .82, 1.53)
+        finish(crown, 'crop')
+    for sign in (-1, 1):
+        for row in range(9):
+            box('crop', sign * .33 + (row - 4) * .009, .450, base, .004, .023, .003)
+    assert homes >= 150, homes
+    return homes
+
+
+def export_detail(out, capital):
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    homes = city_detail(capital)
+    bpy.context.view_layer.update()
+    data = {obj.data for obj in bpy.context.scene.objects if obj.type == 'MESH'}
+    for datum in data:
+        datum.calc_loop_triangles()
+        assert datum.uv_layers, datum.name
+    count = sum(len(datum.loop_triangles) for datum in data)
+    assert count <= 150_000, count
+    bpy.ops.export_scene.gltf(filepath=str(out), export_format='GLB', export_yup=True,
+                              export_texcoords=True, export_normals=True,
+                              export_materials='EXPORT', export_gpu_instances=True)
+    print(f'D-094 {homes} courtyard residences; {count} unique mesh triangles')
+
+
 def watch(x,z,y,scale,lod):
     box('stone',x,z,y,.33*scale,.32*scale,.047*scale)
     for dx in (-.13,.13):
@@ -294,6 +432,10 @@ def main():
     args=sys.argv[sys.argv.index('--')+1:] if '--' in sys.argv else sys.argv[1:]
     out=Path(args[0])
     out.mkdir(parents=True,exist_ok=True)
+    if '--detail' in args:
+        export_detail(out / 'city-8-wall-2-capital-detail-lod0.glb', True)
+        export_detail(out / 'city-8-wall-2-detail-lod0.glb', False)
+        return
     files=[]
     options=[(name,1,False) for name in KINDS]
     options += [(f'city-{level}',wall,False) for level in range(1,9) for wall in range(3)]
