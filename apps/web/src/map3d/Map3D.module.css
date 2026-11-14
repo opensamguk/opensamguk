@@ -1,0 +1,119 @@
+/* 3D 군략도 시제품 (INT-27 0단계). SVG 지도와 같은 10:7 판에 캔버스와 DOM 이름판 층을 겹친다. */
+.frame {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 10/7;
+  max-height: 650px;
+  overflow: hidden;
+  background: #2b4a6b;
+  touch-action: none;
+  user-select: none;
+}
+.fill {
+  height: 100%;
+  aspect-ratio: auto;
+  max-height: none;
+}
+.canvas {
+  position: absolute !important;
+  inset: 0;
+}
+.loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--color-banner-text, #f4ecd8);
+  font-size: var(--text-sm);
+}
+.overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.site {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: auto;
+  min-height: 24px;
+  padding: 0 var(--space-1);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: #221d17;
+  background: rgb(244 236 216 / 88%);
+  border: 1px solid #221d17;
+  border-radius: 0;
+  cursor: pointer;
+  white-space: nowrap;
+  visibility: hidden;
+}
+.site:disabled {
+  cursor: default;
+}
+.site:focus-visible {
+  outline: 2px solid var(--color-accent, #b23a2a);
+  outline-offset: 1px;
+}
+.selected {
+  color: #fff;
+  background: #b23a2a;
+  border-color: #b23a2a;
+}
+.mine {
+  box-shadow:
+    0 0 0 2px #f4ecd8,
+    0 0 0 4px #221d17;
+}
+.name {
+  pointer-events: none;
+}
+.controls {
+  position: absolute;
+  left: var(--space-3);
+  bottom: var(--space-3);
+  display: flex;
+  gap: var(--space-1);
+}
+.controls button {
+  min-width: 44px;
+  min-height: 44px;
+  font: inherit;
+  font-size: var(--title-sm, 18px);
+  color: var(--color-text, #221d17);
+  background: var(--color-surface, #f4ecd8);
+  border: 2px solid var(--color-ink, #221d17);
+  border-radius: 0;
+  cursor: pointer;
+}
+.stats {
+  position: absolute;
+  right: var(--space-2);
+  top: var(--space-2);
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+  color: #f4ecd8;
+  background: rgb(34 29 23 / 80%);
+}
+/* 겹쳐서 줄인 이름판: 작은 점만 남기고 초점·마우스를 올리면 이름을 다시 보인다. */
+.site[data-compact='true'] {
+  min-width: 10px;
+  min-height: 10px;
+  padding: 0;
+}
+.site[data-compact='true'] .name {
+  display: none;
+}
+.site[data-compact='true']:hover,
+.site[data-compact='true']:focus-visible {
+  z-index: 2;
+  padding: 0 var(--space-1);
+}
+.site[data-compact='true']:hover .name,
+.site[data-compact='true']:focus-visible .name {
+  display: inline;
+}
