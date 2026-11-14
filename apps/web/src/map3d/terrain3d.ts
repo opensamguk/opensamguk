@@ -135,9 +135,19 @@ export function compactLabels(boxes: readonly LabelBox[]): Set<string> {
 
 // 실제 높이 자료 (tools/map-data/build-height-field.py). 칸마다 1바이트, 0은 해수면 이하,
 // 나머지는 round(sqrt(m / maxMetres) * 255)다. 높이 과장 배율은 지도 단위 1당 미터다.
-export type HeightData = { columns: number; rows: number; maxMetres: number; data: string };
-// 지도 1단위가 약 3.5km라 실제 비율이면 산이 거의 보이지 않는다. 9km가 약 24단위가 되게 과장한다.
-export const UNITS_PER_METRE = 40 / 9000;
+export type HeightData = {
+  columns: number;
+  rows: number;
+  maxMetres: number;
+  data: string;
+  /** 바다 깊이(칸 두 개마다 1바이트, round(sqrt(깊이 / maxDepth) × 255)). 옛 자료에는 없다. */
+  depth?: string;
+  depthColumns?: number;
+  depthRows?: number;
+  maxDepth?: number;
+};
+// 지도 1단위가 약 3.5km라 실제 비율이면 산이 거의 보이지 않는다. 9km가 60단위(약 1:2.6 과장 기준의 1.5배)가 되게 크게 과장해 산세가 또렷하다.
+export const UNITS_PER_METRE = 60 / 9000;
 
 export function decodeMetres(height: HeightData): Float32Array {
   const binary = atob(height.data);
@@ -149,30 +159,90 @@ export function decodeMetres(height: HeightData): Float32Array {
   return metres;
 }
 
-// 실제 높이로 칸 높이를 만든다. 물 칸(지형 종류)은 물높이 아래로, 땅 칸은 물높이 위로 둔다. 한 번 평균을 내 모서리를 다듬는다.
-export function heightFieldFromMetres(grid: TerrainCells, metres: Float32Array): Float32Array {
+// 실제 높이로 칸 높이를 만든다. 물 칸(지형 종류)은 바다 깊이만큼 물높이 아래로, 땅 칸은 물높이 위로 둔다.
+// 한 번 평균을 내 모서리를 다듬고, 바닷가는 땅·물 표시를 넓게 흐려 그 0 높이 선을 해안선으로 쓴다.
+// 도트 지도의 계단 해안이 둥근 해안선이 된다(물 띠·거점은 groundAt으로 물높이 위에 남는다).
+export function heightFieldFromMetres(
+  grid: TerrainCells,
+  metres: Float32Array,
+  depth: Float32Array | null = null,
+): Float32Array {
   const { cells, columns, rows } = grid;
   const raw = new Float32Array(columns * rows);
   for (let i = 0; i < raw.length; i++)
-    raw[i] = isOpenWater(cells[i]!) ? WATER_LEVEL - 1.2 : Math.max(metres[i]! * UNITS_PER_METRE, WATER_LEVEL + 0.15);
-  const field = new Float32Array(raw.length);
+    raw[i] = isOpenWater(cells[i]!)
+      ? WATER_LEVEL - 0.6 - Math.min(depth?.[i] ?? 0, 3000) * UNITS_PER_METRE * 0.4
+      : Math.max(metres[i]! * UNITS_PER_METRE, WATER_LEVEL + 0.25);
+  const field = boxBlur(raw, columns, rows, 1);
+  let side: Float32Array = new Float32Array(raw.length);
+  for (let i = 0; i < side.length; i++) side[i] = isOpenWater(cells[i]!) ? -1 : 1;
+  side = boxBlur(side, columns, rows, 2);
+  for (let i = 0; i < field.length; i++) {
+    const s = side[i]!;
+    const coast = Math.abs(s);
+    if (coast >= 1) continue;
+    // 해안 근처: 흐린 땅·물 표시(s)가 0인 곳이 물높이가 되게 하고, 바닷가에서 멀어질수록 원래 높이로 돌아간다.
+    const near = s * 0.7;
+    const far = isOpenWater(cells[i]!)
+      ? Math.min(field[i]!, WATER_LEVEL - 0.05)
+      : Math.max(field[i]!, WATER_LEVEL + 0.05);
+    const blended = near * (1 - coast) + far * coast;
+    // 땅 쪽(s > 0)은 물높이 위, 물 쪽은 아래에 묶어 0 높이 선이 s = 0과 겹치게 한다.
+    field[i] = s > 0 ? Math.max(blended, WATER_LEVEL + 0.02 * s) : Math.min(blended, WATER_LEVEL + 0.07 * s);
+  }
+  return field;
+}
+
+// 3×3 평균을 passes번. 판 밖은 세지 않는다.
+export function boxBlur(source: Float32Array, columns: number, rows: number, passes: number): Float32Array {
+  let field: Float32Array = source;
+  for (let pass = 0; pass < passes; pass++) {
+    const next = new Float32Array(field.length);
+    for (let y = 0; y < rows; y++)
+      for (let x = 0; x < columns; x++) {
+        let sum = 0;
+        let count = 0;
+        for (let dy = -1; dy <= 1; dy++)
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx < 0 || ny < 0 || nx >= columns || ny >= rows) continue;
+            sum += field[ny * columns + nx]!;
+            count++;
+          }
+        next[y * columns + x] = sum / count;
+      }
+    field = next;
+  }
+  return field;
+}
+
+// 바다 깊이(m)를 지도 칸 해상도로. 깊이 자료는 칸 두 개마다 하나라 쌍선형으로 늘린다. 자료가 없으면 null.
+export function decodeDepth(height: HeightData, columns: number, rows: number): Float32Array | null {
+  if (!height.depth || !height.depthColumns || !height.depthRows || !height.maxDepth) return null;
+  const binary = atob(height.depth);
+  const dc = height.depthColumns;
+  const dr = height.depthRows;
+  const at = (x: number, y: number) => {
+    const value = binary.charCodeAt(Math.min(y, dr - 1) * dc + Math.min(x, dc - 1)) / 255;
+    return value * value * height.maxDepth!;
+  };
+  const stepX = columns / dc;
+  const stepY = rows / dr;
+  const out = new Float32Array(columns * rows);
   for (let y = 0; y < rows; y++)
     for (let x = 0; x < columns; x++) {
-      let sum = 0;
-      let count = 0;
-      for (let dy = -1; dy <= 1; dy++)
-        for (let dx = -1; dx <= 1; dx++) {
-          const nx = x + dx;
-          const ny = y + dy;
-          if (nx < 0 || ny < 0 || nx >= columns || ny >= rows) continue;
-          sum += raw[ny * columns + nx]!;
-          count++;
-        }
-      const index = y * columns + x;
-      const water = isOpenWater(cells[index]!);
-      field[index] = water ? Math.min(sum / count, WATER_LEVEL - 0.2) : Math.max(sum / count, WATER_LEVEL + 0.1);
+      const fx = Math.max((x + 0.5) / stepX - 0.5, 0);
+      const fy = Math.max((y + 0.5) / stepY - 0.5, 0);
+      const x0 = Math.floor(fx);
+      const y0 = Math.floor(fy);
+      const tx = fx - x0;
+      const ty = fy - y0;
+      out[y * columns + x] =
+        (at(x0, y0) * (1 - tx) + at(x0 + 1, y0) * tx) * (1 - ty) +
+        (at(x0, y0 + 1) * (1 - tx) + at(x0 + 1, y0 + 1) * tx) * ty;
     }
-  return field;
+  return out;
 }
 
 // 바다·호수처럼 물높이 아래로 내리는 칸. 강은 땅 높이를 따르고 색으로만 그린다(칸 모양 도랑이 생기지 않게).

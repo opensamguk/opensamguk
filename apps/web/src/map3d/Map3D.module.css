@@ -3,10 +3,11 @@
   position: relative;
   width: 100%;
   min-width: 0;
-  aspect-ratio: 10/7;
-  max-height: 650px;
+  /* 천하 전도는 가로로 긴 판(2:1)이다. 45° 시점에서 중원 지도 전체가 꽉 찬다. */
+  aspect-ratio: 2/1;
+  max-height: 720px;
   overflow: hidden;
-  background: #2b4a6b;
+  background: #0c2a42;
   touch-action: none;
   user-select: none;
 }
@@ -36,23 +37,53 @@
   inset: 0;
   pointer-events: none;
 }
+/* 거점 표시: 나라 글자 깃발(깃대 포함)과 그 아래 옻칠 빛 이름판. 단추 하나가 둘을 세로로 묶는다. */
 .site {
   position: absolute;
   left: 0;
   top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   pointer-events: auto;
+  min-width: 24px;
   min-height: 24px;
-  padding: 0 var(--space-1);
+  padding: 0;
   font: inherit;
   font-size: var(--text-xs);
   font-weight: 700;
-  color: #221d17;
-  background: rgb(244 236 216 / 88%);
-  border: 1px solid #221d17;
+  color: #f6eedc;
+  background: none;
+  border: 0;
   border-radius: 0;
   cursor: pointer;
   white-space: nowrap;
   visibility: hidden;
+}
+.flag {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 2px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  color: #fff;
+  border: 1.5px solid rgb(255 255 255 / 88%);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 55%);
+  text-shadow: 0 1px 1px rgb(0 0 0 / 45%);
+}
+.flag::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  width: 2px;
+  height: 7px;
+  margin-left: -1px;
+  background: #3b2f22;
 }
 .site:disabled {
   cursor: default;
@@ -61,17 +92,24 @@
   outline: 2px solid var(--color-accent, #b23a2a);
   outline-offset: 1px;
 }
-.selected {
+.selected .name {
   color: #fff;
   background: #b23a2a;
-  border-color: #b23a2a;
+  border-color: #fff;
 }
-.mine {
+.mine .name {
   box-shadow:
     0 0 0 2px #f4ecd8,
-    0 0 0 4px #221d17;
+    0 0 0 3px #221d17;
 }
 .name {
+  margin-top: 7px;
+  padding: 0 5px;
+  font-size: 11px;
+  line-height: 17px;
+  color: #f6eedc;
+  background: rgb(34 26 18 / 80%);
+  border: 1px solid rgb(201 164 92 / 85%);
   pointer-events: none;
 }
 .stats {
@@ -85,22 +123,22 @@
   background: rgb(34 29 23 / 80%);
 }
 /* 겹쳐서 줄인 이름판: 작은 점만 남기고 초점·마우스를 올리면 이름을 다시 보인다. */
-.site[data-compact='true'] {
-  min-width: 10px;
-  min-height: 10px;
-  padding: 0;
-}
+/* 겹친 거점은 이름판을 접고 작은 깃발만 남긴다. */
 .site[data-compact='true'] .name {
   display: none;
+}
+.site[data-compact='true'] .flag {
+  min-width: 14px;
+  height: 14px;
+  font-size: 9px;
 }
 .site[data-compact='true']:hover,
 .site[data-compact='true']:focus-visible {
   z-index: 2;
-  padding: 0 var(--space-1);
 }
 .site[data-compact='true']:hover .name,
 .site[data-compact='true']:focus-visible .name {
-  display: inline;
+  display: block;
 }
 /* 1단계: SVG 지도와 같은 배율 단추·거점 고르기 줄과 도움말 (INT-27). */
 .wrap {
