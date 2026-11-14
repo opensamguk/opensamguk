@@ -38,6 +38,7 @@ import {
 } from 'three';
 import { loadGlbMesh, toonGradient } from './glbMesh';
 import { PaintPass } from './paintPass';
+import { RepeatWrapping, TextureLoader, type Texture } from 'three';
 import { pickModel, regionTint, TIER_LOD, tileFill, zoomTier, type ZoomTier } from './siteModels';
 import type { PublicGeography } from '@opensamguk/shared';
 import { roadWalks, TERRAINS, waterLanes, type Terrain } from '../main/terrainTiles';
@@ -50,6 +51,7 @@ import type { DrawnNation } from '../main/siteMarkers';
 import type { ModelCity } from '../main/mapModel';
 import {
   cellNoise,
+  biomeWeights,
   decodeDepth,
   decodeMetres,
   groundAt,
@@ -59,6 +61,7 @@ import {
   siteSize,
   treeSpots,
   UNITS_PER_METRE,
+  WATER_LEVEL,
   type HeightData,
   type TerrainCells,
 } from './terrain3d';
@@ -68,9 +71,14 @@ export type AnchorSite = Site & { anchorKey: number };
 
 // 위에서 내려다보는 각도(수평에서 55°). 화면 위쪽이 북쪽이다.
 export const ELEVATION = (35 * Math.PI) / 180;
+/** 지형 명암 법선의 높이 배율(실제 높이는 그대로). */
+const RELIEF_SHADE = 2.4;
 /** 영지 칸 한 변(지도 단위). 칸은 45° 돌려 놓아 비스듬히 보면 마름모다. */
 export const TILE = 8;
 const NEUTRAL = '#d6d0c4';
+const TERRAIN_TEXTURES = ['grass', 'field', 'dirt', 'forest', 'rock', 'cliff', 'snow', 'sand'] as const;
+/** 노멀맵을 쓰는 질감(땅 결·바위 결). 표본기 수를 아끼려고 둘만 쓴다. */
+const TERRAIN_NORMALS = ['grass', 'rock'] as const;
 const LAKE = TERRAINS.indexOf('lake');
 
 // 영지 칸 그리기. 월드 xz를 45° 돌린 칸 좌표로 바꿔 칸 자료를 읽고,
@@ -91,24 +99,33 @@ vec3 drawRoads(vec3 base, vec2 xz) {
   if (pxTile > 0.12) return base;
   vec2 uv = (cell - uTileOrigin + 0.5) / uTileCount;
   if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) return base;
-  vec4 road = texture2D(uRoads, uv);
-  int bits = int(road.r * 255.0 + 0.5);
-  int flags = int(road.b * 255.0 + 0.5);
-  if (bits == 0 || (flags & 8) != 0) return base;
-  float major = (flags & 1) != 0 ? 1.0 : 0.0;
-  float halfWidth = max(mix(0.07, 0.1, major), pxTile * 0.9);
+  // 이웃 여덟 칸의 길도 함께 본다. 대각선 길은 칸 모서리를 지나므로 자기 칸만 보면 모서리마다 끊긴다.
   float d = 10.0;
-  vec2 along = vec2(1.0, 0.0);
-  for (int k = 0; k < 8; k++) {
-    if (((bits >> k) & 1) == 0) continue;
-    vec2 tip = vec2(0.5) + ROAD_DIRS[k] * 0.5;
-    float dk = segmentDistance(f, vec2(0.5), tip);
-    if (dk < d) { d = dk; along = normalize(ROAD_DIRS[k]); }
-  }
+  float major = 0.0;
+  for (int oy = -1; oy <= 1; oy++)
+    for (int ox = -1; ox <= 1; ox++) {
+      vec2 o = vec2(float(ox), float(oy));
+      vec2 nuv = (cell + o - uTileOrigin + 0.5) / uTileCount;
+      if (nuv.x < 0.0 || nuv.y < 0.0 || nuv.x > 1.0 || nuv.y > 1.0) continue;
+      vec4 road = texture2D(uRoads, nuv);
+      int bits = int(road.r * 255.0 + 0.5);
+      int flags = int(road.b * 255.0 + 0.5);
+      if (bits == 0 || (flags & 8) != 0) continue;
+      vec2 centre = o + vec2(0.5);
+      for (int k = 0; k < 8; k++) {
+        if (((bits >> k) & 1) == 0) continue;
+        float dk = segmentDistance(f, centre, centre + ROAD_DIRS[k] * 0.5);
+        if (dk < d) { d = dk; major = (flags & 1) != 0 ? 1.0 : 0.0; }
+      }
+    }
+  if (d > 0.5) return base;
+  // 흙길은 가늘고 가장자리가 고르지 않다(사용자 2026-11-14). 큰길만 조금 넓다.
+  float halfWidth = max(mix(0.045, 0.07, major), pxTile * 0.9);
+  d += (noise2(xz * 2.3) - 0.5) * halfWidth * 0.5 * (1.0 - smoothstep(0.02, 0.06, pxTile));
   float edge = pxTile * 0.8;
   float paint = 1.0 - smoothstep(halfWidth - edge, halfWidth + edge, d);
-  vec3 dirt = vec3(0.70, 0.58, 0.40);
-  vec3 stone = vec3(0.76, 0.72, 0.63);
+  vec3 dirt = vec3(0.50, 0.40, 0.28);
+  vec3 stone = vec3(0.62, 0.57, 0.48);
   vec3 colour = mix(dirt, stone, major);
   // 가까이 볼 때 바퀴 자국 두 줄과 길섶의 옅은 테.
   float near = 1.0 - smoothstep(0.01, 0.03, pxTile);
@@ -117,6 +134,20 @@ vec3 drawRoads(vec3 base, vec2 xz) {
   float rim = (1.0 - smoothstep(halfWidth, halfWidth + edge * 3.0 + 0.02, d)) * (1.0 - paint);
   vec3 result = mix(base, base * 0.86, rim * 0.6 * near);
   return mix(result, colour, paint * 0.92);
+}`;
+
+const TEXTURE_GLSL = `
+vec3 sampleTex(sampler2D t, vec2 xz) {
+  vec3 a = texture2D(t, xz / 6.0).rgb;
+  vec3 b = texture2D(t, mat2(0.8, -0.6, 0.6, 0.8) * xz / 21.0).rgb;
+  return mix(a, b, 0.35);
+}
+// 노멀맵(OpenGL 규약)을 같은 두 크기로 읽어 땅 위 xz 기울기로 돌려준다.
+vec2 sampleSlope(sampler2D t, vec2 xz) {
+  vec2 a = texture2D(t, xz / 6.0).rg * 2.0 - 1.0;
+  vec2 b = texture2D(t, mat2(0.8, -0.6, 0.6, 0.8) * xz / 21.0).rg * 2.0 - 1.0;
+  b = mat2(0.8, 0.6, -0.6, 0.8) * b;
+  return mix(a, b, 0.35);
 }`;
 
 const TERRITORY_GLSL = `
@@ -187,6 +218,34 @@ float ridged(vec2 p) {
 
 export type CameraState = { x: number; z: number; zoom: number };
 
+/** 물길 선 다듬기: 차이킨 깎기 두 번으로 모서리를 둥글게 하고, step 간격 이하로 다시 찍는다. */
+export function smoothLine(points: ReadonlyArray<{ x: number; y: number }>, step = 0.8): Array<{ x: number; y: number }> {
+  let line = points.slice();
+  for (let pass = 0; pass < 2 && line.length > 2; pass++) {
+    const next = [line[0]!];
+    for (let i = 0; i < line.length - 1; i++) {
+      const a = line[i]!;
+      const b = line[i + 1]!;
+      next.push({ x: a.x * 0.75 + b.x * 0.25, y: a.y * 0.75 + b.y * 0.25 }, { x: a.x * 0.25 + b.x * 0.75, y: a.y * 0.25 + b.y * 0.75 });
+    }
+    next.push(line[line.length - 1]!);
+    line = next;
+  }
+  const out: Array<{ x: number; y: number }> = [];
+  for (let i = 0; i < line.length; i++) {
+    const a = line[i]!;
+    out.push(a);
+    const b = line[i + 1];
+    if (!b) break;
+    const count = Math.floor(Math.hypot(b.x - a.x, b.y - a.y) / step);
+    for (let k = 1; k <= count; k++) {
+      const t = k / (count + 1);
+      out.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+    }
+  }
+  return out;
+}
+
 export class MapScene {
   readonly renderer: WebGLRenderer;
   readonly camera = new OrthographicCamera(-1, 1, 1, -1, -4000, 4000);
@@ -242,6 +301,14 @@ transformed += normalize(objectNormal) * 0.012;`,
     count: { value: new Vector2(1, 1) },
   };
   private rings: Mesh[] = [];
+  /** 지형 질감(CC0 항공 사진 등, D-094). 받기 전에는 흰 1×1이고 uTexOn이 0이라 쓰지 않는다. */
+  private readonly terrainTextures = Object.fromEntries(
+    TERRAIN_TEXTURES.map((name) => [name, { value: new DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1) }]),
+  ) as Record<(typeof TERRAIN_TEXTURES)[number], { value: DataTexture | Texture }>;
+  private readonly terrainNormals = Object.fromEntries(
+    TERRAIN_NORMALS.map((name) => [name, { value: new DataTexture(new Uint8Array([128, 128, 255, 255]), 1, 1) }]),
+  ) as Record<(typeof TERRAIN_NORMALS)[number], { value: DataTexture | Texture }>;
+  private readonly textureOn = { value: 0 };
   /** 그림 후처리(유화 붓 터치). 화면이 뭉개져서 기본은 끈다(사용자 2026-11-14). 그림 느낌은 질감·모형으로 낸다. */
   readonly paint = new PaintPass();
   painterly = false;
@@ -275,6 +342,7 @@ transformed += normalize(objectNormal) * 0.012;`,
     const metres = heights ? decodeMetres(heights) : null;
     const depth = heights ? decodeDepth(heights, grid.columns, grid.rows) : null;
     this.field = metres ? heightFieldFromMetres(grid, metres, depth) : heightField(grid);
+    this.flattenSitePads(map);
 
     // 하늘빛(위)과 땅에서 되비치는 흙빛(아래). 해가 낮아 능선의 명암이 또렷하다.
     this.scene.add(new HemisphereLight('#dfe6ea', '#5a4a34', 0.38));
@@ -326,7 +394,12 @@ transformed += normalize(objectNormal) * 0.012;`,
       colors[i + 2] = linear.b;
     }
     geometry.setAttribute('color', new Float32BufferAttribute(colors, 3));
+    geometry.setAttribute('biome', new Float32BufferAttribute(biomeWeights(this.grid), 3));
+    // 명암용 법선은 높이를 RELIEF_SHADE배 키워 구한다(사용자 참고 시안 2026-11-14: 깎아 낸 듯한 음영 지형).
+    // 실제 높이는 낮게 둬 거점을 가리지 않고, 빛과 그늘만 가파른 산처럼 떨어지게 한다.
+    for (let i = 0; i < position.count; i++) position.setY(i, Math.max(this.field[i]!, 0) * RELIEF_SHADE + Math.min(this.field[i]!, 0));
     geometry.computeVertexNormals();
+    for (let i = 0; i < position.count; i++) position.setY(i, this.field[i]!);
     // 카툰풍 지형: 빛을 세 단계로 끊는다(사용자 2026-11-14). 색·무늬는 아래 셰이더가 정한다.
     // 지형은 그림처럼 사실적인 명암(참고 시안·삼국지 시리즈 분위기). 계단 명암(카툰)은 모형에만 쓴다.
     const material = new MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 });
@@ -340,13 +413,22 @@ transformed += normalize(objectNormal) * 0.012;`,
       shader.uniforms.uTileOrigin = territory.origin;
       shader.uniforms.uTileCount = territory.count;
       shader.uniforms.uRoads = this.roadMap;
+      for (const name of TERRAIN_TEXTURES) shader.uniforms[`t_${name}`] = this.terrainTextures[name];
+      for (const name of TERRAIN_NORMALS) shader.uniforms[`n_${name}`] = this.terrainNormals[name];
+      shader.uniforms.uTexOn = this.textureOn;
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', `#include <common>\nvarying vec3 vGround;\nvarying vec3 vUp;`)
-        .replace('#include <begin_vertex>', `#include <begin_vertex>\nvGround = position;\nvUp = normal;`);
+        .replace(
+          '#include <common>',
+          `#include <common>\nvarying vec3 vGround;\nvarying vec3 vUp;\nattribute vec3 biome;\nvarying vec3 vBiome;`,
+        )
+        .replace(
+          '#include <begin_vertex>',
+          `#include <begin_vertex>\nvGround = position;\nvUp = normal;\nvBiome = biome;`,
+        );
       shader.fragmentShader = shader.fragmentShader
         .replace(
           '#include <common>',
-          `#include <common>\nvarying vec3 vGround;\nvarying vec3 vUp;\nuniform sampler2D uTerritory;\nuniform vec2 uTileOrigin;\nuniform vec2 uTileCount;\nuniform sampler2D uRoads;\n${TERRAIN_NOISE}\n${TERRITORY_GLSL}\n${ROAD_GLSL}`,
+          `#include <common>\nvarying vec3 vGround;\nvarying vec3 vUp;\nuniform sampler2D uTerritory;\nuniform vec2 uTileOrigin;\nuniform vec2 uTileCount;\nuniform sampler2D uRoads;\nuniform sampler2D t_grass;\nuniform sampler2D t_field;\nuniform sampler2D t_dirt;\nuniform sampler2D t_forest;\nuniform sampler2D t_rock;\nuniform sampler2D t_cliff;\nuniform sampler2D t_snow;\nuniform sampler2D t_sand;\nuniform sampler2D n_grass;\nuniform sampler2D n_rock;\nuniform float uTexOn;\nvarying vec3 vBiome;\n${TERRAIN_NOISE}\n${TEXTURE_GLSL}\n${TERRITORY_GLSL}\n${ROAD_GLSL}`,
         )
         .replace(
           '#include <color_fragment>',
@@ -371,10 +453,22 @@ float tdot = length(fract(tq) - 0.5 - tj * 0.5);
 float tdensity = smoothstep(0.42, 0.72, fbm(vGround.xz * 0.045 + 11.0)) * lowland * (0.4 + lush * 0.6);
 float tree = step(hash2(tc), tdensity * 0.7) * (1.0 - smoothstep(0.1, 0.19, tdot)) * (1.0 - smoothstep(0.18, 0.45, px));
 paint = mix(paint, vec3(0.15, 0.23, 0.11), tree * 0.85);
+// 질감(CC0 항공 사진): 두 크기로 섞어 반복 무늬를 깨고, 질감 밝기 결을 칸 색에 입힌다. 가까이 볼수록 질감이 주가 된다.
+float texW = uTexOn * (1.0 - smoothstep(0.25, 0.9, px));
+if (texW > 0.001) {
+  vec3 ground = sampleTex(t_grass, vGround.xz);
+  ground = mix(ground, sampleTex(t_field, vGround.xz), vBiome.x);
+  ground = mix(ground, sampleTex(t_forest, vGround.xz), vBiome.y);
+  ground = mix(ground, sampleTex(t_dirt, vGround.xz), vBiome.z);
+  float groundLuma = dot(ground, vec3(0.3, 0.55, 0.15));
+  vec3 detailed = paint * (groundLuma / 0.22);
+  paint = mix(paint, mix(detailed, ground * 1.15, 0.45), texW);
+}
 diffuseColor.rgb = paint;
 // 바닷가 모래와 물 아래 바닥.
 float sand = (1.0 - smoothstep(0.08, 0.45, vGround.y + (grain - 0.5) * 0.2)) * step(-0.02, vGround.y) * smoothstep(0.9, 0.97, flatness);
-diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.80, 0.74, 0.58) * (0.9 + grain * 0.2), sand * 0.75);
+vec3 sandColour = mix(vec3(0.80, 0.74, 0.58) * (0.9 + grain * 0.2), sampleTex(t_sand, vGround.xz) * 1.1, uTexOn * 0.8);
+diffuseColor.rgb = mix(diffuseColor.rgb, sandColour, sand * 0.75);
 if (vGround.y < -0.02) diffuseColor.rgb = mix(vec3(0.62, 0.58, 0.46), vec3(0.30, 0.33, 0.30), smoothstep(-0.05, -2.0, vGround.y)) * (0.85 + grain * 0.3);`,
         )
         .replace(
@@ -384,7 +478,10 @@ if (vGround.y < -0.02) diffuseColor.rgb = mix(vec3(0.62, 0.58, 0.46), vec3(0.30,
 // 산세는 크게: 낮은 주파수 능선만 쓰고 평야는 거의 건드리지 않는다(그림체에서 자글자글함을 뺀다).
 // 산은 날카롭게 깎인 능선과 골짜기(두 겹 능선 잡음). 평야는 거의 건드리지 않는다.
 float rugged = smoothstep(1.2, 9.0, vGround.y) * 1.0 + smoothstep(0.99, 0.88, vUp.y) * 0.45;
-rugged *= 1.0 - smoothstep(0.35, 0.9, px);
+// 질감이 있으면 잡음 기복은 끈다(가까이서 녹은 덩어리처럼 보였다, 사용자 2026-11-14). 노멀맵 결이 맡는다.
+// 능선 잡음은 중간 줌(칸이 작을 때)만, 더 가까이(px < 약 0.15)는 노멀맵 결로 넘긴다.
+float texDetail = uTexOn * (1.0 - smoothstep(0.07, 0.16, px));
+rugged *= (1.0 - smoothstep(0.35, 0.9, px)) * (1.0 - texDetail);
 vec2 g = vec2(0.0);
 if (rugged > 0.01) {
   float e = 0.08;
@@ -395,13 +492,20 @@ if (rugged > 0.01) {
   g *= rugged * 1.5;
   normal = normalize(normal + (viewMatrix * vec4(-g.x, 0.0, -g.y, 0.0)).xyz);
 }
+// 질감 노멀맵 결: 평지는 땅 결을 옅게, 가파르거나 높은 곳은 바위 결을 세게.
+if (texDetail > 0.001) {
+  float steep = smoothstep(0.95, 0.75, vUp.y) + smoothstep(1.2, 6.0, vGround.y) * 0.5;
+  vec2 tn = mix(sampleSlope(n_grass, vGround.xz) * 0.35, sampleSlope(n_rock, vGround.xz) * 0.9, clamp(steep, 0.0, 1.0));
+  normal = normalize(normal + (viewMatrix * vec4(tn.x, 0.0, -tn.y, 0.0)).xyz * texDetail);
+}
 // 바위·눈은 흔든 법선의 경사와 고도로 화소마다 정한다.
 float slope = 1.0 - normalize(vUp + vec3(-g.x, 0.0, -g.y) * 0.6).y;
 float rock = smoothstep(0.16, 0.42, slope + (grain - 0.5) * 0.12) * step(0.3, vGround.y);
 vec3 rockColor = mix(vec3(0.44, 0.39, 0.32), vec3(0.6, 0.54, 0.45), grain);
+rockColor = mix(rockColor, mix(sampleTex(t_rock, vGround.xz), sampleTex(t_cliff, vGround.xz * 0.7), smoothstep(0.35, 0.6, slope)) * 1.05, uTexOn * 0.85);
 diffuseColor.rgb = mix(diffuseColor.rgb, rockColor, rock * 0.85);
 float snow = smoothstep(${(4300 * UNITS_PER_METRE).toFixed(2)}, ${(5200 * UNITS_PER_METRE).toFixed(2)}, vGround.y + (grain - 0.5) * ${(650 * UNITS_PER_METRE).toFixed(2)}) * (1.0 - smoothstep(0.45, 0.75, slope));
-diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.94, 0.96), snow);
+diffuseColor.rgb = mix(diffuseColor.rgb, mix(vec3(0.93, 0.94, 0.96), sampleTex(t_snow, vGround.xz) * 1.05, uTexOn * 0.7), snow);
 if (vGround.y > 0.0) diffuseColor.rgb = territoryColor(diffuseColor.rgb, vGround.xz);
 if (vGround.y > -0.02) diffuseColor.rgb = drawRoads(diffuseColor.rgb, vGround.xz);
 // 오지(무대 밖 땅): 색을 빼고 어둡게 해 게임 무대 밖임을 보인다.
@@ -685,23 +789,28 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
       const lat = n0 - (point.y / 700) * (n0 - s0);
       return { x: ((lon - w1) / (e1 - w1)) * width, y: ((n1 - lat) / (n1 - s1)) * height };
     };
+    // 원 자료 선은 성기고 각져 있다. 모서리를 두 번 깎아 둥글게 하고 짧은 간격으로 다시 찍어
+    // 물 띠가 땅 높이를 촘촘히 따라가게 한다(사용자 2026-11-14: 강 틈·각진 물길).
     const lines = riverData.split(';').map((line) =>
-      line.split(' ').map((pair) => {
-        const [x, y] = pair.split(',').map(Number);
-        return move({ x: x!, y: y! });
-      }),
+      smoothLine(
+        line.split(' ').map((pair) => {
+          const [x, y] = pair.split(',').map(Number);
+          return move({ x: x!, y: y! });
+        }),
+      ),
     );
     // 강둑(옅은 풀빛 모래)을 넓게 깔고 그 위에 청록 물 띠를 얹는다.
     const group = new Object3D();
     group.add(
       new Mesh(
-        this.ribbon(lines, 3.2, 0.1),
+        this.ribbon(lines, 3.0, 0.06),
+        // 겹치는 물길(합류·급한 굽이)에서 반투명이 두 번 칠해져 이음매가 보였다. 둘 다 불투명으로 둔다.
+        // 강둑은 깊이를 쓰지 않아 물 띠를 덮지 못한다(비탈에서 둑이 물 위로 올라와 얼룩졌다).
         new MeshStandardMaterial({
-          color: '#c3cc98',
+          color: '#8e9062',
           roughness: 0.9,
           side: DoubleSide,
-          transparent: true,
-          opacity: 0.4,
+          depthWrite: false,
           polygonOffset: true,
           polygonOffsetFactor: 0,
           polygonOffsetUnits: -2,
@@ -714,8 +823,6 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
         color: '#3f9ea3',
         roughness: 0.2,
         metalness: 0,
-        transparent: true,
-        opacity: 0.92,
         side: DoubleSide,
         polygonOffset: true,
         polygonOffsetFactor: 0,
@@ -723,6 +830,8 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
       }),
     );
     group.add(water);
+    // 둑을 먼저 그리고 물을 그 위에 그린다.
+    group.children[0]!.renderOrder = -1;
     return group;
   }
 
@@ -1071,6 +1180,76 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     const { height } = siteSize(site.kind, level);
     return this.world(site.position.x, site.position.y, height * 1.8 + 2);
   }
+
+  /**
+   * 지형 질감을 받는다(개발 미리보기 ?models=<주소>의 <주소>/textures, 공개 배포는 승인 원격 주소).
+   * 다 받으면 uTexOn을 켠다.
+   */
+  async loadTerrainTextures(base: string) {
+    const loader = new TextureLoader();
+    await Promise.all(
+      TERRAIN_TEXTURES.map(async (name) => {
+        const texture = await loader.loadAsync(`${base}/${name}.webp`);
+        texture.wrapS = RepeatWrapping;
+        texture.wrapT = RepeatWrapping;
+        texture.colorSpace = SRGBColorSpace;
+        texture.anisotropy = 8;
+        this.terrainTextures[name].value = texture;
+      }),
+    );
+    await Promise.all(
+      TERRAIN_NORMALS.map(async (name) => {
+        const texture = await loader.loadAsync(`${base}/${name}-normal.webp`);
+        texture.wrapS = RepeatWrapping;
+        texture.wrapT = RepeatWrapping;
+        texture.anisotropy = 8;
+        this.terrainNormals[name].value = texture;
+      }),
+    );
+    this.textureOn.value = 1;
+  }
+
+  // 성 자리 다지기: 도시·관문 둘레(칸 반경)의 땅을 성 높이로 고른다. 낮게 누운 카메라에서 앞 능선이 성을 가리지 않게 한다.
+  private flattenSitePads(map: PublicGeography) {
+    const { columns, rows } = this.grid;
+    const cellW = this.canvasSize.width / (columns - 1);
+    const cellH = this.canvasSize.height / (rows - 1);
+    // 시선 띠: 카메라 쪽(+z) 앞 땅이 35° 시선보다 높으면 성 밑동을 가린다(사용자 2026-11-14: 장안이 진령에 가려짐).
+    // 성 앞 폭 약 3칸·깊이 6칸 안은 시선의 3/4 기울기 아래로 깎는다. 옆으로 갈수록 덜 깎아 골짜기처럼 이어진다.
+    const sight = Math.tan(ELEVATION) * 0.75;
+    const depth = TILE * 6;
+    for (const site of map.sites) {
+      if (site.kind !== 'CITY' && site.kind !== 'PASS') continue;
+      const radius = site.kind === 'CITY' ? TILE * 1.5 : TILE * 1.1;
+      const centre = this.tileCentre(site.position.x, site.position.y);
+      const pad = Math.max(groundAt(this.field, this.grid, this.canvasSize, centre.x, centre.y), WATER_LEVEL + 0.2);
+      const c0 = Math.max(0, Math.floor((centre.x - radius * 2) / cellW));
+      const c1 = Math.min(columns - 1, Math.ceil((centre.x + radius * 2) / cellW));
+      const r0 = Math.max(0, Math.floor((centre.y - radius) / cellH));
+      const r1 = Math.min(rows - 1, Math.ceil((centre.y + depth) / cellH));
+      for (let r = r0; r <= r1; r++)
+        for (let c = c0; c <= c1; c++) {
+          const i = r * columns + c;
+          // 물 칸은 건드리지 않는다.
+          if (this.field[i]! <= WATER_LEVEL) continue;
+          const dx = c * cellW - centre.x;
+          const dz = r * cellH - centre.y;
+          const d = Math.hypot(dx, dz);
+          // 성터: 땅을 성 높이 쪽으로 끌어당긴다(높은 곳은 내리고 낮은 곳은 올린다).
+          if (d <= radius) {
+            const t = Math.min(Math.max((d - radius * 0.5) / (radius * 0.5), 0), 1);
+            const w = 1 - t * t * (3 - 2 * t);
+            this.field[i] = this.field[i]! + (pad - this.field[i]!) * w;
+          }
+          if (dz <= 0) continue;
+          const side = Math.min(Math.max((Math.abs(dx) - radius * 0.8) / (radius * 1.2), 0), 1);
+          const keep = side * side * (3 - 2 * side);
+          const cap = pad + Math.max(dz - radius * 0.3, 0) * sight;
+          if (this.field[i]! > cap) this.field[i] = cap + (this.field[i]! - cap) * keep;
+        }
+    }
+  }
+
 
   /** 지도 좌표가 든 영지 칸의 가운데(지도 좌표). */
   private tileCentre(x: number, y: number) {

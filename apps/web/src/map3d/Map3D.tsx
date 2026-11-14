@@ -319,6 +319,11 @@ export default function Map3D({
     // 공개 빌드에서는 승인한 원격 모형만 쓰므로 이 경로를 열지 않는다.
     const modelBase = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('models') : null;
     if (modelBase)
+      void scene
+        .loadTerrainTextures(`${modelBase.replace(/\/$/, '')}/textures`)
+        .then(() => invalidateRef.current())
+        .catch(() => undefined);
+    if (modelBase)
       void import('./siteModels').then(({ MODEL_NAMES }) =>
         scene.loadSiteModels(modelBase.replace(/\/$/, ''), MODEL_NAMES).then(() => invalidateRef.current()),
       );

@@ -152,7 +152,8 @@ export function toonGradient(steps: readonly number[] = [90, 150, 215, 255]) {
 }
 
 export async function loadGlbMesh(url: string): Promise<{ geometry: BufferGeometry; material: MeshToonMaterial }> {
-  const response = await fetch(url);
+  // 같은 주소로 모형을 다시 만들어 올릴 수 있어 매번 바뀌었는지 묻는다(바뀌지 않았으면 캐시를 쓴다).
+  const response = await fetch(url, { cache: 'no-cache' });
   if (!response.ok) throw new Error(`모형을 받지 못했습니다 (${response.status})`);
   const { json, bin } = parseGlb(await response.arrayBuffer());
   const primitive = json.meshes[0]?.primitives[0];

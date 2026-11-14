@@ -147,8 +147,9 @@ export type HeightData = {
   depthRows?: number;
   maxDepth?: number;
 };
-// 지도 1단위가 약 3.5km라 실제 비율이면 산이 거의 보이지 않는다. 9km가 60단위(약 1:2.6 과장 기준의 1.5배)가 되게 크게 과장해 산세가 또렷하다.
-export const UNITS_PER_METRE = 75 / 9000;
+// 지도 1단위가 약 3.5km라 실제 비율이면 산이 거의 보이지 않는다. 높이를 약 13배 과장한다(9km가 34단위).
+// 더 키우면 35° 시점에서 산줄기가 뒤 골짜기 거점을 가린다(사용자 2026-11-14: 장안이 진령에 가려짐).
+export const UNITS_PER_METRE = 34 / 9000;
 
 export function decodeMetres(height: HeightData): Float32Array {
   const binary = atob(height.data);
@@ -349,6 +350,35 @@ export function realisticColors(
     colors = next;
   }
   return colors;
+}
+
+// 꼭짓점마다 질감 섞임 비율(밭, 숲, 메마른 땅). 칸 종류로 정하고 한 번 평균을 내 경계를 부드럽게 한다.
+export function biomeWeights(grid: TerrainCells): Float32Array {
+  const { cells, columns, rows } = grid;
+  const raw = new Float32Array(columns * rows * 3);
+  for (let i = 0; i < cells.length; i++) {
+    const name = TERRAINS[cells[i]!];
+    if (name === 'farmland') raw[i * 3] = 1;
+    else if (name === 'forest') raw[i * 3 + 1] = 1;
+    else if (name === 'desert' || name === 'loess' || name === 'coastSand') raw[i * 3 + 2] = 1;
+  }
+  const out = new Float32Array(raw.length);
+  for (let y = 0; y < rows; y++)
+    for (let x = 0; x < columns; x++)
+      for (let k = 0; k < 3; k++) {
+        let sum = 0;
+        let count = 0;
+        for (let dy = -1; dy <= 1; dy++)
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx < 0 || ny < 0 || nx >= columns || ny >= rows) continue;
+            sum += raw[(ny * columns + nx) * 3 + k]!;
+            count++;
+          }
+        out[(y * columns + x) * 3 + k] = sum / count;
+      }
+  return out;
 }
 
 // 칸 번호로 정하는 0~1 난수(같은 지도면 늘 같다). 나무 자리처럼 고정된 흩뿌림에 쓴다.
