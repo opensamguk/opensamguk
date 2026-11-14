@@ -247,7 +247,10 @@ export function GeneralLogList({ items, clock }: { items: readonly GeneralItem[]
           <LogKindIcon kind={item.kind} />
           {item.kind === 'failure' ? <Tag tone="danger">실패</Tag> : null}
           <span className={styles.text}>
-            <Rich text={item.text} />
+            {/* 기록 글은 자기 칸에 둔다. 뒤의 시각과 글자가 섞이지 않아 글 그대로 찾을 수 있다(e2e messages). */}
+            <span>
+              <Rich text={item.text} />
+            </span>
             {clockOf(item.createdAt) ? (
               <small className={`num ${styles.clock}`}>{clockOf(item.createdAt)}</small>
             ) : null}
