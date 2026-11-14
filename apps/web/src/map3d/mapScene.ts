@@ -180,8 +180,9 @@ vec3 territoryColor(vec3 base, vec2 xz) {
   }
   float edge = min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y));
   // 칸 격자는 칸이 화면에서 약 60px 넘게 보일 때만(확대 3·4단계). 그보다 멀면 국경·나라 색만 남긴다.
-  float grid = (1.0 - smoothstep(0.0, pxTile * 1.1, edge)) * (1.0 - smoothstep(0.012, 0.02, pxTile));
-  color = mix(color, vec3(1.0, 0.97, 0.86), grid * (own.a > 0.0 ? 0.16 : 0.08));
+  // 화풍 규격(STYLE-GUIDE 2.6): 격자는 지도 전체에 가는 흰 선(약 28%), 산 위에도 그린다. 칸이 화면에서 너무 작아지면(약 8px 미만) 뺀다.
+  float grid = (1.0 - smoothstep(0.0, pxTile * 1.1, edge)) * (1.0 - smoothstep(0.06, 0.12, pxTile));
+  color = mix(color, vec3(1.0, 0.98, 0.92), grid * (own.a > 0.0 ? 0.28 : 0.2));
   vec4 sides[4];
   sides[0] = tileAt(cell + vec2(-1.0, 0.0));
   sides[1] = tileAt(cell + vec2(1.0, 0.0));
@@ -971,7 +972,8 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
         // 겹치는 물길(합류·급한 굽이)에서 반투명이 두 번 칠해져 이음매가 보였다. 둘 다 불투명으로 둔다.
         // 강둑은 깊이를 쓰지 않아 물 띠를 덮지 못한다(비탈에서 둑이 물 위로 올라와 얼룩졌다).
         styleMaterial({
-          color: '#8e9062',
+          // 강가 밝은 모래 띠(STYLE-GUIDE 2.4).
+          color: '#b9ad84',
           roughness: 0.9,
           side: DoubleSide,
           depthWrite: false,
@@ -984,7 +986,8 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     const water = new Mesh(
       this.ribbon(lines, 2.4, 0.16),
       new MeshStandardMaterial({
-        color: '#3f9ea3',
+        // 물: 짙은 초록빛 청록(STYLE-GUIDE 1, 참고 그림 물 중앙값 rgb 59–71, 110–123, 104–118).
+        color: '#40746e',
         roughness: 0.2,
         metalness: 0,
         side: DoubleSide,
