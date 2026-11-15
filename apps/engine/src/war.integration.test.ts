@@ -246,7 +246,7 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
     const history = await db.nationHistory.findUniqueOrThrow({
       where: { worldId_tick_nationId: { worldId, tick: 100, nationId: 1 } },
     });
-    expect(history.data).toMatchObject({ events: ['포상: 자기 국가 장수만 가능합니다.'] });
+    expect(history.data).toMatchObject({ events: ['포상: BAD_TARGET: 자기 국가 장수만 가능합니다.'] });
   });
   it.each(['success', 'error', 'token', 'expiry'] as const)(
     '수도 함락 %s 뒤 자동 천도·보급·반격·역사를 저장하고 롤백·재생한다',

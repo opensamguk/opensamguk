@@ -386,13 +386,22 @@ test('5 소속 장수의 빈 칸은 엔진 턴에서 권농 방침의 농지 개
   evidence.db = { logs, cityAfter, clock: await readWorld(world) };
   expect(logs).toMatchObject([
     { tick: HUMAN_TURN, commandKey: 'farm', kind: 'success', text: '기본 방침(권농)으로 농지 개간' },
-    { tick: HUMAN_TURN, commandKey: 'farm', kind: 'success', text: expect.stringMatching(/^농지 개간: \d+$/) },
+    {
+      tick: HUMAN_TURN,
+      commandKey: 'farm',
+      kind: 'success',
+      text: expect.stringMatching(
+        /^농지 개간 작업으로 [\d,]+ 상승했습니다\.(?: 대성공했습니다\.| 성과가 저조했습니다\.)?$/,
+      ),
+    },
   ]);
 
   await page.reload();
   await expect(records(page)).toHaveCount(2);
   await expect(records(page).nth(0)).toContainText('기본 방침(권농)으로 농지 개간');
-  await expect(records(page).nth(1)).toContainText(/^.*농지 개간: \d+$/);
+  await expect(records(page).nth(1).locator('span').last()).toHaveText(
+    /^농지 개간 작업으로 [\d,]+ 상승했습니다\.(?: 대성공했습니다\.| 성과가 저조했습니다\.)?$/,
+  );
   await expect(records(page).first()).toHaveAttribute('data-log-kind', 'success');
   // 1번 칸은 당겨진 직접 휴식, 나머지는 빈 칸이다.
   await expect(row(page, 1)).not.toHaveAttribute('data-empty', 'true');

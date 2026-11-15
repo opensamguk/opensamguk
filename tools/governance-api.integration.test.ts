@@ -439,11 +439,24 @@ describe('AC-P2-31 실제 HTTP 황실 접수·동의·경제', () => {
       where: { worldId, tick: nextTick, nationId: { in: [upper, lower] } },
       orderBy: { nationId: 'asc' },
     });
-    expect(declared.map(({ nationId, data }) => ({ nationId, data }))).toEqual(
+    expect(declared.map(({ nationId, data }) => ({ nationId, data }))).toMatchObject(
       [upper, lower]
         .sort((a, b) => a - b)
         .map((nationId) => ({ nationId, data: { events: ['황실국 → 봉신국 선전포고'] } })),
     );
+    for (const { data } of declared)
+      expect(data).toMatchObject({
+        structuredEvents: [
+          {
+            ordinal: 0,
+            kind: 'command',
+            visibility: 'nation',
+            text: '황실국 → 봉신국 선전포고',
+            partsVersion: 1,
+            parts: expect.any(Array),
+          },
+        ],
+      });
 
     await advance(worldId, 30_000);
     const archive = await exportReplay(db, worldId);

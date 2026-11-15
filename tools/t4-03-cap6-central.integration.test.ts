@@ -1054,7 +1054,11 @@ it('P23 실제 휴식·방침·정복 턴 앞뒤의 treaties는 깊이 같고 �
       })),
     );
     if (modern) expect(logs[0]!.text).toBe('기본 방침(권농)으로 농지 개간');
-    expect(logs.at(-1)!.text).toMatch(modern ? /^농지 개간: \d+$/ : /^휴식$/);
+    if (modern)
+      expect(logs[1]!.text).toMatch(
+        /^농지 개간 작업으로 [\d,]+ 상승했습니다\.(?: 대성공했습니다\.| 성과가 저조했습니다\.)?$/,
+      );
+    else expect(logs[0]!.text).toBe('휴식했습니다.');
   }
   const initial = commandInitial();
   // 도시 2 점령이 통일 조건을 채우도록 P23 사본의 중립 도시를 생성 전에 배정한다.

@@ -80,7 +80,7 @@ const CASES: Case[] = [
     policyName: '권농',
     expected: 'farm',
     commandName: '농지 개간',
-    resultLine: /^농지 개간: \d+$/,
+    resultLine: /^농지 개간 작업으로 [\d,]+ 상승했습니다\.(?: 대성공했습니다\.| 성과가 저조했습니다\.)?$/,
     emptyLabel: '(권농) 농지 개간',
     shape: { general: RICH, city: { agriculture: 500, agricultureMax: 1000 } },
   },
@@ -91,7 +91,7 @@ const CASES: Case[] = [
     policyName: '중상',
     expected: 'commerce',
     commandName: '상업 투자',
-    resultLine: /^상업 투자: \d+$/,
+    resultLine: /^상업 투자 작업으로 [\d,]+ 상승했습니다\.(?: 대성공했습니다\.| 성과가 저조했습니다\.)?$/,
     emptyLabel: '(중상) 상업 투자',
     shape: { general: RICH, city: { commerce: 500, commerceMax: 1000 } },
   },
@@ -102,7 +102,7 @@ const CASES: Case[] = [
     policyName: '치안',
     expected: 'security',
     commandName: '치안 강화',
-    resultLine: /^치안 강화: \d+$/,
+    resultLine: /^치안 강화 작업으로 [\d,]+ 상승했습니다\.(?: 대성공했습니다\.| 성과가 저조했습니다\.)?$/,
     emptyLabel: '(치안) 치안 강화',
     shape: { general: RICH, city: { security: 500, securityMax: 1000 } },
   },
@@ -113,7 +113,7 @@ const CASES: Case[] = [
     policyName: '수비',
     expected: 'defence',
     commandName: '수비 강화',
-    resultLine: /^수비 강화: \d+$/,
+    resultLine: /^수비 강화 작업으로 [\d,]+ 상승했습니다\.(?: 대성공했습니다\.| 성과가 저조했습니다\.)?$/,
     emptyLabel: '(수비) 수비 강화',
     shape: { general: RICH, city: { defence: 500, defenceMax: 1000 } },
   },
@@ -124,7 +124,7 @@ const CASES: Case[] = [
     policyName: '수비',
     expected: 'wall',
     commandName: '성벽 보수',
-    resultLine: /^성벽 보수: \d+$/,
+    resultLine: /^성벽 보수 작업으로 [\d,]+ 상승했습니다\.(?: 대성공했습니다\.| 성과가 저조했습니다\.)?$/,
     emptyLabel: '(수비) 수비 강화',
     shape: { general: RICH, city: { defence: 1000, defenceMax: 1000, wall: 500, wallMax: 1000 } },
   },
@@ -135,7 +135,7 @@ const CASES: Case[] = [
     policyName: '훈련',
     expected: 'train',
     commandName: '훈련',
-    resultLine: /^훈련: 60$/,
+    resultLine: /^훈련했습니다\. 현재 수치 60입니다\.$/,
     emptyLabel: '(훈련) 훈련',
     shape: { general: { ...RICH, crew: 1000, train: 50, atmos: 50 }, city: {} },
   },
@@ -146,7 +146,7 @@ const CASES: Case[] = [
     policyName: '훈련',
     expected: 'morale',
     commandName: '사기진작',
-    resultLine: /^사기진작: 60$/,
+    resultLine: /^사기진작했습니다\. 현재 수치 60입니다\.$/,
     emptyLabel: '(훈련) 훈련',
     shape: { general: { ...RICH, crew: 1000, train: 100, atmos: 50 }, city: {} },
   },
@@ -427,7 +427,9 @@ for (const c of CASES) {
     expect(third).toEqual([{ generalId: HUMAN_ID, tick: FOLLOW_RESERVED_DUE, commandKey: 'farm' }]);
     expect(thirdLogs).toHaveLength(1);
     expect(thirdLogs[0]).toMatchObject({ tick: FOLLOW_RESERVED_DUE, commandKey: 'farm', kind: 'success' });
-    expect(thirdLogs[0]!.text).toMatch(/^농지 개간: \d+$/);
+    expect(thirdLogs[0]!.text).toMatch(
+      /^농지 개간 작업으로 [\d,]+ 상승했습니다\.(?: 대성공했습니다\.| 성과가 저조했습니다\.)?$/,
+    );
 
     const final = await ownTurnState(world);
     const finalLedger = await inputLedger(world);
