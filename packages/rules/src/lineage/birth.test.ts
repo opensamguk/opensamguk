@@ -62,7 +62,6 @@ it('AC-P2-32 다섯 능력치는 원본 범위로 물려받으며 사람 생성�
   const { world, a, b } = parents();
   for (const id of [a, b])
     Object.assign(world.generals[id]!, { leadership: 100, strength: 100, intel: 100, politics: 100, charm: 100 });
-  world.ruleFeatures!.push('five-stats');
   world.lineage!.config.birth.statSpread = 0;
   const born = generateLineageChild(world, 1, 10_000, {
     ...birthResources,

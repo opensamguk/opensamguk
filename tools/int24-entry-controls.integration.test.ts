@@ -108,7 +108,6 @@ async function world(withPreset = true, published = false) {
       })
     : commandInitial();
   if (!published) initial.scenarioKey = 'integration191';
-  initial.ruleFeatures = [...new Set([...(initial.ruleFeatures ?? []), 'personnel', 'policy'])].sort();
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '생성 이름',
     turnTermMinutes: 60,

@@ -34,7 +34,6 @@ const payload = {
 };
 const initial = commandInitial();
 initial.statRules = { ...FIVE_STAT_RULES };
-initial.ruleFeatures = ['five-stats', 'personnel', 'policy'];
 initial.generals = initial.generals.map((g) => ({ ...g, politics: 0, charm: 100 }));
 
 async function identity() {

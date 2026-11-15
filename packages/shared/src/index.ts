@@ -1,5 +1,6 @@
 export * from './gameDate';
 export * from './rng';
+export * from './tactical';
 export * from './editArray';
 export * from './publicMap';
 export * from './publicGeography';

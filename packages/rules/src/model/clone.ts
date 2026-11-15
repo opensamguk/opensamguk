@@ -4,7 +4,7 @@ import type { WorldState, WorldView } from './world';
 
 // 모든 가변 필드를 복제한다. 평평한 장수 수백 명을 매 턴 직렬화하지 않는다.
 export function cloneWorld(view: WorldView): WorldState {
-  return cloneWorldWithRegistry(view, extRegistryForRuleFeatures(view.ruleFeatures));
+  return cloneWorldWithRegistry(view, extRegistryForRuleFeatures());
 }
 
 export function cloneWorldWithRegistry(view: WorldView, registry: ExtStateRegistry): WorldState {
@@ -17,8 +17,12 @@ export function cloneWorldWithRegistry(view: WorldView, registry: ExtStateRegist
     cities[key] = { ...city, connections: [...city.connections] };
   }
   for (const key in view.nations) nations[key] = { ...view.nations[key]! };
-  for (const key in view.generals) generals[key] = { ...view.generals[key]! };
+  for (const key in view.generals) {
+    const { movePath, ...general } = view.generals[key]!;
+    generals[key] = { ...general, ...(movePath ? { movePath: [...movePath] } : {}) };
+  }
   return {
+    ...(view.fogOfWar === undefined ? {} : { fogOfWar: view.fogOfWar }),
     ...(view.relations ? { relations: structuredClone(view.relations) as NonNullable<WorldState['relations']> } : {}),
     ...(view.officeEffects ? { officeEffects: structuredClone(view.officeEffects) } : {}),
     ...(view.preparedTurns
@@ -50,7 +54,6 @@ export function cloneWorldWithRegistry(view: WorldView, registry: ExtStateRegist
     ...(ext ? { ext } : {}),
     ...(view.presetRules ? { presetRules: structuredClone(view.presetRules) as PresetRules } : {}),
     ...(view.recruitmentLocation ? { recruitmentLocation: view.recruitmentLocation } : {}),
-    ...(view.ruleFeatures ? { ruleFeatures: [...view.ruleFeatures] } : {}),
     startYear: view.startYear,
     cities,
     nations,

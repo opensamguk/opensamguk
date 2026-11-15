@@ -21,8 +21,8 @@ function registry(handler: QueuedInputHandler): EngineRegistry {
     })),
   };
 }
-function fixture(kind = 'test-a.queued', features = ['test-a']) {
-  const world = { id: 'world', replayFormat: 3, ruleFeatures: features } as EngineWorld;
+function fixture(kind = 'test-a.queued') {
+  const world = { id: 'world', replayFormat: 3 } as EngineWorld;
   const event = { id: 1n, generalId: null as number | null, kind, status: 'PENDING', worldId: world.id };
   const tx = {
     general: { findUnique: vi.fn(async () => ({ removedAt: null as number | null })) },
@@ -79,7 +79,7 @@ describe('T2-26 통합 입력 처리기', () => {
     });
   });
   it('기능이 꺼졌으면 처리기를 부르지 않고 확정 거절한다', async () => {
-    const { world, tx, client } = fixture('test-a.queued', []);
+    const { world, tx, client } = fixture('test-a.queued');
     const handler = vi.fn<QueuedInputHandler>();
     await processInputs(client, world, 12, registry(handler));
     expect(handler).not.toHaveBeenCalled();
@@ -142,20 +142,13 @@ describe('T2-26 통합 입력 처리기', () => {
 describe('T2-26 엔진 시작 대조와 서버 기능 확인', () => {
   it('기존 형식으로 바꾼 뒤 남은 기능 사본은 capability 선택 전에 거부한다', () => {
     for (const replayOrigin of [null, { version: 1, initial: {} }, { version: 6 }]) {
-      expect(() => checkStoredReplayFormat({ replayFormat: 1, ruleFeatures: ['test-a'], replayOrigin })).toThrow(
-        '사본',
-      );
+      expect(() => checkStoredReplayFormat({ replayFormat: 1, replayOrigin })).toThrow('사본');
     }
-    expect(() =>
-      checkStoredReplayFormat({ replayFormat: 1, ruleFeatures: [], replayOrigin: { version: 6 } }),
-    ).not.toThrow();
+    expect(() => checkStoredReplayFormat({ replayFormat: 1, replayOrigin: { version: 6 } })).not.toThrow();
   });
   it('형식 1의 null 원본만 허용한다', () => {
-    expect(() => checkWorldReplay({ replayOrigin: null, replayFormat: 1, ruleFeatures: [] })).not.toThrow();
-    for (const value of [
-      { replayFormat: 3, ruleFeatures: [] },
-      { replayFormat: 1, ruleFeatures: ['test-a'] },
-    ])
+    expect(() => checkWorldReplay({ replayOrigin: null, replayFormat: 1 })).not.toThrow();
+    for (const value of [{ replayFormat: 3 }, { replayFormat: 1 }])
       expect(() => checkWorldReplay({ replayOrigin: null, ...value })).toThrow();
   });
   it('S2~S5는 형식·기능 사본과 생성 기록을 대조한다', async () => {
@@ -163,11 +156,10 @@ describe('T2-26 엔진 시작 대조와 서버 기능 확인', () => {
     const world = {
       replayOrigin: archive.origin as unknown as Prisma.JsonValue,
       replayFormat: 3,
-      ruleFeatures: ['test-a'],
     };
     expect(() => checkWorldReplay(world, featureRegistry)).not.toThrow();
     expect(() => checkWorldReplay({ ...world, replayFormat: 1 }, featureRegistry)).toThrow();
-    expect(() => checkWorldReplay({ ...world, ruleFeatures: [] }, featureRegistry)).toThrow();
+    expect(() => checkWorldReplay({ ...world }, featureRegistry)).toThrow();
     expect(() => checkWorldReplay(world)).toThrow('모르는');
     archive.origin.initialStateHash = 'not checked at startup';
     expect(() => checkWorldReplay(world, featureRegistry)).not.toThrow();

@@ -140,13 +140,7 @@ export async function exportReplay(
       await assertStoredCityResources(tx, world);
       await assertStoredCityRuins(tx, world);
       await assertStoredLogistics(tx, world);
-      if (
-        world.ruleFeatures.includes('stratagem-cards-v1') ||
-        world.stratagemCardsState != null ||
-        world.ruleFeatures.includes('nation-lifecycle-v1') ||
-        world.nationLifecycleState != null
-      )
-        await loadWorld(tx, worldId);
+      await loadWorld(tx, worldId);
       const v3 = world.replayFormat === 3;
       if (!v3) {
         const capabilities = selectWorldCapabilities(world);
@@ -242,7 +236,7 @@ export async function exportReplay(
       if (v3) {
         const archive = { ...common, end: common.end ?? adminEnd, version: 3, config };
         readArchive(archive);
-        if (world.ruleFeatures.includes('governance-v1')) {
+        {
           ledger = await readGovernanceLedger(tx, worldId);
         }
         return archive as unknown as ReplayArchiveV3;
@@ -396,28 +390,15 @@ export function readArchive(value: unknown, registry: RuleRegistry = ruleRegistr
         : input.tick !== null)
     )
       throw new Error('입력의 처리 tick을 확인하세요.');
-    if (kind.feature !== null && !archive.origin.initial.ruleFeatures?.includes(kind.feature)) {
-      if (input.status === 'APPLIED') throw new Error('이 월드에서 켜지 않은 기능입니다.');
-      const result = input.result as { code?: unknown; message?: unknown } | null;
-      if (
-        !result ||
-        result.code !== 'FEATURE_DISABLED' ||
-        typeof result.message !== 'string' ||
-        Object.keys(result).some((key) => key !== 'code' && key !== 'message')
-      )
-        throw new Error('끈 기능의 입력 거절 기록이 다릅니다.');
-    }
   }
   if (archive.version === 3) validateAdminArchiveEnd(archive);
   if (archive.version === 3)
-    for (const key of archive.origin.initial.ruleFeatures ?? [])
-      registry.features
-        .find((feature) => feature.key === key)!
-        .checkArchive?.({
-          origin: archive.origin,
-          inputs: allInputs.sort((a, b) => a.sequence - b.sequence),
-          end: archive.end,
-        });
+    for (const feature of registry.features)
+      feature.checkArchive?.({
+        origin: archive.origin,
+        inputs: allInputs.sort((a, b) => a.sequence - b.sequence),
+        end: archive.end,
+      });
   return archive;
 }
 
@@ -468,7 +449,7 @@ function validateAdminArchiveEnd(archive: ReplayArchiveV3): void {
       reset.settings.endYear !== creationEndYear(archive) ||
       reset.settings.name !== creationName(reset.confirmedName ?? reset.settings.name, archive.inputs) ||
       reset.settings.featureDataHash !== hashState(archive.origin.featureData ?? null) ||
-      hashState(reset.settings.ruleFeatures) !== hashState(archive.origin.initial.ruleFeatures ?? [])
+      reset.settings.fogOfWar !== (archive.origin.initial.fogOfWar ?? false)
     )
       throw new Error('초기화 원본과 재생 생성 기록이 다릅니다.');
   }
@@ -675,7 +656,7 @@ function replayArchiveWithLedger(
         if (action.tick > tick || (action.kind === 'monthly' && sequence !== expected.sequence)) {
           throw new Error(`정산 순서가 다릅니다: ${tick}`);
         }
-        if (governanceRows && action.kind === 'monthly' && replay.state.ruleFeatures?.includes('governance-v1')) {
+        if (governanceRows && action.kind === 'monthly') {
           const settled = settleReplayMonth(replay, origin.initial.seed, action.tick, registry);
           const { movements } = z
             .object({ movements: z.array(governanceMovementSchema) })

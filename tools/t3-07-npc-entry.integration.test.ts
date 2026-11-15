@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '@opensamguk/rules';
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { readdir, readFile } from 'node:fs/promises';
@@ -100,9 +101,8 @@ async function call<T = unknown>(path: string, input: unknown, cookie?: string) 
   ];
   return { status: response.status, data: body.result?.data, code: body.error?.data.code, raw };
 }
-async function world(features = true) {
+async function world() {
   const initial = commandInitial();
-  initial.ruleFeatures = features ? ['personnel', 'policy'] : [];
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '역할 입장 검증',
     turnTermMinutes: 60,
@@ -279,14 +279,13 @@ it('AC-M3-14 정식491명 확장 판에서5능력치 후보를 맡고 장비·�
     seed: 'npc-expanded-ownership',
   });
   expect(initial.generals).toHaveLength(491);
-  const features = [...profile.ruleFeatures, 'equipment-v1'].sort();
-  initial.ruleFeatures = features;
+  [...providedRuleKeys, 'equipment-v1'].sort();
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '정식 확장 맡기',
     turnTermMinutes: 60,
     endYear: 231,
     replayFormat: 3,
-    ruleFeatures: features,
+
     featureData: { ...profile.featureData, 'equipment-v1': STANDARD_EQUIPMENT_CONFIG },
   });
   await enable(worldId);
@@ -716,7 +715,6 @@ it('AC-M3-14 commit 실패는 소유권·앵커·맡기 로그·완료 기록을
 
 it('AC-M3-14 맡기 입력과 실제 턴·월 정산을 섞은 12개월 보관 파일을 엄격하게 재생한다', async () => {
   const initial = commandInitial();
-  initial.ruleFeatures = ['personnel', 'policy'];
   initial.diplomacies = [{ nationA: 1, nationB: 2, state: 'NON_AGGRESSION', untilTick: 130000 }];
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '맡기 월간 재생',

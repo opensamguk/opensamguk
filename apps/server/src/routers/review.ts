@@ -11,7 +11,6 @@ const orderBy = [{ year: 'desc' }, { month: 'desc' }] as const;
 export const reviewRouter = router({
   latest: protectedProcedure.input(worldInput).query(({ ctx, input }) =>
     readWorld(ctx.db, input.worldId, async (tx, world) => {
-      if (!world.ruleFeatures.includes('reputation-v1')) return null;
       const row = await tx.monthlyReview.findFirst({
         where: { worldId: input.worldId },
         orderBy: [...orderBy],
@@ -24,7 +23,6 @@ export const reviewRouter = router({
   ),
   get: protectedProcedure.input(getInput).query(({ ctx, input }) =>
     readWorld(ctx.db, input.worldId, async (tx, world) => {
-      if (!world.ruleFeatures.includes('reputation-v1')) return null;
       const row = await tx.monthlyReview.findUnique({
         where: { worldId_year_month: input },
         select: monthlyReviewSelect,
@@ -36,7 +34,6 @@ export const reviewRouter = router({
   ),
   months: protectedProcedure.input(worldInput).query(({ ctx, input }) =>
     readWorld(ctx.db, input.worldId, async (tx, world) => {
-      if (!world.ruleFeatures.includes('reputation-v1')) return [];
       const rows = await tx.monthlyReview.findMany({
         where: { worldId: input.worldId },
         orderBy: [...orderBy],

@@ -37,12 +37,7 @@ it('AC-P2-20 게시 1030 관계는 생성 원본에서 재적재·재생하고 �
   const changed = structuredClone(initial);
   changed.generals.find(({ id }) => id === relations.pairs[0]!.a.id)!.name = '다른 장수';
   expect(() => createRelationsData(changed)).toThrow('생성 장수');
-  const { worldId } = await createWorldFromCli(
-    db,
-    initial,
-    { ...options, ruleFeatures: [RELATIONS_FEATURE] },
-    resources,
-  );
+  const { worldId } = await createWorldFromCli(db, initial, { ...options }, resources);
   try {
     const origin = readArchive(await exportReplay(db, worldId)).origin;
     const state = await loadWorld(db, worldId);
@@ -130,7 +125,7 @@ it('AC-P2-20 초기화는 이전 원본의 관계 사본을 새 월드에 보존
       turnTermMinutes: 60,
       endYear: null,
       replayFormat: 3,
-      ruleFeatures: [RELATIONS_FEATURE],
+
       featureData: { [RELATIONS_FEATURE]: archived },
     },
     resources,

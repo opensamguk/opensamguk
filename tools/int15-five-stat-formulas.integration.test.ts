@@ -23,7 +23,6 @@ const worlds: string[] = [];
 let worldId: string, otherWorld: string, legacyWorld: string, cookie: string, outsider: string;
 const initial = commandInitial();
 initial.statRules = { ...FIVE_STAT_RULES };
-initial.ruleFeatures = ['five-stats', 'policy'];
 initial.nations = initial.nations.map((row) => ({ ...row, isNpc: false }));
 initial.generals = initial.generals.map((row, index) => ({
   ...row,

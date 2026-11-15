@@ -20,7 +20,7 @@ import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import type { Context } from '../context';
 import { requirePersonnelSession } from './personnelAdmission';
-import { readView, requireGeneral, requireRuleFeature, requireWorld } from './queries';
+import { readView, requireGeneral, requireWorld } from './queries';
 import { requireCampaignOrderAccess } from './campaignOrders';
 import { recruitmentAvailability } from './recruitment';
 
@@ -35,7 +35,6 @@ function identity(ctx: ActorContext, started: number) {
   return { userId: ctx.user.id, sessionId: ctx.sessionId ?? '', at: new Date(ctx.now + performance.now() - started) };
 }
 function ready(world: Awaited<ReturnType<typeof requireWorld>>) {
-  requireRuleFeature(world, 'campaign-v1');
   if (world.replayFormat !== 3)
     throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '휘하 기능을 사용할 수 없습니다.' });
   const origin: unknown = world.replayOrigin;
@@ -276,7 +275,18 @@ export async function readCampaignBoard(ctx: ActorContext, worldId: string) {
         offers,
         units: campaign.units
           .filter((unit) => unit.ownerId === actor.id)
-          .map((unit) => ({ ...unit, cityKey: view.generals[unit.commanderId]!.cityKey })),
+          .map((unit) => ({
+            ...unit,
+            supply: unit.supply
+              ? {
+                  feature: unit.supply.feature,
+                  unit: unit.supply.unit,
+                  loaded: unit.supply.loaded,
+                  remaining: unit.supply.remaining,
+                }
+              : null,
+            cityKey: view.generals[unit.commanderId]!.cityKey,
+          })),
         commanders: [
           actor.id,
           ...campaign.links

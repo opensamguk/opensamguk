@@ -8,7 +8,6 @@ import { emptyCampaignState } from './state';
 
 function fixture() {
   const world = commandWorld();
-  world.ruleFeatures = ['campaign-v1', 'five-stats'];
   for (const general of Object.values(world.generals)) Object.assign(general, { politics: 60, charm: 55, crew: 0 });
   Object.assign(world.generals[4]!, { nationId: 1, cityKey: 4, officerLevel: 1 });
   world.campaign = emptyCampaignState(world, 'monthly-seed', 'sourced-fixture');
@@ -37,7 +36,6 @@ describe('AC-INT-09 기존 월 정산의 부곡 연결', () => {
     const world = fixture();
     const baseline = structuredClone(world);
     delete baseline.campaign;
-    delete baseline.ruleFeatures;
     expect(buildYearbook(world, 191).nations[0]!.power - buildYearbook(baseline, 191).nations[0]!.power).toBe(3000);
     world.generals[4]!.activeFromYear = 200;
     expect(buildYearbook(world, 191).nations[0]!.power - buildYearbook(baseline, 191).nations[0]!.power).toBe(1000);
@@ -45,7 +43,6 @@ describe('AC-INT-09 기존 월 정산의 부곡 연결', () => {
   it('월급·세입과 기존 군량은 보존하고 새 월 유지비나 휴대 군량을 만들지 않는다', () => {
     const world = fixture();
     const legacy = structuredClone(world);
-    delete legacy.ruleFeatures;
     delete legacy.campaign;
     const source = () => rngFor('monthly-seed', 'monthly', 191, 1);
     const next = runMonthly(deepFreeze(world), 10000, source()).state;

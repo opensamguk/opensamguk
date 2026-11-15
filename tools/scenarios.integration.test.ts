@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '@opensamguk/rules';
 import { setTimeout as delay } from 'node:timers/promises';
 import { execFileSync, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -460,8 +461,8 @@ it('S5 miniche 지도·병종의 게시, 롤백과 월드 재생', async () => {
       );
       const { worldId } = JSON.parse(output) as { worldId: string };
       expect(await db.city.count({ where: { worldId } })).toBe(78);
-      const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
-      expect(world.ruleFeatures).toContain('battle-affinity-v2');
+      await db.world.findUniqueOrThrow({ where: { id: worldId } });
+      expect(providedRuleKeys).toContain('battle-affinity-v2');
       await controlClock(db, worldId, 'start');
       const lease = await acquireLease(db, worldId);
       if (!lease) throw new Error('소형 지도 검증 월드의 실행권을 얻지 못했습니다.');
@@ -534,7 +535,7 @@ it.each([
       name: map,
       turnTermMinutes: 60,
       endYear: 200,
-      ...(unitSet === 'basic' ? {} : { ruleFeatures: ['battle-affinity-v2'] }),
+      ...(unitSet === 'basic' ? {} : {}),
     });
     const savedCities = await db.city.findMany({
       where: { worldId },
@@ -636,7 +637,6 @@ it.each([
         name: `소형 지도 ${key}`,
         turnTermMinutes: 60,
         endYear: 200,
-        ruleFeatures: ['battle-affinity-v2'],
       });
       await controlClock(db, worldId, 'start');
       const lease = await acquireLease(db, worldId);
@@ -677,14 +677,12 @@ it.each(ready)('S6 $key 두 DB 월드의 행 수와 재적재 해시는 파일 �
         name: `시나리오 ${row.key}`,
         turnTermMinutes: 60,
         endYear: null,
-        ...(ruleFeatures ? { ruleFeatures } : {}),
+        ...(ruleFeatures ? {} : {}),
       });
       expect(await db.city.count({ where: { worldId } })).toBe(row.expected!.cities);
       expect(await db.nation.count({ where: { worldId } })).toBe(row.expected!.nations);
       expect(await db.general.count({ where: { worldId } })).toBe(row.expected!.generals);
-      expect(hashState(await readWorldState(db, worldId))).toBe(
-        hashState(ruleFeatures ? { ...initial, ruleFeatures } : initial),
-      );
+      expect(hashState(await readWorldState(db, worldId))).toBe(hashState(ruleFeatures ? { ...initial } : initial));
     }
   });
 });
@@ -703,8 +701,8 @@ it.each([
       { replayFormat: 'policy' },
       { treatyFormat: 1 },
       { extFormat: 1 },
-      { ruleFeatures: ['personnel'] },
-      { replayFormat: 1, ruleFeatures: ['nation-lifecycle-v1', 'personnel'] },
+      {},
+      { replayFormat: 1 },
     ];
     for (const disabled of invalid) {
       await expect(saveInitialWorld(db, initial, { ...options, ...disabled })).rejects.toThrow('시작 방랑');
@@ -737,9 +735,9 @@ it.each([
     const result = JSON.parse(output) as { worldId: string; stateHash: string };
     const { worldId } = result;
     const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
-    expect(world.ruleFeatures).toEqual(['nation-lifecycle-v1', 'personnel']);
+    expect(providedRuleKeys).toEqual(['nation-lifecycle-v1', 'personnel']);
     expect(world.nationLifecycleState).toEqual({ version: 1, nations: { [row.nationId]: { sinceTick: 0 } } });
-    expect(result.stateHash).toBe(hashState({ ...initial, ruleFeatures: world.ruleFeatures }));
+    expect(result.stateHash).toBe(hashState({ ...initial }));
     expect(await db.nation.findUniqueOrThrow({ where: { worldId_id: { worldId, id: row.nationId } } })).toMatchObject({
       capitalCityKey: null,
     });
@@ -950,7 +948,7 @@ describe.each(ready)('S8 $key 전체 장수가 있는 DB 월드', (row) => {
         name: `시나리오 ${row.key} 한 달`,
         turnTermMinutes: 60,
         endYear: null,
-        ...(ruleFeatures ? { ruleFeatures } : {}),
+        ...(ruleFeatures ? {} : {}),
       }));
       expect(await db.general.count({ where: { worldId } })).toBe(row.expected!.generals);
     })();

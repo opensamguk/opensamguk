@@ -258,6 +258,22 @@ it('AC-INT-03 SAN10 GIS 해시·범위·도시 좌표가 다르면 다른 지도
   expect(matchesOperationalGeography(geography, changedCities)).toBe(false);
 });
 
+it('AC-INT-27 작은 현은 소유 앵커 수와 거점 선택 목록에 넣지 않는다', () => {
+  const geography = publicGeographySchema.parse(san10Resource);
+  const mapped: MapCity[] = geography.sites
+    .filter((site) => site.anchorKey !== undefined)
+    .map((site) => ({
+      ...makeCity(site.anchorKey!, site.name, site.kind as 'CITY' | 'PASS', site.position.x),
+      y: site.position.y,
+      links: [],
+    }));
+  geography.sites.push({ id: 'city:99999', name: '작은현', kind: 'CITY', siteLevel: 2, position: { x: 500, y: 500 } });
+  expect(matchesOperationalGeography(geography, mapped)).toBe(true);
+  render(<WorldMap cities={mapped} nations={nations} operationalMap={geography} onSelect={vi.fn()} />);
+  expect(screen.getByTestId('world-map')).toBeDefined();
+  expect(screen.queryByRole('option', { name: /작은현/ })).toBeNull();
+});
+
 it('휠 확대는 커서 아래 지도 점을 그 자리에 두고 가장 큰 표식이 화면을 채울 만큼 들어간다', () => {
   const view = { x: 100, y: 50, width: 400, height: 280 };
   const zoomed = zoomAround(view, 2, 300, 120, 1000, 0.7);

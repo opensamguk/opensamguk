@@ -231,7 +231,7 @@ describe('T2-26 실제 DB 입력 원자성', () => {
     const value = await create();
     const actor = await user();
     // 운영 목록은 비어 있다. 시험 월드와 처리기에만 기능을 주입한다.
-    await db.world.update({ where: { id: value.worldId }, data: { ruleFeatures: ['test-a', 'test-b'] } });
+    await db.world.update({ where: { id: value.worldId }, data: {} });
     const handler: QueuedInputHandler = async (tx, world, event) => {
       await tx.nation.update({
         where: { worldId_id: { worldId: world.id, id: 1 } },
@@ -263,7 +263,7 @@ describe('T2-26 실제 DB 입력 원자성', () => {
     expect(await db.generalTurn.count({ where: { worldId: value.worldId, generalId: results[1]!.generalId! } })).toBe(
       30,
     );
-    await db.world.update({ where: { id: value.worldId }, data: { ruleFeatures: [] } });
+    await db.world.update({ where: { id: value.worldId }, data: {} });
     const disabled = await enqueue(value.worldId, actor, 'test-a.queued');
     await fenced(value.lease, async (tx) => {
       await processInputs(tx, await tx.world.findUniqueOrThrow({ where: { id: value.worldId } }), 50, registry);
@@ -300,7 +300,7 @@ describe('T2-26 실제 DB 입력 원자성', () => {
   it('한 트랜잭션에서 여러 종류를 처리해도 실패하면 모두 PENDING이다', async () => {
     const value = await create();
     const actor = await user();
-    await db.world.update({ where: { id: value.worldId }, data: { ruleFeatures: ['test-a', 'test-b'] } });
+    await db.world.update({ where: { id: value.worldId }, data: {} });
     const before = await db.nation.findUniqueOrThrow({ where: { worldId_id: { worldId: value.worldId, id: 1 } } });
     for (const kind of ['test-a.queued', 'general.create', 'test-b.queued']) await enqueue(value.worldId, actor, kind);
     const handler: QueuedInputHandler = async (tx, world) => {
@@ -346,12 +346,7 @@ describe('T2-26 실제 DB 생성·시작 거부', () => {
   it('생성 검사가 실패하면 월드 행이 없다', async () => {
     const initial = await monthlyFixture();
     const before = await db.world.count();
-    for (const options of [
-      { ruleFeatures: ['unknown'] },
-      { replayFormat: 1 as const, ruleFeatures: ['unknown'] },
-      { featureData: {} },
-      { featureData: { unknown: true } },
-    ]) {
+    for (const options of [{}, { replayFormat: 1 as const }, { featureData: {} }, { featureData: { unknown: true } }]) {
       await expect(
         saveInitialWorld(db, initial, { name: '거부', turnTermMinutes: 60, endYear: null, ...options }),
       ).rejects.toThrow();
@@ -368,15 +363,14 @@ describe('T2-26 실제 DB 생성·시작 거부', () => {
     if (code === 'S3')
       await db.world.update({
         where: { id: value.worldId },
-        data: { replayFormat: 1, ruleFeatures: ['test-a'], replayOrigin: { ...origin, version: 1 } },
+        data: { replayFormat: 1, replayOrigin: { ...origin, version: 1 } },
       });
-    if (code === 'S4') await db.world.update({ where: { id: value.worldId }, data: { ruleFeatures: ['test-a'] } });
+    if (code === 'S4') await db.world.update({ where: { id: value.worldId }, data: {} });
     if (code === 'S5')
       await db.world.update({
         where: { id: value.worldId },
         data: {
-          ruleFeatures: ['unknown'],
-          replayOrigin: { ...origin, initial: { ...(origin.initial as Prisma.JsonObject), ruleFeatures: ['unknown'] } },
+          replayOrigin: { ...origin, initial: { ...(origin.initial as Prisma.JsonObject) } },
         },
       });
     const before = await db.world.findUniqueOrThrow({ where: { id: value.worldId } });
@@ -406,7 +400,7 @@ describe('T2-26 실제 DB 생성·시작 거부', () => {
       },
     });
     worlds.push(world.id);
-    expect(world).toMatchObject({ replayFormat: 1, ruleFeatures: [], replayOrigin: null });
+    expect(world).toMatchObject({ replayFormat: 1, replayOrigin: null });
   });
   it('PENDING 입력의 tick 검사 제약을 DB가 적용한다', async () => {
     const value = await create();

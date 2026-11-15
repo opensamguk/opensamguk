@@ -29,14 +29,17 @@ export interface Failure {
     | 'NOT_RULER'
     | 'BAD_TARGET'
     | 'NOT_ADJACENT'
+    | 'BLOCKED_BY_COUNTY'
     | 'NOT_WAR'
     | 'BAD_STATE'
+    | 'STALE_SUPPLY_PREVIEW'
     | 'NO_POPULATION'
     | 'NO_OFFER'
     | 'NO_UNIT_SET'
     | 'COMMAND_DISABLED'
     | 'VASSAL_BOUND'
-    | 'PROTECTED';
+    | 'PROTECTED'
+    | 'BATTLE_BUSY';
   message: string;
 }
 export interface LogEntry {

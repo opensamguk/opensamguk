@@ -8,7 +8,7 @@ function fixture() {
     id: 'world',
     status: 'RUNNING',
     replayFormat: 3,
-    ruleFeatures: ['personnel', 'policy'],
+
     clockTick: 100,
     preset: null,
     replayOrigin: null,
@@ -71,7 +71,6 @@ describe('자기 직책 칸의 B7 직접 저장', () => {
   });
   it('정책 off는 직접 tick만 기록하고 활동을 쓰지 않는다', async () => {
     const f = fixture();
-    f.world.ruleFeatures = ['personnel'];
     await f.save();
     expect(f.tx.inputEvent.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ tick: 100, result: { revision: 5 } }),

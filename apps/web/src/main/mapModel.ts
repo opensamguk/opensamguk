@@ -45,7 +45,7 @@ export function buildMapModel({
     siteById,
     generalsAt: generalsByCity(generals),
     drawnSites: map.sites.filter((site) => site.kind !== 'PORT' || usedPorts.has(site.id)),
-    anchors: map.sites.filter((site) => site.kind === 'CITY' || site.kind === 'PASS'),
+    anchors: map.sites.filter((site) => site.anchorKey !== undefined),
   };
 }
 

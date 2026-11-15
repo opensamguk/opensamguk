@@ -36,17 +36,7 @@ if (!['127.0.0.1', 'localhost'].includes(url.hostname) || url.searchParams.has('
 const db = createDb(url.toString());
 const origin = 'http://127.0.0.1:5173',
   now = Date.now();
-const features = [
-  'campaign-assignment-v2',
-  'campaign-v1',
-  'city-resources-v1',
-  'five-stats',
-  'operational-map',
-  'personnel',
-  'policy',
-  'stratagem-basic',
-  'treaty',
-];
+
 type Account = { userId: string; cookie: string };
 type Actor = Account & { generalId: number };
 type Board = Awaited<ReturnType<typeof readCampaignOrders>>;
@@ -290,7 +280,6 @@ beforeAll(() => {
         site.initial.agriculture = site.max.agriculture = 100000;
       }
     initial = buildInitialWorld(source);
-    initial.ruleFeatures = [...features];
     rulerId = initial.generals.find((g) => g.officerLevel === BALANCE.RULER_LEVEL)!.id;
     ({ worldId } = await saveInitialWorld(db, initial, {
       name: 'INT19 NPC 자기부곡 통제 검사',

@@ -139,7 +139,7 @@ async function world(lineage = true, peaceUntilTick = 300000, npcGenerations = f
     turnTermMinutes: 60,
     endYear: null,
     replayFormat: 3,
-    ruleFeatures: lineage ? ['lineage-v1', 'personnel', 'policy'] : ['personnel', 'policy'],
+
     ...(lineage ? { featureData: { 'lineage-v1': config } } : {}),
   });
   worldIds.push(saved.worldId);
@@ -240,14 +240,13 @@ it.each([
       seed: `lineage-sex-${profile.count}`,
     });
     expect(initial.generals).toHaveLength(491);
-    initial.ruleFeatures = [...new Set([...(initial.ruleFeatures ?? []), ...profile.features])].sort();
     expect(initial.generals.every((general) => !Object.hasOwn(general, 'sex'))).toBe(true);
     const saved = await saveInitialWorld(db, initial, {
       name: `가문 성별 ${profile.count}능력치`,
       turnTermMinutes: 60,
       endYear: null,
       replayFormat: 3,
-      ruleFeatures: [...profile.features].sort(),
+
       featureData: { 'lineage-v1': lineageTestConfig },
     });
     worldIds.push(saved.worldId);
@@ -298,7 +297,7 @@ it.each([
 ] as const)(
   'AC-P2-32 $edition 판은 실제 491명 저장·월간 재생·HTTP 관리자 초기화 뒤에도 유지된다',
   async ({ edition, unknownCount, guanSex }) => {
-    const { features: ruleFeatures, ...selection } =
+    const { ...selection } =
       edition === 3
         ? san10Lineage
         : {
@@ -310,7 +309,6 @@ it.each([
           };
     const resources = await readInitialResources(db, selection);
     const initial = composeInitialWorld(resources, 'old-sex-edition-pg');
-    initial.ruleFeatures = ruleFeatures;
     const saved = await db.$transaction(
       async (tx) => {
         const result = await savePreparedInitialWorld(
@@ -322,7 +320,7 @@ it.each([
               turnTermMinutes: 60,
               endYear: null,
               replayFormat: 3,
-              ruleFeatures,
+
               featureData: { 'lineage-v1': lineageTestConfig },
             },
             loadSexLedgers()[edition - 1],
@@ -782,19 +780,6 @@ it('AC-P2-32 동의 계승 뒤 전임자의 대기 중인 즉위와 교역을 �
   Object.assign(ruler, { sex: 'MALE', birthYear: 166, age: 25 });
   initial.generals.push({ ...ruler, id: mom, name: '계승가문모', sex: 'FEMALE', officerLevel: 1 });
   initial.diplomacies = [{ nationA: 1, nationB: 2, state: 'NON_AGGRESSION', untilTick: 300000 }];
-  initial.ruleFeatures = [
-    'campaign-assignment-v2',
-    'campaign-v1',
-    'city-resources-v1',
-    'five-stats',
-    'governance-v1',
-    'lineage-v1',
-    'logistics-v1',
-    'operational-map',
-    'personnel',
-    'policy',
-    'treaty',
-  ];
   const { worldId } = await saveInitialWorld(db, initial, {
     name: 'AC-P2-32 계승 뒤 대기 요청',
     turnTermMinutes: 60,

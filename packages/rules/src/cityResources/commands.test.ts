@@ -15,7 +15,6 @@ const base = createCampaignCommandResolver(createCommandResolver(null));
 const resolver = createCityResourceCommandResolver(base);
 function fixture() {
   const world = commandWorld();
-  world.ruleFeatures = ['five-stats', 'city-resources-v1'];
   for (const general of Object.values(world.generals)) Object.assign(general, { politics: 60, charm: 55, crew: 0 });
   Object.assign(world.generals[1]!, {
     userId: null,
@@ -44,11 +43,17 @@ describe('AC-INT-18A/B 도시 명령 연결과 실제 NPC 의사결정', () => {
     const next = applyEffects(world, recruited.effects);
     expect(next.campaign!.units).toEqual([]);
     expect(next.cityResources!.cities['1']!.garrison[0]!.troops).toBe(1000);
-    const formed = resolver.run(deepFreeze(next), actor, 'form_unit', { crewType: 1100 }, random());
-    if ('code' in formed) throw new Error(formed.message);
-    const final = applyEffects(next, formed.effects);
-    expect(final.campaign!.units[0]).toMatchObject({ troops: 0, ownerId: 1, commanderId: 1 });
-    expect(final.cityResources).toEqual(next.cityResources);
+    const allocated = resolver.run(
+      deepFreeze(next),
+      { ...actor, target: 'nation' },
+      'nation_city_allocate',
+      { cityKey: 1, unitId: 'new', recipientId: 1, crewType: 1100, amount: 1000 },
+      random(),
+    );
+    if ('code' in allocated) throw new Error(allocated.message);
+    const final = applyEffects(next, allocated.effects);
+    expect(final.campaign!.units[0]).toMatchObject({ troops: 1000, ownerId: 1, commanderId: 1 });
+    expect(final.cityResources!.cities['1']!.garrison).toEqual([]);
     expect(world).toEqual(before);
   });
   it('부곡 대상 훈련은 기존 개인 금을 쓰고 도시 대상 훈련만 도시 금을 쓴다', () => {
@@ -107,7 +112,7 @@ describe('AC-INT-18A/B 도시 명령 연결과 실제 NPC 의사결정', () => {
       if (general.key === 'attack') break;
     }
     expect(chosen[0]).toBe('recruit');
-    expect(chosen).toContain('form_unit');
+    expect(chosen).not.toContain('form_unit');
     expect(chosen).toContain('morale');
     expect(chosen).toContain('train');
     expect(allocated).toBe(true);
@@ -135,13 +140,14 @@ describe('AC-INT-18A/B 도시 명령 연결과 실제 NPC 의사결정', () => {
     expect(result.personnel!.offices[1]![12]!.revision).toBe(1);
     expect(world.campaign!.units[0]!.troops).toBe(0);
   });
-  it('같은 빈 부곡을 중복 편성하거나 구판에 새 resolver를 강제 적용할 수 없다', () => {
+  it('empty formation is removed and a fresh recruit creates a populated unit', () => {
     const world = fixture();
-    const result = resolver.run(world, actor, 'form_unit', { crewType: 1100 }, random());
+    expect(resolver.get('form_unit')).toBeUndefined();
+    const result = resolver.run(world, actor, 'recruit', { unitId: 'new', crewType: 1100, amount: 100 }, random());
     if ('code' in result) throw new Error(result.message);
     const next = applyEffects(world, result.effects);
-    expect(resolver.precheck(next, actor, 'form_unit', { crewType: 1100 })).toMatchObject({ code: 'BAD_STATE' });
-    next.ruleFeatures = ['five-stats'];
-    expect(resolver.precheck(next, actor, 'form_unit', { crewType: 1100 })).toMatchObject({ code: 'COMMAND_DISABLED' });
+    expect(next.campaign!.units).toMatchObject([{ ownerId: 1, commanderId: 1, troops: 100 }]);
+    expect(next.cityResources!.cities['1']!.gold).toBeLessThan(world.cityResources!.cities['1']!.gold);
+    expect(next.generals[1]!.gold).toBe(world.generals[1]!.gold);
   });
 });

@@ -1,5 +1,6 @@
 import { COURT_RANK_FEATURE } from './personnel/nationRank';
-import type { JsonValue, WorldView } from './model/world';
+import { tacticalInputKinds } from './tactical/input';
+import type { JsonValue } from './model/world';
 import type { WorldInit } from './world/bootstrap';
 import { checkInitialNpcStatLimits } from './world/initialNpcStats';
 import { assertInitialNationLifecycle, NATION_LIFECYCLE_FEATURE } from './nationLifecycle/state';
@@ -16,6 +17,7 @@ import {
   treatyExpandedFeature,
   fiveStatsFeature,
   operationalMapFeature,
+  capturableFieldFeature,
   basicStratagemFeature,
   battleAffinityFeature,
   personnelInputKinds,
@@ -25,7 +27,7 @@ import {
 import { checkStatProfile } from './general/fiveStats';
 import { checkOperationalProfile } from './world/map/profile';
 import type { RecordedInput, ReplayState } from './replay';
-import { campaignFeature, campaignInputKinds } from './campaign/feature';
+import { campaignFeature, campaignInputKinds, marchSupplyFeature } from './campaign/feature';
 import { campaignAssignmentFeature } from './campaign/assignment';
 import { ADMIN_CLOCK_KINDS, applyAdminClockRecord } from './clock/admin';
 import { cityResourcesFeature, cityResourceInputKind } from './cityResourcesFeature';
@@ -154,11 +156,13 @@ export const ruleRegistry: RuleRegistry = {
     treatyExpandedFeature,
     fiveStatsFeature,
     operationalMapFeature,
+    capturableFieldFeature,
     basicStratagemFeature,
     battleAffinityFeature,
     campaignFeature,
     campaignAssignmentFeature,
     cityResourcesFeature,
+    marchSupplyFeature,
     logisticsFeature,
     equipmentFeature,
     governanceFeature,
@@ -233,6 +237,7 @@ export const ruleRegistry: RuleRegistry = {
     ...treatyInputKinds,
     treatyBreakInputKind,
     ...campaignInputKinds,
+    ...tacticalInputKinds,
     cityResourceInputKind,
     logisticsInputKind,
     governanceInputKind,
@@ -250,9 +255,7 @@ export function settleMonthlyFeatures(
 ): { replay: ReplayState; effects: Record<string, unknown> } {
   let replay = settled;
   const effects: Record<string, unknown> = {};
-  const selected = registry.features.filter(
-    (feature) => hasRuleFeature(before.state, feature.key) && feature.settleMonthly,
-  );
+  const selected = registry.features.filter((feature) => feature.settleMonthly);
   const order = registry.monthlyOrder ?? [];
   if (new Set(order).size !== order.length || selected.some((feature) => !order.includes(feature.key)))
     throw new Error('월간 규칙 기능의 실행 순서가 없습니다.');
@@ -284,9 +287,6 @@ export function checkRuleFeatures(value: unknown, registry: RuleRegistry = ruleR
   }
   return [...value];
 }
-export function hasRuleFeature(state: Pick<WorldView, 'ruleFeatures'>, key: string): boolean {
-  return state.ruleFeatures?.includes(key) ?? false;
-}
 
 // 해시 검사는 운반 경로에서 하고 여기서는 생성 기록의 모양과 기능을 검사한다.
 export function checkReplayOrigin(
@@ -296,6 +296,11 @@ export function checkReplayOrigin(
   const origin = value as ReplayOriginV3 | ReplayOriginV1;
   if (!origin || ![1, 3].includes(origin.version) || !origin.initial || typeof origin.initial !== 'object')
     throw new Error('재생 생성 기록의 버전을 확인하세요.');
+  if (
+    Object.hasOwn(origin.initial, 'ruleFeatures') ||
+    (origin.initial.fogOfWar !== undefined && typeof origin.initial.fogOfWar !== 'boolean')
+  )
+    throw new Error('월드 규칙 선택은 지원하지 않으며 안개 설정은 boolean이어야 합니다.');
   if (
     Object.hasOwn(origin.initial, 'recruitmentLocation') &&
     (origin.version !== 3 || origin.initial.recruitmentLocation !== 'city')
@@ -307,15 +312,9 @@ export function checkReplayOrigin(
   checkInitialNpcStatLimits(origin.initial, origin.version === 3 ? 'current' : 'legacy');
   checkCityScaleInitial(origin.initial);
   checkOperationalProfile(origin.initial);
-  assertInitialNationLifecycle(
-    origin.initial,
-    origin.version === 3 && origin.initial.ruleFeatures?.includes(NATION_LIFECYCLE_FEATURE) === true,
-  );
-  if (origin.initial.unitSet.coefMode === 'multiply' && !origin.initial.ruleFeatures?.includes('battle-affinity-v2'))
-    throw new Error('곱셈 병종 판에는 battle-affinity-v2 규칙 기능이 필요합니다.');
+  assertInitialNationLifecycle(origin.initial, origin.version === 3);
   if (origin.version === 1) {
-    if (Object.hasOwn(origin.initial, 'ruleFeatures') || Object.hasOwn(origin, 'featureData'))
-      throw new Error('형식 1 생성 기록에 규칙 기능을 넣을 수 없습니다.');
+    if (Object.hasOwn(origin, 'featureData')) throw new Error('형식 1 생성 기록에 규칙 기능을 넣을 수 없습니다.');
     return;
   }
   const required = ['version', 'initial', 'initialStateHash', 'resourceHash'];
@@ -324,9 +323,7 @@ export function checkReplayOrigin(
     Object.keys(origin).some((key) => ![...required, 'featureData'].includes(key))
   )
     throw new Error('형식 3 생성 기록의 칸을 확인하세요.');
-  const features = Object.hasOwn(origin.initial, 'ruleFeatures')
-    ? checkRuleFeatures(origin.initial.ruleFeatures, registry)
-    : [];
+  const features = registry.features.map((feature) => feature.key).sort();
   if (
     Object.hasOwn(origin, 'featureData') &&
     (!origin.featureData ||

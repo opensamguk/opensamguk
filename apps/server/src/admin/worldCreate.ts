@@ -8,6 +8,7 @@ import {
   worldCreateStatusInput,
   worldCreateIntent,
   worldCreateRejectMessages,
+  parseResourceKey,
 } from '@opensamguk/rules';
 import type { z } from 'zod';
 import type { Context } from '../context';
@@ -60,16 +61,27 @@ export async function requestWorldCreate(ctx: Context, input: z.infer<typeof req
           throw new TRPCError({ code: 'CONFLICT', message: '이 요청 번호는 다른 내용에 썼습니다.' });
         return response(prior);
       }
-      const expandedMap = await tx.gameResource.findFirst({ where: artifactMapVersion, select: { id: true } });
+      const expandedMap = await tx.gameResource.findFirst({
+        where: artifactMapVersion,
+        orderBy: { version: 'desc' },
+        select: { id: true },
+      });
       if (expandedMap) {
         const { scenarioKey } = intent;
-        const usesArtifactSelection = Object.entries(artifactSelection).every(
-          ([key, value]) => intent[key as keyof typeof artifactSelection] === value,
+        const mapRef = intent.mapKey ? parseResourceKey(intent.mapKey) : null;
+        const scenarioRef = scenarioKey ? parseResourceKey(scenarioKey) : null;
+        const usesArtifactSelection = Object.entries(artifactSelection).every(([key, value]) =>
+          key === 'mapKey' ? mapRef?.name === value : intent[key as keyof typeof artifactSelection] === value,
         );
         const scenario =
-          usesArtifactSelection && scenarioKey && new RegExp(artifactScenarioPattern).test(scenarioKey)
+          usesArtifactSelection &&
+          scenarioRef &&
+          mapRef &&
+          scenarioRef.version === mapRef.version &&
+          [1, 2, 3].includes(mapRef.version) &&
+          new RegExp(artifactScenarioPattern).test(scenarioRef.name)
             ? await tx.gameResource.findFirst({
-                where: { kind: 'SCENARIO', name: scenarioKey, version: 1, ...artifactPublication },
+                where: { kind: 'SCENARIO', ...scenarioRef, ...artifactPublication },
                 select: { content: true },
               })
             : null;
@@ -82,7 +94,7 @@ export async function requestWorldCreate(ctx: Context, input: z.infer<typeof req
           idempotencyKey: input.idempotencyKey,
           intentHash,
           intent,
-          ...(intent.ruleFeatures?.includes('personnel') ? { officeEffects: defaultOfficeEffects } : {}),
+          ...{ officeEffects: defaultOfficeEffects },
           effectiveSeed: intent.seed ?? randomBytes(16).toString('hex'),
           plannedWorldId: randomUUID(),
         },

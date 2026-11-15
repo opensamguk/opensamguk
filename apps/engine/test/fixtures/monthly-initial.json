@@ -1,5 +1,5 @@
 {
-  "$comment": "Source: core2026 df6c926 / resources/map/map_che.json, resources/scenario/scenario_1030.json, resources/scenario/default.json, resources/unitset/unitset_basic.json via monthlyFixture() at c577784 (T4-77 S1); MIT (c) 2025 devsam. See resources/NOTICE.md.",
+  "$comment": "AC-INT-28 / D-104: 전체 제공 규칙이 실행되는 월간·재생 기준 고정물.",
   "initial": {
     "seed": "monthly-golden",
     "scenarioKey": "1030",
@@ -7,9 +7,10 @@
     "unitSetKey": "basic",
     "startYear": 191,
     "statRules": {
-      "total": 165,
+      "count": 5,
+      "total": 275,
       "min": 15,
-      "max": 80
+      "max": 90
     },
     "unitSet": {
       "id": "basic",
@@ -122,7 +123,8 @@
         "wall": 50,
         "wallMax": 1000,
         "trust": 80,
-        "supplied": true
+        "supplied": true,
+        "kind": "CITY"
       },
       {
         "cityKey": 2,
@@ -146,7 +148,8 @@
         "wall": 50,
         "wallMax": 1000,
         "trust": 80,
-        "supplied": true
+        "supplied": true,
+        "kind": "CITY"
       },
       {
         "cityKey": 3,
@@ -170,7 +173,8 @@
         "wall": 50,
         "wallMax": 1000,
         "trust": 80,
-        "supplied": true
+        "supplied": true,
+        "kind": "CITY"
       },
       {
         "cityKey": 4,
@@ -194,7 +198,8 @@
         "wall": 50,
         "wallMax": 1000,
         "trust": 80,
-        "supplied": true
+        "supplied": true,
+        "kind": "CITY"
       }
     ],
     "nations": [
@@ -253,7 +258,10 @@
         "dedication": 0,
         "age": 23,
         "injury": 2,
-        "nextTurnTick": 100
+        "nextTurnTick": 100,
+        "politics": 50,
+        "charm": 50,
+        "sex": "UNKNOWN"
       },
       {
         "id": 2,
@@ -282,7 +290,10 @@
         "dedication": 0,
         "age": 21,
         "injury": 2,
-        "nextTurnTick": 10000
+        "nextTurnTick": 10000,
+        "politics": 50,
+        "charm": 50,
+        "sex": "UNKNOWN"
       },
       {
         "id": 3,
@@ -311,7 +322,10 @@
         "dedication": 0,
         "age": 18,
         "injury": 2,
-        "nextTurnTick": 500
+        "nextTurnTick": 500,
+        "politics": 50,
+        "charm": 50,
+        "sex": "UNKNOWN"
       }
     ],
     "diplomacies": [
@@ -321,6 +335,169 @@
         "state": "DECLARED",
         "untilTick": 10000
       }
-    ]
+    ],
+    "cityScale": {
+      "cities": []
+    },
+    "fogOfWar": false,
+    "operationalMap": {
+      "version": 3,
+      "id": "che",
+      "name": "월 정산 고정물",
+      "canvas": {
+        "width": 1000,
+        "height": 700
+      },
+      "basemap": {
+        "source": "natural-earth-5.1.2",
+        "projection": "WGS84 plate carree",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "bounds": [94, 17, 132.571428571429, 44]
+      },
+      "defaults": {
+        "trust": 80,
+        "supplyState": 1
+      },
+      "sites": [
+        {
+          "id": "city:1",
+          "kind": "CITY",
+          "name": "도시1",
+          "anchorKey": 1,
+          "level": 8,
+          "region": 1,
+          "position": {
+            "x": 345,
+            "y": 130
+          },
+          "initial": {
+            "population": 1000,
+            "agriculture": 200,
+            "commerce": 100,
+            "security": 50,
+            "defence": 50,
+            "wall": 50
+          },
+          "max": {
+            "population": 2000,
+            "agriculture": 1000,
+            "commerce": 1000,
+            "security": 1000,
+            "defence": 1000,
+            "wall": 1000
+          }
+        },
+        {
+          "id": "city:2",
+          "kind": "CITY",
+          "name": "도시2",
+          "anchorKey": 2,
+          "level": 8,
+          "region": 2,
+          "position": {
+            "x": 330,
+            "y": 215
+          },
+          "initial": {
+            "population": 1000,
+            "agriculture": 200,
+            "commerce": 100,
+            "security": 50,
+            "defence": 50,
+            "wall": 50
+          },
+          "max": {
+            "population": 2000,
+            "agriculture": 1000,
+            "commerce": 1000,
+            "security": 1000,
+            "defence": 1000,
+            "wall": 1000
+          }
+        },
+        {
+          "id": "city:3",
+          "kind": "CITY",
+          "name": "도시3",
+          "anchorKey": 3,
+          "level": 8,
+          "region": 2,
+          "position": {
+            "x": 275,
+            "y": 180
+          },
+          "initial": {
+            "population": 1000,
+            "agriculture": 200,
+            "commerce": 100,
+            "security": 50,
+            "defence": 50,
+            "wall": 50
+          },
+          "max": {
+            "population": 2000,
+            "agriculture": 1000,
+            "commerce": 1000,
+            "security": 1000,
+            "defence": 1000,
+            "wall": 1000
+          }
+        },
+        {
+          "id": "city:4",
+          "kind": "CITY",
+          "name": "도시4",
+          "anchorKey": 4,
+          "level": 8,
+          "region": 3,
+          "position": {
+            "x": 145,
+            "y": 165
+          },
+          "initial": {
+            "population": 1000,
+            "agriculture": 200,
+            "commerce": 100,
+            "security": 50,
+            "defence": 50,
+            "wall": 50
+          },
+          "max": {
+            "population": 2000,
+            "agriculture": 1000,
+            "commerce": 1000,
+            "security": 1000,
+            "defence": 1000,
+            "wall": 1000
+          }
+        }
+      ],
+      "routes": [
+        {
+          "id": "route:1:2",
+          "from": "city:1",
+          "to": "city:2",
+          "mode": "LAND",
+          "direction": "BOTH",
+          "enabled": true
+        },
+        {
+          "id": "route:2:3",
+          "from": "city:2",
+          "to": "city:3",
+          "mode": "LAND",
+          "direction": "BOTH",
+          "enabled": true
+        },
+        {
+          "id": "route:2:4",
+          "from": "city:2",
+          "to": "city:4",
+          "mode": "LAND",
+          "direction": "BOTH",
+          "enabled": true
+        }
+      ]
+    }
   }
 }

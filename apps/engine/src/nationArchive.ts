@@ -10,18 +10,20 @@ export async function persistPublicNationEvents(
   next: WorldState,
   at: ActionAt,
 ) {
-  const data: { kind: string; text: string }[] = [];
+  const data: { kind: string; text: string; nations: { id: number; name: string; color: string }[] }[] = [];
+  const identity = ({ id, name, color }: { id: number; name: string; color: string }) => ({ id, name, color });
   for (const nation of Object.values(next.nations)) {
-    if (!before.nations[nation.id]) data.push({ kind: 'found', text: `${nation.name} 건국` });
+    if (!before.nations[nation.id])
+      data.push({ kind: 'found', text: `${nation.name} 건국`, nations: [identity(nation)] });
   }
   for (const nation of Object.values(before.nations)) {
-    if (!next.nations[nation.id]) data.push({ kind: 'fall', text: `${nation.name} 멸망` });
+    if (!next.nations[nation.id]) data.push({ kind: 'fall', text: `${nation.name} 멸망`, nations: [identity(nation)] });
   }
   for (const city of Object.values(next.cities)) {
     const previous = before.cities[city.cityKey]?.nationId;
     const owner = city.nationId === null ? undefined : next.nations[city.nationId];
     if (previous !== undefined && previous !== city.nationId && owner && before.nations[owner.id])
-      data.push({ kind: 'capture', text: `${owner.name}의 ${city.name} 점령` });
+      data.push({ kind: 'capture', text: `${owner.name}의 ${city.name} 점령`, nations: [identity(owner)] });
   }
   if (before.diplomacies !== next.diplomacies) {
     const prior = new Set(
@@ -33,7 +35,8 @@ export async function persistPublicNationEvents(
       if (state !== 'DECLARED' || prior.has(`${nationA}:${nationB}`)) continue;
       const a = next.nations[nationA],
         b = next.nations[nationB];
-      if (a && b) data.push({ kind: 'declare', text: `${a.name}·${b.name} 사이 선전포고` });
+      if (a && b)
+        data.push({ kind: 'declare', text: `${a.name}·${b.name} 사이 선전포고`, nations: [identity(a), identity(b)] });
     }
   }
   if (data.length) {

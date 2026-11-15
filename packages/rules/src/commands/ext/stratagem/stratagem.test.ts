@@ -100,10 +100,8 @@ it.each([['security'], ['commerce', 'agriculture'], ['security', 'commerce', 'ag
   'AC-INT-21 폐허 최대치 0에서도 탈취 결과와 난수 순서를 보존한다: %j',
   (...fields) => {
     const state = world();
-    state.ruleFeatures = ['city-scale-v1', 'five-stats', 'stratagem-basic'];
     for (const general of Object.values(state.generals)) Object.assign(general, { politics: 50, charm: 50 });
     const control = structuredClone(state);
-    control.ruleFeatures = ['five-stats', 'stratagem-basic'];
     for (const field of fields) {
       state.cities[2]![field] = control.cities[2]![field] = 0;
       state.cities[2]![`${field}Max`] = 0;

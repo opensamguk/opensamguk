@@ -42,7 +42,6 @@ async function fixture() {
   if (city.kind !== 'CITY') throw new Error('검사 도시가 없습니다.');
   city.initial.wall = city.initial.defence = 0;
   const initial = buildInitialWorld(source);
-  initial.ruleFeatures = ['campaign-v1', 'five-stats', 'operational-map', 'personnel', 'policy'];
   for (const nation of initial.nations) nation.isNpc = false;
   initial.diplomacies = [{ nationA: 1, nationB: 2, state: 'WAR', untilTick: 0 }];
   const { worldId } = await saveInitialWorld(db, initial, {

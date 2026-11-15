@@ -5,14 +5,10 @@ import { cityInfo, commandedTroops, garrisonGeneralInfo, visibility } from '../v
 import { readView } from '../game/queries';
 import {
   cityRegionName,
-  INTEL_FEATURE,
   LINEAGE_EXITED_YEAR,
-  OFFICE_EFFECTS_FEATURE,
   toGameDate,
   isOfficeResident,
   readOperationalMap,
-  officeEffectsSchema,
-  hasCitySecretary,
   nowTick,
 } from '@opensamguk/rules';
 import { readCityScaleProjection } from '../game/cityScale';
@@ -22,7 +18,7 @@ import { cityDefense } from '../game/defenseRead';
 export const cityRouter = router({
   get: protectedProcedure.input(worldInput.extend({ cityKey: entityKey }).strict()).query(({ ctx, input }) =>
     readWorld(ctx.db, input.worldId, async (tx, world) => {
-      const fogEnabled = world.ruleFeatures.includes(INTEL_FEATURE);
+      const fogEnabled = world.fogOfWar;
       const general = await viewerGeneral(tx, input.worldId, ctx.user.id);
       const viewer = fogEnabled && general?.removedAt != null ? null : general;
       const city = await tx.city.findUnique({
@@ -59,25 +55,16 @@ export const cityRouter = router({
         (await tx.city.count({
           where: { worldId: input.worldId, nationId, cityKey: { in: city.connections } },
         })) > 0;
-      const campaignEnabled = world.ruleFeatures.includes('campaign-v1');
-      const view = campaignEnabled && !garrisonHidden ? await readView(tx, input.worldId) : undefined;
+      const view = !garrisonHidden ? await readView(tx, input.worldId) : undefined;
       const units = view?.campaign?.units;
-      const ruins = await readCityScaleProjection(tx, input.worldId, world.ruleFeatures);
+      const ruins = await readCityScaleProjection(tx, input.worldId);
       const intel =
         fogEnabled && viewer?.nationId != null && !visibility(viewer).city(city)
           ? await readCityIntel(tx, world, viewer.nationId, city.cityKey, ctx)
           : null;
-      const officeEffectsEnabled = world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE);
-      const secretaryEnabled =
-        officeEffectsEnabled &&
-        hasCitySecretary(
-          officeEffectsSchema.parse(
-            (await tx.world.findUniqueOrThrow({ where: { id: input.worldId }, select: { officeEffects: true } }))
-              .officeEffects,
-          ),
-        );
+
       const officers =
-        officeEffectsEnabled && !garrisonHidden && city.nationId !== null && city.kind !== 'PASS'
+        !garrisonHidden && city.nationId !== null && city.kind !== 'PASS' && city.kind !== 'FIELD'
           ? await tx.general.findMany({
               where: {
                 worldId: input.worldId,
@@ -100,25 +87,21 @@ export const cityRouter = router({
             })
           : [];
       return {
-        ...(officeEffectsEnabled
-          ? {
-              officeEffectsEnabled: true as const,
-              ...(secretaryEnabled ? { secretaryEnabled: true as const } : {}),
-              ...(!garrisonHidden
-                ? {
-                    officers: officers.map((officer) => ({
-                      generalId: officer.id,
-                      name: officer.name,
-                      officerLevel: officer.officerLevel,
-                      isHuman: officer.userId !== null,
-                      portraitId: officer.portraitId,
-                      resident: isOfficeResident(officer, city.nationId),
-                    })),
-                  }
-                : {}),
-            }
-          : {}),
-        ...cityInfo(city, activeViewer, alliedResidence),
+        ...{
+          ...(!garrisonHidden
+            ? {
+                officers: officers.map((officer) => ({
+                  generalId: officer.id,
+                  name: officer.name,
+                  officerLevel: officer.officerLevel,
+                  isHuman: officer.userId !== null,
+                  portraitId: officer.portraitId,
+                  resident: isOfficeResident(officer, city.nationId),
+                })),
+              }
+            : {}),
+        },
+        ...cityInfo(city, activeViewer, alliedResidence, !fogEnabled || visibility(activeViewer).city(city)),
         ...(!garrisonHidden && city.nationId !== null && city.nationId === activeViewer?.nationId
           ? { defense: cityDefense(city, generals, world.startYear, nowTick(worldClock(world), ctx.now), view) }
           : {}),
@@ -126,11 +109,10 @@ export const cityRouter = router({
         regionName: cityRegionName(
           city.region,
           city.world.mapKey,
-          readOperationalMap(city.world.operationalMap, world.ruleFeatures)?.regionScheme,
+          readOperationalMap(city.world.operationalMap)?.regionScheme,
         ),
         ...(ruins ? { ruin: ruins.get(city.cityKey) ?? null } : {}),
-        ...(campaignEnabled ? { campaignEnabled: true as const } : {}),
-        ...(world.ruleFeatures.includes('five-stats') ? { fiveStats: true as const } : {}),
+
         ...(fogEnabled ? { fog: { intel, garrisonHidden } } : {}),
         ...(full && !garrisonHidden && nationId != null
           ? {

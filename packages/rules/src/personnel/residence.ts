@@ -67,7 +67,6 @@ export function updateResidenceAnchors(input: ResidenceStepInput): Record<number
       target = before.generals[toId];
     const record = after.lineage?.persons[String(fromId)];
     if (
-      !after.ruleFeatures?.includes('lineage-v1') ||
       createdHumanId !== null ||
       !Number.isSafeInteger(fromId) ||
       !Number.isSafeInteger(toId) ||

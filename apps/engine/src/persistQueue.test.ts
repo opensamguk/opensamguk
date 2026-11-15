@@ -2,7 +2,7 @@ import type { Prisma } from '@opensamguk/db';
 import { describe, expect, it, vi } from 'vitest';
 import { shiftTurns } from './persist';
 
-const world = { replayFormat: 3, ruleFeatures: ['policy'], policyFromSequence: 0, actionSequence: 1 };
+const world = { replayFormat: 3, policyFromSequence: 0, actionSequence: 1 };
 const queue = () =>
   Array.from({ length: 30 }, (_, slot) => ({
     worldId: 'world',

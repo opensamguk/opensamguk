@@ -1,4 +1,5 @@
 import type { Prisma } from '@opensamguk/db';
+import { processProposalRecord } from './proposalRecord';
 import {
   assertSlotSet,
   isPolicyKey,
@@ -47,9 +48,10 @@ import { processStratagemCardsInput } from './stratagemCards/input';
 import { reconcileQueuedStratagemCards } from './stratagemCards/state';
 import { appendReputationEvents, loadReputationLedger, persistMonthlyReview } from './reputationState';
 import { persistNationLifecycleMonth } from './nationLifecycleState';
+import { processTacticalInput } from './tacticalBattle';
 
 export async function loadPersonnelTurnContext(tx: Prisma.TransactionClient, worldId: string, state: WorldState) {
-  if (state.ruleFeatures?.includes('policy')) {
+  {
     // 복합 PK가 칸 중복을 금지한다. 개수와 양 끝 값으로 같은 연속 범위를 검증한다.
     const rows = await tx.$queryRaw<
       {
@@ -179,6 +181,8 @@ const processPersonnelInput: QueuedInputHandler = async (tx, world, event, { tic
 };
 
 export const builtInEngineFeatures: readonly EngineFeature[] = [
+  { key: 'capturable-field-v1' },
+  { key: 'march-supply-v1' },
   { key: 'office-effects' },
   { key: 'nation-strategy-v1' },
   { key: 'prepared-turns-v1' },
@@ -207,6 +211,9 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
       'campaign.relationship': processCampaignQueuedInput,
       'campaign.unit': processCampaignQueuedInput,
       'campaign.order': processCampaignQueuedInput,
+      'battle.plan': processTacticalInput,
+      'battle.council': processTacticalInput,
+      'battle.turn': processTacticalInput,
     },
     afterQueuedInput: (tx, world, before, input) =>
       ['city.resources', 'logistics.order', 'governance.act', 'lineage.act', 'stratagem-cards.act'].includes(input.kind)
@@ -273,6 +280,7 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
       'personnel.appoint': processPersonnelInput,
       'personnel.dismiss': processPersonnelInput,
       'offer.respond': processPersonnelInput,
+      'proposal.record': processProposalRecord,
     },
     async afterQueuedInput(tx, world, before, input) {
       const state = await loadWorld(tx, world.id);
@@ -314,20 +322,20 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
     key: 'treaty',
     loadWorld: async (tx, worldId, state) => ({
       ...state,
-      ...(await loadTreaties(tx, worldId, treatyOptions(state.ruleFeatures ?? []))),
+      ...(await loadTreaties(tx, worldId, treatyOptions())),
     }),
     queuedInputs: {
       'treaty.propose': (tx, world, event, context) =>
         processTreatyQueuedInput(tx, world, event, {
           ...context,
-          treatyTradeEnabled: world.ruleFeatures.includes('treaty-trade'),
-          treatyExpandedEnabled: world.ruleFeatures.includes(EXPANDED_TREATY_FEATURE),
+          treatyTradeEnabled: true,
+          treatyExpandedEnabled: true,
         }),
       'treaty.respond': (tx, world, event, context) =>
         processTreatyQueuedInput(tx, world, event, {
           ...context,
-          treatyTradeEnabled: world.ruleFeatures.includes('treaty-trade'),
-          treatyExpandedEnabled: world.ruleFeatures.includes(EXPANDED_TREATY_FEATURE),
+          treatyTradeEnabled: true,
+          treatyExpandedEnabled: true,
         }),
     },
     async persistMonthly(tx, worldId, before, next, effects, context) {
@@ -344,8 +352,8 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
         processTreatyQueuedInput(tx, world, event, {
           ...context,
           treatyBreakEnabled: true,
-          treatyTradeEnabled: world.ruleFeatures.includes('treaty-trade'),
-          treatyExpandedEnabled: world.ruleFeatures.includes(EXPANDED_TREATY_FEATURE),
+          treatyTradeEnabled: true,
+          treatyExpandedEnabled: true,
         }),
     },
   },

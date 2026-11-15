@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '@opensamguk/rules';
 import { execFileSync } from 'node:child_process';
 import { afterAll, expect, it, onTestFailed } from 'vitest';
 import { createDb } from '../packages/db/src/index';
@@ -61,7 +62,7 @@ it('AC-INT-22: 실제 프리셋 생성의45병종·155거점이12개월 DB 재�
   let replay = initialReplayStateWithRegistry(initial, ruleRegistry, origin.featureData);
   let sequence = 0;
   expect(world.unitSetKey).toBe('expanded');
-  expect(world.ruleFeatures).toContain('battle-affinity-v2');
+  expect(providedRuleKeys).toContain('battle-affinity-v2');
   expect(initial.unitSet.crewTypes).toHaveLength(45);
   expect(initial.cities).toHaveLength(155);
   expect(initial.generals).toHaveLength(491);

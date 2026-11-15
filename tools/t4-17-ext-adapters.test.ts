@@ -62,7 +62,7 @@ function world() {
     id: 'unit-ext',
     preset,
     replayFormat: 1,
-    ruleFeatures: [],
+
     replayOrigin: origin(),
     initialStateHash: hashState(initial),
     treatyFormat: null,

@@ -5,7 +5,6 @@ import { frontier } from '../npc/frontier';
 
 // 실행 가능 여부와 패·대기·권한은 기존 chooser가 같은 명령 check로 판정한다.
 export function nationStrategyNpcCandidates(view: WorldView, nationId: number, tick: number): NpcCandidate[] {
-  if (!view.ruleFeatures?.includes('nation-strategy-v1')) return [];
   const result: NpcCandidate[] = [];
   const year = toGameDate(view.startYear, tick).year;
   const strength: Record<number, number> = {};

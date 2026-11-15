@@ -15,7 +15,7 @@ import type { Context } from '../context';
 import { visibility } from '../visibility';
 import { activeSanctionWhere } from '../auth/sanction';
 import { requirePersonnelSession } from './personnelAdmission';
-import { readView, requireGeneral, requireRuleFeature, requireWorld } from './queries';
+import { readView, requireGeneral, requireWorld } from './queries';
 import { recruitmentAvailability } from './recruitment';
 
 type ActorContext = Pick<Context, 'db' | 'sessionId' | 'now'> & { user: { id: string } };
@@ -25,13 +25,11 @@ function identity(ctx: ActorContext, started: number) {
   return { userId: ctx.user.id, sessionId: ctx.sessionId ?? '', at: new Date(ctx.now + performance.now() - started) };
 }
 function ready(world: Awaited<ReturnType<typeof requireWorld>>) {
-  requireRuleFeature(world, 'city-resources-v1');
   if (world.replayFormat !== 3)
     throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '도시 자원 기능을 사용할 수 없습니다.' });
   const origin: unknown = world.replayOrigin;
   checkReplayOrigin(origin);
-  if (origin.version !== 3 || !isDeepStrictEqual(origin.initial.ruleFeatures ?? [], world.ruleFeatures))
-    throw new Error('도시 자원 기능 사본이 생성 기록과 다릅니다.');
+  if (origin.version !== 3) throw new Error('도시 자원 기능 사본이 생성 기록과 다릅니다.');
   if (!isDeepStrictEqual(world.unitSet, origin.initial.unitSet)) throw new Error('운영 병종이 생성 기록과 다릅니다.');
   return origin.initial;
 }
@@ -201,6 +199,22 @@ export async function readCityResourceBoard(ctx: ActorContext, worldId: string, 
         canAllocate,
         resources: view.cityResources!.cities[String(cityKey)]!,
         targets,
+        newUnitRecipients: canAllocate
+          ? Object.values(view.generals)
+              .filter(
+                (person) =>
+                  person.nationId === actor.nationId && person.cityKey === cityKey && person.activeFromYear <= year,
+              )
+              .sort((a, b) => a.id - b.id)
+              .map((person) => ({
+                id: person.id,
+                name: person.name,
+                capacity: person.leadership * 100,
+                commanded: view
+                  .campaign!.units.filter((unit) => unit.commanderId === person.id)
+                  .reduce((sum, unit) => sum + unit.troops, 0),
+              }))
+          : [],
         armyTypes: initial.unitSet.crewTypes
           .filter((type) => campaignArmyTypes(initial).includes(type.id))
           .map(({ id, name }) => ({ id, name })),

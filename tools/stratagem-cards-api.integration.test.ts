@@ -221,15 +221,7 @@ async function fixture(
     turnTermMinutes: 60,
     endYear: null,
     replayFormat: 3,
-    ruleFeatures: [
-      'five-stats',
-      'personnel',
-      'policy',
-      'stratagem-basic',
-      ...(enabled ? ['stratagem-cards-v1'] : []),
-      ...(campaign ? ['operational-map', 'campaign-v1'] : []),
-      ...(options.governance ? ['campaign-assignment-v2', 'city-resources-v1', 'governance-v1', 'treaty'] : []),
-    ].sort(),
+
     featureData: {
       ...(enabled ? { 'stratagem-cards-v1': { version: 1, config } } : {}),
       ...(options.governance ? { 'governance-v1': governanceTestConfig } : {}),
@@ -548,7 +540,7 @@ it('AC-P2-23 SQL과 저장 어댑터는 비활성·누락·설정·시드·시�
   for (const part of ['missing', 'feature', 'config', 'seed', 'tick', 'revision']) {
     const next = structuredClone(before.state);
     if (part === 'missing') delete next.stratagemCards;
-    if (part === 'feature') next.ruleFeatures = next.ruleFeatures!.filter((key) => key !== 'stratagem-cards-v1');
+
     if (part === 'config') next.stratagemCards!.config.trap.lossBp++;
     if (part === 'seed') next.stratagemCards!.seed += '-changed';
     if (part === 'tick') next.stratagemCards!.monthlyTick += 10_000;
@@ -566,21 +558,13 @@ it('AC-P2-23 게시491명의 실제 관리자 초기화는 설정과 새 카드 
     portraitMap: '191-map',
     seed: `cards-reset-${randomUUID()}`,
   });
-  initial.ruleFeatures = [
-    'five-stats',
-    'operational-map',
-    'personnel',
-    'policy',
-    'stratagem-basic',
-    'stratagem-cards-v1',
-  ];
   const config = { ...TEST_STRATAGEM_CARDS_CONFIG, startHand: 1, deck: [{ kind: 'trap' as const, weight: 1 }] };
   const saved = await saveInitialWorld(db, initial, {
     name: '계략 패 초기화 검증',
     turnTermMinutes: 60,
     endYear: null,
     replayFormat: 3,
-    ruleFeatures: ['five-stats', 'operational-map', 'personnel', 'policy', 'stratagem-basic', 'stratagem-cards-v1'],
+
     featureData: { 'stratagem-cards-v1': { version: 1, config } },
   });
   worldIds.push(saved.worldId);

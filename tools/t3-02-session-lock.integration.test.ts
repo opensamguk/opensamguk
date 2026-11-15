@@ -63,7 +63,6 @@ it.each(['message', 'sse'] as const)(
       turnTermMinutes: 1,
       endYear: null,
       replayFormat: 3,
-      ruleFeatures: ['policy'],
     });
     worlds.add(worldId);
     const suffix = randomUUID().replaceAll('-', '');

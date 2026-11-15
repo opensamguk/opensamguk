@@ -37,24 +37,16 @@ export function assertInitialNationLifecycle(initial: Pick<WorldInit, 'nations' 
   }
 }
 
-export function readNationLifecycle(value: unknown, world: Pick<WorldView, 'ruleFeatures'>) {
-  if (!world.ruleFeatures?.includes(NATION_LIFECYCLE_FEATURE)) {
-    if (value != null) throw new Error('방랑 기능을 끈 월드에 국가 변천 상태가 있습니다.');
-    return undefined;
-  }
+export function readNationLifecycle(value: unknown) {
   return nationLifecycleSchema.parse(value);
 }
 
-export function isWandering(world: Pick<WorldView, 'ruleFeatures' | 'nationLifecycle'>, nationId: number | null) {
-  return (
-    world.ruleFeatures?.includes(NATION_LIFECYCLE_FEATURE) === true &&
-    nationId !== null &&
-    Object.hasOwn(world.nationLifecycle?.nations ?? {}, String(nationId))
-  );
+export function isWandering(world: Pick<WorldView, 'nationLifecycle'>, nationId: number | null) {
+  return nationId !== null && Object.hasOwn(world.nationLifecycle?.nations ?? {}, String(nationId));
 }
 
 export function assertNationLifecycle(world: WorldView): void {
-  const state = readNationLifecycle(world.nationLifecycle, world);
+  const state = readNationLifecycle(world.nationLifecycle);
   if (Object.values(world.nations).some((nation) => nation.capitalCityKey === null && !isWandering(world, nation.id)))
     throw new Error('수도가 없는 국가의 방랑 원장이 없습니다.');
   if (!state) return;

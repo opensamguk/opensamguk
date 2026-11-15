@@ -16,8 +16,6 @@ const deny = (code: string, message: string) => ({ ok: false as const, code, mes
 
 // 세션·제재·행위자 고정은 호출 경계에서 다시 검사한다. 여기서는 현재 게임 권한을 검사한다.
 export function decideStratagemCardsAction(world: WorldView, actorId: number, payload: unknown, tick: number) {
-  if (!world.ruleFeatures?.includes('stratagem-cards-v1'))
-    return deny('FEATURE_DISABLED', '계략 패 기능을 켜지 않은 월드입니다.');
   const cards = readStratagemCardsState(world.stratagemCards, world),
     actor = world.generals[actorId];
   if (!cardQuantity.safeParse(tick).success || tick < cards.monthlyTick || tick >= cards.monthlyTick + TICKS_PER_MONTH)

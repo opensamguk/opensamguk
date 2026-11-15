@@ -149,16 +149,9 @@ async function propose(worldId: string, actor: User, text: string, tick: number)
     await waiting;
   }
 }
-async function fixture(enabled = true, borderReturn = false) {
+async function fixture() {
   const initial = commandInitial();
   initial.seed = `nation-lifecycle-${randomUUID()}`;
-  initial.ruleFeatures = [
-    ...(borderReturn ? ['border-return-v1'] : []),
-    ...(enabled ? ['nation-lifecycle-v1'] : []),
-    'personnel',
-    'policy',
-    ...(enabled ? ['treaty'] : []),
-  ];
   initial.diplomacies = [];
   initial.cities[0]!.connections.push(3);
   initial.cities[2]!.connections.push(1);

@@ -1,4 +1,11 @@
-import { commandPlayerDocs, commands, unitSetSchema, type CommandDef } from '@opensamguk/rules';
+import {
+  commandMoveTargets,
+  commandAttackTargets,
+  commandPlayerDocs,
+  commands,
+  unitSetSchema,
+  type CommandDef,
+} from '@opensamguk/rules';
 import { z } from 'zod';
 import { router, protectedProcedure } from '../trpc';
 import { readView, requireGeneral, requireWorld, worldInput } from '../game/queries';
@@ -22,6 +29,28 @@ function describeCommand(def: CommandDef) {
 
 export const commandList = commands.filter((def) => def.target === 'general').map(describeCommand);
 export const commandsRouter = router({
+  moveTargets: protectedProcedure.input(strictWorldInput).query(({ ctx, input }) =>
+    ctx.db.$transaction(
+      async (tx) => {
+        const world = await requireWorld(tx, input.worldId);
+        const general = await requireGeneral(tx, world.id, ctx.user.id);
+        if (world.status === 'ENDED' || general.removedAt !== null) return [];
+        return commandMoveTargets(await readView(tx, world.id), general.id, general.nextTurnTick);
+      },
+      { isolationLevel: 'RepeatableRead' },
+    ),
+  ),
+  attackTargets: protectedProcedure.input(strictWorldInput).query(({ ctx, input }) =>
+    ctx.db.$transaction(
+      async (tx) => {
+        const world = await requireWorld(tx, input.worldId);
+        const general = await requireGeneral(tx, world.id, ctx.user.id);
+        if (world.status === 'ENDED' || general.removedAt !== null) return [];
+        return commandAttackTargets(await readView(tx, world.id), general.id);
+      },
+      { isolationLevel: 'RepeatableRead' },
+    ),
+  ),
   recruitCandidates: protectedProcedure.input(strictWorldInput).query(({ ctx, input }) =>
     ctx.db.$transaction(
       async (tx) => {

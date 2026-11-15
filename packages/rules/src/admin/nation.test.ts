@@ -9,9 +9,8 @@ const context = { userActive: true, admin: true, sanctioned: false, replayFormat
 const rulerAction = { kind: 'admin.nation.setRuler', nationId: 2, generalId: 3, expectedRulerId: 2 } as const;
 const disbandAction = { kind: 'admin.nation.disband', nationId: 2 } as const;
 const payload = (action: unknown) => ({ version: 1, reason: '국가 운영 조치', action });
-function fixture(features = ['personnel', 'policy']) {
+function fixture() {
   const initial = commandInitial();
-  initial.ruleFeatures = features;
   for (const general of initial.generals) Object.assign(general, { politics: 60, charm: 55 });
   const replay = initialReplayState(initial, { policy: { version: 1, turnTermMinutes: 60 } });
   replay.state.generals[2]!.experience = 5;
@@ -127,8 +126,8 @@ it('AC-INT-23 군주 교체는 참조·생존·등장과 접수 당시 군주를
 
 it.each([false, true])(
   'AC-INT-23 운영 해산은 도시 보유·전쟁·첫 달에도 같은 자원 상한을 적용한다 (방랑 기능 %s)',
-  (enabled) => {
-    const replay = fixture(['personnel', 'policy', ...(enabled ? ['nation-lifecycle-v1'] : [])]);
+  () => {
+    const replay = fixture();
     replay.state.generals[3]!.rice = 7;
     const original = structuredClone(replay);
     const outcome = apply(disbandAction, replay);
@@ -183,7 +182,7 @@ it.each([false, true])(
 );
 
 it('AC-INT-23 부곡·도시 수비병은 해산하고 변경 한도에서는 부분 적용하지 않는다', () => {
-  const replay = fixture(['campaign-assignment-v2', 'campaign-v1', 'city-resources-v1', 'personnel', 'policy']);
+  const replay = fixture();
   replay.state.campaign!.units = [
     { id: 1, ownerId: 2, commanderId: 2, troops: 100, crewType: 1100, train: 50, atmos: 50 },
     { id: 2, ownerId: 3, commanderId: 3, troops: 200, crewType: 1100, train: 50, atmos: 50 },
@@ -193,10 +192,7 @@ it('AC-INT-23 부곡·도시 수비병은 해산하고 변경 한도에서는 �
   const original = structuredClone(replay);
   const outcome = apply(disbandAction, replay);
   expect(outcome.status).toBe('APPLIED');
-  expect(outcome.replay.state.campaign!.units.filter((unit) => [2, 3].includes(unit.ownerId))).toSatisfy(
-    (units: { troops: number; train: number; atmos: number }[]) =>
-      units.length > 0 && units.every((unit) => unit.troops === 0 && unit.train === 0 && unit.atmos === 0),
-  );
+  expect(outcome.replay.state.campaign!.units.filter((unit) => [2, 3].includes(unit.ownerId))).toEqual([]);
   expect(outcome.replay.state.campaign!.revision).toBe(replay.state.campaign!.revision + 1);
   expect(outcome.replay.state.cityResources!.cities['2']).toEqual({
     ...replay.state.cityResources!.cities['2'],

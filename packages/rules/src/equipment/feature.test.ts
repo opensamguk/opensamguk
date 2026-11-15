@@ -23,7 +23,6 @@ const features = [
 ];
 function origin() {
   const initial = buildInitialWorld(operationalInput());
-  initial.ruleFeatures = [...features];
   for (const general of initial.generals) general.crew = 0;
   return {
     version: 3 as const,

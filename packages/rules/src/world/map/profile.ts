@@ -2,30 +2,20 @@ import type { WorldInit } from '../bootstrap';
 import { operationalMapSchema } from './operational';
 import { operationalAnchors } from './anchors';
 import { validateMap } from '../validate/map';
-import { CITY_SCALE_FEATURE, cityScaleRecordSchema, resolveCityScale } from './cityScale';
+import { cityScaleRecordSchema, resolveCityScale } from './cityScale';
 import { appliesOperationalOpening, LEGACY_OPENING_CITY_PROFILE, legacyOpeningCityValues } from '../openingCityProfile';
 
 export function checkOperationalProfile(
-  initial: Pick<
-    WorldInit,
-    'ruleFeatures' | 'operationalMap' | 'cities' | 'nations' | 'cityScale' | 'openingCityProfile'
-  >,
+  initial: Pick<WorldInit, 'operationalMap' | 'cities' | 'nations' | 'cityScale' | 'openingCityProfile'>,
 ) {
-  const enabled = initial.ruleFeatures?.includes('operational-map') ?? false;
   const opening = Object.hasOwn(initial, 'openingCityProfile');
-  if (opening && (!enabled || initial.openingCityProfile !== LEGACY_OPENING_CITY_PROFILE))
+  if (opening && initial.openingCityProfile !== LEGACY_OPENING_CITY_PROFILE)
     throw new Error('운영 지도의 개막 도시 설정을 확인하세요.');
-  if (!enabled) {
-    if (Object.hasOwn(initial, 'operationalMap') || initial.cities.some((city) => Object.hasOwn(city, 'kind')))
-      throw new Error('기존 지도 판에는 운영 지도 원장·거점 종류를 넣을 수 없습니다.');
-    return;
-  }
   const map = operationalMapSchema.parse(initial.operationalMap);
+
   if (validateMap(map, { scenarios: [] }).status !== 'pass') throw new Error('운영 지도의 연결망을 확인하세요.');
   const source = operationalAnchors(map);
-  const record = initial.ruleFeatures?.includes(CITY_SCALE_FEATURE)
-    ? cityScaleRecordSchema.parse(initial.cityScale)
-    : undefined;
+  const record = cityScaleRecordSchema.parse(initial.cityScale ?? { cities: [] });
   const scaled = resolveCityScale(
     source,
     record?.cities.map((row) => ({
@@ -34,7 +24,7 @@ export function checkOperationalProfile(
       ...(row.ruin ? { ruin: true as const } : {}),
     })),
   );
-  if (JSON.stringify(scaled.record) !== JSON.stringify(record))
+  if (JSON.stringify(scaled.record ?? { cities: [] }) !== JSON.stringify(record))
     throw new Error('도시 규모의 생성 원장과 지도 계산 결과가 다릅니다.');
   const anchors = scaled.cities;
   if (initial.cities.length !== anchors.length) throw new Error('운영 지도의 앵커 수가 생성 상태와 다릅니다.');

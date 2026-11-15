@@ -1,7 +1,8 @@
+import { previewMarchSupply, marchForce, campaignAttackingUnits } from '@opensamguk/rules';
 import { randomUUID } from 'node:crypto';
 import { TRPCError } from '@trpc/server';
 import { nextActionSequence, type Prisma } from '@opensamguk/db';
-import { commandStatPreview, emptyTurn, INTEL_FEATURE, unitSetSchema, type QueuedTurn } from '@opensamguk/rules';
+import { commandStatPreview, emptyTurn, unitSetSchema, type QueuedTurn } from '@opensamguk/rules';
 import { editArray, type ArrayEdit } from '@opensamguk/shared';
 import { z } from 'zod';
 import { router, protectedProcedure, worldVerifiedProcedure } from '../trpc';
@@ -82,7 +83,7 @@ async function save(
     const parse = (turn: SubmittedTurn | null) => parseSlot(turn, true, resolver);
     assertEnabledSlots(world, submitted.map(parse));
     if (world.status === 'ENDED') throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '종료된 월드입니다.' });
-    const policyEnabled = world.replayFormat === 3 ? world.ruleFeatures.includes('policy') : true;
+    const policyEnabled = world.replayFormat === 3 ? true : true;
     if (policyEnabled) requirePolicyReady(world);
     // 키 재검사는 장수 잠금·revision 비교보다 먼저 한다 (§5).
     const previous = await tx.inputEvent.findUnique({
@@ -158,7 +159,7 @@ export const turnsRouter = router({
             input.worldId,
             displaySlots(await readSlots(tx, input.worldId, actor.id), worldResolver(world).resolver),
             {
-              fogEnabled: world.ruleFeatures.includes(INTEL_FEATURE),
+              fogEnabled: world.fogOfWar,
               nationId: actor.removedAt === null ? actor.nationId : null,
             },
           ),
@@ -205,7 +206,12 @@ export const turnsRouter = router({
         const view = await readView(tx, input.worldId);
         const def = (extended ?? worldResolver(world)).resolver.get(turn.commandKey);
         if (!def)
-          return { ok: false as const, code: 'COMMAND_DISABLED' as const, message: '이 월드에서 꺼진 명령입니다.' };
+          return {
+            ok: false as const,
+            supply: null,
+            code: 'COMMAND_DISABLED' as const,
+            message: '이 월드에서 꺼진 명령입니다.',
+          };
         const commandActor = {
           generalId: actor.id,
           tick: actor.nextTurnTick,
@@ -213,9 +219,34 @@ export const turnsRouter = router({
         };
         const failure = def.precheck(view, commandActor, turn.args);
         const preview = commandStatPreview(view, commandActor, turn.commandKey, turn.args);
+        const supplyUnit = view.campaign ? campaignAttackingUnits(view, commandActor) : [];
+        let supply = null;
+        if (
+          turn.commandKey === 'attack' &&
+          supplyUnit?.length &&
+          typeof turn.args === 'object' &&
+          turn.args !== null &&
+          'cityKey' in turn.args
+        ) {
+          try {
+            const computed = previewMarchSupply(
+              view,
+              marchForce(supplyUnit),
+              Number(turn.args.cityKey),
+              turn.args as Parameters<typeof previewMarchSupply>[3],
+            );
+            if (computed) {
+              const { last: _last, ...contract } = computed;
+              void _last;
+              supply = contract;
+            }
+          } catch {
+            /* The command failure identifies an unavailable route. */
+          }
+        }
         return failure
-          ? { ok: false as const, ...failure, ...(preview ? { preview } : {}) }
-          : { ok: true as const, ...(preview ? { preview } : {}) };
+          ? { ok: false as const, ...failure, supply, ...(preview ? { preview } : {}) }
+          : { ok: true as const, supply, ...(preview ? { preview } : {}) };
       },
       { isolationLevel: 'RepeatableRead' },
     );

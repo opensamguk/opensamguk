@@ -525,16 +525,6 @@ for (let index = 0; index < 2; index++)
       portraitMap: '191-map',
       seed: 'consent-191-' + index,
     });
-    initial.ruleFeatures = [
-      'campaign-assignment-v2',
-      'campaign-v1',
-      'five-stats',
-      'operational-map',
-      'personnel',
-      'policy',
-      'stratagem-basic',
-      'treaty',
-    ];
     expect(initial.generals).toHaveLength(491);
     expect(initial.nations).toHaveLength(21);
     const saved = await saveInitialWorld(db, initial, {

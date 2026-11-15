@@ -343,7 +343,6 @@ it.each([false, true])('목우의 저지는 수비측일 때만 발동한다 (�
 
 it.each(['장수', '부곡', '두 번째 부곡'] as const)('%s 출병에서 정란의 선제사격을 한 번만 적용한다', (kind) => {
   const world = commandWorld();
-  world.ruleFeatures = ['battle-affinity-v2'];
   Object.assign(world.cities[2]!, { wall: 5000, wallMax: 5000, defence: 1500, defenceMax: 1500 });
   world.generals[1]!.crewType = 1500;
   world.generals[2]!.crewType = 1200;
@@ -359,7 +358,6 @@ it.each(['장수', '부곡', '두 번째 부곡'] as const)('%s 출병에서 정
   const actor = { generalId: 1, tick: 100, unitSet };
   const target = { cityKey: 2 };
   if (kind !== '장수') {
-    world.ruleFeatures.push('five-stats', 'city-resources-v1');
     for (const general of Object.values(world.generals)) Object.assign(general, { politics: 60, charm: 55 });
     world.campaign = emptyCampaignState(world, 'che-sortie', 'sourced-fixture');
     world.cityResources = emptyCityResourcesState(world);

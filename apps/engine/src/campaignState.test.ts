@@ -16,7 +16,6 @@ beforeAll(async () => {
 });
 function fixture() {
   const state = toWorldState(initial);
-  state.ruleFeatures = ['campaign-v1', 'five-stats', 'operational-map', 'personnel', 'policy'];
   for (const general of Object.values(state.generals)) Object.assign(general, { politics: 60, charm: 55, crew: 0 });
   state.campaign = emptyCampaignState(state, 'storage-test-seed', 'source-scenario');
   const execute = vi.fn().mockResolvedValue(1);

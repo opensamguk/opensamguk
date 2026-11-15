@@ -92,6 +92,7 @@ async function advance(worldId: string, tick: number, fail = false) {
 }
 const snapshot = (worldId: string) => db.$transaction((tx) => loadReplayState(tx, worldId));
 async function fixture(enabled = true, players?: [Player, Player]) {
+  void enabled;
   const initial = await monthlyFixture();
   initial.seed = 'monthly-review-integration';
   initial.generals = initial.generals.map((general) => ({ ...general, nextTurnTick: 1_000_000_000, injury: 0 }));
@@ -118,13 +119,12 @@ async function fixture(enabled = true, players?: [Player, Player]) {
     city.agriculture = city.agricultureMax - 1;
     initial.diplomacies = [{ nationA: 1, nationB: 2, state: 'WAR', untilTick: 0 }];
   }
-  const features = [...(players ? ['policy'] : []), ...(enabled ? ['reputation-v1'] : [])];
+
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '월단평 실제 검증',
     turnTermMinutes: 60,
     endYear: null,
     replayFormat: 3,
-    ruleFeatures: features,
   });
   worldIds.push(worldId);
   await controlClock(db, worldId, 'start');
@@ -176,7 +176,6 @@ it('T3-07 AC-M3-15 실제 전투·내정 사건과 월 정산은 기존 기록�
   expect(legacy).not.toHaveProperty('reputation');
   const same = structuredClone(stored);
   delete same.reputation;
-  same.state.ruleFeatures = legacy.state.ruleFeatures;
   expect(same).toEqual(legacy);
   for (const { worldId } of [modern, old]) expect((await exportReplay(db, worldId)).months).toHaveLength(1);
   const oldRows = await db.yearbookSnapshot.findMany({
@@ -326,7 +325,6 @@ it('T3-07 AC-M3-15 실제 조약 파기의 적용·거절·롤백은 큐 입력 
     turnTermMinutes: 60,
     endYear: null,
     replayFormat: 3,
-    ruleFeatures: ['reputation-v1', 'treaty', 'treaty-break'],
   });
   worldIds.push(worldId);
   await controlClock(db, worldId, 'start');
@@ -477,7 +475,6 @@ it('T3-07 AC-M3-15 장수 제거와 국가 멸망 뒤에도 과거 순위의 공
     turnTermMinutes: 60,
     endYear: null,
     replayFormat: 3,
-    ruleFeatures: ['policy', 'reputation-v1'],
   });
   worldIds.push(worldId);
   await controlClock(db, worldId, 'start');

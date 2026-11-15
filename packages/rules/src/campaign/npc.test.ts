@@ -11,7 +11,6 @@ const resolver = createCampaignCommandResolver(createCommandResolver(null));
 const context = { tick: 100, unitSet: testUnits, resolver };
 function fixture() {
   const world = commandWorld();
-  world.ruleFeatures = ['campaign-v1', 'five-stats'];
   for (const general of Object.values(world.generals)) Object.assign(general, { politics: 10, charm: 50, crew: 0 });
   for (const nation of Object.values(world.nations)) nation.isNpc = false;
   world.campaign = emptyCampaignState(world, 'npc-seed', 'sourced-fixture');

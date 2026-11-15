@@ -1,5 +1,5 @@
 import { LEGACY_OPENING_CITY_PROFILE } from '../openingCityProfile';
-import { operationalMapSchema, type OperationalMapResource } from './operational';
+import { isStrategicSite, operationalMapSchema, type OperationalMapResource } from './operational';
 
 export function readOpeningCityProfile(origin: unknown) {
   const initial = origin && typeof origin === 'object' && 'initial' in origin ? origin.initial : undefined;
@@ -9,16 +9,9 @@ export function readOpeningCityProfile(origin: unknown) {
   return initial.openingCityProfile;
 }
 
-export function readOperationalMap(
-  value: unknown,
-  features: readonly string[],
-  origin?: unknown,
-): OperationalMapResource | undefined {
-  if (!features.includes('operational-map')) {
-    if (value !== null && value !== undefined) throw new Error('기존 월드에 운영 지도 원장이 있습니다.');
-    return undefined;
-  }
+export function readOperationalMap(value: unknown, origin?: unknown): OperationalMapResource | undefined {
   const map = operationalMapSchema.parse(value);
+
   if (origin !== undefined) {
     const initial = origin && typeof origin === 'object' && 'initial' in origin ? origin.initial : undefined;
     const originalMap =
@@ -32,15 +25,24 @@ export function readOperationalMap(
 export function attachOperationalKinds<T extends { cityKey: number; kind?: string | null }>(
   cities: readonly T[],
   map: OperationalMapResource | undefined,
-): Array<Omit<T, 'kind'> & { kind?: 'CITY' | 'PASS' }> {
+): Array<Omit<T, 'kind'> & { kind?: 'CITY' | 'PASS' | 'FIELD' }> {
+  cities = cities.map((row) => {
+    const city = { ...row } as T & { state?: unknown; stateTerm?: unknown; parentCityKey?: unknown };
+    if (city.state == null) {
+      delete city.state;
+      delete city.stateTerm;
+      delete city.parentCityKey;
+    }
+    return city;
+  });
   if (!map)
     return cities.map(({ kind, ...city }) => {
       if (kind !== undefined && kind !== null) throw new Error('기존 월드에 운영 거점 종류가 있습니다.');
       return city;
     });
   const kinds = new Map(
-    map.sites.flatMap((site): Array<[number, 'CITY' | 'PASS']> =>
-      site.kind === 'CITY' || site.kind === 'PASS' ? [[site.anchorKey, site.kind]] : [],
+    map.sites.flatMap((site): Array<[number, 'CITY' | 'PASS' | 'FIELD']> =>
+      isStrategicSite(map, site) ? [[site.anchorKey, site.kind]] : [],
     ),
   );
   if (cities.length !== kinds.size || new Set(cities.map((city) => city.cityKey)).size !== kinds.size)
@@ -48,6 +50,24 @@ export function attachOperationalKinds<T extends { cityKey: number; kind?: strin
   return cities.map((city) => {
     const kind = kinds.get(city.cityKey);
     if (!kind || city.kind !== kind) throw new Error('저장된 운영 지도 앵커 종류가 다릅니다.');
+    const stored = city as T & { state?: number | null; stateTerm?: number | null; parentCityKey?: number | null };
+    if (stored.state != null) {
+      if (
+        !Number.isInteger(stored.state) ||
+        stored.state < 0 ||
+        stored.state > 49 ||
+        !Number.isInteger(stored.stateTerm) ||
+        stored.stateTerm! < 0
+      )
+        throw new Error('저장된 도시 상태를 확인하세요.');
+      const source = map.sites.find((site) => 'anchorKey' in site && site.anchorKey === city.cityKey);
+      if (
+        source?.kind === 'CITY' &&
+        source.parentCityKey !== undefined &&
+        stored.parentCityKey !== source.parentCityKey
+      )
+        throw new Error('저장된 부모 도시와 지도 원장이 다릅니다.');
+    }
     return { ...city, kind };
   });
 }
@@ -64,7 +84,9 @@ export function operationalMapDisplay(map: OperationalMapResource) {
       name: site.name,
       kind: site.kind,
       position: site.position,
-      ...('anchorKey' in site ? { anchorKey: site.anchorKey } : {}),
+      ...(site.description !== undefined ? { description: site.description } : {}),
+      ...(map.siteClassification === 'd096' && site.kind === 'CITY' ? { siteLevel: site.level } : {}),
+      ...(isStrategicSite(map, site) ? { anchorKey: site.anchorKey } : {}),
       ...(site.kind === 'PORT' ? { parentCityId: site.parentCityId } : {}),
     })),
     routes: map.routes,

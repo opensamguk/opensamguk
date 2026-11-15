@@ -36,7 +36,7 @@ function feed(state: WorldState, row: CampaignUnitState) {
 function modifiers(state: WorldState, row: CampaignUnitState): BattleModifiers {
   const commander = state.generals[row.commanderId]!;
   const stats = fiveStatsSchema.parse(Object.fromEntries(FIVE_STAT_KEYS.map((key) => [key, commander[key]])));
-  const equipment = state.ruleFeatures?.includes('equipment-v1') ? equipmentBonus(state, commander.id) : undefined;
+  const equipment = equipmentBonus(state, commander.id);
   const base = fiveStatsBattleModifiers(
     stats,
     equipment ? { leadership: equipment.leadership, strength: equipment.strength } : undefined,
@@ -82,7 +82,7 @@ export function fightCampaignUnits(
       defenderTech: state.nations[bNation]!.tech,
       unitSet,
       attackerFirstVolleyUsed,
-      coefMode: state.ruleFeatures?.includes('battle-affinity-v2') ? 'multiply' : 'divide',
+      coefMode: 'multiply',
       attackerModifiers: modifiers(state, attacker),
       defenderModifiers: modifiers(state, defender),
     },
@@ -125,7 +125,7 @@ export function fightCampaignWall(
       siege: !openingSkirmish,
       attackerFirstVolleyUsed,
       unitSet,
-      coefMode: state.ruleFeatures?.includes('battle-affinity-v2') ? 'multiply' : 'divide',
+      coefMode: 'multiply',
       attackerModifiers: modifiers(state, attacker),
     },
     rng,
@@ -145,7 +145,6 @@ export function fightCampaignCityGarrison(
   rng: Rng,
   attackerFirstVolleyUsed = false,
 ) {
-  if (!view.ruleFeatures?.includes('city-resources-v1')) throw new Error('도시 수비 규칙이 없는 판입니다.');
   const state = start(view),
     attacker = unit(state, attackerId),
     city = state.cities[cityKey];
@@ -184,7 +183,7 @@ export function fightCampaignCityGarrison(
       defence: city.defence,
       unitSet,
       attackerFirstVolleyUsed,
-      coefMode: state.ruleFeatures?.includes('battle-affinity-v2') ? 'multiply' : 'divide',
+      coefMode: 'multiply',
       attackerModifiers: modifiers(state, attacker),
     },
     rng,

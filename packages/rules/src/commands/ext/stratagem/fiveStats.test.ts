@@ -1,3 +1,4 @@
+import { providedRuleKeys } from './../../../providedRules';
 import { describe, expect, it } from 'vitest';
 import { commandInitial, commandWorld } from '../../../../test/commandFixture';
 import { createRng, type Rng } from '@opensamguk/shared';
@@ -8,7 +9,6 @@ import { stratagemCommands } from './index';
 
 function world() {
   const state = commandWorld();
-  state.ruleFeatures = ['five-stats', 'stratagem-basic'];
   for (const general of Object.values(state.generals)) Object.assign(general, { politics: 50, charm: 50 });
   Object.assign(state.generals[1]!, { intel: 60, strength: 80, charm: 20 });
   for (const general of Object.values(state.generals)) if (general.id !== 1) general.cityKey = 3;
@@ -92,7 +92,6 @@ describe('AC-INT-17 기본 계략의 5능력치 어댑터', () => {
     for (const failure of [false, true]) {
       const modern = world();
       const legacy = structuredClone(modern);
-      delete legacy.ruleFeatures;
       const modernRng = trackingRng(failure),
         legacyRng = trackingRng(failure);
       const actor = { generalId: 1 },
@@ -117,15 +116,13 @@ describe('AC-INT-17 기본 계략의 5능력치 어댑터', () => {
 
   it('인사·정책·조약과 함께 등록하고 네 명령만 추가한다', () => {
     const state = world();
-    state.ruleFeatures = ['five-stats', 'personnel', 'policy', 'stratagem-basic', 'treaty'];
-    expect(checkRuleFeatures(state.ruleFeatures)).toEqual(state.ruleFeatures);
+    expect(checkRuleFeatures(providedRuleKeys)).toEqual(providedRuleKeys);
     const resolver = resolverForRuleFeatures(state)!;
     for (const command of stratagemCommands) expect(resolver.get(command.key)).toBe(command);
     expect(resolver.get('scout')).toBeUndefined();
     expect(() => checkRuleFeatures(['stratagem-basic'])).toThrow();
     const initial = commandInitial();
     initial.statRules = { count: 5, total: 275, min: 15, max: 90 };
-    initial.ruleFeatures = state.ruleFeatures;
     for (const general of initial.generals) Object.assign(general, { politics: 50, charm: 50 });
     const origin = {
       version: 3,

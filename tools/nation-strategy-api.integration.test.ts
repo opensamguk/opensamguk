@@ -111,12 +111,6 @@ async function fixture(kind: 'nation_mobilize' | 'nation_rivalry' | 'nation_raid
   const initial = commandInitial();
   initial.seed = `nation-strategy-${randomUUID()}`;
   initial.statRules = { ...FIVE_STAT_RULES };
-  initial.ruleFeatures = [
-    'five-stats',
-    'personnel',
-    'policy',
-    ...(enabled ? ['nation-strategy-v1', 'stratagem-basic', 'stratagem-cards-v1'] : []),
-  ].sort();
   for (const general of initial.generals)
     Object.assign(general, {
       politics: 55,

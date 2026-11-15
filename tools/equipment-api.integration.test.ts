@@ -120,7 +120,7 @@ async function fixture(enabled = true, lineage = false, specialty: 'iron' | 'hor
     ...(lineage ? { sex: 'UNKNOWN' as const } : {}),
   }));
   initial.diplomacies = [{ nationA: 1, nationB: 2, state: 'NON_AGGRESSION', untilTick: 1_000_000 }];
-  const features = [
+  [
     'campaign-assignment-v2',
     'campaign-v1',
     'city-resources-v1',
@@ -132,7 +132,6 @@ async function fixture(enabled = true, lineage = false, specialty: 'iron' | 'hor
     ...(enabled ? ['equipment-v1'] : []),
     ...(lineage ? ['lineage-v1'] : []),
   ].sort();
-  initial.ruleFeatures = features;
   const logistics = structuredClone(TEST_EQUIPMENT_LOGISTICS_CONFIG);
   logistics.capacity.base = 10000;
   logistics.specialties = [{ cityKey: 3, good: specialty, perMonth: specialty === 'iron' ? 500 : 100 }];
@@ -145,7 +144,7 @@ async function fixture(enabled = true, lineage = false, specialty: 'iron' | 'hor
     turnTermMinutes: 60,
     endYear: null,
     replayFormat: 3,
-    ruleFeatures: features,
+
     featureData: {
       'logistics-v1': logistics,
       ...(enabled ? { 'equipment-v1': STANDARD_EQUIPMENT_CONFIG } : {}),

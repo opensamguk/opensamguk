@@ -46,7 +46,11 @@ export const commandPlayerDocs: Readonly<Record<string, PlayerDoc>> = {
     }),
   ),
   rest: { summary: '이번 장수 턴에 쉽니다.', requires: [], cost: null },
-  recruit: { summary: '병사를 모집합니다.', requires: recruit, cost: recruitCost },
+  recruit: {
+    summary: '도시 수비병 또는 선택한 기존·새 부곡의 병사를 모집합니다.',
+    requires: recruit,
+    cost: recruitCost,
+  },
   conscript: {
     summary: '민심을 낮추는 대신 병사를 더 적은 금으로 모집합니다.',
     requires: recruit,
@@ -227,13 +231,9 @@ export const commandPlayerDocs: Readonly<Record<string, PlayerDoc>> = {
     ],
     cost: null,
   },
-  form_unit: {
-    summary: '선택한 병종으로 병력이 없는 새 부곡을 편성합니다.',
-    requires: ['도시 자원 기능을 켠 월드', ownCity, '편성할 수 있는 병종과 같은 병종의 빈 부곡 없음'],
-    cost: null,
-  },
+
   nation_city_allocate: {
-    summary: '도시 수비병을 같은 병종의 부곡으로 옮깁니다.',
+    summary: '도시 수비병을 같은 병종의 기존 부곡이나 수령 장수의 새 부곡으로 옮깁니다.',
     requires: [
       '도시 자원 기능을 켠 월드',
       '군주·참모·수뇌',

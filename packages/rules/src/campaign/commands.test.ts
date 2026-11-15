@@ -13,7 +13,6 @@ const resolver = createCampaignCommandResolver(base);
 const actor = { generalId: 1, tick: 100, unitSet: testUnits };
 function fixture() {
   const world = commandWorld();
-  world.ruleFeatures = ['five-stats'];
   for (const general of Object.values(world.generals)) Object.assign(general, { politics: 60, charm: 55, crew: 0 });
   world.generals[1]!.userId = 'owner';
   world.campaign = emptyCampaignState(world, 'command-seed', 'sourced-fixture');
@@ -54,7 +53,7 @@ describe('AC-INT-09 기존 명령의 부곡 실행 연결', () => {
     next = run(next, 'morale', {}).state;
     expect(next.campaign!.units[0]!.atmos).toBeGreaterThan(0);
     next = run(next, 'dismiss', {}).state;
-    expect(next.campaign!.units[0]!.troops).toBe(0);
+    expect(next.campaign!.units).toEqual([]);
     expect(next.cities[1]!.population).toBe(world.cities[1]!.population);
   });
   it('기존 이동·귀환은 같은 거점의 NPC 지휘관과 부곡을 따르게 한다', () => {

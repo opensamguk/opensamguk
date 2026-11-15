@@ -145,15 +145,6 @@ beforeAll(() =>
       portraitMap: '191-map',
       seed,
     });
-    initial.ruleFeatures = [
-      'campaign-v1',
-      'five-stats',
-      'operational-map',
-      'personnel',
-      'policy',
-      'stratagem-basic',
-      'treaty',
-    ];
     const cityKeys = initial.cities.filter((city) => city.kind === 'CITY').map((city) => city.cityKey);
     // 동일 생성 RNG를 사용해 초반 offset인 계정 ID만 고른다. 원본 491명과 능력치·위치는 바꾸지 않는다.
     for (let index = 0; index < 2; index++) {

@@ -30,13 +30,6 @@ export async function persistStratagemCardsState(
   next: WorldState,
   monthlyTick?: number,
 ) {
-  if (!before.ruleFeatures?.includes('stratagem-cards-v1') && !next.ruleFeatures?.includes('stratagem-cards-v1')) {
-    if (before.stratagemCards !== undefined || next.stratagemCards !== undefined)
-      throw Error('계략 패를 끈 월드에 상태가 있습니다.');
-    return;
-  }
-  if (!before.ruleFeatures?.includes('stratagem-cards-v1') || !next.ruleFeatures?.includes('stratagem-cards-v1'))
-    throw Error('진행 중 계략 패 기능을 바꿀 수 없습니다.');
   const original = readStratagemCardsState(before.stratagemCards, before),
     candidate = stratagemCardsStateSchema.parse(next.stratagemCards);
   if (JSON.stringify(original.config) !== JSON.stringify(candidate.config) || original.seed !== candidate.seed)
@@ -53,7 +46,7 @@ export async function reconcileQueuedStratagemCards(tx: Prisma.TransactionClient
       where: { id: worldId },
       select: {
         replayFormat: true,
-        ruleFeatures: true,
+
         replayOrigin: true,
         monthlyTick: true,
         stratagemCardsState: true,

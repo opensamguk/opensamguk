@@ -10,6 +10,8 @@ datasource db {
 }
 
 model World {
+  tacticalBattles      Battle[]
+  commandProposals     CommandProposal[]
   reputationEvents     ReputationEvent[]
   publicNationEvents   PublicNationEvent[]
   monthlyReviews       MonthlyReview[]
@@ -59,7 +61,7 @@ model World {
   treatyFormat         Int?
   personnelFormat      Int?
   replayFormat         Int                  @default(1)
-  ruleFeatures         String[]             @default([])
+  fogOfWar             Boolean              @default(false)
   officeEffects        Json?
   replayOrigin         Json?
   inputEvents          InputEvent[]
@@ -89,6 +91,28 @@ model World {
   seasonGenerals       SeasonGeneral[]
 }
 
+model CommandProposal {
+  id            String  @id @default(uuid())
+  worldId       String
+  nationId      Int
+  proposerId    Int
+  proposerLevel Int
+  commandKey    String
+  args          Json
+  slot          Int?
+  note          String?
+  status        String  @default("PENDING")
+  createdTick   Int
+  expiresTick   Int
+  responseBy    Int?
+  responseTick  Int?
+  reason        String?
+  world         World   @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@index([worldId, nationId, status])
+  @@index([worldId, proposerId, status])
+}
+
 model PublicNationEvent {
   id       BigInt @id @default(autoincrement())
   worldId  String
@@ -96,6 +120,7 @@ model PublicNationEvent {
   tick     Int
   kind     String
   text     String
+  nations  Json   @default("[]")
   world    World  @relation(fields: [worldId], references: [id], onDelete: Cascade)
 
   @@index([worldId, tick, id])
@@ -384,36 +409,39 @@ model Nation {
 }
 
 model City {
-  worldId          String
-  cityKey          Int
-  kind             String?
-  name             String
-  level            Int
-  region           Int
-  x                Float
-  y                Float
-  connections      Int[]
-  nationId         Int?
-  population       Int
-  populationMax    Int
-  agriculture      Int
-  agricultureMax   Int
-  commerce         Int
-  commerceMax      Int
-  security         Int
-  securityMax      Int
-  defence          Int
-  defenceMax       Int
-  wall             Int
-  wallMax          Int
-  trust            Float
-  supplied         Boolean
-  world            World       @relation(fields: [worldId], references: [id], onDelete: Cascade)
-  nation           Nation?     @relation("OwnedCities", fields: [worldId, nationId], references: [worldId, id], onDelete: NoAction)
-  capitalOf        Nation[]    @relation("Capital")
-  generals         General[]
-  appointedOfficers General[] @relation("CityOffice")
-  operationTargets Operation[]
+  state             Int?
+  stateTerm         Int?
+  parentCityKey     Int?
+  worldId           String
+  cityKey           Int
+  kind              String?
+  name              String
+  level             Int
+  region            Int
+  x                 Float
+  y                 Float
+  connections       Int[]
+  nationId          Int?
+  population        Int
+  populationMax     Int
+  agriculture       Int
+  agricultureMax    Int
+  commerce          Int
+  commerceMax       Int
+  security          Int
+  securityMax       Int
+  defence           Int
+  defenceMax        Int
+  wall              Int
+  wallMax           Int
+  trust             Float
+  supplied          Boolean
+  world             World       @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  nation            Nation?     @relation("OwnedCities", fields: [worldId, nationId], references: [worldId, id], onDelete: NoAction)
+  capitalOf         Nation[]    @relation("Capital")
+  generals          General[]
+  appointedOfficers General[]   @relation("CityOffice")
+  operationTargets  Operation[]
 
   @@id([worldId, cityKey])
   @@unique([worldId, name])
@@ -421,6 +449,7 @@ model City {
 }
 
 model General {
+  movePath          Int[]             @default([])
   sex               String?
   worldId           String
   id                Int
@@ -471,7 +500,8 @@ model General {
   operationMembers  OperationMember[]
   world             World             @relation(fields: [worldId], references: [id], onDelete: Cascade)
   nation            Nation?           @relation(fields: [worldId, nationId], references: [worldId, id], onDelete: NoAction)
-  city              City              @relation(fields: [worldId, cityKey], references: [worldId, cityKey], onDelete: NoAction)
+  cityAnchorKey     Int?              @default(dbgenerated())
+  city              City?             @relation(fields: [worldId, cityAnchorKey], references: [worldId, cityKey], onDelete: NoAction, map: "General_worldId_cityKey_fkey")
   officerCity       City?             @relation("CityOffice", fields: [worldId, officerCityKey], references: [worldId, cityKey], onDelete: NoAction, onUpdate: NoAction, map: "General_officerCityKey_fkey")
 
   @@id([worldId, id])
@@ -654,10 +684,10 @@ model User {
 }
 
 model AccountPortrait {
-  id      Int    @id @default(autoincrement())
-  userId  String @unique
-  png     Bytes
-  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     Int    @id @default(autoincrement())
+  userId String @unique
+  png    Bytes
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model ResourceEditorGrant {
@@ -877,6 +907,71 @@ enum InputEventStatus {
   PENDING
   APPLIED
   REJECTED
+}
+
+model Battle {
+  world        World               @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  turns        BattleTurn[]
+  events       BattleEvent[]
+  reservations BattleReservation[]
+  presence     BattlePresence[]
+  worldId      String
+  id           String
+  revision     Int
+  phase        String
+  deadlineAt   DateTime
+  state        Json
+
+  @@id([worldId, id])
+  @@index([worldId, phase, deadlineAt])
+}
+
+model BattleTurn {
+  battle     Battle @relation(fields: [worldId, battleId], references: [worldId, id], onDelete: Cascade)
+  worldId    String
+  battleId   String
+  turnNo     Int
+  beforeHash String
+  afterHash  String
+  record     Json
+  attackView Json
+  defendView Json
+
+  @@id([worldId, battleId, turnNo])
+}
+
+model BattleEvent {
+  battle   Battle @relation(fields: [worldId, battleId], references: [worldId, id], onDelete: Cascade)
+  worldId  String
+  battleId String
+  turnNo   Int
+  ordinal  Int
+  data     Json
+
+  @@id([worldId, battleId, turnNo, ordinal])
+}
+
+model BattleReservation {
+  battle           Battle @relation(fields: [worldId, battleId], references: [worldId, id], onDelete: Cascade)
+  worldId          String
+  key              String
+  battleId         String
+  createdSequence  Int
+  releasedSequence Int?
+
+  @@id([worldId, key, battleId])
+  @@index([worldId, battleId])
+}
+
+model BattlePresence {
+  battle     Battle   @relation(fields: [worldId, battleId], references: [worldId, id], onDelete: Cascade)
+  worldId    String
+  battleId   String
+  generalId  Int
+  sessionId  String
+  receivedAt DateTime
+
+  @@id([worldId, battleId, generalId])
 }
 
 model InputEvent {

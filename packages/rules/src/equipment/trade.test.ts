@@ -16,7 +16,6 @@ const actor = { generalId: 1 };
 const horse = { slot: 'horse' as const, itemKey: 'horse_01' };
 function fixture() {
   const world = commandWorld();
-  world.ruleFeatures = ['equipment-v1', 'logistics-v1'];
   world.equipment = initialEquipment(TEST_EQUIPMENT_CONFIG);
   world.logistics = initialLogisticsState(TEST_EQUIPMENT_LOGISTICS_CONFIG, world);
   Object.assign(world.logistics.cities['1']!, { iron: 20, wood: 20, horses: 20 });
@@ -86,17 +85,10 @@ it('AC-P2-12 인공 제안 정책의 교체는 이전 장비 판매 금을 더�
 });
 
 it.each<[string, (world: WorldState) => void, string]>([
-  [
-    '끈 판',
-    (w) => {
-      w.ruleFeatures = ['logistics-v1'];
-    },
-    'COMMAND_DISABLED',
-  ],
+  ['끈 판', () => {}, 'COMMAND_DISABLED'],
   [
     '물류 없는 판',
     (w) => {
-      w.ruleFeatures = ['equipment-v1'];
       delete w.logistics;
     },
     'COMMAND_DISABLED',

@@ -6,7 +6,7 @@ import type { Actor, CommandDef, Failure } from '../commands/types';
 import { cloneWorld } from '../model/clone';
 import type { WorldView } from '../model/world';
 import { withPrepare } from '../preparedTurns/withPrepare';
-import { NATION_RESEARCH_FEATURE, readNationResearch, type ResearchName } from './state';
+import { readNationResearch, type ResearchName } from './state';
 
 export const nationResearchSpecs = [
   { key: 'nation_research_greatsword', research: 'greatsword', name: '대검병 연구', turns: 12, cost: 50_000 },
@@ -19,14 +19,8 @@ export const nationResearchSpecs = [
 ] as const satisfies readonly { key: string; research: ResearchName; name: string; turns: number; cost: number }[];
 const args = z.strictObject({});
 
-export function canExecuteResearchNationCommand(view: Pick<WorldView, 'ruleFeatures'>, level: number, key: string) {
-  return (
-    !!view.ruleFeatures?.includes(NATION_RESEARCH_FEATURE) &&
-    Number.isInteger(level) &&
-    level >= 5 &&
-    level <= 12 &&
-    nationResearchSpecs.some((spec) => spec.key === key)
-  );
+export function canExecuteResearchNationCommand(view: object, level: number, key: string) {
+  return Number.isInteger(level) && level >= 5 && level <= 12 && nationResearchSpecs.some((spec) => spec.key === key);
 }
 
 function defineResearch(spec: (typeof nationResearchSpecs)[number]): CommandDef {
@@ -37,12 +31,10 @@ function defineResearch(spec: (typeof nationResearchSpecs)[number]): CommandDef 
       return fail('NOT_NATION', '국가에 소속되어야 합니다.');
     if (view.cities[general.cityKey]?.nationId !== general.nationId)
       return fail('NOT_OWN_CITY', '자기 국가 도시에서만 가능합니다.');
-    if (!view.ruleFeatures?.includes(NATION_RESEARCH_FEATURE))
-      return fail('COMMAND_DISABLED', '이 월드에서 꺼진 명령입니다.');
     if (!canExecuteResearchNationCommand(view, general.officerLevel, spec.key))
       return fail('NOT_RULER', '수뇌 이상만 연구할 수 있습니다.');
     if (!args.safeParse(raw).success) return fail('BAD_ARGS', '연구 명령의 인자를 확인하세요.');
-    const ledger = readNationResearch(view.nationResearch, view)!;
+    const ledger = readNationResearch(view.nationResearch)!;
     if (ledger.nations[general.nationId]?.includes(spec.research))
       return fail('BAD_STATE', `${spec.name}가 이미 완료되었습니다.`);
     const nation = view.nations[general.nationId]!;
@@ -70,7 +62,7 @@ function defineResearch(spec: (typeof nationResearchSpecs)[number]): CommandDef 
         nation.rice -= spec.cost;
         general.experience += 5 * spec.turns;
         general.dedication += 5 * spec.turns;
-        const ledger = readNationResearch(state.nationResearch, state)!;
+        const ledger = readNationResearch(state.nationResearch)!;
         ledger.nations[nationId] = [...(ledger.nations[nationId] ?? []), spec.research].sort();
         state.nationResearch = ledger;
         const text = `${spec.name} 완료`;

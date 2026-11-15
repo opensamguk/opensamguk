@@ -49,7 +49,7 @@ async function fixture() {
     presetKey: null,
     turnTermMinutes: 30,
     endYear: null,
-    ruleFeatures: [],
+
     replayFormat: 3,
     replayOrigin: origin,
     initialStateHash: origin.initialStateHash,

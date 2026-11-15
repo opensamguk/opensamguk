@@ -6,6 +6,8 @@ import { operationalMapSchema, type OperationalMapResource } from '../../package
 import { scenarioSchema, type ScenarioResource } from '../../packages/rules/src/world/resources';
 import { validateWorldResources } from '../../packages/rules/src/world/validate';
 import { hashState } from '../../packages/shared/src/node/hashState';
+import { applyExpandedEdits } from './expanded-edits';
+import { isStrategicSite } from '../../packages/rules/src/world/map/operational';
 
 type Site = [string, number, number, 'C' | 'P', number, number];
 type Roster = [
@@ -32,7 +34,7 @@ type Entry = {
 };
 type Source = { sites: Site[]; routes: [string, string, string][]; roster: Roster[]; scenarios: Entry[] };
 const sourceUrl = 'https://claude.ai/artifact/YDyLtPmfANcJ6uqj8Vpi82';
-const sourceHash = '023f60bf7625f0a318ad6a9ed22224fab564c57d7bae83e5467e4ac5c5e48275';
+const sourceHash = 'eb764cc8d722fae4e0be4cb3dc7fff7f8155a3c58ad915338cd8c2c155fd1e1c';
 const mapId = 'san10-expanded';
 const factionColorSource = 'https://namu.wiki/w/삼국지%20시리즈/상징색';
 const san10FactionColors = new Map(
@@ -165,7 +167,18 @@ const routes = source.routes.map(([a, b], i): OperationalMapResource['routes'][n
   return old ?? { id: `route:san10-expanded-${i + 1}`, from, to, mode: 'LAND', direction: 'BOTH', enabled: true };
 });
 if (oldRoutes.size) throw Error(`기존 도로 누락: ${oldRoutes.size}`);
-const map = operationalMapSchema.parse({ ...base, id: mapId, name: 'SAN10 확장 확정판', sites, routes });
+const map = applyExpandedEdits(
+  operationalMapSchema.parse({ ...base, id: mapId, name: 'SAN10 확장 확정판', sites, routes }),
+);
+const strategicNames = new Set(map.sites.filter((site) => isStrategicSite(map, site)).map((site) => site.name));
+const scenarioNames = new Set(
+  map.sites.filter((site) => isStrategicSite(map, site) && site.kind !== 'FIELD').map((site) => site.name),
+);
+const currentNames = new Map(sites.map((site) => [site.name, map.sites.find((row) => row.id === site.id)!.name]));
+const strategicName = (name: string) => {
+  const current = currentNames.get(name);
+  return current && scenarioNames.has(current) ? current : null;
+};
 const roster = new Map(source.roster.map((row) => [row[0], row]));
 function hexColor(input: string) {
   if (/^#[\da-f]{6}$/i.test(input)) return input;
@@ -206,7 +219,7 @@ function compileScenario(entry: Entry): ScenarioResource {
       name,
       null,
       faction + 1,
-      city || null,
+      strategicName(city),
       leadership,
       strength,
       intel,
@@ -243,7 +256,16 @@ function compileScenario(entry: Entry): ScenarioResource {
       0,
       '',
       1,
-      [f.capital, ...f.cities.filter((city) => city !== f.capital)],
+      [f.capital, ...f.cities.filter((city) => city !== f.capital)]
+        .flatMap((city) => {
+          const name = strategicName(city);
+          return name ? [name] : [];
+        })
+        .sort(
+          (a, b) =>
+            Number(map.sites.find((site) => site.name === a)?.kind !== 'CITY') -
+            Number(map.sites.find((site) => site.name === b)?.kind !== 'CITY'),
+        ),
     ]),
   });
 }
@@ -272,7 +294,7 @@ if (
   source.sites.length !== 322 ||
   source.routes.length !== 467 ||
   source.scenarios.length !== 90 ||
-  roster.size !== 3011 ||
+  roster.size !== 3111 ||
   new Set(entries.map((e) => e.id)).size !== 91
 )
   throw Error('아티팩트 항목 수가 다릅니다.');
@@ -283,7 +305,7 @@ const scenarios = entries.map((entry) => {
   if (report.status !== 'pass') throw Error(`${scenario.id}: ${JSON.stringify(report).slice(0, 1000)}`);
   const initial = buildInitialWorld({ ...materials, scenario, seed: 'san10-expanded-import' });
   if (
-    initial.cities.length !== 322 ||
+    initial.cities.length !== strategicNames.size ||
     initial.generals.length !== entry.officers.length ||
     initial.nations.length !== entry.factions.length
   )
@@ -299,6 +321,7 @@ const write = (name: string, value: unknown) => writeFile(join(outputDir, name),
 await write('map.json', map);
 for (const { scenario } of scenarios) await write(`${scenario.id}.json`, scenario);
 await write('manifest.json', {
+  resourceVersion: 3,
   sourceUrl,
   sourceHash,
   factionColorSource,
@@ -314,8 +337,8 @@ await write('manifest.json', {
 console.log(
   JSON.stringify({
     map: map.id,
-    sites: sites.length,
-    routes: routes.length,
+    sites: map.sites.length,
+    routes: map.routes.length,
     scenarios: scenarios.length,
     blankGenerals: blank.officers.length,
   }),

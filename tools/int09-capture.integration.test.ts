@@ -122,7 +122,6 @@ beforeAll(
         }
       }
       initial = buildInitialWorld(source);
-      initial.ruleFeatures = ['campaign-v1', 'five-stats', 'operational-map', 'personnel', 'policy'];
       for (const nation of initial.nations) nation.isNpc = false;
       initial.diplomacies = [{ nationA: 1, nationB: 2, state: 'WAR', untilTick: 0 }];
       ({ worldId } = await saveInitialWorld(db, initial, {

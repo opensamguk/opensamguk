@@ -4,7 +4,6 @@ import { createDb } from '../packages/db/src/index';
 import {
   TICKS_PER_MONTH,
   officerTitle,
-  COURT_RANK_FEATURE,
   toGameDate,
   assignmentRejectCost,
   ASSIGNMENT_REJECT_PERCENT,
@@ -96,7 +95,6 @@ async function fixture(path: Path, options: { owner?: number; requestId?: string
     turnTermMinutes: 60,
     endYear: null,
     replayFormat: 3,
-    ruleFeatures: [...(options.courtRank ? [COURT_RANK_FEATURE] : []), 'personnel', 'policy'],
   });
   worldIds.add(worldId);
   await db.world.update({

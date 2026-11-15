@@ -59,8 +59,7 @@ describe('AC-M3-12 1030 고정 시드 관직 주재 골든', () => {
       residentOfficeBonuses(before, before.startYear),
     );
     const { version, minimumAbility, tax, supplyLoss } = before.officeEffects!;
-    before.officeEffects = { version, minimumAbility, tax, supplyLoss };
-    expect(appointOfficer(before, 1, 3, 2, 1, null)).toMatchObject({ ok: false, code: 'BAD_ARGS' });
+    expect(() => officeEffectsSchema.parse({ version, minimumAbility, tax, supplyLoss })).toThrow();
   });
   it('태수와 군사 보정은 각각 10%이고 참모가 함께 있어도 가장 큰 한 번만 붙는다', async () => {
     const before = await source();

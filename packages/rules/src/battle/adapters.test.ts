@@ -13,7 +13,6 @@ const paths = ['general', 'wall', 'campaign', 'campaignWall', 'garrison'] as con
 for (const enabled of [false, true]) {
   it.each(paths)(`AC-INT-22 %s는 기능 ${enabled}의 공통 계산식·효과·난수 순서를 쓴다`, (path) => {
     const world = commandWorld();
-    world.ruleFeatures = ['five-stats', ...(enabled ? ['battle-affinity-v2'] : [])];
     for (const general of Object.values(world.generals))
       Object.assign(general, {
         crew: 0,
@@ -86,7 +85,6 @@ for (const enabled of [false, true]) {
         });
       world.campaign.nextUnitId = world.campaign.units.length + 1;
       if (path === 'garrison') {
-        world.ruleFeatures.push('city-resources-v1');
         world.cityResources = emptyCityResourcesState(world);
         Object.assign(world.cityResources.cities['2']!, {
           rice: 10000,

@@ -44,7 +44,11 @@ export function effectiveStat(general: Pick<InitialGeneral, Stat>, stat: Stat): 
   return Math.trunc(Math.max(0, Math.min(STRATAGEM.MAX_STAT, general[stat] + Math.round(cross / 4))));
 }
 
-export function stratagemAttackScore(general: InitialGeneral, commandKey: string, view?: WorldView): number {
+export function stratagemAttackScore(
+  general: Pick<InitialGeneral, 'leadership' | 'strength' | 'intel' | 'politics' | 'charm' | 'id'>,
+  commandKey: string,
+  view?: WorldView,
+): number {
   const { leadership, strength, intel, politics, charm } = general;
   const base = fiveStatsSchema.parse({ leadership, strength, intel, politics, charm });
   const stats = view ? withEquipmentBonus(view, general.id, base) : base;
@@ -89,16 +93,9 @@ export function stratagemProbability(
   const city = view.cities[cityKey]!;
   const year = toGameDate(view.startYear, actor.tick ?? 0).year;
   const defenders = stratagemDefenders(view, cityKey, year);
-  const modern = view.ruleFeatures?.includes('stratagem-basic') ?? false;
-  const attack =
-    (modern ? stratagemAttackScore(general, commandKey ?? '', view) : effectiveStat(general, stat)) /
-    STRATAGEM.STAT_COEFFICIENT;
+  const attack = stratagemAttackScore(general, commandKey ?? '', view) / STRATAGEM.STAT_COEFFICIENT;
   const defence =
-    Math.max(
-      0,
-      ...defenders.map((g) => (modern ? g.intel + equipmentBonus(view, g.id).intel : effectiveStat(g, stat))),
-    ) /
-      STRATAGEM.STAT_COEFFICIENT +
+    Math.max(0, ...defenders.map((g) => g.intel + equipmentBonus(view, g.id).intel)) / STRATAGEM.STAT_COEFFICIENT +
     (Math.log2(defenders.length + 1) - 1.25) * 0.04 +
     developmentRatio(view, city.security, city.securityMax) / 5 +
     (city.supplied ? 0.1 : 0);
@@ -110,14 +107,14 @@ export function stratagemProbability(
 
 // 폐허의 내림으로 최대치가 0이 된 새 월드만 비율을 0으로 읽는다. 기존 공식은 보존한다.
 function developmentRatio(view: WorldView, value: number, max: number): number {
-  return max === 0 && view.ruleFeatures?.includes('city-scale-v1') ? 0 : value / max;
+  return max === 0 ? 0 : value / max;
 }
 
 export function plunderYearCoefficient(startYear: number, year: number): number {
   return Math.sqrt(1 + Math.max(0, year - startYear) / 4) / 2;
 }
 
-export function checkStratagem(view: WorldView, actor: Actor, raw: unknown): Failure | null {
+export function checkStratagem(view: WorldView, actor: Actor, raw: unknown, key?: string): Failure | null {
   const failure = ownCity(view, actor);
   if (failure) return failure;
   const parsed = stratagemArgs.safeParse(raw);
@@ -125,7 +122,8 @@ export function checkStratagem(view: WorldView, actor: Actor, raw: unknown): Fai
   const general = view.generals[actor.generalId]!;
   const city = view.cities[parsed.data.cityKey];
   if (!city) return fail('BAD_TARGET', '없는 도시입니다.');
-  if (city.kind === 'PASS') return fail('BAD_TARGET', '계략의 대상은 도시여야 합니다.');
+  if (city.kind === 'FIELD' || (city.kind === 'PASS' && key !== 'sabotage'))
+    return fail('BAD_TARGET', '계략의 대상은 도시여야 합니다.');
   if (city.nationId === general.nationId) return fail('BAD_TARGET', '자기 국가 도시에는 계략을 쓸 수 없습니다.');
   if (city.nationId === null) return fail('BAD_TARGET', '공백지에는 계략을 쓸 수 없습니다.');
   if (relation(view, general.nationId!, city.nationId)?.state === 'NON_AGGRESSION')
@@ -142,7 +140,7 @@ export function executeStratagem(
   raw: unknown,
   rng: Rng,
 ): CommandResult {
-  const failure = checkStratagem(view, actor, raw);
+  const failure = checkStratagem(view, actor, raw, spec.key);
   if (failure) throw new Error(failure.message);
   const { cityKey } = stratagemArgs.parse(raw);
   const general = view.generals[actor.generalId]!;
@@ -222,6 +220,12 @@ export function executeStratagem(
     { kind: 'general', id: general.id, field: 'rice', op: 'add', value: -STRATAGEM.COST_RICE },
     { kind: 'general', id: general.id, field: 'experience', op: 'add', value: experience },
     { kind: 'general', id: general.id, field: 'dedication', op: 'add', value: dedication },
+    ...(success && city.state != null
+      ? [
+          { kind: 'city' as const, id: cityKey, field: 'state' as const, op: 'set' as const, value: 32 },
+          { kind: 'city' as const, id: cityKey, field: 'stateTerm' as const, op: 'set' as const, value: 3 },
+        ]
+      : []),
     ...injuries,
     ...damage,
   ];

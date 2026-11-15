@@ -1,6 +1,6 @@
+import { initialReplayState } from '../src/replay';
 import type { WorldInit } from '../src/world/bootstrap';
 import type { UnitSetResource } from '../src/world/resources';
-import { toWorldState } from '../src/model/world';
 
 export const testUnits: UnitSetResource = {
   id: 'basic',
@@ -67,13 +67,15 @@ export const testUnits: UnitSetResource = {
   ],
 };
 export function commandInitial(): WorldInit {
-  return {
+  const initial: WorldInit = {
     seed: 'war-contract',
     scenarioKey: 'command-test',
     mapKey: 'test',
     unitSetKey: 'basic',
     startYear: 191,
-    statRules: { min: 1, max: 100, total: 200 },
+    statRules: { count: 5, min: 15, max: 90, total: 275 },
+    cityScale: { cities: [] },
+    fogOfWar: false,
     unitSet: structuredClone(testUnits),
     nations: [1, 2].map((id) => ({
       id,
@@ -123,6 +125,9 @@ export function commandInitial(): WorldInit {
       leadership: 100,
       strength: 80,
       intel: 70,
+      politics: 70,
+      charm: 70,
+      sex: 'UNKNOWN',
       officerLevel: id <= 2 ? 12 : id === 3 ? 1 : 0,
       birthYear: 160,
       deathYear: 230,
@@ -143,5 +148,58 @@ export function commandInitial(): WorldInit {
     })),
     diplomacies: [{ nationA: 1, nationB: 2, state: 'WAR', untilTick: 0 }],
   };
+  for (const city of initial.cities) city.kind = 'CITY';
+  initial.operationalMap = {
+    version: 3,
+    id: 'test',
+    name: '명령 시험 지도',
+    canvas: { width: 1000, height: 700 },
+    basemap: {
+      source: 'natural-earth-5.1.2',
+      projection: 'WGS84 plate carree',
+      sha256: 'a'.repeat(64),
+      bounds: [94, 17, 132.571428571429, 44],
+    },
+    defaults: { trust: 80, supplyState: 1 },
+    sites: initial.cities.map((c) => ({
+      id: `city:${c.cityKey}`,
+      kind: 'CITY' as const,
+      name: c.name,
+      anchorKey: c.cityKey,
+      level: c.level,
+      region: c.region,
+      position: { x: c.x, y: c.y },
+      initial: {
+        population: c.population,
+        agriculture: c.agriculture,
+        commerce: c.commerce,
+        security: c.security,
+        defence: c.defence,
+        wall: c.wall,
+      },
+      max: {
+        population: c.populationMax,
+        agriculture: c.agricultureMax,
+        commerce: c.commerceMax,
+        security: c.securityMax,
+        defence: c.defenceMax,
+        wall: c.wallMax,
+      },
+    })),
+    routes: initial.cities.flatMap((c) =>
+      c.connections
+        .filter((k) => c.cityKey < k)
+        .map((k) => ({
+          id: `route:${c.cityKey}:${k}`,
+          from: `city:${c.cityKey}`,
+          to: `city:${k}`,
+          mode: 'LAND' as const,
+          direction: 'BOTH' as const,
+          enabled: true,
+        })),
+    ),
+  };
+  return initial;
 }
-export const commandWorld = () => toWorldState(commandInitial());
+
+export const commandWorld = () => initialReplayState(commandInitial()).state;

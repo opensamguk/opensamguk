@@ -24,7 +24,6 @@ let worldId: string, otherWorld: string, cookie: string, outsider: string;
 let generalId: number, firstTick: number;
 const initial = commandInitial();
 initial.statRules = { ...FIVE_STAT_RULES };
-initial.ruleFeatures = ['five-stats', 'personnel', 'policy', 'stratagem-basic', 'treaty'];
 initial.nations = initial.nations.map((nation) => ({ ...nation, isNpc: false }));
 initial.generals = initial.generals.map((general) => ({
   ...general,

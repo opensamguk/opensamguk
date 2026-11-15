@@ -5,7 +5,6 @@ import { readArchive, resourceHashV3, type ReplayArchiveV3 } from './replay';
 
 async function archive(features: string[]): Promise<ReplayArchiveV3> {
   const initial = await monthlyFixture();
-  initial.ruleFeatures = features;
   const origin: ReplayArchiveV3['origin'] = {
     version: 3,
     initial,

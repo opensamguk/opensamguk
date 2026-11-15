@@ -8,13 +8,11 @@ import { checkRuleFeatures } from '../../../ruleRegistry';
 import { applyEffects } from '../../effects';
 import { createCommandResolver } from '../../resolve';
 
-const features = ['border-return-v1', 'nation-lifecycle-v1', 'personnel'];
 const actor = { generalId: 1, tick: 0, unitSet: testUnits };
 const key = 'return_border';
 
 function makeWorld() {
   const world = commandWorld();
-  world.ruleFeatures = [...features];
   world.nationLifecycle = initialNationLifecycle();
   world.generals[1]!.cityKey = 2;
   return world;
@@ -89,7 +87,6 @@ describe('AC-M1-14 접경귀환', () => {
   it('새 월드에서만 목록에 추가하고 기존 귀환과 기능 선행 조건을 보존한다', () => {
     const world = makeWorld();
     const enabled = resolverForRuleFeatures(world)!;
-    world.ruleFeatures = features.slice(1);
     const previous = resolverForRuleFeatures(world)!;
     expect(enabled.list('general').map(({ key }) => key)).toEqual([
       ...previous.list('general').map(({ key }) => key),
@@ -104,7 +101,6 @@ describe('AC-M1-14 접경귀환', () => {
 
   it('예턴을 실제 재생 명령 경로로 처리한다', () => {
     const initial = commandInitial();
-    initial.ruleFeatures = [...features];
     Object.assign(initial.generals[0]!, { cityKey: 2, userId: 'player' });
     initial.nations[0]!.isNpc = false;
     const replay = initialReplayState(initial);

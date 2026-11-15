@@ -14,7 +14,7 @@ async function main() {
     options: {
       seeds: { type: 'string' },
       seed: { type: 'string' },
-      scenario: { type: 'string', default: '1030' },
+      scenario: { type: 'string', default: 'san10-191' },
       'max-year': { type: 'string', default: String(DEFAULT_SIMULATION_MAX_YEAR) },
       convergence: { type: 'string', default: 'on' },
       output: { type: 'string' },
@@ -34,7 +34,7 @@ async function main() {
   const db = createDb(process.env.DATABASE_URL);
   let resources: InitialResources;
   try {
-    resources = await readInitialResources(db, { scenario: values.scenario, map: 'che' });
+    resources = await readInitialResources(db, { scenario: values.scenario, map: 'san10', unitSet: 'expanded' });
   } finally {
     await db.$disconnect();
   }
@@ -45,7 +45,7 @@ async function main() {
       logicalCpus: cpus().length,
       memoryBytes: totalmem(),
       scenario: values.scenario,
-      map: 'che',
+      map: 'san10',
       maxYear: Number(values['max-year']),
       convergence: values.convergence,
       resources: Object.values(resources).map(({ kind, name, version, contentHash }) => ({

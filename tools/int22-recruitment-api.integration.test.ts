@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '@opensamguk/rules';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import type { inferRouterOutputs } from '@trpc/server';
@@ -48,9 +49,9 @@ async function fixture(conditions: boolean) {
     ];
     initial.unitSet.crewTypes.find((unit) => unit.id === 1200)!.requirements = [{ kind: 'research', name: 'repeater' }];
   }
-  const features = [
+  [
     ...new Set([
-      ...(initial.ruleFeatures ?? []),
+      ...(providedRuleKeys ?? []),
       'campaign-assignment-v2',
       'campaign-v1',
       'city-resources-v1',
@@ -71,13 +72,12 @@ async function fixture(conditions: boolean) {
     build: { wall: { iron: 0, wood: 1, horses: 0 }, defence: { iron: 1, wood: 1, horses: 0 } },
     trade: { iron: { buy: 3, sell: 1 }, wood: { buy: 3, sell: 1 }, horses: { buy: 3, sell: 1 } },
   };
-  initial.ruleFeatures = features;
   const saved = await saveInitialWorld(db, initial, {
     name: 'AC-INT-22 모집 조건 조회',
     turnTermMinutes: 60,
     endYear: null,
     replayFormat: 3,
-    ruleFeatures: features,
+
     featureData: { 'logistics-v1': config },
   });
   worlds.push(saved.worldId);

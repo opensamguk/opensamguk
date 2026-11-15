@@ -7,7 +7,6 @@ import { deepFreeze } from './personnel/testFixture';
 
 function fixture() {
   const world = commandWorld();
-  world.ruleFeatures = ['city-resources-v1'];
   for (const city of Object.values(world.cities))
     Object.assign(city, { population: 10_000, commerce: 0, agriculture: 0 });
   Object.assign(world.cities[1]!, { commerce: 100, agriculture: 75 });
@@ -193,7 +192,7 @@ describe('AC-INT-18A 기존 급여를 보존하는 도시 세수 배분', () => 
     if (kind === 'unaffiliated') settled.generals[4]!.gold++;
     if (kind === 'missing-nation') delete settled.nations[2];
     if (kind === 'ledger') settled.cityResources!.cities['1']!.gold++;
-    if (kind === 'feature') settled.ruleFeatures = [];
+
     if (kind === 'city-change') settled.cities[1]!.population++;
     const snapshots = structuredClone({ before, settled });
     expect(() => applyCityResourceIncome(deepFreeze(before), deepFreeze(settled), { year: 191, month: 1 })).toThrow();

@@ -11,14 +11,12 @@ describe('AC-INT-15 명령 미리보기', () => {
   it('구형 판과 알 수 없는 행위자·명령에는 새 계약을 추가하지 않는다', () => {
     const state = commandWorld();
     expect(commandStatPreview(state, { generalId: 1 }, 'farm', {})).toBeNull();
-    state.ruleFeatures = ['five-stats'];
     expect(commandStatPreview(state, { generalId: 999 }, 'farm', {})).toBeNull();
     expect(commandStatPreview(state, { generalId: 1 }, 'rest', {})).toBeNull();
   });
 
   it('반복 미리보기는 상태를 바꾸지 않고 실제 차감·확정 훈련량과 같다', () => {
     const state = commandWorld();
-    state.ruleFeatures = ['five-stats'];
     Object.assign(state.generals[1]!, { politics: 90, charm: 70, train: 95, atmos: 80, crew: 100 });
     const before = structuredClone(state);
     const actor = { generalId: 1, unitSet: testUnits };
@@ -42,7 +40,6 @@ describe('AC-INT-15 명령 미리보기', () => {
 
   it('잘못된 모병 인자·부대에는 비용을 꾸며 내지 않는다', () => {
     const state = commandWorld();
-    state.ruleFeatures = ['five-stats'];
     Object.assign(state.generals[1]!, { politics: 50, charm: 50 });
     for (const args of [{}, { amount: -1, crewType: 1100 }, { amount: 10, crewType: 1000 }])
       expect(commandStatPreview(state, { generalId: 1, unitSet: testUnits }, 'recruit', args)).toBeNull();
@@ -50,7 +47,6 @@ describe('AC-INT-15 명령 미리보기', () => {
 
   it('부곡 미리보기는 실제 부장과 해당 부곡의 훈련·사기를 쓰고 비용은 소유자에게 계산한다', () => {
     const state = commandWorld();
-    state.ruleFeatures = ['campaign-v1', 'five-stats'];
     for (const general of Object.values(state.generals)) Object.assign(general, { politics: 50, charm: 50, crew: 0 });
     Object.assign(state.generals[1]!, { leadership: 25, charm: 20, train: 0, atmos: 0 });
     Object.assign(state.generals[4]!, { nationId: 1, cityKey: 1, leadership: 100, charm: 100 });

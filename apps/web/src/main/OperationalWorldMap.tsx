@@ -71,7 +71,7 @@ export function matchesOperationalGeography(map: MapData, cities: readonly Drawn
     JSON.stringify(map.basemap.bounds) !== JSON.stringify(basemap.bounds)
   )
     return false;
-  const anchors = map.sites.filter((site) => site.kind === 'CITY' || site.kind === 'PASS');
+  const anchors = map.sites.filter((site) => site.anchorKey !== undefined);
   if (
     anchors.length !== cities.length ||
     new Set(map.sites.map((site) => site.id)).size !== map.sites.length ||

@@ -338,7 +338,6 @@ describe('인사 기록과 직책 칸', () => {
   });
   it('전략을 켠 월드만 수뇌의 백성동원 예턴을 같은 기록으로 재생한다', () => {
     const state = world();
-    state.ruleFeatures = ['nation-strategy-v1', 'personnel'];
     const record = turnRecord();
     record.payload.turns[0] = { commandKey: 'nation_mobilize', args: { cityKey: 1 } };
     const before = structuredClone(state);
@@ -346,7 +345,6 @@ describe('인사 기록과 직책 칸', () => {
       record.payload.turns[0],
     );
     expect(state).toEqual(before);
-    before.ruleFeatures = ['personnel'];
     expect(() => applyNationTurnsRecord(before, {}, record)).toThrow();
   });
   it.each(['tenure', 'revision', 'office', 'command', 'args', 'length'] as const)(

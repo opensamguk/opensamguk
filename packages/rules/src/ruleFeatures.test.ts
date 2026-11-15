@@ -4,10 +4,10 @@ import { buildCreatedGeneral } from './general/create';
 import { applyRecordedInput, emptyTurns, initialReplayState } from './replay';
 import { checkReplayOrigin, ruleRegistry, settleMonthlyFeatures, type RuleRegistry } from './ruleRegistry';
 
-const initial = (features: string[]) => ({ ...commandInitial(), ruleFeatures: features });
+const initial = () => ({ ...commandInitial() });
 const origin = (features: string[], featureData?: Record<string, import('./model/world').JsonValue>) => ({
   version: 3,
-  initial: initial(features),
+  initial: initial(),
   initialStateHash: 'adapter-checks-hash',
   resourceHash: 'adapter-checks-hash',
   ...(featureData ? { featureData } : {}),
@@ -23,7 +23,7 @@ describe('형식 3의 정책·인사·조약 결합', () => {
   it('정책의 턴 간격은 생성 자료에서 읽고 30칸은 빈칸으로 시작한다', () => {
     const data = { policy: { version: 1, turnTermMinutes: 60 } };
     expect(() => checkReplayOrigin(origin(['policy'], data))).not.toThrow();
-    const replay = initialReplayState(initial(['policy']), data);
+    const replay = initialReplayState(initial(), data);
     expect(replay.policy).toMatchObject({ turnTermMinutes: 60, lastActiveTicks: {} });
     expect(replay.turns[1]).toHaveLength(30);
     expect(replay.turns[1]!.every((turn) => turn.explicit === false && turn.commandKey === 'rest')).toBe(true);
@@ -37,7 +37,7 @@ describe('형식 3의 정책·인사·조약 결합', () => {
   );
 
   it('인사는 빈 비공개 map으로 시작하고 WorldState에 앵커를 넣지 않는다', () => {
-    const replay = initialReplayState(initial(['personnel']));
+    const replay = initialReplayState(initial());
     expect(replay.offices).toEqual({});
     expect(replay.residenceAnchors).toEqual({});
     expect(Object.hasOwn(replay.state, 'residenceAnchors')).toBe(false);
@@ -51,7 +51,7 @@ describe('형식 3의 정책·인사·조약 결합', () => {
   });
 
   it('생성105 뒤 개인 칸 저장과 직책 칸 편집100은 앵커105를 보존한다', () => {
-    const source = initial(['personnel']);
+    const source = initial();
     source.generals[3]!.nationId = 1;
     source.generals[3]!.officerLevel = 5;
     const before = initialReplayState(source);
@@ -127,7 +127,7 @@ describe('형식 3의 정책·인사·조약 결합', () => {
   });
 
   it('월간 기능은 알파벳 대신 조약 다음 인사 순서로 실행한다', () => {
-    const before = initialReplayState(initial(['personnel', 'treaty']));
+    const before = initialReplayState(initial());
     const calls: string[] = [];
     const registry: RuleRegistry = {
       inputKinds: [],
@@ -153,7 +153,7 @@ describe('형식 3의 정책·인사·조약 결합', () => {
   it('조약 파기는 조약 기능을 함께 선택하고 빈 신의 상태에서 시작한다', () => {
     expect(() => checkReplayOrigin(origin(['treaty-break']))).toThrow('의존');
     expect(() => checkReplayOrigin(origin(['treaty', 'treaty-break']))).not.toThrow();
-    const replay = initialReplayState(initial(['treaty', 'treaty-break']));
+    const replay = initialReplayState(initial());
     expect(Object.hasOwn(replay.state, 'nationTrust')).toBe(false);
     expect(ruleRegistry.inputKinds.find((kind) => kind.kind === 'treaty.break')).toMatchObject({
       feature: 'treaty-break',
@@ -162,7 +162,7 @@ describe('형식 3의 정책·인사·조약 결합', () => {
   });
 
   it('실제 등록표로 조약 제안과 파기를 재현하고 신의는 한 번만 바꾼다', () => {
-    const before = initialReplayState(initial(['treaty', 'treaty-break']));
+    const before = initialReplayState(initial());
     const accepted = applyRecordedInput(before, {
       sequence: 10,
       tick: 100,

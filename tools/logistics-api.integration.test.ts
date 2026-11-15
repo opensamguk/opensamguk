@@ -46,16 +46,7 @@ const db = createDb(url),
 const now = Date.now();
 const app = await buildServer({ db, now: () => now, logging: false });
 let base: string, initial: WorldInit;
-const features = [
-  'campaign-assignment-v2',
-  'campaign-v1',
-  'city-resources-v1',
-  'five-stats',
-  'logistics-v1',
-  'operational-map',
-  'personnel',
-  'policy',
-];
+
 type Out = inferRouterOutputs<AppRouter>;
 type Results = {
   'world.summary': Out['world']['summary'];
@@ -223,7 +214,7 @@ async function fixture({ fundedRecruitment = false, expandedRecruitment = false 
       turnTermMinutes: 60,
       endYear: 201,
       replayFormat: 3,
-      ruleFeatures: features,
+
       featureData: { 'logistics-v1': config },
     },
   );
@@ -284,7 +275,6 @@ beforeAll(async () => {
     portraitMap: '191-map',
     seed: 'logistics-api',
   });
-  initial.ruleFeatures = [...features];
   initial.generals = initial.generals.map((general) => ({ ...general, crew: 0, nextTurnTick: 1_000_000 }));
   base = await app.listen({ host: '127.0.0.1', port: 0 });
 });
@@ -352,7 +342,7 @@ describe('AC-P2-30 실제 HTTP 물류 접수·조회·엔진', () => {
         turnTermMinutes: 60,
         endYear: 201,
         replayFormat: 3,
-        ruleFeatures: features,
+
         featureData: { 'logistics-v1': config },
       });
       worldIds.push(worldId);

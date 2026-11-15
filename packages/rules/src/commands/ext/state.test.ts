@@ -57,13 +57,13 @@ it('복원할 조각 key는 정렬한 합집합이며 명령 결합을 검증한
 });
 
 it('조각이 없는 월드는 undefined만 복원하고 운영 목록은 시험 key를 거부한다', () => {
-  expect(restoreExtState(null, undefined)).toBeUndefined();
+  expect(restoreExtState(undefined)).toBeUndefined();
   for (const input of [null, { general: [], nation: [] }, { general: ['t_free'], nation: [] }]) {
     expect(restoreExtStateWithRegistry(input, undefined, fixture())).toBeUndefined();
     for (const raw of [null, {}, [], { s_shared: { nested: [] } }])
       expect(() => restoreExtStateWithRegistry(input, raw, fixture())).toThrow();
   }
-  expect(() => restoreExtState({ general: ['t_a'], nation: [] }, { s_a: { nested: [] } })).toThrow();
+  expect(() => restoreExtState({ s_a: { nested: [] } })).toThrow();
 });
 
 it('복원은 기대 조각이 빠지거나 남은 값과 조각 검증 실패를 거부한다', () => {

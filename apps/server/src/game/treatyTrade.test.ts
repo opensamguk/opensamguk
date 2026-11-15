@@ -9,7 +9,7 @@ function fixture() {
     id: 'world',
     status: 'RUNNING',
     replayFormat: 3,
-    ruleFeatures: ['treaty', 'treaty-trade'],
+
     startYear: 191,
     actionSequence: 30,
     clockTick: 20000,
@@ -91,7 +91,6 @@ describe('T2-07 / AC-M2-14 교역 후보 API leaf', () => {
   });
   it('교역 기능이 없으면 저장 행을 읽기 전에 거절한다', async () => {
     const f = fixture();
-    f.world.ruleFeatures = ['treaty'];
     await expect(f.query()).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
     expect(f.tx.treaty.findMany).not.toHaveBeenCalled();
   });

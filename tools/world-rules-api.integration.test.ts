@@ -46,13 +46,11 @@ async function query(input: unknown, cookie: string | undefined = cookies[0]) {
 }
 
 async function save(initial: ReturnType<typeof commandInitial>) {
-  initial.ruleFeatures = [...new Set([...(initial.ruleFeatures ?? []), 'personnel', 'policy'])].sort();
   const saved = await saveInitialWorld(db, initial, {
     name: 'T4-85 규칙 조회',
     turnTermMinutes: 60,
     endYear: null,
     replayFormat: 3,
-    ruleFeatures: initial.ruleFeatures,
   });
   worlds.push(saved.worldId);
   return saved.worldId;

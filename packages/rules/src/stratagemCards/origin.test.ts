@@ -9,7 +9,6 @@ import { decideStratagemCardsAction } from './actions';
 
 function fixture() {
   const initial = commandInitial();
-  initial.ruleFeatures = ['five-stats', 'personnel', 'stratagem-basic', 'stratagem-cards-v1'];
   const config = { ...TEST_STRATAGEM_CARDS_CONFIG, deck: [{ kind: 'trap' as const, weight: 1 }], startHand: 1 },
     state = toWorldState(initial),
     cards = initialStratagemCards(config, state, initial.seed);
@@ -18,7 +17,7 @@ function fixture() {
     state,
     row: {
       replayFormat: 3,
-      ruleFeatures: initial.ruleFeatures,
+
       monthlyTick: 0,
       replayOrigin: { version: 3, initial, featureData: { 'stratagem-cards-v1': { version: 1, config } } },
       stratagemCardsState: cards,
@@ -29,37 +28,25 @@ function fixture() {
 it('AC-P2-23 명시 원 설정·시드·월 시각의 저장 사본만 적재한다', () => {
   const { state, row } = fixture();
   expect(readStoredStratagemCards(row, state)).toEqual(state.stratagemCards);
-  expect(readStratagemCardsStorage({ ...row, ruleFeatures: [], stratagemCardsState: null })).toBeUndefined();
-  expect(() => readStratagemCardsStorage({ ...row, ruleFeatures: [] })).toThrow();
+  expect(readStratagemCardsStorage({ ...row, stratagemCardsState: null })).toBeUndefined();
+  expect(() => readStratagemCardsStorage({ ...row })).toThrow();
 });
 
-it.each([
-  'format',
-  'flags',
-  'dependency',
-  'fiveStats',
-  'data',
-  'state',
-  'seed',
-  'config',
-  'monthlyTick',
-  'unsupported',
-])('AC-P2-23 저장된 %s 불일치를 기본값으로 덮지 않는다', (part) => {
-  const { row } = fixture();
-  if (part === 'format') row.replayFormat = 1;
-  if (part === 'flags') row.replayOrigin.initial.ruleFeatures = ['personnel'];
-  if (part === 'dependency' || part === 'fiveStats') {
-    row.ruleFeatures = row.ruleFeatures.filter((key) => key !== (part === 'dependency' ? 'personnel' : 'five-stats'));
-    row.replayOrigin.initial.ruleFeatures = [...row.ruleFeatures];
-  }
-  if (part === 'data') delete (row.replayOrigin.featureData as Record<string, unknown>)['stratagem-cards-v1'];
-  if (part === 'state') row.stratagemCardsState = null as never;
-  if (part === 'seed') row.stratagemCardsState.seed += '-changed';
-  if (part === 'config') row.stratagemCardsState.config.trap.lossBp++;
-  if (part === 'monthlyTick') row.monthlyTick = 10_000;
-  if (part === 'unsupported') row.replayOrigin.featureData['stratagem-cards-v1'].config.setter = 'chiefs';
-  expect(() => readStratagemCardsStorage(row)).toThrow();
-});
+it.each(['format', 'data', 'state', 'seed', 'config', 'monthlyTick', 'unsupported'])(
+  'AC-P2-23 저장된 %s 불일치를 기본값으로 덮지 않는다',
+  (part) => {
+    const { row } = fixture();
+    if (part === 'format') row.replayFormat = 1;
+
+    if (part === 'data') delete (row.replayOrigin.featureData as Record<string, unknown>)['stratagem-cards-v1'];
+    if (part === 'state') row.stratagemCardsState = null as never;
+    if (part === 'seed') row.stratagemCardsState.seed += '-changed';
+    if (part === 'config') row.stratagemCardsState.config.trap.lossBp++;
+    if (part === 'monthlyTick') row.monthlyTick = 10_000;
+    if (part === 'unsupported') row.replayOrigin.featureData['stratagem-cards-v1'].config.setter = 'chiefs';
+    expect(() => readStratagemCardsStorage(row)).toThrow();
+  },
+);
 
 it('AC-P2-23 소유 변경은 구조 검사 뒤 정리하되 일반 적재에서는 거부한다', () => {
   const { state, row } = fixture(),

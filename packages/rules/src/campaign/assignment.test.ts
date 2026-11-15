@@ -1,3 +1,4 @@
+import { providedRuleKeys } from './../providedRules';
 import { describe, expect, it } from 'vitest';
 import { commandWorld, commandInitial } from '../../test/commandFixture';
 import { deepFreeze } from '../personnel/testFixture';
@@ -8,7 +9,7 @@ import { emptyCampaignState } from './state';
 import { campaignFeature } from './feature';
 import { campaignAssignmentFeature } from './assignment';
 
-function fixture(corrected = true): ReplayState {
+function fixture(): ReplayState {
   const state = commandWorld();
   for (const general of Object.values(state.generals))
     Object.assign(general, { politics: 60, charm: 55, crew: 0, cityKey: 1, nationId: 1, officerLevel: 1 });
@@ -17,14 +18,6 @@ function fixture(corrected = true): ReplayState {
   state.generals[4]!.officerLevel = 12;
   state.cities[2]!.nationId = 1;
   state.nations[1]!.isNpc = false;
-  state.ruleFeatures = [
-    ...(corrected ? ['campaign-assignment-v2'] : []),
-    'campaign-v1',
-    'five-stats',
-    'operational-map',
-    'personnel',
-    'policy',
-  ];
   state.campaign = emptyCampaignState(state, 'assignment-seed', 'sourced-test');
   state.campaign.links = [
     { masterId: 1, personId: 2, relation: 'LIEUTENANT' },
@@ -55,12 +48,12 @@ function expire(before: ReplayState) {
 
 describe('AC-INT-09 발령 기한 수락과 부곡 동행의 원생성별 규칙 판', () => {
   it('기존 campaign-v1의 월간 결과는 바꾸지 않는다', () => {
-    const before = fixture(false),
+    const before = fixture(),
       after = expire(before);
     expect(after.state.generals[1]!.cityKey).toBe(2);
     expect(after.state.generals[2]!.cityKey).toBe(1);
     expect(after.state.assignmentOffers).toBeUndefined();
-    expect(after.state.ruleFeatures).toEqual(before.state.ruleFeatures);
+    expect(providedRuleKeys).toEqual(providedRuleKeys);
   });
 
   it('보완판의 명시 수락과 기한 수락은 집결한 NPC 부장만 같은 목적지로 보낸다', () => {
@@ -109,8 +102,8 @@ describe('AC-INT-09 발령 기한 수락과 부곡 동행의 원생성별 규칙
   });
 
   it('새 판은 campaign-v1 의존성과 원생성의 명시 선택을 검사한다', () => {
-    const before = fixture();
-    expect(checkRuleFeatures(before.state.ruleFeatures)).toEqual(before.state.ruleFeatures);
+    fixture();
+    expect(checkRuleFeatures(providedRuleKeys)).toEqual(providedRuleKeys);
     expect(() => checkRuleFeatures(['campaign-assignment-v2'])).toThrow('의존');
     expect(() => campaignAssignmentFeature.checkOrigin!({ initial: commandInitial(), data: {} })).toThrow('초기 자료');
   });

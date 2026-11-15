@@ -3,6 +3,7 @@ import { TICKS_PER_MONTH } from '../clock/constants';
 import type { WorldView } from '../model/world';
 import type { RecordedInput } from '../replay';
 import { applyCityAllocation, cityAllocationArgs } from './allocation';
+import { battleBusy } from '../tactical/world';
 
 const integer = z.number().int().min(0).max(2_147_483_647);
 export const cityResourceInputSchema = cityAllocationArgs;
@@ -24,10 +25,28 @@ export function applyCityResourceInput(
     return deny('ACTOR_INACTIVE', '아직 등장하지 않은 장수입니다.');
   const parsed = cityResourceInputSchema.safeParse(value);
   if (!parsed.success) return deny('BAD_INPUT', '도시 병력 배속 입력을 확인하세요.');
-  const ownerId = world.campaign?.units.find((row) => row.id === parsed.data.unitId)?.ownerId;
-  const commanderId = world.campaign?.units.find((row) => row.id === parsed.data.unitId)?.commanderId;
+  if (
+    battleBusy(world, {
+      cityKeys: [parsed.data.cityKey],
+      unitIds: typeof parsed.data.unitId === 'number' ? [parsed.data.unitId] : [],
+      generalIds: parsed.data.recipientId === undefined ? [] : [parsed.data.recipientId],
+    })
+  )
+    return deny('BATTLE_BUSY', '전투 중');
+  const ownerId =
+    parsed.data.unitId === 'new'
+      ? parsed.data.recipientId
+      : world.campaign?.units.find((row) => row.id === parsed.data.unitId)?.ownerId;
+  const commanderId =
+    parsed.data.unitId === 'new'
+      ? parsed.data.recipientId
+      : world.campaign?.units.find((row) => row.id === parsed.data.unitId)?.commanderId;
   const year = world.startYear + Math.floor(context.tick / (12 * TICKS_PER_MONTH));
-  if ([ownerId, commanderId].some((id) => id !== undefined && world.generals[id]!.activeFromYear > year))
+  if (
+    [ownerId, commanderId].some(
+      (id) => id !== undefined && (!world.generals[id] || world.generals[id]!.activeFromYear > year),
+    )
+  )
     return deny('BAD_TARGET', '아직 등장하지 않은 부곡 인물에게 배속할 수 없습니다.');
   const outcome = applyCityAllocation(
     world,
@@ -58,7 +77,7 @@ export function validateCityResourceRecord(input: RecordedInput): void {
   const payload = cityResourceInputSchema.parse(input.payload),
     result = cityResourceResultSchema.parse(input.result);
   if (result.tick !== input.tick) throw new Error('도시 자원 처리 tick이 기록과 다릅니다.');
-  if ((['cityKey', 'unitId', 'crewType', 'amount'] as const).some((key) => payload[key] !== result[key]))
+  if ((['cityKey', 'unitId', 'recipientId', 'crewType', 'amount'] as const).some((key) => payload[key] !== result[key]))
     throw new Error('도시 자원 입력과 처리 결과의 대상·수량이 다릅니다.');
 }
 

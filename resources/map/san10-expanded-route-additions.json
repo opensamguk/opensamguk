@@ -1,0 +1,1183 @@
+{
+ "note": "INT-27 길 보강(사용자 2026-11-14: \"영지가 붙은 것 중에 길이 안이어진거 확인해보고 판단해서 길을 잇던지 해\", \"답씨와 평곽은 길을 이어야\"). 시나리오 기획판 아티팩트(eb764cc8) 영지에서 맞닿았는데 직접 길이 없는 쌍 445개 가운데, 경계 2칸 이상·거리 110 이하이면서 길로 4번 이상 돌아가거나(모두) 3번 돌아가고 양쪽이 소 이상 도시·이민족 본거인 쌍을 잇는다.",
+ "source": "https://claude.ai/artifact/YDyLtPmfANcJ6uqj8Vpi82 (SHA-256 eb764cc8d722fae4e0be4cb3dc7fff7f8155a3c58ad915338cd8c2c155fd1e1c)",
+ "routes": [
+  {
+   "from": "city:10101",
+   "to": "city:10128",
+   "names": [
+    "삭방",
+    "사연"
+   ],
+   "hops": 13,
+   "border": 5,
+   "dist": 79
+  },
+  {
+   "from": "city:10078",
+   "to": "city:10079",
+   "names": [
+    "평곽",
+    "답씨"
+   ],
+   "hops": 12,
+   "border": 5,
+   "dist": 51
+  },
+  {
+   "from": "city:1079",
+   "to": "city:10128",
+   "names": [
+    "오원",
+    "사연"
+   ],
+   "hops": 12,
+   "border": 3,
+   "dist": 68
+  },
+  {
+   "from": "city:10081",
+   "to": "city:10128",
+   "names": [
+    "서하",
+    "사연"
+   ],
+   "hops": 12,
+   "border": 9,
+   "dist": 58
+  },
+  {
+   "from": "city:10101",
+   "to": "city:10129",
+   "names": [
+    "삭방",
+    "영주"
+   ],
+   "hops": 11,
+   "border": 9,
+   "dist": 71
+  },
+  {
+   "from": "city:10081",
+   "to": "city:10182",
+   "names": [
+    "서하",
+    "고노"
+   ],
+   "hops": 11,
+   "border": 8,
+   "dist": 48
+  },
+  {
+   "from": "city:10060",
+   "to": "city:10174",
+   "names": [
+    "장가",
+    "시안"
+   ],
+   "hops": 11,
+   "border": 12,
+   "dist": 83
+  },
+  {
+   "from": "city:10074",
+   "to": "city:10080",
+   "names": [
+    "운중",
+    "대"
+   ],
+   "hops": 10,
+   "border": 4,
+   "dist": 90
+  },
+  {
+   "from": "city:10128",
+   "to": "city:10129",
+   "names": [
+    "사연",
+    "영주"
+   ],
+   "hops": 10,
+   "border": 5,
+   "dist": 64
+  },
+  {
+   "from": "city:10128",
+   "to": "city:10212",
+   "names": [
+    "사연",
+    "북지"
+   ],
+   "hops": 10,
+   "border": 5,
+   "dist": 63
+  },
+  {
+   "from": "city:10080",
+   "to": "city:10100",
+   "names": [
+    "대",
+    "정양"
+   ],
+   "hops": 9,
+   "border": 10,
+   "dist": 40
+  },
+  {
+   "from": "city:10182",
+   "to": "city:10212",
+   "names": [
+    "고노",
+    "북지"
+   ],
+   "hops": 9,
+   "border": 7,
+   "dist": 43
+  },
+  {
+   "from": "city:10154",
+   "to": "city:10246",
+   "names": [
+    "동안",
+    "게양"
+   ],
+   "hops": 9,
+   "border": 7,
+   "dist": 61
+  },
+  {
+   "from": "city:10060",
+   "to": "city:10116",
+   "names": [
+    "장가",
+    "원릉"
+   ],
+   "hops": 9,
+   "border": 5,
+   "dist": 89
+  },
+  {
+   "from": "city:10080",
+   "to": "city:10124",
+   "names": [
+    "대",
+    "평성"
+   ],
+   "hops": 8,
+   "border": 6,
+   "dist": 13
+  },
+  {
+   "from": "city:1089",
+   "to": "city:10182",
+   "names": [
+    "평양",
+    "고노"
+   ],
+   "hops": 8,
+   "border": 2,
+   "dist": 59
+  },
+  {
+   "from": "city:10212",
+   "to": "city:10213",
+   "names": [
+    "북지",
+    "조음"
+   ],
+   "hops": 8,
+   "border": 3,
+   "dist": 38
+  },
+  {
+   "from": "city:1124",
+   "to": "city:10080",
+   "names": [
+    "선비",
+    "대"
+   ],
+   "hops": 7,
+   "border": 5,
+   "dist": 99
+  },
+  {
+   "from": "city:10080",
+   "to": "city:10159",
+   "names": [
+    "대",
+    "안문"
+   ],
+   "hops": 7,
+   "border": 3,
+   "dist": 37
+  },
+  {
+   "from": "city:22",
+   "to": "city:10129",
+   "names": [
+    "서량",
+    "영주"
+   ],
+   "hops": 7,
+   "border": 13,
+   "dist": 97
+  },
+  {
+   "from": "city:1089",
+   "to": "city:10213",
+   "names": [
+    "평양",
+    "조음"
+   ],
+   "hops": 7,
+   "border": 4,
+   "dist": 53
+  },
+  {
+   "from": "city:45",
+   "to": "city:1067",
+   "names": [
+    "영안",
+    "서성"
+   ],
+   "hops": 7,
+   "border": 2,
+   "dist": 45
+  },
+  {
+   "from": "city:1067",
+   "to": "city:10244",
+   "names": [
+    "서성",
+    "선한"
+   ],
+   "hops": 7,
+   "border": 2,
+   "dist": 55
+  },
+  {
+   "from": "city:27",
+   "to": "city:10116",
+   "names": [
+    "강주",
+    "원릉"
+   ],
+   "hops": 7,
+   "border": 5,
+   "dist": 100
+  },
+  {
+   "from": "city:1149",
+   "to": "city:10070",
+   "names": [
+    "부여",
+    "고현"
+   ],
+   "hops": 6,
+   "border": 9,
+   "dist": 89
+  },
+  {
+   "from": "city:1125",
+   "to": "city:10074",
+   "names": [
+    "흉노",
+    "운중"
+   ],
+   "hops": 6,
+   "border": 25,
+   "dist": 10
+  },
+  {
+   "from": "city:1124",
+   "to": "city:10105",
+   "names": [
+    "선비",
+    "영성"
+   ],
+   "hops": 6,
+   "border": 2,
+   "dist": 75
+  },
+  {
+   "from": "city:37",
+   "to": "city:10307",
+   "names": [
+    "북해",
+    "노수 나루"
+   ],
+   "hops": 6,
+   "border": 5,
+   "dist": 31
+  },
+  {
+   "from": "city:25",
+   "to": "city:10014",
+   "names": [
+    "상용",
+    "상락"
+   ],
+   "hops": 6,
+   "border": 2,
+   "dist": 44
+  },
+  {
+   "from": "city:25",
+   "to": "city:45",
+   "names": [
+    "상용",
+    "영안"
+   ],
+   "hops": 6,
+   "border": 5,
+   "dist": 36
+  },
+  {
+   "from": "city:1126",
+   "to": "city:10093",
+   "names": [
+    "저",
+    "음평"
+   ],
+   "hops": 6,
+   "border": 7,
+   "dist": 27
+  },
+  {
+   "from": "city:24",
+   "to": "city:10244",
+   "names": [
+    "한중",
+    "선한"
+   ],
+   "hops": 6,
+   "border": 2,
+   "dist": 50
+  },
+  {
+   "from": "city:5",
+   "to": "city:1126",
+   "names": [
+    "성도",
+    "저"
+   ],
+   "hops": 6,
+   "border": 10,
+   "dist": 92
+  },
+  {
+   "from": "city:10065",
+   "to": "city:10174",
+   "names": [
+    "포산",
+    "시안"
+   ],
+   "hops": 6,
+   "border": 5,
+   "dist": 59
+  },
+  {
+   "from": "city:10060",
+   "to": "city:10200",
+   "names": [
+    "장가",
+    "영방"
+   ],
+   "hops": 6,
+   "border": 4,
+   "dist": 105
+  },
+  {
+   "from": "city:1124",
+   "to": "city:10052",
+   "names": [
+    "선비",
+    "어양"
+   ],
+   "hops": 5,
+   "border": 5,
+   "dist": 73
+  },
+  {
+   "from": "city:1124",
+   "to": "city:10208",
+   "names": [
+    "선비",
+    "상곡"
+   ],
+   "hops": 5,
+   "border": 5,
+   "dist": 74
+  },
+  {
+   "from": "city:10018",
+   "to": "city:10028",
+   "names": [
+    "신미",
+    "고자미동"
+   ],
+   "hops": 5,
+   "border": 3,
+   "dist": 43
+  },
+  {
+   "from": "city:1125",
+   "to": "city:10100",
+   "names": [
+    "흉노",
+    "정양"
+   ],
+   "hops": 5,
+   "border": 3,
+   "dist": 60
+  },
+  {
+   "from": "city:7",
+   "to": "city:10222",
+   "names": [
+    "건업",
+    "종리"
+   ],
+   "hops": 5,
+   "border": 2,
+   "dist": 37
+  },
+  {
+   "from": "city:1089",
+   "to": "city:10125",
+   "names": [
+    "평양",
+    "포판"
+   ],
+   "hops": 5,
+   "border": 4,
+   "dist": 27
+  },
+  {
+   "from": "city:4",
+   "to": "city:10213",
+   "names": [
+    "장안",
+    "조음"
+   ],
+   "hops": 5,
+   "border": 3,
+   "dist": 45
+  },
+  {
+   "from": "city:1123",
+   "to": "city:10146",
+   "names": [
+    "산월",
+    "단양"
+   ],
+   "hops": 5,
+   "border": 4,
+   "dist": 48
+  },
+  {
+   "from": "city:25",
+   "to": "city:10094",
+   "names": [
+    "상용",
+    "석현"
+   ],
+   "hops": 5,
+   "border": 5,
+   "dist": 42
+  },
+  {
+   "from": "city:45",
+   "to": "city:10244",
+   "names": [
+    "영안",
+    "선한"
+   ],
+   "hops": 5,
+   "border": 5,
+   "dist": 53
+  },
+  {
+   "from": "city:45",
+   "to": "city:10116",
+   "names": [
+    "영안",
+    "원릉"
+   ],
+   "hops": 5,
+   "border": 5,
+   "dist": 70
+  },
+  {
+   "from": "city:10150",
+   "to": "city:10154",
+   "names": [
+    "감현",
+    "동안"
+   ],
+   "hops": 5,
+   "border": 3,
+   "dist": 102
+  },
+  {
+   "from": "city:1121",
+   "to": "city:10070",
+   "names": [
+    "오환",
+    "고현"
+   ],
+   "hops": 4,
+   "border": 3,
+   "dist": 90
+  },
+  {
+   "from": "city:1139",
+   "to": "city:10070",
+   "names": [
+    "졸본",
+    "고현"
+   ],
+   "hops": 4,
+   "border": 3,
+   "dist": 56
+  },
+  {
+   "from": "city:10006",
+   "to": "city:10021",
+   "names": [
+    "동예",
+    "사벌"
+   ],
+   "hops": 4,
+   "border": 3,
+   "dist": 38
+  },
+  {
+   "from": "city:1132",
+   "to": "city:1136",
+   "names": [
+    "불미국",
+    "이사국"
+   ],
+   "hops": 4,
+   "border": 11,
+   "dist": 49
+  },
+  {
+   "from": "city:10027",
+   "to": "city:10035",
+   "names": [
+    "초팔",
+    "모로비리"
+   ],
+   "hops": 4,
+   "border": 2,
+   "dist": 37
+  },
+  {
+   "from": "city:1079",
+   "to": "city:10100",
+   "names": [
+    "오원",
+    "정양"
+   ],
+   "hops": 4,
+   "border": 6,
+   "dist": 62
+  },
+  {
+   "from": "city:1088",
+   "to": "city:10097",
+   "names": [
+    "낭야",
+    "설"
+   ],
+   "hops": 4,
+   "border": 6,
+   "dist": 29
+  },
+  {
+   "from": "city:19",
+   "to": "city:10300",
+   "names": [
+    "진류",
+    "오소"
+   ],
+   "hops": 4,
+   "border": 2,
+   "dist": 11
+  },
+  {
+   "from": "city:10300",
+   "to": "city:10303",
+   "names": [
+    "오소",
+    "형양 변수"
+   ],
+   "hops": 4,
+   "border": 2,
+   "dist": 16
+  },
+  {
+   "from": "city:7",
+   "to": "city:10221",
+   "names": [
+    "건업",
+    "우이"
+   ],
+   "hops": 4,
+   "border": 2,
+   "dist": 27
+  },
+  {
+   "from": "city:23",
+   "to": "city:10017",
+   "names": [
+    "하내",
+    "형양"
+   ],
+   "hops": 4,
+   "border": 2,
+   "dist": 9
+  },
+  {
+   "from": "city:7",
+   "to": "city:10310",
+   "names": [
+    "건업",
+    "소요진"
+   ],
+   "hops": 4,
+   "border": 2,
+   "dist": 38
+  },
+  {
+   "from": "city:42",
+   "to": "city:10125",
+   "names": [
+    "홍농",
+    "포판"
+   ],
+   "hops": 4,
+   "border": 2,
+   "dist": 20
+  },
+  {
+   "from": "city:41",
+   "to": "city:1060",
+   "names": [
+    "안정",
+    "적도"
+   ],
+   "hops": 4,
+   "border": 9,
+   "dist": 86
+  },
+  {
+   "from": "city:4",
+   "to": "city:10180",
+   "names": [
+    "장안",
+    "임진"
+   ],
+   "hops": 4,
+   "border": 2,
+   "dist": 30
+  },
+  {
+   "from": "city:3",
+   "to": "city:10",
+   "names": [
+    "낙양",
+    "완"
+   ],
+   "hops": 4,
+   "border": 2,
+   "dist": 41
+  },
+  {
+   "from": "city:11",
+   "to": "city:1098",
+   "names": [
+    "수춘",
+    "의양"
+   ],
+   "hops": 4,
+   "border": 3,
+   "dist": 72
+  },
+  {
+   "from": "city:4",
+   "to": "city:10162",
+   "names": [
+    "장안",
+    "정현"
+   ],
+   "hops": 4,
+   "border": 6,
+   "dist": 20
+  },
+  {
+   "from": "city:56",
+   "to": "city:10146",
+   "names": [
+    "여강",
+    "단양"
+   ],
+   "hops": 4,
+   "border": 4,
+   "dist": 59
+  },
+  {
+   "from": "city:41",
+   "to": "city:10211",
+   "names": [
+    "안정",
+    "견현"
+   ],
+   "hops": 4,
+   "border": 3,
+   "dist": 21
+  },
+  {
+   "from": "city:10038",
+   "to": "city:10073",
+   "names": [
+    "포한",
+    "금성"
+   ],
+   "hops": 4,
+   "border": 11,
+   "dist": 12
+  },
+  {
+   "from": "city:1120",
+   "to": "city:10038",
+   "names": [
+    "강",
+    "포한"
+   ],
+   "hops": 4,
+   "border": 3,
+   "dist": 9
+  },
+  {
+   "from": "city:1063",
+   "to": "city:10211",
+   "names": [
+    "가정",
+    "견현"
+   ],
+   "hops": 4,
+   "border": 2,
+   "dist": 20
+  },
+  {
+   "from": "city:1106",
+   "to": "city:10223",
+   "names": [
+    "서새산",
+    "주현"
+   ],
+   "hops": 4,
+   "border": 3,
+   "dist": 9
+  },
+  {
+   "from": "city:10153",
+   "to": "city:10230",
+   "names": [
+    "후관",
+    "송양"
+   ],
+   "hops": 4,
+   "border": 3,
+   "dist": 61
+  },
+  {
+   "from": "city:6",
+   "to": "city:10238",
+   "names": [
+    "양양",
+    "자귀"
+   ],
+   "hops": 4,
+   "border": 2,
+   "dist": 42
+  },
+  {
+   "from": "city:1126",
+   "to": "city:10040",
+   "names": [
+    "저",
+    "임조"
+   ],
+   "hops": 4,
+   "border": 5,
+   "dist": 70
+  },
+  {
+   "from": "city:96",
+   "to": "city:1126",
+   "names": [
+    "서평",
+    "저"
+   ],
+   "hops": 4,
+   "border": 4,
+   "dist": 105
+  },
+  {
+   "from": "city:5",
+   "to": "city:10093",
+   "names": [
+    "성도",
+    "음평"
+   ],
+   "hops": 4,
+   "border": 3,
+   "dist": 65
+  },
+  {
+   "from": "city:1071",
+   "to": "city:10244",
+   "names": [
+    "임강",
+    "선한"
+   ],
+   "hops": 4,
+   "border": 4,
+   "dist": 28
+  },
+  {
+   "from": "city:45",
+   "to": "city:53",
+   "names": [
+    "영안",
+    "무릉"
+   ],
+   "hops": 4,
+   "border": 2,
+   "dist": 76
+  },
+  {
+   "from": "city:10150",
+   "to": "city:10246",
+   "names": [
+    "감현",
+    "게양"
+   ],
+   "hops": 4,
+   "border": 7,
+   "dist": 80
+  },
+  {
+   "from": "city:1119",
+   "to": "city:10174",
+   "names": [
+    "창오",
+    "시안"
+   ],
+   "hops": 4,
+   "border": 3,
+   "dist": 57
+  },
+  {
+   "from": "city:1075",
+   "to": "city:1122",
+   "names": [
+    "애뢰",
+    "남만"
+   ],
+   "hops": 4,
+   "border": 9,
+   "dist": 47
+  },
+  {
+   "from": "city:1139",
+   "to": "city:10076",
+   "names": [
+    "졸본",
+    "현도"
+   ],
+   "hops": 3,
+   "border": 5,
+   "dist": 55
+  },
+  {
+   "from": "city:1121",
+   "to": "city:10083",
+   "names": [
+    "오환",
+    "요서"
+   ],
+   "hops": 3,
+   "border": 9,
+   "dist": 12
+  },
+  {
+   "from": "city:10021",
+   "to": "city:10024",
+   "names": [
+    "사벌",
+    "조문"
+   ],
+   "hops": 3,
+   "border": 4,
+   "dist": 14
+  },
+  {
+   "from": "city:1134",
+   "to": "city:1136",
+   "names": [
+    "투마국",
+    "이사국"
+   ],
+   "hops": 3,
+   "border": 4,
+   "dist": 39
+  },
+  {
+   "from": "city:1145",
+   "to": "city:10005",
+   "names": [
+    "목지국",
+    "맥국"
+   ],
+   "hops": 3,
+   "border": 2,
+   "dist": 27
+  },
+  {
+   "from": "city:1146",
+   "to": "city:10041",
+   "names": [
+    "건마국",
+    "감문"
+   ],
+   "hops": 3,
+   "border": 2,
+   "dist": 31
+  },
+  {
+   "from": "city:10035",
+   "to": "city:10039",
+   "names": [
+    "모로비리",
+    "안야"
+   ],
+   "hops": 3,
+   "border": 2,
+   "dist": 44
+  },
+  {
+   "from": "city:10080",
+   "to": "city:10205",
+   "names": [
+    "대",
+    "탁군"
+   ],
+   "hops": 3,
+   "border": 3,
+   "dist": 49
+  },
+  {
+   "from": "city:10119",
+   "to": "city:10205",
+   "names": [
+    "중산",
+    "탁군"
+   ],
+   "hops": 3,
+   "border": 3,
+   "dist": 35
+  },
+  {
+   "from": "city:9",
+   "to": "city:10020",
+   "names": [
+    "남피",
+    "안평"
+   ],
+   "hops": 3,
+   "border": 3,
+   "dist": 33
+  },
+  {
+   "from": "city:10081",
+   "to": "city:10159",
+   "names": [
+    "서하",
+    "안문"
+   ],
+   "hops": 3,
+   "border": 5,
+   "dist": 68
+  },
+  {
+   "from": "city:35",
+   "to": "city:10119",
+   "names": [
+    "진양",
+    "중산"
+   ],
+   "hops": 3,
+   "border": 3,
+   "dist": 66
+  },
+  {
+   "from": "city:1087",
+   "to": "city:1088",
+   "names": [
+    "태산",
+    "낭야"
+   ],
+   "hops": 3,
+   "border": 3,
+   "dist": 44
+  },
+  {
+   "from": "city:10178",
+   "to": "city:10192",
+   "names": [
+    "감릉",
+    "제남"
+   ],
+   "hops": 3,
+   "border": 2,
+   "dist": 31
+  },
+  {
+   "from": "city:10139",
+   "to": "city:10178",
+   "names": [
+    "동평",
+    "감릉"
+   ],
+   "hops": 3,
+   "border": 2,
+   "dist": 29
+  },
+  {
+   "from": "city:1089",
+   "to": "city:10081",
+   "names": [
+    "평양",
+    "서하"
+   ],
+   "hops": 3,
+   "border": 2,
+   "dist": 64
+  },
+  {
+   "from": "city:11",
+   "to": "city:20",
+   "names": [
+    "수춘",
+    "여남"
+   ],
+   "hops": 3,
+   "border": 4,
+   "dist": 64
+  },
+  {
+   "from": "city:4",
+   "to": "city:10212",
+   "names": [
+    "장안",
+    "북지"
+   ],
+   "hops": 3,
+   "border": 2,
+   "dist": 52
+  },
+  {
+   "from": "city:11",
+   "to": "city:56",
+   "names": [
+    "수춘",
+    "여강"
+   ],
+   "hops": 3,
+   "border": 3,
+   "dist": 51
+  },
+  {
+   "from": "city:57",
+   "to": "city:1123",
+   "names": [
+    "회계",
+    "산월"
+   ],
+   "hops": 3,
+   "border": 3,
+   "dist": 60
+  },
+  {
+   "from": "city:15",
+   "to": "city:1123",
+   "names": [
+    "시상",
+    "산월"
+   ],
+   "hops": 3,
+   "border": 2,
+   "dist": 71
+  },
+  {
+   "from": "city:15",
+   "to": "city:52",
+   "names": [
+    "시상",
+    "강하"
+   ],
+   "hops": 3,
+   "border": 2,
+   "dist": 52
+  },
+  {
+   "from": "city:1060",
+   "to": "city:1126",
+   "names": [
+    "적도",
+    "저"
+   ],
+   "hops": 3,
+   "border": 7,
+   "dist": 43
+  },
+  {
+   "from": "city:1072",
+   "to": "city:10059",
+   "names": [
+    "월수",
+    "건위"
+   ],
+   "hops": 3,
+   "border": 3,
+   "dist": 72
+  },
+  {
+   "from": "city:28",
+   "to": "city:10060",
+   "names": [
+    "건녕",
+    "장가"
+   ],
+   "hops": 3,
+   "border": 20,
+   "dist": 95
+  },
+  {
+   "from": "city:97",
+   "to": "city:1122",
+   "names": [
+    "영창",
+    "남만"
+   ],
+   "hops": 3,
+   "border": 6,
+   "dist": 56
+  }
+ ]
+}

@@ -27,7 +27,6 @@ function fixture(withPreset = true) {
     features: { advisor: false },
   });
   const initial = commandInitial();
-  initial.ruleFeatures = ['personnel', 'policy'];
   if (withPreset) initial.presetRules = presetRules(preset);
   const replay = initialReplayState(initial, { policy: { version: 1, turnTermMinutes: 60 } });
   const world: WorldSettings = {

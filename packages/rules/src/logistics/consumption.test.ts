@@ -33,7 +33,6 @@ const resolver = createCityResourceCommandResolver(createCampaignCommandResolver
 const actor = { generalId: 1, tick: 100, unitSet: testUnits };
 function fixture() {
   const world = commandWorld();
-  world.ruleFeatures = ['five-stats', 'city-resources-v1', 'logistics-v1'];
   for (const general of Object.values(world.generals)) Object.assign(general, { politics: 60, charm: 55, crew: 0 });
   world.campaign = emptyCampaignState(world, 'consumption', 'source-fixture');
   world.cityResources = emptyCityResourcesState(world);
@@ -104,7 +103,6 @@ describe('AC-P2-30 모집·건설의 실제 원자재 소비', () => {
   it.each(['wall', 'defence'] as const)('%s는 기존 효과와 RNG를 유지하고 성공당 한 번 소비한다', (key) => {
     const world = fixture(),
       legacy = cloneWorld(world);
-    legacy.ruleFeatures = legacy.ruleFeatures!.filter((flag) => flag !== 'logistics-v1');
     delete legacy.logistics;
     const rng = createRng('build'),
       oldRng = createRng('build');

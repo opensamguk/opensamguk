@@ -321,7 +321,6 @@ it('T4-46 AC-P2-24: 개막 도시 보정을 저장하고 다시 읽어도 생성
     name: '삼10 개막 재적재',
     turnTermMinutes: 60,
     endYear: null,
-    ruleFeatures: initial.ruleFeatures,
   });
   try {
     const reloaded = await readWorldState(db, saved.worldId);
@@ -335,18 +334,7 @@ it('T4-46 AC-P2-24: 개막 도시 보정을 저장하고 다시 읽어도 생성
 
 it.each(['san10-191', 'san10-empty'])('%s의 9기능 원생성은155거점 빈 원장 하나만 허용한다', async (scenario) => {
   const initial = await loadInitialWorldFromDb(db, { map: 'san10', scenario, seed: 'san10-ledger' });
-  const features = [
-    'campaign-assignment-v2',
-    'campaign-v1',
-    'city-resources-v1',
-    'five-stats',
-    'operational-map',
-    'personnel',
-    'policy',
-    'stratagem-basic',
-    'treaty',
-  ];
-  initial.ruleFeatures = [...features];
+
   const before = hashState(initial),
     state = toWorldState(initial),
     ledger = emptyCityResourcesState(state);
@@ -355,9 +343,7 @@ it.each(['san10-191', 'san10-empty'])('%s의 9기능 원생성은155거점 빈 �
   expect(
     Object.values(ledger.cities).every((city) => city.gold === 0 && city.rice === 0 && city.garrison.length === 0),
   ).toBe(true);
-  expect(() =>
-    prepareInitialWorld(initial, { name: '새 지도 정본', turnTermMinutes: 60, endYear: 300, ruleFeatures: features }),
-  ).not.toThrow();
+  expect(() => prepareInitialWorld(initial, { name: '새 지도 정본', turnTermMinutes: 60, endYear: 300 })).not.toThrow();
   const missing = structuredClone(ledger);
   delete missing.cities[Object.keys(missing.cities)[0]!];
   expect(() => readCityResourcesState(missing, state)).toThrow();

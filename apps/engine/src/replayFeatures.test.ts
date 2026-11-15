@@ -127,7 +127,6 @@ describe('T2-26 형식과 기능 재생', () => {
     else if (target === 'direct') archive.inputs[0]!.payload = { value: '#' };
     else archive.inputs[1] = input;
     expect(() => replayArchive(archive, 1, featureRegistry)).toThrow('금지 문자');
-    archive.origin.initial.ruleFeatures = ['test-b'];
     rehash(archive);
     archive.inputs = archive.inputs.map((i) => ({ ...i, status: 'REJECTED' }));
     expect(() => readArchive(archive, featureRegistry)).toThrow('거절 기록');
@@ -147,7 +146,7 @@ describe('T2-26 형식과 기능 재생', () => {
     expect(() =>
       readArchive({
         ...archive,
-        origin: { ...archive.origin, initial: { ...archive.origin.initial, ruleFeatures: [] } },
+        origin: { ...archive.origin, initial: { ...archive.origin.initial } },
       }),
     ).toThrow();
     expect(() => readArchive({ ...archive, origin: { ...archive.origin, featureData: {} } })).toThrow();
@@ -173,12 +172,7 @@ describe('T2-26 형식과 기능 재생', () => {
   );
   it('F6~F9는 초기 기능·의존·자료 키를 검사한다', async () => {
     const archive = await featureArchive([]);
-    for (const features of [[], ['test-b', 'test-a'], ['test-c'], ['test-b', 'test-d'], ['unknown']]) {
-      const bad = clone(archive);
-      bad.origin.initial.ruleFeatures = features;
-      rehash(bad);
-      expect(() => readArchive(bad, featureRegistry)).toThrow();
-    }
+
     archive.origin.featureData = { 'test-a': 'fixture' };
     rehash(archive);
     expect(() => readArchive(archive, featureRegistry)).toThrow('자료');
@@ -210,7 +204,6 @@ describe('T2-26 형식과 기능 재생', () => {
     const missing = clone(source);
     delete (missing.inputs[1] as Partial<ReplayArchiveV3['inputs'][number]>).tick;
     expect(() => readArchive(missing, featureRegistry)).toThrow('tick');
-    delete source.origin.initial.ruleFeatures;
     rehash(source);
     expect(() => readArchive(source, featureRegistry)).toThrow('켜지');
     source.inputs = source.inputs.map((input) => ({ ...input, status: 'REJECTED' }));

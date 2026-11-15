@@ -165,12 +165,7 @@ async function world(
     turnTermMinutes: 60,
     replayFormat: 3,
     endYear: options.endYear ?? null,
-    ruleFeatures: [
-      ...(enabled ? ['heritage-v1'] : []),
-      'policy',
-      ...(options.personnel || withLineage ? ['personnel'] : []),
-      ...(withLineage ? ['lineage-v1'] : []),
-    ].sort(),
+
     featureData,
   });
   await controlClock(db, saved.worldId, 'start');
@@ -700,13 +695,11 @@ it.each(['end', 'reset'] as const)(
       portraitMap: '191-map',
       seed: randomUUID(),
     });
-    initial.ruleFeatures = [...new Set([...(initial.ruleFeatures ?? []), 'policy'])].sort();
     const { worldId: id } = await saveInitialWorld(db, initial, {
       name: '비유산 종료 초기화 검증',
       turnTermMinutes: 60,
       endYear: 200,
       replayFormat: 3,
-      ruleFeatures: [...new Set([...(initial.ruleFeatures ?? []), 'policy'])].sort(),
     });
     await controlClock(db, id, 'start');
     const request = await admit(id, player, {
@@ -948,13 +941,12 @@ it('AC-P2-33 실제 491명 시나리오 초기화는 원본 사용만 반환하�
     seed: randomUUID(),
   });
   expect(initial.generals).toHaveLength(491);
-  initial.ruleFeatures = [...new Set([...(initial.ruleFeatures ?? []), 'policy', 'heritage-v1'])].sort();
   const { worldId: id } = await saveInitialWorld(db, initial, {
     name: '491명 유산 초기화',
     turnTermMinutes: 60,
     endYear: 200,
     replayFormat: 3,
-    ruleFeatures: initial.ruleFeatures,
+
     featureData: { 'heritage-v1': { version: 1 } },
   });
   await controlClock(db, id, 'start');

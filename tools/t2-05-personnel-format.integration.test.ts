@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '@opensamguk/rules';
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { readdir, readFile } from 'node:fs/promises';
@@ -247,7 +248,7 @@ it('PG-B8-1 인사 표지 migration은 구 SQL fixture를 보존하고 현재 fa
       const row = await db.world.findUniqueOrThrow({ where: { id } });
       expect(row.personnelFormat).toBeNull();
       expect(row.replayFormat).toBe(1);
-      expect(row.ruleFeatures).toEqual([]);
+      expect(providedRuleKeys).toEqual([]);
       expect(selectWorldCapabilities(row)).toEqual(expectedSelections.get(id));
     }
     const initial = commandInitial();
@@ -286,7 +287,7 @@ it('PG-B8-1 인사 표지 migration은 구 SQL fixture를 보존하고 현재 fa
       expect(row.personnelFormat).toBeNull();
       expect(row.treatyFormat).toBe(treaty ? 1 : null);
       expect(row.replayFormat).toBe(treaty ? 1 : 3);
-      expect(row.ruleFeatures).toEqual([]);
+      expect(providedRuleKeys).toEqual([]);
       expect(row.policyFromSequence).toBe(treaty ? 0 : null);
       expect(row.replayOrigin).toEqual(expectedOrigin);
       if (treaty)

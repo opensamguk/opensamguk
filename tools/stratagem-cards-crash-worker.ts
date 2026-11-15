@@ -24,8 +24,7 @@ const db = createDb(url.href),
 if (
   world.name !== '계략 패 실제 처리 검증' ||
   world.scenarioKey !== 'command-test' ||
-  !world.seed.startsWith('cards-pg-') ||
-  !world.ruleFeatures.includes('stratagem-cards-v1')
+  !world.seed.startsWith('cards-pg-')
 )
   throw Error('계략 패 중단 시험 월드가 아닙니다.');
 const tick = process.env.CARDS_CRASH_TICK ? Number(process.env.CARDS_CRASH_TICK) : world.clockTick;
