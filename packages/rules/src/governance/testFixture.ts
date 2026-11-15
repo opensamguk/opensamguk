@@ -26,7 +26,7 @@ export const governanceTestConfig: GovernanceConfig = {
 };
 export function governanceFixture(count = 5) {
   const world = commandWorld();
-  world.ruleFeatures = ['governance-v1'];
+
   world.diplomacies = [];
   for (let id = 1; id <= count; id++) {
     world.nations[id] = { ...world.nations[1]!, id, name: `국가${id}`, capitalCityKey: id };

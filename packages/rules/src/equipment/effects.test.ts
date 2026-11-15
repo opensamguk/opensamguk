@@ -14,7 +14,6 @@ import { equipmentTrade } from './trade';
 
 function fixture() {
   const world = commandWorld();
-  world.ruleFeatures = ['five-stats', 'equipment-v1', 'logistics-v1', 'stratagem-basic'];
   for (const general of Object.values(world.generals)) Object.assign(general, { politics: 100, charm: 100 });
   Object.assign(world.generals[1]!, { leadership: 100, strength: 100, intel: 100, gold: 100000 });
   world.equipment = initialEquipment(STANDARD_EQUIPMENT_CONFIG);
@@ -57,12 +56,10 @@ it('AC-P2-12 장비 통솔은 훈련·사기 경계에 반영하고 기본 능�
     general = world.generals[1]!;
   general.leadership = 99;
   expect(drillGain(world, general, false)).toBe(12);
-  world.ruleFeatures = world.ruleFeatures!.filter((key) => key !== 'equipment-v1');
   expect(drillGain(world, general, false)).toBe(11);
   general.leadership = 60;
   general.charm = 0;
   expect(drillGain(world, general, true)).toBe(8);
-  world.ruleFeatures.push('equipment-v1');
   expect(drillGain(world, general, true)).toBe(9);
   expect(general.leadership).toBe(60);
 });
@@ -70,7 +67,6 @@ it('AC-P2-12 장비 통솔은 훈련·사기 경계에 반영하고 기본 능�
 it('AC-P2-12 장비를 끈 계산은 장착 원장을 읽지 않고 같은 기본값을 반환한다', () => {
   const world = equipped(),
     general = world.generals[1]!;
-  world.ruleFeatures = world.ruleFeatures!.filter((key) => key !== 'equipment-v1');
   Object.defineProperty(world, 'equipment', {
     get() {
       throw new Error('장착 원장을 읽었습니다.');

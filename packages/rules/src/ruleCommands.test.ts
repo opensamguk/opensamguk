@@ -28,15 +28,14 @@ describe('교역의 형식 3 무상태 명령 등록', () => {
   it('조약 없이 교역만 선택할 수 없고 끈 기능은 명령을 내지 않는다', () => {
     expect(() => checkRuleFeatures(['treaty-trade'])).toThrow('의존');
     expect(resolverForRuleFeatures({})).toBeUndefined();
-    expect(resolverForRuleFeatures({ ruleFeatures: ['treaty'] })).toBeUndefined();
-    const resolver = resolverForRuleFeatures({ ruleFeatures: ['treaty', 'treaty-trade'] })!;
+    expect(resolverForRuleFeatures({})).toBeUndefined();
+    const resolver = resolverForRuleFeatures({})!;
     expect(resolver.get('trade')?.name).toBe('교역');
     expect(resolver.list('general').length + resolver.list('nation').length).toBe(38);
     expect(resolver.get('fire_attack')).toBeUndefined();
   });
   it('실제 조약 입력을 재현한 뒤 명시 교역 예턴을 같은 기능표 resolver로 실행한다', () => {
     const initial = commandInitial();
-    initial.ruleFeatures = ['treaty', 'treaty-trade'];
     initial.generals[0]!.userId = 'human';
     initial.generals[1]!.userId = 'other-human';
     initial.nations[1]!.isNpc = false;

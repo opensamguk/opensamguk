@@ -7,8 +7,8 @@ export async function persistNationResearch(
   before: WorldView,
   next: WorldView,
 ) {
-  const original = readNationResearch(before.nationResearch, before),
-    final = readNationResearch(next.nationResearch, next);
+  const original = readNationResearch(before.nationResearch),
+    final = readNationResearch(next.nationResearch);
   if (!original && !final) return;
   if (!original || !final) throw new Error('진행 중 병종 연구 기능을 바꿀 수 없습니다.');
   if (JSON.stringify(original) === JSON.stringify(final)) return;

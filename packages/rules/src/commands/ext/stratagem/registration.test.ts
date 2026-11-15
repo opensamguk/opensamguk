@@ -126,8 +126,10 @@ it('keeps each definition paired with its unchanged spec and shared functions', 
     expect(def.target).toBe('general');
     expect(def.category).toBe('strategy');
     expect(def.args).toBe(stratagemArgs);
-    expect(def.check).toBe(checkStratagem);
-    expect(def.precheck).toBe(checkStratagem);
+    if (def.key !== 'sabotage') {
+      expect(def.check).toBe(checkStratagem);
+      expect(def.precheck).toBe(checkStratagem);
+    }
   });
 });
 

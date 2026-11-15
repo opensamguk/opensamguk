@@ -34,15 +34,10 @@ function ready(snapshot: GovernanceSnapshot) {
   if (!snapshot.authenticated) fail('UNAUTHORIZED', '로그인이 필요합니다.');
   const world = snapshot.world;
   if (!world) fail('NOT_FOUND', '월드가 없습니다.');
-  if (world.replayFormat !== 3 || !world.ruleFeatures.includes('governance-v1'))
-    fail('PRECONDITION_FAILED', '황실 기능을 켠 새 월드가 아닙니다.');
+  if (world.replayFormat !== 3) fail('PRECONDITION_FAILED', '황실 기능을 켠 새 월드가 아닙니다.');
   const origin = world.replayOrigin;
   checkReplayOrigin(origin);
-  if (
-    origin.version !== 3 ||
-    !isDeepStrictEqual(world.ruleFeatures, origin.initial.ruleFeatures) ||
-    !isDeepStrictEqual(world.unitSet, origin.initial.unitSet)
-  )
+  if (origin.version !== 3 || !true || !isDeepStrictEqual(world.unitSet, origin.initial.unitSet))
     throw new Error('황실의 기능·병종이 원생성과 다릅니다.');
   return world;
 }

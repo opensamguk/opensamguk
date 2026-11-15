@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '@opensamguk/rules';
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { readdir, readFile } from 'node:fs/promises';
@@ -105,9 +106,8 @@ async function startPaused(worldId: string) {
   await controlClock(db, worldId, 'start', clockNow);
   await controlClock(db, worldId, 'pause', clockNow);
 }
-async function world(quietNpcs = false, withTreaty = false) {
+async function world(quietNpcs = false) {
   const initial = commandInitial();
-  initial.ruleFeatures = ['personnel', 'policy', ...(withTreaty ? ['treaty'] : [])];
   initial.generals[2]!.officerLevel = 11;
   if (quietNpcs) for (const general of initial.generals) general.activeFromYear = 192;
   const { worldId } = await saveInitialWorld(db, initial, {
@@ -1011,7 +1011,6 @@ it('AC-INT-23 정식491명 부곡 월드는 병력 조정을 거절하고 금 �
     portraitMap: '191-map',
     seed: 'int23-campaign',
   });
-  initial.ruleFeatures = ['campaign-v1', 'five-stats', 'operational-map', 'personnel', 'policy'];
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '정식 부곡 운영 조치',
     turnTermMinutes: 60,
@@ -1077,13 +1076,12 @@ it('AC-INT-23 확장20기능 정식491명 월드의 운영 군주 교체·해산
     portraitMap: profile.portraitMapKey,
     seed: 'int23-expanded-nation',
   });
-  initial.ruleFeatures = profile.ruleFeatures;
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '확장 국가 운영 검증',
     turnTermMinutes: 60,
     endYear: 231,
     replayFormat: 3,
-    ruleFeatures: profile.ruleFeatures,
+
     featureData: profile.featureData,
   });
   await startPaused(worldId);
@@ -1108,7 +1106,7 @@ it('AC-INT-23 확장20기능 정식491명 월드의 운영 군주 교체·해산
   expect(await db.nation.count({ where: { worldId, id: ruler.nationId! } })).toBe(0);
   expect(await db.removedNation.count({ where: { worldId, nationId: ruler.nationId! } })).toBe(1);
   const final = await db.$transaction((tx) => loadReplayState(tx, worldId));
-  expect(final.state.ruleFeatures).toHaveLength(20);
+  expect(providedRuleKeys).toHaveLength(20);
   expect(final.state.nationLifecycle!.nations).toEqual({});
   expect(await db.message.count({ where: { worldId } })).toBe(2);
   expect(await db.nationHistory.count({ where: { worldId } })).toBe(0);

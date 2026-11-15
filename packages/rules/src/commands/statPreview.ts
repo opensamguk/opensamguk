@@ -20,13 +20,9 @@ export function commandStatPreview(
   key: string,
   args: unknown,
 ): CommandStatPreview | null {
-  if (!view.ruleFeatures?.includes('five-stats')) return null;
   const general = view.generals[actor.generalId];
   if (!general) return null;
-  if (
-    view.ruleFeatures.includes('campaign-v1') &&
-    (key === 'recruit' || key === 'conscript' || key === 'train' || key === 'morale')
-  ) {
+  if (key === 'recruit' || key === 'conscript' || key === 'train' || key === 'morale') {
     const outcome = applyCampaignPreparation(view, actor, key, args);
     if (!outcome.ok) return null;
     const next = outcome.state.campaign!.units.find((unit) => unit.id === outcome.unitId)!;

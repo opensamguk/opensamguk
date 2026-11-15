@@ -1,7 +1,7 @@
 import { protectedProcedure, router } from '../trpc';
 import { nextTurnAt, turnSchedule, readWorld, requireGeneral, worldClock, worldInput } from '../queries';
 import { cityInfo, ownGeneralInfo, logInfo, logSelect, nationInfo } from '../visibility';
-import { nowTick, OFFICE_EFFECTS_FEATURE, policyOptions } from '@opensamguk/rules';
+import { nowTick, policyOptions, courtOfficeTitle } from '@opensamguk/rules';
 import { displaySlots, readSlots } from '../game/slots';
 import { readCityScaleProjection } from '../game/cityScale';
 import { nationPopulation, projectNationFinance, salaryRate } from '../game/nationFinance';
@@ -12,9 +12,12 @@ export const homeRouter = router({
   get: protectedProcedure.input(worldInput).query(({ ctx, input }) =>
     readWorld(ctx.db, input.worldId, async (tx, world) => {
       const general = await requireGeneral(tx, input.worldId, ctx.user.id);
-      const city = await tx.city.findUniqueOrThrow({
-        where: { worldId_cityKey: { worldId: input.worldId, cityKey: general.cityKey } },
-      });
+      const city =
+        general.cityKey === 0
+          ? null
+          : await tx.city.findUniqueOrThrow({
+              where: { worldId_cityKey: { worldId: input.worldId, cityKey: general.cityKey } },
+            });
       const nation =
         general.nationId === null
           ? null
@@ -29,28 +32,24 @@ export const homeRouter = router({
                 generals: { select: { activeFromYear: true, removedAt: true } },
               },
             });
-      const state =
-        world.ruleFeatures.includes('campaign-v1') ||
-        (nation && world.status !== 'ENDED' && world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE))
-          ? await readView(tx, input.worldId)
-          : undefined;
+      const state = await readView(tx, input.worldId);
       const finance =
         nation && world.status !== 'ENDED'
           ? projectNationFinance(world, ctx.now, nation.cities, nation.generals, state)
           : undefined;
       const turns = displaySlots(await readSlots(tx, input.worldId, general.id));
       const defense = cityDefense(
-        city,
+        city ?? { cityKey: 0, nationId: null },
         general.removedAt === null ? [general] : [],
         world.startYear,
         nowTick(worldClock(world), ctx.now),
-        state,
+        city ? state : undefined,
       );
       const defendingTroops =
         general.removedAt === null
           ? (defense.generals.find(({ generalId }) => generalId === general.id)?.troops ?? 0)
           : 0;
-      const ruins = await readCityScaleProjection(tx, input.worldId, world.ruleFeatures);
+      const ruins = await readCityScaleProjection(tx, input.worldId);
       const logs = await tx.generalLog.findMany({
         where: { worldId: input.worldId, generalId: general.id },
         orderBy: [{ tick: 'desc' }, { id: 'desc' }],
@@ -60,6 +59,7 @@ export const homeRouter = router({
       return {
         general: {
           ...ownGeneralInfo(general),
+          courtTitle: nation ? courtOfficeTitle(nation.level, general.officerLevel) : null,
           defense: {
             participating: defendingTroops > 0,
             troops: defendingTroops,
@@ -85,7 +85,7 @@ export const homeRouter = router({
             return { key: option.key, name: option.name };
           })(),
         },
-        city: { ...cityInfo(city, general), ...(ruins ? { ruin: ruins.get(city.cityKey) ?? null } : {}) },
+        city: city ? { ...cityInfo(city, general), ...(ruins ? { ruin: ruins.get(city.cityKey) ?? null } : {}) } : null,
         nation:
           nation === null
             ? null

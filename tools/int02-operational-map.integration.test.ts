@@ -25,7 +25,6 @@ const userId = randomUUID(),
 const ownedUsers = [userId];
 let cookie: string, worldId: string, legacyWorld: string;
 const initial = buildInitialWorld(operationalInput());
-initial.ruleFeatures!.push('policy');
 let legacy: Awaited<ReturnType<typeof loadInitialWorldFromDb>>;
 
 async function request(path: string, input: unknown, session = cookie, mutation = false) {
@@ -126,9 +125,7 @@ it('INT-02 DB의 잘못된 종류와 기능 판을 거부하고 생성 원장 �
   await expect(
     db.city.update({ where: { worldId_cityKey: { worldId, cityKey: 99 } }, data: { kind: 'PORT' } }),
   ).rejects.toThrow();
-  await expect(
-    db.world.update({ where: { id: worldId }, data: { ruleFeatures: ['five-stats', 'policy'] } }),
-  ).rejects.toThrow();
+  await expect(db.world.update({ where: { id: worldId }, data: {} })).rejects.toThrow();
   const map = structuredClone(initial.operationalMap!);
   map.sites[0]!.position.x++;
   await db.world.update({ where: { id: worldId }, data: { operationalMap: map } });
@@ -150,7 +147,6 @@ it('INT-02 실제 조약 견적·목록·수락 비용과 국가 표시에서 �
     sessions.push(`sid=${session.token}`);
   }
   const value = buildInitialWorld(operationalInput());
-  value.ruleFeatures!.push('policy', 'treaty');
   value.nations.forEach((nation) => {
     nation.isNpc = false;
     nation.gold = 100;
@@ -223,7 +219,6 @@ it('INT-02 교역 후보 API는 관문 출발과 관문 목표를 제외한다',
     enabled: true,
   });
   const value = buildInitialWorld(input);
-  value.ruleFeatures!.push('policy', 'treaty', 'treaty-trade');
   value.cities.find((city) => city.cityKey === 99)!.nationId = 2;
   value.generals[0]!.userId = userId;
   Object.assign(value.generals[0]!, { leadership: 55, strength: 55, intel: 55, politics: 55, charm: 55 });

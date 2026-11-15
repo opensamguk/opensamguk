@@ -29,13 +29,12 @@ export const cityScaleRecordSchema = z.strictObject({
         ruin: z.literal(true).optional(),
       }),
     )
-    .min(1)
     .max(300)
     .refine((rows) => rows.every((row, index) => index === 0 || rows[index - 1]!.cityKey < row.cityKey)),
 });
 export type CityScaleRecord = z.infer<typeof cityScaleRecordSchema>;
 export type CityScaleValues = MapResource['cities'][number]['max'];
-export type ScaleAnchor = MapResource['cities'][number] & { kind?: 'CITY' | 'PASS' };
+export type ScaleAnchor = MapResource['cities'][number] & { kind?: 'CITY' | 'PASS' | 'FIELD' };
 type ScaleRequest = NonNullable<ScenarioResource['cityScale']>['cities'][number];
 
 export function ruinMaximum(base: Readonly<CityScaleValues>, percent: 10 | 40 | 70): CityScaleValues {
@@ -45,7 +44,7 @@ export function ruinMaximum(base: Readonly<CityScaleValues>, percent: 10 | 40 | 
 }
 
 export function checkMapCityScale(city: ScaleAnchor): void {
-  if (city.kind === 'PASS') return;
+  if (city.kind === 'PASS' || city.kind === 'FIELD') return;
   if (!Number.isInteger(city.level) || city.level < 0 || city.level > 9) throw new Error('도시 규모는 0~9여야 합니다.');
   if (city.level === 9 && !['낙양', '장안'].includes(city.name))
     throw new Error('경 규모는 낙양과 장안에만 지정할 수 있습니다.');
@@ -68,7 +67,8 @@ export function resolveCityScale<T extends ScaleAnchor>(
   const requested = new Map<string, ScaleRequest>();
   for (const request of requests) {
     const city = byName.get(request.city);
-    if (!city || city.kind === 'PASS') throw new Error('도시 규모 지정 대상은 지도에 있는 도시여야 합니다.');
+    if (!city || city.kind === 'PASS' || city.kind === 'FIELD')
+      throw new Error('도시 규모 지정 대상은 지도에 있는 도시여야 합니다.');
     if (requested.has(request.city)) throw new Error('도시 규모 지정이 겹칩니다.');
     if (request.level === undefined && request.ruin !== true) throw new Error('도시 규모나 폐허 상태를 지정하세요.');
     if (request.level !== undefined && (!Number.isInteger(request.level) || request.level < 0 || request.level > 9))
@@ -76,7 +76,7 @@ export function resolveCityScale<T extends ScaleAnchor>(
     requested.set(request.city, request);
   }
   const sample = (level: number) => {
-    const sample = source.filter((city) => city.kind !== 'PASS' && city.level === level);
+    const sample = source.filter((city) => city.kind !== 'PASS' && city.kind !== 'FIELD' && city.level === level);
     if (!sample.length) throw new Error('목표 규모의 최대치를 계산할 지도 표본이 없습니다.');
     return sample;
   };
@@ -87,7 +87,7 @@ export function resolveCityScale<T extends ScaleAnchor>(
     Number(numerator / denominator) + Math.round(Number(numerator % denominator) / Number(denominator));
   const rows: CityScaleRecord['cities'] = [];
   const cities = source.map((city) => {
-    if (city.kind === 'PASS') return city;
+    if (city.kind === 'PASS' || city.kind === 'FIELD') return city;
     const request = requested.get(city.name);
     const level = request?.level ?? city.level;
     let max = { ...city.max };

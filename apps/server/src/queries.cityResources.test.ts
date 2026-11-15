@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '@opensamguk/rules';
 import { describe, expect, it } from 'vitest';
 import { worldSummary } from './queries';
 
@@ -13,7 +14,7 @@ function fixture() {
     clockTick: 0,
     clockAnchorAt: null,
     turnTermMinutes: 60,
-    ruleFeatures: [] as string[],
+
     preset: null,
     runtimeOptions: null,
   };
@@ -34,14 +35,12 @@ describe('AC-INT-18B 월드 요약의 도시 자원 표시', () => {
       truce: null,
     });
     const existing = fixture();
-    existing.ruleFeatures = ['campaign-v1'];
     expect(Object.hasOwn(worldSummary(existing, 0), 'cityResourcesEnabled')).toBe(false);
   });
   it('새 판 표시만 조건부로 추가하고 원장이나 자원을 노출하지 않는다', () => {
     const before = fixture(),
       current = fixture();
-    current.ruleFeatures = ['city-resources-v1'];
     expect(worldSummary(current, 0)).toEqual({ ...worldSummary(before, 0), cityResourcesEnabled: true });
-    expect(current.ruleFeatures).toEqual(['city-resources-v1']);
+    expect(providedRuleKeys).toEqual(['city-resources-v1']);
   });
 });

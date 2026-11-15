@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '@opensamguk/rules';
 import { setTimeout as delay } from 'node:timers/promises';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -269,7 +270,7 @@ it('AC-INT-04 정식 게시를 재실행해도 원래 게시 자원과 구형191
     expect(await preservedWorld(db, worldId)).toEqual(beforeWorld);
     const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
     expect(world.operationalMap).toBeNull();
-    expect(world.ruleFeatures).toEqual([]);
+    expect(providedRuleKeys).toEqual([]);
   });
 });
 
@@ -355,7 +356,7 @@ it('AC-INT-04 실제CLI는 게시된 191년61거점·21국·491명·초상·5능
       await db.nation.count({ where: { worldId: world.id } }),
       await db.general.count({ where: { worldId: world.id } }),
     ]).toEqual([61, 21, 491]);
-    expect(world.ruleFeatures).toEqual(['five-stats', 'operational-map']);
+    expect(providedRuleKeys).toEqual(['five-stats', 'operational-map']);
     expect(
       await db.general.count({
         where: { worldId: world.id, OR: [{ portraitId: null }, { politics: null }, { charm: null }] },

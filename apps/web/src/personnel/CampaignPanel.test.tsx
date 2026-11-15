@@ -45,6 +45,13 @@ const base: Board = {
   units: [],
   commanders: [{ id: 1, capacity: 5500, commanded: 0 }],
 };
+const armed: Board = {
+  ...base,
+  units: [
+    { id: 1, ownerId: 1, commanderId: 1, troops: 100, crewType: 1100, train: 50, atmos: 50, cityKey: 1, supply: null },
+  ],
+  commanders: [...base.commanders, { id: 2, capacity: 5500, commanded: 0 }],
+};
 const clients: QueryClient[] = [];
 afterEach(() => {
   cleanup();
@@ -266,9 +273,9 @@ describe('명시적인 새 휘하 제안 준비', () => {
     },
   );
 
-  it('T4-95 AC-P2-32 편성 같은 즉시 요청도 보내기 전에 다시 읽고, 같은 계정의 장수가 바뀌었으면 보내지 않는다', async () => {
-    const view = mount((read) => (read === 1 ? base : { ...base, actorId: 99 }));
-    fireEvent.click(await screen.findByRole('button', { name: '빈 부곡 편성' }));
+  it('T4-95 AC-P2-32 지휘관 변경도 보내기 전에 다시 읽고, 같은 계정의 장수가 바뀌었으면 보내지 않는다', async () => {
+    const view = mount((read) => (read === 1 ? armed : { ...armed, actorId: 99 }));
+    fireEvent.change(await screen.findByLabelText('부곡 1 지휘관'), { target: { value: '2' } });
     await screen.findByText(/바뀌었습니다/);
     expect(view.reads()).toBeGreaterThanOrEqual(2);
     expect(view.mutations).toHaveLength(0);
@@ -276,10 +283,13 @@ describe('명시적인 새 휘하 제안 준비', () => {
   });
 
   it('T4-95 AC-P2-32 다시 읽은 장수가 같으면 즉시 요청을 한 번만 보낸다', async () => {
-    const view = mount(() => base);
-    fireEvent.click(await screen.findByRole('button', { name: '빈 부곡 편성' }));
+    const view = mount(() => armed);
+    fireEvent.change(await screen.findByLabelText('부곡 1 지휘관'), { target: { value: '2' } });
     await waitFor(() => expect(view.mutations).toHaveLength(1));
-    expect(view.mutations[0]).toMatchObject({ path: 'campaign.unit', input: { payload: { type: 'form' } } });
+    expect(view.mutations[0]).toMatchObject({
+      path: 'campaign.unit',
+      input: { payload: { type: 'command', unitId: 1, commanderId: 2 } },
+    });
   });
 
   it('최신 조회가 실패하면 남아 있는 과거 data로 보내지 않는다', async () => {
@@ -365,7 +375,7 @@ describe('명시적인 새 휘하 제안 준비', () => {
   it.each([
     ['응답', 'campaign.relationship', { type: 'respond', offerId: 3, accept: true, revision: 1 }],
     ['해제', 'campaign.relationship', { type: 'release', personId: 2, revision: 1 }],
-    ['부곡', 'campaign.unit', { type: 'form', commanderId: 1, crewType: 1100, revision: 1 }],
+    ['부곡', 'campaign.unit', { type: 'command', unitId: 1, commanderId: 1, revision: 1 }],
   ])('기존 pending %s 재전송에는 기대 UUID나 새로운 조회를 추가하지 않는다', async (_name, kind, payload) => {
     const old = { kind, requestId: '154eb720-a267-423b-b77e-4162872eb075', payload };
     sessionStorage.setItem(`campaign.pending:${userId}:${worldId}`, JSON.stringify(old));

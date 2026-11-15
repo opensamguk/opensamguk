@@ -15,7 +15,7 @@ import { activeSanctionWhere } from '../auth/sanction';
 import { missingConsents } from '../legal/policy';
 import { databaseTime } from '../messaging';
 import { PublicReasonError } from '../trpc';
-import { requireGeneral, requireWorld, readView, requireRuleFeature } from './queries';
+import { requireGeneral, requireWorld, readView } from './queries';
 import { worldResolver } from './resolver';
 import { readSlots } from './slots';
 
@@ -64,15 +64,10 @@ export async function requireCampaignOrderAccess(tx: Prisma.TransactionClient, c
     });
 }
 function ready(world: Awaited<ReturnType<typeof requireWorld>>) {
-  requireRuleFeature(world, 'campaign-v1');
   if (world.replayFormat !== 3)
     throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '휘하 지시를 사용할 수 없습니다.' });
   checkReplayOrigin(world.replayOrigin);
-  if (
-    world.replayOrigin.version !== 3 ||
-    !isDeepStrictEqual(world.replayOrigin.initial.ruleFeatures ?? [], world.ruleFeatures) ||
-    !isDeepStrictEqual(world.unitSet, world.replayOrigin.initial.unitSet)
-  )
+  if (world.replayOrigin.version !== 3 || !isDeepStrictEqual(world.unitSet, world.replayOrigin.initial.unitSet))
     throw new Error('휘하 지시의 원생성 기능·병종 사본이 다릅니다.');
 }
 export async function readCampaignOrders(ctx: OrderContext, worldId: string) {

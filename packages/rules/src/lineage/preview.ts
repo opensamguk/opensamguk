@@ -83,15 +83,13 @@ export function successionPreview(world: WorldView, fromId: number, heirId: numb
       .sort((a, b) => a - b);
   }
   const value = successionPreviewSchema.parse({
-    ...(world.ruleFeatures?.includes('equipment-v1')
-      ? {
-          equipment: {
-            from: world.equipment!.generals[String(fromId)] ?? null,
-            heir: world.equipment!.generals[String(heirId)] ?? null,
-            inherited: next.equipment!.generals[String(heirId)] ?? null,
-          },
-        }
-      : {}),
+    ...{
+      equipment: {
+        from: world.equipment!.generals[String(fromId)] ?? null,
+        heir: world.equipment!.generals[String(heirId)] ?? null,
+        inherited: next.equipment!.generals[String(heirId)] ?? null,
+      },
+    },
     heirId,
     officerLevel: to.officerLevel,
     gold: to.gold,

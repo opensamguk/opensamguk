@@ -1,6 +1,5 @@
 import type { Prisma, PrismaClient } from '@opensamguk/db';
 import {
-  checkRuleFeatures,
   OFFICE_EFFECTS_FEATURE,
   officeEffectsSchema,
   worldCreateIntentSchema,
@@ -90,8 +89,7 @@ async function resolveCreation(db: PrismaClient, request: Request) {
       (featureProfile.value.version === 3 &&
         (featureProfile.value.unitSetKey !== selection.unitSet ||
           featureProfile.value.statRulesKey !== selection.statRules ||
-          featureProfile.value.portraitMapKey !== selection.portraitMap)) ||
-      hashState([...featureProfile.value.ruleFeatures].sort()) !== hashState(intent.ruleFeatures)
+          featureProfile.value.portraitMapKey !== selection.portraitMap))
     )
       throw new CreationRejected('INPUT_INVALID');
   }
@@ -110,23 +108,13 @@ async function resolveCreation(db: PrismaClient, request: Request) {
   }
   let prepared: PreparedInitialWorld | undefined;
   try {
-    const presetFeatures = state.unitSet.coefMode === 'multiply' ? ['battle-affinity-v2'] : [];
     const officeEffects = request.officeEffects == null ? undefined : officeEffectsSchema.parse(request.officeEffects);
-    const combined = [
-      ...new Set([
-        ...(state.ruleFeatures ?? []),
-        ...presetFeatures,
-        ...(intent.ruleFeatures ?? []),
-        ...(officeEffects ? [OFFICE_EFFECTS_FEATURE] : []),
-      ]),
-    ].sort();
-    const ruleFeatures = combined.length ? checkRuleFeatures(combined) : [];
-    if (state.ruleFeatures) state.ruleFeatures = ruleFeatures;
     const options = {
       name: intent.name,
+      fogOfWar: intent.fogOfWar ?? false,
       turnTermMinutes,
       endYear: intent.endYear,
-      ruleFeatures,
+
       ...(featureProfile || officeEffects
         ? {
             featureData: {
@@ -141,10 +129,10 @@ async function resolveCreation(db: PrismaClient, request: Request) {
       request.resolution && typeof request.resolution === 'object' && !Array.isArray(request.resolution)
         ? request.resolution.initialStateHash
         : undefined;
-    const ledgers = request.resolution !== null && ruleFeatures.includes('lineage-v1') ? loadSexLedgers() : [undefined];
+    const ledgers = request.resolution !== null ? loadSexLedgers() : [undefined];
     for (const ledger of ledgers) {
       const candidate = prepareInitialWorld(structuredClone(state), options, ledger);
-      if (request.resolution === null || !ruleFeatures.includes('lineage-v1') || candidate.stateHash === frozenHash) {
+      if (request.resolution === null || candidate.stateHash === frozenHash) {
         prepared = candidate;
         break;
       }

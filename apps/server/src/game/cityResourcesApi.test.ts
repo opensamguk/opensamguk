@@ -45,10 +45,10 @@ function fixture() {
       ],
     },
   };
-  const initial = { ruleFeatures: ['city-resources-v1'], unitSet: { crewTypes: [{ id: 1100, name: '보병' }] } };
+  const initial = { unitSet: { crewTypes: [{ id: 1100, name: '보병' }] } };
   const world = {
     id: 'own-world',
-    ruleFeatures: ['city-resources-v1'],
+
     replayFormat: 3,
     replayOrigin: { version: 3, initial },
     unitSet: initial.unitSet,
@@ -299,7 +299,6 @@ describe('AC-INT-18B 도시 자원 API 접수', () => {
   });
   it('생성 기록의 기능 사본이 바뀐 월드는 읽지 않는다', async () => {
     const f = fixture();
-    f.world.replayOrigin.initial.ruleFeatures = [];
     await expect(readCityResourceBoard(f.ctx, 'own-world', 1)).rejects.toThrow('기능 사본');
     expect(readView).not.toHaveBeenCalled();
   });

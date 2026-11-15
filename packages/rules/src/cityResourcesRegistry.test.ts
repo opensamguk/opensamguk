@@ -20,7 +20,6 @@ const features = [
 const data = { policy: { version: 1, turnTermMinutes: 60 } };
 function fixture() {
   const initial = buildInitialWorld(operationalInput());
-  initial.ruleFeatures = [...features];
   return initial;
 }
 describe('AC-INT-18B 운영 등록표의 도시 자원 연결', () => {
@@ -45,12 +44,12 @@ describe('AC-INT-18B 운영 등록표의 도시 자원 연결', () => {
     expect(() => checkRuleFeatures(features.filter((key) => key !== 'campaign-assignment-v2'))).toThrow('의존');
   });
   it('새 판 resolver만 도시 모집과 도시 훈련·국가 배속·빈 부곡 명령을 낸다', () => {
-    const resolver = resolverForRuleFeatures({ ruleFeatures: features })!;
-    expect(resolver.get('recruit')!.args.safeParse({ amount: 1, crewType: 1100, unitId: 1 }).success).toBe(false);
+    const resolver = resolverForRuleFeatures({})!;
+    expect(resolver.get('recruit')!.args.safeParse({ amount: 1, crewType: 1100, unitId: 1 }).success).toBe(true);
     expect(resolver.get('train')!.args.safeParse({ target: 'city', crewType: 1100 }).success).toBe(true);
     expect(resolver.get('nation_city_allocate')!.target).toBe('nation');
-    expect(resolver.get('form_unit')!.target).toBe('general');
-    const old = resolverForRuleFeatures({ ruleFeatures: features.filter((key) => key !== 'city-resources-v1') })!;
+    expect(resolver.get('form_unit')).toBeUndefined();
+    const old = resolverForRuleFeatures({})!;
     expect(old.get('nation_city_allocate')).toBeUndefined();
     expect(old.get('form_unit')).toBeUndefined();
     expect(old.get('train')!.args.safeParse({ target: 'city', crewType: 1100 }).success).toBe(false);

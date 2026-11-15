@@ -5,7 +5,6 @@ import { worldResolver } from './resolver';
 const world = {
   preset: null,
   replayFormat: 3,
-  ruleFeatures: ['campaign-v1', 'five-stats', 'operational-map', 'personnel', 'policy'],
 };
 const resolver = worldResolver(world).resolver;
 

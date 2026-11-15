@@ -51,7 +51,6 @@ describe('AC-P2-05 국가 직책의 연속 준비', () => {
     const success = { effects: [], logs: [] };
     expect(trackNationTurn(state, { nationId: 1, officerLevel: 12 }, 'nation_rest', success)).toBe(state);
     expect(state).not.toHaveProperty('preparedTurns');
-    state.ruleFeatures = ['personnel', 'prepared-turns-v1'];
     state.preparedTurns = initialPreparedTurns();
     const record = { commandKey: 'research', args: {}, term: 11 };
     state.preparedTurns.nations = { 1: { 5: { ...record }, 12: { ...record } }, 999: { 5: { ...record } } };
@@ -61,13 +60,13 @@ describe('AC-P2-05 국가 직책의 연속 준비', () => {
     expect(state.preparedTurns.nations[1]![5]).toEqual(record);
     trackNationTurn(state, { nationId: 1, officerLevel: 5 }, 'nation_rest', success);
     expect(state.preparedTurns.nations[1]).toEqual({ 12: record });
-    expect(readPreparedTurns(state.preparedTurns, state)?.nations[999]).toEqual({ 5: record });
+    expect(readPreparedTurns(state.preparedTurns)?.nations[999]).toEqual({ 5: record });
     trackNationTurn(state, { nationId: 1, officerLevel: 12 }, 'nation_rest', success);
     expect(state.preparedTurns.nations).not.toHaveProperty('1');
     const copied = cloneWorld(state);
     copied.preparedTurns!.nations[999]![5]!.term = 2;
     expect(state.preparedTurns.nations[999]![5]!.term).toBe(11);
-    expect(() => readPreparedTurns(state.preparedTurns, {})).toThrow();
-    expect(() => readPreparedTurns(null, state)).toThrow();
+    expect(() => readPreparedTurns(state.preparedTurns)).toThrow();
+    expect(() => readPreparedTurns(null)).toThrow();
   });
 });

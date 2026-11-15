@@ -274,16 +274,6 @@ for (const index of [0, 1])
       portraitMap: '191-map',
       seed: 'admin-world-list-' + index,
     });
-    initial.ruleFeatures = [
-      'campaign-assignment-v2',
-      'campaign-v1',
-      'five-stats',
-      'operational-map',
-      'personnel',
-      'policy',
-      'stratagem-basic',
-      'treaty',
-    ];
     expect(initial.nations).toHaveLength(21);
     expect(initial.generals).toHaveLength(491);
     const { worldId } = await saveInitialWorld(db, initial, {
@@ -796,16 +786,6 @@ it('PREOPEN 정식191년 월드를 실제 감독 자식이 발견해 시작하�
     portraitMap: '191-map',
     seed: 'admin-clock-supervisor',
   });
-  initial.ruleFeatures = [
-    'campaign-assignment-v2',
-    'campaign-v1',
-    'five-stats',
-    'operational-map',
-    'personnel',
-    'policy',
-    'stratagem-basic',
-    'treaty',
-  ];
   expect(initial.nations).toHaveLength(21);
   expect(initial.generals).toHaveLength(491);
   const { worldId } = await saveInitialWorld(db, initial, {

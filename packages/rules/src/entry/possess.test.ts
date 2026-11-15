@@ -13,9 +13,9 @@ const context = {
   sanctioned: false,
   replayFormat: 3,
 };
-function record(generalId = 1, policy = false, personnel = false) {
+function record(generalId = 1, policy = false) {
   const initial = commandInitial();
-  if (policy || personnel) initial.ruleFeatures = [...(personnel ? ['personnel'] : []), ...(policy ? ['policy'] : [])];
+
   const replay = initialReplayState(initial, policy ? { policy: { version: 1, turnTermMinutes: 60 } } : undefined);
   const payload = { generalId, userId };
   const outcome = decidePossession(replay, payload, context);
@@ -51,7 +51,7 @@ it.each([false, true])(
 );
 
 it('AC-M3-14 공용 재생 경로가 맡기 앵커를 만들고 거절의 조기 반환도 검증한다', () => {
-  const { replay, input } = record(1, true, true);
+  const { replay, input } = record(1, true);
   const next = applyRecordedInput(replay, input);
   expect(next.residenceAnchors).toEqual({ 1: context.tick });
   expect(next.policy!.lastActiveTicks).toEqual({ 1: context.tick });

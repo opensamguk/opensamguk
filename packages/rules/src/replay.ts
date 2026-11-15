@@ -1,6 +1,6 @@
+import { providedRuleData } from './providedRuleData';
 import { emptyTurns, validatePolicyInput } from './replayInputs';
-export { emptyTurns, applyTurnsInput, applyCreationInput } from './replayInputs';
-import { hasRuleFeature, ruleRegistry, settleMonthlyFeatures, type RuleRegistry } from './ruleRegistry';
+import { ruleRegistry, settleMonthlyFeatures, type RuleRegistry } from './ruleRegistry';
 import type { CommandResolver } from './commands/resolve';
 import { resolverForRuleFeatures } from './ruleCommands';
 import { rngFor } from '@opensamguk/shared';
@@ -22,6 +22,7 @@ import { appendReputationEvents } from './review/ledger';
 import { isAdminSettingKind, validateAdminSettingRecord } from './admin/settings';
 import { validateAdminGameRecord } from './admin/apply';
 import { POSSESSION_KIND, validatePossessionRecord } from './entry/possess';
+export { emptyTurns, applyTurnsInput, applyCreationInput } from './replayInputs';
 
 export interface QueuedTurn {
   commandKey: string;
@@ -62,13 +63,14 @@ export function initialReplayStateWithRegistry(
   registry: RuleRegistry,
   featureData?: ReplayOriginData,
 ): ReplayState {
+  featureData = { ...providedRuleData(initial, 60), ...featureData };
   let replay: ReplayState = {
     state: toWorldState(initial),
     turns: Object.fromEntries(initial.generals.map(({ id }) => [id, emptyTurns()])),
     revisions: Object.fromEntries(initial.generals.map(({ id }) => [id, 0])),
     monthlyTick: 0,
   };
-  for (const key of initial.ruleFeatures ?? []) {
+  for (const key of registry.features.map((feature) => feature.key).sort()) {
     const feature = registry.features.find((feature) => feature.key === key);
     if (!feature) throw new Error(`모르는 규칙 기능입니다: ${key}`);
     replay = feature.initReplayState?.(replay, { initial, data: featureData?.[key] }) ?? replay;
@@ -94,7 +96,12 @@ export function settleReplayMonth(
   registry: RuleRegistry = ruleRegistry,
 ) {
   const date = monthlyDate(replay.state.startYear, tick);
-  const result = runMonthly(replay.state, tick, rngFor(seed, 'monthly', date.year, date.month));
+  const result = runMonthly(
+    replay.state,
+    tick,
+    rngFor(seed, 'monthly', date.year, date.month),
+    rngFor(seed, 'city-disaster', date.year, date.month),
+  );
   return settleMonthlyFeatures(replay, { ...replay, state: result.state, monthlyTick: tick }, tick, registry, seed);
 }
 
@@ -105,7 +112,7 @@ export function runReplayAction(
   resolver?: CommandResolver,
   registry: RuleRegistry = ruleRegistry,
 ): ReplayState {
-  return replayAction(replay, seed, unitSet, resolver, registry, false);
+  return replayAction(replay, seed, unitSet, resolver, registry, false).replay;
 }
 
 /** 읽은 아카이브의 작업 상태는 재생 루프만 소유한다. */
@@ -115,7 +122,11 @@ export function runArchiveReplayAction(
   unitSet: UnitSetResource,
   registry: RuleRegistry,
 ): ReplayState {
-  return replayAction(replay, seed, unitSet, undefined, registry, registry === ruleRegistry);
+  return replayAction(replay, seed, unitSet, undefined, registry, registry === ruleRegistry).replay;
+}
+
+export function runSimulationAction(replay: ReplayState, seed: string, unitSet: UnitSetResource, convergence: boolean) {
+  return replayAction(replay, seed, unitSet, undefined, ruleRegistry, false, convergence);
 }
 
 function replayAction(
@@ -125,10 +136,11 @@ function replayAction(
   resolver: CommandResolver | undefined,
   registry: RuleRegistry,
   ownsArchiveState: boolean,
-): ReplayState {
+  convergence?: boolean,
+): { replay: ReplayState; commandKey?: string; nationCommandKey?: string } {
   const action = nextGameAction(replay);
   if (action.kind === 'monthly') {
-    return settleReplayMonth(replay, seed, action.tick, registry).replay;
+    return { replay: settleReplayMonth(replay, seed, action.tick, registry).replay };
   }
   // 보관 루프에서는 규칙이 새 상태를 만들 때까지 직전 월드 상태를 읽는다.
   const next = ownsArchiveState
@@ -150,6 +162,7 @@ function replayAction(
     {
       ...(next.policy ? { policy: next.policy.policies[action.generalId]! } : {}),
       turnRevision: next.revisions[action.generalId] ?? 0,
+      ...(convergence === undefined ? {} : { convergence }),
     },
     resolver ?? resolverForRuleFeatures(next.state, registry),
     personnel ? { offices: next.offices! } : undefined,
@@ -174,7 +187,7 @@ function replayAction(
         createdHumanId: null,
       });
   }
-  if (hasRuleFeature(replay.state, 'reputation-v1')) {
+  {
     if (!next.reputation) throw Error('월단평 재생 원장이 없습니다.');
     next.reputation = appendReputationEvents(
       next.reputation,
@@ -190,7 +203,11 @@ function replayAction(
   }
   next.turns[action.generalId] = [...turns.slice(1), next.policy ? emptyTurn() : { commandKey: 'rest', args: {} }];
   next.revisions[action.generalId] = (next.revisions[action.generalId] ?? 0) + 1;
-  return next;
+  return {
+    replay: next,
+    commandKey: result.commandKey,
+    ...(result.nation ? { nationCommandKey: result.nation.commandKey } : {}),
+  };
 }
 
 export function applyRecordedInput(
@@ -203,52 +220,25 @@ export function applyRecordedInput(
   if (isAdminGameKind(input.kind)) validateAdminGameRecord(input);
   if (isAdminSettingKind(input.kind)) validateAdminSettingRecord(input);
   if (input.kind === POSSESSION_KIND) validatePossessionRecord(input);
-  if (
-    replay.policy &&
-    (!replay.state.ruleFeatures ||
-      ['turns.set', 'general.create', 'general.setPolicy', 'general.active'].includes(input.kind))
-  )
-    validatePolicyInput(
-      input,
-      replay.state.ruleFeatures?.includes('five-stats'),
-      replay.state.ruleFeatures?.includes('lineage-v1'),
-      replay.state.ruleFeatures?.includes('heritage-v1'),
-    );
+  if (replay.policy && ['turns.set', 'general.create', 'general.setPolicy', 'general.active'].includes(input.kind))
+    validatePolicyInput(input, true, true, true);
   const kind = registry.inputKinds.find((kind) => kind.kind === input.kind);
-  if (input.status === 'REJECTED') {
-    if (
-      kind?.feature &&
-      !hasRuleFeature(replay.state, kind.feature) &&
-      !(kind.feature === 'policy' && replay.policy && !replay.state.ruleFeatures)
-    ) {
-      const result = input.result as { code?: unknown; message?: unknown } | null;
-      if (
-        !result ||
-        result.code !== 'FEATURE_DISABLED' ||
-        typeof result.message !== 'string' ||
-        Object.keys(result).some((key) => key !== 'code' && key !== 'message')
-      )
-        throw new Error('끈 기능의 입력 거절 기록이 다릅니다.');
-    }
-    return replay;
-  }
-  if (!kind) throw new Error(`재생할 수 없는 입력 종류입니다: ${input.kind}`);
-  const legacyPolicy = kind.feature === 'policy' && replay.policy && !replay.state.ruleFeatures;
-  if (kind.feature !== null && !hasRuleFeature(replay.state, kind.feature) && !legacyPolicy)
-    throw new Error('이 월드에서 켜지 않은 기능입니다.');
+  if (input.status === 'REJECTED') return replay;
+  if (!kind) throw new Error(`알 수 없는 입력 종류입니다: ${input.kind}`);
   let next =
     input.kind === 'campaign.order'
       ? kind.apply(replay, input, { ...context, resolver: resolverForRuleFeatures(replay.state, registry) })
       : kind.apply(replay, input, context);
-  const features = replay.state.ruleFeatures ?? [];
+  const features = registry.features.map((feature) => feature.key).sort();
   // 엄격한 후속 적재 전에 멸망·거점 소유 변경에 따른 계략 패를 정리한다.
-  const ordered = features.includes('stratagem-cards-v1')
-    ? ['stratagem-cards-v1', ...features.filter((key) => key !== 'stratagem-cards-v1')]
-    : features;
+  const ordered = ['stratagem-cards-v1', ...features.filter((key) => key !== 'stratagem-cards-v1')];
   for (const key of ordered) {
     if (key === kind.feature) continue;
     const feature = registry.features.find((feature) => feature.key === key);
-    next = feature?.afterAppliedInput?.(replay, next, input, { route: kind.route }) ?? next;
+    next =
+      feature?.afterAppliedInput?.(replay, next, input, {
+        route: input.kind === 'battle.step' ? 'queued' : kind.route,
+      }) ?? next;
   }
   return next;
 }

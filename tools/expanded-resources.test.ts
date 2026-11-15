@@ -37,13 +37,12 @@ it('AC-INT-21·AC-P2-03·04·30 공개 확장 원생성이 승인된 규모·물
     statRules: read('scenario/five-stats.json'),
     portraitMap: read('portraits/191-map.json'),
   });
-  initial.ruleFeatures = profile.ruleFeatures;
   initial.scenarioKey = profile.scenarioKey;
   const settings = {
     name: '새 SAN10 확장 설정',
     turnTermMinutes: 60,
     endYear: 231,
-    ruleFeatures: profile.ruleFeatures,
+
     featureData: profile.featureData,
   };
   expect(prepareInitialWorld(initial, settings).stateHash).toBe(prepareInitialWorld(initial, settings).stateHash);
@@ -91,11 +90,4 @@ it('AC-P2-03·04 형식3은 자원 다섯 칸·장비·패 설정·전략 기능
     delete invalid.featureData[key];
     expect(featureProfileSchema.safeParse(invalid).success).toBe(false);
   }
-  for (const key of ['equipment-v1', 'stratagem-cards-v1', 'nation-strategy-v1'])
-    expect(
-      featureProfileSchema.safeParse({
-        ...profile,
-        ruleFeatures: profile.ruleFeatures.filter((f: string) => f !== key),
-      }).success,
-    ).toBe(false);
 });

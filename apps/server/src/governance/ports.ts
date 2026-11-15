@@ -7,7 +7,7 @@ export interface GovernanceWorld {
   clockTick: number;
   monthlyTick: number;
   replayFormat: number;
-  ruleFeatures: readonly string[];
+
   replayOrigin: unknown;
   unitSet: unknown;
 }

@@ -339,17 +339,6 @@ beforeAll(() =>
       portraitMap: '191-map',
       seed: 'int18-authz-formal191',
     });
-    initial.ruleFeatures = [
-      'campaign-assignment-v2',
-      'campaign-v1',
-      'city-resources-v1',
-      'five-stats',
-      'operational-map',
-      'personnel',
-      'policy',
-      'stratagem-basic',
-      'treaty',
-    ];
     expect(initial.startYear).toBe(191);
     expect(initial.nations).toHaveLength(21);
     expect(initial.generals).toHaveLength(491);

@@ -12,7 +12,6 @@ import { readFixture } from '../apps/server/test/readFixture';
 import { readWorldState, saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { persistSeasonArchive } from '../apps/engine/src/seasonArchive';
 import { commandInitial } from '../packages/rules/test/commandFixture';
-import { INTEL_FEATURE } from '../packages/rules/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -39,6 +38,7 @@ const paths = [
   'auth.me',
   'world.list',
   'world.publicMaps',
+  'lobby.headlines',
   'world.summary',
   'world.map',
   'resources.worldRules',
@@ -223,6 +223,7 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
             path.startsWith('auth.') ||
             path === 'health' ||
             path === 'world.publicMaps' ||
+            path === 'lobby.headlines' ||
             path === 'timelapse.publicFrames';
           const cookie =
             category === 'unauthenticated'
@@ -404,7 +405,6 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
   });
   it('AC-P2-07 첩보 예턴은 같은 국가에만 저장 보고서를 열고 병력을 구간으로 표시한다', async () => {
     const initial = commandInitial();
-    initial.ruleFeatures = [INTEL_FEATURE, 'policy'];
     initial.generals[0]!.userId = users[0]!.id;
     initial.generals[1]!.userId = users[1]!.id;
     Object.assign(initial.generals[2]!, { userId: users[4]!.id, nationId: 1 });

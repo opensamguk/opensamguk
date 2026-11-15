@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '@opensamguk/rules';
 import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -71,7 +72,6 @@ describe('AC-P2-30·31·32·33 정식 491명 확장 결합', () => {
       expect(initial.nations).toHaveLength(21);
       expect(initial.cities).toHaveLength(61);
       const native = structuredClone(initial);
-      initial.ruleFeatures = [...features];
       const supplied = structuredClone(initial);
       const city = initial.cities.find(
         (row) =>
@@ -109,7 +109,7 @@ describe('AC-P2-30·31·32·33 정식 491명 확장 결합', () => {
         turnTermMinutes: 60,
         endYear: 201,
         replayFormat: 3,
-        ruleFeatures: [...features],
+
         featureData: {
           'logistics-v1': logistics,
           'governance-v1': governanceTestConfig,
@@ -121,7 +121,7 @@ describe('AC-P2-30·31·32·33 정식 491명 확장 결합', () => {
       expect(initial).toEqual(supplied);
       const stored = await db.world.findUniqueOrThrow({ where: { id: worldId } });
       const origin = stored.replayOrigin as unknown as { initial: WorldInit; featureData: Record<string, unknown> };
-      expect(origin.initial).toEqual({ ...native, ruleFeatures: features, generals: origin.initial.generals });
+      expect(origin.initial).toEqual({ ...native, generals: origin.initial.generals });
       expect(
         origin.initial.generals.map((general) => {
           const unchanged = { ...general };
@@ -131,7 +131,7 @@ describe('AC-P2-30·31·32·33 정식 491명 확장 결합', () => {
       ).toEqual(native.generals);
       expect(stored.initialStateHash).toBe(hashState(origin.initial));
       expect(origin.featureData['heritage-v1']).toEqual({ version: 1 });
-      expect(stored.ruleFeatures).toEqual(features);
+      expect(providedRuleKeys).toEqual(features);
       before = await db.$transaction((tx) => loadReplayState(tx, worldId));
       expect(Object.keys(before.state.generals)).toHaveLength(491);
       expect(Object.values(before.state.generals).filter((general) => general.sex === 'UNKNOWN')).toHaveLength(468);
@@ -250,13 +250,11 @@ describe('AC-P2-30·31·32·33 차례 인사 문맥의 전역 무결성', () => 
   });
   async function fixture() {
     const initial = commandInitial();
-    initial.ruleFeatures = ['personnel', 'policy'];
     const saved = await saveInitialWorld(db, initial, {
       name: '인사 문맥 무결성 고정물',
       turnTermMinutes: 60,
       endYear: null,
       replayFormat: 3,
-      ruleFeatures: initial.ruleFeatures,
     });
     owned.push(saved.worldId);
     await controlClock(db, saved.worldId, 'start');

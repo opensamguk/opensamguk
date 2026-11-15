@@ -10,14 +10,8 @@ const requestInput = worldInput.extend({ requestId: z.uuid() });
 const generalId = z.number().int().positive().max(2_147_483_647);
 export const personnelRouter = router({
   officers: protectedProcedure.input(worldInput).query(({ ctx, input }) =>
-    withPersonnel(ctx, input.worldId, async (tx, ready) => ({
-      ...(await readPersonnelBoard(
-        tx,
-        { worldId: input.worldId, userId: ctx.user.id },
-        ready.officeEffectsEnabled === true,
-        ready.courtRankEnabled === true,
-      )),
-      ...(ready.secretaryEnabled ? { secretaryEnabled: true as const } : {}),
+    withPersonnel(ctx, input.worldId, async (tx) => ({
+      ...(await readPersonnelBoard(tx, { worldId: input.worldId, userId: ctx.user.id }, true, true)),
     })),
   ),
   appoint: worldVerifiedProcedure

@@ -1,3 +1,4 @@
+import { buildSupplyLedger } from './supply';
 import { z } from 'zod';
 import type { RuleFeatureDefinition, InputKindDefinition } from '../ruleRegistry';
 import type { WorldInit } from '../world/bootstrap';
@@ -74,15 +75,10 @@ export const campaignFeature: RuleFeatureDefinition = {
     };
   },
   checkArchive({ origin, inputs }) {
-    const types = campaignArmyTypes(origin.initial);
+    campaignArmyTypes(origin.initial);
     for (const input of inputs)
       if (['campaign.relationship', 'campaign.unit', 'campaign.order'].includes(input.kind)) {
         validateCampaignRecord(input);
-        if (input.kind === 'campaign.unit' && input.status === 'APPLIED') {
-          const payload = campaignUnitInputSchema.parse(input.payload);
-          if (payload.type === 'form' && !types.includes(payload.crewType))
-            throw new Error('생성 기록에 없는 부곡 병종입니다.');
-        }
       }
   },
   afterAppliedInput(before, after, input) {
@@ -144,3 +140,23 @@ export const campaignInputKinds: readonly InputKindDefinition[] = [
   route: 'queued',
   apply: applyCampaign,
 }));
+
+export const marchSupplyFeature: RuleFeatureDefinition = {
+  key: 'march-supply-v1',
+  requires: ['campaign-v1', 'city-resources-v1', 'operational-map'],
+  conflicts: [],
+  checkOrigin({ initial, data }) {
+    if (data !== undefined || !initial.operationalMap) throw new Error('행군 보급에는 운영 지도가 필요합니다.');
+    buildSupplyLedger(initial.operationalMap);
+  },
+  initReplayState(replay, { initial }) {
+    if (!initial.operationalMap || !replay.state.campaign) throw new Error('행군 경로 원장의 선행 자료가 없습니다.');
+    return {
+      ...replay,
+      state: {
+        ...replay.state,
+        campaign: { ...replay.state.campaign, supplyLedger: buildSupplyLedger(initial.operationalMap) },
+      },
+    };
+  },
+};

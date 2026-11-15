@@ -1,11 +1,12 @@
-import { rngFor } from '@opensamguk/shared';
+import { applySexLedger } from '@opensamguk/rules';
+import { loadSexLedger } from './world/resources';
 import { hashState } from '@opensamguk/shared/node';
 import {
   monthlyDate,
-  runGeneralTurn,
-  runMonthly,
-  TICKS_PER_MONTH,
-  toWorldState,
+  toGameDate,
+  initialReplayState,
+  runSimulationAction,
+  nextGameAction,
   unifiedNation,
   seasonOutcome,
   type WorldInit,
@@ -19,52 +20,42 @@ export function simulateGame(
   initial: WorldInit,
   options: { maxYear?: number; convergence?: boolean; onYear?: (year: number, turns: number) => void } = {},
 ) {
-  if (initial.ruleFeatures?.includes('reputation-v1'))
-    throw new Error('월단평 월드는 턴 엔진과 형식 3 재생으로 실행하세요.');
   const maxYear = options.maxYear ?? DEFAULT_SIMULATION_MAX_YEAR;
   if (!Number.isSafeInteger(maxYear) || maxYear < initial.startYear || maxYear > 10000)
     throw new Error('종료 연도는 시작 연도 이상, 10000 이하여야 합니다.');
   if (initial.generals.some((general) => general.userId !== null))
     throw new Error('시뮬레이터는 NPC 전용 월드만 실행합니다.');
   const started = performance.now();
-  let state = toWorldState(initial);
+  const normalized = {
+    ...initial,
+    generals: initial.generals.every((general) => general.sex !== undefined)
+      ? structuredClone(initial.generals)
+      : applySexLedger(initial, loadSexLedger()),
+  };
+  let replay = initialReplayState(normalized);
+  let state = replay.state;
   let turns = 0;
   let date = { year: initial.startYear, month: 1 };
   let winner = unifiedNation(state);
   const commandCounts: Record<string, number> = {};
   const nationCommandCounts: Record<string, number> = {};
-  // 장수는 달마다 한 번 실행한다. 월간 정산의 미등장 장수 offset 갱신도 그대로 적용한다.
-  for (let boundary = TICKS_PER_MONTH; winner === null; boundary += TICKS_PER_MONTH) {
-    date = monthlyDate(initial.startYear, boundary);
-    const due = Object.values(state.generals)
-      .filter((g) => g.activeFromYear <= date.year && g.nextTurnTick < boundary)
-      .sort((a, b) => a.nextTurnTick - b.nextTurnTick || a.id - b.id);
-    for (const general of due) {
-      const tick = state.generals[general.id]!.nextTurnTick;
-      const turn = runGeneralTurn(
-        state,
-        { generalId: general.id, tick, unitSet: initial.unitSet },
-        { commandKey: 'rest', args: {} },
-        initial.seed,
-        { convergence: options.convergence ?? true },
-      );
-      if ('code' in turn.result)
-        throw new Error(`시드 ${initial.seed}, tick ${tick}, 장수 ${general.id}: ${turn.result.code}`);
-      if (turn.nation && 'code' in turn.nation.result)
-        throw new Error(`시드 ${initial.seed}, 국가 명령: ${turn.nation.result.code}`);
-      state = turn.state;
-      state.generals[general.id]!.nextTurnTick = tick + TICKS_PER_MONTH;
+  while (winner === null) {
+    const action = nextGameAction(replay);
+    const result = runSimulationAction(replay, initial.seed, initial.unitSet, options.convergence ?? true);
+    replay = result.replay;
+    state = replay.state;
+    date =
+      action.kind === 'monthly'
+        ? monthlyDate(initial.startYear, action.tick)
+        : toGameDate(initial.startYear, action.tick);
+    if (result.commandKey) {
       turns++;
-      commandCounts[turn.commandKey] = (commandCounts[turn.commandKey] ?? 0) + 1;
-      if (turn.nation)
-        nationCommandCounts[turn.nation.commandKey] = (nationCommandCounts[turn.nation.commandKey] ?? 0) + 1;
-      winner = seasonOutcome(state, { endYear: maxYear })?.winnerNationId ?? null;
-      if (winner !== null) break;
+      commandCounts[result.commandKey] = (commandCounts[result.commandKey] ?? 0) + 1;
+      if (result.nationCommandKey)
+        nationCommandCounts[result.nationCommandKey] = (nationCommandCounts[result.nationCommandKey] ?? 0) + 1;
     }
-    if (winner !== null) break;
-    state = runMonthly(state, boundary, rngFor(initial.seed, 'monthly', date.year, date.month)).state;
-    if (date.month === 12) options.onYear?.(date.year, turns);
-    const outcome = seasonOutcome(state, { endYear: maxYear, settled: date });
+    if (action.kind === 'monthly' && date.month === 12) options.onYear?.(date.year, turns);
+    const outcome = seasonOutcome(state, { endYear: maxYear, ...(action.kind === 'monthly' ? { settled: date } : {}) });
     winner = outcome?.winnerNationId ?? null;
     if (outcome) break;
   }

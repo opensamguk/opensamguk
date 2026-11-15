@@ -51,13 +51,7 @@ export async function persistGovernanceState(
   next: WorldView,
 ) {
   if (!before.governance && !next.governance) return;
-  if (
-    !before.governance ||
-    !next.governance ||
-    !before.ruleFeatures?.includes('governance-v1') ||
-    !next.ruleFeatures?.includes('governance-v1')
-  )
-    throw new Error('진행 중 황실 기능을 바꿀 수 없습니다.');
+  if (!before.governance || !next.governance) throw new Error('진행 중 황실 기능을 바꿀 수 없습니다.');
   const original = readGovernanceState(before.governance),
     final = readGovernanceState(next.governance);
   if (JSON.stringify(original.config) !== JSON.stringify(final.config))

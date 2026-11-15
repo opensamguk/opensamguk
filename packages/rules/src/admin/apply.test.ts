@@ -17,7 +17,6 @@ const context: AdminGameContext = {
 const payload = (action: AdminGameAction) => ({ version: 1, reason: '운영 검증', action });
 function fixture(features: string[] = []) {
   const initial = commandInitial();
-  initial.ruleFeatures = features;
   return initialReplayState(
     initial,
     features.includes('policy') ? { policy: { version: 1, turnTermMinutes: 10 } } : undefined,
@@ -136,7 +135,6 @@ it('AC-INT-23 인증·월드·대상·expected·부곡·범위의 거절 순서�
   expect(apply({ kind: 'admin.general.rename', generalId: 99, name: '새이름' })).toMatchObject({
     result: { code: 'TARGET_MISSING' },
   });
-  replay.state.ruleFeatures!.push('campaign-v1');
   const campaign: AdminGameAction = {
     kind: 'admin.general.adjust',
     generalId: 1,

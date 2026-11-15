@@ -87,14 +87,12 @@ beforeAll(async () => {
     ],
   });
   const initial = buildInitialWorld({ ...input, unitSet });
-  initial.ruleFeatures = ['campaign-v1', 'five-stats', 'operational-map', 'personnel', 'policy'];
   for (const general of initial.generals) general.nextTurnTick = 1_000_000_000;
   const saved = await saveInitialWorld(db, initial, {
     name: 'INT22 모집 조건 실제 검증',
     turnTermMinutes: 60,
     endYear: null,
     replayFormat: 3,
-    ruleFeatures: initial.ruleFeatures,
   });
   worldId = saved.worldId;
   worlds.push(worldId);

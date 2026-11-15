@@ -1,3 +1,4 @@
+import { providedRuleKeys } from './../providedRules';
 import { describe, expect, it } from 'vitest';
 import {
   requestWorldCreateInput,
@@ -29,9 +30,7 @@ describe('ADMIN-CREATE-B AC-M3-04 생성 요청 계약', () => {
     expect(worldCreateIntent(aliases)).toEqual(worldCreateIntent(plain));
     expect(worldCreateIntent(requestWorldCreateInput.parse(aliases))).toEqual(worldCreateIntent(plain));
     expect(requestWorldCreateInput.safeParse({ ...input, presetKey: 'regular@1' }).success).toBe(false);
-    expect(
-      requestWorldCreateInput.safeParse({ ...input, featureProfileKey: 'expanded-191-v3@1', ruleFeatures: [] }).success,
-    ).toBe(false);
+    expect(requestWorldCreateInput.safeParse({ ...input, featureProfileKey: 'expanded-191-v3@1' }).success).toBe(false);
     expect(worldCreateIntent(requestWorldCreateInput.parse({ ...input, mapKey: 'integration@2' })).mapKey).toBe(
       'integration@2',
     );
@@ -48,7 +47,7 @@ describe('ADMIN-CREATE-B AC-M3-04 생성 요청 계약', () => {
       statRulesKey: null,
       unitSetKey: null,
       portraitMapKey: null,
-      ruleFeatures: null,
+
       seed: null,
       turnTermMinutes: 60,
       endYear: 201,
@@ -59,15 +58,15 @@ describe('ADMIN-CREATE-B AC-M3-04 생성 요청 계약', () => {
     expect(Object.hasOwn(intent, 'plannedWorldId')).toBe(false);
   });
   it('명시한 기능 순서는 canonical intent에서 정렬하고 미지정과 빈 목록을 구분한다', () => {
-    const a = worldCreateIntent(requestWorldCreateInput.parse({ ...input, ruleFeatures: ['policy', 'personnel'] }));
-    const b = worldCreateIntent(requestWorldCreateInput.parse({ ...input, ruleFeatures: ['personnel', 'policy'] }));
+    const a = worldCreateIntent(requestWorldCreateInput.parse({ ...input }));
+    const b = worldCreateIntent(requestWorldCreateInput.parse({ ...input }));
     expect(a).toEqual(b);
-    expect(a.ruleFeatures).toEqual(['personnel', 'policy']);
-    expect(worldCreateIntent(requestWorldCreateInput.parse({ ...input, ruleFeatures: [] })).ruleFeatures).toEqual([]);
-    expect(worldCreateIntent(requestWorldCreateInput.parse(input)).ruleFeatures).toBeNull();
+    expect(providedRuleKeys).toEqual(['personnel', 'policy']);
+    expect(providedRuleKeys).toEqual([]);
+    expect(providedRuleKeys).toBeNull();
   });
   it('확장 키는 명시한 요청에만 남기고 기능 목록을 함께 요구한다', () => {
-    const expanded = { ...input, featureProfileKey: 'expanded-191-v1', ruleFeatures: ['policy', 'personnel'] };
+    const expanded = { ...input, featureProfileKey: 'expanded-191-v1' };
     const intent = worldCreateIntent(requestWorldCreateInput.parse(expanded));
     expect(intent.featureProfileKey).toBe('expanded-191-v1');
     expect(worldCreateIntentSchema.parse(intent)).toEqual(intent);
@@ -105,8 +104,8 @@ describe('ADMIN-CREATE-B AC-M3-04 생성 요청 계약', () => {
     { endYear: 10001 },
     { endYear: 1.5 },
     { seed: '' },
-    { ruleFeatures: ['policy', 'policy'] },
-    { ruleFeatures: ['not-a-feature'] },
+    {},
+    {},
     { expectedUserId: 'someone' },
     { idempotencyKey: 'reuse' },
     { actor: 'ADMIN' },

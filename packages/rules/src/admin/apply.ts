@@ -237,7 +237,6 @@ export function decideAdminGameAction(
       if (changed.some(([field, value]) => values[field] !== value.expected)) return reject('TARGET_CHANGED');
       if (
         action.kind === 'admin.general.adjust' &&
-        replay.state.ruleFeatures?.includes('campaign-v1') &&
         ['crew', 'crewType', 'train', 'atmos'].some((key) => Object.hasOwn(action.changes, key))
       )
         return reject('CAMPAIGN_FIELD');

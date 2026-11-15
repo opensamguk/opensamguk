@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '@opensamguk/rules';
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -74,7 +75,6 @@ async function fixture(preset?: 'beginner' | 'regular') {
   initial.generals[0]!.userId = ruler.id;
   initial.generals[1]!.userId = enemy.id;
   initial.generals[3]!.userId = free.id;
-  initial.ruleFeatures = ['policy'];
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '군사 조언 검증',
     turnTermMinutes: 60,
@@ -488,8 +488,7 @@ describe('T3-07 AC-M3-13 실제 HTTP 군사 조언', () => {
       statRules: 'five-stats',
       portraitMap: '191-map',
     });
-    const features = [...profile.ruleFeatures, 'equipment-v1'].sort();
-    initial.ruleFeatures = features;
+    [...providedRuleKeys, 'equipment-v1'].sort();
     expect(initial.generals).toHaveLength(491);
     const actor = await identity();
     const general = initial.generals.find(
@@ -500,7 +499,7 @@ describe('T3-07 AC-M3-13 실제 HTTP 군사 조언', () => {
       turnTermMinutes: 60,
       endYear: 231,
       replayFormat: 3,
-      ruleFeatures: features,
+
       featureData: { ...profile.featureData, 'equipment-v1': STANDARD_EQUIPMENT_CONFIG },
     });
     worlds.push(worldId);
@@ -519,7 +518,7 @@ describe('T3-07 AC-M3-13 실제 HTTP 군사 조언', () => {
       turnTermMinutes: 60,
       endYear: 231,
       replayFormat: 3,
-      ruleFeatures: features,
+
       featureData: { ...profile.featureData, 'equipment-v1': STANDARD_EQUIPMENT_CONFIG },
     });
     worlds.push(second.worldId);

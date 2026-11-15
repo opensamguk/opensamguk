@@ -1,3 +1,4 @@
+import { providedRuleKeys } from './../providedRules';
 import { describe, expect, it } from 'vitest';
 import { operationalInput } from '../../test/operationalMapFixture';
 import { buildInitialWorld, type WorldInit } from '../world/bootstrap';
@@ -31,7 +32,7 @@ describe('AC-INT-21 선택 기능과 결정적 폐허 복구', () => {
     expect(old).not.toHaveProperty('cityScale');
     expect(initialReplayState(old).state).not.toHaveProperty('cityRuins');
     const initial = fixture();
-    expect(initial.ruleFeatures).toEqual(['city-scale-v1', 'five-stats', 'operational-map']);
+    expect(providedRuleKeys).toEqual(['city-scale-v1', 'five-stats', 'operational-map']);
     expect(() => checkReplayOrigin(origin(initial))).not.toThrow();
     const state = initialReplayState(initial).state;
     expect(state.cities[1]).toMatchObject({ level: 1, populationMax: 200, agricultureMax: 10, commerceMax: 10 });
@@ -106,11 +107,10 @@ describe('AC-INT-21 선택 기능과 결정적 폐허 복구', () => {
     initial.cityScale!.cities[0]!.max.population++;
     expect(() => checkReplayOrigin(origin(initial))).toThrow();
     const disabled = fixture();
-    disabled.ruleFeatures = ['five-stats', 'operational-map'];
     expect(() => checkCityScaleInitial(disabled)).toThrow('끈');
     const replay = initialReplayState(fixture());
     expect(() => readCityRuins(null, replay.state)).toThrow();
-    expect(() => readCityRuins(replay.state.cityRuins, { ...replay.state, ruleFeatures: [] })).toThrow('끈');
+    expect(() => readCityRuins(replay.state.cityRuins, { ...replay.state })).toThrow('끈');
     replay.state.cities[1]!.wallMax++;
     expect(() => readCityRuins(replay.state.cityRuins, replay.state)).toThrow('최대치');
   });
@@ -141,7 +141,7 @@ describe('AC-INT-21 선택 기능과 결정적 폐허 복구', () => {
         cityScale: { cities: [{ city: '마을', level: 0 }] },
       },
     });
-    expect(initial.ruleFeatures).toEqual(['city-scale-v1']);
+    expect(providedRuleKeys).toEqual(['city-scale-v1']);
     expect(() => checkReplayOrigin(origin(initial))).not.toThrow();
     expect(initialReplayState(initial).state.cityRuins).toEqual({ version: 1, cities: [] });
     expect(cityScaleFeature.requires).toEqual([]);

@@ -107,7 +107,7 @@ export function applySuccession(world: WorldView, fromId: number, toId: number, 
       }
       unit.commanderId = commanderId;
     }
-    campaign.units = campaign.units.filter((unit) => !removed.has(unit.id));
+    campaign.units = campaign.units.filter((unit) => !removed.has(unit.id) && unit.troops > 0);
     closeCampaignActivity(campaign, new Set([fromId, toId]), tick);
     if (campaign.revision === LINEAGE_MAX) return lineageFail('LIMIT', '부곡 변경 번호 한도에 닿았습니다.');
     campaign.revision++;
@@ -197,7 +197,7 @@ export function retireNpcWithoutHeir(world: WorldView, fromId: number, tick: num
       unit.troops = retained;
       unit.commanderId = owner.id;
     }
-    campaign.units = campaign.units.filter((unit) => !removed.has(unit.id));
+    campaign.units = campaign.units.filter((unit) => !removed.has(unit.id) && unit.troops > 0);
     campaign.links = campaign.links.filter((link) => link.masterId !== fromId && link.personId !== fromId);
     closeCampaignActivity(campaign, new Set([fromId]), tick);
     campaign.revision++;

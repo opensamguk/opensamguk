@@ -8,7 +8,6 @@ import { domesticStatScore, drillGain, recruitCost } from './statScores';
 
 function world() {
   const state = commandWorld();
-  state.ruleFeatures = ['five-stats'];
   Object.assign(state.generals[1]!, { politics: 50, charm: 50 });
   return state;
 }

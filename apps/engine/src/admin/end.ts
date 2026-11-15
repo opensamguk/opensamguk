@@ -17,6 +17,7 @@ import { checkedAdminResetResult } from './reset';
 import { PgHeritageRepository } from '../heritage/repository';
 import { refundHeritageCreations } from '../heritage/service';
 import { readCreationWorld } from './settingsHistory';
+import { cancelTacticalBattles } from '../tacticalBattle';
 
 export function checkedAdminEndResult(
   world: Prisma.WorldGetPayload<Record<string, never>>,
@@ -106,6 +107,7 @@ export async function processAdminEnd(
     }
   }
   const status = code ? ('REJECTED' as const) : ('APPLIED' as const);
+  if (!code && world.campaignState) await cancelTacticalBattles(tx, world, now, '관리자 월드 종료');
   const result = code
     ? { code, message: adminEndRejectMessages[code] }
     : {
@@ -131,10 +133,9 @@ export async function processAdminEnd(
       data: { status: 'ENDED', endedAt: now, clockRevision: { increment: 1 } },
     });
     if (saved.count !== 1) throw new Error('월드 상태가 바뀌어 종료를 취소했습니다.');
-    if (world.ruleFeatures.includes('heritage-v1'))
-      await refundHeritageCreations(new PgHeritageRepository(tx), world.id, 'ADMIN_END', {
-        requestId: String(event.id),
-      });
+    await refundHeritageCreations(new PgHeritageRepository(tx), world.id, 'ADMIN_END', {
+      requestId: String(event.id),
+    });
   }
   const saved = await tx.inputEvent.updateMany({
     where: { id: event.id, status: 'PENDING' },

@@ -68,7 +68,7 @@ function record(): RecordedInput {
         presetHash: null,
         turnTermMinutes: 30,
         endYear: null,
-        ruleFeatures: [],
+
         featureDataHash: 'a'.repeat(64),
       },
     },

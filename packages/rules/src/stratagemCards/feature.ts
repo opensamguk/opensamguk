@@ -22,12 +22,10 @@ const rejectionSchema = z.strictObject({
   reason: z.string().min(1).optional(),
 });
 
-export function readStratagemCardsConfig(data: unknown, ruleFeatures: readonly string[] = []) {
+export function readStratagemCardsConfig(data: unknown) {
   const { config } = stratagemCardsFeatureDataSchema.parse(data);
   if (!config.consumeOnRollFailure || config.campaignLoss !== 'eligibleAll' || config.setter !== 'ruler')
     throw Error('아직 구현하지 않은 계략 패 규칙입니다.');
-  if (config.deck.some((card) => card.kind.startsWith('nation_')) && !ruleFeatures.includes('nation-strategy-v1'))
-    throw Error('국가 전략 패는 전략 기능 구현 뒤 등록합니다.');
   return config;
 }
 
@@ -52,7 +50,7 @@ export const stratagemCardsFeature: RuleFeatureDefinition = {
   conflicts: [],
   checkOrigin({ initial, data }) {
     if (Object.hasOwn(initial, 'stratagemCards')) throw Error('계략 패는 원생성의 빈 상태에서 시작합니다.');
-    initialStratagemCards(readStratagemCardsConfig(data, initial.ruleFeatures), toWorldState(initial), initial.seed);
+    initialStratagemCards(readStratagemCardsConfig(data), toWorldState(initial), initial.seed);
   },
   initReplayState(replay, { initial, data }) {
     if (Object.hasOwn(replay.state, 'stratagemCards')) throw Error('계략 패 초기화가 중복됐습니다.');
@@ -60,11 +58,7 @@ export const stratagemCardsFeature: RuleFeatureDefinition = {
       ...replay,
       state: {
         ...replay.state,
-        stratagemCards: initialStratagemCards(
-          readStratagemCardsConfig(data, initial.ruleFeatures),
-          replay.state,
-          initial.seed,
-        ),
+        stratagemCards: initialStratagemCards(readStratagemCardsConfig(data), replay.state, initial.seed),
       },
     };
   },

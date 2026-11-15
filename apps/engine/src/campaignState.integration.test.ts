@@ -44,7 +44,6 @@ async function fixture(enabled = true) {
   const world = toWorldState(source);
   const seed = `campaign-storage-${randomUUID()}`;
   if (enabled) {
-    world.ruleFeatures = ['campaign-v1', 'five-stats', 'operational-map', 'personnel', 'policy'];
     world.campaign = emptyCampaignState(world, seed, 'storage-fixture');
   }
   const row = await db.world.create({
@@ -60,7 +59,7 @@ async function fixture(enabled = true) {
       unitSet: json(source.unitSet),
       turnTermMinutes: 60,
       replayFormat: enabled ? 3 : 1,
-      ruleFeatures: world.ruleFeatures ?? [],
+
       ...(enabled ? { campaignState: json(world.campaign), operationalMap: json(source.operationalMap) } : {}),
     },
   });
@@ -131,7 +130,7 @@ describe('AC-INT-06 실제 PostgreSQL 휘하 스냅샷', () => {
       db.world.update({ where: { id: old.row.id }, data: { campaignState: json(f.world.campaign) } }),
     ).rejects.toThrow();
     for (const patch of [
-      { ruleFeatures: f.row.ruleFeatures.filter((key) => key !== 'policy') },
+      {},
       { campaignState: json({ ...f.world.campaign, seed: 'other-seed' }) },
       { campaignState: json({ ...f.world.campaign, version: 2 }) },
       { campaignState: {} },

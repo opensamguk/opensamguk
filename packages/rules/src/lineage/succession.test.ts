@@ -155,7 +155,7 @@ it('AC-P2-32 NPC 사망의 다른 도시 부곡은 손실 처리하고 남의 �
   expect(outcome.ok).toBe(true);
   if (!outcome.ok) throw Error(outcome.message);
   expect(outcome.loss.troops).toBe(125);
-  expect(outcome.world.campaign!.units).toEqual([unit(2, other, other, 0), unit(3, heir, mother, 30)]);
+  expect(outcome.world.campaign!.units).toEqual([unit(3, heir, mother, 30)]);
   expect(outcome.world.generals[mother]!.cityKey).toBe(world.generals[mother]!.cityKey);
   expect(() => assertLineageFinal(outcome.world, 0)).not.toThrow();
 });

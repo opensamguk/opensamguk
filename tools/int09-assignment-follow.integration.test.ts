@@ -31,7 +31,7 @@ afterAll(async () => {
   }
 });
 
-async function fixture(corrected: boolean) {
+async function fixture() {
   const source = operationalInput();
   source.scenario.nation = [source.scenario.nation[0]!];
   source.scenario.nation[0]![8] = ['도시1', '도시2', '관문'];
@@ -58,14 +58,6 @@ async function fixture(corrected: boolean) {
     officerId: generalId,
   }));
   const initial = buildInitialWorld(source);
-  initial.ruleFeatures = [
-    ...(corrected ? ['campaign-assignment-v2'] : []),
-    'campaign-v1',
-    'five-stats',
-    'operational-map',
-    'personnel',
-    'policy',
-  ];
   initial.nations[0]!.isNpc = false;
   const { worldId } = await saveInitialWorld(db, initial, {
     name: 'INT09 발령 동행 저장 고정물',

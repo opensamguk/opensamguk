@@ -134,7 +134,6 @@ it('AC-INT-23 직접 운영 입력도 현재 혼인을 정리하며 가문의 �
   const replay = fixture();
   replay.state = lineageFixture();
   delete replay.state.governance;
-  replay.state.ruleFeatures = ['lineage-v1'];
   replay.state.generals[3]!.officerLevel = 1;
   replay.state.lineage!.marriages = [{ id: 1, a: 3, b: 4, householdGeneralId: 3, sinceTick: 0 }];
   replay.state.lineage!.nextMarriageId = 2;

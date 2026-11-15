@@ -54,13 +54,6 @@ it.each(['만료', '파기'] as const)(
     });
     users.push(rulerA.id, rulerB.id);
     const initial = await monthlyFixture();
-    initial.ruleFeatures = [
-      ...(personnel ? ['personnel'] : []),
-      'treaty',
-      'treaty-break',
-      'treaty-expanded',
-      'treaty-trade',
-    ];
     initial.nations.forEach((nation) => {
       nation.isNpc = false;
     });

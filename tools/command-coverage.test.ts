@@ -68,7 +68,7 @@ const runCli = (...args: string[]) =>
   spawnSync(process.execPath, ['tools/command-coverage.mjs', ...args], { cwd: root, encoding: 'utf8' });
 
 it('AC-M1-14 기능 명령 목록을 최종 resolver와 대조하고 잘못된 대상·중복을 거부한다', () => {
-  const resolver = resolverForRuleFeatures({ ruleFeatures: ruleRegistry.features.map(({ key }) => key).sort() })!;
+  const resolver = resolverForRuleFeatures({})!;
   const builtins = new Set(commands.map(({ key }) => key));
   const registered = [...resolver.list('general'), ...resolver.list('nation')]
     .filter(({ key }) => !builtins.has(key))

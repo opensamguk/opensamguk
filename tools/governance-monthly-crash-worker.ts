@@ -21,12 +21,7 @@ if (
 process.once('disconnect', () => process.exit(2));
 const db = createDb(url.href);
 const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
-if (
-  world.name !== 'AC-P2-31 황실 HTTP' ||
-  !world.ruleFeatures.includes('governance-v1') ||
-  world.monthlyTick !== 60_000 ||
-  world.clockTick !== tick - 1
-)
+if (world.name !== 'AC-P2-31 황실 HTTP' || world.monthlyTick !== 60_000 || world.clockTick !== tick - 1)
   throw Error('황실 정산 중단 시험 월드가 아닙니다.');
 
 async function reached(tx: Pick<Prisma.TransactionClient, 'yearbookSnapshot' | 'governanceMovement'>) {

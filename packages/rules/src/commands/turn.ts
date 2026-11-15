@@ -54,6 +54,8 @@ export function runGeneralTurn(
       throw new PersonnelInvariantError('인사 기능을 켠 월드에 국가 예턴이 있습니다.');
     assertTick(actor.tick as number);
   }
+  const pendingMove = state.generals[actor.generalId]?.movePath;
+  if (pendingMove?.length) command = { commandKey: 'move', args: { cityKey: pendingMove.at(-1)! }, explicit: true };
   const take = personnel === undefined ? null : takeOfficeTurn(state, personnel.offices, actor.generalId);
   const personnelChange: PersonnelTurnChange | undefined =
     personnel === undefined
@@ -153,7 +155,9 @@ export function runGeneralTurn(
     }
     nation = { commandKey: slot.commandKey, result, nationId };
   }
-  const instructed = takeCampaignOrder(next, actor.generalId, options.turnRevision, command, actor.tick ?? 0);
+  const instructed = pendingMove?.length
+    ? { state: next, order: undefined }
+    : takeCampaignOrder(next, actor.generalId, options.turnRevision, command, actor.tick ?? 0);
   next = instructed.state as WorldState;
   let selected = instructed.order ? { ...instructed.order.command, explicit: true } : command;
   if (!instructed.order && general.userId !== null && command.explicit === false && options.policy !== undefined) {

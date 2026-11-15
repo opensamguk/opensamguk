@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
-import { RELATIONS_FEATURE, TICKS_PER_MONTH } from '../packages/rules/src/index';
+import { TICKS_PER_MONTH } from '../packages/rules/src/index';
 import { createWorldFromCli } from '../apps/engine/src/admin/creation';
 import { composeInitialWorld, readInitialResources } from '../apps/engine/src/world/resources';
 import { newSession } from '../apps/server/src/auth/session';
@@ -64,7 +64,7 @@ beforeAll(async () => {
   year = initial.startYear;
   nationCount = initial.nations.length;
   const options = { name: '관계 조회 검증', turnTermMinutes: 60, endYear: null, replayFormat: 3 } as const;
-  ({ worldId } = await createWorldFromCli(db, initial, { ...options, ruleFeatures: [RELATIONS_FEATURE] }, resources));
+  ({ worldId } = await createWorldFromCli(db, initial, { ...options }, resources));
   worldIds.push(worldId);
   ({ worldId: offWorldId } = await createWorldFromCli(db, initial, options, resources));
   worldIds.push(offWorldId);

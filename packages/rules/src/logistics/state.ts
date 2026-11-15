@@ -103,7 +103,14 @@ export function logisticsCapacity(config: Pick<LogisticsConfig, 'capacity'>, lev
 
 export function readLogisticsConfig(value: unknown, world: CityWorld): LogisticsConfig {
   const config = logisticsConfigSchema.parse(value);
-  if (config.specialties.some((row) => !world.cities[row.cityKey] || world.cities[row.cityKey]!.kind === 'PASS'))
+  if (
+    config.specialties.some(
+      (row) =>
+        !world.cities[row.cityKey] ||
+        world.cities[row.cityKey]!.kind === 'PASS' ||
+        world.cities[row.cityKey]!.kind === 'FIELD',
+    )
+  )
     throw new Error('특산 생산 거점이 없거나 관문입니다.');
   return config;
 }

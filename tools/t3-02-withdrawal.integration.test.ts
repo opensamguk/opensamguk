@@ -498,17 +498,6 @@ for (const index of [0, 1])
       seed: 'account-withdrawal-' + index,
     });
     const lineage = index === 1;
-    initial.ruleFeatures = [
-      'campaign-assignment-v2',
-      'campaign-v1',
-      'five-stats',
-      ...(lineage ? ['lineage-v1'] : []),
-      'operational-map',
-      'personnel',
-      'policy',
-      'stratagem-basic',
-      'treaty',
-    ];
     expect(initial.nations).toHaveLength(21);
     expect(initial.generals).toHaveLength(491);
     const { worldId } = await saveInitialWorld(db, initial, {

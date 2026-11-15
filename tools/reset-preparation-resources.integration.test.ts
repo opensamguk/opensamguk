@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '@opensamguk/rules';
 import { readFileSync } from 'node:fs';
 import type { Prisma, PrismaClient, PublishedResource } from '../packages/db/src/index';
 import { parsePreset, worldCreateIntent, ADMIN_RESET_KIND, type ReplayOriginV3 } from '../packages/rules/src/index';
@@ -20,6 +21,9 @@ import {
   resetSettingsReference,
   type ResetPreparation,
 } from '../apps/engine/src/admin/resetPreparation';
+import { readInitialResources } from '../apps/engine/src/world/resources';
+import { createDb } from '../packages/db/src/index';
+import { testDatabaseUrl } from './test-database';
 
 const worldId = '00000000-0000-4000-8000-000000000001';
 const requestId = '00000000-0000-4000-8000-000000000002';
@@ -31,9 +35,6 @@ function resource(kind: PublishedResource['kind'], name: string, path: string): 
   const content = json(path);
   return { kind, name, version: 1, content, contentHash: hashState(content), source: 'repository formal fixture' };
 }
-import { readInitialResources } from '../apps/engine/src/world/resources';
-import { createDb } from '../packages/db/src/index';
-import { testDatabaseUrl } from './test-database';
 
 const selectedResources = await (async () => {
   const db = createDb(testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL }).href);
@@ -51,13 +52,11 @@ const resources: InitialResources = {
   statRules: resource('STAT_RULES', 'five-stats', 'resources/scenario/five-stats.json'),
   portraitMap: resource('PORTRAIT_MAP', '191-map', 'resources/portraits/191-map.json'),
 };
-const features = ['campaign-v1', 'five-stats', 'operational-map', 'personnel', 'policy'].sort();
 const options: InitialWorldOptions = {
   name: '원본 정식 191년',
   turnTermMinutes: 30,
   endYear: 200,
   replayFormat: 3,
-  ruleFeatures: features,
 };
 afterEach(() => vi.restoreAllMocks());
 type World = Prisma.WorldGetPayload<Record<string, never>>;
@@ -98,7 +97,6 @@ async function capture(prepared: PreparedInitialWorld) {
 let sourceWorld: World;
 beforeAll(async () => {
   const initial = composeInitialWorld(resources, oldSeed);
-  initial.ruleFeatures = features;
   sourceWorld = (await capture(prepareInitialWorld(initial, options))).world;
 });
 function request(world = sourceWorld): Request {
@@ -111,7 +109,7 @@ function request(world = sourceWorld): Request {
     statRulesKey: 'five-stats',
     unitSetKey: 'basic',
     portraitMapKey: '191-map',
-    ruleFeatures: features,
+
     seed: oldSeed,
     turnTermMinutes: 30,
     endYear: 200,
@@ -208,10 +206,8 @@ async function reject(f: ReturnType<typeof fixture>, code: ResetPreparationError
 
 async function sexEditionFixture(useRequest: boolean, edition: 'first' | 'second' | 'latest' = 'first') {
   const f = fixture(useRequest),
-    ruleFeatures = [...features, 'lineage-v1'].sort(),
-    lineageOptions = { ...options, ruleFeatures, featureData: { 'lineage-v1': lineageTestConfig } },
+    lineageOptions = { ...options, featureData: { 'lineage-v1': lineageTestConfig } },
     initial = composeInitialWorld(resources, oldSeed);
-  initial.ruleFeatures = ruleFeatures;
   const old = prepareInitialWorld(initial, lineageOptions, resourceLoaders.loadSexLedgers()[0]),
     latest = prepareInitialWorld(initial, lineageOptions);
   expect(old.stateHash).not.toBe(latest.stateHash);
@@ -224,7 +220,7 @@ async function sexEditionFixture(useRequest: boolean, edition: 'first' | 'second
   Object.assign(f.world, (await capture(prepared)).world);
   if (useRequest) {
     const row = request(f.world),
-      intent = { ...(row.intent as Record<string, unknown>), ruleFeatures };
+      intent = { ...(row.intent as Record<string, unknown>) };
     f.requests[0] = { ...row, intent, intentHash: hashState(intent) } as Request;
   }
   return f;
@@ -317,7 +313,6 @@ async function san10RequestFixture(
       'treaty',
     ].sort();
   const initial = composeInitialWorld(selected, oldSeed);
-  initial.ruleFeatures = san10Features;
   const f = fixture();
   Object.assign(
     f.world,
@@ -325,7 +320,7 @@ async function san10RequestFixture(
       await capture(
         prepareInitialWorld(initial, {
           ...options,
-          ruleFeatures: san10Features,
+
           turnTermMinutes: preset.turnTermMinutes,
           preset: { key: presetKey, value: preset },
         }),
@@ -339,7 +334,7 @@ async function san10RequestFixture(
     presetKey,
     seed: oldSeed,
     endYear: f.world.endYear,
-    ruleFeatures: san10Features.filter((feature) => unitMode !== 'expanded' || feature !== 'battle-affinity-v2'),
+
     ...(unitMode === 'basic-override' ? { unitSetKey: 'basic' } : {}),
   });
   f.rows.splice(0, f.rows.length, ...structuredClone(Object.values(selected)));
@@ -379,8 +374,8 @@ it.each(['expanded', 'basic-override'] as const)(
     const result = await prepareWorldReset(f.db, worldId, 'expanded-reset-seed', controller().signal);
     const saved = await capture(result.prepared);
     expect(saved.world.unitSetKey).toBe(unitMode === 'expanded' ? 'expanded' : 'basic');
-    expect(saved.world.ruleFeatures).toEqual(san10Features);
-    expect(saved.world.ruleFeatures.includes('battle-affinity-v2')).toBe(unitMode === 'expanded');
+    expect(providedRuleKeys).toEqual(san10Features);
+    expect(providedRuleKeys.includes('battle-affinity-v2')).toBe(unitMode === 'expanded');
     expect(result.evidence.provenance).toEqual({ kind: 'request', requestId });
   },
 );
@@ -401,7 +396,7 @@ it.each(['san10-191', 'san10-empty'] as const)(
     expect(origin.initial.generals).toHaveLength(491);
     expect(origin.initial.generals.every((general) => general.userId === null)).toBe(true);
     expect(origin.initial.cities).toHaveLength(155);
-    expect(saved.world.ruleFeatures).toEqual(san10Features);
+    expect(providedRuleKeys).toEqual(san10Features);
     const ledger = saved.world.cityResourcesState as {
       cities: Record<string, { gold: number; rice: number; garrison: unknown[] }>;
     };
@@ -467,7 +462,6 @@ it('저장 프리셋과 원본 featureData를 쓰며 현재 파일의 이름·�
   preset.name = '저장된 독립 프리셋';
   preset.turnTermMinutes = 37;
   const initial = composeInitialWorld(resources, oldSeed);
-  initial.ruleFeatures = features;
   Object.assign(
     f.world,
     (
@@ -528,7 +522,6 @@ it('원본 초기 상태 자체의 변경과 기능·프리셋 불일치를 거�
   (a.world.replayOrigin as unknown as ReplayOriginV3).initial.cities[0]!.population++;
   await reject(a, 'ORIGIN_INVALID');
   const b = fixture();
-  b.world.ruleFeatures.push('unknown');
   await reject(b, 'ORIGIN_INVALID');
   const c = fixture();
   c.world.presetKey = 'absent';
@@ -590,8 +583,7 @@ it('생성 manifest의 자원 선택·고정 해시·프리셋·간격·연도 �
 it('원본 intent 기능을 바꾸고 재해시해도 원생성 기능과 다르면 거부한다', async () => {
   const f = fixture(),
     r = f.requests[0]!,
-    intent = r.intent as unknown as { ruleFeatures: string[] };
-  intent.ruleFeatures = ['five-stats', 'operational-map'];
+    intent = r.intent as unknown as object;
   r.intentHash = hashState(intent);
   await reject(f, 'PROVENANCE_INVALID');
 });
@@ -733,7 +725,7 @@ it('D1 공유 settings hash 추출은 승인된 C 원 recipe와 같다', () => {
       preset: w.preset,
       turnTermMinutes: w.turnTermMinutes,
       endYear: w.endYear,
-      ruleFeatures: w.ruleFeatures,
+
       origin: w.replayOrigin,
     }),
   );

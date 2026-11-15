@@ -15,8 +15,6 @@ it.each([true, false])(
   'AC-P2-32 같은 직책 장수의 조작자 전환은 lineage=%s에서만 칸과 임기를 새로 시작한다',
   (enabled) => {
     const { state, offices } = fixture();
-    state.ruleFeatures = (state.ruleFeatures ?? []).filter((feature) => feature !== 'lineage-v1');
-    if (enabled) state.ruleFeatures.push('lineage-v1');
     const king = Object.values(state.generals).find(
       (general) => general.nationId === 1 && general.officerLevel === 12,
     )!;

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { battleBusy } from '../tactical/world';
 import { BALANCE } from '../balance';
 import type { Actor, Failure } from '../commands/types';
 import { readCampaignState } from '../campaign/state';
@@ -8,7 +9,13 @@ import { allocateCityGarrison } from './ledger';
 import { readCityResourcesState } from './state';
 
 const id = z.number().int().min(1).max(2_147_483_647);
-export const cityAllocationArgs = z.strictObject({ cityKey: id, unitId: id, crewType: id, amount: id });
+export const cityAllocationArgs = z.strictObject({
+  cityKey: id,
+  unitId: z.union([id, z.literal('new')]),
+  recipientId: id.optional(),
+  crewType: id,
+  amount: id,
+});
 
 // 사람 입력과 국가 예약 명령이 같은 소속·직책·집결·수량 검사를 사용한다.
 export function applyCityAllocation(
@@ -18,8 +25,6 @@ export function applyCityAllocation(
   armyTypesOverride?: readonly number[],
 ) {
   const fail = (code: Failure['code'], message: string) => ({ ok: false as const, code, message });
-  if (!view.ruleFeatures?.includes('city-resources-v1'))
-    return fail('COMMAND_DISABLED', '도시 자원을 사용하는 판이 아닙니다.');
   const armyTypes = armyTypesOverride ?? actor.unitSet?.crewTypes.filter((row) => row.armType > 0).map((row) => row.id);
   const ledger = readCityResourcesState(view.cityResources, view, armyTypes);
   const campaign = readCampaignState(view.campaign, view);
@@ -27,6 +32,14 @@ export function applyCityAllocation(
     throw new Error('도시·부곡 원장 밖에 중복된 장수 병력이 있습니다.');
   const parsed = cityAllocationArgs.safeParse(value);
   if (!parsed.success) return fail('BAD_ARGS', '도시 병력 배속 인자를 확인하세요.');
+  if (
+    battleBusy(view, {
+      cityKeys: [parsed.data.cityKey],
+      unitIds: typeof parsed.data.unitId === 'number' ? [parsed.data.unitId] : [],
+      generalIds: parsed.data.recipientId === undefined ? [] : [parsed.data.recipientId],
+    })
+  )
+    return fail('BATTLE_BUSY', '전투 중');
   const general = view.generals[actor.generalId];
   if (!general) return fail('NO_ACTOR', '장수가 없습니다.');
   if (general.nationId === null || !view.nations[general.nationId])
@@ -36,8 +49,26 @@ export function applyCityAllocation(
   const args = parsed.data,
     city = view.cities[args.cityKey];
   if (!city || city.nationId !== general.nationId) return fail('NOT_OWN_CITY', '자기 국가 도시를 선택하세요.');
-  const unit = campaign.units.find((entry) => entry.id === args.unitId);
+  if (city.kind === 'FIELD') return fail('BAD_TARGET', '전장에는 배속할 도시 수비병이 없습니다.');
+  if (args.unitId === 'new' && (!args.recipientId || campaign.nextUnitId === 2_147_483_647))
+    return fail('BAD_ARGS', '새 부곡을 받을 장수를 선택하세요.');
+  if (args.unitId !== 'new' && args.recipientId !== undefined)
+    return fail('BAD_ARGS', '기존 부곡 배속에는 수령 장수를 지정하지 않습니다.');
+  const recipient = args.recipientId === undefined ? undefined : view.generals[args.recipientId];
+  const unit =
+    args.unitId === 'new' && recipient
+      ? {
+          id: campaign.nextUnitId,
+          ownerId: recipient.id,
+          commanderId: recipient.id,
+          troops: 0,
+          crewType: args.crewType,
+          train: 0,
+          atmos: 0,
+        }
+      : campaign.units.find((entry) => entry.id === args.unitId);
   if (!unit) return fail('BAD_TARGET', '배속할 부곡이 없습니다.');
+  if (unit.supply) return fail('BAD_STATE', '귀환을 마친 뒤 부곡 병력을 보충하세요.');
   const owner = view.generals[unit.ownerId]!,
     commander = view.generals[unit.commanderId]!;
   if (owner.nationId !== general.nationId || commander.nationId !== general.nationId)
@@ -56,7 +87,10 @@ export function applyCityAllocation(
   if (campaign.revision === 2_147_483_647) return fail('BAD_STATE', '휘하 변경 번호 한도를 넘었습니다.');
   const allocated = allocateCityGarrison(ledger.cities[String(args.cityKey)]!, unit, args.crewType, args.amount);
   ledger.cities[String(args.cityKey)] = allocated.city;
-  campaign.units[campaign.units.findIndex((entry) => entry.id === unit.id)] = allocated.unit;
+  if (args.unitId === 'new') {
+    campaign.nextUnitId++;
+    campaign.units.push(allocated.unit);
+  } else campaign.units[campaign.units.findIndex((entry) => entry.id === unit.id)] = allocated.unit;
   campaign.revision++;
   const state = cloneWorld(view);
   state.cityResources = readCityResourcesState(ledger, state, armyTypes);

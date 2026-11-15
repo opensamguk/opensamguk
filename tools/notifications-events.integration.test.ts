@@ -140,7 +140,6 @@ async function fixture(
     turnTermMinutes: 30,
     endYear: null,
     replayFormat: 3,
-    ruleFeatures: initial.ruleFeatures ?? ['policy', 'treaty'],
   });
   await db.world.update({ where: { id: worldId }, data: { status: 'RUNNING', clockAnchorAt: new Date() } });
   const lease = await acquireLease(db, worldId);
@@ -522,7 +521,6 @@ it.each(['ACCEPTED', 'DECLINED', 'REJECTED'] as const)(
 it('휘하 지시가 원 예턴과 다른 도시를 공격하면 실제 대상 국가만 받는다', async () => {
   const f = await fixture(
     (initial) => {
-      initial.ruleFeatures = ['campaign-v1', 'five-stats', 'operational-map', 'personnel', 'policy', 'treaty'];
       initial.diplomacies = [{ nationA: 1, nationB: 2, state: 'WAR', untilTick: 0 }];
       initial.generals.forEach((general) => {
         general.userId = null;

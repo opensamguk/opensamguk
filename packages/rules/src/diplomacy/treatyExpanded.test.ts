@@ -7,7 +7,6 @@ import type { WorldState } from '../model/world';
 
 function world() {
   const state = commandWorld();
-  state.ruleFeatures = ['treaty', 'treaty-break', 'treaty-expanded', 'treaty-trade'];
   state.nations[2]!.isNpc = false;
   state.diplomacies = [];
   return state;
@@ -117,7 +116,6 @@ describe('AC-M2-06 확장 조약', () => {
 
   it('기존 판의 미연결 조항을 유지하고 새 판에서 범위를 엄격히 검사한다', () => {
     const legacy = world();
-    legacy.ruleFeatures = ['treaty', 'treaty-trade'];
     expect(propose(legacy, [{ kind: 'passage', cityKeys: [2], months: 1 }])).toMatchObject({
       ok: false,
       result: { code: 'CLAUSE_NOT_CONNECTED' },

@@ -30,7 +30,6 @@ const config: LogisticsConfig = {
 const settings = { recruitTarget: 500, budgetBp: 2000, maxActions: 3, stockCapBp: 8000, upgradeAtBp: 9000 };
 function fixture(enabled = true) {
   const world = commandWorld();
-  world.ruleFeatures = ['campaign-v1', 'city-resources-v1', 'five-stats', 'logistics-v1'];
   for (const general of Object.values(world.generals)) Object.assign(general, { crew: 0, politics: 50, charm: 50 });
   world.generals[2]!.userId = 'other-player';
   world.cities[1]!.connections = [2, 4];

@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '@opensamguk/rules';
 import { randomUUID } from 'node:crypto';
 import { readFile, readdir, mkdir, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -348,11 +349,11 @@ for (const category of categories)
       if (category === 'success') {
         expect(result.body.result?.data).toMatchObject({ userId: owner.id });
         const data = result.body.result!.data as {
-          profiles: Array<{ available: boolean; code?: string; ruleFeatures?: string[] }>;
+          profiles: Array<{ available: boolean; code?: string }>;
         };
         const cityRegistered = ruleRegistry.features.some((feature) => feature.key === 'city-resources-v1');
         expect(data.profiles[0]!.available).toBe(cityRegistered);
-        if (cityRegistered) expect(data.profiles[0]!.ruleFeatures).toEqual([...creationFeatures]);
+        if (cityRegistered) expect(providedRuleKeys).toEqual([...creationFeatures]);
         else expect(data.profiles[0]!.code).toBe('RULES_UNAVAILABLE');
         expect(JSON.stringify(data)).not.toMatch(/password|connectionString|portraitId|generalStats|DATABASE_URL/);
       }
@@ -452,7 +453,7 @@ it('AC-M3-04 도시 규칙 통합 뒤 실제 게시 정식9기능을 검증한�
   const result = await call({ expectedUserId: owner.id }, owner.cookie);
   expect(result.body.result?.data).toMatchObject({
     profiles: [
-      { available: true, ruleFeatures: [...creationFeatures], counts: { nations: 21, generals: 491, anchors: 61 } },
+      { available: true, counts: { nations: 21, generals: 491, anchors: 61 } },
       { id: 'san10-191', available: false, code: 'RESOURCES_UNAVAILABLE' },
       { id: 'san10-empty', available: false, code: 'RESOURCES_UNAVAILABLE' },
     ],

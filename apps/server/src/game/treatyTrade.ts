@@ -30,7 +30,8 @@ export async function listTradeTargets(
     where: { worldId_cityKey: { worldId: input.worldId, cityKey: actor.cityKey } },
     select: { cityKey: true, nationId: true, connections: true, kind: true },
   });
-  if (!home || home.kind === 'PASS' || home.nationId !== nationId) return blocked('자기 국가 도시에서만 가능합니다.');
+  if (!home || home.kind === 'PASS' || home.kind === 'FIELD' || home.nationId !== nationId)
+    return blocked('자기 국가 도시에서만 가능합니다.');
   const [cities, nations, diplomacies, rows] = await Promise.all([
     tx.city.findMany({
       where: { worldId: input.worldId, cityKey: { in: home.connections }, nationId: { not: nationId } },
@@ -61,7 +62,11 @@ export async function listTradeTargets(
         ...Object.fromEntries(
           cities.map((city) => [
             city.cityKey,
-            { nationId: city.nationId, connections: [], ...(city.kind === 'PASS' ? { kind: 'PASS' as const } : {}) },
+            {
+              nationId: city.nationId,
+              connections: [],
+              ...(city.kind === 'PASS' || city.kind === 'FIELD' ? { kind: 'PASS' as const } : {}),
+            },
           ]),
         ),
         [home.cityKey]: { nationId: home.nationId, connections: home.connections },

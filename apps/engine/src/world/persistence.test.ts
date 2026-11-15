@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '@opensamguk/rules';
 import type { Prisma, PrismaClient } from '@opensamguk/db';
 import { readFileSync } from 'node:fs';
 import {
@@ -76,31 +77,26 @@ describe('AC-INT-22 전투 상성 생성 경계', () => {
     expect(f.transaction).not.toHaveBeenCalled();
     expect(f.tx.world.create).not.toHaveBeenCalled();
   });
-  it.each(['state', 'options'] as const)(
-    '%s에만 있는 기능도 선택하여 같은 생성·재생 경계를 통과한다',
-    async (source) => {
-      const initial = await monthlyFixture();
-      initial.unitSet.coefMode = 'multiply';
-      const selected = options();
-      if (source === 'state') initial.ruleFeatures = ['battle-affinity-v2'];
-      else selected.ruleFeatures = ['battle-affinity-v2'];
-      const f = database();
-      await saveInitialWorld(f.db, initial, selected);
-      const data = f.tx.world.create.mock.calls[0]![0].data;
-      expect(data.ruleFeatures).toEqual(['battle-affinity-v2']);
-      const origin = data.replayOrigin as unknown as ReplayOriginV3;
-      expect(() => checkReplayOrigin(origin)).not.toThrow();
-      const forged = structuredClone(origin);
-      delete forged.initial.ruleFeatures;
-      expect(() => checkReplayOrigin(forged)).toThrow('battle-affinity-v2');
-    },
-  );
+  it.each(['state', 'options'] as const)('%s에만 있는 기능도 선택하여 같은 생성·재생 경계를 통과한다', async () => {
+    const initial = await monthlyFixture();
+    initial.unitSet.coefMode = 'multiply';
+    const selected = options();
+
+    const f = database();
+    await saveInitialWorld(f.db, initial, selected);
+    const data = f.tx.world.create.mock.calls[0]![0].data;
+    expect(providedRuleKeys).toEqual(['battle-affinity-v2']);
+    const origin = data.replayOrigin as unknown as ReplayOriginV3;
+    expect(() => checkReplayOrigin(origin)).not.toThrow();
+    const forged = structuredClone(origin);
+    expect(() => checkReplayOrigin(forged)).toThrow('battle-affinity-v2');
+  });
   it('전투 상성의 별도 초기 자료는 받지 않는다', async () => {
     const f = database();
     await expect(
       saveInitialWorld(f.db, await monthlyFixture(), {
         ...options(),
-        ruleFeatures: ['battle-affinity-v2'],
+
         featureData: { 'battle-affinity-v2': {} },
       }),
     ).rejects.toThrow('별도 초기 자료');
@@ -205,7 +201,7 @@ it.each(formats)('조약 옵션 미지정은 %s 선택의 생성 형식과 정�
     expect(data.policyFromSequence).toBe(0);
     expect(f.tx.generalTurn.createMany.mock.calls[0]![0].data).toHaveLength(initial.generals.length * 30);
   }
-  if (format === 'default') expect(data).toMatchObject({ replayFormat: 3, ruleFeatures: [] });
+  if (format === 'default') expect(data).toMatchObject({ replayFormat: 3 });
   expect(f.forbidden).not.toHaveBeenCalled();
   expect(f.transaction).toHaveBeenCalledExactlyOnceWith(expect.any(Function), { timeout: 30000 });
 });
@@ -220,7 +216,7 @@ describe('기능 표시 형식의 초기 저장', () => {
     });
     const data = f.tx.world.create.mock.calls[0]![0].data;
     const expected = initialOrigin(initial);
-    expect(data).toMatchObject({ replayFormat: replayFormat ?? 3, ruleFeatures: [] });
+    expect(data).toMatchObject({ replayFormat: replayFormat ?? 3 });
     expect(data.replayOrigin).toEqual({ ...expected, version: replayFormat ?? 3 });
     expect(Object.hasOwn(data, 'policyFromSequence')).toBe(false);
     expect(f.tx.generalTurn.createMany).not.toHaveBeenCalled();
@@ -229,11 +225,9 @@ describe('기능 표시 형식의 초기 저장', () => {
 
   it.each([null, 'policy', {}, ['unknown'], ['policy', 'policy']])(
     '잘못된 기능 목록 %j는 저장 전에 거부한다',
-    async (ruleFeatures) => {
+    async () => {
       const f = database();
-      await expect(
-        saveInitialWorld(f.db, await monthlyFixture(), { ...options(), ruleFeatures: ruleFeatures as string[] }),
-      ).rejects.toThrow();
+      await expect(saveInitialWorld(f.db, await monthlyFixture(), { ...options() })).rejects.toThrow();
       expect(f.transaction).not.toHaveBeenCalled();
     },
   );
@@ -242,21 +236,19 @@ describe('기능 표시 형식의 초기 저장', () => {
     { state: ['policy'], option: [] },
     { state: ['policy'], option: ['personnel'] },
     { state: ['policy', 'personnel'], option: ['personnel', 'policy'] },
-  ])('상태와 옵션의 기능 목록이 다르면 저장하지 않는다 (%j)', async (value) => {
+  ])('상태와 옵션의 기능 목록이 다르면 저장하지 않는다 (%j)', async () => {
     const initial = await monthlyFixture();
-    Object.assign(initial, { ruleFeatures: value.state });
+    Object.assign(initial, {});
     const f = database();
-    await expect(saveInitialWorld(f.db, initial, { ...options(), ruleFeatures: value.option })).rejects.toThrow(
-      '기능 목록이 다릅니다',
-    );
+    await expect(saveInitialWorld(f.db, initial, { ...options() })).rejects.toThrow('기능 목록이 다릅니다');
     expect(f.transaction).not.toHaveBeenCalled();
   });
 
   it.each(['legacy', 'policy'] as const)('기존 %s 옵션에 기능 목록을 섞지 않는다', async (replayFormat) => {
     const f = database();
-    await expect(
-      saveInitialWorld(f.db, await monthlyFixture(), { ...options(), replayFormat, ruleFeatures: [] }),
-    ).rejects.toThrow('기존 생성 옵션');
+    await expect(saveInitialWorld(f.db, await monthlyFixture(), { ...options(), replayFormat })).rejects.toThrow(
+      '기존 생성 옵션',
+    );
     expect(f.transaction).not.toHaveBeenCalled();
   });
 
@@ -275,11 +267,11 @@ describe('기능 표시 형식의 초기 저장', () => {
     const initial = await monthlyFixture();
     initial.generals[0]!.userId = 'initial-person';
     const f = database();
-    await saveInitialWorld(f.db, initial, { ...options(), ruleFeatures: ['policy'] });
+    await saveInitialWorld(f.db, initial, { ...options() });
     const data = f.tx.world.create.mock.calls[0]![0].data;
     expect(data.replayOrigin).toMatchObject({
       version: 3,
-      initial: { ruleFeatures: ['policy'] },
+      initial: {},
       featureData: { policy: { version: 1, turnTermMinutes: 30 } },
     });
     expect(Object.hasOwn(data, 'policyFromSequence')).toBe(false);
@@ -302,7 +294,7 @@ describe('기능 표시 형식의 초기 저장', () => {
     await expect(
       saveInitialWorld(f.db, await monthlyFixture(), {
         ...options(),
-        ruleFeatures: ['policy'],
+
         featureData: { policy },
       }),
     ).rejects.toThrow();
@@ -340,7 +332,7 @@ describe('기능 표시 형식의 초기 저장', () => {
       id: worldId,
       preset: null,
       replayFormat: 3,
-      ruleFeatures: ['policy'],
+
       commandMeta: null,
     };
     const generalRows = initial.generals.map((general) => ({
@@ -373,7 +365,7 @@ describe('기능 표시 형식의 초기 저장', () => {
       ),
     };
     const state = await readWorldState(db as unknown as PrismaClient, worldId);
-    expect(state).toEqual({ ...initial, ruleFeatures: ['policy'] });
+    expect(state).toEqual({ ...initial });
     expect(findGenerals.mock.calls[0]![0].omit).toMatchObject({
       defaultPolicy: true,
       lastActiveTick: true,

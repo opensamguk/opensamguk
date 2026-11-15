@@ -11,10 +11,10 @@ vi.mock('./treatyInput', () => ({ processTreatyQueuedInput: vi.fn(async () => ({
 
 describe('형식 3 교역의 엔진·API·재생 연결', () => {
   it('엔진은 같은 feature 명령을 고르고 legacy 선택은 교역을 노출하지 않는다', () => {
-    const modern = { preset: null, replayFormat: 3, ruleFeatures: ['treaty', 'treaty-trade'] };
+    const modern = { preset: null, replayFormat: 3 };
     expect(engineResolver(modern).resolver.get('trade')).toBe(trade);
     for (const replayFormat of [1, 6])
-      expect(engineResolver({ ...modern, replayFormat, ruleFeatures: [] }).resolver.get('trade')).toBeUndefined();
+      expect(engineResolver({ ...modern, replayFormat }).resolver.get('trade')).toBeUndefined();
   });
   it('같은 production handler가 제안·응답·파기마다 명시 선택 문맥을 넘긴다', async () => {
     const handlers = queuedInputHandlers();
@@ -25,9 +25,7 @@ describe('형식 3 교역의 엔진·API·재생 연결', () => {
         .sort(),
     );
     for (const kind of ['treaty.propose', 'treaty.respond', 'treaty.break']) {
-      const world = { ruleFeatures: ['treaty', 'treaty-break', 'treaty-trade'] } as Prisma.WorldGetPayload<
-        Record<string, never>
-      >;
+      const world = {} as Prisma.WorldGetPayload<Record<string, never>>;
       await handlers[kind]!(
         {} as Prisma.TransactionClient,
         world,
@@ -68,7 +66,6 @@ describe('형식 3 교역의 엔진·API·재생 연결', () => {
   });
   it('교역 APPLIED 기록은 선택된 feature 문맥으로만 보관 검사에 통과한다', async () => {
     const initial = await monthlyFixture();
-    initial.ruleFeatures = ['treaty', 'treaty-trade'];
     const origin: ReplayArchiveV3['origin'] = {
       version: 3,
       initial,
@@ -104,7 +101,6 @@ describe('형식 3 교역의 엔진·API·재생 연결', () => {
       afterEnd: [],
     };
     expect(() => readArchive(archive)).not.toThrow();
-    archive.origin.initial.ruleFeatures = ['treaty'];
     archive.origin.initialStateHash = hashState(archive.origin.initial);
     expect(() => readArchive(archive)).toThrow('조항');
   });

@@ -14,7 +14,6 @@ const base = createCommandResolver({ general: ['fire_attack', 'sabotage', 'incit
   target = { cityKey: 2 };
 const setup = () => {
   const world = commandWorld();
-  world.ruleFeatures = ['five-stats', 'stratagem-basic', 'stratagem-cards-v1'];
   for (const general of Object.values(world.generals)) {
     general.politics = general.intel;
     general.charm = general.leadership;

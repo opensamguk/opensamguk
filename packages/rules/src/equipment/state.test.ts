@@ -10,7 +10,6 @@ import { TEST_EQUIPMENT_CONFIG } from './testFixture';
 
 const fixture = () => {
   const world = commandWorld();
-  world.ruleFeatures = ['equipment-v1'];
   world.equipment = initialEquipment(TEST_EQUIPMENT_CONFIG);
   return world;
 };
@@ -111,7 +110,6 @@ it('AC-P2-12 끈 판에서는 주입된 장착을 계산하지 않고 없는 상
   world.equipment = initialEquipment(TEST_EQUIPMENT_CONFIG);
   world.equipment.generals['1'] = { book: 'book_01' };
   expect(equipmentBonus(world, 1).intel).toBe(0);
-  world.ruleFeatures = ['equipment-v1'];
   delete world.equipment;
   expect(() => equipmentBonus(world, 1)).toThrow();
 });

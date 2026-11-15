@@ -42,12 +42,11 @@ export function assertGeneralStatProfile(general: object, five: boolean): void {
 
 export function checkStatProfile(initial: {
   statRules: { count?: number | undefined; total: number; min: number; max: number };
-  ruleFeatures?: readonly string[];
+
   generals: readonly object[];
 }): void {
-  const five = initial.ruleFeatures?.includes('five-stats') ?? false;
-  if (five !== (initial.statRules.count === 5)) throw new Error('능력치 규칙과 기능 판이 다릅니다.');
-  if (five && (initial.statRules.total !== 275 || initial.statRules.min !== 15 || initial.statRules.max !== 90))
+  if (initial.statRules.count !== 5) throw new Error('능력치 규칙과 기능 판이 다릅니다.');
+  if (initial.statRules.total !== 275 || initial.statRules.min !== 15 || initial.statRules.max !== 90)
     throw new Error('5능력치 생성 규칙을 확인하세요.');
-  for (const general of initial.generals) assertGeneralStatProfile(general, five);
+  for (const general of initial.generals) assertGeneralStatProfile(general, true);
 }

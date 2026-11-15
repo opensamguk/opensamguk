@@ -55,7 +55,7 @@ it('T4-46 AC-P2-24 추가 NPC 상한은 형식 3 생성과 재생에만 적용�
 
 async function adminEndArchive(features: string[] = []): Promise<ReplayArchiveV3> {
   const initial = await monthlyFixture();
-  if (features.length) initial.ruleFeatures = features;
+
   const origin: rules.ReplayOriginV3 = { version: 3, initial, initialStateHash: hashState(initial), resourceHash: '' };
   if (features.includes('policy')) origin.featureData = { policy: { version: 1, turnTermMinutes: 60 } };
   origin.resourceHash = resourceHashV3(origin);
@@ -145,7 +145,7 @@ async function adminResetArchive(): Promise<ReplayArchiveV3> {
         presetHash: null,
         turnTermMinutes: 30,
         endYear: null,
-        ruleFeatures: [],
+
         featureDataHash: hashState(null),
       },
     },
@@ -220,7 +220,7 @@ describe('ADMIN-RESET AC-M3-04 원본 terminal 재생', () => {
 describe('ADMIN-END AC-M3-04 형식3 강제 종료', () => {
   it('원생성 상태와 자원 해시까지 대조한다', async () => {
     const value = await adminEndArchive();
-    const world = { replayFormat: 3, ruleFeatures: [], replayOrigin: value.origin };
+    const world = { replayFormat: 3, replayOrigin: value.origin };
     expect(() => rules.checkAdminEndOrigin(world, rules.checkReplayOrigin, hashState)).not.toThrow();
     for (const field of ['initialStateHash', 'resourceHash'])
       expect(() =>
@@ -572,7 +572,7 @@ function exportDatabase(archive: ReplayArchiveV2 | ReplayArchiveV5, ended = true
     world: {
       findUniqueOrThrow: vi.fn(async () => ({
         replayFormat: 1,
-        ruleFeatures: [],
+
         replayOrigin: archive.origin,
         treatyFormat: null,
         personnelFormat: null,
@@ -677,7 +677,7 @@ describe('T1-26 내보내기와 네 키 상태', () => {
         findUniqueOrThrow: async () => ({
           id: worldId,
           replayFormat: 1,
-          ruleFeatures: [],
+
           preset: null,
           treatyFormat: null,
           personnelFormat: null,

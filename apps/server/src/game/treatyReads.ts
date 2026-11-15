@@ -25,7 +25,6 @@ import {
   toTreatyDetail,
   toTreatySettlementDate,
   treatyBreakEnabled,
-  treatyTradeEnabled,
   worldTreatyOptions,
   type TreatyDetail,
 } from './treatyQueries';
@@ -67,9 +66,6 @@ type RecentAction = {
   reason: string | null;
 };
 export type TreatyListPage = {
-  breakEnabled?: true;
-  tradeEnabled?: true;
-  expandedEnabled?: true;
   canPropose: TreatyAllowed;
   targets: TreatyTarget[];
   items: TreatyListItem[];
@@ -239,9 +235,6 @@ export async function listTreaties(
   const nationId = actor.nationId;
   if (nationId === null)
     return {
-      ...(breakEnabled ? { breakEnabled: true } : {}),
-      ...(treatyTradeEnabled(world) ? { tradeEnabled: true } : {}),
-      ...(worldTreatyOptions(world).expandedEnabled ? { expandedEnabled: true } : {}),
       canPropose,
       targets: [],
       items: [],
@@ -492,9 +485,6 @@ export async function listTreaties(
     .filter((n) => n.id !== nationId)
     .map((n) => ({ nation: publicNation(n), ...publicRelation(world.startYear, relations.get(n.id)) }));
   return {
-    ...(breakEnabled ? { breakEnabled: true } : {}),
-    ...(treatyTradeEnabled(world) ? { tradeEnabled: true } : {}),
-    ...(worldTreatyOptions(world).expandedEnabled ? { expandedEnabled: true } : {}),
     canPropose,
     targets,
     items,

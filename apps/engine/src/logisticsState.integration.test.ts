@@ -50,16 +50,7 @@ const db = createDb(url),
   ids: string[] = [],
   userIds: string[] = [];
 let initial: WorldInit, config: LogisticsConfig;
-const features = [
-  'campaign-assignment-v2',
-  'campaign-v1',
-  'city-resources-v1',
-  'five-stats',
-  'logistics-v1',
-  'operational-map',
-  'personnel',
-  'policy',
-];
+
 beforeAll(async () => {
   initial = await loadInitialWorldFromDb(db, {
     scenario: 'integration191',
@@ -70,7 +61,6 @@ beforeAll(async () => {
   });
   // 이 스케줄도 원생성에 고정한다. DB를 고쳐서 NPC 차례를 생략하지 않는다.
   initial.generals = initial.generals.map((general) => ({ ...general, crew: 0, nextTurnTick: 1_000_000 }));
-  initial.ruleFeatures = [...features];
   const city = initial.cities.find(
     (row) =>
       row.kind !== 'PASS' &&
@@ -116,7 +106,7 @@ async function fixture(source = initial, rules = config, seed: string = randomUU
       turnTermMinutes: 60,
       endYear: 201,
       replayFormat: 3,
-      ruleFeatures: features,
+
       featureData: { 'logistics-v1': rules },
     },
   );
@@ -531,7 +521,7 @@ describe('AC-P2-30 실제 PostgreSQL 물류', () => {
     await expect(
       db.world.update({
         where: { id: world.id },
-        data: { ruleFeatures: features.filter((key) => key !== 'logistics-v1') },
+        data: {},
       }),
     ).rejects.toThrow();
     const corrupted = structuredClone(world.before.logistics!);

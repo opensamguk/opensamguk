@@ -11,7 +11,6 @@ type ResolverWorld = {
   preset: unknown;
   replayOrigin?: unknown;
   replayFormat?: number;
-  ruleFeatures?: readonly string[];
 } & Partial<Parameters<typeof selectWorldCapabilities>[0]>;
 
 export function worldResolver(world: ResolverWorld) {
@@ -38,9 +37,6 @@ export function worldResolver(world: ResolverWorld) {
   return {
     preset,
     commands,
-    resolver:
-      (world.replayFormat === 3
-        ? resolverForRuleFeatures(world.ruleFeatures ? { ruleFeatures: world.ruleFeatures } : {})
-        : undefined) ?? resolverForPreset(preset),
+    resolver: (world.replayFormat === 3 ? resolverForRuleFeatures({}) : undefined) ?? resolverForPreset(preset),
   };
 }

@@ -327,7 +327,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       isHuman: true,
     });
     expect(open.data.generals[1]).toHaveProperty('isHuman', false);
-    await db.world.update({ where: { id: world }, data: { ruleFeatures: { push: 'intel-v1' } } });
+    await db.world.update({ where: { id: world }, data: {} });
     const foreign = await query('world.map', input, users[3]!.cookie);
     expect(foreign.status).toBe(200);
     expect(foreign.data.generals).toEqual([]);
@@ -339,7 +339,6 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     await db.world.update({
       where: { id: world },
       data: {
-        ruleFeatures: { push: 'office-effects' },
         officeEffects: {
           version: 1,
           secretary: true,
@@ -355,7 +354,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     });
     const result = await query('city.get', { worldId: world, cityKey });
     expect(result.status).toBe(200);
-    expect(result.data.secretaryEnabled).toBe(true);
+    expect(result.data).not.toHaveProperty('secretaryEnabled');
     expect(result.data.officers).toContainEqual({
       generalId: 1,
       name: state.generals[0]!.name,
@@ -453,6 +452,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       const before = await db.world.findUniqueOrThrow({ where: { id: endedWorldId }, include: { result: true } });
       const expected: Results['world.summary'] = {
         name: 'ended-year',
+        fogOfWar: false,
         status: 'ENDED',
         startYear: 300,
         gameDate: { year: 300, month: 12 },

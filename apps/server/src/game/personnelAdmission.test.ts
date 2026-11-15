@@ -11,7 +11,7 @@ const identity = {
 };
 type Event = Prisma.InputEventGetPayload<Record<string, never>>;
 function fixture() {
-  const world = { id: 'world', status: 'RUNNING', replayFormat: 3, ruleFeatures: ['personnel', 'policy'] };
+  const world = { id: 'world', status: 'RUNNING', replayFormat: 3 };
   const actor = { id: 1, nationId: 1 as number | null, officerLevel: 12, userId: 'user' };
   const target = { id: 3, nationId: 1, officerLevel: 1 };
   let previous: Pick<Event, 'kind' | 'payload'> | null = null;
@@ -90,7 +90,6 @@ describe('인사 접수 B7 활동 경계', () => {
   );
   it('정책을 끄면 인사 접수만 만든다', async () => {
     const f = fixture();
-    f.world.ruleFeatures = ['personnel'];
     await f.submit();
     expect(f.tx.inputEvent.create).toHaveBeenCalledOnce();
     expect(f.tx.$executeRaw).not.toHaveBeenCalled();

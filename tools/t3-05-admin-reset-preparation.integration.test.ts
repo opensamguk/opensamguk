@@ -529,7 +529,7 @@ it('AC-M3-04 B 생성 소비자의 DONE manifest를 가진 정식 두 번째 원
     mapKey: 'integration',
     statRulesKey: 'five-stats',
     portraitMapKey: '191-map',
-    ruleFeatures: features,
+
     seed: 'reset-original-b',
     turnTermMinutes: 30,
     endYear: 200,

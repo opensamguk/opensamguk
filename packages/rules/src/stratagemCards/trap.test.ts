@@ -16,10 +16,8 @@ const actor = { generalId: 1, tick: 100, unitSet: testUnits },
   base = createCommandResolver({ general: ['fire_attack', 'sabotage', 'incite', 'plunder'], nation: [] });
 function fixture(campaign: boolean, armed = true) {
   const world = commandWorld();
-  world.ruleFeatures = ['five-stats', 'stratagem-basic', 'stratagem-cards-v1'];
   for (const general of Object.values(world.generals)) Object.assign(general, { politics: 60, charm: 55 });
   if (campaign) {
-    world.ruleFeatures.push('campaign-v1');
     for (const general of Object.values(world.generals)) general.crew = 0;
     Object.assign(world.generals[4]!, { nationId: 1, cityKey: 1, officerLevel: 1 });
     world.generals[1]!.userId = 'owner';

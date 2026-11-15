@@ -28,7 +28,7 @@ export async function assertWorldCapabilities(
   readStoredPreparedTurns(world);
   readStoredNationResearch(world);
   readStoredNationLifecycle(world);
-  const armyTypes = world.ruleFeatures.includes('campaign-v1') ? readCampaignArmyTypes(world, origin) : [];
+  const armyTypes = readCampaignArmyTypes(world, origin);
   await assertStoredCityResources(tx, world, armyTypes);
   await assertStoredCityRuins(tx, world);
   await assertStoredLogistics(tx, world);
@@ -51,28 +51,22 @@ export async function assertWorldCapabilities(
       closedSequence: true,
     },
   });
-  const enabled = modern
-    ? world.ruleFeatures.includes('treaty')
-    : capabilities.kind === 'caps' && 'treaty' in capabilities.selection;
+  const enabled = modern ? true : capabilities.kind === 'caps' && 'treaty' in capabilities.selection;
   if (!enabled) {
     if (rows.length) throw new Error('조약을 끈 월드에 조약 저장 행이 있습니다.');
   } else {
-    const options = treatyOptions(modern ? world.ruleFeatures : []);
+    const options = treatyOptions();
     if (modern)
       for (const row of rows)
         if (!['PROPOSED', 'ACTIVE', 'BROKEN'].includes(row.status)) validateClosedTreatyRow(row, options);
     const broken = rows.filter((row) => row.status === 'BROKEN');
-    if (modern && world.ruleFeatures.includes('treaty-break')) {
+    if (modern) {
       for (const row of broken) validateBrokenTreatyRow(row, options);
       projectTreatyRows(
         rows.filter((row) => row.status !== 'BROKEN'),
         options,
       );
     } else projectTreatyRows(rows, options);
-  }
-  if (modern && !world.ruleFeatures.includes('treaty-break')) {
-    const trust = await tx.nationTrust.count({ where: { worldId: world.id } });
-    if (trust) throw new Error('조약 파기를 끈 월드에 국가 신뢰 저장 행이 있습니다.');
   }
   return capabilities;
 }

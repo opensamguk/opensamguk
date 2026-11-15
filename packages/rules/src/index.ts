@@ -1,3 +1,5 @@
+export { providedRuleData } from './providedRuleData';
+export { providedRuleKeys } from './providedRules';
 // 순수 게임 규칙. DB, 네트워크, 파일, 현재 시각, Math.random을 쓰지 않는다 (lint로 막음).
 export const RULESET_ID = 'opensamguk-mvp';
 export * from './world/bootstrap';
@@ -320,3 +322,24 @@ export { readStoredNationResearch } from './nationResearch/origin';
 export { canExecuteResearchNationCommand } from './nationResearch/commands';
 
 export { COURT_RANK_FEATURE, courtOfficeTitle, nationRank } from './personnel/nationRank';
+
+export { previewMarchSupply, buildSupplyLedger, supplyCellCost, marchForce } from './campaign/supply';
+
+export { campaignAttackingUnits } from './campaign/attack';
+
+export { verifySupplyLedger } from './campaign/supply';
+export * from './personnel/proposals';
+
+export {
+  countyDetached,
+  captureCounties,
+  assignCountyParents,
+  countyTaxDestination,
+  countyUndefended,
+} from './cityAffiliation';
+export { commandMoveTargets, commandAttackTargets } from './commandPaths';
+export * from './tactical/state';
+export * from './tactical/battle';
+export * from './tactical/world';
+export * from './tactical/input';
+export * from './tactical/clock';

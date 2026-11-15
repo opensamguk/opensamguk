@@ -1,4 +1,5 @@
 import { publicMapConfig } from '@opensamguk/shared';
+import { processTacticalStep } from './tacticalBattle';
 import { worldClock } from './world/truce';
 import { persistPublicMap } from './publicMap';
 import type { Prisma, PrismaClient } from '@opensamguk/db';
@@ -247,6 +248,37 @@ export class TurnLoop {
             status: world.status,
           };
         }
+        if (!catchUp && world.campaignState) {
+          const tactical = await processTacticalStep(tx, world, new Date(now));
+          if (tactical) {
+            await persistPublicMap(
+              tx,
+              this.lease,
+              tactical,
+              world.clockTick,
+              this.hooks.publicMapNow?.() ?? now,
+              this.mapConfig,
+              { worldId, status: 'RUNNING' },
+            );
+            const participants = new Set(
+              tactical.campaign?.tactical?.battles.flatMap((b) =>
+                b.units.flatMap((u) => [u.ownerId, u.commanderId].filter((id): id is number => id !== null)),
+              ) ?? [],
+            );
+            for (const generalId of participants) signals.push({ kind: 'turn.result', target: { generalId } });
+            await this.hooks.beforeCommit?.(tx);
+            signal?.throwIfAborted();
+            await assertLease(tx, this.lease);
+            return {
+              tick: world.clockTick,
+              state: tactical,
+              execution: null,
+              checkpointed: false,
+              progressed: true,
+              status: world.status,
+            };
+          }
+        }
         const due = await tx.general.findFirst({
           where: { worldId, removedAt: null, nextTurnTick: { lte: tick }, activeFromYear: { lte: year } },
           orderBy: [{ nextTurnTick: 'asc' }, { id: 'asc' }],
@@ -267,10 +299,7 @@ export class TurnLoop {
           await tx.$queryRaw`SELECT id FROM "General" WHERE "worldId" = ${worldId} AND id = ${due.id} FOR UPDATE`;
           // 예턴 편집은 actor 행 잠금 또는 turnRevision 조건을 함께 사용해야 한다.
           const state = await loadWorldAfterCapabilityCheck(tx, world, capabilities);
-          const personnelBefore =
-            world.replayFormat === 3 && world.ruleFeatures.includes('personnel')
-              ? await loadPersonnelTurnContext(tx, worldId, state)
-              : null;
+          const personnelBefore = world.replayFormat === 3 ? await loadPersonnelTurnContext(tx, worldId, state) : null;
           const actor = await tx.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: due.id } } });
           const slots = await tx.generalTurn.findMany({
             where: { worldId, generalId: due.id },
@@ -279,7 +308,7 @@ export class TurnLoop {
           const command = slots.find((slot) => slot.slot === 0);
           const modern =
             world.replayFormat === 3
-              ? world.ruleFeatures.includes('policy')
+              ? true
               : isPolicyMode({ fromSequence: world.policyFromSequence, actionSequence: world.actionSequence });
           if (modern) {
             assertSlotSet(slots);
@@ -360,19 +389,18 @@ export class TurnLoop {
             capabilities.kind === 'registry' ? capabilities.armyTypes : undefined,
           );
           await persistExt(tx, worldId, state.ext, next.ext);
-          if (world.ruleFeatures.includes('reputation-v1'))
-            await appendReputationEvents(
-              tx,
-              worldId,
-              reputationTurnEvents({
-                before: state,
-                after: next,
-                generalId: due.id,
-                tick: due.nextTurnTick,
-                commandKey,
-                result,
-              }),
-            );
+          await appendReputationEvents(
+            tx,
+            worldId,
+            reputationTurnEvents({
+              before: state,
+              after: next,
+              generalId: due.id,
+              tick: due.nextTurnTick,
+              commandKey,
+              result,
+            }),
+          );
           await appendLogisticsMovements(tx, worldId, consumption, { sequence, tick: due.nextTurnTick });
           if (!failed) await persistCommandReports(tx, worldId, due.nextTurnTick, due.id, result);
           if (turn.nation) {
@@ -440,14 +468,13 @@ export class TurnLoop {
             },
           });
           await persistSeasonArchive(tx, worldId, date.year);
-          if (world.ruleFeatures.includes('heritage-v1'))
-            await creditHeritageSeason(new PgHeritageRepository(tx), {
-              worldId,
-              ...outcome,
-              generals: Object.values(next!.generals),
-              endedSequence: sequence,
-              finalStateHash,
-            });
+          await creditHeritageSeason(new PgHeritageRepository(tx), {
+            worldId,
+            ...outcome,
+            generals: Object.values(next!.generals),
+            endedSequence: sequence,
+            finalStateHash,
+          });
         }
         const saved = await tx.world.updateMany({
           where: { id: worldId, status: 'RUNNING', clockRevision: world.clockRevision },

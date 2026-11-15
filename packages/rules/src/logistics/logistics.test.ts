@@ -22,7 +22,6 @@ const config: LogisticsConfig = {
 };
 function fixture() {
   const world = commandWorld();
-  world.ruleFeatures = ['logistics-v1', 'city-resources-v1'];
   for (const city of Object.values(world.cities)) {
     city.nationId = 1;
     city.supplied = true;
@@ -185,7 +184,7 @@ describe('AC-P2-30 물류 정본·수량 보존', () => {
       if (kind === 'foreign') context.userId = 'another';
       if (kind === 'rank') world.generals[1]!.officerLevel = 4;
       if (kind === 'future') world.generals[1]!.activeFromYear = 200;
-      if (kind === 'disabled') world.ruleFeatures = [];
+
       const before = structuredClone(world);
       expect(
         applyLogisticsInput(

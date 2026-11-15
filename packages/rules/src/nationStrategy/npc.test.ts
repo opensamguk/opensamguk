@@ -7,7 +7,6 @@ import { initialNationStrategy } from './state';
 
 function fixture() {
   const world = commandWorld();
-  world.ruleFeatures = ['nation-strategy-v1', 'personnel'];
   world.nationStrategy = initialNationStrategy();
   Object.assign(world.nations[1]!, { isNpc: true, gold: 0 });
   for (const city of Object.values(world.cities))
@@ -39,7 +38,6 @@ it('기능이나 대기가 막히면 NPC 후보에 전략을 넣지 않는다', 
   world.nationStrategy!.nations[1] = { strategicUntil: 9, commands: {} };
   expect(choose(world).candidates.some((row) => row.key === 'nation_mobilize')).toBe(false);
   delete world.nationStrategy;
-  world.ruleFeatures = ['personnel'];
   expect(
     choose(world).candidates.some(
       (row) => row.key.startsWith('nation_mob') || row.key === 'nation_raid' || row.key === 'nation_rivalry',

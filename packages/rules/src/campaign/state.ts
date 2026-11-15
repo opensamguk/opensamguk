@@ -1,8 +1,10 @@
+import { supplyLedgerSchema, unitSupplySchema } from './supply';
 import { z } from 'zod';
 import type { WorldView } from '../model/world';
 import { readGeneralFiveStats } from '../general/fiveStats';
 import { buildRetinueHierarchy, INITIAL_RENOWN_CAPACITY, type RetinuePerson } from './retinue';
 import { campaignOrdersSchema } from './orderTypes';
+import { tacticalStateSchema } from '../tactical/state';
 
 const integer = z.number().int().min(0).max(2_147_483_647);
 const id = integer.min(1);
@@ -15,6 +17,7 @@ export const campaignUnitSchema = z.strictObject({
   crewType: id,
   train: integer.max(100),
   atmos: integer.max(100),
+  supply: unitSupplySchema.optional(),
 });
 export const campaignOfferSchema = z.strictObject({
   id,
@@ -36,6 +39,8 @@ export const campaignStateSchema = z.strictObject({
   units: z.array(campaignUnitSchema),
   attempts: z.array(z.strictObject({ masterId: id, personId: id, month: integer })),
   orders: campaignOrdersSchema.optional(),
+  supplyLedger: supplyLedgerSchema.optional(),
+  tactical: tacticalStateSchema.optional(),
 });
 export type CampaignState = z.infer<typeof campaignStateSchema>;
 export type CampaignUnitState = z.infer<typeof campaignUnitSchema>;
@@ -99,6 +104,8 @@ export function readCampaignState(value: unknown, world: WorldView, expectedSeed
     throw new Error('휘하·부곡 번호가 중복되거나 다음 번호를 넘었습니다.');
   const commandedTroops = new Map<number, number>();
   for (const unit of state.units) {
+    if (unit.supply && (!state.supplyLedger || unit.supply.remaining > unit.supply.loaded))
+      throw new Error('부곡 보급 잔량이나 칸 원장을 확인하세요.');
     const owner = world.generals[unit.ownerId],
       commander = world.generals[unit.commanderId];
     if (

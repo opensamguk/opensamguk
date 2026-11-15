@@ -20,7 +20,7 @@ export function validTreatyTargets(
     if (clause.kind === 'passage')
       return clause.cityKeys.every((key) => {
         const city = state.cities[key];
-        return city && city.kind !== 'PASS' && isParty(city.nationId);
+        return city && city.kind !== 'PASS' && city.kind !== 'FIELD' && isParty(city.nationId);
       });
     if (clause.kind === 'tribute') return isParty(clause.payerNationId);
     if (clause.kind !== 'cityTransfer') return true;
@@ -31,6 +31,7 @@ export function validTreatyTargets(
       isParty(clause.giverNationId) &&
       city?.nationId === clause.giverNationId &&
       city.kind !== 'PASS' &&
+      city.kind !== 'FIELD' &&
       city.cityKey !== giver?.capitalCityKey &&
       capital?.nationId === clause.giverNationId
     );
@@ -38,7 +39,6 @@ export function validTreatyTargets(
 }
 
 export function hasTreatyPassage(state: WorldView, nationId: number, cityKey: number, tick: number): boolean {
-  if (!state.ruleFeatures?.includes(EXPANDED_TREATY_FEATURE)) return false;
   const owner = state.cities[cityKey]?.nationId;
   if (owner == null || owner === nationId) return false;
   const lower = Math.min(nationId, owner);

@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '@opensamguk/rules';
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 import { rngFor } from '../packages/shared/src/index';
@@ -35,7 +36,6 @@ async function fixture() {
     statRules: read('scenario/five-stats.json'),
     portraitMap: read('portraits/191-map.json'),
   });
-  initial.ruleFeatures = profile.ruleFeatures;
   initial.scenarioKey = profile.scenarioKey;
   initial.generals = applySexLedger(initial, loadSexLedger());
   const replay = initialReplayStateWithRegistry(initial, ruleRegistry, {
@@ -110,11 +110,10 @@ it('AC-P2-08·09 새 20기능 판은 기존 v4 자원·설정을 보존하고 �
   expect(read('feature-profile/expanded-191-v5.json')).toEqual({
     ...previous,
     key: 'expanded-191-v5',
-    ruleFeatures: [...previous.ruleFeatures, 'nation-lifecycle-v1'].sort(),
   });
   const f = await fixture();
   expect(f.initial.generals).toHaveLength(491);
-  expect(f.initial.ruleFeatures).toHaveLength(20);
+  expect(providedRuleKeys).toHaveLength(20);
   expect(f.replay.state.nationLifecycle).toEqual({ version: 1, nations: {} });
   assertAll(f.replay.state, 0);
 });

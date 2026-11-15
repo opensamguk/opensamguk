@@ -22,7 +22,6 @@ const registry = ruleRegistry;
 const data = { policy: { version: 1, turnTermMinutes: 60 } };
 function fixture() {
   const initial = buildInitialWorld(operationalInput());
-  initial.ruleFeatures = ['campaign-v1', 'five-stats', 'operational-map', 'personnel', 'policy'];
   Object.assign(initial.generals[0]!, { nationId: null, officerLevel: 0 });
   const replay = initialReplayStateWithRegistry(initial, registry, data);
   const payload = {
@@ -69,7 +68,17 @@ describe('AC-INT-06 휘하 프로필 생성·입력 재생 계약', () => {
   });
   it('실제 편성 입력 결과를 재계산하고 결과·tick·미등록 병종 위조를 거부한다', () => {
     const f = fixture(),
-      payload = { type: 'form', commanderId: 3, crewType: 1100, revision: 1 };
+      payload = { type: 'command', unitId: 1, commanderId: 3, revision: 1 };
+    f.created.state.campaign!.units.push({
+      id: 1,
+      ownerId: 3,
+      commanderId: 3,
+      troops: 1,
+      crewType: 1100,
+      train: 0,
+      atmos: 0,
+    });
+    f.created.state.campaign!.nextUnitId = 2;
     const applied = applyCampaignUnitInput(f.created.state, payload, 3, f.created.state.campaign, {
       tick: 1,
       userId: 'owner',
@@ -137,7 +146,6 @@ describe('AC-INT-06 휘하 프로필 생성·입력 재생 계약', () => {
     };
     expect(() => checkReplayOrigin(origin, registry)).not.toThrow();
     const bad = structuredClone(origin);
-    bad.initial.ruleFeatures = bad.initial.ruleFeatures!.filter((key) => key !== 'personnel');
     expect(() => checkReplayOrigin(bad, registry)).toThrow();
     const duplicate = structuredClone(origin);
     duplicate.initial.generals[0]!.crew = 100;

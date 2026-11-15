@@ -40,15 +40,10 @@ function worldOf(snapshot: StratagemCardsSnapshot) {
 }
 function ready(snapshot: StratagemCardsSnapshot) {
   const world = worldOf(snapshot);
-  if (world.replayFormat !== 3 || !world.ruleFeatures.includes('stratagem-cards-v1'))
-    fail('PRECONDITION_FAILED', '계략 패 기능을 켠 새 월드가 아닙니다.');
+  if (world.replayFormat !== 3) fail('PRECONDITION_FAILED', '계략 패 기능을 켠 새 월드가 아닙니다.');
   const origin = world.replayOrigin;
   checkReplayOrigin(origin);
-  if (
-    origin.version !== 3 ||
-    !isDeepStrictEqual(world.ruleFeatures, origin.initial.ruleFeatures) ||
-    !isDeepStrictEqual(world.unitSet, origin.initial.unitSet)
-  )
+  if (origin.version !== 3 || !true || !isDeepStrictEqual(world.unitSet, origin.initial.unitSet))
     throw Error('계략 패의 기능·병종이 원생성과 다릅니다.');
   return world;
 }
@@ -92,24 +87,12 @@ export async function readStratagemCardsBoard(
     snapshot = await store.read(identity, input.worldId),
     world = worldOf(snapshot);
   const base = { userId: identity.userId, worldId: input.worldId, status: world.status, tick: world.clockTick };
-  if (!world.ruleFeatures.includes('stratagem-cards-v1'))
-    return {
-      ...base,
-      enabled: false as const,
-      capacity: 3,
-      hand: [],
-      traps: [],
-      mine: null,
-      settling: false,
-      canSubmit: false,
-    };
   ready(snapshot);
   if (!snapshot.state?.stratagemCards) throw Error('계략 패 조회 상태가 없습니다.');
   const view = stratagemCardsView(snapshot.state, viewer(snapshot, identity.userId), world.clockTick),
     settling = world.clockTick >= world.monthlyTick + TICKS_PER_MONTH;
   return {
     ...base,
-    enabled: true as const,
     ...view,
     settling,
     canSubmit: view.mine?.canSetTrap === true && world.status === 'RUNNING' && !snapshot.sanctioned && !settling,

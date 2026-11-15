@@ -10,7 +10,11 @@ import { crewContext, crewTypeFailure } from '../world/crewRequirements';
 
 const positive = z.number().int().min(1).max(1_000_000);
 const unitId = z.number().int().min(1).max(2_147_483_647).optional();
-export const campaignRecruitArgs = z.strictObject({ amount: positive, crewType: positive, unitId });
+export const campaignRecruitArgs = z.strictObject({
+  amount: positive,
+  crewType: positive,
+  unitId: z.union([unitId.unwrap(), z.literal('new')]).optional(),
+});
 export const campaignDrillArgs = z.strictObject({ unitId });
 export type CampaignPreparationKey = 'recruit' | 'conscript' | 'train' | 'morale' | 'dismiss';
 
@@ -33,12 +37,14 @@ export function applyCampaignPreparation(view: WorldView, actor: Actor, key: Cam
   const requestedId = parsed.data.unitId;
   const owned = campaign.units.filter((row) => row.ownerId === owner.id).sort((a, b) => a.id - b.id);
   let unit =
-    requestedId === undefined
-      ? recruiting
-        ? owned[0]
-        : owned.find((row) => row.troops > 0)
-      : owned.find((row) => row.id === requestedId);
-  if (requestedId !== undefined && !unit) return fail('BAD_TARGET', '자기 부곡을 선택하세요.');
+    requestedId === 'new'
+      ? undefined
+      : requestedId === undefined
+        ? recruiting
+          ? owned[0]
+          : owned.find((row) => row.troops > 0)
+        : owned.find((row) => row.id === requestedId);
+  if (requestedId !== undefined && requestedId !== 'new' && !unit) return fail('BAD_TARGET', '자기 부곡을 선택하세요.');
   if (!unit && !recruiting) return fail('NO_CREW', '병력이 없습니다.');
   if (!unit && campaign.nextUnitId === 2_147_483_647) return fail('BAD_STATE', '부곡 번호 한도를 넘었습니다.');
   const commander = view.generals[unit?.commanderId ?? owner.id]!;
@@ -103,6 +109,7 @@ export function applyCampaignPreparation(view: WorldView, actor: Actor, key: Cam
       text = `부곡${unit!.id} ${key === 'morale' ? '사기진작' : '훈련'}: ${unit![field]}`;
     }
   }
+  campaign.units = campaign.units.filter((row) => row.troops > 0);
   campaign.revision++;
   readCampaignState(campaign, state);
   return { ok: true as const, state, unitId: unit!.id, text };
