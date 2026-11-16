@@ -45,7 +45,7 @@ export async function loadReplayState(tx: Prisma.TransactionClient, worldId: str
   const slots = await tx.generalTurn.findMany({ where: { worldId }, orderBy: { slot: 'asc' } });
   const modern =
     world.replayFormat === 3
-      ? world.ruleFeatures.includes('policy')
+      ? true
       : isPolicyMode({ fromSequence: world.policyFromSequence ?? null, actionSequence: world.actionSequence });
   const turns = Object.fromEntries(generals.map(({ id }) => [id, emptyTurns()]));
   if (modern) {
@@ -81,14 +81,10 @@ export async function loadReplayState(tx: Prisma.TransactionClient, worldId: str
     revisions: Object.fromEntries(generals.map(({ id, turnRevision }) => [id, turnRevision])),
     monthlyTick: world.monthlyTick,
     ...(policy ? { policy } : {}),
-    ...(world.ruleFeatures.includes('lineage-v1') ? { lineageResources: readLineageResources(world) } : {}),
-    ...(world.ruleFeatures.includes('campaign-v1')
-      ? { campaignArmyTypes: readCampaignArmyTypes(world), campaignUnitSet: unitSetSchema.parse(world.unitSet) }
-      : {}),
+    ...{ lineageResources: readLineageResources(world) },
+    ...{ campaignArmyTypes: readCampaignArmyTypes(world), campaignUnitSet: unitSetSchema.parse(world.unitSet) },
   };
-  for (const feature of engineFeatures
-    .filter((feature) => state.ruleFeatures?.includes(feature.key))
-    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)))
+  for (const feature of [...engineFeatures].sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)))
     replay = (await feature.loadReplayState?.(tx, worldId, replay)) ?? replay;
   return replay;
 }
@@ -105,7 +101,12 @@ export async function persistMonthly(
   const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
   const capabilities = world.replayFormat === 3 ? null : selectWorldCapabilities(world);
   const date = monthlyDate(before.startYear, tick);
-  const result = runMonthly(before, tick, rngFor(seed, 'monthly', date.year, date.month));
+  const result = runMonthly(
+    before,
+    tick,
+    rngFor(seed, 'monthly', date.year, date.month),
+    rngFor(seed, 'city-disaster', date.year, date.month),
+  );
   const treatyEnabled = capabilities?.kind === 'caps' && 'treaty' in capabilities.selection;
   const settled = { ...beforeReplay, state: result.state, monthlyTick: tick };
   const features =
@@ -131,17 +132,40 @@ export async function persistMonthly(
   }
   for (const general of Object.values(next.generals)) {
     if (!before.generals[general.id]) {
-      if (!world.ruleFeatures.includes('lineage-v1') || next.lineage?.persons[String(general.id)]?.bornTick !== tick)
+      if (next.lineage?.persons[String(general.id)]?.bornTick !== tick)
         throw Error('월 정산에 출처 없는 장수가 추가됐습니다.');
       continue;
     }
     if (JSON.stringify(general) !== JSON.stringify(before.generals[general.id])) {
       await tx.general.update({
         where: { worldId_id: { worldId, id: general.id } },
-        data: { ...general, ...(before.officeEffects ? { officerCityKey: general.officerCityKey ?? null } : {}) },
+        data: {
+          ...general,
+          movePath: [...(general.movePath ?? [])],
+          ...(before.officeEffects ? { officerCityKey: general.officerCityKey ?? null } : {}),
+        },
       });
     }
   }
+  const disasterPublic = result.disasterLogs.filter((log) => log.generalId === undefined);
+  if (disasterPublic.length)
+    await tx.publicNationEvent.createMany({
+      data: disasterPublic.map(({ kind, text }) => ({ worldId, tick, sequence, kind, text, nations: [] })),
+    });
+  const disasterPersonal = result.disasterLogs.filter((log) => log.generalId !== undefined);
+  if (disasterPersonal.length)
+    await tx.generalLog.createMany({
+      data: disasterPersonal.map((log, ordinal) => ({
+        worldId,
+        tick,
+        sequence,
+        ordinal,
+        generalId: log.generalId!,
+        commandKey: 'monthly.disaster',
+        kind: log.kind,
+        text: log.text,
+      })),
+    });
   if (result.officeTaxLogs.length) {
     await tx.generalLog.createMany({
       data: result.officeTaxLogs.map((log, ordinal) => ({
@@ -149,7 +173,7 @@ export async function persistMonthly(
         worldId,
         tick,
         sequence,
-        ordinal,
+        ordinal: ordinal + disasterPersonal.length,
         commandKey: 'office.residence',
         kind: 'success',
       })),
@@ -169,17 +193,11 @@ export async function persistMonthly(
   await persistEquipmentState(tx, worldId, before, next);
   await persistStratagemCardsState(tx, worldId, before, next, tick);
   await persistCampaignState(tx, worldId, before, next);
-  await persistCityResourcesState(
-    tx,
-    worldId,
-    before,
-    next,
-    world.ruleFeatures.includes('city-resources-v1') ? readCampaignArmyTypes(world) : [],
-  );
+  await persistCityResourcesState(tx, worldId, before, next, readCampaignArmyTypes(world));
   if (treatyEnabled) await persistTreatyClosures(tx, worldId, before, next, { tick, sequence });
   for (const key of ruleRegistry.monthlyOrder ?? []) {
     const feature = engineFeatures.find((feature) => feature.key === key);
-    if (feature && next.ruleFeatures?.includes(key))
+    if (feature)
       await feature.persistMonthly?.(tx, worldId, beforeReplay, features.replay, features.effects[key], {
         tick,
         sequence,

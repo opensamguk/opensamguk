@@ -13,7 +13,7 @@ import { processWorldCreateRequest } from '../apps/engine/src/admin/createReques
 import { prepareWorldReset } from '../apps/engine/src/admin/resetPreparation';
 import { exportReplay, replayArchive } from '../apps/engine/src/replay';
 import { rngFor } from '../packages/shared/src/index';
-import { defaultOfficeEffects, INTEL_FEATURE, residentOfficeBonuses, runMonthly } from '../packages/rules/src/index';
+import { defaultOfficeEffects, residentOfficeBonuses, runMonthly } from '../packages/rules/src/index';
 import { commandInitial } from '../packages/rules/test/commandFixture';
 
 const url = process.env.TEST_DATABASE_URL;
@@ -99,7 +99,7 @@ async function claim(worldId: string, generalId: number, actor: Actor) {
     userId: actor.id,
   });
 }
-async function createWorld(capture = false, fog = false) {
+async function createWorld(capture = false) {
   const initial = commandInitial();
   const base = initial.generals[2]!;
   Object.assign(base, { nationId: 1, cityKey: 1, strength: 65, intel: 65 });
@@ -119,7 +119,6 @@ async function createWorld(capture = false, fog = false) {
   } else {
     initial.diplomacies = [];
   }
-  initial.ruleFeatures = [...(fog ? [INTEL_FEATURE] : []), 'office-effects', 'personnel', 'policy'];
   const { worldId } = await saveInitialWorld(db, initial, { name: '주재 검증', turnTermMinutes: 60, endYear: 230 });
   worlds.push(worldId);
   await controlClock(db, worldId, 'start');
@@ -346,7 +345,6 @@ it('AC-M3-12 운영 생성 요청과 초기화 준비가 주재 효과 표의 �
     mapKey: 'che',
     turnTermMinutes: 60,
     endYear: null,
-    ruleFeatures: ['personnel'],
   };
   expect(await call('admin.world.create', input, admin)).toMatchObject({ status: 200, data: { status: 'PENDING' } });
   const where = { requestedBy_idempotencyKey: { requestedBy: admin.id, idempotencyKey: input.idempotencyKey } };
@@ -360,7 +358,7 @@ it('AC-M3-12 운영 생성 요청과 초기화 준비가 주재 효과 표의 �
   const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
   expect(world).toMatchObject({
     officeEffects: defaultOfficeEffects,
-    ruleFeatures: ['office-effects', 'personnel'],
+
     replayOrigin: { featureData: { 'office-effects': defaultOfficeEffects } },
   });
   expect(await db.publicMapSnapshot.count({ where: { worldId } })).toBe(1);

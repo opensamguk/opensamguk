@@ -14,7 +14,6 @@ import { emptyCityResourcesState } from './state';
 
 function fixture() {
   const world = commandWorld();
-  world.ruleFeatures = ['five-stats', 'city-resources-v1'];
   for (const general of Object.values(world.generals))
     Object.assign(general, { politics: 60, charm: 55, crew: 0, rice: 10_000 });
   world.campaign = emptyCampaignState(world, 'city-defense', 'sourced-fixture');
@@ -145,9 +144,7 @@ describe('AC-INT-18A 실제 도시 수비병·군량·점령', () => {
   });
   it('기존 기능 판에서 도시 교전을 호출하거나 자국 도시를 공격하면 거부한다', () => {
     const world = fixture();
-    world.ruleFeatures = ['five-stats'];
     expect(() => fightCampaignCityGarrison(world, 1, 2, 1100, testUnits, rng())).toThrow('규칙');
-    world.ruleFeatures.push('city-resources-v1');
     world.cities[2]!.nationId = 1;
     expect(() => fightCampaignCityGarrison(world, 1, 2, 1100, testUnits, rng())).toThrow('서로 다른');
   });

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { JsonValue, WorldView } from '../model/world';
+import type { JsonValue } from '../model/world';
 
 export const PREPARED_TURNS_FEATURE = 'prepared-turns-v1';
 const storedString = z.string().refine(
@@ -37,11 +37,7 @@ export const preparedTurnsSchema = z.strictObject({
 export type PrepareRecord = z.infer<typeof prepareRecordSchema>;
 export type PreparedTurnsState = z.infer<typeof preparedTurnsSchema>;
 export const initialPreparedTurns = (): PreparedTurnsState => ({ version: 1, nations: {} });
-export function readPreparedTurns(value: unknown, world: Pick<WorldView, 'ruleFeatures'>) {
-  if (!world.ruleFeatures?.includes(PREPARED_TURNS_FEATURE)) {
-    if (value != null) throw new Error('준비 기능을 끈 월드에 진행 상태가 있습니다.');
-    return undefined;
-  }
+export function readPreparedTurns(value: unknown) {
   return preparedTurnsSchema.parse(value);
 }
 

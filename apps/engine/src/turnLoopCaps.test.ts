@@ -19,7 +19,7 @@ function fixture(status: World['status'] = 'PAUSED', caps = false, beforeCommit?
   const world = {
     id: 'world',
     replayFormat: 1,
-    ruleFeatures: [],
+
     status,
     preset: null,
     treatyFormat: caps ? 1 : null,
@@ -174,7 +174,6 @@ it.each(statuses)('%s의 off 잔여 행은 입력·sequence 전에 같은 잠금
 
 it.each(statuses)('%s의 형식 1에 남은 기능 사본은 S3에서 입력·순서·시계 쓰기 전에 멈춘다 (단위)', async (status) => {
   const f = fixture(status);
-  f.world.ruleFeatures = ['test-a'];
   f.world.replayOrigin = { ...legacy.origin, version: 1 } as unknown as Prisma.JsonValue;
   f.events.push(pending('general.create'));
   await expect(f.loop.advanceTo(999)).rejects.toThrow('사본');

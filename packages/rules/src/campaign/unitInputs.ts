@@ -4,15 +4,16 @@ import { cloneWorld } from '../model/clone';
 import type { DeepReadonly, WorldView } from '../model/world';
 import { readCampaignState } from './state';
 import type { UnitSetResource } from '../world/resources';
-import { crewContext, crewTypeFailure } from '../world/crewRequirements';
+import { battleBusy } from '../tactical/world';
 
 const integer = z.number().int().min(0).max(2_147_483_647),
   id = integer.min(1);
-export const campaignUnitInputSchema = z.discriminatedUnion('type', [
-  z.strictObject({ type: z.literal('form'), commanderId: id, crewType: id, revision: integer }),
-  z.strictObject({ type: z.literal('command'), unitId: id, commanderId: id, revision: integer }),
-  z.strictObject({ type: z.literal('disband'), unitId: id, revision: integer }),
-]);
+export const campaignUnitInputSchema = z.strictObject({
+  type: z.literal('command'),
+  unitId: id,
+  commanderId: id,
+  revision: integer,
+});
 export type CampaignUnitInput = z.infer<typeof campaignUnitInputSchema>;
 
 // 편성 입력은 병력을 생성하거나 General/군량에서 옮기지 않는다. 모병·소집해제는 기존 예약 명령이다.
@@ -40,20 +41,16 @@ export function applyCampaignUnitInput(
   if (!context.userActive || !actor || !context.userId || actor.userId !== context.userId)
     return deny('ACTOR_INACTIVE', '활성 계정의 자기 장수만 편성할 수 있습니다.');
   const input = parsed.data;
+  if (battleBusy(world, { generalIds: [actorId, input.commanderId], unitIds: [input.unitId] }))
+    return deny('BATTLE_BUSY', '전투 중');
   if (input.revision !== current.revision) return deny('STALE_REVISION', '휘하 현황을 다시 불러오세요.');
   if (current.revision === 2_147_483_647) return deny('REVISION_LIMIT', '휘하 변경 번호 한도를 넘었습니다.');
   const next = structuredClone(current),
     state = cloneWorld(world);
-  const unit = input.type === 'form' ? null : next.units.find((unit) => unit.id === input.unitId);
-  if (input.type !== 'form' && (!unit || unit.ownerId !== actorId))
-    return deny('NOT_ALLOWED', '자기 부곡만 편성할 수 있습니다.');
+  const unit = next.units.find((unit) => unit.id === input.unitId);
+  if (!unit || unit.ownerId !== actorId) return deny('NOT_ALLOWED', '자기 부곡만 편성할 수 있습니다.');
   let unitId: number, commanderId: number;
-  if (input.type === 'disband') {
-    if (unit!.troops !== 0) return deny('TROOPS_PRESENT', '소집해제로 병력을 돌려보낸 뒤 빈 부곡을 해산하세요.');
-    unitId = unit!.id;
-    commanderId = unit!.commanderId;
-    next.units = next.units.filter((row) => row.id !== unitId);
-  } else {
+  {
     const commander = world.generals[input.commanderId];
     if (
       !commander ||
@@ -77,27 +74,8 @@ export function applyCampaignUnitInput(
     if (commanded + (unit?.troops ?? 0) > commander.leadership * 100)
       return deny('COMMAND_CAPACITY', '실제 지휘관의 전체 병력 상한을 넘습니다.');
     commanderId = commander.id;
-    if (input.type === 'form') {
-      if (!context.armyTypes.includes(input.crewType)) return deny('BAD_CREW_TYPE', '편성할 병종을 확인하세요.');
-      const crewType = context.unitSet.crewTypes.find((row) => row.id === input.crewType && row.armType > 0);
-      if (!crewType) return deny('BAD_CREW_TYPE', '편성할 병종을 확인하세요.');
-      const requirement = crewTypeFailure(crewType, crewContext(world, { generalId: actorId, tick: context.tick }));
-      if (requirement) return { ok: false as const, ...requirement };
-      if (next.nextUnitId === 2_147_483_647) return deny('ID_LIMIT', '부곡 번호 한도를 넘었습니다.');
-      unitId = next.nextUnitId++;
-      next.units.push({
-        id: unitId,
-        ownerId: actorId,
-        commanderId,
-        troops: 0,
-        crewType: input.crewType,
-        train: 0,
-        atmos: 0,
-      });
-    } else {
-      unitId = unit!.id;
-      unit!.commanderId = commanderId;
-    }
+    unitId = unit!.id;
+    unit!.commanderId = commanderId;
   }
   next.revision++;
   if (state.campaign) state.campaign = next;

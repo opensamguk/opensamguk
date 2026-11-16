@@ -10,7 +10,6 @@ import { heritageFeature } from './feature';
 
 function fixture(five = false) {
   const initial = commandInitial();
-  initial.ruleFeatures = [...(five ? ['five-stats'] : []), 'heritage-v1', 'policy'];
   const featureData = { 'heritage-v1': { version: 1 }, policy: { version: 1, turnTermMinutes: 60 } };
   if (five) {
     initial.statRules = FIVE_STAT_RULES;

@@ -22,6 +22,7 @@ export interface AssignmentOffer {
 export type OfficeTurns = Record<number, Record<number, { commandKey: string; args: unknown }[]>>;
 export type OfficeRevisions = Record<number, Record<number, { revision: number; tenure: number }>>;
 export interface WorldState {
+  fogOfWar?: boolean;
   relations?: import('../relations/data').RelationsData;
   officeEffects?: import('../personnel/residentOffice').OfficeEffects;
   preparedTurns?: import('../preparedTurns/state').PreparedTurnsState;
@@ -38,7 +39,7 @@ export interface WorldState {
   campaign?: CampaignState;
   presetRules?: PresetRules;
   recruitmentLocation?: 'city';
-  ruleFeatures?: string[];
+
   ext?: WorldExt;
   startYear: number;
   cities: Record<number, InitialCity>;
@@ -69,7 +70,7 @@ interface ReadonlyJsonObject {
 // 재귀 JSON의 mapped type을 매번 펼치지 않고 깊은 읽기 전용 경계를 유지한다.
 export type WorldView = DeepReadonly<WorldState>;
 export function toWorldState(initial: WorldInit): WorldState {
-  return toWorldStateWithRegistry(initial, extRegistryForRuleFeatures(initial.ruleFeatures));
+  return toWorldStateWithRegistry(initial, extRegistryForRuleFeatures());
 }
 
 export function toWorldStateWithRegistry(initial: WorldInit, registry: ExtStateRegistry): WorldState {
@@ -79,7 +80,7 @@ export function toWorldStateWithRegistry(initial: WorldInit, registry: ExtStateR
     ...(ext ? { ext } : {}),
     ...(state.presetRules ? { presetRules: state.presetRules } : {}),
     ...(state.recruitmentLocation ? { recruitmentLocation: state.recruitmentLocation } : {}),
-    ...(state.ruleFeatures ? { ruleFeatures: state.ruleFeatures } : {}),
+    ...(state.fogOfWar === undefined ? {} : { fogOfWar: state.fogOfWar }),
     startYear: state.startYear,
     cities: Object.fromEntries(state.cities.map((city) => [city.cityKey, city])),
     nations: Object.fromEntries(state.nations.map((nation) => [nation.id, nation])),

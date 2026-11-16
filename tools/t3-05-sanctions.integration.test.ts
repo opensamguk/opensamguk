@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '@opensamguk/rules';
 import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -934,15 +935,6 @@ it('정식 두191년 월드에서21개 변경 차단·본인 조회·같은 월�
     portraitMap: '191-map',
     seed: 'sanction-formal-191',
   });
-  initial.ruleFeatures = [
-    'campaign-v1',
-    'five-stats',
-    'operational-map',
-    'personnel',
-    'policy',
-    'stratagem-basic',
-    'treaty',
-  ];
   expect(initial.nations).toHaveLength(21);
   expect(initial.generals).toHaveLength(491);
   for (const name of ['제재 월드', '허용 월드']) {
@@ -1065,9 +1057,7 @@ it('정식 두191년 월드에서21개 변경 차단·본인 조회·같은 월�
   expect(guarded).toContain('cityResources.allocate');
   // AC-INT-19B: 장수 지시 접수도 월드 제재 대상이다.
   expect(guarded).toContain('campaign.order');
-  expect(
-    (await db.world.findUniqueOrThrow({ where: { id: worldId }, select: { ruleFeatures: true } })).ruleFeatures,
-  ).not.toContain('city-resources-v1');
+  expect(providedRuleKeys).not.toContain('city-resources-v1');
   const cityInput = {
     worldId,
     requestId: randomUUID(),

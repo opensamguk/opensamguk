@@ -20,7 +20,7 @@ function fixture(status: 'PAUSED' | 'RUNNING', human: boolean, modern = false) {
   const world = {
     id: 'binding-world',
     replayFormat: 1,
-    ruleFeatures: [],
+
     status,
     preset: null,
     treatyFormat: null,

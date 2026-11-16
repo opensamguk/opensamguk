@@ -21,7 +21,7 @@ afterAll(async () => {
 });
 async function create(initial?: WorldInit, ruleFeatures?: string[]) {
   initial ??= await warFixture();
-  if (ruleFeatures) initial.ruleFeatures = ruleFeatures;
+
   // 12개월 전투·재생 회귀가 조기 통일로 끝나지 않도록 접근할 수 없는 중립 도시를 남긴다.
   initial.cities.push({
     ...initial.cities[0]!,
@@ -33,7 +33,7 @@ async function create(initial?: WorldInit, ruleFeatures?: string[]) {
   });
   const { worldId } = await saveInitialWorld(db, initial, {
     replayFormat: ruleFeatures ? 3 : 'legacy',
-    ...(ruleFeatures ? { ruleFeatures } : {}),
+    ...(ruleFeatures ? {} : {}),
     name: '전투 통합',
     turnTermMinutes: 60,
     endYear: null,

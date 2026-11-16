@@ -100,7 +100,6 @@ it.each([false, true])('확장 프리셋은 원작식 기능을 한 번만 합�
     seed: 'cli-unit',
     unitSetKey: 'expanded',
     unitSet: { coefMode: 'multiply' },
-    ruleFeatures: ['five-stats', 'operational-map'],
   });
   process.argv = [
     process.execPath,
@@ -123,18 +122,18 @@ it.each([false, true])('확장 프리셋은 원작식 기능을 한 번만 합�
     seed: 'cli-unit',
     unitSet: 'expanded',
   });
-  const features = ['battle-affinity-v2', 'five-stats', 'operational-map'];
+
   expect(mocks.createWorldFromCli).toHaveBeenCalledWith(
     expect.anything(),
-    { seed: 'cli-unit', unitSetKey: 'expanded', unitSet: { coefMode: 'multiply' }, ruleFeatures: features },
-    expect.objectContaining({ ruleFeatures: features, preset: expect.objectContaining({ key: 'regular' }) }),
+    { seed: 'cli-unit', unitSetKey: 'expanded', unitSet: { coefMode: 'multiply' } },
+    expect.objectContaining({ preset: expect.objectContaining({ key: 'regular' }) }),
     publishedResources,
   );
   expect(console.error).not.toHaveBeenCalled();
 });
 
 it('자원 프로필과 요청 기능을 합칠 때 정렬한 뒤 의존 관계를 검사한다', async () => {
-  mocks.composeInitialWorld.mockReturnValue({ seed: 'cli-unit', ruleFeatures: ['five-stats', 'operational-map'] });
+  mocks.composeInitialWorld.mockReturnValue({ seed: 'cli-unit' });
   process.argv = [
     process.execPath,
     'createWorld.ts',
@@ -144,11 +143,11 @@ it('자원 프로필과 요청 기능을 합칠 때 정렬한 뒤 의존 관계�
   ];
   await import('./createWorld');
   await vi.waitFor(() => expect(mocks.disconnect).toHaveBeenCalledOnce());
-  const features = ['campaign-v1', 'five-stats', 'operational-map', 'personnel', 'policy', 'stratagem-basic', 'treaty'];
+
   expect(mocks.createWorldFromCli).toHaveBeenCalledExactlyOnceWith(
     expect.anything(),
-    { seed: 'cli-unit', ruleFeatures: features },
-    expect.objectContaining({ ruleFeatures: features }),
+    { seed: 'cli-unit' },
+    expect.objectContaining({}),
     publishedResources,
   );
   expect(console.error).not.toHaveBeenCalled();

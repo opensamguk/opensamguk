@@ -50,7 +50,6 @@ beforeAll(
         portraitMap: '191-map',
         seed: `int09-report-${randomUUID()}`,
       });
-      initial.ruleFeatures = ['campaign-v1', 'five-stats', 'operational-map', 'personnel', 'policy'];
       ({ worldId } = await saveInitialWorld(db, initial, { name: 'INT09 보고 키', turnTermMinutes: 60, endYear: 201 }));
       const state = await db.$transaction((tx) => loadWorld(tx, worldId!));
       const from = Object.values(state.cities).find(

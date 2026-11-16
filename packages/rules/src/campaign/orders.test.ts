@@ -21,7 +21,6 @@ const snapshot = (value: unknown) => JSON.stringify(value);
 const slot = { commandKey: 'rest', args: {}, explicit: false };
 function fixture() {
   const world = commandWorld();
-  world.ruleFeatures = ['campaign-v1', 'five-stats', 'operational-map', 'personnel', 'policy'];
   for (const general of Object.values(world.generals))
     Object.assign(general, { politics: 60, charm: 55, crew: 0, cityKey: 1, nationId: 1, officerLevel: 1 });
   world.generals[1]!.userId = 'owner';
@@ -179,11 +178,9 @@ describe('AC-INT-19A 명시 동의·현재 상관·변경 없는30칸', () => {
 });
 
 describe('AC-INT-19B 실제차례 한 번 실행·현재권한·예약 펜스', () => {
-  it.each(['move', 'train', 'form_unit'])('저장된 %s와 같은 key라도 다른 인자는 NPC 군사 예외를 얻지 못한다', (key) => {
+  it.each(['move', 'train'])('저장된 %s와 같은 key라도 다른 인자는 NPC 군사 예외를 얻지 못한다', (key) => {
     const f = fixture(),
       cityResolver = createCityResourceCommandResolver(resolver);
-    f.world.ruleFeatures!.push('city-resources-v1');
-    f.world.ruleFeatures!.sort();
     f.world.cityResources = emptyCityResourcesState(f.world);
     f.world.campaign!.nextUnitId = 3;
     f.world.campaign!.units = [1, 2].map((id) => ({
@@ -210,34 +207,18 @@ describe('AC-INT-19B 실제차례 한 번 실행·현재권한·예약 펜스', 
     });
     expect(snapshot(issued.state)).toBe(before);
   });
-  it('새 도시 판의 빈 부곡 편성도 저장 지시일 때만 허용하며 금·쌀·병력을 만들지 않는다', () => {
+  it('removed formation orders cannot be issued', () => {
     const f = fixture(),
       cityResolver = createCityResourceCommandResolver(resolver);
-    f.world.ruleFeatures!.push('city-resources-v1');
-    f.world.ruleFeatures!.sort();
-    f.world.cityResources = emptyCityResourcesState(f.world);
-    const cityHash = snapshot(f.world.cityResources);
+    const before = snapshot(f.world);
+    expect(cityResolver.get('form_unit')).toBeUndefined();
     expect(
-      cityResolver.precheck(f.world, { generalId: 4, unitSet: testUnits }, 'form_unit', { crewType: 1100 }),
-    ).toMatchObject({ code: 'COMMAND_DISABLED' });
-    const issued = ok(
       applyCampaignOrder(f.world, issue(4, 'form_unit', { crewType: 1100 }), 1, {
         ...f.context,
         resolver: cityResolver,
-      }),
-    );
-    const turn = runGeneralTurn(
-      issued.state,
-      { generalId: 4, tick: 2, unitSet: testUnits },
-      slot,
-      'order-seed',
-      { turnRevision: 0 },
-      cityResolver,
-    );
-    expect(turn.state.campaign!.units).toEqual([
-      { id: 1, ownerId: 4, commanderId: 4, crewType: 1100, troops: 0, train: 0, atmos: 0 },
-    ]);
-    expect(snapshot(turn.state.cityResources)).toBe(cityHash);
+      }).ok,
+    ).toBe(false);
+    expect(snapshot(f.world)).toBe(before);
   });
   it('사람이 수락한 휴식은 기본방침 앞에서 한 번 실행되고 재실행되지 않는다', () => {
     const f = fixture(),

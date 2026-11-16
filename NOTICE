@@ -57,6 +57,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 
+Terrain Tiles on AWS (INT-27/28 supply geography)
+Source: https://registry.opendata.aws/terrain-tiles/ (Terrarium PNG, zoom 6).
+The pinned SAN10 height field derives from the US Government public domain data
+SRTM (NASA/USGS), GMTED2010 (USGS/NGA) and ETOPO1 (NOAA).
+The INT-28 land mask comes from PR #678 and includes Natural Earth geography
+and the height field; the mountain mask records the source digest and 1,500 m cutoff.
+Rebuild the mountain mask with tools/map-data/build-supply-mountains.py.
+
 Natural Earth geographic basemap
 Source: https://www.naturalearthdata.com/ and nvkelso/natural-earth-vector v5.1.2
 Terms: https://www.naturalearthdata.com/about/terms-of-use/

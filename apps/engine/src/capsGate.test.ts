@@ -51,7 +51,7 @@ function world(changes: Partial<World> = {}): World {
   return {
     id: 'world',
     replayFormat: 1,
-    ruleFeatures: [],
+
     status: 'RUNNING',
     preset: null,
     commandMeta: null,

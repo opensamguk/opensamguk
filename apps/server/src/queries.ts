@@ -2,7 +2,6 @@ import type { Prisma, PrismaClient } from '@opensamguk/db';
 import { TRPCError } from '@trpc/server';
 import {
   nowTick,
-  RELATIONS_FEATURE,
   TICKS_PER_MONTH,
   toGameDate,
   effectiveWorldOptions,
@@ -25,6 +24,7 @@ export const recordsInput = worldInput
   })
   .strict();
 const worldSelect = {
+  fogOfWar: true,
   id: true,
   name: true,
   scenarioKey: true,
@@ -36,7 +36,7 @@ const worldSelect = {
   clockTick: true,
   clockAnchorAt: true,
   turnTermMinutes: true,
-  ruleFeatures: true,
+
   preset: true,
   runtimeOptions: true,
 } as const satisfies Prisma.WorldSelect;
@@ -112,11 +112,12 @@ export function seasonResultInfo(world: Pick<ReadWorld, 'status' | 'result'>) {
     : null;
 }
 
-export function worldSummary(world: Omit<ReadWorld, 'scenarioKey'>, now: number) {
+export function worldSummary(world: Omit<ReadWorld, 'scenarioKey' | 'fogOfWar'> & { fogOfWar?: boolean }, now: number) {
   const clock = worldClock(world);
   const tick = nowTick(clock, now);
   const result = seasonResultInfo(world);
   return {
+    fogOfWar: world.fogOfWar ?? false,
     name: world.name,
     status: world.status,
     startYear: world.startYear,
@@ -128,12 +129,6 @@ export function worldSummary(world: Omit<ReadWorld, 'scenarioKey'>, now: number)
     msPerTick: (world.turnTermMinutes * 60_000) / TICKS_PER_MONTH,
     turnTermMinutes: world.turnTermMinutes,
     truce: truceStatus(clock, now),
-    ...(world.ruleFeatures.includes('city-resources-v1') ? { cityResourcesEnabled: true as const } : {}),
-    ...(world.ruleFeatures.includes('logistics-v1') ? { logisticsEnabled: true as const } : {}),
-    ...(world.ruleFeatures.includes('governance-v1') ? { governanceEnabled: true as const } : {}),
-    ...(world.ruleFeatures.includes('lineage-v1') ? { lineageEnabled: true as const } : {}),
-    ...(world.ruleFeatures.includes(RELATIONS_FEATURE) ? { relationsEnabled: true as const } : {}),
-    ...(world.ruleFeatures.includes('equipment-v1') ? { equipmentEnabled: true as const } : {}),
   };
 }
 

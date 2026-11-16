@@ -2,7 +2,7 @@ import { TRPCError } from '@trpc/server';
 import { equipmentSlotSchema, equipmentBonus, fiveStatsSchema, withEquipmentBonus } from '@opensamguk/rules';
 import { requirePersonnelSession } from './personnelAdmission';
 import { personnelIdentity, type PersonnelActorContext } from './personnelApi';
-import { requireWorld, requireGeneral, requireRuleFeature, readView } from './queries';
+import { requireWorld, requireGeneral, readView } from './queries';
 import { worldResolver } from './resolver';
 
 export function readEquipmentBoard(ctx: PersonnelActorContext, worldId: string, started = performance.now()) {
@@ -11,7 +11,6 @@ export function readEquipmentBoard(ctx: PersonnelActorContext, worldId: string, 
       await requirePersonnelSession(tx, personnelIdentity(ctx, started));
       const world = await requireWorld(tx, worldId);
       const general = await requireGeneral(tx, worldId, ctx.user.id);
-      requireRuleFeature(world, 'equipment-v1');
       const state = await readView(tx, worldId),
         equipment = state.equipment!;
       const command = worldResolver(world)

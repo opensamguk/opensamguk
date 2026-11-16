@@ -16,6 +16,7 @@ import { readPersonnelBoard } from './personnelQueries';
 type General = Prisma.GeneralGetPayload<Record<string, never>>;
 function general(changes: Partial<General> = {}): General {
   return {
+    cityAnchorKey: null,
     worldId: 'world',
     sex: null,
     id: 1,
@@ -23,6 +24,7 @@ function general(changes: Partial<General> = {}): General {
     nationId: 1,
     cityKey: 1,
     officerLevel: 12,
+    movePath: [],
     officerCityKey: null,
     name: '장수',
     affinity: 0,

@@ -9,16 +9,33 @@ const site = z
     name: z.string().min(1).max(60),
     kind: z.enum(['CITY', 'PASS', 'PORT', 'FIELD']),
     position: point,
+    description: z.string().max(600).optional(),
+    siteLevel: z.number().int().min(0).max(9).optional(),
     anchorKey: z.number().int().positive().optional(),
     parentCityId: id.optional(),
   })
   .superRefine((value, ctx) => {
-    const anchor = value.kind === 'CITY' || value.kind === 'PASS';
+    const anchor =
+      (value.kind === 'CITY' &&
+        (value.siteLevel === undefined || [1, 2, 4, 5, 6, 7, 8, 9].includes(value.siteLevel))) ||
+      value.kind === 'PASS' ||
+      (value.kind === 'FIELD' && value.anchorKey !== undefined);
     if (anchor !== (value.anchorKey !== undefined))
       ctx.addIssue({ code: 'custom', message: '거점 앵커를 확인하세요.' });
     if ((value.kind === 'PORT') !== (value.parentCityId !== undefined))
       ctx.addIssue({ code: 'custom', message: '항구 소속을 확인하세요.' });
   });
+export const territoryGridSchema = z
+  .strictObject({
+    tile: z.literal(8),
+    originX: z.number().int().min(-512).max(512),
+    originY: z.number().int().min(-512).max(512),
+    columns: z.number().int().positive().max(512),
+    rows: z.number().int().positive().max(512),
+    owner: z.array(z.number().int().min(-1).max(2147483647)).max(512 * 512),
+  })
+  .refine((grid) => grid.owner.length === grid.rows * grid.columns, '영지 칸 수를 확인하세요.');
+
 export const publicGeographySchema = z
   .object({
     id,
@@ -31,13 +48,14 @@ export const publicGeographySchema = z
       bounds: z.tuple([z.number().finite(), z.number().finite(), z.number().finite(), z.number().finite()]),
     }),
     sites: z.array(site).min(1).max(500),
+    territory: territoryGridSchema.optional(),
     routes: z
       .array(
         z.object({
           id,
           from: id,
           to: id,
-          mode: z.enum(['LAND', 'FORD', 'BRIDGE', 'RIVER']),
+          mode: z.enum(['LAND', 'FORD', 'BRIDGE', 'RIVER', 'SEA']),
           direction: z.enum(['BOTH', 'FORWARD']),
           enabled: z.boolean(),
           via: z.array(id).max(200).optional(),
@@ -52,7 +70,10 @@ export const publicGeographySchema = z
       value.sites.some((site) => site.position.x > value.canvas.width || site.position.y > value.canvas.height)
     )
       ctx.addIssue({ code: 'custom', message: '지도 범위와 거점 좌표를 확인하세요.' });
-    const anchors = value.sites.filter((site) => site.kind === 'CITY' || site.kind === 'PASS');
+    const anchors = value.sites.filter((site) => site.anchorKey !== undefined);
+    const cityKeys = new Set(anchors.filter((site) => site.kind === 'CITY').map((site) => site.anchorKey));
+    if (value.territory?.owner.some((key) => key !== -1 && !cityKeys.has(key)))
+      ctx.addIssue({ code: 'custom', path: ['territory', 'owner'], message: '영지 칸의 도시를 확인하세요.' });
     if (
       new Set(value.sites.map((site) => site.id)).size !== value.sites.length ||
       new Set(anchors.map((site) => site.anchorKey)).size !== anchors.length

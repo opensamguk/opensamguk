@@ -8,24 +8,21 @@ type City = Prisma.CityGetPayload<Record<string, never>>;
 export async function readCityScaleProjection(
   tx: Prisma.TransactionClient,
   worldId: string,
-  features: readonly string[],
   cities?: readonly City[],
 ): Promise<Map<number, RuinInfo> | undefined> {
-  if (!features.includes('city-scale-v1')) return undefined;
   const world = await tx.world.findUniqueOrThrow({
     where: { id: worldId },
-    select: { ruleFeatures: true, replayFormat: true, replayOrigin: true, cityRuinsState: true },
+    select: { replayFormat: true, replayOrigin: true, cityRuinsState: true },
   });
   const origin: unknown = world.replayOrigin;
   checkReplayOrigin(origin);
-  if (world.replayFormat !== 3 || origin.version !== 3 || !origin.initial.ruleFeatures?.includes('city-scale-v1'))
-    throw new Error('폐허의 재생 형식이나 생성 원장이 다릅니다.');
+  if (world.replayFormat !== 3 || origin.version !== 3) throw new Error('폐허의 재생 형식이나 생성 원장이 다릅니다.');
   const rows = cities ?? (await tx.city.findMany({ where: { worldId } }));
-  const state: Pick<WorldState, 'ruleFeatures' | 'cities'> = {
-    ruleFeatures: world.ruleFeatures,
+  const state: Pick<WorldState, 'cities'> = {
     cities: Object.fromEntries(
       rows.map(({ kind, ...city }): [number, WorldState['cities'][number]] => {
-        if (kind !== null && kind !== 'CITY' && kind !== 'PASS') throw new Error('도시 종류가 저장 형식과 다릅니다.');
+        if (kind !== null && kind !== 'CITY' && kind !== 'PASS' && kind !== 'FIELD')
+          throw new Error('도시 종류가 저장 형식과 다릅니다.');
         return [city.cityKey, { ...city, ...(kind ? { kind } : {}) }];
       }),
     ),

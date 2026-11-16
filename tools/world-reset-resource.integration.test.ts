@@ -63,7 +63,7 @@ function fixture() {
       name: '원본',
       clockRevision: 2,
       replayFormat: 3,
-      ruleFeatures: [],
+
       replayOrigin: structuredClone(origin),
       status: 'PAUSED',
       endedAt: null as Date | null,
@@ -190,7 +190,7 @@ function applied(event: Event) {
       presetHash: null,
       turnTermMinutes: 30,
       endYear: null,
-      ruleFeatures: [],
+
       featureDataHash: 'a'.repeat(64),
     },
   } as Prisma.JsonObject;

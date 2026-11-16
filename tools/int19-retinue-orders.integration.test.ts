@@ -9,7 +9,6 @@ import {
   resolverForRuleFeatures,
   runGeneralTurn,
 } from '../packages/rules/src/index';
-import { creationFeatures } from '../apps/server/src/admin/worldCreateOptions';
 
 import { createDb } from '../packages/db/src/index';
 import { testDatabaseUrl } from './test-database';
@@ -35,7 +34,6 @@ it('AC-INT-19B 정식191년21국491명에서 사람 생성·정상출사·NPC지
   expect(initial.nations).toHaveLength(21);
   const original = structuredClone(initial),
     originHash = hashState(initial);
-  initial.ruleFeatures = [...creationFeatures];
   const replay = initialReplayState(initial, { policy: { version: 1, turnTermMinutes: 60 } });
   expect(replay.state.campaign).not.toHaveProperty('orders');
   const payload = {
@@ -114,9 +112,8 @@ it('AC-INT-19B 정식191년21국491명에서 사람 생성·정상출사·NPC지
   );
   expect(replayed.state).toEqual(result.state);
   expect(replayed.turns).toEqual(created.turns);
-  expect(initial).toEqual({ ...original, ruleFeatures: [...creationFeatures] });
+  expect(initial).toEqual({ ...original });
   const unchangedOrigin = { ...initial };
-  if (Object.hasOwn(original, 'ruleFeatures')) unchangedOrigin.ruleFeatures = original.ruleFeatures!;
-  else delete unchangedOrigin.ruleFeatures;
+
   expect(hashState(unchangedOrigin)).toBe(originHash);
 });

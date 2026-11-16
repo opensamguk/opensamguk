@@ -20,7 +20,7 @@ import { monthlyReviewSelect, readMonthlyReview } from '../review';
 const generalInput = worldInput.extend({ cursor: z.string().min(1).max(256).optional() }).strict();
 const activityInput = generalInput.extend({ scope: z.enum(['all', 'world']).default('all') });
 const activityCursor = z.tuple([recordTick, z.enum(['reputation', 'nation']), recordId]);
-const nationEventKind = z.enum(['found', 'fall', 'declare', 'capture']);
+const nationEventKind = z.enum(['found', 'fall', 'declare', 'capture', 'disaster', 'boom']);
 const battleCursor = z.tuple([recordTick, entityKey]);
 
 async function recordPortraits(tx: Prisma.TransactionClient, worldId: string, ids: number[]) {
@@ -237,13 +237,12 @@ export const recordsRouter = router({
         take: 31,
         select: { tick: true, year: true, month: true, data: true },
       });
-      const reviews =
-        world.ruleFeatures.includes('reputation-v1') && history.length
-          ? await tx.monthlyReview.findMany({
-              where: { worldId: input.worldId, tick: { in: history.map((row) => row.tick) } },
-              select: monthlyReviewSelect,
-            })
-          : [];
+      const reviews = history.length
+        ? await tx.monthlyReview.findMany({
+            where: { worldId: input.worldId, tick: { in: history.map((row) => row.tick) } },
+            select: monthlyReviewSelect,
+          })
+        : [];
       const headlines = new Map(
         reviews.map((row) => {
           const review = readMonthlyReview(row, world.startYear);

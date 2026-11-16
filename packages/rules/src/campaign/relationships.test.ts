@@ -6,7 +6,6 @@ import { emptyCampaignState, readCampaignState } from './state';
 import { buildRetinueHierarchy } from './retinue';
 function fixture(seed = 'campaign-relationship-test') {
   const world = commandWorld();
-  world.ruleFeatures = ['five-stats'];
   for (const general of Object.values(world.generals))
     Object.assign(general, { politics: 60, charm: 55, crew: 0, cityKey: 1 });
   Object.assign(world.generals[1]!, { userId: 'owner', gold: 1000 });

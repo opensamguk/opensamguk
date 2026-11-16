@@ -29,7 +29,7 @@ type OperationWorld = ReadWorld & {
   policyFromSequence: number | null;
   actionSequence: number;
   replayFormat: number;
-  ruleFeatures: string[];
+
   unitSet: Prisma.JsonValue;
   tick: number;
 };
@@ -40,10 +40,7 @@ const include = {
   members: { include: { general: { include: { city: { select: { name: true } } } } } },
 } as const satisfies Prisma.OperationInclude;
 type Operation = Prisma.OperationGetPayload<{ include: typeof include }>;
-type ForecastWorld = Pick<
-  OperationWorld,
-  'startYear' | 'replayFormat' | 'ruleFeatures' | 'policyFromSequence' | 'actionSequence'
->;
+type ForecastWorld = Pick<OperationWorld, 'startYear' | 'replayFormat' | 'policyFromSequence' | 'actionSequence'>;
 
 const denied = (code: string, reason: string) => ({ ok: false as const, code, reason });
 const allowed = { ok: true as const };
@@ -127,7 +124,7 @@ async function readOperation<T>(
   return readWorld(ctx.db, worldId, async (tx, world) => {
     const extra = await tx.world.findUniqueOrThrow({
       where: { id: worldId },
-      select: { policyFromSequence: true, actionSequence: true, unitSet: true, replayFormat: true, ruleFeatures: true },
+      select: { policyFromSequence: true, actionSequence: true, unitSet: true, replayFormat: true },
     });
     const actor = await requireGeneral(tx, worldId, ctx.user.id);
     return read(tx, { ...world, ...extra, tick: clock(world, ctx.now) }, actor);
@@ -148,7 +145,7 @@ function forecastInput(
 ) {
   const policyMode =
     world.replayFormat === 3
-      ? world.ruleFeatures.includes('policy')
+      ? true
       : isPolicyMode({ fromSequence: world.policyFromSequence, actionSequence: world.actionSequence });
   const policy = policyMode && general.userId !== null ? general.defaultPolicy : 'none';
   if (!isPolicyKey(policy)) throw new Error('저장된 기본 방침이 올바르지 않습니다.');
@@ -232,7 +229,7 @@ async function timelines(tx: Tx, world: OperationWorld, operation: Operation, ac
         name: general.name,
         portraitId: general.portraitId,
         cityKey: general.cityKey,
-        cityName: general.city.name,
+        cityName: general.city?.name ?? '',
         isMe: general.id === actor.id,
         verdict: forecast.verdict,
         beyondWindow: forecast.beyondWindow,
@@ -423,7 +420,7 @@ export function inspectMembers(ctx: OperationContext, worldId: string) {
           portraitId: general.portraitId,
           officerLevel: general.officerLevel,
           cityKey: general.cityKey,
-          cityName: general.city.name,
+          cityName: general.city?.name ?? '',
           isHuman: general.userId !== null,
           crew: general.crew,
           train: general.train,

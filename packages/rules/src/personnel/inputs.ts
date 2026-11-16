@@ -10,7 +10,6 @@ import { canExecuteCityNationCommand } from '../cityResources/commands';
 import { cityAllocationArgs } from '../cityResources/allocation';
 import { nationStrategyCommands } from '../nationStrategy/commands';
 import { canExecuteResearchNationCommand, nationResearchCommands } from '../nationResearch/commands';
-import { NATION_STRATEGY_FEATURE } from '../nationStrategy/state';
 import {
   clonePersonnel,
   PersonnelInvariantError,
@@ -60,7 +59,7 @@ const respondResult = z.strictObject({
 const commonCodes = ['WORLD_CLOSED', 'ACTOR_INACTIVE', 'NO_GENERAL', 'GENERAL_REMOVED'] as const;
 const appointCodes = [...commonCodes, 'NOT_NATION', 'NOT_RULER', 'BAD_ARGS', 'BAD_TARGET', 'BAD_STATE'] as const;
 const dismissCodes = [...commonCodes, 'NOT_NATION', 'NOT_RULER', 'BAD_TARGET'] as const;
-const respondCodes = [...commonCodes, 'OFFER_CLOSED'] as const;
+const respondCodes = [...commonCodes, 'OFFER_CLOSED', 'BATTLE_BUSY'] as const;
 export const PERSONNEL_INPUTS = Object.freeze({
   'personnel.appoint': Object.freeze({
     payloadSchema: appointPayload,
@@ -309,9 +308,7 @@ export function applyNationTurnsRecord(
     }
     const command =
       commandRegistry.get(turn.commandKey) ??
-      (view.ruleFeatures?.includes(NATION_STRATEGY_FEATURE)
-        ? nationStrategyCommands.find((definition) => definition.key === turn.commandKey)
-        : undefined) ??
+      nationStrategyCommands.find((definition) => definition.key === turn.commandKey) ??
       (canExecuteResearchNationCommand(view, actor.officerLevel, turn.commandKey)
         ? nationResearchCommands.find((definition) => definition.key === turn.commandKey)
         : undefined);

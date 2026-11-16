@@ -187,9 +187,7 @@ export const entryRouter = router({
               leadership: general.leadership,
               strength: general.strength,
               intel: general.intel,
-              ...(world.ruleFeatures.includes('five-stats')
-                ? { politics: general.politics!, charm: general.charm! }
-                : {}),
+              ...{ politics: general.politics!, charm: general.charm! },
               officerLevel: general.officerLevel,
               recommendedNation: suggested
                 ? { id: suggested.id, name: suggested.name, reason: suggested.reason }

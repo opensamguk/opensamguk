@@ -102,16 +102,10 @@ async function advance(worldId: string, tick = 0, beforeCommit?: (tx: Prisma.Tra
 }
 const snapshot = (worldId: string) =>
   db.$transaction((tx) => loadReplayState(tx, worldId), { isolationLevel: 'RepeatableRead' });
-async function fixture(enabled = true, research: ResearchName = 'greatsword') {
+async function fixture(research: ResearchName = 'greatsword') {
   const initial = commandInitial();
   initial.seed = `nation-research-${randomUUID()}`;
   initial.statRules = { ...FIVE_STAT_RULES };
-  initial.ruleFeatures = [
-    'five-stats',
-    'personnel',
-    'policy',
-    ...(enabled ? ['prepared-turns-v1', 'nation-research-v1'] : []),
-  ].sort();
   initial.unitSet.crewTypes[1]!.requirements = [{ kind: 'research', name: research }];
   for (const general of initial.generals)
     Object.assign(general, {

@@ -8,11 +8,11 @@ import { STRATAGEM_CARD_KINDS } from './config';
 import { incrementCardsRevision, readStratagemCardsState, reconcileStratagemCards } from './state';
 import { triggerStratagemTrap } from './trap';
 
-const enabled = (world: WorldView) => world.ruleFeatures?.includes('stratagem-cards-v1') ?? false;
+const enabled = () => true;
 const cardFor = (key: string) => STRATAGEM_CARD_KINDS.find((kind) => kind !== 'trap' && kind === key);
 
 function cardFailure(world: WorldView, actor: Actor, key: string, reserve: boolean) {
-  if (!enabled(world) || !cardFor(key)) return null;
+  if (!enabled() || !cardFor(key)) return null;
   const state = readStratagemCardsState(world.stratagemCards, world);
   if (reserve && !state.config.checkOnReserve) return null;
   const nationId = world.generals[actor.generalId]?.nationId;
@@ -31,7 +31,7 @@ export function createStratagemCardResolver(base: CommandResolver): CommandResol
       check: (world, actor, args) => original.check(world, actor, args) ?? cardFailure(world, actor, key, false),
       precheck: (world, actor, args) => original.precheck(world, actor, args) ?? cardFailure(world, actor, key, true),
       execute(world, actor, args, rng) {
-        if (!enabled(world)) return original.execute(world, actor, args, rng);
+        if (!enabled()) return original.execute(world, actor, args, rng);
         const denied = original.check(world, actor, args) ?? cardFailure(world, actor, key, false);
         if (denied) throw Error(denied.message);
         let state = cloneWorld(world);
@@ -78,12 +78,12 @@ export function createStratagemCardResolver(base: CommandResolver): CommandResol
     get: definition,
     list: (target) => base.list(target).map((def) => definition(def.key)!),
     precheck(world, actor, key, args) {
-      if (!enabled(world) || !base.get(key)) return base.precheck(world, actor, key, args);
+      if (!enabled() || !base.get(key)) return base.precheck(world, actor, key, args);
       const prepared = prepare(actor, key, args);
       return 'failure' in prepared ? prepared.failure : prepared.def.precheck(world, actor, prepared.args);
     },
     run(world, actor, key, args, rng) {
-      if (!enabled(world) || !base.get(key)) return base.run(world, actor, key, args, rng);
+      if (!enabled() || !base.get(key)) return base.run(world, actor, key, args, rng);
       const prepared = prepare(actor, key, args);
       if ('failure' in prepared) return prepared.failure;
       return prepared.def.check(world, actor, prepared.args) ?? prepared.def.execute(world, actor, prepared.args, rng);

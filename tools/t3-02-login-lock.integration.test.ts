@@ -70,7 +70,6 @@ it.each([false, true])(
       turnTermMinutes: 1,
       endYear: null,
       replayFormat: 3,
-      ruleFeatures: ['policy'],
     });
     worlds.add(worldId);
     await db.world.update({ where: { id: worldId }, data: { status: 'RUNNING' } });

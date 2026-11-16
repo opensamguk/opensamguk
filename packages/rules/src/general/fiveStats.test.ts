@@ -129,7 +129,6 @@ describe('INT-14 / AC-INT-14 5능력치 계약', () => {
     delete bad.initial.generals[0]!.charm;
     expect(() => checkReplayOrigin(bad)).toThrow();
     const mismatch = origin();
-    delete mismatch.initial.ruleFeatures;
     expect(() => checkStatProfile(mismatch.initial)).toThrow();
     expect(buildInitialWorld(resources(false))).toEqual(old.initial);
   });

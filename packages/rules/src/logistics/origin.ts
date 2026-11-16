@@ -2,10 +2,9 @@ import { readLogisticsConfig } from './state';
 import type { WorldView } from '../model/world';
 
 export function readLogisticsOriginConfig(
-  world: { replayFormat: number; ruleFeatures: readonly string[]; replayOrigin: unknown },
+  world: { replayFormat: number; replayOrigin: unknown },
   state: Pick<WorldView, 'cities'>,
 ) {
-  if (!world.ruleFeatures.includes('logistics-v1')) return undefined;
   const origin = world.replayOrigin;
   if (
     world.replayFormat !== 3 ||

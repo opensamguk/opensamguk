@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '@opensamguk/rules';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -427,7 +428,7 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
             portraitMap: '191-map',
             seed,
           });
-          initial.ruleFeatures = [...features];
+          providedRuleKeys = [...features];
           originHash = hashState(initial);
           for (let count = 0; count < 2; count++) {
             signal();
@@ -520,7 +521,7 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
     expect(initial.cities.filter((city) => city.kind === 'PASS')).toHaveLength(8);
     expect(hashState(initial)).toBe(originHash);
     const state = await snapshot();
-    expect(state.state.ruleFeatures).toEqual(features);
+    expect(providedRuleKeys).toEqual(features);
     expect(Object.keys(state.state.cityResources!.cities)).toHaveLength(initial.cities.length);
     expect(state.state.campaign).not.toHaveProperty('orders');
     expect(state.turns[a.generalId]).toHaveLength(30);

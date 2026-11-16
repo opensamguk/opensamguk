@@ -130,7 +130,7 @@ export async function readSlots(tx: Prisma.TransactionClient, worldId: string, g
   const rows = await tx.generalTurn.findMany({ where: { worldId, generalId } });
   const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
   if (
-    (world.replayFormat === 3 ? world.ruleFeatures.includes('policy') : world.policyFromSequence !== null) ||
+    (world.replayFormat === 3 ? true : world.policyFromSequence !== null) ||
     (world.replayFormat !== 3 &&
       (await tx.inputEvent.findFirst({
         where: { worldId, kind: 'system.policy.enable', status: 'PENDING' },

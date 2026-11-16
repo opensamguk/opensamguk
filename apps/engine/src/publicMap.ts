@@ -1,5 +1,6 @@
 import type { Prisma } from '@opensamguk/db';
 import {
+  countyDetached,
   toGameDate,
   readOperationalMap,
   operationalMapDisplay,
@@ -15,14 +16,24 @@ function publicMapData(state: WorldState, map?: OperationalMapResource) {
   const ruins = readCityRuins(state.cityRuins, state);
   const recovery = new Map(ruins?.cities.map((row) => [row.cityKey, { percent: RUIN_PERCENT[row.stage] }]));
   return {
-    capitalAndSupply: true,
+    emperorCityKey: state.governance?.config.seatCityKey ?? null,
     ...(map ? { operationalMap: operationalMapDisplay(map) } : {}),
+    ...(map?.capturableFields
+      ? {
+          siteOwnership: Object.values(state.cities)
+            .sort((a, b) => a.cityKey - b.cityKey)
+            .map((city) => ({ anchorKey: city.cityKey, nationId: city.nationId })),
+        }
+      : {}),
     cities: Object.values(state.cities)
       .sort((a, b) => a.cityKey - b.cityKey)
       .map((city) => ({
         key: String(city.cityKey),
         name: city.name,
         level: city.level,
+        ...(!state.fogOfWar ? { state: city.state ?? 0, stateTerm: city.stateTerm ?? 0 } : {}),
+        parentCityKey: city.parentCityKey ?? null,
+        detached: countyDetached(city, state.cities),
         ...(city.kind ? { kind: city.kind } : {}),
         ...(ruins ? { ruin: recovery.get(city.cityKey) ?? null } : {}),
         x: city.x,
@@ -49,7 +60,7 @@ export async function persistInitialPublicMap(
       takenAt: world.createdAt,
       tick: 0,
       ...toGameDate(state.startYear, 0),
-      data: { ...publicMapData(state, map), initial: true },
+      data: { ...publicMapData(state, map), initial: true, publicNationEventId: '0' },
     },
   });
 }
@@ -84,22 +95,23 @@ export async function persistPublicMap(
     select: { takenAt: true },
   });
   if (latest && now - latest.takenAt.getTime() < config.intervalMinutes * 60_000) return false;
-  const geography = state.ruleFeatures?.includes('operational-map')
-    ? await tx.world.findUniqueOrThrow({
-        where: { id: worldId },
-        select: { operationalMap: true, ruleFeatures: true, replayOrigin: true },
-      })
-    : null;
-  const map = geography
-    ? readOperationalMap(geography.operationalMap, geography.ruleFeatures, geography.replayOrigin)
-    : undefined;
+  const geography = await tx.world.findUniqueOrThrow({
+    where: { id: worldId },
+    select: { operationalMap: true, replayOrigin: true },
+  });
+  const map = geography ? readOperationalMap(geography.operationalMap, geography.replayOrigin) : undefined;
+  const lastEvent = await tx.publicNationEvent.findFirst({
+    where: { worldId },
+    orderBy: { id: 'desc' },
+    select: { id: true },
+  });
   await tx.publicMapSnapshot.create({
     data: {
       worldId,
       takenAt: new Date(now),
       tick,
       ...toGameDate(state.startYear, tick),
-      data: publicMapData(state, map),
+      data: { ...publicMapData(state, map), publicNationEventId: lastEvent?.id.toString() ?? '0' },
     },
   });
   const anchor = await tx.publicMapSnapshot.findFirst({

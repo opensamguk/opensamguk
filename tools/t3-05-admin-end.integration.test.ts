@@ -275,16 +275,6 @@ async function freshWorld(human = false, nameOverride?: string) {
   });
   const initial = structuredClone(await initialPromise);
   initial.seed = 'admin-end-' + randomUUID();
-  initial.ruleFeatures = [
-    'campaign-assignment-v2',
-    'campaign-v1',
-    'five-stats',
-    'operational-map',
-    'personnel',
-    'policy',
-    'stratagem-basic',
-    'treaty',
-  ];
   const { worldId } = await saveInitialWorld(db, initial, {
     name: nameOverride ?? '관리 종료 ' + worlds.length,
     turnTermMinutes: 60,

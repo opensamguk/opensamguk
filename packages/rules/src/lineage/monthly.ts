@@ -27,7 +27,7 @@ function coins(world: WorldView) {
 }
 
 export function settleLineageMonthly(world: WorldView, tick: number, resources: LineageResources) {
-  if (!world.ruleFeatures?.includes('lineage-v1') || !world.lineage) throw new Error('가문 정산 상태가 없습니다.');
+  if (!world.lineage) throw new Error('가문 정산 상태가 없습니다.');
   if (tick !== world.lineage.monthlyTick + TICKS_PER_MONTH)
     throw new Error('가문 월 정산이 중복되거나 달을 건너뛰었습니다.');
   const date = monthlyDate(world.startYear, tick);
@@ -64,7 +64,12 @@ export function settleLineageMonthly(world: WorldView, tick: number, resources: 
     effects.deaths.push({ generalId: id, successorId: heir ?? null, loss: outcome.loss });
   }
   for (const nation of Object.values(state.nations).sort((a, b) => a.id - b.id)) {
-    if (!Object.values(state.cities).some((city) => city.nationId === nation.id && city.kind !== 'PASS')) continue;
+    if (
+      !Object.values(state.cities).some(
+        (city) => city.nationId === nation.id && city.kind !== 'PASS' && city.kind !== 'FIELD',
+      )
+    )
+      continue;
     const active = Object.values(state.generals).filter(
       (general) => general.nationId === nation.id && lineageActive(state, general.id, eligibilityTick),
     );

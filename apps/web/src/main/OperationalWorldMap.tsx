@@ -81,7 +81,7 @@ export function matchesOperationalGeography(map: MapData, cities: readonly Drawn
     JSON.stringify(map.basemap.bounds) !== JSON.stringify(basemap.bounds)
   )
     return false;
-  const anchors = map.sites.filter((site) => site.kind === 'CITY' || site.kind === 'PASS');
+  const anchors = map.sites.filter((site) => site.anchorKey !== undefined);
   if (
     anchors.length !== cities.length ||
     new Set(map.sites.map((site) => site.id)).size !== map.sites.length ||
@@ -297,7 +297,7 @@ export function OperationalWorldMap({
     map.routes.flatMap((route) => (route.enabled && route.mode === 'RIVER' ? (route.portIds ?? []) : [])),
   );
   const drawnSites = map.sites.filter((site) => site.kind !== 'PORT' || usedPorts.has(site.id));
-  const anchors = map.sites.filter((site) => site.kind === 'CITY' || site.kind === 'PASS');
+  const anchors = map.sites.filter((site) => site.anchorKey !== undefined);
   const tapTargets = layout.mobile && onSelect ? mapTapTargets(cities, view, layout) : [];
   const targetByKey = new Map(tapTargets.map((target) => [target.key, target]));
   // 화면 px / 지도 단위. 크기를 아직 못 읽었으면 0이고 표식은 네모로 줄인다.

@@ -42,17 +42,6 @@ const json = (value: unknown): Prisma.InputJsonValue => JSON.parse(JSON.stringif
 async function fixture(enabled = true) {
   const world = toWorldState(source),
     seed = `city-storage-${randomUUID()}`;
-  world.ruleFeatures = enabled
-    ? [
-        'campaign-assignment-v2',
-        'campaign-v1',
-        'city-resources-v1',
-        'five-stats',
-        'operational-map',
-        'personnel',
-        'policy',
-      ]
-    : [];
   if (enabled) {
     world.campaign = emptyCampaignState(world, seed, 'storage-contract');
     world.cityResources = emptyCityResourcesState(world);
@@ -70,7 +59,7 @@ async function fixture(enabled = true) {
       unitSet: json(source.unitSet),
       turnTermMinutes: 60,
       replayFormat: enabled ? 3 : 1,
-      ruleFeatures: world.ruleFeatures,
+
       ...(enabled
         ? {
             campaignState: json(world.campaign),
@@ -152,7 +141,7 @@ describe('AC-INT-18B 실제 PostgreSQL 도시 원장', () => {
       db.$executeRaw`UPDATE "World" SET "cityResourcesState" = NULL WHERE id = ${f.row.id}`,
     ).rejects.toThrow();
     for (const data of [
-      { ruleFeatures: f.row.ruleFeatures.filter((key) => key !== 'campaign-assignment-v2') },
+      {},
       { cityResourcesState: json({ version: 2, cities: {} }) },
       { cityResourcesState: json({ version: 1, cities: [] }) },
       { cityResourcesState: {} },

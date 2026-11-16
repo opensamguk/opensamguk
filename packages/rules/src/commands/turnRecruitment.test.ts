@@ -65,7 +65,6 @@ it('AC-P2-24 방랑국 자진 해산으로 한 나라가 남아도 임관을 허
   const world = fixture();
   world.nations[2]!.isNpc = false;
   world.diplomacies = [];
-  world.ruleFeatures = ['nation-lifecycle-v1', 'personnel'];
   world.nationLifecycle = initialNationLifecycle();
   const wandering = run(world, firstMonthOf195, 2, 'wander');
   expect(wandering.state.nationLifecycle?.nations[2]).toEqual({ sinceTick: firstMonthOf195 });

@@ -551,16 +551,6 @@ for (const index of [0, 1])
       portraitMap: '191-map',
       seed: 'admin-notice-formal',
     });
-    initial.ruleFeatures = [
-      'campaign-assignment-v2',
-      'campaign-v1',
-      'five-stats',
-      'operational-map',
-      'personnel',
-      'policy',
-      'stratagem-basic',
-      'treaty',
-    ];
     expect(initial.nations).toHaveLength(21);
     expect(initial.generals).toHaveLength(491);
     const { worldId } = await saveInitialWorld(db, initial, {

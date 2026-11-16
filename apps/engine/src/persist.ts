@@ -50,7 +50,7 @@ export async function shiftTurns(
   generalId: number,
   lockedWorld?: Pick<
     Prisma.WorldGetPayload<Record<string, never>>,
-    'replayFormat' | 'ruleFeatures' | 'policyFromSequence' | 'actionSequence'
+    'replayFormat' | 'policyFromSequence' | 'actionSequence'
   >,
   lockedSlots?: readonly Prisma.GeneralTurnGetPayload<Record<string, never>>[],
 ) {
@@ -63,11 +63,11 @@ export async function shiftTurns(
     lockedWorld ??
     (await tx.world.findUniqueOrThrow({
       where: { id: worldId },
-      select: { replayFormat: true, ruleFeatures: true, policyFromSequence: true, actionSequence: true },
+      select: { replayFormat: true, policyFromSequence: true, actionSequence: true },
     }));
   const modern =
     world.replayFormat === 3
-      ? world.ruleFeatures.includes('policy')
+      ? true
       : isPolicyMode({ fromSequence: world.policyFromSequence ?? null, actionSequence: world.actionSequence });
   if (modern) assertSlotSet(slots);
   const next = Array.from({ length: 30 }, (_, slot) => {

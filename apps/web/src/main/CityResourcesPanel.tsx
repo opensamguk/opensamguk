@@ -222,7 +222,8 @@ function ResourceBoard({ worldId, cityKey }: { worldId: string; cityKey: number 
         if (
           !fresh.board.visible ||
           !fresh.board.canAllocate ||
-          request.payload.amount > allocationLimit(fresh.board, request.payload.unitId, request.payload.crewType)
+          request.payload.amount >
+            allocationLimit(fresh.board, Number(request.payload.unitId), request.payload.crewType)
         )
           throw new Error('수량·병종·지휘 상한을 다시 확인하세요.');
         const me = await api.auth.me.query(undefined, {

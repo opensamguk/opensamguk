@@ -29,7 +29,6 @@ export const lineageTestConfig: LineageConfig = {
 };
 export function lineageFixture() {
   const world = governanceFixture();
-  world.ruleFeatures!.push('lineage-v1');
   for (const [index, general] of Object.values(world.generals).entries())
     general.sex = index % 2 === 0 ? 'MALE' : 'FEMALE';
   world.lineage = initialLineageState(lineageTestConfig, world, 'lineage-fixture');

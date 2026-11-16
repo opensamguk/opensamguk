@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '@opensamguk/rules';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
@@ -444,7 +445,7 @@ async function actor(role: 'ADMIN' | 'USER' = 'ADMIN', verified = true, consent 
   return { id: user.id, cookie: 'sid=' + session.token, sessionId: session.id };
 }
 // 기존 공장으로 만든 전제 조건이다. CLI나 초기화 소비자 실행 근거로 세지 않는다.
-async function world(options: { ruleFeatures?: ['policy'] } = {}) {
+async function world() {
   const state = await checked(() =>
     loadInitialWorldFromDb(db, {
       scenario: 'integration191',
@@ -454,10 +455,7 @@ async function world(options: { ruleFeatures?: ['policy'] } = {}) {
       seed: randomUUID(),
     }),
   );
-  const selected =
-    options.ruleFeatures === undefined
-      ? {}
-      : { ruleFeatures: [...new Set([...(state.ruleFeatures ?? []), ...options.ruleFeatures])] };
+  const selected = providedRuleKeys === undefined ? {} : {};
   const featureState = { ...state, ...selected };
   expect(state.nations).toHaveLength(21);
   expect(state.generals).toHaveLength(491);
@@ -950,7 +948,7 @@ let resetOwner: Actor | undefined,
 it('AC-M3-04 D2 정식21국491명 두 월드에 실제 사람·30예약·기록을 준비한다', async (signal) => {
   resetOwner = await actor();
   for (const index of [0, 1]) {
-    const source = await world({ ruleFeatures: ['policy'] });
+    const source = await world({});
     preservedWorlds.push(source.id);
     await human(source.id, resetOwner, signal, index);
     expect(await checked(() => db.nation.count({ where: { worldId: source.id } }))).toBe(21);
@@ -989,7 +987,6 @@ it('AC-M3-04 D2 실제 접수·엔진은 원본·타월드·사람·30칸을 보
     scenarioKey: source.scenarioKey,
     mapKey: source.mapKey,
     preset: source.preset,
-    ruleFeatures: source.ruleFeatures,
   });
   expect(await existingRows(preservedWorlds, source.id, event.id)).toBe(before);
   expect(await checked(() => db.worldResult.count({ where: { worldId: source.id } }))).toBe(0);
@@ -1059,7 +1056,7 @@ for (const table of ['World', 'Nation', 'General', 'GeneralTurn', 'AuditLog'] as
   it('AC-M3-04 D2 ' + table + ' 실제 INSERT 거부는 원본·mapping·새 월드 전체를 롤백한다', async (signal) => {
     // 초기 GeneralTurn 쓰기는 정책 기능을 고른 월드에서만 발생한다.
     const owner = await actor(),
-      source = await world(table === 'GeneralTurn' ? { ruleFeatures: ['policy'] } : {}),
+      source = await world(table === 'GeneralTurn' ? {} : {}),
       payload = input(owner, source);
     await accepted(owner, payload, signal);
     const event = await eventFor(payload),
@@ -1549,8 +1546,8 @@ async function assertFreshCityResetWorld(id: string) {
   expect(row).toMatchObject({ status: 'PREOPEN', clockTick: 0, clockRevision: 0, startedAt: null, endedAt: null });
   const expectedFeatures =
     row.officeEffects == null ? cityResetFeatures : [...cityResetFeatures, 'office-effects'].sort();
-  expect(row.ruleFeatures).toEqual(expectedFeatures);
-  expect(origin.initial.ruleFeatures).toEqual(expectedFeatures);
+  expect(providedRuleKeys).toEqual(expectedFeatures);
+  expect(providedRuleKeys).toEqual(expectedFeatures);
   expect(row.initialStateHash).toBe(hashState(origin.initial));
   expect(origin.resourceHash).toBe(resourceHashV3(origin));
   expect(Object.hasOwn(origin.initial, 'cityResources')).toBe(false);
@@ -1606,7 +1603,7 @@ async function cityReset(owner: Actor, source: CityResetWorld, signal: AbortSign
       charm: general.charm,
     }));
   expect(identities(nextOrigin.initial)).toEqual(identities(oldOrigin.initial));
-  expect(next.ruleFeatures).toEqual(source.ruleFeatures);
+  expect(providedRuleKeys).toEqual(providedRuleKeys);
   expect(next.seed).toBe(adminResetPayloadSchema.parse(event.payload).effectiveSeed);
   const oldArchive = await checked(() => exportReplay(db, source.id));
   expect(replayToEnd(oldArchive)).toMatchObject({ reason: 'ADMIN_RESET', winnerNationId: null });
@@ -1685,13 +1682,11 @@ it('AC-INT-18D AC-M3-04 실제 게시 CLI의 도시 판과 두 월드 사람30�
       seed: 'city-reset-peer-source',
     }),
   );
-  initial.ruleFeatures = [...cityResetFeatures];
   const peer = await checked(() =>
     saveInitialWorld(db, initial, {
       name: '도시 초기화 격리 정식191',
       turnTermMinutes: 30,
       endYear: 200,
-      ruleFeatures: [...cityResetFeatures],
     }),
   );
   await assertFreshCityResetWorld(peer.worldId);
@@ -1766,7 +1761,7 @@ it('AC-INT-18D AC-M3-04 실제 생성 DONE과 초기화 APPLIED 출처는 같은
         mapKey: 'integration',
         statRulesKey: 'five-stats',
         portraitMapKey: '191-map',
-        ruleFeatures: cityResetFeatures.filter((feature) => !['five-stats', 'operational-map'].includes(feature)),
+
         seed: 'city-reset-done-source',
         turnTermMinutes: 30,
         endYear: 200,
@@ -1819,12 +1814,12 @@ it('AC-INT-18D AC-M3-04 새 도시 원장 NULL은 초기화 전체를 롤백하�
     );
   });
   await assertNoLiveLease(source.id);
-  const old = await world({ ruleFeatures: ['policy'] }),
+  const old = await world({}),
     oldPayload = input(cityOwner, old),
     oldReceipt = await accepted(cityOwner, oldPayload, signal);
   expect(await apply(old.id, signal)).toMatchObject({ status: 'ENDED' });
   const legacy = await checked(() => db.world.findUniqueOrThrow({ where: { id: oldReceipt.plannedNewWorldId } }));
-  expect(legacy.ruleFeatures).not.toContain('city-resources-v1');
+  expect(providedRuleKeys).not.toContain('city-resources-v1');
   expect(legacy.cityResourcesState).toBeNull();
   expect(
     Object.hasOwn(

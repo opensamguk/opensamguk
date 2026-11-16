@@ -8,7 +8,6 @@ import { chooseGeneralTurn } from './index';
 const context = { tick: 100, unitSet: testUnits };
 function world(stats: { leadership: number; strength: number; intel: number; politics: number; charm: number }) {
   const state = commandWorld();
-  state.ruleFeatures = ['five-stats'];
   Object.assign(state.generals[1]!, stats, { crew: 2000, train: 100, atmos: 100, rice: 100000 });
   state.cities[1]!.agriculture = 0;
   return state;

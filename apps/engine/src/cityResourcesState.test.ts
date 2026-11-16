@@ -10,7 +10,6 @@ beforeAll(async () => {
 });
 function fixture() {
   const world = structuredClone(initial);
-  world.ruleFeatures = ['campaign-v1', 'campaign-assignment-v2', 'city-resources-v1'];
   world.cityResources = emptyCityResourcesState(world);
   return world;
 }
@@ -22,7 +21,6 @@ const client = (execute = vi.fn(async () => 1)) => ({
 describe('AC-INT-18B 도시 저장 경계', () => {
   it('기존 월드는 NULL을 읽고 새 필드를 덧붙이지 않는다', async () => {
     const old = structuredClone(initial);
-    delete old.ruleFeatures;
     expect(readStoredCityResources(null, old, [])).toBeUndefined();
     const { tx, execute } = client();
     await persistCityResourcesState(tx, 'old', old, structuredClone(old), []);
@@ -44,9 +42,7 @@ describe('AC-INT-18B 도시 저장 경계', () => {
   it('OFF 비NULL과 의존 누락·도시 누락·없는 병종을 거부한다', () => {
     const world = fixture();
     expect(() => readStoredCityResources(world.cityResources, initial, [1100])).toThrow('끈');
-    expect(() =>
-      readStoredCityResources(world.cityResources, { ...world, ruleFeatures: ['city-resources-v1'] }, [1100]),
-    ).toThrow('의존');
+    expect(() => readStoredCityResources(world.cityResources, { ...world }, [1100])).toThrow('의존');
     const missing = structuredClone(world.cityResources!);
     delete missing.cities[Object.keys(missing.cities)[0]!];
     expect(() => readStoredCityResources(missing, world, [1100])).toThrow('대응');
@@ -79,7 +75,6 @@ describe('AC-INT-18B 도시 저장 경계', () => {
   it('실행 도중 원장 생성·삭제·형식 변경을 거부한다', async () => {
     const current = fixture(),
       old = structuredClone(initial);
-    delete old.ruleFeatures;
     const { tx, execute } = client();
     await expect(persistCityResourcesState(tx, 'w', old, current, [1100])).rejects.toThrow('추가하거나');
     await expect(persistCityResourcesState(tx, 'w', current, old, [1100])).rejects.toThrow('추가하거나');
@@ -94,7 +89,7 @@ describe('AC-INT-18B 도시 저장 경계', () => {
     const world = {
       id: 'w',
       replayFormat: 1,
-      ruleFeatures: [],
+
       replayOrigin: null,
       unitSet: {},
       cityResourcesState: {},

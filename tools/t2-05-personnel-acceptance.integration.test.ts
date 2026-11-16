@@ -59,7 +59,6 @@ async function fixture() {
     name: '발령 응답과 NPC 인사 검증',
     turnTermMinutes: 60,
     endYear: null,
-    ruleFeatures: ['personnel', 'policy'],
   });
   worlds.push(worldId);
   const userId = randomUUID();

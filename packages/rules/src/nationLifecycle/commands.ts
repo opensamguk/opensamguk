@@ -6,11 +6,9 @@ import type { Actor, CommandDef } from '../commands/types';
 import type { WorldView } from '../model/world';
 import { refreshSupply } from '../supply';
 import { dissolveNation, transferRulership } from './operations';
-import { assertNationLifecycle, isWandering, NATION_LIFECYCLE_FEATURE } from './state';
+import { assertNationLifecycle, isWandering } from './state';
 
 function canAct(world: WorldView, actor: Actor) {
-  if (!world.ruleFeatures?.includes(NATION_LIFECYCLE_FEATURE))
-    return fail('COMMAND_DISABLED', '이 월드에서는 국가 변천 명령을 쓸 수 없습니다.');
   const denied = ruler(world, actor);
   if (denied) return denied;
   assertNationLifecycle(world);
@@ -79,7 +77,13 @@ export const nationLifecycleCommands: readonly CommandDef[] = [
       const general = world.generals[actor.generalId]!;
       if (!isWandering(world, general.nationId)) return fail('BAD_STATE', '방랑 국가만 재정착할 수 있습니다.');
       const city = world.cities[general.cityKey];
-      if (!city || city.kind === 'PASS' || city.nationId !== null || ![5, 6].includes(city.level))
+      if (
+        !city ||
+        city.kind === 'PASS' ||
+        city.kind === 'FIELD' ||
+        city.nationId !== null ||
+        ![5, 6].includes(city.level)
+      )
         return fail('BAD_TARGET', '소·중 규모의 빈 도시에서만 재정착할 수 있습니다.');
       return Object.values(world.generals).filter((row) => row.nationId === general.nationId).length < 2
         ? fail('BAD_STATE', '소속 장수가 2명 이상이어야 합니다.')

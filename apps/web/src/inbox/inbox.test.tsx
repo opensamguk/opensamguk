@@ -57,6 +57,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
 const { TRPCProvider, trpcClient } = await import('../trpc');
 const { InboxPage } = await import('./InboxPage');
 const { countInbox } = await import('./count');
+const { useInboxCount } = await import('./useInboxCount');
 
 const ok = { ok: true } as const;
 const offer: AssignmentOfferView = {
@@ -195,6 +196,25 @@ describe('받은 제안함', () => {
 });
 
 describe('메뉴의 제안함 수', () => {
+  function Count() {
+    return <span>제안 수 {useInboxCount('w1')}</span>;
+  }
+  it('권한자가 받은 열린 상신을 조회해 메뉴 수에 더한다', async () => {
+    on('general.mine', () => ({ general: { id: 1 }, creationRules: { personnelEnabled: true } }));
+    on('proposals.list', () => [{ id: 'proposal-1' }, { id: 'proposal-2' }]);
+    render(
+      <QueryClientProvider client={client}>
+        <TRPCProvider trpcClient={trpcClient} queryClient={client}>
+          <Count />
+        </TRPCProvider>
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByText('제안 수 2')).toBeTruthy();
+    expect(wire.calls).toContainEqual({
+      path: 'proposals.list',
+      input: { worldId: 'w1', box: 'received', status: 'PENDING' },
+    });
+  });
   it('받은 대기 제안만 센다', () => {
     expect(countInbox({ offers: undefined, board: undefined, treaties: undefined })).toBe(0);
     expect(

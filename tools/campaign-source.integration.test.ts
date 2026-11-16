@@ -22,7 +22,6 @@ describe('AC-INT-06 휘하 저장 경계', () => {
       portraitMap: '191-map',
       seed: 'immutable-army-source',
     });
-    initial.ruleFeatures = ['campaign-v1', 'five-stats', 'operational-map', 'personnel', 'policy'];
     const origin = {
       version: 3,
       initial,
@@ -34,7 +33,7 @@ describe('AC-INT-06 휘하 저장 경계', () => {
     const types = readCampaignArmyTypes(row);
     expect(types).toContain(1100);
     expect(types).not.toContain(1000);
-    const checked = checkStoredReplayFormat({ ...row, replayFormat: 3, ruleFeatures: initial.ruleFeatures });
+    const checked = checkStoredReplayFormat({ ...row, replayFormat: 3 });
     expect(checked).toBe(row.replayOrigin);
     expect(readCampaignArmyTypes(row, checked)).toEqual(types);
     expect(() => readCampaignArmyTypes({ ...row, replayOrigin: structuredClone(row.replayOrigin) }, checked)).toThrow(

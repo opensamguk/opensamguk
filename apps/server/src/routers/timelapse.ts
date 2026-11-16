@@ -93,12 +93,10 @@ export const timelapseRouter = router({
         input.cursor === undefined
           ? await tx.world.findUnique({
               where: { id: input.worldId },
-              select: { operationalMap: true, ruleFeatures: true, replayOrigin: true },
+              select: { operationalMap: true, replayOrigin: true },
             })
           : null;
-      const geography = layout?.ruleFeatures?.includes('operational-map')
-        ? readOperationalMap(layout.operationalMap, layout.ruleFeatures, layout.replayOrigin)
-        : undefined;
+      const geography = layout ? readOperationalMap(layout.operationalMap, layout.replayOrigin) : undefined;
       const map =
         input.cursor === undefined
           ? {

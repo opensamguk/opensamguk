@@ -36,7 +36,7 @@ function defineStrategy<A>(spec: StrategySpec<A>): CommandDef {
     if (!parsed.success) return fail('BAD_ARGS', '명령 인자가 잘못되었습니다.');
     const targetFailure = spec.check(view, actor, parsed.data);
     if (targetFailure) return targetFailure;
-    const state = readNationStrategy(view.nationStrategy, view);
+    const state = readNationStrategy(view.nationStrategy);
     if (!state) return fail('COMMAND_DISABLED', '이 월드에서 꺼진 명령입니다.');
     const current = strategyMonth(actor.tick ?? 0),
       cooldown = state.nations[general.nationId];
@@ -62,7 +62,7 @@ function defineStrategy<A>(spec: StrategySpec<A>): CommandDef {
         current = strategyMonth(tick),
         year = toGameDate(state.startYear, tick).year;
       const result = spec.change(state, actor, spec.args.parse(raw));
-      const ledger = readNationStrategy(state.nationStrategy, state)!;
+      const ledger = readNationStrategy(state.nationStrategy)!;
       const cooldown = (ledger.nations[nationId] ??= { strategicUntil: 0, commands: {} });
       const count = Math.max(
         10,

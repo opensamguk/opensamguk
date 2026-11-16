@@ -182,7 +182,7 @@ async function drain(worldId: string, rollback = false) {
 }
 async function createWorld(enabled = true, fixture = initial) {
   const source = structuredClone(fixture);
-  if (!enabled) source.ruleFeatures = source.ruleFeatures!.filter((key) => key !== 'city-resources-v1');
+
   const { worldId } = await saveInitialWorld(db, source, {
     name: enabled ? 'INT18 정식 원생성' : 'INT18 기존 판',
     turnTermMinutes: 60,
@@ -317,17 +317,6 @@ beforeAll(() =>
       portraitMap: '191-map',
       seed: 'int18-formal-city-resources',
     });
-    initial.ruleFeatures = [
-      'campaign-assignment-v2',
-      'campaign-v1',
-      'city-resources-v1',
-      'five-stats',
-      'operational-map',
-      'personnel',
-      'policy',
-      'stratagem-basic',
-      'treaty',
-    ];
     app = await buildServer({
       db,
       logging: false,

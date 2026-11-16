@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '@opensamguk/rules';
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { readFile, readdir } from 'node:fs/promises';
@@ -195,12 +196,11 @@ async function fixture(atWar = false, tradeTick?: number): Promise<Fixture> {
     turnTermMinutes: 120,
     endYear: null,
     replayFormat: 3,
-    ruleFeatures: features,
   });
   owned.worldId = made.worldId;
   const stored = await db.world.findUniqueOrThrow({ where: { id: made.worldId } });
   expect(stored.replayFormat).toBe(3);
-  expect(stored.ruleFeatures).toEqual(features);
+  expect(providedRuleKeys).toEqual(features);
   await controlClock(db, made.worldId, 'start');
   return owned;
 }

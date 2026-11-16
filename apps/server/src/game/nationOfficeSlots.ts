@@ -7,7 +7,6 @@ import {
   canExecuteCityNationCommand,
   canExecuteResearchNationCommand,
   officerTitle,
-  COURT_RANK_FEATURE,
   nationRank,
   type QueuedTurn,
 } from '@opensamguk/rules';
@@ -96,7 +95,7 @@ export async function readNationOfficeTabs(tx: Prisma.TransactionClient, worldId
     if (occupied.length > 1) throw new Error('한 직책에 장수가 둘 이상 있습니다.');
     const holder = occupied[0];
     const courtTitle = rank?.offices.find((office) => office.officerLevel === officerLevel)?.title ?? null;
-    if (!holder && courtTitle === null && world.ruleFeatures.includes(COURT_RANK_FEATURE)) continue;
+    if (!holder && courtTitle === null) continue;
     tabs.push({
       office: { nationId, officerLevel, tenure: row?.tenure ?? 0 },
       officerLevel,
@@ -168,7 +167,6 @@ export async function saveNationOfficeTurns(
       args: turn.args as Prisma.InputJsonValue,
     })),
   });
-  const policy = world.ruleFeatures.includes('policy');
   const event = await tx.inputEvent.create({
     data: {
       worldId: world.id,
@@ -180,13 +178,12 @@ export async function saveNationOfficeTurns(
       sequence: await nextActionSequence(tx, world.id),
       tick: world.clockTick,
       payload: { office: input.office, revision: current, turns } as unknown as Prisma.InputJsonValue,
-      result: { revision, ...(policy ? { activeTick: world.clockTick } : {}) },
+      result: { revision, ...{ activeTick: world.clockTick } },
     },
   });
-  if (policy)
-    await tx.general.update({
-      where: { worldId_id: { worldId: world.id, id: actor.id } },
-      data: { lastActiveTick: Math.max(actor.lastActiveTick ?? 0, world.clockTick), lastActiveAt: event.createdAt },
-    });
+  await tx.general.update({
+    where: { worldId_id: { worldId: world.id, id: actor.id } },
+    data: { lastActiveTick: Math.max(actor.lastActiveTick ?? 0, world.clockTick), lastActiveAt: event.createdAt },
+  });
   return { ok: true as const, revision, slots: displayOfficeTurns(world, turns) };
 }

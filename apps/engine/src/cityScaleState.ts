@@ -4,30 +4,20 @@ import { checkReplayOrigin, readCityRuins, type WorldView, type CityRuinsState }
 
 type StoredWorld = Pick<
   Prisma.WorldGetPayload<Record<string, never>>,
-  'id' | 'ruleFeatures' | 'replayFormat' | 'replayOrigin' | 'cityRuinsState'
+  'id' | 'replayFormat' | 'replayOrigin' | 'cityRuinsState'
 >;
 
-export function readStoredCityRuins(
-  world: StoredWorld,
-  state: Pick<WorldView, 'ruleFeatures' | 'cities'>,
-): CityRuinsState | undefined {
-  if (!world.ruleFeatures.includes('city-scale-v1')) return readCityRuins(world.cityRuinsState, state);
+export function readStoredCityRuins(world: StoredWorld, state: Pick<WorldView, 'cities'>): CityRuinsState | undefined {
   const origin: unknown = world.replayOrigin;
   checkReplayOrigin(origin);
-  if (world.replayFormat !== 3 || origin.version !== 3 || !origin.initial.ruleFeatures?.includes('city-scale-v1'))
-    throw new Error('폐허의 재생 형식이나 생성 원장이 다릅니다.');
+  if (world.replayFormat !== 3 || origin.version !== 3) throw new Error('폐허의 재생 형식이나 생성 원장이 다릅니다.');
   return readCityRuins(world.cityRuinsState, state, origin.initial.cityScale);
 }
 
 export async function assertStoredCityRuins(tx: Prisma.TransactionClient, world: StoredWorld): Promise<void> {
-  if (!world.ruleFeatures.includes('city-scale-v1')) {
-    readStoredCityRuins(world, { cities: {}, ruleFeatures: world.ruleFeatures });
-    return;
-  }
   const rows = await tx.city.findMany({ where: { worldId: world.id }, omit: { kind: true } });
   readStoredCityRuins(world, {
     cities: Object.fromEntries(rows.map((city) => [city.cityKey, city])),
-    ruleFeatures: world.ruleFeatures,
   });
 }
 

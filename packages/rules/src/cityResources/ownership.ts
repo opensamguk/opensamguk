@@ -4,7 +4,6 @@ import { readCityResourcesState } from './state';
 
 // 점령·멸망·중립화 때 같은 도시의 금·쌀은 남고 잔여 병력만 해산한다.
 export function disbandCityGarrison(view: WorldView, cityKey: number) {
-  if (!view.ruleFeatures?.includes('city-resources-v1')) throw new Error('도시 자원 규칙이 없는 판입니다.');
   const ledger = readCityResourcesState(view.cityResources, view),
     city = view.cities[cityKey];
   if (!city) throw new Error('해산할 도시를 확인하세요.');

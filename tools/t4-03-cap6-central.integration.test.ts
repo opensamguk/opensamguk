@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '@opensamguk/rules';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
@@ -500,7 +501,7 @@ it('P3 기능 없는 새 CLI는 origin3과 빈 기능 목록, 조약 꺼짐을 �
   checkReplayOrigin(origin);
   expect(origin).toMatchObject({ version: 3, initialStateHash: result.stateHash });
   expect(world.replayFormat).toBe(3);
-  expect(world.ruleFeatures).toEqual([]);
+  expect(providedRuleKeys).toEqual([]);
   expect(world.policyFromSequence).toBeNull();
   expect(world.treatyFormat).toBeNull();
   expect(await db.treaty.count({ where: { worldId: world.id } })).toBe(0);
@@ -531,7 +532,7 @@ it('P3 명시 방침 factory는 origin1과 방침 표지 0, 조약 꺼짐을 보
   checkReplayOrigin(origin);
   expect(origin).toMatchObject({ version: 1, initialStateHash: result.stateHash });
   expect(world.replayFormat).toBe(1);
-  expect(world.ruleFeatures).toEqual([]);
+  expect(providedRuleKeys).toEqual([]);
   expect(world.policyFromSequence).toBe(0);
   expect(world.treatyFormat).toBeNull();
   expect(await db.treaty.count({ where: { worldId: world.id } })).toBe(0);

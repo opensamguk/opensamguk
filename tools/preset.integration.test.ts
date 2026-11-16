@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '@opensamguk/rules';
 import { execFileSync } from 'node:child_process';
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -287,7 +288,7 @@ describe('T2-02 실제 DB 생성·고정', () => {
     expect(world.mapKey).toBe('che');
     expect(world.scenarioKey).toBe('1030');
     expect(world.unitSetKey).toBe('basic');
-    expect(world.ruleFeatures).not.toContain('battle-affinity-v2');
+    expect(providedRuleKeys).not.toContain('battle-affinity-v2');
     expect(world.preset).toEqual(await loadPreset('speed'));
   });
   it('없는 프리셋·경로 이탈·없는 시나리오·필수 인자가 빠진 CLI는 행을 만들지 않는다', async () => {

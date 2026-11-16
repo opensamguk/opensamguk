@@ -10,7 +10,6 @@ import { CITY_RESOURCE_MAX, emptyCityResourcesState } from './state';
 
 function fixture() {
   const world = commandWorld();
-  world.ruleFeatures = ['five-stats', 'city-resources-v1'];
   for (const general of Object.values(world.generals)) Object.assign(general, { politics: 60, charm: 55, crew: 0 });
   Object.assign(world.generals[1]!, { cityKey: 1, nationId: 1, officerLevel: 12, gold: 7, rice: 11 });
   Object.assign(world.generals[2]!, { cityKey: 1, nationId: 1, userId: null, leadership: 80 });
@@ -188,7 +187,6 @@ describe('AC-INT-18A 도시 모집·준비·배속의 보존과 권한', () => {
   });
   it('기능 표시가 없으면 기존 판을 새 규칙으로 처리하지 않는다', () => {
     const world = fixture();
-    world.ruleFeatures = ['five-stats'];
     expect(applyCityAllocation(world, actor, allocation)).toMatchObject({ ok: false, code: 'COMMAND_DISABLED' });
     expect(applyCityPreparation(world, actor, 'train', { target: 'city', crewType: 1100 })).toMatchObject({
       ok: false,

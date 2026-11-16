@@ -291,15 +291,6 @@ describe('T3-02 AC-M3-01 실제 PostgreSQL·HTTP 이메일 인증 차단', () =>
       portraitMap: '191-map',
       seed: 'public-verification-http-191',
     });
-    initial.ruleFeatures = [
-      'campaign-v1',
-      'five-stats',
-      'operational-map',
-      'personnel',
-      'policy',
-      'stratagem-basic',
-      'treaty',
-    ];
     expect(initial.generals).toHaveLength(491);
     expect(initial.nations).toHaveLength(21);
     const saved = await saveInitialWorld(db, initial, { name: '공개 인증 정식191', turnTermMinutes: 60, endYear: 201 });

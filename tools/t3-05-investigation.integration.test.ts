@@ -405,16 +405,6 @@ it('AC-M3-05 정식 두 월드와 실제 같은 기기 가입·장수 생성으�
       portraitMap: '191-map',
       seed: 'investigation-world-' + index,
     });
-    initial.ruleFeatures = [
-      'campaign-assignment-v2',
-      'campaign-v1',
-      'five-stats',
-      'operational-map',
-      'personnel',
-      'policy',
-      'stratagem-basic',
-      'treaty',
-    ];
     expect(initial.nations).toHaveLength(21);
     expect(initial.generals).toHaveLength(491);
     expect(initial.cities).toHaveLength(61);

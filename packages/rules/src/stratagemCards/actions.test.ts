@@ -9,7 +9,6 @@ import { stratagemCardsFeature, stratagemCardsInputKind } from './feature';
 const payload = { type: 'trap.set', nationId: 1, cityKey: 1 };
 function fixture() {
   const world = commandWorld();
-  world.ruleFeatures = ['five-stats', 'stratagem-basic', 'stratagem-cards-v1'];
   world.generals[1]!.userId = 'owner';
   world.stratagemCards = initialStratagemCards(TEST_STRATAGEM_CARDS_CONFIG, world, 'action-fixture');
   world.stratagemCards.nations[1]!.hand = ['trap'];
@@ -70,7 +69,6 @@ it.each([
 it('AC-P2-23 실제 월간 뽑기 뒤의 설치 기록은 같은 결과로 재현되고 변조는 거부된다', () => {
   const world = commandWorld(),
     initial = commandInitial();
-  world.ruleFeatures = ['five-stats', 'stratagem-basic', 'stratagem-cards-v1'];
   world.generals[1]!.userId = 'owner';
   const start: ReplayState = { state: world, turns: { 1: [] }, revisions: { 1: 0 }, monthlyTick: 0 },
     data = { version: 1, config: { ...TEST_STRATAGEM_CARDS_CONFIG, deck: [{ kind: 'trap', weight: 1 }] } };

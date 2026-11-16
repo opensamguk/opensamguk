@@ -1,3 +1,4 @@
+import { verifySupplyLedger } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import type { Prisma } from '@opensamguk/db';
 import {
@@ -25,7 +26,6 @@ import { readStoredPreparedTurns, readStoredNationResearch } from '@opensamguk/r
 import { assertWorldCapabilities } from './capsGate';
 import { loadTreaties } from './treatyState';
 import { assertPersonnelStorage } from './personnelState';
-import { assertNoResidenceAnchorsInRows } from './residenceState';
 import { storedGeneralStats } from './generalStats';
 import { readCampaignArmyTypes, readStoredCampaign } from './campaignState';
 import { readStoredCityResources } from './cityResourcesState';
@@ -46,15 +46,14 @@ export async function loadWorldAfterCapabilityCheck(
   capabilities: Awaited<ReturnType<typeof assertWorldCapabilities>>,
 ): Promise<WorldState> {
   const worldId = world.id;
-  const armyTypes = world.ruleFeatures.includes('campaign-v1')
-    ? ((capabilities.kind === 'registry' ? capabilities.armyTypes : undefined) ?? readCampaignArmyTypes(world))
-    : [];
-  const { preset, commands } = engineResolver(world);
+  const armyTypes =
+    (capabilities.kind === 'registry' ? capabilities.armyTypes : undefined) ?? readCampaignArmyTypes(world);
+  const { preset } = engineResolver(world);
   const { presetRules: rules, recruitmentLocation } = effectiveWorldOptions(preset, world.runtimeOptions);
-  if (world.replayFormat === 3) await assertPersonnelStorage(tx, worldId, world.ruleFeatures.includes('personnel'));
-  const ext = await loadExt(tx, worldId, commands, world.ruleFeatures);
+  if (world.replayFormat === 3) await assertPersonnelStorage(tx, worldId, true);
+  const ext = await loadExt(tx, worldId);
   const cities = await tx.city.findMany({ where: { worldId } });
-  const operationalMap = readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin);
+  const operationalMap = readOperationalMap(world.operationalMap, world.replayOrigin);
   const nations = await tx.nation.findMany({
     where: { worldId },
     omit: { notice: true, noticeDirective: true, noticeRevision: true, noticeUpdatedAt: true, noticeUpdatedBy: true },
@@ -63,7 +62,6 @@ export async function loadWorldAfterCapabilityCheck(
     where: { worldId },
     omit: { noticeSeen: true, defaultPolicy: true, lastActiveTick: true, lastActiveAt: true },
   });
-  if (world.replayFormat === 3 && !world.ruleFeatures.includes('personnel')) assertNoResidenceAnchorsInRows(generals);
   const diplomacies = await tx.diplomacy.findMany({
     where: { worldId },
     orderBy: [{ nationA: 'asc' }, { nationB: 'asc' }],
@@ -72,8 +70,7 @@ export async function loadWorldAfterCapabilityCheck(
     void ignored;
     return value;
   };
-  const officeEnabled = world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE);
-  const officeEffects = officeEnabled ? officeEffectsSchema.parse(world.officeEffects) : undefined;
+  const officeEffects = officeEffectsSchema.parse(world.officeEffects);
   if (officeEffects) {
     const origin = world.replayOrigin as { featureData?: Record<string, unknown> } | null;
     if (
@@ -87,8 +84,9 @@ export async function loadWorldAfterCapabilityCheck(
     ...(officeEffects ? { officeEffects } : {}),
     ...(rules ? { presetRules: rules } : {}),
     ...(recruitmentLocation === 'city' ? { recruitmentLocation } : {}),
-    ...(world.ruleFeatures?.length ? { ruleFeatures: [...world.ruleFeatures] } : {}),
+
     ...(ext ? { ext } : {}),
+    fogOfWar: world.fogOfWar,
     startYear: world.startYear,
     cities: Object.fromEntries(
       attachOperationalKinds(cities.map(stripWorldId), operationalMap).map((city) => [city.cityKey, city]),
@@ -111,11 +109,11 @@ export async function loadWorldAfterCapabilityCheck(
             storedGeneralRemoval(
               storedGeneralSex(
                 { ...stripWorldId(general), ...(officerCityKey == null ? {} : { officerCityKey }) },
-                world.ruleFeatures.includes('lineage-v1'),
+                true,
               ),
               world.replayFormat,
             ),
-            world.ruleFeatures?.includes('five-stats') ?? false,
+            true,
           ),
         ];
       }),
@@ -125,6 +123,7 @@ export async function loadWorldAfterCapabilityCheck(
     ...(capabilities.kind === 'caps' && 'treaty' in capabilities.selection ? await loadTreaties(tx, worldId) : {}),
   };
   const campaign = readStoredCampaign(world.campaignState, state, world.seed);
+  verifySupplyLedger(campaign?.supplyLedger, operationalMap, true);
   if (campaign) state.campaign = campaign;
   const cityResources = readStoredCityResources(world.cityResourcesState, state, armyTypes);
   if (cityResources) state.cityResources = cityResources;
@@ -153,9 +152,7 @@ export async function loadWorldAfterCapabilityCheck(
   if (equipment) state.equipment = equipment;
   const cards = readStoredStratagemCards(world, state);
   if (cards) state.stratagemCards = cards;
-  for (const feature of engineFeatures
-    .filter((feature) => world.ruleFeatures?.includes(feature.key))
-    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)))
+  for (const feature of [...engineFeatures].sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)))
     state = (await feature.loadWorld?.(tx, worldId, state)) ?? state;
   return state;
 }

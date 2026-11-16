@@ -27,9 +27,6 @@ function sexEditionRequest(frozen: 'old' | 'second' | 'latest' | 'missing' | nul
       Object.entries(selectedResources).map(([slot, row]) => [slot, { ...row, source: 'repository fixture' }]),
     ) as resources.InitialResources,
     initial = resources.composeInitialWorld(selected, 'sex-request-seed'),
-    ruleFeatures = [
-      ...new Set([...(initial.ruleFeatures ?? []), 'personnel', 'policy', ...(lineage ? ['lineage-v1'] : [])]),
-    ].sort(),
     intent = worldCreateIntent({
       expectedUserId: '00000000-0000-4000-8000-000000000001',
       idempotencyKey: '00000000-0000-4000-8000-000000000002',
@@ -41,14 +38,13 @@ function sexEditionRequest(frozen: 'old' | 'second' | 'latest' | 'missing' | nul
       seed: initial.seed,
       turnTermMinutes: 60,
       endYear: null,
-      ruleFeatures,
     }),
     realPrepare = persistence.prepareInitialWorld,
     options = {
       name: intent.name,
       turnTermMinutes: 60,
       endYear: null,
-      ruleFeatures,
+
       ...(lineage ? { featureData: { 'lineage-v1': lineageTestConfig } } : {}),
     },
     ledgers = resources.loadSexLedgers(),

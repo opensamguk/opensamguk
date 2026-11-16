@@ -61,7 +61,7 @@ export const featureRegistry: RuleRegistry = {
 
 export async function featureArchive(features: string[]): Promise<ReplayArchiveV3> {
   const initial = await monthlyFixture();
-  if (features.length) initial.ruleFeatures = [...features];
+
   const origin: ReplayOriginV3 = { version: 3, initial, initialStateHash: hashState(initial), resourceHash: '' };
   origin.resourceHash = replayModule.resourceHashV3(origin);
   const archive: ReplayArchiveV3 = {
@@ -141,7 +141,7 @@ export function exportDatabase(archive: ReplayArchiveV2 | ReplayArchiveV3) {
       findUniqueOrThrow: async () => ({
         replayOrigin: archive.origin,
         replayFormat: archive.version === 3 ? 3 : 1,
-        ruleFeatures: archive.origin.initial.ruleFeatures ?? [],
+
         treatyFormat: null,
         personnelFormat: null,
         policyFromSequence: null,

@@ -1,3 +1,4 @@
+import { countyTaxDestination } from './cityAffiliation';
 import type { GameDate } from '@opensamguk/shared';
 import { BALANCE } from './balance';
 import { CITY_RESOURCE_MAX, readCityResourcesState } from './cityResources/state';
@@ -35,10 +36,6 @@ export function applyCityResourceIncome(
   date: GameDate,
   bonuses = residentOfficeBonuses(before, date.year),
 ): WorldState {
-  const active = before.ruleFeatures?.includes('city-resources-v1') ?? false;
-  if (active !== (settled.ruleFeatures?.includes('city-resources-v1') ?? false))
-    throw new Error('도시 세수 정산 중 규칙 판이 바뀌었습니다.');
-  if (!active) return cloneWorld(settled);
   if (!Number.isSafeInteger(date.year) || !Number.isInteger(date.month) || date.month < 1 || date.month > 12)
     throw new Error('도시 세수 정산 날짜를 확인하세요.');
   const original = readCityResourcesState(before.cityResources, before);
@@ -97,7 +94,7 @@ export function applyCityResourceIncome(
     if (!after) throw new Error('세수 정산 국가가 없습니다.');
     const delta = quantity(quantity(after[resource]) - quantity(nation[resource]));
     const cities = Object.values(before.cities)
-      .filter((city) => city.nationId === nation.id && city.kind !== 'PASS')
+      .filter((city) => city.nationId === nation.id && city.kind !== 'PASS' && city.kind !== 'FIELD')
       .sort((left, right) => left.cityKey - right.cityKey);
     let weight = 0;
     const exactWeights = cities.map((city) => {
@@ -131,7 +128,7 @@ export function applyCityResourceIncome(
     if (deposits.reduce((total, value) => sum(total, value), 0) !== delta)
       throw new Error('도시 세수 배분 총액이 다릅니다.');
     for (let index = 0; index < cities.length; index++) {
-      const city = ledger.cities[String(cities[index]!.cityKey)]!;
+      const city = ledger.cities[String(countyTaxDestination(before, cities[index]!.cityKey))]!;
       city[resource] = sum(city[resource], deposits[index]!);
     }
   }

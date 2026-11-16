@@ -15,6 +15,7 @@ export function ownGeneral(
     intel: g.intel,
     ...(g.politics != null && g.charm != null ? { politics: g.politics, charm: g.charm } : {}),
     officerLevel: g.officerLevel,
+    courtTitle: null as string | null,
     birthYear: g.birthYear,
     deathYear: g.deathYear,
     activeFromYear: g.activeFromYear,

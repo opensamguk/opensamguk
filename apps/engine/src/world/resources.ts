@@ -79,11 +79,9 @@ export function resolveWorldResourceSelection(options: WorldResourceSelection): 
     scenario: formatResourceKey(parseResourceKey(options.scenario)),
     map: formatResourceKey(map),
     unitSet: formatResourceKey(parseResourceKey(options.unitSet ?? 'basic')),
-    statRules: formatResourceKey(
-      parseResourceKey(options.statRules ?? (map.name === 'san10' ? 'five-stats' : 'default')),
-    ),
+    statRules: formatResourceKey(parseResourceKey(options.statRules ?? 'five-stats')),
     portraitMap: formatResourceKey(
-      parseResourceKey(options.portraitMap ?? (map.name === 'san10' ? '191-map' : 'rtk14-map')),
+      parseResourceKey(options.portraitMap ?? (map.name === 'san10-expanded' ? 'san10-expanded-portraits' : '191-map')),
     ),
   };
 }

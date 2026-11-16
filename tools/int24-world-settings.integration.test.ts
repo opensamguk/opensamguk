@@ -125,7 +125,6 @@ async function world(withPreset = true, published = false, truce?: Truce) {
     : commandInitial();
   // 소형 fixture도 실제 로비에서 제목을 읽을 수 있는 시나리오 키를 쓴다.
   if (!published) initial.scenarioKey = 'integration191';
-  initial.ruleFeatures = [...new Set([...(initial.ruleFeatures ?? []), 'personnel', 'policy'])].sort();
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '생성 이름',
     turnTermMinutes: 60,
@@ -578,7 +577,6 @@ it('AC-INT-22 도시별 모집을 운영 중 바꿔도 기존 설정 원본과 �
 it('AC-INT-24 월말과 같은 tick의 장수 턴은 정산 체크포인트 뒤에 따로 진행한다', async () => {
   const initial = commandInitial();
   initial.generals[0]!.nextTurnTick = 0;
-  initial.ruleFeatures = ['personnel', 'policy'];
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '월경계 비교',
     turnTermMinutes: 60,

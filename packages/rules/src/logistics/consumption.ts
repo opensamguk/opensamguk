@@ -28,7 +28,6 @@ export function affordableByGoods(
 }
 
 function current(view: WorldView): LogisticsState {
-  if (!view.ruleFeatures?.includes('logistics-v1')) throw new Error('물류 판이 아닙니다.');
   return readLogisticsState(view.logistics, view);
 }
 
@@ -66,8 +65,7 @@ export function consumeCityGoods(view: WorldView, cityKey: number, cost: Readonl
 // 한 차례의 개인·국가 명령을 모두 반영한 뒤 한 번 기록한다. 이동·교역은 별도 입력 경로다.
 export function logisticsCommandMovements(before: WorldView, after: WorldView): LogisticsMovement[] {
   if (!before.logistics && !after.logistics) {
-    if (before.ruleFeatures?.includes('logistics-v1') || after.ruleFeatures?.includes('logistics-v1'))
-      throw new Error('물류 판의 재고가 없습니다.');
+    throw new Error('물류 판의 재고가 없습니다.');
     return [];
   }
   const prior = current(before),

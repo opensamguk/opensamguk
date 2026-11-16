@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '@opensamguk/rules';
 import type { Prisma } from '@opensamguk/db';
 import { assertSlotSet, emptyTurns, isPolicyMode, toWorldState, type ReplayState } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
@@ -19,7 +20,7 @@ type General = {
 type Slot = { generalId: number; slot: number; commandKey: string; args: unknown; explicit: boolean };
 type World = {
   replayFormat: number;
-  ruleFeatures: string[];
+
   policyFromSequence: number | null;
   actionSequence: number;
   turnTermMinutes: number;
@@ -51,7 +52,7 @@ async function fixture(count?: number) {
   ).flat();
   const world: World = {
     replayFormat: 3,
-    ruleFeatures: ['policy'],
+
     policyFromSequence: null,
     actionSequence: 10,
     turnTermMinutes: 60,
@@ -80,7 +81,7 @@ function previousProjection(f: Fixture): ReplayState {
   const { state, world, generals, slots } = f,
     modern =
       world.replayFormat === 3
-        ? world.ruleFeatures.includes('policy')
+        ? providedRuleKeys.includes('policy')
         : isPolicyMode({ fromSequence: world.policyFromSequence, actionSequence: world.actionSequence });
   const turns = Object.fromEntries(generals.map(({ id }) => [id, emptyTurns()]));
   for (const general of generals) if (modern) assertSlotSet(slots.filter((slot) => slot.generalId === general.id));
@@ -138,7 +139,7 @@ describe('replay slot indexing preserves the complete original projection', () =
       const f = await fixture();
       Object.assign(f.world, {
         replayFormat: format,
-        ruleFeatures: [...features],
+
         policyFromSequence: fromSequence,
         actionSequence: sequence,
       });
@@ -207,7 +208,7 @@ describe('replay slot indexing preserves the complete original projection', () =
   });
   it('legacy sparse and duplicate queues retain empty defaults and the original last-row result', async () => {
     const f = await fixture();
-    Object.assign(f.world, { replayFormat: 1, ruleFeatures: [], policyFromSequence: null });
+    Object.assign(f.world, { replayFormat: 1, policyFromSequence: null });
     f.slots.splice(
       0,
       f.slots.length,

@@ -138,16 +138,6 @@ async function world() {
   } finally {
     await resourceDb.$disconnect();
   }
-  initial.ruleFeatures = [
-    'campaign-assignment-v2',
-    'campaign-v1',
-    'five-stats',
-    'operational-map',
-    'personnel',
-    'policy',
-    'stratagem-basic',
-    'treaty',
-  ];
   expect(initial.nations).toHaveLength(21);
   expect(initial.generals).toHaveLength(491);
   return (await saveInitialWorld(db, initial, { name: '정리 시험 월드', turnTermMinutes: 60, endYear: 201 })).worldId;

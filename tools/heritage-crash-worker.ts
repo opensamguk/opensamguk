@@ -12,8 +12,7 @@ if (!process.send || !/^\/heritage_[a-f0-9]{32}_test$/.test(url.pathname) || !wo
 process.once('disconnect', () => process.exit(2));
 const db = createDb(url.href);
 const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
-if (world.name !== '유산 실제 처리 검증' || !world.ruleFeatures.includes('heritage-v1'))
-  throw new Error('유산 중단 시험 월드가 아닙니다.');
+if (world.name !== '유산 실제 처리 검증') throw new Error('유산 중단 시험 월드가 아닙니다.');
 const lease = await acquireLease(db, worldId, randomUUID(), 5000);
 if (!lease) throw new Error('중단 시험 실행권이 없습니다.');
 try {

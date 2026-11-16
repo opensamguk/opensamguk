@@ -1,3 +1,4 @@
+import { assignCountyParents } from '../cityAffiliation';
 import type { PresetRules } from './preset';
 import { rngFor } from '@opensamguk/shared';
 import { TICKS_PER_MONTH } from '../clock/constants';
@@ -15,12 +16,16 @@ import { legacyCheCrewRegionsMatch, unitSetRegionSchemeMatches } from './crewReg
 import type { WorldState, WorldExt } from '../model/world';
 import { operationalMapSchema, type OperationalMapResource } from './map/operational';
 import { operationalAnchors } from './map/anchors';
+import { createMapTerritory } from './map/territory';
 import { validateMap } from './validate/map';
-import { CITY_SCALE_FEATURE, resolveCityScale, type CityScaleRecord, type ScaleAnchor } from './map/cityScale';
+import { resolveCityScale, type CityScaleRecord, type ScaleAnchor } from './map/cityScale';
 import { appliesOperationalOpening, LEGACY_OPENING_CITY_PROFILE, legacyOpeningCityValues } from './openingCityProfile';
 
 export interface InitialCity {
-  kind?: 'CITY' | 'PASS';
+  state?: number | null;
+  stateTerm?: number | null;
+  parentCityKey?: number | null;
+  kind?: 'CITY' | 'PASS' | 'FIELD';
   cityKey: number;
   name: string;
   level: number;
@@ -60,6 +65,7 @@ export interface InitialNation {
 }
 
 export interface InitialGeneral {
+  movePath?: number[];
   id: number;
   userId: string | null;
   sex?: import('../general/sex').GeneralSex;
@@ -102,12 +108,13 @@ export interface InitialDiplomacy {
 }
 
 export interface WorldInit {
+  fogOfWar?: boolean;
   openingCityProfile?: typeof LEGACY_OPENING_CITY_PROFILE;
   recruitmentLocation?: 'city';
   cityScale?: CityScaleRecord;
   operationalMap?: OperationalMapResource;
   presetRules?: PresetRules;
-  ruleFeatures?: string[];
+
   ext?: WorldExt;
   commandMeta?: WorldState['commandMeta'];
   nationTurns?: WorldState['nationTurns'];
@@ -255,8 +262,29 @@ export function buildInitialWorld(input: {
   });
 
   // 배치만 bootstrap 스트림을 소비한다. DB ID·시각은 규칙 상태에 넣지 않는다.
+  if (operational?.siteClassification === 'd096') {
+    for (const city of cities) {
+      city.state = 0;
+      city.stateTerm = 0;
+      city.parentCityKey = null;
+    }
+    const sourceCounties = operational.sites.filter((site) => site.kind === 'CITY' && site.level === 2);
+    if (sourceCounties.some((site) => site.kind === 'CITY' && site.parentCityKey === undefined)) {
+      const fixed = operationalAnchors(operational).map((anchor) => ({
+        ...cities.find((city) => city.cityKey === anchor.id)!,
+        level: anchor.level,
+      }));
+      assignCountyParents(fixed);
+      for (const city of cities)
+        city.parentCityKey = fixed.find((row) => row.cityKey === city.cityKey)!.parentCityKey ?? null;
+    } else {
+      for (const site of sourceCounties)
+        if (site.kind === 'CITY')
+          cities.find((city) => city.cityKey === site.anchorKey)!.parentCityKey = site.parentCityKey!;
+    }
+  }
   const rng = rngFor(input.seed, 'bootstrap');
-  const allCities = cities.filter((city) => city.kind !== 'PASS').map((city) => city.cityKey);
+  const allCities = cities.filter((city) => city.kind !== 'PASS' && city.kind !== 'FIELD').map((city) => city.cityKey);
   const generals: InitialGeneral[] = scenario.general.map((row, i) => {
     const [
       affinity,
@@ -330,17 +358,8 @@ export function buildInitialWorld(input: {
     });
   }
   return {
-    ...(five || operational || scaled.record
-      ? {
-          ruleFeatures: [
-            ...(scaled.record ? [CITY_SCALE_FEATURE] : []),
-            ...(five ? ['five-stats'] : []),
-            ...(operational ? ['operational-map'] : []),
-          ],
-        }
-      : {}),
-    ...(scaled.record ? { cityScale: scaled.record } : {}),
-    ...(operational ? { operationalMap: operational } : {}),
+    cityScale: scaled.record ?? { cities: [] },
+    ...(operational ? { operationalMap: createMapTerritory(operational, cities) } : {}),
     ...(operational && scenario.openingCityProfile ? { openingCityProfile: scenario.openingCityProfile } : {}),
     ...(scenario.lastNationRecruitmentLockYear === undefined
       ? {}

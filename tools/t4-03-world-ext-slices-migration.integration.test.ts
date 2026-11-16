@@ -526,7 +526,7 @@ it.each(['empty', 'legacy'] as const)(
         { personnelFormat: null },
       ]);
       expect((await client.query('SELECT DISTINCT "replayFormat", "ruleFeatures" FROM "World"')).rows).toEqual([
-        { replayFormat: 1, ruleFeatures: [] },
+        { replayFormat: 1 },
       ]);
       expect((await client.query('SELECT count(*)::int AS count FROM "Treaty"')).rows).toEqual([{ count: 0 }]);
       expect((await client.query('SELECT count(*)::int AS count FROM "AssignmentOffer"')).rows).toEqual([{ count: 0 }]);

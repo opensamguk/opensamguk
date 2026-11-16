@@ -67,7 +67,7 @@ export function readAdminEditor(ctx: Context, input: z.infer<typeof adminEditorI
   return read(ctx, input.worldId, 'editor', input.worldId, async (tx) => {
     const world = await tx.world.findUnique({
       where: { id: input.worldId },
-      select: { replayFormat: true, status: true, ruleFeatures: true },
+      select: { replayFormat: true, status: true },
     });
     if (!world) throw new TRPCError({ code: 'NOT_FOUND', message: '월드를 찾을 수 없습니다.' });
     if (world.replayFormat !== 3 || !['RUNNING', 'PAUSED'].includes(world.status))
@@ -110,7 +110,7 @@ export function readAdminEditor(ctx: Context, input: z.infer<typeof adminEditorI
       });
       return {
         target: input.target,
-        campaign: world.ruleFeatures.includes('campaign-v1'),
+        campaign: true,
         ...result(rows.map(({ userId, ...row }) => ({ ...row, player: userId !== null }))),
       };
     }

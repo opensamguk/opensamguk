@@ -170,6 +170,7 @@ function exportFixture(source: CapsArchive, ended = true) {
   const initial = snapshot.origin.initial;
   const json = (value: unknown): Prisma.JsonValue => JSON.parse(JSON.stringify(value));
   const world: Prisma.WorldGetPayload<Record<string, never>> = {
+    fogOfWar: false,
     runtimeOptions: null,
     officeEffects: null,
     id: 'caps-export',
@@ -215,7 +216,7 @@ function exportFixture(source: CapsArchive, ended = true) {
     treatyFormat: 1,
     personnelFormat: null,
     replayFormat: 1,
-    ruleFeatures: [],
+
     replayOrigin: json(snapshot.origin),
     commandMeta: null,
   };

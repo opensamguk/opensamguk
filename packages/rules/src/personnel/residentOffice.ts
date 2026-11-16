@@ -11,10 +11,7 @@ const officeEffectsBase = z.strictObject({
   tax: z.strictObject({ 3: percent, 4: percent, 11: percent }),
   supplyLoss: z.strictObject({ 5: percent, 6: percent, 7: percent, 8: percent, 9: percent, 10: percent }),
 });
-export const officeEffectsSchema = z.union([
-  officeEffectsBase.extend({ secretary: z.literal(true) }),
-  officeEffectsBase,
-]);
+export const officeEffectsSchema = officeEffectsBase.extend({ secretary: z.literal(true) });
 export const defaultOfficeEffects = officeEffectsSchema.parse(officeEffectsConfig);
 export type OfficeEffects = z.infer<typeof officeEffectsSchema>;
 export const hasCitySecretary = (effects: OfficeEffects | undefined): boolean =>
@@ -50,7 +47,14 @@ export function residentOfficeBonuses(state: WorldView, year: number): OfficeBon
   if (!state.officeEffects) return bonuses;
   for (const general of Object.values(state.generals)) {
     const city = state.cities[general.cityKey];
-    if (!city || city.kind === 'PASS' || general.removedAt !== undefined || general.activeFromYear > year) continue;
+    if (
+      !city ||
+      city.kind === 'PASS' ||
+      city.kind === 'FIELD' ||
+      general.removedAt !== undefined ||
+      general.activeFromYear > year
+    )
+      continue;
     if (!isOfficeResident(general, city.nationId)) continue;
     const effects = bonuses.get(city.cityKey) ?? {};
     for (const target of ['tax', 'supplyLoss'] as const) {

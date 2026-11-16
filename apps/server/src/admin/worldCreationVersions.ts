@@ -24,6 +24,7 @@ export async function getWorldCreationVersions(ctx: Context, input: z.infer<type
         if (input.kind === 'MAP') {
           const map = await tx.gameResource.findFirst({
             where: artifactMapVersion,
+            orderBy: { version: 'desc' },
             select: { name: true, version: true, contentHash: true },
           });
           if (map) return { items: [{ ...map, key: formatResourceKey(map) }], next: null };

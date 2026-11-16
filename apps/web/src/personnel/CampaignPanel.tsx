@@ -33,7 +33,8 @@ function recover(key: string): Pending | null {
       typeof value.requestId === 'string' &&
       ['campaign.relationship', 'campaign.unit'].includes(value.kind) &&
       value.payload &&
-      typeof value.payload === 'object'
+      typeof value.payload === 'object' &&
+      !(value.kind === 'campaign.unit' && value.payload.type !== 'command')
       ? value
       : null;
   } catch {
@@ -267,8 +268,6 @@ function CampaignControls({
   act: (action: Action) => void;
 }) {
   const [relation, setRelation] = useState<keyof typeof relations>('STAFF');
-  const [commander, setCommander] = useState(board.actorId);
-  const [crewType, setCrewType] = useState(board.armyTypes[0]?.id ?? 1100);
   // 장수 이름은 괄호를 뺀다 (D-085).
   const names = new Map(board.people.map((person) => [person.id, displayName(person.name)]));
   const face = (id: number) => (
@@ -421,37 +420,9 @@ function CampaignControls({
       <section>
         <h3>부곡 편성·지휘</h3>
         <p>
-          빈 부곡을 편성하고 기존 모병·징병·훈련·사기·소집해제 예턴을 사용합니다. 병력은 실제 지휘관의
+          모병·징병·도시 배속에서 새 부곡을 만듭니다. 병력이 0이 되면 부곡이 사라집니다. 병력은 실제 지휘관의
           통솔×100까지입니다. 여러 부곡을 합산합니다. 군량은 소유자의 쌀에서만 씁니다.
         </p>
-        <div className={styles.row}>
-          <label>
-            새 부곡 지휘관{' '}
-            <select value={commander} onChange={(event) => setCommander(Number(event.target.value))}>
-              {board.commanders.map((row) => (
-                <option key={row.id} value={row.id}>
-                  {names.get(row.id)} · {row.commanded}/{row.capacity}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            새 부곡 병종{' '}
-            <select value={crewType} onChange={(event) => setCrewType(Number(event.target.value))}>
-              {board.armyTypes.map((type) => (
-                <option key={type.id} value={type.id}>
-                  {type.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            disabled={disabled || !board.commanders.some((row) => row.id === commander)}
-            onClick={() => unit({ type: 'form', commanderId: commander, crewType, revision: board.revision })}
-          >
-            빈 부곡 편성
-          </button>
-        </div>
         {board.units.map((row) => (
           <article className={styles.unit} key={row.id}>
             <h4>
@@ -485,12 +456,6 @@ function CampaignControls({
                 ))}
               </select>
             </label>
-            <button
-              disabled={disabled || row.troops !== 0}
-              onClick={() => unit({ type: 'disband', unitId: row.id, revision: board.revision })}
-            >
-              {row.troops ? '소집해제 후 해산 가능' : '빈 부곡 해산'}
-            </button>
           </article>
         ))}
       </section>
