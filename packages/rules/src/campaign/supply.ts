@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { WorldView, WorldState } from '../model/world';
 import type { OperationalMapResource } from '../world/map/operational';
 import { isStrategicSite } from '../world/map/operational';
+import { supplyTerrain } from '../world/map/territory';
 import type { CampaignUnitState } from './state';
 
 const natural = z.number().int().min(0).max(2_147_483_647);
@@ -18,7 +19,7 @@ const cell = z.strictObject({
 });
 export const supplyLedgerSchema = z.strictObject({
   version: z.literal(1),
-  cellSize: z.literal(16),
+  cellSize: z.union([z.literal(8), z.literal(16)]),
   routes: z.array(
     z.strictObject({
       routeId: z.string().min(1),
@@ -62,15 +63,15 @@ function revision(value: unknown): string {
   return hash.toString(16).padStart(16, '0');
 }
 
-// 기존 지도에는 산·오지 폴리곤이 없다. 없는 지형을 추측하지 않고 평지로 고정한다.
-// 칸 소유는 경제 도시의 최근접 영지이며 PASS·FIELD는 자기 칸만 소유한다.
 export function buildSupplyLedger(map: OperationalMapResource): SupplyLedger {
   const anchors = map.sites.filter((site) => isStrategicSite(map, site));
   const byId = new Map(map.sites.map((site) => [site.id, site]));
   const economic = anchors
     .filter((site) => site.kind === 'CITY' && site.parentCityKey === undefined)
     .sort((a, b) => a.anchorKey - b.anchorKey);
-  const makeCell = (x: number, y: number) => {
+  const terrain = supplyTerrain(map);
+  // The original square ledger is preserved for worlds created without INT-28 geography.
+  const legacyCell = (x: number, y: number) => {
     const px = x * 16,
       py = y * 16;
     const ownSite = anchors.find(
@@ -100,13 +101,39 @@ export function buildSupplyLedger(map: OperationalMapResource): SupplyLedger {
       for (let index = 1; index < points.length; index++) {
         const a = points[index - 1]!,
           b = points[index]!;
+        if (terrain) {
+          const start = terrain.tileAt(a),
+            end = terrain.tileAt(b);
+          const cuts = [0, 1];
+          for (const key of ['u', 'v'] as const) {
+            const lo = Math.min(start[key], end[key]),
+              hi = Math.max(start[key], end[key]);
+            for (let boundary = Math.floor(lo) + 1; boundary < hi; boundary++)
+              cuts.push((boundary - start[key]) / (end[key] - start[key]));
+          }
+          cuts.sort((a, b) => a - b);
+          const add = (t: number) => {
+            const u = Math.floor(start.u + (end.u - start.u) * t);
+            const v = Math.floor(start.v + (end.v - start.v) * t);
+            const next = terrain.cellAt(u, v, route.mode === 'SEA', route.mode === 'SEA' || route.mode === 'RIVER');
+            if (cells.at(-1)?.cellId !== next.cellId) cells.push(next);
+          };
+          add(0);
+          for (let i = 1; i < cuts.length; i++) {
+            const before = cuts[i - 1]!,
+              after = cuts[i]!;
+            if (after - before > 1e-10) add((before + after) / 2);
+          }
+          add(1);
+          continue;
+        }
         const x0 = Math.round(a.x / 16),
           y0 = Math.round(a.y / 16);
         const x1 = Math.round(b.x / 16),
           y1 = Math.round(b.y / 16);
         const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1);
         for (let step = 0; step <= steps; step++) {
-          const next = makeCell(
+          const next = legacyCell(
             Math.round(x0 + ((x1 - x0) * step) / steps),
             Math.round(y0 + ((y1 - y0) * step) / steps),
           );
@@ -150,7 +177,7 @@ export function buildSupplyLedger(map: OperationalMapResource): SupplyLedger {
       }
     }
   }
-  return supplyLedgerSchema.parse({ version: 1, cellSize: 16, routes });
+  return supplyLedgerSchema.parse({ version: 1, cellSize: terrain ? 8 : 16, routes });
 }
 
 export function verifySupplyLedger(value: unknown, map: OperationalMapResource | undefined, enabled: boolean): void {
@@ -352,10 +379,12 @@ export function applyMarchSupply(
   );
   const capital = friendly.find((city) => city.cityKey === state.nations[owner.nationId!]?.capitalCityKey);
   const distance = (city: { x: number; y: number }) =>
-    Math.max(
-      Math.abs(Math.round(city.x / 16) - Math.round(preview.last.x / 16)),
-      Math.abs(Math.round(city.y / 16) - Math.round(preview.last.y / 16)),
-    );
+    state.campaign!.supplyLedger?.cellSize === 8
+      ? (city.x - preview.last.x) ** 2 + (city.y - preview.last.y) ** 2
+      : Math.max(
+          Math.abs(Math.round(city.x / 16) - Math.round(preview.last.x / 16)),
+          Math.abs(Math.round(city.y / 16) - Math.round(preview.last.y / 16)),
+        );
   const nearest = friendly.sort((a, b) => distance(a) - distance(b) || a.cityKey - b.cityKey)[0];
   const destination = origin ?? capital ?? nearest;
   const returning = new Set([unit.ownerId, ...units.map((row) => row.commanderId)]);

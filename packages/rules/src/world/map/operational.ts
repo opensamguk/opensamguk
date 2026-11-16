@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { territoryGridSchema } from '@opensamguk/shared';
 
 const id = z.string().regex(/^[a-z][a-z0-9:_-]{0,63}$/);
 const name = z.string().trim().min(1).max(60);
@@ -78,6 +79,7 @@ export const operationalMapSchema = z
     }),
     defaults: z.strictObject({ trust: z.number().min(0).max(100), supplyState: z.union([z.literal(0), z.literal(1)]) }),
     sites: z.array(site).min(1).max(500),
+    territory: territoryGridSchema.optional(),
     routes: z.array(route).max(2000),
   })
   .superRefine((map, context) => {
@@ -144,6 +146,13 @@ export const operationalMapSchema = z
     });
     if (!map.sites.some((row) => row.kind === 'CITY' && (map.siteClassification !== 'd096' || row.level >= 4)))
       fail(['sites'], '경제 도시가 하나 이상 필요합니다.');
+    const territoryCities = new Set(
+      map.sites.flatMap((row) =>
+        row.kind === 'CITY' && isStrategicSite(map, row) && row.parentCityKey === undefined ? [row.anchorKey] : [],
+      ),
+    );
+    if (map.territory?.owner.some((key) => key !== -1 && !territoryCities.has(key)))
+      fail(['territory', 'owner'], '영지 칸의 독립 거점을 확인하세요.');
     const routes = new Set<string>();
     map.routes.forEach((edge, index) => {
       const path = ['routes', index];

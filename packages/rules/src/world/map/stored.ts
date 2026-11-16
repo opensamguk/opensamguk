@@ -79,6 +79,7 @@ export function operationalMapDisplay(map: OperationalMapResource) {
     id: map.id,
     canvas: map.canvas,
     basemap: map.basemap,
+    ...(map.territory ? { territory: map.territory } : {}),
     sites: map.sites.map((site) => ({
       id: site.id,
       name: site.name,

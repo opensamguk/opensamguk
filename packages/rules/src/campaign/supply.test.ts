@@ -176,6 +176,7 @@ describe('AC-INT-28 R3 supply and D-098', () => {
   });
   it('replay initializes the same immutable ledger and JSON roundtrip preserves hashes', () => {
     const initial = buildInitialWorld(operationalInput());
+    for (const general of initial.generals) general.sex = 'UNKNOWN';
     const data = { policy: { version: 1, turnTermMinutes: 60 } };
     const replay = initialReplayState(initial, data);
     expect(replay.state.campaign!.supplyLedger).toEqual(buildSupplyLedger(initial.operationalMap!));

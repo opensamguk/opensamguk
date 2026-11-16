@@ -16,6 +16,7 @@ import { legacyCheCrewRegionsMatch, unitSetRegionSchemeMatches } from './crewReg
 import type { WorldState, WorldExt } from '../model/world';
 import { operationalMapSchema, type OperationalMapResource } from './map/operational';
 import { operationalAnchors } from './map/anchors';
+import { createMapTerritory } from './map/territory';
 import { validateMap } from './validate/map';
 import { resolveCityScale, type CityScaleRecord, type ScaleAnchor } from './map/cityScale';
 import { appliesOperationalOpening, LEGACY_OPENING_CITY_PROFILE, legacyOpeningCityValues } from './openingCityProfile';
@@ -358,7 +359,7 @@ export function buildInitialWorld(input: {
   }
   return {
     cityScale: scaled.record ?? { cities: [] },
-    ...(operational ? { operationalMap: operational } : {}),
+    ...(operational ? { operationalMap: createMapTerritory(operational, cities) } : {}),
     ...(operational && scenario.openingCityProfile ? { openingCityProfile: scenario.openingCityProfile } : {}),
     ...(scenario.lastNationRecruitmentLockYear === undefined
       ? {}

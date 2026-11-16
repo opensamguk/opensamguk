@@ -14,19 +14,26 @@ export function tacticalMap(
   if (route.to !== target) source.reverse();
   const distinct = source.filter((c, i) => source.findIndex((v) => v.cellId === c.cellId) === i).slice(-64);
   if (distinct.length < 3) throw Error('전장 배치 공간이 부족합니다.');
-  const grid = (c: { x: number; y: number }) => ({ x: Math.round(c.x / 16), y: Math.round(c.y / 16) });
+  const ledger = world.campaign!.supplyLedger!;
+  type RouteCell = (typeof distinct)[number];
+  const grid = (c: Pick<RouteCell, 'cellId' | 'x' | 'y'>) => {
+    if (ledger.cellSize === 16) return { x: Math.round(c.x / 16), y: Math.round(c.y / 16) };
+    const [, u, v] = c.cellId.split(':');
+    return { x: Number(u), y: Number(v) };
+  };
   const minX = Math.min(...distinct.map((c) => grid(c).x)),
     minY = Math.min(...distinct.map((c) => grid(c).y));
   const width = Math.max(...distinct.map((c) => grid(c).x)) - minX + 1,
     height = Math.max(...distinct.map((c) => grid(c).y)) - minY + 1;
   if (width > 64 || height > 64) throw Error('전장 범위가 64칸을 넘습니다.');
-  const local = (c: { x: number; y: number }) => ({ x: grid(c).x - minX, y: grid(c).y - minY });
+  const local = (c: Parameters<typeof grid>[0]) => {
+    const point = grid(c);
+    return { x: point.x - minX, y: point.y - minY };
+  };
   const terrain: BattleTerrain[] = Array.from({ length: width * height }, () => 'plain');
   const cells = Array.from({ length: width * height }, () => ({ sourceTileId: '', spCost: 1, defendSpCost: 1 }));
   const defendingNation = world.cities[target]!.nationId;
-  const all = world.campaign!.supplyLedger!.routes.flatMap((r) =>
-    r.segments.flatMap((s) => s.cells.map((c) => ({ ...c, mode: s.mode }))),
-  );
+  const all = ledger.routes.flatMap((r) => r.segments.flatMap((s) => s.cells.map((c) => ({ ...c, mode: s.mode }))));
   for (const c of [...all, ...source]) {
     const p = local(c);
     if (p.x < 0 || p.y < 0 || p.x >= width || p.y >= height) continue;
@@ -52,7 +59,7 @@ export function tacticalMap(
     cells[index] = { sourceTileId: c.cellId, spCost: cost(attackingNation), defendSpCost: cost(defendingNation) };
   }
   const edges: Array<[number, number]> = [];
-  for (const segment of world.campaign!.supplyLedger!.routes.flatMap((r) => r.segments))
+  for (const segment of ledger.routes.flatMap((r) => r.segments))
     for (let i = 1; i < segment.cells.length; i++) {
       const a = local(segment.cells[i - 1]!),
         b = local(segment.cells[i]!);

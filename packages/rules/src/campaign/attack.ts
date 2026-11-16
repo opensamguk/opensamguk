@@ -51,6 +51,13 @@ export function campaignDefenders(view: WorldView, tick: number, cityKey: number
     })
     .sort((a, b) => b.troops - a.troops || a.id - b.id);
 }
+function unguardedField(view: WorldView, cityKey: number, defenders: readonly unknown[]) {
+  return (
+    view.cities[cityKey]!.kind === 'FIELD' &&
+    defenders.length === 0 &&
+    !view.cityResources?.cities[String(cityKey)]?.garrison.some((unit) => unit.troops > 0)
+  );
+}
 function check(view: WorldView, actor: Actor, raw: unknown) {
   const parsed = argsSchema.safeParse(raw);
   if (!parsed.success) return fail('BAD_ARGS', '출병 목적지를 확인하세요.');
@@ -79,7 +86,8 @@ function check(view: WorldView, actor: Actor, raw: unknown) {
   if (!force.length) return fail('NO_CREW', '같은 거점에 집결한 부곡 병력이나 사기가 부족합니다.');
   if (force.some((unit) => unit.supply) && force.some((unit) => !unit.supply))
     return fail('BAD_STATE', '귀환을 마친 뒤 새 부곡과 함께 출병하세요.');
-  const all = [...force, ...campaignDefenders(view, actor.tick ?? 0, target.cityKey)];
+  const defenders = campaignDefenders(view, actor.tick ?? 0, target.cityKey);
+  const all = [...force, ...defenders];
   readCityResourcesState(
     view.cityResources,
     view,
@@ -92,16 +100,16 @@ function check(view: WorldView, actor: Actor, raw: unknown) {
     return fail('NO_UNIT_SET', '전투 병종이 없습니다.');
   if (view.campaign?.supplyLedger) {
     try {
-      const preview = cloneWorld(view);
-      openTacticalBattle(
-        preview,
-        actor.tick ?? 0,
-        force as CampaignUnitState[],
-        campaignDefenders(view, actor.tick ?? 0, target.cityKey) as CampaignUnitState[],
-        target.cityKey,
-        actor.unitSet!,
-        parsed.data,
-      );
+      if (!unguardedField(view, target.cityKey, defenders))
+        openTacticalBattle(
+          cloneWorld(view),
+          actor.tick ?? 0,
+          force,
+          defenders,
+          target.cityKey,
+          actor.unitSet!,
+          parsed.data,
+        );
     } catch {
       return fail('BAD_TARGET', '전장 지도·배치·병종을 사용할 수 없습니다.');
     }
@@ -153,14 +161,7 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
   }
   // 출병 시작 때의 수비 순서를 고정한다. 사람의 예약이나 다른 소유자의 부곡을 공격 편성에 넣지 않는다.
   const defendingIds = campaignDefenders(state, actor.tick ?? 0, cityKey).map((unit) => unit.id);
-  if (
-    state.campaign!.supplyLedger &&
-    !(
-      state.cities[cityKey]!.kind === 'FIELD' &&
-      !defendingIds.length &&
-      !state.cityResources?.cities[String(cityKey)]?.garrison.some((u) => u.troops > 0)
-    )
-  ) {
+  if (state.campaign!.supplyLedger && !unguardedField(state, cityKey, defendingIds)) {
     const battle = openTacticalBattle(
       state,
       actor.tick ?? 0,
