@@ -143,9 +143,7 @@ async function withDatabase(
 }
 
 async function seed(client: PgClient) {
-  const archive = JSON.parse(
-    await readFile(new URL('../apps/engine/test/fixtures/replay-v1-b8f5074.json', import.meta.url), 'utf8'),
-  ) as {
+  const archive = JSON.parse(await readFile(new URL('fixtures/migration-replay-v1.json', import.meta.url), 'utf8')) as {
     origin: { initial: WorldInit; initialStateHash: string };
   };
   const initial = archive.origin.initial;

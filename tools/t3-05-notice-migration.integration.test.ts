@@ -6,7 +6,7 @@ import { afterAll, beforeEach, expect, it as test } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import { testDatabaseUrl } from './test-database';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { insertHistoricalWorld } from './historical-world-fixture';
 
 type Pg = {
   connect(): Promise<void>;
@@ -122,12 +122,8 @@ it('T3-05 공지 migration은 두 정식 월드·기존 계정과 모든 기존 
     expect(initial.nations).toHaveLength(21);
     expect(initial.generals).toHaveLength(491);
     db = createDb(target.href);
-    await saveInitialWorld(db, initial, { name: '기존 정식 월드 하나', turnTermMinutes: 60, endYear: 201 });
-    await saveInitialWorld(
-      db,
-      { ...initial, seed: 't305-preservation-two' },
-      { name: '기존 정식 월드 둘', turnTermMinutes: 60, endYear: 201 },
-    );
+    await insertHistoricalWorld(client, initial, 'historical-world-one');
+    await insertHistoricalWorld(client, { ...initial, seed: 't305-preservation-two' }, 'historical-world-two');
     expect(await db.general.count()).toBe(982);
     const worldId = (await db.world.findFirstOrThrow({ select: { id: true } })).id;
     const noticeIds = [randomUUID(), randomUUID()];

@@ -22,7 +22,11 @@ import { prepareInitialWorld, savePreparedInitialWorld } from './world/persisten
 import { loadReplayState, persistMonthly } from './monthly';
 
 const url = process.env.TEST_DATABASE_URL;
-if (!url || new URL(url).host !== '127.0.0.1:5561' || new URL(url).pathname !== '/opensamguk_int30_test')
+if (
+  !url ||
+  new URL(url).host !== '127.0.0.1:5561' ||
+  !['/opensamguk_int30_test', '/opensamguk_ci_green_engine_test'].includes(new URL(url).pathname)
+)
   throw new Error('INT-30 전용 시험 DB가 필요합니다.');
 const db = createDb(url);
 afterAll(() => db.$disconnect());

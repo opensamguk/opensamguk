@@ -291,6 +291,7 @@ for (const index of [0, 1])
         {
           worldId,
           name: '조회사람',
+          sex: 'MALE' as const,
           portraitId: null,
           leadership: 55,
           strength: 55,
@@ -842,6 +843,7 @@ it('PREOPEN 정식191년 월드를 실제 감독 자식이 발견해 시작하�
             {
               worldId,
               name: '감독사람',
+              sex: 'MALE' as const,
               portraitId: null,
               leadership: 55,
               strength: 55,

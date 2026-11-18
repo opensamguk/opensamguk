@@ -136,7 +136,7 @@ export function commandInitial(): WorldInit {
       special: null,
       gold: 100000,
       rice: 100000,
-      crew: [10000, 20, 10, 100][id - 1]!,
+      crew: 0,
       crewType: 1100,
       train: 100,
       atmos: 100,
@@ -202,4 +202,35 @@ export function commandInitial(): WorldInit {
   return initial;
 }
 
-export const commandWorld = () => initialReplayState(commandInitial()).state;
+export function commandWorld() {
+  const world = initialReplayState(commandInitial()).state;
+  world.campaign!.units = [10000, 20, 10].map((troops, index) => ({
+    id: index + 1,
+    ownerId: index + 1,
+    commanderId: index + 1,
+    troops,
+    crewType: 1100,
+    train: 100,
+    atmos: 100,
+  }));
+  world.campaign!.nextUnitId = 4;
+  world.campaign!.supplyLedger!.routes = world.campaign!.supplyLedger!.routes.map((route) => ({
+    ...route,
+    segments: [
+      {
+        routeId: route.routeId,
+        mode: 'LAND',
+        cells: Array.from({ length: 12 }, (_, i) => ({
+          cellId: `cell:${route.routeId}:${i}`,
+          x: i * 16,
+          y: 0,
+          pathCellIndex: i,
+          mountain: false,
+          remote: false,
+          ownerAnchorKey: null,
+        })),
+      },
+    ],
+  }));
+  return world;
+}

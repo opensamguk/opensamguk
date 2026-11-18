@@ -44,7 +44,7 @@
   },
   "seeds": {
     "1": {
-      "initialStateHash": "cf70c04f6b171c040027f44c7e5df2ab817df94428352257d8aa5a4892ecab76",
+      "initialStateHash": "7a339a0f48a5159ae6bf6ec59cfb3381548ed9a3b788522e1d1de1b3b386198e",
       "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
       "cities": 94,
       "nations": 21,
@@ -54,7 +54,7 @@
       "inputResourceCount": 5
     },
     "t2-02-legacy-baseline": {
-      "initialStateHash": "2952fcf863e11af5879fd8af160d9a729b9032ce443d838eb633d8d901189e16",
+      "initialStateHash": "a5b20f48c417eb6008d97c18cdab4c1ec6ad954cf4225a68b7ebd23e1d7b9538",
       "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
       "cities": 94,
       "nations": 21,
@@ -64,7 +64,7 @@
       "inputResourceCount": 5
     },
     "loader": {
-      "initialStateHash": "0aae9f41538290f6cc753cbc40fb3f5f69f71a881df0284dcfa899b000122c15",
+      "initialStateHash": "937c1284c40523b32b7e5b8c7990a8085a3ee3ec4c8e943ade5fb1608971277b",
       "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
       "cities": 94,
       "nations": 21,
@@ -74,7 +74,7 @@
       "inputResourceCount": 5
     },
     "test-world": {
-      "initialStateHash": "b3d61c6ba1d39b08e46fa648728db9d1b4a32f704cf4414045955d0c7fe2adbf",
+      "initialStateHash": "b0992b5388dd9386ca0194331fea3a5ca2f316e305e2a7b800aa590bff9b50ce",
       "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
       "cities": 94,
       "nations": 21,
@@ -84,7 +84,7 @@
       "inputResourceCount": 4
     },
     "command-fixture": {
-      "initialStateHash": "8d32dae06c41399450a35227d71be93ead9bdd0b5f89319c953aeb33aaed0670",
+      "initialStateHash": "be7eb508214e1963e853482fca6a727f21c53c698b1e4d9a1f8f329589d71c00",
       "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
       "cities": 94,
       "nations": 21,
@@ -94,7 +94,7 @@
       "inputResourceCount": 4
     },
     "portraits": {
-      "initialStateHash": "eb9975803403db1756d4a2964d0fe1a7a816306ed625aa26239ba683764d53f6",
+      "initialStateHash": "9484bc810a5f0bdc3cda789e64aa798185baa49046773cb1b1d1a9658414e85d",
       "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
       "cities": 94,
       "nations": 21,
@@ -104,7 +104,7 @@
       "inputResourceCount": 5
     },
     "T1-12-visibility": {
-      "initialStateHash": "181a8442596788a3df22675a6f16e8574cad14f98d3c2ab51041c6437152e24b",
+      "initialStateHash": "d2e15a73f3b59c820fde40a54ab5c57946481bfb19e9642d4e07ef73d2f68256",
       "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
       "cities": 94,
       "nations": 21,
@@ -114,7 +114,7 @@
       "inputResourceCount": 4
     },
     "memory-replay": {
-      "initialStateHash": "0850f0cab85dbd4eb991dbd8bc8142e5062b46d19bb73add7114296ca8fcfad0",
+      "initialStateHash": "df3eabbc221ceb6eba9b455a1b13bf35e29533bf66f3bf147f3903d398b24f9a",
       "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
       "cities": 94,
       "nations": 21,
@@ -124,7 +124,7 @@
       "inputResourceCount": 5
     },
     "engine-test": {
-      "initialStateHash": "0d054c7391de9b49206805104517305ce9a945eb7d087ef3f489ed0f4c71c669",
+      "initialStateHash": "ddaca352b813f690206edd5273e76cc8c79043be115d3b55f9538692548293d9",
       "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
       "cities": 94,
       "nations": 21,
@@ -134,7 +134,7 @@
       "inputResourceCount": 5
     },
     "clock": {
-      "initialStateHash": "4938a7c3dc817bfc06a527b43f3b84cf2a874c1c85ea6240dfb9af4c9e14d1db",
+      "initialStateHash": "243ce038253c38547dd35990a824e9bf31cc16de3dc856489d5c792ce6d0638e",
       "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
       "cities": 94,
       "nations": 21,
@@ -144,7 +144,7 @@
       "inputResourceCount": 5
     },
     "e2e-ranking": {
-      "initialStateHash": "475efe32f296888f396dbea23da2dbdefb091f28c081ffab634705d36bfa2cdd",
+      "initialStateHash": "bef3db7f1c6b0b8f731d54a81393139a057daae9ca2e0d0b99ce0809a2292272",
       "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
       "cities": 94,
       "nations": 21,
@@ -154,7 +154,7 @@
       "inputResourceCount": 5
     },
     "e2e-ranking-fresh": {
-      "initialStateHash": "944781710e34de9f15394d9813516f83123c645d2c1851a6bcb8aa148d915c51",
+      "initialStateHash": "14e151aeac6d0b3728b077a7ee7ab432a6b91e9e596685dde31fdc6380300eb4",
       "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
       "cities": 94,
       "nations": 21,
@@ -164,7 +164,7 @@
       "inputResourceCount": 5
     },
     "t4-76-che": {
-      "initialStateHash": "d43899d6a0dd87758b405f9eeeff09e2e8b11db3e906ff6174c9bec2fe1d9f6b",
+      "initialStateHash": "3d747294e0e31caef65875fa5e98d06b712081ae2bcc5ff4039092b8b4da9ba5",
       "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
       "cities": 94,
       "nations": 21,

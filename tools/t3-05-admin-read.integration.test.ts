@@ -425,6 +425,7 @@ for (const index of [0, 1])
             intel: 55,
             politics: 55,
             charm: 55,
+            sex: 'MALE' as const,
             portraitId: null,
           },
         }),
@@ -585,8 +586,16 @@ it('목록 경계 전용51개 참가 행도 최대50명과 정확한 전체 수�
     `INSERT INTO "City" SELECT (jsonb_populate_record(NULL::"City",to_jsonb(c)||jsonb_build_object('worldId',n.id,'nationId',NULL))).* FROM "City" c CROSS JOIN unnest($1::text[]) n(id) WHERE c."worldId"=$2 AND c."cityKey"=$3`,
     [ids, formalWorlds[0], human.cityKey],
   );
+  const result =
+    await client.query(`SELECT string_agg(quote_ident(column_name),',' ORDER BY ordinal_position) AS columns
+    FROM information_schema.columns WHERE table_schema='public' AND table_name='General' AND is_generated='NEVER'`);
+  const columns = result.rows[0]?.columns;
+  if (typeof columns !== 'string') throw Error('참가 목록 고정물의 장수 열을 확인하세요.');
   await client.query(
-    `INSERT INTO "General" SELECT (jsonb_populate_record(NULL::"General",to_jsonb(g)||jsonb_build_object('worldId',n.id,'userId',$4::text,'nationId',NULL))).* FROM "General" g CROSS JOIN unnest($1::text[]) n(id) WHERE g."worldId"=$2 AND g.id=$3`,
+    `INSERT INTO "General" (${columns}) SELECT ${columns} FROM (
+      SELECT (jsonb_populate_record(NULL::"General",to_jsonb(g)||jsonb_build_object('worldId',n.id,'userId',$4::text,'nationId',NULL))).*
+      FROM "General" g CROSS JOIN unnest($1::text[]) n(id) WHERE g."worldId"=$2 AND g.id=$3
+    ) copied`,
     [ids, formalWorlds[0], human.id, victim.id],
   );
   const before = await gameSnapshot();

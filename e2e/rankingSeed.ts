@@ -41,7 +41,13 @@ async function settled(emails: string[]) {
   // 시나리오의 공헌·경험은 모두 0이라 기준마다 순서가 달라지도록 지력·통솔에서 값을 준다.
   const ids = initial.generals.map((g) => g.id).sort((a, b) => a - b);
   const [firstId, lastId] = [ids[0]!, ids.at(-1)!];
-  const appearing = new Set([...ids.slice(0, 129), lastId]);
+  // 숨긴 군주가 있으면 가문 월간 처리가 다른 NPC를 군주로 세워 기존 군주와 중복된다.
+  const appearing = new Set(initial.generals.filter((g) => g.officerLevel === 12).map((g) => g.id));
+  appearing.add(lastId);
+  for (const id of ids) {
+    if (appearing.size >= 130) break;
+    appearing.add(id);
+  }
   initial.generals = initial.generals.map((g) => ({
     ...g,
     activeFromYear: appearing.has(g.id) ? initial.startYear : initial.startYear + 50,
@@ -62,11 +68,20 @@ async function settled(emails: string[]) {
     await loop.advanceTo(TICKS_PER_MONTH);
     // 정산 뒤에 생긴 장수. 장수 생성 API가 넣는 입력과 같은 모양을 넣고 엔진이 처리한다.
     const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
-    const { total } = statRulesSchema.parse({ stat: world.statRules }).stat;
-    const third = Math.floor(total / 3);
+    const { total, count = 3 } = statRulesSchema.parse({ stat: world.statRules }).stat;
+    const share = Math.floor(total / count);
     const checked = validateGeneralCreation(
-      { name: '새장수', leadership: total - 2 * third, strength: third, intel: third, portraitId: null },
+      {
+        name: '새장수',
+        leadership: total - (count - 1) * share,
+        strength: share,
+        intel: share,
+        ...(count === 5 ? { politics: share, charm: share } : {}),
+        sex: 'MALE',
+        portraitId: null,
+      },
       world.statRules,
+      true,
     );
     if (!checked.ok) throw new Error(checked.message);
     const event = await db.inputEvent.create({

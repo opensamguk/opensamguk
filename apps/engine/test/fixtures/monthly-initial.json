@@ -1,5 +1,5 @@
 {
-  "$comment": "AC-INT-28 / D-104: 전체 제공 규칙이 실행되는 월간·재생 기준 고정물.",
+  "$comment": "Source: core2026 df6c926 / resources/map/map_che.json, resources/scenario/scenario_1030.json, resources/scenario/default.json, resources/unitset/unitset_basic.json; MIT (c) 2025 devsam. See resources/NOTICE.md. AC-INT-28 / D-104: 전체 제공 규칙의 도시 규모·5능력치·부곡 상태로 월간·재생 기준을 생성한다.",
   "initial": {
     "seed": "monthly-golden",
     "scenarioKey": "1030",

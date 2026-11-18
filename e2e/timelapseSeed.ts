@@ -281,9 +281,13 @@ export async function dateOf(world: PreparedWorld, tick: number): Promise<string
   return `${year}년 ${month}월`;
 }
 
-async function borderWorld() {
+export async function borderWorld() {
   const { warFixture } = await import('../apps/engine/test/warFixture');
   const initial = await warFixture();
+  // 재구성한 명단은 역사 1030 성별 원장의 대상이 아니다.
+  initial.scenarioKey = 'e2e-timelapse';
+  initial.cityScale = { cities: [] };
+  delete initial.nationTurns;
   // 조기 통일을 막는 경계 도시 (nationArchive.integration.test.ts:33-40과 같음).
   initial.cities.push({
     ...initial.cities[0]!,
@@ -348,7 +352,7 @@ export async function createLegendWorld(db: PrismaClient): Promise<PreparedWorld
   return { id: worldId, name, startYear: initial.startYear, ticks: [tick] };
 }
 
-async function prepareWorlds(db: PrismaClient): Promise<PreparedWorlds> {
+export async function prepareWorlds(db: PrismaClient): Promise<PreparedWorlds> {
   const [{ saveFixtureWorld }, { controlClock }, lease, { TurnLoop }, rules, dbModule] = await Promise.all([
     import('./worldFixture'),
     import('../apps/engine/src/world/clock'),
@@ -415,9 +419,9 @@ async function prepareWorlds(db: PrismaClient): Promise<PreparedWorlds> {
   initial.generals[0]!.nextTurnTick = 10_100;
   const userPrefix = `t4-36-${tag}-g`;
   for (const general of initial.generals) {
-    general.userId = `${userPrefix}${general.id}`;
+    general.userId = randomUUID();
     await db.user.create({
-      data: { id: general.userId, email: `${general.userId}@example.test`, passwordHash: 'fixture-only' },
+      data: { id: general.userId, email: `${userPrefix}${general.id}@example.test`, passwordHash: 'fixture-only' },
     });
   }
   const p = await save('P', initial);

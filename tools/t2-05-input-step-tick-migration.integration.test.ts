@@ -177,10 +177,10 @@ async function verifyValues(client: PgClient, db: ReturnType<typeof createDb>) {
   }
 
   // 상태·sequence·result·tick과 World 변경이 같은 트랜잭션에서 함께 되돌아간다.
-  const world = await db.world.findUniqueOrThrow({ where: { id: 'tick-world' } });
+  const world = await client.query('SELECT id,"actionSequence" FROM "World" WHERE id=$1', ['tick-world']);
   await expect(
     db.$transaction(async (tx) => {
-      await tx.world.update({ where: { id: world.id }, data: { actionSequence: 50 } });
+      await tx.$executeRaw`UPDATE "World" SET "actionSequence"=50 WHERE id='tick-world'`;
       const updated = await tx.inputEvent.update({
         where: { id: pending.id },
         data: { status: 'APPLIED', sequence: 50, result: { general: 'rollback' }, stepTick: 0 },
@@ -190,7 +190,7 @@ async function verifyValues(client: PgClient, db: ReturnType<typeof createDb>) {
     }),
   ).rejects.toThrow('입력 tick 롤백 시험');
   expect(await db.inputEvent.findUniqueOrThrow({ where: { id: pending.id } })).toEqual(pending);
-  expect(await db.world.findUniqueOrThrow({ where: { id: world.id } })).toEqual(world);
+  expect(await client.query('SELECT id,"actionSequence" FROM "World" WHERE id=$1', ['tick-world'])).toEqual(world);
 }
 
 it('T2-05 N4 입력 tick migration은 기존 행·null·0을 보존하고 CHECK와 롤백을 지킨다', async () => {
@@ -244,7 +244,10 @@ it('T2-05 N4 입력 tick migration은 기존 행·null·0을 보존하고 CHECK�
     console.info('T2-05 입력 tick DB 생성', JSON.stringify({ name, createdOid }));
     expect(createdOid).not.toBeNull();
     await client.connect();
-    const directories = (await readdir(migrations)).filter((directory) => /^\d{14}_/.test(directory)).sort();
+    // 이행 시 기존 월드를 비우도록 정한 always-on 전환 직전까지만 옛 행을 유지한다.
+    const directories = (await readdir(migrations))
+      .filter((directory) => /^\d{14}_/.test(directory) && directory < '20261223000000_always_on_rules')
+      .sort();
     expect(directories.slice(0, required21.length)).toEqual(required21);
     expect(directories[required21.length]).toBe(marker);
     async function apply(directory: string) {

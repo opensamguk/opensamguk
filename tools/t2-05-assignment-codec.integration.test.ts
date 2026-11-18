@@ -122,14 +122,14 @@ async function withDatabase(caseId: CaseId, run: (context: Context) => Promise<v
     const sql = await openSql();
     const migrations = new URL('../packages/db/prisma/migrations/', import.meta.url);
     const directories = (await readdir(migrations, { withFileTypes: true }))
-      .filter((entry) => entry.isDirectory())
+      .filter((entry) => entry.isDirectory() && entry.name < '20261223000000_always_on_rules')
       .map((entry) => entry.name)
       .sort();
     expect(directories.slice(0, requiredMigrations.length)).toEqual([...requiredMigrations]);
     for (const directory of directories)
       await sql.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));
     const archive = JSON.parse(
-      await readFile(new URL('../apps/engine/test/fixtures/replay-v1-b8f5074.json', import.meta.url), 'utf8'),
+      await readFile(new URL('fixtures/migration-replay-v1.json', import.meta.url), 'utf8'),
     ) as {
       origin: { initial: WorldInit; initialStateHash: string };
     };
@@ -331,11 +331,17 @@ it('G2 잘못된 교체 순서는 롤백되고 a·b·c 순서는 성공한다', 
     await seedOffer(db);
     await expect(
       action(db, async (tx) => {
-        await tx.world.update({ where: { id: worldId }, data: { actionSequence: 1 } });
+        await tx.world.update({
+          where: { id: worldId },
+          data: { actionSequence: 1 },
+          select: { actionSequence: true },
+        });
         await tx.assignmentOffer.create({ data: { worldId, targetGeneralId: 7, ...next, status: 'PENDING' } });
       }),
     ).rejects.toMatchObject({ code: 'P2002' });
-    expect((await db.world.findUniqueOrThrow({ where: { id: worldId } })).actionSequence).toBe(0);
+    expect(
+      (await db.world.findUniqueOrThrow({ where: { id: worldId }, select: { actionSequence: true } })).actionSequence,
+    ).toBe(0);
     expect(await loadAssignmentState(db, worldId)).toEqual(snapshot());
     const calls: string[] = [];
     await action(db, async (tx) => {
@@ -422,7 +428,11 @@ it('G4 종료 행은 그대로 두고 외부 결함 주입의 실제 count 0을 
     await expect(
       action(db, async (tx) => {
         const before = await loadAssignmentState(tx, worldId);
-        await tx.world.update({ where: { id: worldId }, data: { actionSequence: 1 } });
+        await tx.world.update({
+          where: { id: worldId },
+          data: { actionSequence: 1 },
+          select: { actionSequence: true },
+        });
         const traced = observe(tx, calls, async () => {
           expect(injected).toBe(false);
           injected = true;
@@ -442,7 +452,9 @@ it('G4 종료 행은 그대로 두고 외부 결함 주입의 실제 count 0을 
       }),
     ).rejects.toThrow('한 행');
     expect(calls).toEqual([`close:${faultOffer.id}:0`]);
-    expect((await db.world.findUniqueOrThrow({ where: { id: worldId } })).actionSequence).toBe(0);
+    expect(
+      (await db.world.findUniqueOrThrow({ where: { id: worldId }, select: { actionSequence: true } })).actionSequence,
+    ).toBe(0);
     expect(
       await db.assignmentOffer.findUniqueOrThrow({ where: { worldId_id: { worldId, id: faultOffer.id } } }),
     ).toMatchObject({ status: 'REJECTED', resolvedBy: 'RESPONSE', resolvedTick: 220 });
@@ -632,7 +644,11 @@ it('G8 종료된 id와 새 제안의 기본키 충돌을 전파한다', async ()
     const beforeRows = await db.assignmentOffer.findMany({ where: { worldId } });
     await expect(
       action(db, async (tx) => {
-        await tx.world.update({ where: { id: worldId }, data: { actionSequence: 1 } });
+        await tx.world.update({
+          where: { id: worldId },
+          data: { actionSequence: 1 },
+          select: { actionSequence: true },
+        });
         await persistAssignmentState(tx, worldId, {
           before: empty,
           beforeFinish: snapshot(),
@@ -642,7 +658,9 @@ it('G8 종료된 id와 새 제안의 기본키 충돌을 전파한다', async ()
       }),
     ).rejects.toMatchObject({ code: 'P2002' });
     expect(await db.assignmentOffer.findMany({ where: { worldId } })).toEqual(beforeRows);
-    expect((await db.world.findUniqueOrThrow({ where: { id: worldId } })).actionSequence).toBe(0);
+    expect(
+      (await db.world.findUniqueOrThrow({ where: { id: worldId }, select: { actionSequence: true } })).actionSequence,
+    ).toBe(0);
   }));
 
 it('G9 원본 증인을 잃으면 실제 DB 쓰기가 0이다', async () =>

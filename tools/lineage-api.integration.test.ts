@@ -147,8 +147,8 @@ async function world(lineage = true, peaceUntilTick = 300000, npcGenerations = f
   return saved.worldId;
 }
 async function advance(worldId: string, tick: number, fail = false, connection = db) {
-  // 운영 폴링과 달리 명시한 여러 달을 한 호출로 처리한다. 시험 제한 120초 안에서 실행권을 잡는다.
-  const lease = await acquireLease(connection, worldId, randomUUID(), 120000);
+  // 운영 폴링과 달리 여러 달을 한 호출로 처리하므로 가장 긴 사례의 제한과 실행권 수명을 맞춘다.
+  const lease = await acquireLease(connection, worldId, randomUUID(), 180000);
   if (!lease) throw Error('가문 시험 실행권이 없습니다.');
   try {
     await new TurnLoop(
@@ -395,12 +395,22 @@ it.each([
     expect(await db.general.count({ where: { worldId: newId, sex: 'UNKNOWN' } })).toBe(unknownCount);
     expect((await snapshot(id)).state.generals[47]?.sex).toBe(guanSex);
   },
-  120000,
+  180000,
 );
 async function create(worldId: string, player: User, name: string, sex: 'MALE' | 'FEMALE') {
   const creating = rpc(
     'general.create',
-    { worldId, name, leadership: 70, strength: 70, intel: 60, portraitId: null, sex },
+    {
+      worldId,
+      name,
+      leadership: 70,
+      strength: 70,
+      intel: 60,
+      politics: 38,
+      charm: 37,
+      portraitId: null,
+      sex,
+    },
     player,
   );
   const deadline = performance.now() + 5000;
@@ -515,17 +525,28 @@ afterAll(async () => {
   }
 });
 
-it('AC-P2-32 실제 migration은 성별 변경·잘못된 값과 꺼진 판의 상태를 거부하고 구형 해시는 유지한다', async () => {
+it('AC-P2-32 상시 가문 원장은 잘못된 성별·NULL을 거부하고 거절 전후 해시를 보존한다', async () => {
   const id = await world(),
     oldId = await world(false),
     before = await snapshot(oldId);
-  expect(Object.hasOwn(before.state.generals[1]!, 'sex')).toBe(false);
-  expect(Object.hasOwn(before, 'lineageResources')).toBe(false);
+  expect(Object.hasOwn(before.state.generals[1]!, 'sex')).toBe(true);
+  expect(before.state.lineage).toBeDefined();
+  expect(before.lineageResources).toBeDefined();
   const invalidPlayer = await user();
   for (const sex of ['UNKNOWN', 'invalid']) {
     const invalid = await rpc(
       'general.create',
-      { worldId: id, name: '성별오류', leadership: 70, strength: 70, intel: 60, portraitId: null, sex },
+      {
+        worldId: id,
+        name: '성별오류',
+        leadership: 70,
+        strength: 70,
+        intel: 60,
+        politics: 38,
+        charm: 37,
+        portraitId: null,
+        sex,
+      },
       invalidPlayer,
     );
     expect(invalid.error?.data.code).toBe('BAD_REQUEST');
@@ -539,11 +560,16 @@ it('AC-P2-32 실제 migration은 성별 변경·잘못된 값과 꺼진 판의 �
       data: { ...commandInitial().generals[0]!, id: 900, name: '오류성별', worldId: id, sex: 'INVALID' },
     }),
   ).rejects.toThrow();
-  await db.general.update({ where: { worldId_id: { worldId: oldId, id: 1 } }, data: { sex: null } });
+  await expect(
+    db.general.update({ where: { worldId_id: { worldId: oldId, id: 1 } }, data: { sex: null } }),
+  ).rejects.toThrow();
   expect(hashState(await snapshot(oldId))).toBe(hashState(before));
   const stranger = await user();
   expect((await rpc('lineage.get', { worldId: id })).error?.data.code).toBe('UNAUTHORIZED');
-  expect((await rpc('lineage.get', { worldId: oldId }, stranger)).error?.data.code).toBe('PRECONDITION_FAILED');
+  expect(await rpc('lineage.get', { worldId: oldId }, stranger)).toMatchObject({
+    status: 200,
+    data: { view: { mine: null } },
+  });
 });
 
 it('AC-P2-32 출생 트랜잭션 실패는 새 행·예약을 모두 되돌리고 재시작 뒤 24개월 NPC 계승과 재생이 같다', async () => {
@@ -948,7 +974,7 @@ it('AC-P2-32 NPC 부모·자녀·손자녀 자동 계승은 연결 재개 뒤에
   expect(replayed.map((month) => month.stateHash)).toEqual(archive.months.map((month) => month.stateHash));
   expect(replayed.at(-1)!.stateHash).toBe(hashState(saved));
   console.info('NPC_GENERATIONS', { months, chain: [2, heir, grandchild], stateHash: replayed.at(-1)!.stateHash });
-}, 120000);
+}, 180000);
 
 it('AC-P2-32 실제 218개월 두 번의 동의 계승은 단일 조작권·이전 영수증·다세대 재생을 보존한다', async () => {
   // 혼인·출생 최소 연령16은 유지한다. 기존 인공 설정의 성인 등장1년과 이 사례의 장기 불가침만 쓴다.

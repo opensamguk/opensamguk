@@ -135,6 +135,9 @@ const createPayload = (worldId: string, name = '신규장수') => ({
   leadership: 55,
   strength: 55,
   intel: 55,
+  sex: 'MALE' as const,
+  politics: 55,
+  charm: 55,
   portraitId: null,
 });
 
@@ -211,8 +214,6 @@ describe('T2-02 실제 DB 생성·고정', () => {
         'apps/engine/src/cli/createWorld.ts',
         '--preset',
         key,
-        '--rule-features',
-        'policy',
         '--seed',
         'preset-cli',
         '--end-year',

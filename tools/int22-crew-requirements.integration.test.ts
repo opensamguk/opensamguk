@@ -112,6 +112,7 @@ it('실제 생성 입력과 임관으로 장수를 준비하고 원본 NPC 소�
     {
       worldId,
       name: '조건검사',
+      sex: 'MALE' as const,
       portraitId: null,
       leadership: 55,
       strength: 55,

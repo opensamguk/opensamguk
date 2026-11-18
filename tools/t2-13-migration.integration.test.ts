@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { readdir, readFile } from 'node:fs/promises';
 import { afterAll, beforeAll, expect, it } from 'vitest';
-import { commandInitial } from '../packages/rules/test/commandFixture';
+import type { WorldInit } from '../packages/rules/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { resourceHash } from '../apps/engine/src/replay';
 
@@ -20,7 +20,8 @@ const client = new Client({ connectionString: url });
 const schema = `t213_${randomUUID().replaceAll('-', '')}`;
 const migrations = new URL('../packages/db/prisma/migrations/', import.meta.url);
 const policyMigration = '20261023050000_default_policy';
-const initial = commandInitial();
+const initial = JSON.parse(await readFile(new URL('fixtures/migration-replay-v1.json', import.meta.url), 'utf8')).origin
+  .initial as WorldInit;
 initial.generals[0]!.userId = 'migration-human';
 const worldId = randomUUID();
 const endedWorldId = randomUUID();

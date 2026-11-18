@@ -352,8 +352,9 @@ export { BUILDINGS } from './construction/catalog';
 export { initialCityUpgrade, CITY_UPGRADE_FEATURE, cityUpgradeConfigSchema } from './cityUpgrade/state';
 export {
   cityUpgradeInfo,
-  cityUpgradeCommands,
   canExecuteCityUpgradeCommand,
   shiftCityLandTurns,
   CITY_UPGRADE_RULES,
 } from './cityUpgrade/upgrade';
+
+export { cityUpgradeCommands } from './cityUpgrade/commands';

@@ -20,7 +20,16 @@ const app = await buildServer({ db, logging: false });
 const worlds: string[] = [];
 const users: string[] = [];
 const notices: string[] = [];
-const payload = { name: '로비장수', leadership: 55, strength: 55, intel: 55, portraitId: 10001 };
+const payload = {
+  name: '로비장수',
+  leadership: 55,
+  strength: 55,
+  intel: 55,
+  sex: 'MALE' as const,
+  politics: 55,
+  charm: 55,
+  portraitId: 10001,
+};
 type Status = 'RUNNING' | 'PREOPEN' | 'PAUSED' | 'ENDED';
 type Row = {
   id: string;

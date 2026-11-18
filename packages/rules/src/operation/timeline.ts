@@ -2,6 +2,8 @@ import { BALANCE } from '../balance';
 import { toGameDate } from '../clock/clock';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import { militaryCommands } from '../commands/military';
+import { drillGain } from '../commands/statScores';
+import type { WorldView } from '../model/world';
 import type { QueuedTurn } from '../replay';
 
 export interface Readiness {
@@ -27,6 +29,8 @@ export interface OperationTimelineInput {
   current: Readonly<Readiness>;
   min: Readonly<Readiness>;
   turns: readonly (QueuedTurn | null)[];
+  view?: WorldView;
+  generalId?: number;
 }
 
 export interface OperationTimeline {
@@ -48,7 +52,7 @@ function record(value: unknown): value is Record<string, unknown> {
 }
 
 // 명령 인자만 검사한다. 자원·경로·보급과 방침 실행은 이 예상에 넣지 않는다.
-function prepare(expected: Readiness, turn: QueuedTurn) {
+function prepare(expected: Readiness, turn: QueuedTurn, context?: Pick<OperationTimelineInput, 'view' | 'generalId'>) {
   const command = preparationCommands.get(turn.commandKey);
   if (!command) return;
   const parsed = command.args.safeParse(turn.args);
@@ -59,10 +63,14 @@ function prepare(expected: Readiness, turn: QueuedTurn) {
     expected.train = Math.floor((expected.train * expected.crew) / crew);
     expected.atmos = Math.floor((expected.atmos * expected.crew) / crew);
     expected.crew = crew;
-  } else if (turn.commandKey === 'train') {
-    expected.train = Math.min(100, expected.train + BALANCE.TRAIN_GAIN);
-  } else if (turn.commandKey === 'morale') {
-    expected.atmos = Math.min(100, expected.atmos + BALANCE.ATMOS_GAIN);
+  } else if (turn.commandKey === 'train' || turn.commandKey === 'morale') {
+    const morale = turn.commandKey === 'morale';
+    const field = morale ? 'atmos' : 'train';
+    const view = context?.view;
+    const general = view?.generals[context?.generalId ?? -1];
+    if (view && !general) throw new Error('작전 예상의 장수가 없습니다.');
+    const gain = view && general ? drillGain(view, general, morale) : morale ? BALANCE.ATMOS_GAIN : BALANCE.TRAIN_GAIN;
+    expected[field] = Math.min(100, expected[field] + gain);
   }
 }
 
@@ -89,7 +97,7 @@ export function calculateOperationTimeline(input: OperationTimelineInput): Opera
   const expected = { ...input.current };
   for (const cell of cells) {
     if (cell === sortie) break;
-    prepare(expected, cell.turn);
+    prepare(expected, cell.turn, input);
   }
   const ready =
     expected.crew >= input.min.crew && expected.train >= input.min.train && expected.atmos >= input.min.atmos;

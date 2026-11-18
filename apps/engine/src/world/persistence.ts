@@ -97,6 +97,8 @@ export function prepareInitialWorld(
   const frozen = structuredClone(state);
   const base = frozen;
   const featureData = { ...providedRuleData(frozen, options.turnTermMinutes), ...options.featureData };
+  if ((featureData.policy as { turnTermMinutes?: number } | null)?.turnTermMinutes !== options.turnTermMinutes)
+    throw new Error('정책 턴 간격과 월드 턴 간격이 다릅니다.');
   assertInitialNationLifecycle(frozen, true);
   const preset = options.preset ? parsePreset(options.preset.value) : null;
   if (preset?.commands) throw new Error('월드별 명령 선택은 지원하지 않습니다.');

@@ -270,7 +270,7 @@ it('기존 월드의 origin·F·해시·시계·sequence와 모든 기존 행을
   await withDatabase('upgrade', async (client) => {
     await applyPreviousMigrations(client);
     const archive = JSON.parse(
-      await readFile(new URL('../apps/engine/test/fixtures/replay-v1-b8f5074.json', import.meta.url), 'utf8'),
+      await readFile(new URL('fixtures/migration-replay-v1.json', import.meta.url), 'utf8'),
     ) as {
       origin: {
         initialStateHash: string;

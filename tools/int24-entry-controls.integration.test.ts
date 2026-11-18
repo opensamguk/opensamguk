@@ -229,6 +229,9 @@ const entrant = (worldId: string) => ({
   leadership: 70,
   strength: 70,
   intel: 60,
+  sex: 'MALE' as const,
+  politics: 38,
+  charm: 37,
   portraitId: null,
 });
 async function setEntry(worldId: string, value: 'open' | 'closed') {

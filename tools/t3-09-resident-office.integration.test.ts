@@ -111,6 +111,14 @@ async function createWorld(capture = false) {
   for (const general of initial.generals) if (general.id !== 3) general.nextTurnTick = 10000;
   initial.cities[0]!.connections.push(4);
   initial.cities[3]!.connections.push(1);
+  initial.operationalMap!.routes.push({
+    id: 'route:1:4',
+    from: 'city:1',
+    to: 'city:4',
+    mode: 'LAND',
+    direction: 'BOTH',
+    enabled: true,
+  });
   if (capture) {
     Object.assign(initial.cities[3]!, { nationId: 2 });
     Object.assign(initial.generals[0]!, { nextTurnTick: 100 });
@@ -370,7 +378,7 @@ it('AC-M3-12 첩보 안개가 가린 도시의 관직과 주재 위치를 공개
   const operator = await identity('ADMIN'),
     ruler = await identity(),
     viewer = await identity();
-  const worldId = await createWorld(false, true);
+  const worldId = await createWorld(false);
   await enableClaims(worldId, operator);
   await claim(worldId, 1, ruler);
   const appoint = call(

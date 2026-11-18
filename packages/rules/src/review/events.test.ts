@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { rngFor } from '@opensamguk/shared';
-import { commandInitial, commandWorld, testUnits } from '../../test/commandFixture';
+import { commandInitial, commandWorld, testUnits } from '../../test/builtinCommandFixture';
 import { BALANCE } from '../balance';
 import { DOMESTIC_SPECS } from '../commands/domestic/investment';
 import { applyEffects } from '../commands/effects';

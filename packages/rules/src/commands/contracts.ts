@@ -1,7 +1,7 @@
 import { expect } from 'vitest';
 import { rngFor } from '@opensamguk/shared';
 import type { WorldState } from '../model/world';
-import { commandWorld, testUnits } from '../../test/commandFixture';
+import { commandWorld, testUnits } from '../../test/builtinCommandFixture';
 import { applyEffects } from './effects';
 import { commandRegistry, runCommand } from './registry';
 import type { CommandResult, Failure } from './types';

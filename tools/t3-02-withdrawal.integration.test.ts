@@ -5,7 +5,7 @@ import { afterAll, beforeAll, beforeEach, expect, it as test } from 'vitest';
 import { createDb, notifyWorld } from '../packages/db/src/index';
 import { lineageResultSchema, lineageStateSchema, type LineageInput } from '../packages/rules/src/index';
 import { lineageTestConfig } from '../packages/rules/src/lineage/testFixture';
-import { buildServer } from '../apps/server/src/server';
+import { buildFixtureServer as buildServer } from './server-fixture';
 import { newSession } from '../apps/server/src/auth/session';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { newAccountToken } from '../apps/server/src/auth/accountToken';
@@ -518,6 +518,7 @@ for (const index of [0, 1])
               {
                 worldId,
                 name: '탈퇴검증' + actorIndex,
+                sex: 'MALE' as const,
                 portraitId: null,
                 leadership: 55,
                 strength: 55,

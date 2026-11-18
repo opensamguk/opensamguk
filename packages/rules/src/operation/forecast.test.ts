@@ -19,7 +19,7 @@ describe('작전 방침 예상', () => {
     input.turns = input.turns.map((turn, i) => (i === 2 ? directTurn('attack', { cityKey: 2 }) : turn));
     const before = structuredClone(input);
     const result = calculateOperationForecast(input);
-    expect(result.expected).toEqual({ crew: 100, train: 100, atmos: 90 });
+    expect(result.expected).toEqual({ crew: 100, train: 100, atmos: 91 });
     expect(result.verdict).toBe('READY');
     expect(result.sortie).toBe(result.cells[2]);
     expect(result.cells[0]!.turn).toEqual({ commandKey: 'rest', args: {}, explicit: false });
@@ -59,7 +59,7 @@ describe('작전 방침 예상', () => {
           ? directTurn('attack', { cityKey: 2 })
           : turn,
     );
-    expect(calculateOperationForecast(input).expected).toEqual({ crew: 200, train: 60, atmos: 50 });
+    expect(calculateOperationForecast(input).expected).toEqual({ crew: 200, train: 62, atmos: 50 });
   });
 
   it('빈칸 방침은 자원 실패를 실행하지 않는 예상이며 첫 출병 뒤 준비는 세지 않는다', () => {

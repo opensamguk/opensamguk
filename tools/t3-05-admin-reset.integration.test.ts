@@ -907,6 +907,7 @@ async function human(worldId: string, owner: Actor, signal: AbortSignal, index: 
       {
         worldId,
         name: '보존사람' + index,
+        sex: 'MALE' as const,
         portraitId: null,
         leadership: 55,
         strength: 55,
@@ -1443,6 +1444,7 @@ it('AC-M3-04 D3 초기화 종료 뒤 게임 쓰기·재개는 거부하고 기�
       {
         worldId,
         name: '종료뒤생성',
+        sex: 'MALE' as const,
         portraitId: null,
         leadership: 55,
         strength: 55,
@@ -1478,6 +1480,7 @@ it('AC-M3-04 D3 접수된 일반 입력은 초기화 뒤 WORLD_CLOSED만 기록�
     {
       worldId: source.id,
       name: '대기장수',
+      sex: 'MALE' as const,
       portraitId: null,
       leadership: 55,
       strength: 55,
@@ -1644,8 +1647,6 @@ it('AC-INT-18D AC-M3-04 실제 게시 CLI의 도시 판과 두 월드 사람30�
             'five-stats',
             '--portrait-map',
             '191-map',
-            '--rule-features',
-            cityResetFeatures.join(','),
             '--seed',
             'city-reset-cli-source',
             '--turn-term',

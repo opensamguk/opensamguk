@@ -1,9 +1,10 @@
+import ts from 'typescript';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join, normalize } from 'node:path';
+import { dirname, join, normalize, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { commands, extensionCommands, resolverForRuleFeatures, ruleRegistry } from '../packages/rules/src/index';
@@ -113,18 +114,37 @@ describe('T4-02 등록된 확장 명령 대조', () => {
     }
   };
   const command = (key: string, target = 'general') => `({ key: '${key}', target: '${target}' })`;
-  const actualSupport = () =>
-    Object.fromEntries(
-      [
-        'support.ts',
-        '../balance.ts',
-        '../model/clone.ts',
-        'ext/state.ts',
-        'ext/intel/record.ts',
-        '../personnel/permissions.ts',
-        '../personnel/types.ts',
-      ].map((file) => [file, readFileSync(join(root, 'packages/rules/src/commands', file), 'utf8')]),
-    );
+  const actualSupport = () => {
+    const files: Record<string, string> = {};
+    const commandRoot = join(root, 'packages/rules/src/commands');
+    const visit = (file: string) => {
+      const key = relative(commandRoot, file).replaceAll('\\', '/');
+      if (Object.hasOwn(files, key)) return;
+      const source = readFileSync(file, 'utf8').replaceAll('\r\n', '\n');
+      files[key] = source;
+      const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+      for (const node of parsed.statements) {
+        if (
+          (!ts.isImportDeclaration(node) && !ts.isExportDeclaration(node)) ||
+          !node.moduleSpecifier ||
+          !ts.isStringLiteral(node.moduleSpecifier)
+        )
+          continue;
+        const specifier = node.moduleSpecifier.text;
+        if (specifier === '@opensamguk/shared') visit(join(root, 'packages/shared/src/index.ts'));
+        else if (specifier.startsWith('.')) {
+          const base = resolve(dirname(file), specifier);
+          const target = [base, `${base}.ts`, join(base, 'index.ts')].find(
+            (candidate) => candidate.endsWith('.ts') && existsSync(candidate),
+          );
+          if (target) visit(target);
+        }
+      }
+    };
+    visit(join(commandRoot, 'support.ts'));
+    visit(join(commandRoot, '../personnel/permissions.ts'));
+    return files;
+  };
   const importWithTsx = (dir: string, expression: string) => {
     const file = pathToFileURL(join(dir, 'packages/rules/src/commands/ext/registry.ts')).href;
     const runtime = spawnSync(
@@ -178,6 +198,27 @@ describe('T4-02 등록된 확장 명령 대조', () => {
         readFileSync(join(root, 'packages/rules/src/commands', file), 'utf8').replaceAll('\r\n', '\n'),
       ]),
     ),
+  });
+
+  it('shared의 재수출 아래 숨은 초기화도 검사한다', () => {
+    fixture(
+      {
+        'ext/registry.ts': `export { list as extensionCommands } from '@opensamguk/shared';`,
+        '../../../shared/src/index.ts': `export {list} from './definitions.ts';`,
+        '../../../shared/src/definitions.ts': `export const list = [${command('fire_attack')}]; list.push(${command('hidden_command')});`,
+      },
+      (dir) => expect(() => readExtensionRegistryKeys(dir)).toThrow('최상위 실행문'),
+    );
+  });
+
+  it.each([
+    `const Math = {max: () => { throw Error('실행 금지'); }}; const value = Math.max(1);`,
+    `const entries = [[{valueOf() { throw Error('실행 금지'); }}, 'x']]; const value = new Map(entries);`,
+    `const entries = [[1]]; const value = entries.map(([x = (() => { throw Error('실행 금지'); })()]) => x);`,
+  ])('닫힌 자료 확장도 사용자 코드가 실행될 초기값은 거부한다: %s', (source) => {
+    fixture({ 'ext/registry.ts': `${source} export const extensionCommands = [];` }, (dir) =>
+      expect(() => readExtensionRegistryKeys(dir)).toThrow('확장 registry'),
+    );
   });
 
   it('T4-17 실제 계략 import와 정적 목록·인자 검사가 같다', () => {
@@ -246,7 +287,7 @@ describe('T4-02 등록된 확장 명령 대조', () => {
             ]);
           }
           expect(() => readExtensionRegistryKeys(dir)).toThrow(
-            kind === 'factory' ? '선언 makeStratagem을 찾지 못했다' : undefined,
+            kind === 'factory' ? 'makeStratagem은 초기값이 있는 const여야 한다' : undefined,
           );
           emptyLegacyRegistry(dir);
           const result = main(['--root', dir, '--file', tablePath]);

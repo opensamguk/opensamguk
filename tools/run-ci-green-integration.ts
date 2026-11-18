@@ -7,7 +7,7 @@ if (!source) throw new Error('TEST_DATABASE_URL이 필요합니다.');
 const url = new URL(source);
 if (!['postgres:', 'postgresql:'].includes(url.protocol) || url.hostname !== '127.0.0.1' || url.port !== '5561')
   throw new Error('127.0.0.1:5561의 기존 PostgreSQL 연결이 필요합니다.');
-url.pathname = '/opensamguk_ci_green_r2_test';
+url.pathname = '/opensamguk_ci_green_db_test';
 const env = { ...process.env, TEST_DATABASE_URL: url.href };
 const result = spawnSync(...pnpmCli(['test:int'], env), { env, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
 // 실패한 하위 명령의 진단에도 연결 문자열을 남기지 않는다.

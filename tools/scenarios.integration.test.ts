@@ -721,8 +721,6 @@ it.each([
         'che',
         '--seed',
         't4-46-a',
-        '--rule-features',
-        'personnel,nation-lifecycle-v1',
         '--turn-term',
         '60',
         '--end-year',
@@ -840,7 +838,16 @@ it.each(['2060', '2070'])(
         const post = (route: string, payload: Record<string, unknown>) =>
           app.inject({ method: 'POST', url: `/trpc/${route}`, headers, payload: { worldId, ...payload } });
         const where = { worldId, userId, kind: 'general.create' as const };
-        const creating = post('general.create', { name, leadership: 55, strength: 55, intel: 55, portraitId: null });
+        const creating = post('general.create', {
+          name,
+          leadership: 55,
+          strength: 55,
+          intel: 55,
+          sex: 'MALE' as const,
+          politics: 55,
+          charm: 55,
+          portraitId: null,
+        });
         try {
           const deadline = performance.now() + 5000;
           while (!(await db.inputEvent.findFirst({ where: { ...where, status: 'PENDING' } }))) {

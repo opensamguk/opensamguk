@@ -5,7 +5,7 @@ import { createDb, type Prisma } from '../packages/db/src/index';
 import { buildInitialWorld, initialReplayState, runReplayAction, TICKS_PER_MONTH } from '../packages/rules/src/index';
 import { operationalInput } from '../packages/rules/test/operationalMapFixture';
 import { hashState } from '../packages/shared/src/node/hashState';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { loadWorld } from '../apps/engine/src/worldLoader';
 import { acquireLease, releaseLease, type Lease } from '../apps/engine/src/lease';

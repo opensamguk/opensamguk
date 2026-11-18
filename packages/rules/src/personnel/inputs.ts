@@ -1,4 +1,5 @@
-import { canExecuteCityUpgradeCommand, cityUpgradeCommands } from '../cityUpgrade/upgrade';
+import { canExecuteCityUpgradeCommand } from '../cityUpgrade/upgrade';
+import { cityUpgradeCommands } from '../cityUpgrade/commands';
 import { z } from 'zod';
 import { commandRegistry } from '../commands/registry';
 import type { DeepReadonly } from '../model/world';

@@ -87,7 +87,17 @@ it('INT-02 새 장수는 도시에서 생성되고 월간 정산·재시작·동
   try {
     const creating = request(
       'general.create',
-      { worldId, name: '지도검사', portraitId: null, leadership: 55, strength: 55, intel: 55, politics: 55, charm: 55 },
+      {
+        worldId,
+        name: '지도검사',
+        sex: 'MALE' as const,
+        portraitId: null,
+        leadership: 55,
+        strength: 55,
+        intel: 55,
+        politics: 55,
+        charm: 55,
+      },
       cookie,
       true,
     );

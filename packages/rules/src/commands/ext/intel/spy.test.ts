@@ -23,19 +23,7 @@ function world() {
   const state = commandWorld();
   state.ext = createExtStateWithRegistry(enabled, state, registry)!;
   state.generals[3]!.crewType = 1200;
-  state.campaign!.units = Object.values(state.generals)
-    .filter((g) => g.crew > 0)
-    .map((g) => ({
-      id: g.id,
-      ownerId: g.id,
-      commanderId: g.id,
-      troops: g.crew,
-      crewType: g.crewType,
-      train: g.train,
-      atmos: g.atmos,
-    }));
-  state.campaign!.nextUnitId = 5;
-  for (const general of Object.values(state.generals)) general.crew = 0;
+  state.campaign!.units.find((unit) => unit.ownerId === 3)!.crewType = 1200;
   state.cities[2]!.trust = 73.25;
   return state;
 }
@@ -209,8 +197,8 @@ describe('AC-P2-07 첩보 규칙', () => {
       ...golden(1),
       owner: null,
       generals: 1,
-      crew: 100,
-      crewTypes: [{ crewType: 1100, generals: 1 }],
+      crew: 0,
+      crewTypes: [],
     };
     delete expected.tech;
     expect(output.intel['1']!['2']).toStrictEqual(expected);

@@ -293,6 +293,7 @@ async function freshWorld(human = false, nameOverride?: string) {
         {
           worldId,
           name: '인수장수',
+          sex: 'MALE' as const,
           portraitId: null,
           leadership: 55,
           strength: 55,

@@ -338,7 +338,17 @@ it('AC-INT-23 같은 tick 운영 기록은 개인 30행·관리자100행에서 �
   await controlClock(db, worldId, 'resume');
   const creating = call(
     'general.create',
-    { worldId, name: '기록장수', leadership: 70, strength: 70, intel: 60, portraitId: null },
+    {
+      worldId,
+      name: '기록장수',
+      leadership: 70,
+      strength: 70,
+      intel: 60,
+      sex: 'MALE' as const,
+      politics: 38,
+      charm: 37,
+      portraitId: null,
+    },
     ordinary.cookie,
   );
   await expect
@@ -435,6 +445,9 @@ it('AC-INT-23 운영 쪽지는 실제 엔진에서 한 번 보내고 개인 수�
         leadership: 70,
         strength: 70,
         intel: 60,
+        sex: 'MALE' as const,
+        politics: 38,
+        charm: 37,
         portraitId: null,
       },
       identity.cookie,
@@ -680,7 +693,17 @@ it('AC-INT-23 접수는 게임 상태를 바꾸지 않고 8종 입력·감사·�
   await controlClock(db, worldId, 'resume');
   const creating = call(
     'general.create',
-    { worldId, name: '사람장수', leadership: 70, strength: 70, intel: 60, portraitId: null },
+    {
+      worldId,
+      name: '사람장수',
+      leadership: 70,
+      strength: 70,
+      intel: 60,
+      sex: 'MALE' as const,
+      politics: 38,
+      charm: 37,
+      portraitId: null,
+    },
     ordinary.cookie,
   );
   await expect
@@ -789,7 +812,17 @@ it('AC-INT-23 사람 내보내기는 먼저 접수된 요청을 거절하고 같
   await controlClock(db, worldId, 'resume');
   const creating = call(
     'general.create',
-    { worldId, name: '퇴장전장수', leadership: 70, strength: 70, intel: 60, portraitId: null },
+    {
+      worldId,
+      name: '퇴장전장수',
+      leadership: 70,
+      strength: 70,
+      intel: 60,
+      sex: 'MALE' as const,
+      politics: 38,
+      charm: 37,
+      portraitId: null,
+    },
     ordinary.cookie,
   );
   await expect
@@ -813,7 +846,17 @@ it('AC-INT-23 사람 내보내기는 먼저 접수된 요청을 거절하고 같
   expect((await call('general.mine', { worldId }, ordinary.cookie)).data).toMatchObject({ general: null });
   const next = call(
     'general.create',
-    { worldId, name: '퇴장후장수', leadership: 70, strength: 70, intel: 60, portraitId: null },
+    {
+      worldId,
+      name: '퇴장후장수',
+      leadership: 70,
+      strength: 70,
+      intel: 60,
+      sex: 'MALE' as const,
+      politics: 38,
+      charm: 37,
+      portraitId: null,
+    },
     ordinary.cookie,
   );
   await expect
@@ -836,7 +879,17 @@ it('AC-INT-23 퇴장 참모의 인사·조약 대기 입력도 조회·아카이
   ] as const) {
     const creating = call(
       'general.create',
-      { worldId, name, leadership: 70, strength: 70, intel: 60, portraitId: null },
+      {
+        worldId,
+        name,
+        leadership: 70,
+        strength: 70,
+        intel: 60,
+        sex: 'MALE' as const,
+        politics: 38,
+        charm: 37,
+        portraitId: null,
+      },
       identity.cookie,
     );
     await expect

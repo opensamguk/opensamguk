@@ -8,7 +8,13 @@ import {
   assignmentRejectCost,
   ASSIGNMENT_REJECT_PERCENT,
   canExecuteNationCommand,
+  canExecuteCityNationCommand,
+  canExecuteCityUpgradeCommand,
+  canExecuteResearchNationCommand,
   courtOfficeTitle,
+  isLocalOffice,
+  localOfficeTitle,
+  isOfficeResident,
   STRATEGY_KEYS,
 } from '../packages/rules/src/index';
 import { ASSIGNMENT_EXPIRY_MONTHS } from '../packages/rules/src/personnel/types';
@@ -240,27 +246,38 @@ const restSlots = () => Array.from({ length: 12 }, () => ({ commandKey: 'nation_
 function expectRead(path: Path, data: unknown, f: Fixture, rows: Rows, foreign = false) {
   const actor = rows.generals.find((general) => general.userId === users[foreign ? 1 : f.owner])!;
   if (path === 'personnel.officers') {
+    const rank = rows.nations.find((nation) => nation.id === actor.nationId)!.level;
     const members = rows.generals
       .filter((general) => general.nationId === actor.nationId)
       .sort((a, b) => b.officerLevel - a.officerLevel || a.id - b.id);
     expect(data).toEqual({
       actorId: actor.id,
+      officeCities: rows.cities
+        .filter((city) => city.nationId === actor.nationId && (city.kind === null || city.kind === 'CITY'))
+        .sort((a, b) => a.cityKey - b.cityKey)
+        .map(({ cityKey, name }) => ({ cityKey, name })),
       appoint: { ok: true },
-      levels: levels.slice(1).map((officerLevel) => ({
-        officerLevel,
-        title: officerTitle(officerLevel),
-        holderId: members.find((general) => general.officerLevel === officerLevel)?.id ?? null,
-      })),
+      levels: levels.slice(1).flatMap((officerLevel) => {
+        const holder = members.find((general) => general.officerLevel === officerLevel);
+        const title = courtOfficeTitle(rank, officerLevel);
+        return title === null && !holder
+          ? []
+          : [{ officerLevel, title: title ?? officerTitle(officerLevel), holderId: holder?.id ?? null }];
+      }),
       members: members.map((general) => {
         const city = rows.cities.find((row) => row.cityKey === general.cityKey)!;
         return {
           generalId: general.id,
           name: general.name,
           officerLevel: general.officerLevel,
-          title: officerTitle(general.officerLevel),
+          title: isLocalOffice(general.officerLevel)
+            ? localOfficeTitle(general.officerLevel)
+            : (courtOfficeTitle(rank, general.officerLevel) ?? officerTitle(general.officerLevel)),
           isHuman: general.userId !== null,
           city: { cityKey: city.cityKey, name: city.name },
           dedication: general.dedication,
+          officerCityKey: general.officerCityKey,
+          resident: isOfficeResident(general, city.nationId),
         };
       }),
     });
@@ -294,39 +311,49 @@ function expectRead(path: Path, data: unknown, f: Fixture, rows: Rows, foreign =
     const rank = rows.nations.find((nation) => nation.id === actor.nationId)!.level;
     expect(data).toEqual({
       actorId: actor.id,
-      tabs: levels.map((officerLevel) => {
-        const office = rows.offices.find((row) => row.nationId === actor.nationId && row.officerLevel === officerLevel);
-        const holder = rows.generals.find(
-          (general) => general.nationId === actor.nationId && general.officerLevel === officerLevel,
-        );
-        return {
-          office: { nationId: actor.nationId, officerLevel, tenure: office?.tenure ?? 0 },
-          officerLevel,
-          title: officerTitle(officerLevel),
-          courtTitle: courtOfficeTitle(rank, officerLevel),
-          holder: holder
-            ? {
-                generalId: holder.id,
-                name: holder.name,
-                portraitId: holder.portraitId,
-                isHuman: holder.userId !== null,
-              }
-            : null,
-          edit:
-            actor.officerLevel === officerLevel
-              ? { ok: true }
-              : { ok: false, reason: '자기 직책 칸만 고칠 수 있습니다.' },
-          revision: office?.turnRevision ?? 0,
-          slots: restSlots(),
-        };
-      }),
+      tabs: levels
+        .map((officerLevel) => {
+          const office = rows.offices.find(
+            (row) => row.nationId === actor.nationId && row.officerLevel === officerLevel,
+          );
+          const holder = rows.generals.find(
+            (general) => general.nationId === actor.nationId && general.officerLevel === officerLevel,
+          );
+          return {
+            office: { nationId: actor.nationId, officerLevel, tenure: office?.tenure ?? 0 },
+            officerLevel,
+            title: officerTitle(officerLevel),
+            courtTitle: courtOfficeTitle(rank, officerLevel),
+            holder: holder
+              ? {
+                  generalId: holder.id,
+                  name: holder.name,
+                  portraitId: holder.portraitId,
+                  isHuman: holder.userId !== null,
+                }
+              : null,
+            edit:
+              actor.officerLevel === officerLevel
+                ? { ok: true }
+                : { ok: false, reason: '자기 직책 칸만 고칠 수 있습니다.' },
+            revision: office?.turnRevision ?? 0,
+            slots: restSlots(),
+          };
+        })
+        .filter((tab) => tab.holder !== null || tab.courtTitle !== null),
     });
   } else if (path === 'nationCommands.list') {
     // 명령 카탈로그의 자료형은 허용하되 응답 객체와 중첩 JSON schema에 DB 칸을 더할 수 없다.
     expect(data).toEqual(
       worldResolver(rows.world)
         .resolver.list('nation')
-        .filter((def) => canExecuteNationCommand(actor.officerLevel, def.key))
+        .filter(
+          (def) =>
+            canExecuteNationCommand(actor.officerLevel, def.key) ||
+            canExecuteCityNationCommand(rows.world, actor.officerLevel, def.key) ||
+            canExecuteCityUpgradeCommand(rows.world, actor.officerLevel, def.key) ||
+            canExecuteResearchNationCommand(rows.world, actor.officerLevel, def.key),
+        )
         .map((def) => ({
           key: def.key,
           name: def.name,
@@ -703,6 +730,7 @@ describe('B7 기존 대기 활동과 새 인사 접수의 실제 DB 회귀', () 
         actor.lastActiveAt = existing.createdAt;
         if (path === 'offers.respond') {
           actor.cityKey = destination!.cityKey;
+          actor.cityAnchorKey = destination!.cityKey;
           actor.residenceTick = 100;
           expect(applied.offers).toEqual([
             { ...before.offers[0]!, status: 'ACCEPTED', resolvedBy: 'RESPONSE', resolvedTick: 100 },

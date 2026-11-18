@@ -118,9 +118,11 @@ describe('작전 타임라인 0단계', () => {
       const result = command.execute(state, { generalId: 1, unitSet: testUnits }, turn.args, rngFor('operation'));
       state = applyEffects(state, result.effects);
     }
-    const result = calculateOperationTimeline(input({ current: initial, turns: turns(...preparation, attack()) }));
+    const result = calculateOperationTimeline(
+      input({ current: initial, turns: turns(...preparation, attack()), view: state, generalId: 1 }),
+    );
     expect(result.expected).toEqual(readiness(state.generals[1]!));
-    expect(result.expected).toEqual({ crew: 365, train: 42, atmos: 41 });
+    expect(result.expected).toEqual({ crew: 365, train: 44, atmos: 42 });
   });
 
   it('병력이 없을 때 모병하면 훈련과 사기는 0으로 희석된다', () => {
@@ -132,7 +134,7 @@ describe('작전 타임라인 0단계', () => {
 
   it('훈련과 사기 증가는 실제 명령과 같이 100에서 멈춘다', () => {
     let state = commandWorld();
-    Object.assign(state.generals[1]!, { train: 95, atmos: 98 });
+    Object.assign(state.generals[1]!, { crew: 10000, train: 95, atmos: 98 });
     const current = readiness(state.generals[1]!);
     for (const commandKey of ['train', 'morale'] as const) {
       const command = militaryCommands.find(({ key }) => key === commandKey)!;

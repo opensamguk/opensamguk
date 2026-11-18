@@ -53,7 +53,16 @@ async function request(path: string, input: unknown, cookie?: string) {
   const [body] = await response.json();
   return { data: body.result?.data, code: body.error?.data.code, message: body.error?.message };
 }
-const creation = { name: '기수시험장수', leadership: 55, strength: 55, intel: 55, portraitId: 10001 };
+const creation = {
+  name: '기수시험장수',
+  leadership: 55,
+  strength: 55,
+  intel: 55,
+  sex: 'MALE' as const,
+  politics: 55,
+  charm: 55,
+  portraitId: 10001,
+};
 const turns = () => Array.from({ length: 30 }, () => null as null | { commandKey: string; args: object });
 async function state(worldId: string) {
   return {

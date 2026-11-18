@@ -23,7 +23,16 @@ const db = createDb(url);
 const app = await buildServer({ db, logging: false });
 const worlds: string[] = [];
 const users: string[] = [];
-const payload = { name: '새장수', leadership: 55, strength: 55, intel: 55, portraitId: 10001 };
+const payload = {
+  name: '새장수',
+  leadership: 55,
+  strength: 55,
+  intel: 55,
+  sex: 'MALE' as const,
+  politics: 55,
+  charm: 55,
+  portraitId: 10001,
+};
 const empty = () => Array.from({ length: 30 }, () => null);
 const mutations = new Set(['general.create', 'turns.set', 'turns.edit']);
 let address: string;

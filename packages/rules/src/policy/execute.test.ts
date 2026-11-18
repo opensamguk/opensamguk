@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { commandWorld } from '../../test/commandFixture';
+import { commandWorld } from '../../test/builtinCommandFixture';
 import { applyEffects } from '../commands/effects';
 import { runPolicyCommand, runPolicySlot } from './execute';
 import { normalizeSlot } from './index';

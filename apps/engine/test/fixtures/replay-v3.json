@@ -8,21 +8,12 @@
       "mapKey": "che",
       "unitSetKey": "basic",
       "startYear": 191,
-      "statRules": {
-        "count": 5,
-        "total": 275,
-        "min": 15,
-        "max": 90
-      },
+      "statRules": { "count": 5, "total": 275, "min": 15, "max": 90 },
       "unitSet": {
         "id": "basic",
         "name": "basic",
         "defaultCrewTypeId": 1100,
-        "armTypes": {
-          "1": "보병",
-          "2": "궁병",
-          "3": "기병"
-        },
+        "armTypes": { "1": "보병", "2": "궁병", "3": "기병" },
         "crewTypes": [
           {
             "id": 1000,
@@ -36,9 +27,7 @@
             "cost": 99,
             "rice": 9,
             "attackCoef": [],
-            "defenceCoef": {
-              "1": 1.2
-            }
+            "defenceCoef": { "1": 1.2 }
           },
           {
             "id": 1100,
@@ -51,14 +40,8 @@
             "magicCoef": 0,
             "cost": 9,
             "rice": 9,
-            "attackCoef": {
-              "2": 1.2,
-              "3": 0.8
-            },
-            "defenceCoef": {
-              "2": 0.8,
-              "3": 1.2
-            }
+            "attackCoef": { "2": 1.2, "3": 0.8 },
+            "defenceCoef": { "2": 0.8, "3": 1.2 }
           },
           {
             "id": 1200,
@@ -71,14 +54,8 @@
             "magicCoef": 0,
             "cost": 10,
             "rice": 10,
-            "attackCoef": {
-              "1": 0.8,
-              "3": 1.2
-            },
-            "defenceCoef": {
-              "1": 1.2,
-              "3": 0.8
-            }
+            "attackCoef": { "1": 0.8, "3": 1.2 },
+            "defenceCoef": { "1": 1.2, "3": 0.8 }
           },
           {
             "id": 1300,
@@ -91,14 +68,8 @@
             "magicCoef": 0,
             "cost": 11,
             "rice": 11,
-            "attackCoef": {
-              "1": 1.2,
-              "2": 0.8
-            },
-            "defenceCoef": {
-              "1": 0.8,
-              "2": 1.2
-            }
+            "attackCoef": { "1": 1.2, "2": 0.8 },
+            "defenceCoef": { "1": 0.8, "2": 1.2 }
           }
         ]
       },
@@ -110,9 +81,7 @@
           "region": 1,
           "x": 345,
           "y": 130,
-          "connections": [
-            2
-          ],
+          "connections": [2],
           "nationId": 1,
           "population": 1000,
           "populationMax": 2000,
@@ -137,11 +106,7 @@
           "region": 2,
           "x": 330,
           "y": 215,
-          "connections": [
-            1,
-            3,
-            4
-          ],
+          "connections": [1, 3, 4],
           "nationId": 2,
           "population": 1000,
           "populationMax": 2000,
@@ -166,9 +131,7 @@
           "region": 2,
           "x": 275,
           "y": 180,
-          "connections": [
-            2
-          ],
+          "connections": [2],
           "nationId": 1,
           "population": 1000,
           "populationMax": 2000,
@@ -193,9 +156,7 @@
           "region": 3,
           "x": 145,
           "y": 165,
-          "connections": [
-            2
-          ],
+          "connections": [2],
           "nationId": 2,
           "population": 1000,
           "populationMax": 2000,
@@ -340,41 +301,21 @@
           "sex": "UNKNOWN"
         }
       ],
-      "diplomacies": [
-        {
-          "nationA": 1,
-          "nationB": 2,
-          "state": "DECLARED",
-          "untilTick": 10000
-        }
-      ],
-      "cityScale": {
-        "cities": []
-      },
+      "diplomacies": [{ "nationA": 1, "nationB": 2, "state": "DECLARED", "untilTick": 10000 }],
+      "cityScale": { "cities": [] },
       "fogOfWar": false,
       "operationalMap": {
         "version": 3,
         "id": "che",
         "name": "월 정산 고정물",
-        "canvas": {
-          "width": 1000,
-          "height": 700
-        },
+        "canvas": { "width": 1000, "height": 700 },
         "basemap": {
           "source": "natural-earth-5.1.2",
           "projection": "WGS84 plate carree",
           "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "bounds": [
-            94,
-            17,
-            132.571428571429,
-            44
-          ]
+          "bounds": [94, 17, 132.571428571429, 44]
         },
-        "defaults": {
-          "trust": 80,
-          "supplyState": 1
-        },
+        "defaults": { "trust": 80, "supplyState": 1 },
         "sites": [
           {
             "id": "city:1",
@@ -383,10 +324,7 @@
             "anchorKey": 1,
             "level": 8,
             "region": 1,
-            "position": {
-              "x": 345,
-              "y": 130
-            },
+            "position": { "x": 345, "y": 130 },
             "initial": {
               "population": 1000,
               "agriculture": 200,
@@ -411,10 +349,7 @@
             "anchorKey": 2,
             "level": 8,
             "region": 2,
-            "position": {
-              "x": 330,
-              "y": 215
-            },
+            "position": { "x": 330, "y": 215 },
             "initial": {
               "population": 1000,
               "agriculture": 200,
@@ -439,10 +374,7 @@
             "anchorKey": 3,
             "level": 8,
             "region": 2,
-            "position": {
-              "x": 275,
-              "y": 180
-            },
+            "position": { "x": 275, "y": 180 },
             "initial": {
               "population": 1000,
               "agriculture": 200,
@@ -467,10 +399,7 @@
             "anchorKey": 4,
             "level": 8,
             "region": 3,
-            "position": {
-              "x": 145,
-              "y": 165
-            },
+            "position": { "x": 145, "y": 165 },
             "initial": {
               "population": 1000,
               "agriculture": 200,
@@ -490,46 +419,20 @@
           }
         ],
         "routes": [
-          {
-            "id": "route:1:2",
-            "from": "city:1",
-            "to": "city:2",
-            "mode": "LAND",
-            "direction": "BOTH",
-            "enabled": true
-          },
-          {
-            "id": "route:2:3",
-            "from": "city:2",
-            "to": "city:3",
-            "mode": "LAND",
-            "direction": "BOTH",
-            "enabled": true
-          },
-          {
-            "id": "route:2:4",
-            "from": "city:2",
-            "to": "city:4",
-            "mode": "LAND",
-            "direction": "BOTH",
-            "enabled": true
-          }
+          { "id": "route:1:2", "from": "city:1", "to": "city:2", "mode": "LAND", "direction": "BOTH", "enabled": true },
+          { "id": "route:2:3", "from": "city:2", "to": "city:3", "mode": "LAND", "direction": "BOTH", "enabled": true },
+          { "id": "route:2:4", "from": "city:2", "to": "city:4", "mode": "LAND", "direction": "BOTH", "enabled": true }
         ]
       }
     },
+    "initialStateHash": "46d8a339d6f66c176b60a764bcc362d60db1176a810207ab39ed1a8f014ab677",
+    "resourceHash": "1f8499bf6562466e9c5eec9417e93fca8fef973d4c7b4af64e2fa072f9970905",
     "featureData": {
       "logistics-v1": {
         "version": 1,
         "specialties": [],
-        "capacity": {
-          "base": 10000,
-          "perLevel": 10000,
-          "maxLevel": 5
-        },
-        "upgrade": {
-          "gold": 1000,
-          "wood": 500
-        },
+        "capacity": { "base": 10000, "perLevel": 10000, "maxLevel": 5 },
+        "upgrade": { "gold": 1000, "wood": 500 },
         "transport": {
           "hopsPerMonth": 2,
           "maxHops": 8,
@@ -538,55 +441,17 @@
           "maxActivePerNation": 20
         },
         "recruitPer100": {
-          "1": {
-            "iron": 2,
-            "wood": 0,
-            "horses": 0
-          },
-          "2": {
-            "iron": 2,
-            "wood": 0,
-            "horses": 0
-          },
-          "3": {
-            "iron": 2,
-            "wood": 0,
-            "horses": 10
-          }
+          "1": { "iron": 2, "wood": 0, "horses": 0 },
+          "2": { "iron": 2, "wood": 0, "horses": 0 },
+          "3": { "iron": 2, "wood": 0, "horses": 10 }
         },
-        "build": {
-          "wall": {
-            "iron": 0,
-            "wood": 50,
-            "horses": 0
-          },
-          "defence": {
-            "iron": 20,
-            "wood": 20,
-            "horses": 0
-          }
-        },
+        "build": { "wall": { "iron": 0, "wood": 50, "horses": 0 }, "defence": { "iron": 20, "wood": 20, "horses": 0 } },
         "trade": {
-          "iron": {
-            "buy": 3,
-            "sell": 1
-          },
-          "wood": {
-            "buy": 3,
-            "sell": 1
-          },
-          "horses": {
-            "buy": 3,
-            "sell": 1
-          }
+          "iron": { "buy": 3, "sell": 1 },
+          "wood": { "buy": 3, "sell": 1 },
+          "horses": { "buy": 3, "sell": 1 }
         },
-        "npc": {
-          "maxActions": 3,
-          "upgradeAtBp": 8000,
-          "recruitTarget": 1000,
-          "stockCapBp": 5000,
-          "budgetBp": 1000
-        }
+        "npc": { "maxActions": 3, "upgradeAtBp": 8000, "recruitTarget": 1000, "stockCapBp": 5000, "budgetBp": 1000 }
       },
       "governance-v1": {
         "version": 1,
@@ -600,36 +465,18 @@
           "censureLoss": 5,
           "renounceLoss": 10
         },
-        "tribute": {
-          "maxBp": 2000,
-          "maxAmount": 100000
-        },
-        "stipendGold": {
-          "chancellor": 100,
-          "grandMarshal": 100,
-          "minister": 100
-        },
+        "tribute": { "maxBp": 2000, "maxAmount": 100000 },
+        "stipendGold": { "chancellor": 100, "grandMarshal": 100, "minister": 100 },
         "offerMonths": 6,
         "maxDepth": 3,
         "maxRemitMonths": 12,
         "censureCooldownMonths": 6,
-        "npc": {
-          "cityRatio": 2,
-          "acceptMaxBp": 1000,
-          "offerBp": 500,
-          "cooldownMonths": 12
-        },
-        "limits": {
-          "sentOffers": 3,
-          "receivedOffers": 5,
-          "worldOffers": 200
-        },
+        "npc": { "cityRatio": 2, "acceptMaxBp": 1000, "offerBp": 500, "cooldownMonths": 12 },
+        "limits": { "sentOffers": 3, "receivedOffers": 5, "worldOffers": 200 },
         "seatCityKey": 1
       },
       "lineage-v1": {
-        "heir": {
-          "depth": 3
-        },
+        "heir": { "depth": 3 },
         "limits": {
           "receivedOffers": 5,
           "worldOffers": 200,
@@ -644,30 +491,16 @@
           "maxSpouses": 1,
           "offerMonths": 6,
           "minAge": 16,
-          "npc": {
-            "chanceBp": 3000,
-            "perMonth": 10,
-            "affinityGap": 30
-          }
+          "npc": { "chanceBp": 3000, "perMonth": 10, "affinityGap": 30 }
         },
         "birth": {
-          "lifespan": {
-            "max": 75,
-            "min": 50
-          },
+          "lifespan": { "max": 75, "min": 50 },
           "comingOfAgeYears": 15,
           "chanceBp": 500,
           "femaleBp": 5000,
           "maxParentAge": 45,
           "minParentAge": 16,
-          "compoundSurnames": [
-            "공손",
-            "사마",
-            "제갈",
-            "하후",
-            "황보",
-            "태사"
-          ],
+          "compoundSurnames": ["공손", "사마", "제갈", "하후", "황보", "태사"],
           "givenNames": [
             "가",
             "각",
@@ -887,9 +720,7 @@
           "statSpread": 10
         }
       },
-      "heritage-v1": {
-        "version": 1
-      },
+      "heritage-v1": { "version": 1 },
       "equipment-v1": {
         "version": 1,
         "items": [
@@ -902,11 +733,7 @@
             "requiredSecurity": 1000,
             "stat": "leadership",
             "bonus": 1,
-            "goods": {
-              "iron": 0,
-              "wood": 0,
-              "horses": 5
-            }
+            "goods": { "iron": 0, "wood": 0, "horses": 5 }
           },
           {
             "key": "horse_02",
@@ -917,11 +744,7 @@
             "requiredSecurity": 2000,
             "stat": "leadership",
             "bonus": 2,
-            "goods": {
-              "iron": 0,
-              "wood": 0,
-              "horses": 10
-            }
+            "goods": { "iron": 0, "wood": 0, "horses": 10 }
           },
           {
             "key": "horse_03",
@@ -932,11 +755,7 @@
             "requiredSecurity": 3000,
             "stat": "leadership",
             "bonus": 3,
-            "goods": {
-              "iron": 0,
-              "wood": 0,
-              "horses": 15
-            }
+            "goods": { "iron": 0, "wood": 0, "horses": 15 }
           },
           {
             "key": "horse_04",
@@ -947,11 +766,7 @@
             "requiredSecurity": 4000,
             "stat": "leadership",
             "bonus": 4,
-            "goods": {
-              "iron": 0,
-              "wood": 0,
-              "horses": 20
-            }
+            "goods": { "iron": 0, "wood": 0, "horses": 20 }
           },
           {
             "key": "horse_05",
@@ -962,11 +777,7 @@
             "requiredSecurity": 5000,
             "stat": "leadership",
             "bonus": 5,
-            "goods": {
-              "iron": 0,
-              "wood": 0,
-              "horses": 25
-            }
+            "goods": { "iron": 0, "wood": 0, "horses": 25 }
           },
           {
             "key": "horse_06",
@@ -977,11 +788,7 @@
             "requiredSecurity": 6000,
             "stat": "leadership",
             "bonus": 6,
-            "goods": {
-              "iron": 0,
-              "wood": 0,
-              "horses": 30
-            }
+            "goods": { "iron": 0, "wood": 0, "horses": 30 }
           },
           {
             "key": "weapon_01",
@@ -992,11 +799,7 @@
             "requiredSecurity": 1000,
             "stat": "strength",
             "bonus": 1,
-            "goods": {
-              "iron": 5,
-              "wood": 0,
-              "horses": 0
-            }
+            "goods": { "iron": 5, "wood": 0, "horses": 0 }
           },
           {
             "key": "weapon_02",
@@ -1007,11 +810,7 @@
             "requiredSecurity": 2000,
             "stat": "strength",
             "bonus": 2,
-            "goods": {
-              "iron": 10,
-              "wood": 0,
-              "horses": 0
-            }
+            "goods": { "iron": 10, "wood": 0, "horses": 0 }
           },
           {
             "key": "weapon_03",
@@ -1022,11 +821,7 @@
             "requiredSecurity": 3000,
             "stat": "strength",
             "bonus": 3,
-            "goods": {
-              "iron": 15,
-              "wood": 0,
-              "horses": 0
-            }
+            "goods": { "iron": 15, "wood": 0, "horses": 0 }
           },
           {
             "key": "weapon_04",
@@ -1037,11 +832,7 @@
             "requiredSecurity": 4000,
             "stat": "strength",
             "bonus": 4,
-            "goods": {
-              "iron": 20,
-              "wood": 0,
-              "horses": 0
-            }
+            "goods": { "iron": 20, "wood": 0, "horses": 0 }
           },
           {
             "key": "weapon_05",
@@ -1052,11 +843,7 @@
             "requiredSecurity": 5000,
             "stat": "strength",
             "bonus": 5,
-            "goods": {
-              "iron": 25,
-              "wood": 0,
-              "horses": 0
-            }
+            "goods": { "iron": 25, "wood": 0, "horses": 0 }
           },
           {
             "key": "weapon_06",
@@ -1067,11 +854,7 @@
             "requiredSecurity": 6000,
             "stat": "strength",
             "bonus": 6,
-            "goods": {
-              "iron": 30,
-              "wood": 0,
-              "horses": 0
-            }
+            "goods": { "iron": 30, "wood": 0, "horses": 0 }
           },
           {
             "key": "book_01",
@@ -1082,11 +865,7 @@
             "requiredSecurity": 1000,
             "stat": "intel",
             "bonus": 1,
-            "goods": {
-              "iron": 0,
-              "wood": 0,
-              "horses": 0
-            }
+            "goods": { "iron": 0, "wood": 0, "horses": 0 }
           },
           {
             "key": "book_02",
@@ -1097,11 +876,7 @@
             "requiredSecurity": 2000,
             "stat": "intel",
             "bonus": 2,
-            "goods": {
-              "iron": 0,
-              "wood": 0,
-              "horses": 0
-            }
+            "goods": { "iron": 0, "wood": 0, "horses": 0 }
           },
           {
             "key": "book_03",
@@ -1112,11 +887,7 @@
             "requiredSecurity": 3000,
             "stat": "intel",
             "bonus": 3,
-            "goods": {
-              "iron": 0,
-              "wood": 0,
-              "horses": 0
-            }
+            "goods": { "iron": 0, "wood": 0, "horses": 0 }
           },
           {
             "key": "book_04",
@@ -1127,11 +898,7 @@
             "requiredSecurity": 4000,
             "stat": "intel",
             "bonus": 4,
-            "goods": {
-              "iron": 0,
-              "wood": 0,
-              "horses": 0
-            }
+            "goods": { "iron": 0, "wood": 0, "horses": 0 }
           },
           {
             "key": "book_05",
@@ -1142,11 +909,7 @@
             "requiredSecurity": 5000,
             "stat": "intel",
             "bonus": 5,
-            "goods": {
-              "iron": 0,
-              "wood": 0,
-              "horses": 0
-            }
+            "goods": { "iron": 0, "wood": 0, "horses": 0 }
           },
           {
             "key": "book_06",
@@ -1157,11 +920,7 @@
             "requiredSecurity": 6000,
             "stat": "intel",
             "bonus": 6,
-            "goods": {
-              "iron": 0,
-              "wood": 0,
-              "horses": 0
-            }
+            "goods": { "iron": 0, "wood": 0, "horses": 0 }
           }
         ],
         "sellRateBp": 5000,
@@ -1173,44 +932,17 @@
           "version": 1,
           "capacity": 3,
           "deck": [
-            {
-              "kind": "fire_attack",
-              "weight": 1
-            },
-            {
-              "kind": "sabotage",
-              "weight": 1
-            },
-            {
-              "kind": "incite",
-              "weight": 1
-            },
-            {
-              "kind": "plunder",
-              "weight": 1
-            },
-            {
-              "kind": "nation_mobilize",
-              "weight": 1
-            },
-            {
-              "kind": "nation_rivalry",
-              "weight": 1
-            },
-            {
-              "kind": "nation_raid",
-              "weight": 1
-            },
-            {
-              "kind": "trap",
-              "weight": 1
-            }
+            { "kind": "fire_attack", "weight": 1 },
+            { "kind": "sabotage", "weight": 1 },
+            { "kind": "incite", "weight": 1 },
+            { "kind": "plunder", "weight": 1 },
+            { "kind": "nation_mobilize", "weight": 1 },
+            { "kind": "nation_rivalry", "weight": 1 },
+            { "kind": "nation_raid", "weight": 1 },
+            { "kind": "trap", "weight": 1 }
           ],
           "trapCountsInCapacity": true,
-          "trap": {
-            "lossBp": 1000,
-            "atmosLoss": 10
-          },
+          "trap": { "lossBp": 1000, "atmosLoss": 10 },
           "campaignLoss": "eligibleAll",
           "consumeOnRollFailure": true,
           "checkOnReserve": false,
@@ -1220,40 +952,19 @@
           "trapExpiryMonths": null
         }
       },
+      "city-upgrade-v1": { "version": 1, "enabled": true },
       "office-effects": {
         "version": 1,
         "minimumAbility": 65,
-        "tax": {
-          "3": 10,
-          "4": 10,
-          "11": 5
-        },
-        "supplyLoss": {
-          "5": 10,
-          "6": 10,
-          "7": 10,
-          "8": 10,
-          "9": 10,
-          "10": 10
-        },
+        "tax": { "3": 10, "4": 10, "11": 5 },
+        "supplyLoss": { "5": 10, "6": 10, "7": 10, "8": 10, "9": 10, "10": 10 },
         "secretary": true
       },
-      "relations-v1": {
-        "version": 1,
-        "pairs": []
-      },
-      "policy": {
-        "version": 1,
-        "turnTermMinutes": 60
-      }
-    },
-    "initialStateHash": "46d8a339d6f66c176b60a764bcc362d60db1176a810207ab39ed1a8f014ab677",
-    "resourceHash": "8b91e6b0d3170c23dd4da4272676278038be8cf64ed97fdc1a091bca96b9ae5b"
+      "relations-v1": { "version": 1, "pairs": [] },
+      "policy": { "version": 1, "turnTermMinutes": 60 }
+    }
   },
-  "config": {
-    "endYear": null,
-    "outcomeFromSequence": 0
-  },
+  "config": { "endYear": 191, "outcomeFromSequence": 0 },
   "inputs": [
     {
       "sequence": 1,
@@ -1261,10 +972,7 @@
       "generalId": 2,
       "kind": "general.possess",
       "status": "APPLIED",
-      "payload": {
-        "generalId": 2,
-        "userId": "10000000-0000-4000-8000-000000000001"
-      },
+      "payload": { "generalId": 2, "userId": "10000000-0000-4000-8000-000000000001" },
       "result": {
         "generalId": 2,
         "userId": "10000000-0000-4000-8000-000000000001",
@@ -1281,163 +989,40 @@
       "status": "APPLIED",
       "payload": {
         "turns": [
-          {
-            "commandKey": "rest",
-            "args": {},
-            "explicit": false
-          },
-          {
-            "commandKey": "rest",
-            "args": {},
-            "explicit": false
-          },
-          {
-            "commandKey": "rest",
-            "args": {},
-            "explicit": false
-          },
-          {
-            "commandKey": "rest",
-            "args": {},
-            "explicit": false
-          },
-          {
-            "commandKey": "rest",
-            "args": {},
-            "explicit": false
-          },
-          {
-            "commandKey": "rest",
-            "args": {},
-            "explicit": false
-          },
-          {
-            "commandKey": "rest",
-            "args": {},
-            "explicit": false
-          },
-          {
-            "commandKey": "rest",
-            "args": {},
-            "explicit": false
-          },
-          {
-            "commandKey": "rest",
-            "args": {},
-            "explicit": false
-          },
-          {
-            "commandKey": "rest",
-            "args": {},
-            "explicit": false
-          },
-          {
-            "commandKey": "rest",
-            "args": {},
-            "explicit": false
-          },
-          {
-            "commandKey": "rest",
-            "args": {},
-            "explicit": false
-          },
-          {
-            "commandKey": "rest",
-            "args": {},
-            "explicit": false
-          },
-          {
-            "commandKey": "rest",
-            "args": {},
-            "explicit": false
-          },
-          {
-            "commandKey": "rest",
-            "args": {},
-            "explicit": false
-          },
-          {
-            "commandKey": "rest",
-            "args": {},
-            "explicit": false
-          },
-          {
-            "commandKey": "rest",
-            "args": {},
-            "explicit": false
-          },
-          {
-            "commandKey": "rest",
-            "args": {},
-            "explicit": false
-          },
-          {
-            "commandKey": "rest",
-            "args": {},
-            "explicit": false
-          },
-          {
-            "commandKey": "rest",
-            "args": {},
-            "explicit": false
-          },
-          {
-            "commandKey": "rest",
-            "args": {},
-            "explicit": false
-          },
-          {
-            "commandKey": "rest",
-            "args": {},
-            "explicit": false
-          },
-          {
-            "commandKey": "rest",
-            "args": {},
-            "explicit": false
-          },
-          {
-            "commandKey": "rest",
-            "args": {},
-            "explicit": false
-          },
-          {
-            "commandKey": "rest",
-            "args": {},
-            "explicit": false
-          },
-          {
-            "commandKey": "rest",
-            "args": {},
-            "explicit": false
-          },
-          {
-            "commandKey": "rest",
-            "args": {},
-            "explicit": false
-          },
-          {
-            "commandKey": "rest",
-            "args": {},
-            "explicit": false
-          },
-          {
-            "commandKey": "rest",
-            "args": {},
-            "explicit": false
-          },
-          {
-            "commandKey": "rest",
-            "args": {},
-            "explicit": false
-          }
+          { "commandKey": "rest", "args": {}, "explicit": false },
+          { "commandKey": "rest", "args": {}, "explicit": false },
+          { "commandKey": "rest", "args": {}, "explicit": false },
+          { "commandKey": "rest", "args": {}, "explicit": false },
+          { "commandKey": "rest", "args": {}, "explicit": false },
+          { "commandKey": "rest", "args": {}, "explicit": false },
+          { "commandKey": "rest", "args": {}, "explicit": false },
+          { "commandKey": "rest", "args": {}, "explicit": false },
+          { "commandKey": "rest", "args": {}, "explicit": false },
+          { "commandKey": "rest", "args": {}, "explicit": false },
+          { "commandKey": "rest", "args": {}, "explicit": false },
+          { "commandKey": "rest", "args": {}, "explicit": false },
+          { "commandKey": "rest", "args": {}, "explicit": false },
+          { "commandKey": "rest", "args": {}, "explicit": false },
+          { "commandKey": "rest", "args": {}, "explicit": false },
+          { "commandKey": "rest", "args": {}, "explicit": false },
+          { "commandKey": "rest", "args": {}, "explicit": false },
+          { "commandKey": "rest", "args": {}, "explicit": false },
+          { "commandKey": "rest", "args": {}, "explicit": false },
+          { "commandKey": "rest", "args": {}, "explicit": false },
+          { "commandKey": "rest", "args": {}, "explicit": false },
+          { "commandKey": "rest", "args": {}, "explicit": false },
+          { "commandKey": "rest", "args": {}, "explicit": false },
+          { "commandKey": "rest", "args": {}, "explicit": false },
+          { "commandKey": "rest", "args": {}, "explicit": false },
+          { "commandKey": "rest", "args": {}, "explicit": false },
+          { "commandKey": "rest", "args": {}, "explicit": false },
+          { "commandKey": "rest", "args": {}, "explicit": false },
+          { "commandKey": "rest", "args": {}, "explicit": false },
+          { "commandKey": "rest", "args": {}, "explicit": false }
         ],
         "revision": 1
       },
-      "result": {
-        "revision": 2,
-        "activeTick": 0
-      }
+      "result": { "revision": 2, "activeTick": 0 }
     },
     {
       "sequence": 3,
@@ -1445,557 +1030,248 @@
       "generalId": 2,
       "kind": "general.setPolicy",
       "status": "APPLIED",
-      "payload": {
-        "policy": "farm"
-      },
-      "result": {
-        "policy": "farm",
-        "activeTick": 0
-      }
+      "payload": { "policy": "farm" },
+      "result": { "policy": "farm", "activeTick": 0 }
     }
   ],
   "months": [
     {
-      "sequence": 5,
       "tick": 10000,
       "year": 191,
       "month": 1,
-      "stateHash": "fcb9292ebd49df4a89b3fd39719989e774e91fe6df71c22728ed8bc12c11f558",
+      "sequence": 5,
+      "stateHash": "b5f04666641ed9c651c003b9f21e88d97f299971a59da9dbed1e0852245690e8",
       "data": {
         "nations": [
-          {
-            "nationId": 1,
-            "cities": 2,
-            "generals": 0,
-            "power": 2340,
-            "gold": 100,
-            "rice": 200
-          },
-          {
-            "nationId": 2,
-            "cities": 2,
-            "generals": 1,
-            "power": 2340,
-            "gold": 100,
-            "rice": 200
-          }
+          { "nationId": 1, "cities": 2, "generals": 0, "power": 2340, "gold": 100, "rice": 200 },
+          { "nationId": 2, "cities": 2, "generals": 1, "power": 2340, "gold": 100, "rice": 200 }
         ],
         "cities": [
-          {
-            "cityKey": 1,
-            "nationId": 1
-          },
-          {
-            "cityKey": 2,
-            "nationId": 2
-          },
-          {
-            "cityKey": 3,
-            "nationId": 1
-          },
-          {
-            "cityKey": 4,
-            "nationId": 2
-          }
+          { "cityKey": 1, "nationId": 1 },
+          { "cityKey": 2, "nationId": 2 },
+          { "cityKey": 3, "nationId": 1 },
+          { "cityKey": 4, "nationId": 2 }
         ]
       }
     },
     {
-      "sequence": 7,
       "tick": 20000,
       "year": 191,
       "month": 2,
-      "stateHash": "3126eed53d8064a13c25bb3b1c80261da74e4f70756bf721142c095cf0b5d601",
+      "sequence": 7,
+      "stateHash": "42c70fcbb08482ecde88459fb14990dedd65ab4495a26756bf8fe0754bf2f39b",
       "data": {
         "nations": [
-          {
-            "nationId": 1,
-            "cities": 2,
-            "generals": 0,
-            "power": 2380,
-            "gold": 100,
-            "rice": 200
-          },
-          {
-            "nationId": 2,
-            "cities": 2,
-            "generals": 1,
-            "power": 2380,
-            "gold": 100,
-            "rice": 200
-          }
+          { "nationId": 1, "cities": 2, "generals": 0, "power": 2380, "gold": 100, "rice": 200 },
+          { "nationId": 2, "cities": 2, "generals": 1, "power": 2380, "gold": 100, "rice": 200 }
         ],
         "cities": [
-          {
-            "cityKey": 1,
-            "nationId": 1
-          },
-          {
-            "cityKey": 2,
-            "nationId": 2
-          },
-          {
-            "cityKey": 3,
-            "nationId": 1
-          },
-          {
-            "cityKey": 4,
-            "nationId": 2
-          }
+          { "cityKey": 1, "nationId": 1 },
+          { "cityKey": 2, "nationId": 2 },
+          { "cityKey": 3, "nationId": 1 },
+          { "cityKey": 4, "nationId": 2 }
         ]
       }
     },
     {
-      "sequence": 9,
       "tick": 30000,
       "year": 191,
       "month": 3,
-      "stateHash": "e60df55ab8232837918ba467ce45586eab4526d52ffc2de8b26e893aeef95c05",
+      "sequence": 9,
+      "stateHash": "93803687954d1abcc77ef515dffa8a7c7bc85fedf8621d87eaa8fd241d294a3d",
       "data": {
         "nations": [
-          {
-            "nationId": 1,
-            "cities": 2,
-            "generals": 0,
-            "power": 2418,
-            "gold": 100,
-            "rice": 200
-          },
-          {
-            "nationId": 2,
-            "cities": 2,
-            "generals": 1,
-            "power": 2418,
-            "gold": 100,
-            "rice": 200
-          }
+          { "nationId": 1, "cities": 2, "generals": 0, "power": 2418, "gold": 100, "rice": 200 },
+          { "nationId": 2, "cities": 2, "generals": 1, "power": 2418, "gold": 100, "rice": 200 }
         ],
         "cities": [
-          {
-            "cityKey": 1,
-            "nationId": 1
-          },
-          {
-            "cityKey": 2,
-            "nationId": 2
-          },
-          {
-            "cityKey": 3,
-            "nationId": 1
-          },
-          {
-            "cityKey": 4,
-            "nationId": 2
-          }
+          { "cityKey": 1, "nationId": 1 },
+          { "cityKey": 2, "nationId": 2 },
+          { "cityKey": 3, "nationId": 1 },
+          { "cityKey": 4, "nationId": 2 }
         ]
       }
     },
     {
-      "sequence": 11,
       "tick": 40000,
       "year": 191,
       "month": 4,
-      "stateHash": "ad87c0bb43bdfb0132f641ad88c8725acb0ad5765399a726b8d36eceacd6e408",
+      "sequence": 11,
+      "stateHash": "df573b3210cc71a739a6bc6653cce2af20954324091e60153739a306ad12ba74",
       "data": {
         "nations": [
-          {
-            "nationId": 1,
-            "cities": 2,
-            "generals": 0,
-            "power": 2456,
-            "gold": 100,
-            "rice": 200
-          },
-          {
-            "nationId": 2,
-            "cities": 2,
-            "generals": 1,
-            "power": 2456,
-            "gold": 100,
-            "rice": 200
-          }
+          { "nationId": 1, "cities": 2, "generals": 0, "power": 2456, "gold": 100, "rice": 200 },
+          { "nationId": 2, "cities": 2, "generals": 1, "power": 2456, "gold": 100, "rice": 200 }
         ],
         "cities": [
-          {
-            "cityKey": 1,
-            "nationId": 1
-          },
-          {
-            "cityKey": 2,
-            "nationId": 2
-          },
-          {
-            "cityKey": 3,
-            "nationId": 1
-          },
-          {
-            "cityKey": 4,
-            "nationId": 2
-          }
+          { "cityKey": 1, "nationId": 1 },
+          { "cityKey": 2, "nationId": 2 },
+          { "cityKey": 3, "nationId": 1 },
+          { "cityKey": 4, "nationId": 2 }
         ]
       }
     },
     {
-      "sequence": 13,
       "tick": 50000,
       "year": 191,
       "month": 5,
-      "stateHash": "d1baf7f105bf590a1fae6c55acee91a33d9086a917c50bde3865c965a3347168",
+      "sequence": 13,
+      "stateHash": "8186ab2470686aaa8feb3c14449b3ab60c77d7430292ac077179028496a1ef0d",
       "data": {
         "nations": [
-          {
-            "nationId": 1,
-            "cities": 2,
-            "generals": 0,
-            "power": 2492,
-            "gold": 100,
-            "rice": 200
-          },
-          {
-            "nationId": 2,
-            "cities": 2,
-            "generals": 1,
-            "power": 2492,
-            "gold": 100,
-            "rice": 200
-          }
+          { "nationId": 1, "cities": 2, "generals": 0, "power": 2492, "gold": 100, "rice": 200 },
+          { "nationId": 2, "cities": 2, "generals": 1, "power": 2492, "gold": 100, "rice": 200 }
         ],
         "cities": [
-          {
-            "cityKey": 1,
-            "nationId": 1
-          },
-          {
-            "cityKey": 2,
-            "nationId": 2
-          },
-          {
-            "cityKey": 3,
-            "nationId": 1
-          },
-          {
-            "cityKey": 4,
-            "nationId": 2
-          }
+          { "cityKey": 1, "nationId": 1 },
+          { "cityKey": 2, "nationId": 2 },
+          { "cityKey": 3, "nationId": 1 },
+          { "cityKey": 4, "nationId": 2 }
         ]
       }
     },
     {
-      "sequence": 15,
       "tick": 60000,
       "year": 191,
       "month": 6,
-      "stateHash": "38c0e3f8a2f8dac365b2dbd3be717ca7f99ae4ef20391df5b33b18563193757c",
+      "sequence": 15,
+      "stateHash": "43595233629edc054ae69e477883b30d008c21623ee7d9ccd2ddad5c4a835e7d",
       "data": {
         "nations": [
-          {
-            "nationId": 1,
-            "cities": 2,
-            "generals": 0,
-            "power": 2528,
-            "gold": 100,
-            "rice": 200
-          },
-          {
-            "nationId": 2,
-            "cities": 2,
-            "generals": 1,
-            "power": 2528,
-            "gold": 100,
-            "rice": 200
-          }
+          { "nationId": 1, "cities": 2, "generals": 0, "power": 2528, "gold": 100, "rice": 200 },
+          { "nationId": 2, "cities": 2, "generals": 1, "power": 2528, "gold": 100, "rice": 200 }
         ],
         "cities": [
-          {
-            "cityKey": 1,
-            "nationId": 1
-          },
-          {
-            "cityKey": 2,
-            "nationId": 2
-          },
-          {
-            "cityKey": 3,
-            "nationId": 1
-          },
-          {
-            "cityKey": 4,
-            "nationId": 2
-          }
+          { "cityKey": 1, "nationId": 1 },
+          { "cityKey": 2, "nationId": 2 },
+          { "cityKey": 3, "nationId": 1 },
+          { "cityKey": 4, "nationId": 2 }
         ]
       }
     },
     {
-      "sequence": 17,
       "tick": 70000,
       "year": 191,
       "month": 7,
-      "stateHash": "2e30184fe547bd595e5600b7625e2574cabb8b07a16edd892f56dbe4e7a80855",
+      "sequence": 17,
+      "stateHash": "9040b51150c48ed8cf364f7f0fbedb48e4297566e63af072a4b8a7916c05687f",
       "data": {
         "nations": [
-          {
-            "nationId": 1,
-            "cities": 2,
-            "generals": 0,
-            "power": 2564,
-            "gold": 100,
-            "rice": 200
-          },
-          {
-            "nationId": 2,
-            "cities": 2,
-            "generals": 1,
-            "power": 2564,
-            "gold": 100,
-            "rice": 200
-          }
+          { "nationId": 1, "cities": 2, "generals": 0, "power": 2564, "gold": 100, "rice": 200 },
+          { "nationId": 2, "cities": 2, "generals": 1, "power": 2564, "gold": 100, "rice": 200 }
         ],
         "cities": [
-          {
-            "cityKey": 1,
-            "nationId": 1
-          },
-          {
-            "cityKey": 2,
-            "nationId": 2
-          },
-          {
-            "cityKey": 3,
-            "nationId": 1
-          },
-          {
-            "cityKey": 4,
-            "nationId": 2
-          }
+          { "cityKey": 1, "nationId": 1 },
+          { "cityKey": 2, "nationId": 2 },
+          { "cityKey": 3, "nationId": 1 },
+          { "cityKey": 4, "nationId": 2 }
         ]
       }
     },
     {
-      "sequence": 19,
       "tick": 80000,
       "year": 191,
       "month": 8,
-      "stateHash": "1da111303ea90ce14990b1c761570ac5673ea3d0da26b6210388a2a14c46eab8",
+      "sequence": 19,
+      "stateHash": "dc75f5a97af4e9cefd24ed54a003571e1b7965100da10804235f2c4798aa8a87",
       "data": {
         "nations": [
-          {
-            "nationId": 1,
-            "cities": 2,
-            "generals": 0,
-            "power": 2598,
-            "gold": 100,
-            "rice": 200
-          },
-          {
-            "nationId": 2,
-            "cities": 2,
-            "generals": 1,
-            "power": 2598,
-            "gold": 100,
-            "rice": 200
-          }
+          { "nationId": 1, "cities": 2, "generals": 0, "power": 2598, "gold": 100, "rice": 200 },
+          { "nationId": 2, "cities": 2, "generals": 1, "power": 2598, "gold": 100, "rice": 200 }
         ],
         "cities": [
-          {
-            "cityKey": 1,
-            "nationId": 1
-          },
-          {
-            "cityKey": 2,
-            "nationId": 2
-          },
-          {
-            "cityKey": 3,
-            "nationId": 1
-          },
-          {
-            "cityKey": 4,
-            "nationId": 2
-          }
+          { "cityKey": 1, "nationId": 1 },
+          { "cityKey": 2, "nationId": 2 },
+          { "cityKey": 3, "nationId": 1 },
+          { "cityKey": 4, "nationId": 2 }
         ]
       }
     },
     {
-      "sequence": 21,
       "tick": 90000,
       "year": 191,
       "month": 9,
-      "stateHash": "031cc281b8be9dd77a6c3b915072cd87a45561a25a529398c32409104083f857",
+      "sequence": 21,
+      "stateHash": "2f3bc64f660f64345be7f5f1cd125dece8642e22311bce72102de3a395b19802",
       "data": {
         "nations": [
-          {
-            "nationId": 1,
-            "cities": 2,
-            "generals": 0,
-            "power": 2632,
-            "gold": 100,
-            "rice": 200
-          },
-          {
-            "nationId": 2,
-            "cities": 2,
-            "generals": 1,
-            "power": 2632,
-            "gold": 100,
-            "rice": 200
-          }
+          { "nationId": 1, "cities": 2, "generals": 0, "power": 2632, "gold": 100, "rice": 200 },
+          { "nationId": 2, "cities": 2, "generals": 1, "power": 2632, "gold": 100, "rice": 200 }
         ],
         "cities": [
-          {
-            "cityKey": 1,
-            "nationId": 1
-          },
-          {
-            "cityKey": 2,
-            "nationId": 2
-          },
-          {
-            "cityKey": 3,
-            "nationId": 1
-          },
-          {
-            "cityKey": 4,
-            "nationId": 2
-          }
+          { "cityKey": 1, "nationId": 1 },
+          { "cityKey": 2, "nationId": 2 },
+          { "cityKey": 3, "nationId": 1 },
+          { "cityKey": 4, "nationId": 2 }
         ]
       }
     },
     {
-      "sequence": 23,
       "tick": 100000,
       "year": 191,
       "month": 10,
-      "stateHash": "0e1c8733a10a15cc5f2e7f0a62dba643752961ca160ad69e6a348fee71c37827",
+      "sequence": 23,
+      "stateHash": "cc3b4c2fec114d834cefc3dafb8430b8a26f6755c65e8914e3d819db2ff82744",
       "data": {
         "nations": [
-          {
-            "nationId": 1,
-            "cities": 2,
-            "generals": 0,
-            "power": 2666,
-            "gold": 100,
-            "rice": 200
-          },
-          {
-            "nationId": 2,
-            "cities": 2,
-            "generals": 1,
-            "power": 2666,
-            "gold": 100,
-            "rice": 200
-          }
+          { "nationId": 1, "cities": 2, "generals": 0, "power": 2666, "gold": 100, "rice": 200 },
+          { "nationId": 2, "cities": 2, "generals": 1, "power": 2666, "gold": 100, "rice": 200 }
         ],
         "cities": [
-          {
-            "cityKey": 1,
-            "nationId": 1
-          },
-          {
-            "cityKey": 2,
-            "nationId": 2
-          },
-          {
-            "cityKey": 3,
-            "nationId": 1
-          },
-          {
-            "cityKey": 4,
-            "nationId": 2
-          }
+          { "cityKey": 1, "nationId": 1 },
+          { "cityKey": 2, "nationId": 2 },
+          { "cityKey": 3, "nationId": 1 },
+          { "cityKey": 4, "nationId": 2 }
         ]
       }
     },
     {
-      "sequence": 25,
       "tick": 110000,
       "year": 191,
       "month": 11,
-      "stateHash": "66cce95c8b44680f178a27cfc62ea91e06c4429bc0ae5e5a9cdf992dcbf22f55",
+      "sequence": 25,
+      "stateHash": "7f4dfe9adf1f9c431afcb8a281bed24f3cf6018fa20ec0b1eb906e87b2278b0b",
       "data": {
         "nations": [
-          {
-            "nationId": 1,
-            "cities": 2,
-            "generals": 0,
-            "power": 2698,
-            "gold": 100,
-            "rice": 200
-          },
-          {
-            "nationId": 2,
-            "cities": 2,
-            "generals": 1,
-            "power": 2698,
-            "gold": 100,
-            "rice": 200
-          }
+          { "nationId": 1, "cities": 2, "generals": 0, "power": 2698, "gold": 100, "rice": 200 },
+          { "nationId": 2, "cities": 2, "generals": 1, "power": 2698, "gold": 100, "rice": 200 }
         ],
         "cities": [
-          {
-            "cityKey": 1,
-            "nationId": 1
-          },
-          {
-            "cityKey": 2,
-            "nationId": 2
-          },
-          {
-            "cityKey": 3,
-            "nationId": 1
-          },
-          {
-            "cityKey": 4,
-            "nationId": 2
-          }
+          { "cityKey": 1, "nationId": 1 },
+          { "cityKey": 2, "nationId": 2 },
+          { "cityKey": 3, "nationId": 1 },
+          { "cityKey": 4, "nationId": 2 }
         ]
       }
     },
     {
-      "sequence": 27,
       "tick": 120000,
       "year": 191,
       "month": 12,
-      "stateHash": "965ac6d8f96cfb2e436ffe1321c3268a81150477d05d14b8307bcdf9a5b017e0",
+      "sequence": 27,
+      "stateHash": "539a9712d6ffae5b931468f6d9aff540b400a73373548e677877511240e59390",
       "data": {
         "nations": [
-          {
-            "nationId": 1,
-            "cities": 2,
-            "generals": 0,
-            "power": 2730,
-            "gold": 100,
-            "rice": 200
-          },
-          {
-            "nationId": 2,
-            "cities": 2,
-            "generals": 1,
-            "power": 2730,
-            "gold": 100,
-            "rice": 200
-          }
+          { "nationId": 1, "cities": 2, "generals": 0, "power": 2730, "gold": 100, "rice": 200 },
+          { "nationId": 2, "cities": 2, "generals": 1, "power": 2730, "gold": 100, "rice": 200 }
         ],
         "cities": [
-          {
-            "cityKey": 1,
-            "nationId": 1
-          },
-          {
-            "cityKey": 2,
-            "nationId": 2
-          },
-          {
-            "cityKey": 3,
-            "nationId": 1
-          },
-          {
-            "cityKey": 4,
-            "nationId": 2
-          }
+          { "cityKey": 1, "nationId": 1 },
+          { "cityKey": 2, "nationId": 2 },
+          { "cityKey": 3, "nationId": 1 },
+          { "cityKey": 4, "nationId": 2 }
         ]
       }
     }
   ],
-  "end": null,
+  "end": {
+    "sequence": 27,
+    "tick": 120000,
+    "reason": "END_YEAR",
+    "winnerNationId": null,
+    "year": 191,
+    "month": 12,
+    "finalStateHash": "539a9712d6ffae5b931468f6d9aff540b400a73373548e677877511240e59390"
+  },
   "afterEnd": []
 }

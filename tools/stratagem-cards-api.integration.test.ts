@@ -185,6 +185,7 @@ async function fixture(
     intel: 55,
     politics: 55,
     charm: 55,
+    sex: 'MALE' as const,
     portraitId: null,
   };
   let playerId = '';
@@ -300,6 +301,7 @@ async function attacker(f: Awaited<ReturnType<typeof fixture>>) {
       intel: 55,
       politics: 55,
       charm: 55,
+      sex: 'MALE' as const,
       portraitId: null,
     },
     player,
@@ -584,6 +586,7 @@ it('AC-P2-23 게시491명의 실제 관리자 초기화는 설정과 새 카드 
         intel: 55,
         politics: 55,
         charm: 55,
+        sex: 'MALE' as const,
         portraitId: null,
       },
     },

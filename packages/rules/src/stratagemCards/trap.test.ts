@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { createRng } from '@opensamguk/shared';
-import { commandWorld, testUnits } from '../../test/commandFixture';
+import { commandWorld, testUnits } from '../../test/builtinCommandFixture';
 import { createCommandResolver } from '../commands/resolve';
 import { applyEffects } from '../commands/effects';
 import { cloneWorld } from '../model/clone';

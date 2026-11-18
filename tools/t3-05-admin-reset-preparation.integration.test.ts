@@ -70,17 +70,6 @@ let failed = false,
 const oldWorlds: string[] = [],
   newWorlds: string[] = [],
   monthHashes: string[] = [];
-const features = [
-  'campaign-v1',
-  'five-stats',
-  'operational-map',
-  'personnel',
-  'policy',
-  'stratagem-basic',
-  'treaty',
-  'treaty-break',
-  'treaty-trade',
-].sort();
 const origin = 'http://127.0.0.1:5173';
 function fail(error: unknown) {
   failed = true;
@@ -210,8 +199,6 @@ async function publishedCli(signal: AbortSignal) {
       'five-stats',
       '--portrait-map',
       '191-map',
-      '--rule-features',
-      features.join(','),
       '--seed',
       'reset-original-cli',
       '--name',
@@ -568,6 +555,7 @@ it('AC-M3-04 실제 API와 엔진으로 기존 사람 장수·30예약·입력 �
       body: JSON.stringify({
         worldId,
         name: '보존사람',
+        sex: 'MALE' as const,
         portraitId: null,
         leadership: 55,
         strength: 55,

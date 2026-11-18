@@ -159,6 +159,7 @@ function creation(name: string) {
     intel: stat,
     politics: stat,
     charm: stat,
+    sex: 'MALE' as const,
     portraitId: null,
   };
 }
@@ -166,7 +167,7 @@ function selectPlayer(seed: string, id: number, tick: number, excluded: readonly
   const payload = creation('황실장수');
   const cities = initial.cities.filter(
     (city) =>
-      city.kind !== 'PASS' &&
+      (city.kind === undefined || city.kind === 'CITY') &&
       city.nationId === null &&
       city.population >= 100_000 &&
       city.commerce >= 1000 &&
@@ -182,7 +183,9 @@ function selectPlayer(seed: string, id: number, tick: number, excluded: readonly
       startYear: initial.startYear,
       tick,
       monthlyTick: 0,
-      cityKeys: initial.cities.filter((city) => city.kind !== 'PASS').map((city) => city.cityKey),
+      cityKeys: initial.cities
+        .filter((city) => city.kind === undefined || city.kind === 'CITY')
+        .map((city) => city.cityKey),
       unitSet: initial.unitSet,
     });
     // 월말 스냅샷 뒤 같은 tick에 장수 턴이 실행되는 경우를 피한다.

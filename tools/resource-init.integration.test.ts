@@ -10,7 +10,7 @@ import { expect, it } from 'vitest';
 import { createDb, type PrismaClient } from '../packages/db/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { monthlyFixture } from '../apps/engine/test/monthlyFixture';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { insertHistoricalWorld } from './historical-world-fixture';
 import { initializeResources, ResourceInitializationError } from './init-resources';
 import { BODY_TAG, RESOURCE_INPUTS } from './resources-sql/convert';
 import { INITIAL_NOTICE_FIXTURE, verifyInitialNotice } from './resources-sql/notice';
@@ -179,13 +179,8 @@ it('P1 빈 DB에 기존 SQL과 자원 migration 전체를 적용한다', async (
 });
 
 it('P2 기존 월드·도시·replayOrigin은 자원 migration 뒤에도 같다', async () => {
-  await withDatabase(async ({ db, native, applyCatalog }) => {
-    const { worldId } = await saveInitialWorld(db, await monthlyFixture(), {
-      name: '자원 이전',
-      turnTermMinutes: 60,
-      endYear: null,
-      replayFormat: 'legacy',
-    });
+  await withDatabase(async ({ native, applyCatalog }) => {
+    const worldId = await insertHistoricalWorld(native, await monthlyFixture(), '자원 이전');
     const snapshot = async () => ({
       world: (await native.query('SELECT to_jsonb(w) AS row FROM "World" w WHERE id = $1', [worldId])).rows,
       cities: (

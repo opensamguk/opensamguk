@@ -49,17 +49,7 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
   const origin = 'http://127.0.0.1:5173',
     seed = 'int19-formal-orders-http-191',
     now = Date.now();
-  const features = [
-    'campaign-assignment-v2',
-    'campaign-v1',
-    'city-resources-v1',
-    'five-stats',
-    'operational-map',
-    'personnel',
-    'policy',
-    'stratagem-basic',
-    'treaty',
-  ];
+  const features = [...providedRuleKeys];
   const worldIds: string[] = [],
     userIds: string[] = [],
     sanctionIds: string[] = [];
@@ -428,7 +418,6 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
             portraitMap: '191-map',
             seed,
           });
-          providedRuleKeys = [...features];
           originHash = hashState(initial);
           for (let count = 0; count < 2; count++) {
             signal();

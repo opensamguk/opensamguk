@@ -1,7 +1,7 @@
 import type { RuleFeatureDefinition } from '../ruleRegistry';
 import { cloneWorld } from '../model/clone';
 import { CITY_UPGRADE_FEATURE, cityUpgradeConfigSchema, initialCityUpgrade } from './state';
-import { cityUpgradeCommands } from './upgrade';
+import { cityUpgradeCommands } from './commands';
 
 export const cityUpgradeFeature: RuleFeatureDefinition = {
   key: CITY_UPGRADE_FEATURE,

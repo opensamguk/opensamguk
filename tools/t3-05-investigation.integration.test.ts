@@ -421,6 +421,7 @@ it('AC-M3-05 정식 두 월드와 실제 같은 기기 가입·장수 생성으�
         {
           worldId,
           name: '조사사람' + users.indexOf(user),
+          sex: 'MALE' as const,
           portraitId: null,
           leadership: 55,
           strength: 55,

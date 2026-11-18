@@ -13,7 +13,7 @@ import { TICKS_PER_MONTH, type LineageInput } from '../packages/rules/src/index'
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { initializeIntegrationResources } from './integration-resources';
 import { hashState } from '../packages/shared/src/node/hashState';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease, lockLease, assertLease } from '../apps/engine/src/lease';
 import { processAdminReset } from '../apps/engine/src/admin/reset';
@@ -203,6 +203,9 @@ const payload = (worldId: string, name = '유산장수') => ({
   leadership: 70,
   strength: 70,
   intel: 60,
+  sex: 'MALE' as const,
+  politics: 38,
+  charm: 37,
   portraitId: null,
   heritage: { leadership: 3, intel: 3 },
 });
@@ -369,6 +372,8 @@ it('AC-P2-33 계승 전후 36개월 활동을 합산하고 다음 허용 기수�
       leadership: 70,
       strength: 70,
       intel: 60,
+      politics: 38,
+      charm: 37,
       portraitId: null,
     });
     await advance(id);
@@ -434,8 +439,12 @@ it('AC-P2-33 계승 전후 36개월 활동을 합산하고 다음 허용 기수�
 
   const disabled = await world({ enabled: false });
   const bonus = { leadership: 3 };
-  expect((await rpc('general.mine', { worldId: disabled }, father)).data!.creationRules).not.toHaveProperty('heritage');
-  expect((await rpc('general.create', { ...payload(disabled), heritage: bonus }, father)).status).toBe(400);
+  expect((await rpc('general.mine', { worldId: disabled }, father)).data!.creationRules.heritage).toMatchObject({
+    balance: 3,
+    perStat: 3,
+    perGeneral: 6,
+  });
+  expect((await rpc('general.create', { ...payload(disabled), heritage: { leadership: 4 } }, father)).status).toBe(400);
   expect(await db.inputEvent.count({ where: { worldId: disabled, kind: 'general.create' } })).toBe(0);
   expect((await invariant(father)).balance).toBe(3);
 
@@ -710,6 +719,7 @@ it.each(['end', 'reset'] as const)(
       intel: 55,
       politics: 55,
       charm: 55,
+      sex: 'MALE' as const,
       portraitId: null,
     });
     await advance(id);
@@ -959,6 +969,7 @@ it('AC-P2-33 실제 491명 시나리오 초기화는 원본 사용만 반환하�
     intel: 55,
     politics: 55,
     charm: 55,
+    sex: 'MALE' as const,
     portraitId: null,
     heritage: { leadership: 3, intel: 3 },
   });
@@ -1010,6 +1021,7 @@ it('AC-P2-33 실제 491명 시나리오 초기화는 원본 사용만 반환하�
     intel: 55,
     politics: 55,
     charm: 55,
+    sex: 'MALE' as const,
     portraitId: null,
     heritage: { leadership: 3, intel: 3 },
   });

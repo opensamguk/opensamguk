@@ -60,7 +60,7 @@ export function suggestOperationTurns(input: OperationSuggestionInput): Operatio
     const preparations: PolicySlot[] = [];
     const add = (turn: PolicySlot) => {
       preparations.push(turn);
-      prepareOperationReadiness(expected, turn);
+      prepareOperationReadiness(expected, turn, input);
     };
     if (expected.crew < input.min.crew) {
       const turn = direct('recruit', { amount: input.min.crew - expected.crew, crewType: input.crewType });

@@ -634,6 +634,7 @@ it('AC-M3-04 정식 두 월드·실제 사람 입력·각30칸과 기존 기록�
         {
           worldId: saved.worldId,
           name: '보존사람' + index,
+          sex: 'MALE' as const,
           portraitId: null,
           leadership: 55,
           strength: 55,

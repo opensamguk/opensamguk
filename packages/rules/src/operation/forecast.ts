@@ -30,7 +30,7 @@ export function calculateOperationForecast(input: OperationForecastInput) {
       }
       effective[cell.slot] = turn;
     }
-    prepareOperationReadiness(expected, turn);
+    prepareOperationReadiness(expected, turn, input);
   }
   const result = calculateOperationTimeline({ ...input, turns: effective });
   // 표시 칸은 저장된 명령을 유지한다. 방침 선택은 예상값에만 쓴다.

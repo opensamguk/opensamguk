@@ -38,6 +38,7 @@ it('AC-INT-19B 정식191년21국491명에서 사람 생성·정상출사·NPC지
   expect(replay.state.campaign).not.toHaveProperty('orders');
   const payload = {
     name: '지시수신',
+    sex: 'MALE' as const,
     portraitId: null,
     leadership: 55,
     strength: 55,

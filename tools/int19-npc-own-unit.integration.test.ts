@@ -296,6 +296,7 @@ beforeAll(() => {
         {
           worldId,
           name: '지시검사',
+          sex: 'MALE' as const,
           portraitId: null,
           leadership: 55,
           strength: 55,

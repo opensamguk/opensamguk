@@ -91,6 +91,7 @@ async function createHuman() {
       {
         worldId,
         name: '계략검사',
+        sex: 'MALE' as const,
         portraitId: null,
         leadership: 55,
         strength: 70,

@@ -907,7 +907,17 @@ it('AC-P2-19 HTTP 상태·첫 칸·30칸은 같은 휴전 시계를 쓰고 기�
   await controlClock(db, worldId, 'resume');
   const creating = call(
     'general.create',
-    { worldId, name: '휴전장', leadership: 70, strength: 70, intel: 60, portraitId: null },
+    {
+      worldId,
+      name: '휴전장',
+      leadership: 70,
+      strength: 70,
+      intel: 60,
+      sex: 'MALE' as const,
+      politics: 38,
+      charm: 37,
+      portraitId: null,
+    },
     ordinary.cookie,
   );
   await expect

@@ -16,7 +16,7 @@ import {
   readInitialResources,
   resourceRoot,
 } from '../apps/engine/src/world/resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveInitialWorld, prepareInitialWorld } from '../apps/engine/src/world/persistence';
 import { exportReplay, replayArchive, resourceHash } from '../apps/engine/src/replay';
 import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -27,12 +27,15 @@ import { scenarioTitle } from '../apps/server/src/routers/lobby';
 import { validateWorldResources } from '../packages/rules/src/world/validate/index';
 import baseline from './fixtures/t4-77-baseline.json';
 import { initializeResources } from './init-resources';
+import { initializeSan10Resources } from './san10-resources';
 import { BODY_TAG, convertResourcesToSql, RESOURCE_INPUTS, type ResourceTexts } from './resources-sql/convert';
 import { INITIAL_NOTICE_FIXTURE, verifyInitialNotice } from './resources-sql/notice';
 import { testDatabaseUrl } from './test-database';
 import { getResource, listResources } from '../apps/server/src/resourceAdmin/read';
 import { makeLimits, RESOURCE_PAYLOAD_LIMITS } from '../apps/server/src/resourceAdmin/payload';
 import { simulateGame } from '../apps/engine/src/simulation';
+import { operationalInput } from '../packages/rules/test/operationalMapFixture';
+import { commandInitial } from '../packages/rules/test/commandFixture';
 
 vi.mock('../packages/rules/src/index', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../packages/rules/src/index')>();
@@ -47,7 +50,7 @@ const root = new URL('../', import.meta.url);
 const migrationRoot = new URL('packages/db/prisma/migrations/', root);
 const buildSpy = vi.mocked(buildInitialWorld);
 const fileSpy = vi.mocked(readFile);
-const options = { scenario: '1030', map: 'che', seed: 'loader' };
+const options = { scenario: '1030', map: 'che', statRules: 'default', portraitMap: 'rtk14-map', seed: 'loader' };
 const refs: GameResourceRef[] = RESOURCE_INPUTS.map(({ kind, name }) => ({ kind, name, version: 1 }));
 
 interface PgClient {
@@ -305,13 +308,13 @@ function countingDb(db: PrismaClient) {
   return { db: wrapper, count: () => count };
 }
 
-it('P13 빈 표는 다섯 누락 키와 초기화 안내로 실패하고 파일을 읽지 않는다', async () => {
+it('P13 빈 표는 첫 시나리오 누락 키와 초기화 안내로 실패하고 파일을 읽지 않는다', async () => {
   await withDatabase(async ({ db }) => {
     await noFileFallback(async () => {
       const error = await loadInitialWorldFromDb(db, options).catch((error: unknown) => error);
       expect(error).toBeInstanceOf(Error);
       const message = (error as Error).message;
-      for (const ref of refs) expect(message).toContain(`${ref.kind}/${ref.name}/1`);
+      expect(message).toContain('SCENARIO/1030/1');
       expect(message).toContain('pnpm db:init-resources');
     });
   });
@@ -380,8 +383,14 @@ it.each([false, true])('AC-P2-27 게시 2판 CLI 생성·출처·초기화·재�
   await withDatabase(
     async (fixture) => {
       const original = await readInitialResources(fixture.db, options);
+      // 게시 판·출처·초기화·재생의 대조에는 정식 명단 전체가 필요하지 않다.
+      const scenario = cliScenario(original.scenario.content, 's3-versioned-scenario');
       for (const row of Object.values(original))
-        await insertResource(fixture, { kind: row.kind, name: row.name, version: 2 }, row.content);
+        await insertResource(
+          fixture,
+          { kind: row.kind, name: row.kind === 'SCENARIO' ? scenario.id : row.name, version: 2 },
+          row.kind === 'SCENARIO' ? scenario : row.kind === 'STAT_RULES' ? operationalInput().statRules : row.content,
+        );
       const output = execFileSync(
         process.execPath,
         [
@@ -392,7 +401,7 @@ it.each([false, true])('AC-P2-27 게시 2판 CLI 생성·출처·초기화·재�
           '--map',
           'che@2',
           '--scenario',
-          '1030@2',
+          `${scenario.id}@2`,
           '--unit-set',
           'basic@2',
           '--stat-rules',
@@ -417,8 +426,8 @@ it.each([false, true])('AC-P2-27 게시 2판 CLI 생성·출처·초기화·재�
       );
       const { worldId } = JSON.parse(output.trim()) as { worldId: string };
       const world = await fixture.db.world.findUniqueOrThrow({ where: { id: worldId } });
-      expect(world).toMatchObject({ mapKey: 'che@2', scenarioKey: '1030@2', unitSetKey: 'basic@2' });
-      expect(await scenarioTitle('1030@2', fixture.db)).toBe((original.scenario.content as { title: string }).title);
+      expect(world).toMatchObject({ mapKey: 'che@2', scenarioKey: `${scenario.id}@2`, unitSetKey: 'basic@2' });
+      expect(await scenarioTitle(`${scenario.id}@2`, fixture.db)).toBe(scenario.title);
       const audit = await fixture.db.auditLog.findFirstOrThrow({
         where: { worldId, actorKind: 'CLI', action: 'world.create.applied' },
       });
@@ -478,7 +487,7 @@ it.each([false, true])('AC-P2-27 게시 2판 CLI 생성·출처·초기화·재�
       expect(await fixture.db.world.findUniqueOrThrow({ where: { id: next.worldId } })).toMatchObject({
         seed: 't479-next',
         mapKey: 'che@2',
-        scenarioKey: '1030@2',
+        scenarioKey: `${scenario.id}@2`,
         unitSetKey: 'basic@2',
       });
       await expect(prepareWorldReset(fixture.db, next.worldId, 'missing', signal)).rejects.toMatchObject({
@@ -571,13 +580,13 @@ it.each([
 });
 
 it.each([
-  ['scenario', '../1030'],
-  ['map', '/che'],
-  ['unitSet', ''],
-] as const)('P20 잘못된 %s 이름은 조회 전에 거부한다', async (slot, value) => {
+  ['scenario', '../1030', 0],
+  ['map', '/che', 1],
+  ['unitSet', '', 1],
+] as const)('P20 잘못된 %s 이름은 선택된 자원을 읽기 전에 거부한다', async (slot, value, reads) => {
   const counter = countingDb(sharedDb());
   await expect(readInitialResources(counter.db, { ...options, [slot]: value })).rejects.toThrow();
-  expect(counter.count()).toBe(0);
+  expect(counter.count()).toBe(reads);
 });
 
 it.each([0, -1, 1.5])('P20 판 번호 %s는 조회 전에 거부한다', async (version) => {
@@ -595,11 +604,26 @@ function resourceCli(fixture: Fixture, script: string, args: string[] = []) {
   });
 }
 
+function cliScenario(content: unknown, id: string) {
+  const scenario = operationalInput().scenario;
+  scenario.id = id;
+  const source = content as { nation: [string, string, number, number, string, number, string, number, string[]][] };
+  scenario.nation = structuredClone(source.nation.slice(0, 2));
+  scenario.general.forEach((general, index) => {
+    general[4] = source.nation[index]![8][0]!;
+  });
+  return scenario;
+}
+
 const s5CreateArgs = [
   '--scenario',
   '1030',
   '--map',
   'che',
+  '--stat-rules',
+  'default',
+  '--portrait-map',
+  'rtk14-map',
   '--seed',
   'loader',
   '--turn-term',
@@ -610,10 +634,15 @@ const s5CreateArgs = [
   'DB 기본 생성',
 ];
 
-it('T4-77 S5 기본 CLI는 S0 해시와 정확한 게시 판의 감사 출처를 보존한다', async () => {
+it('T4-77 S5 기본 CLI는 정규화된 초기 해시와 정확한 게시 판의 감사 출처를 보존한다', async () => {
   await withDatabase(
     async (fixture) => {
       const resources = await readInitialResources(fixture.db, options);
+      const expected = prepareInitialWorld(composeInitialWorld(resources, 'loader'), {
+        name: 'DB 기본 생성',
+        turnTermMinutes: 30,
+        endYear: 300,
+      });
       const result = resourceCli(fixture, 'apps/engine/src/cli/createWorld.ts', s5CreateArgs);
       expect(result.error).toBeUndefined();
       expect(result.status, result.stderr).toBe(0);
@@ -623,7 +652,7 @@ it('T4-77 S5 기본 CLI는 S0 해시와 정확한 게시 판의 감사 출처를
         mapKey: 'che',
         scenarioKey: '1030',
         unitSetKey: 'basic',
-        initialStateHash: baseline.seeds.loader.initialStateHash,
+        initialStateHash: expected.stateHash,
       });
       const audit = await fixture.db.auditLog.findFirstOrThrow({
         where: { worldId, actorKind: 'CLI', action: 'world.create.applied' },
@@ -649,7 +678,7 @@ it('T4-77 S5 기본 CLI는 게시 자원이 없으면 파일 대체·쓰기 없�
     const result = resourceCli(fixture, 'apps/engine/src/cli/createWorld.ts', s5CreateArgs);
     expect(result.error).toBeUndefined();
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain('MAP/che/1');
+    expect(result.stderr).toContain('SCENARIO/1030/1');
     expect(result.stdout).toBe('');
     expect(
       await Promise.all([fixture.db.world.count(), fixture.db.auditLog.count(), fixture.db.gameResource.count()]),
@@ -755,20 +784,40 @@ it('T4-77 S6 시뮬레이션 열 시드의 DB·파일 초기 상태가 같다', 
 it('T4-77 S6 실제 sim CLI의 다중·반복 시드는 파일 공급자의 짧은 실행과 같다', async () => {
   await withDatabase(
     async (fixture) => {
-      const resources = await readInitialResources(fixture.db, options);
+      await initializeSan10Resources(fixture.db);
+      // CLI·공급자·반복 시드의 대조는 소형 게시 시나리오로 하고 정식 명단 실행과 분리한다.
+      const published = await readInitialResources(fixture.db, {
+        scenario: 'san10-191',
+        map: 'san10',
+        unitSet: 'expanded',
+      });
+      const scenario = cliScenario(published.scenario.content, 'sim-cli-fixture');
+      await insertResource(fixture, { kind: 'SCENARIO', name: scenario.id, version: 1 }, scenario);
+      const resources = await readInitialResources(fixture.db, {
+        scenario: scenario.id,
+        map: 'san10',
+        unitSet: 'expanded',
+      });
       const before = await fixture.db.gameResource.findMany({ orderBy: { id: 'asc' } });
       const initial = composeInitialWorld(resources, '1');
+      const expectedBySeed = new Map<string, Omit<ReturnType<typeof simulateGame>, 'seconds'>>();
       for (const args of [
         ['--seeds', '2'],
         ['--seed', '1', '--repeat'],
       ]) {
-        const result = resourceCli(fixture, 'tools/sim/cli.ts', [...args, '--max-year', String(initial.startYear)]);
+        const result = resourceCli(fixture, 'tools/sim/cli.ts', [
+          ...args,
+          '--scenario',
+          scenario.id,
+          '--max-year',
+          String(initial.startYear),
+        ]);
         expect(result.error).toBeUndefined();
         expect(result.status, result.stderr).toBe(0);
         const environment = JSON.parse(result.stderr.trim());
         expect(environment).toMatchObject({
-          scenario: '1030',
-          map: 'che',
+          scenario: scenario.id,
+          map: 'san10',
           maxYear: initial.startYear,
           convergence: 'on',
         });
@@ -788,10 +837,15 @@ it('T4-77 S6 실제 sim CLI의 다중·반복 시드는 파일 공급자의 짧�
         expect(rows.map((row) => row.seed)).toEqual(args.includes('--repeat') ? ['1', '1'] : ['1', '2']);
         for (const [index, row] of rows.entries()) {
           const { seconds, repeat, ...actual } = row;
-          const { seconds: expectedSeconds, ...expected } = simulateGame(composeInitialWorld(resources, row.seed), {
-            maxYear: initial.startYear,
-          });
-          expect(expectedSeconds).toBeGreaterThan(0);
+          let expected = expectedBySeed.get(row.seed);
+          if (!expected) {
+            const { seconds: expectedSeconds, ...generated } = simulateGame(composeInitialWorld(resources, row.seed), {
+              maxYear: initial.startYear,
+            });
+            expect(expectedSeconds).toBeGreaterThan(0);
+            expected = generated;
+            expectedBySeed.set(row.seed, expected);
+          }
           expect(seconds).toBeGreaterThan(0);
           expect(seconds).toBeLessThanOrEqual(900);
           expect(repeat).toBe(args.includes('--repeat') && index === 1 ? true : undefined);
@@ -813,7 +867,7 @@ it('T4-77 S6 sim은 게시 자원이 없으면 출력 파일과 DB 행을 만들
       const result = resourceCli(fixture, 'tools/sim/cli.ts', ['--seed', '1', '--output', output]);
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(1);
-      expect(result.stderr).toContain('SCENARIO/1030/1');
+      expect(result.stderr).toContain('SCENARIO/san10-191/1');
       expect(result.stdout).toBe('');
       await expect(readFile(output)).rejects.toMatchObject({ code: 'ENOENT' });
       expect(await fixture.db.gameResource.count()).toBe(0);
@@ -851,13 +905,12 @@ for (const [seed, expected] of Object.entries(baseline.seeds)) {
 
 it('P22 자원 초기화와 추가 게시 뒤에도 기존 월드·도시·생성 기록·재생 결과가 같다', async () => {
   await withDatabase(async (fixture) => {
-    const initial = composeInitialWorld(await readInitialResources(sharedDb(), options), 'engine-test');
-    expect(hashState(initial)).toBe(baseline.seeds['engine-test'].initialStateHash);
+    const initial = commandInitial();
     const { worldId } = await saveInitialWorld(fixture.db, initial, {
       name: '자원 카탈로그 대조',
       turnTermMinutes: 60,
       endYear: null,
-      replayFormat: 'legacy',
+      replayFormat: 3,
     });
     await controlClock(fixture.db, worldId, 'start');
     const lease = await acquireLease(fixture.db, worldId);

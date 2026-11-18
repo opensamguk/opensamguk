@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { rngFor } from '@opensamguk/shared';
-import { commandWorld, testUnits } from '../../test/commandFixture';
+import { commandWorld, testUnits } from '../../test/builtinCommandFixture';
 import { applyEffects } from './effects';
 import { commands, runCommand } from './registry';
 import { runGeneralTurn } from './turn';

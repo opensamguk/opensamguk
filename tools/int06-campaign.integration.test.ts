@@ -201,6 +201,7 @@ it('정식 원본을 보존하고 실제 생성 입력·30칸 예약·임관으�
         {
           worldId,
           name: `휘하검사${index}`,
+          sex: 'MALE' as const,
           portraitId: null,
           leadership: 55,
           strength: 55,

@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, beforeAll, beforeEach, expect, it as test } from 'vitest';
 import { createDb } from '../packages/db/src/index';
-import { buildServer } from '../apps/server/src/server';
+import { buildFixtureServer as buildServer } from './server-fixture';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { newSession } from '../apps/server/src/auth/session';
 import { withdrawAccount } from '../apps/server/src/auth/withdrawalStore';

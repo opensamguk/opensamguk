@@ -206,6 +206,7 @@ async function createActor(worldId: string, index: number): Promise<Actor> {
       {
         worldId,
         name: `도시검사${index}`,
+        sex: 'MALE' as const,
         portraitId: null,
         leadership: 55,
         strength: 55,

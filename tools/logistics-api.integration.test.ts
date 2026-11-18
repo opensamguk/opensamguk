@@ -116,6 +116,7 @@ function creation(name: string) {
     intel: per,
     politics: per,
     charm: per,
+    sex: 'MALE' as const,
     portraitId: null,
   };
 }
@@ -164,7 +165,7 @@ async function fixture({ fundedRecruitment = false, expandedRecruitment = false 
   if (expandedRecruitment) source.generals = source.generals.filter((general) => general.officerLevel === 12);
   const neutral = initial.cities.filter(
     (city) =>
-      city.kind !== 'PASS' &&
+      (city.kind === undefined || city.kind === 'CITY') &&
       city.nationId === null &&
       city.population > 0 &&
       city.commerce > 0 &&
@@ -183,7 +184,9 @@ async function fixture({ fundedRecruitment = false, expandedRecruitment = false 
       startYear: initial.startYear,
       tick: 0,
       monthlyTick: 0,
-      cityKeys: initial.cities.filter((city) => city.kind !== 'PASS').map((city) => city.cityKey),
+      cityKeys: initial.cities
+        .filter((city) => city.kind === undefined || city.kind === 'CITY')
+        .map((city) => city.cityKey),
       unitSet: initial.unitSet,
     });
     if (preview.nextTurnTick < 10_000 && neutral.some((city) => city.cityKey === preview.cityKey)) {
@@ -257,7 +260,9 @@ async function visitorAtCity(world: Awaited<ReturnType<typeof fixture>>) {
       startYear: initial.startYear,
       monthlyTick: 10_000,
       tick: 10_000,
-      cityKeys: initial.cities.filter((city) => city.kind !== 'PASS').map((city) => city.cityKey),
+      cityKeys: initial.cities
+        .filter((city) => city.kind === undefined || city.kind === 'CITY')
+        .map((city) => city.cityKey),
       unitSet: initial.unitSet,
     });
     if (preview.cityKey !== world.cityKey) continue;

@@ -1,6 +1,6 @@
 import { createRng, rngFor } from '@opensamguk/shared';
 import { describe, expect, it } from 'vitest';
-import { commandWorld, testUnits } from '../../test/commandFixture';
+import { commandWorld, testUnits } from '../../test/builtinCommandFixture';
 import { simulateBattle, type BattleInput } from '../battle/simulate';
 import { attack, createAttackWithProviders } from '../commands/attack';
 import { applyEffects } from '../commands/effects';

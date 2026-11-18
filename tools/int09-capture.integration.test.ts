@@ -153,6 +153,7 @@ it('실제 HTTP 편성·동의·30칸 예약으로 두 나라의 부대를 준�
       {
         worldId,
         name: `통제장수${index}`,
+        sex: 'MALE' as const,
         portraitId: null,
         leadership: 55,
         strength: 55,

@@ -48,8 +48,6 @@ it('AC-INT-22: 실제 프리셋 생성의45병종·155거점이12개월 DB 재�
       'AC-INT-22 실제 확장 병종',
       '--end-year',
       '300',
-      '--rule-features',
-      'campaign-assignment-v2,campaign-v1,city-resources-v1,five-stats,operational-map,personnel,policy,stratagem-basic,treaty',
     ],
     { cwd: new URL('../', import.meta.url), env: { ...process.env, DATABASE_URL: url }, encoding: 'utf8' },
   );

@@ -30,6 +30,7 @@ const payload = {
   intel: 55,
   politics: 55,
   charm: 55,
+  sex: 'MALE' as const,
   portraitId: null,
 };
 const initial = commandInitial();

@@ -29,9 +29,9 @@ describe('T2-02 실제 PostgreSQL migration', () => {
       const config = join(temp, 'prisma.config.ts');
       try {
         await db.$executeRawUnsafe(`CREATE SCHEMA "${schema}"`);
-        const before = JSON.parse(
-          await readFile(join(root, 'apps/engine/test/fixtures/replay-v1-b8f5074.json'), 'utf8'),
-        ) as { origin: { initialStateHash: string } };
+        const before = JSON.parse(await readFile(join(root, 'tools/fixtures/migration-replay-v1.json'), 'utf8')) as {
+          origin: { initialStateHash: string };
+        };
         await cp(join(dbRoot, 'prisma/migrations'), migrations, {
           recursive: true,
           filter: (source) => {

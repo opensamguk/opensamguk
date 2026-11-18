@@ -9,7 +9,7 @@ import { commandInitial } from '../packages/rules/test/commandFixture';
 import { operationalInput } from '../packages/rules/test/operationalMapFixture';
 import { buildInitialWorld } from '../packages/rules/src/world/bootstrap';
 import { hashState } from '../packages/shared/src/node/hashState';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { acquireLease, releaseLease, type Lease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { loadReplayState } from '../apps/engine/src/monthly';
@@ -542,6 +542,7 @@ it('휘하 지시가 원 예턴과 다른 도시를 공격하면 실제 대상 �
         kind: 'general.create',
         payload: {
           name: `사건장수${index}`,
+          sex: 'MALE' as const,
           portraitId: null,
           leadership: 55,
           strength: 55,

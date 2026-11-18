@@ -1,3 +1,4 @@
+import { cityUpgradeCommands } from './commands';
 import { describe, expect, it } from 'vitest';
 import { cityLandSlots, rngFor } from '@opensamguk/shared';
 import { commandInitial } from '../../test/commandFixture';
@@ -7,7 +8,6 @@ import { CITY_SCALE_FIELDS, cityScaleIncrease, checkMapCityScale, resolveCitySca
 import { checkCityScaleInitial, readCityRuins } from '../cityScale/state';
 import { initialCityUpgrade } from './state';
 import {
-  cityUpgradeCommands,
   completeCityUpgrade,
   shiftedLandSlot,
   shiftCityLandTurns,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createRng, type Rng } from '@opensamguk/shared';
-import { commandWorld, testUnits } from '../test/commandFixture';
+import { commandWorld, testUnits } from '../test/builtinCommandFixture';
 import { assignCountyParents, captureCounties, countyDetached, countyTaxDestination } from './cityAffiliation';
 import { commandAttackTargets, commandMoveTargets } from './commandPaths';
 import { settleDisaster, expireCityStates, disasterProbability } from './monthly/disaster';

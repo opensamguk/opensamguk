@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Prisma } from '@opensamguk/db';
-import { ruleRegistry } from '@opensamguk/rules';
+import { ruleRegistry, providedRuleData } from '@opensamguk/rules';
 import { processInputs, queuedInputHandlers } from './inputs';
 import {
   checkWorldReplay,
@@ -20,11 +20,20 @@ vi.mock('./monthly', () => ({ loadReplayState: vi.fn(async () => null) }));
 
 function registry(handler: QueuedInputHandler): EngineRegistry {
   return {
-    rules: featureRegistry,
-    features: featureRegistry.features.map((feature) => ({
-      key: feature.key,
-      queuedInputs: { [`${feature.key}.queued`]: handler },
-    })),
+    rules: {
+      ...featureRegistry,
+      features: featureRegistry.features.filter(({ key }) => key.startsWith('test-')),
+      inputKinds: featureRegistry.inputKinds.filter(
+        ({ kind }) => kind.startsWith('test-') || ['general.create', 'general.possess'].includes(kind),
+      ),
+      monthlyOrder: [],
+    },
+    features: featureRegistry.features
+      .filter(({ key }) => key.startsWith('test-'))
+      .map((feature) => ({
+        key: feature.key,
+        queuedInputs: { [`${feature.key}.queued`]: handler },
+      })),
   };
 }
 function fixture(kind = 'test-a.queued') {
@@ -158,7 +167,13 @@ describe('T2-26 엔진 시작 대조와 서버 기능 확인', () => {
   });
   it('S2~S5는 형식·기능 사본과 생성 기록을 대조한다', async () => {
     const initial = await monthlyFixture();
-    const origin = { version: 3 as const, initial, initialStateHash: hashState(initial), resourceHash: '' };
+    const origin = {
+      version: 3 as const,
+      initial,
+      initialStateHash: hashState(initial),
+      resourceHash: '',
+      featureData: providedRuleData(initial, 60),
+    };
     origin.resourceHash = resourceHashV3(origin);
     const world = {
       replayOrigin: origin as unknown as Prisma.JsonValue,
@@ -166,7 +181,7 @@ describe('T2-26 엔진 시작 대조와 서버 기능 확인', () => {
     };
     expect(() => checkWorldReplay(world, featureRegistry)).not.toThrow();
     expect(() => checkWorldReplay({ ...world, replayFormat: 1 }, featureRegistry)).toThrow();
-    expect(() => checkWorldReplay(world)).toThrow();
+    expect(() => checkWorldReplay(world)).not.toThrow();
     origin.initialStateHash = 'not checked at startup';
     expect(() => checkWorldReplay(world, featureRegistry)).not.toThrow();
     for (const version of [2, 4, 5])

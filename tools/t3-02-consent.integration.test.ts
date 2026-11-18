@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, beforeAll, beforeEach, expect, it as test } from 'vitest';
 import { createDb } from '../packages/db/src/index';
-import { buildServer } from '../apps/server/src/server';
+import { buildFixtureServer as buildServer } from './server-fixture';
 import { authzCase } from '../apps/server/src/authz/case';
 import { categories } from '../apps/server/src/authz/coverage';
 import { newSession } from '../apps/server/src/auth/session';
@@ -547,7 +547,7 @@ it('두 정식 월드의 미동의 변경은 전부403·무변경이며 실제 �
   const paths = Object.entries(procedures)
     .filter(([, procedure]) => procedure._def.type === 'mutation' && procedure._def.meta?.accountAccess === 'verified')
     .map(([path]) => path);
-  expect(paths).toHaveLength(47);
+  expect(paths).toHaveLength(54);
   expect(paths).toContain('account.setPortrait');
   expect(paths).toContain('entry.possess');
   expect(paths).toContain('admin.game.request');
@@ -598,7 +598,17 @@ it('두 정식 월드의 미동의 변경은 전부403·무변경이며 실제 �
   const creating = track(() =>
     call(
       'general.create',
-      { worldId, name: '동의장수', portraitId: null, leadership: 55, strength: 55, intel: 55, politics: 55, charm: 55 },
+      {
+        worldId,
+        name: '동의장수',
+        sex: 'MALE' as const,
+        portraitId: null,
+        leadership: 55,
+        strength: 55,
+        intel: 55,
+        politics: 55,
+        charm: 55,
+      },
       cookie,
     ),
   );

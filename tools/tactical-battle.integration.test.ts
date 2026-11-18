@@ -3,6 +3,8 @@ import { beforeAll, afterAll, it, expect } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import { testDatabaseUrl } from './test-database';
 import { tacticalFixture, testUnits } from '../packages/rules/test/tacticalFixture';
+import { commandInitial } from '../packages/rules/test/commandFixture';
+import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { persistTacticalTables } from '../apps/engine/src/tacticalBattle';
 import {
   closeCouncil,
@@ -11,7 +13,7 @@ import {
   settleTacticalBattle,
 } from '../packages/rules/src/index';
 
-const db = createDb(testDatabaseUrl(process.env).href);
+const db = createDb(testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL }).href);
 let worldId: string | undefined;
 beforeAll(async () => {
   await db.$queryRaw`SELECT 1`;
@@ -21,22 +23,10 @@ afterAll(async () => {
   await db.$disconnect();
 });
 it('AC-INT-28·AC-M1-10 실제 DB 전투 저장·재적재·예약 유일성·rollback과 해제', async () => {
-  worldId = `tactical-test-${randomUUID()}`;
-  await db.world.create({
-    data: {
-      id: worldId,
-      name: '전술 통합 시험',
-      scenarioKey: 'test',
-      mapKey: 'test',
-      unitSetKey: 'test',
-      seed: 'test',
-      startYear: 191,
-      turnTermMinutes: 60,
-      initialStateHash: 'test',
-      statRules: {},
-      unitSet: JSON.parse(JSON.stringify(testUnits)),
-    },
-  });
+  const initial = commandInitial();
+  initial.seed = `tactical-test-${randomUUID()}`;
+  initial.unitSet = testUnits;
+  ({ worldId } = await saveInitialWorld(db, initial, { name: '전술 통합 시험', turnTermMinutes: 60, endYear: null }));
   const { world, battle } = tacticalFixture(),
     before = structuredClone(world);
   delete before.campaign!.tactical;

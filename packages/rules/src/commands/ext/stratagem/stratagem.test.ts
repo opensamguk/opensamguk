@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createRng, type Rng } from '@opensamguk/shared';
-import { commandWorld, testUnits } from '../../../../test/commandFixture';
+import { commandWorld, testUnits } from '../../../../test/builtinCommandFixture';
 import { commandCases } from '../../contracts';
 import { TICKS_PER_MONTH } from '../../../clock/constants';
 import type { WorldState } from '../../../model/world';

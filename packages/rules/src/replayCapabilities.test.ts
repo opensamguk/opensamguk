@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { rngFor } from '@opensamguk/shared';
 import { commandInitial, testUnits } from '../test/commandFixture';
-import { createCommandResolver } from './commands/resolve';
+import { resolverForRuleFeatures } from './ruleCommands';
+import { ruleRegistry } from './ruleRegistry';
 import { parsePreset, presetRules } from './world/preset';
 import { applyTreatyInput, settleTreaties } from './diplomacy/treaty';
 import type { TreatyClause, TreatyInput } from './diplomacy/treatyTypes';
@@ -13,6 +14,7 @@ import {
   applyRecordedInput,
   initialReplayState,
   runReplayAction,
+  runArchiveReplayAction,
   type RecordedInput,
   type ReplayState,
 } from './replay';
@@ -305,13 +307,16 @@ describe('T4-17 / AC-P2-03 (나) B 무상태 확장 선택과 재생', () => {
 
   it('실제 확장 resolver로 비용을 적용하고 12개월 상태·해시가 직접 재생과 같다', async () => {
     const input = extOrigin();
-    input.initial.generals.forEach((general) => {
+
+    let replay = initialReplayState(input.initial, { policy: { version: 1, turnTermMinutes: 30 } });
+    for (const general of Object.values(replay.state.generals)) {
       general.userId = `human-${general.id}`;
-    });
-    const chosen = selectSupportedCapabilities(input, { ...config, policy: extPolicy });
-    let replay = startCapsReplay(input, chosen);
+      replay.residenceAnchors![general.id] = 0;
+      replay.policy!.lastActiveTicks[general.id] = 0;
+    }
     const saved: RecordedInput = {
       sequence: 1,
+      tick: 0,
       generalId: 1,
       kind: 'turns.set',
       status: 'APPLIED',
@@ -321,22 +326,23 @@ describe('T4-17 / AC-P2-03 (나) B 무상태 확장 선택과 재생', () => {
       },
       result: { revision: 1, activeTick: 0 },
     };
-    replay = applyCapsRecordedInput(replay, saved, { selection: chosen });
+    replay.state.stratagemCards!.nations[1]!.hand = ['fire_attack'];
+    replay = applyRecordedInput(replay, saved);
     let direct = structuredClone(replay);
-    const resolver = createCommandResolver({ general: ['fire_attack'], nation: [] });
+    const resolver = resolverForRuleFeatures(replay.state);
     const gold = replay.state.generals[1]!.gold;
     const rice = replay.state.generals[1]!.rice;
-    replay = runCapsReplayAction(replay, input.initial.seed, testUnits, chosen);
+    replay = runArchiveReplayAction(replay, input.initial.seed, testUnits, ruleRegistry);
     direct = runReplayAction(direct, input.initial.seed, testUnits, resolver);
     expect(replay.state.generals[1]).toMatchObject({ gold: gold - 100, rice: rice - 100 });
     expect(replay).toEqual(direct);
     const monthHashes: string[] = [];
     while (replay.monthlyTick < 120000) {
       const tick = replay.monthlyTick;
-      replay = runCapsReplayAction(replay, input.initial.seed, testUnits, chosen);
+      replay = runArchiveReplayAction(replay, input.initial.seed, testUnits, ruleRegistry);
       direct = runReplayAction(direct, input.initial.seed, testUnits, resolver);
       expect(replay).toEqual(direct);
-      expect(replay.state).not.toHaveProperty('ext');
+      expect(replay.state.ext).toBeDefined();
       expect(replay.state).not.toHaveProperty('treaties');
       if (tick !== replay.monthlyTick) {
         const actual = await hash(replay);
@@ -347,18 +353,15 @@ describe('T4-17 / AC-P2-03 (나) B 무상태 확장 선택과 재생', () => {
     expect(monthHashes).toHaveLength(12);
   });
 
-  it('월간 조약 정산은 조약 갈래에서만 실행한다', () => {
+  it('형식 3 월간은 모든 상시 규칙과 조약을 함께 정산한다', () => {
     const active = accepted();
-    active.state.generals = {};
-    active.monthlyTick = 10000;
-    const input = extOrigin();
-    const chosen = selectSupportedCapabilities(input, { ...config, policy: extPolicy });
-    const ext = startCapsReplay(input, chosen);
-    ext.state.generals = {};
-    ext.state.treaties = structuredClone(active.state.treaties!);
-    ext.monthlyTick = 10000;
-    expect(runCapsReplayAction(active, 'month', undefined, selection).state).not.toHaveProperty('treaties');
-    expect(runCapsReplayAction(ext, 'month', undefined, chosen).state.treaties).toEqual(ext.state.treaties);
+    for (const general of Object.values(active.state.generals)) general.nextTurnTick = 1000000;
+    const first = runReplayAction(active, 'month', testUnits);
+    const direct = runReplayAction(first, 'month', testUnits);
+    expect(direct.state).not.toHaveProperty('treaties');
+    expect(direct.state.campaign).toBeDefined();
+    expect(direct.state.ext).toBeDefined();
+    expect(direct.state.logistics).toBeDefined();
   });
 });
 
@@ -519,87 +522,52 @@ describe('T4-03 / AC-P2-02 형식 6 입력 소유와 strict 기록', () => {
     );
     expect(applyCapsRecordedInput(replay, rejection(), { selection: futurePolicy })).toBe(replay);
   });
-  it('공통 입력과 정책 입력을 기존 처리기에 위임하고 전환 뒤 활동 기준을 보존한다', () => {
-    const input = origin();
-    input.initial.generals[0]!.userId = 'human';
-    const replay = startCapsReplay(input, futurePolicy);
-    const slots = structuredClone(replay.turns[1]!);
-    const saved = applyCapsRecordedInput(
-      replay,
-      {
-        sequence: 1,
-        generalId: 1,
-        kind: 'turns.set',
-        status: 'APPLIED',
-        payload: { turns: slots, revision: 0 },
-        result: { revision: 1 },
-      },
-      { selection: futurePolicy },
-    );
-    expect(saved.revisions[1]).toBe(1);
-    const switched = applyCapsRecordedInput(
-      saved,
-      {
-        ...marker(1700),
-        payload: { version: 5, emptySlots: [2, 3, 4] },
-        result: { ...(marker(1700).result as object), emptySlots: [2, 3, 4] },
-      },
-      { selection: futurePolicy },
-    );
-    expect(switched.turns[1]![0]!.explicit).toBe(true);
-    expect(switched.turns[2]![0]!.explicit).toBe(false);
-    const changed = applyCapsRecordedInput(
-      switched,
-      {
-        sequence: 21,
-        generalId: 1,
-        kind: 'general.setPolicy',
-        status: 'APPLIED',
-        payload: { policy: 'farm' },
-        result: { policy: 'farm', activeTick: 1800 },
-      },
-      { selection: futurePolicy },
-    );
-    const active = applyCapsRecordedInput(
-      changed,
-      {
-        sequence: 22,
-        generalId: 1,
-        kind: 'general.active',
-        status: 'APPLIED',
-        payload: {},
-        result: { activeTick: 1701 },
-      },
-      { selection: futurePolicy },
-    );
+  it('형식 3 공통 입력과 정책 입력은 상시 방침과 활동 기준을 보존한다', () => {
+    const replay = initialReplayState(origin().initial);
+    replay.state.generals[1]!.userId = 'human';
+    replay.residenceAnchors![1] = 0;
+    replay.policy!.lastActiveTicks[1] = 0;
+    const saved = applyRecordedInput(replay, {
+      sequence: 1,
+      tick: 1700,
+      generalId: 1,
+      kind: 'turns.set',
+      status: 'APPLIED',
+      payload: { turns: replay.turns[1], revision: 0 },
+      result: { revision: 1, activeTick: 1700 },
+    });
+    const changed = applyRecordedInput(saved, {
+      sequence: 2,
+      tick: 1800,
+      generalId: 1,
+      kind: 'general.setPolicy',
+      status: 'APPLIED',
+      payload: { policy: 'farm' },
+      result: { policy: 'farm', activeTick: 1800 },
+    });
+    const active = applyRecordedInput(changed, {
+      sequence: 3,
+      tick: 1701,
+      generalId: 1,
+      kind: 'general.active',
+      status: 'APPLIED',
+      payload: {},
+      result: { activeTick: 1701 },
+    });
+    expect(active.revisions[1]).toBe(1);
     expect(active.policy!.policies[1]).toBe('farm');
     expect(active.policy!.lastActiveTicks[1]).toBe(1800);
-    const queue = applyCapsRecordedInput(
-      active,
-      {
-        sequence: 23,
-        generalId: 1,
-        kind: 'turns.set',
-        status: 'APPLIED',
-        payload: { turns: emptyQueue(), revision: 1 },
-        result: { revision: 2, activeTick: 1900 },
-      },
-      { selection: futurePolicy },
-    );
-    expect(queue.revisions[1]).toBe(2);
-    expect(queue.policy!.lastActiveTicks[1]).toBe(1900);
-    expect(
-      applyCapsRecordedInput(
-        queue,
-        rejection({
-          kind: 'general.active',
-          sequence: 24,
-          payload: null,
-          result: { code: 'ACTOR_INACTIVE', message: '활성 계정이 아닙니다.' },
-        }),
-        { selection: futurePolicy },
-      ),
-    ).toBe(queue);
+    expect(() => applyRecordedInput(active, marker(1700))).toThrow();
+    const rejected = {
+      sequence: 4,
+      tick: 1900,
+      generalId: 1,
+      kind: 'general.active',
+      status: 'REJECTED' as const,
+      payload: null,
+      result: { code: 'ACTOR_INACTIVE', message: '활성 계정이 아닙니다.' },
+    };
+    expect(applyRecordedInput(active, rejected)).toBe(active);
   });
   it.each([
     { payload: null },
@@ -746,11 +714,13 @@ describe('T4-03 / AC-P2-02 형식 6 재생과 해시 보존', () => {
       await hash(applyCapsRecordedInput(replay, input, { selection })),
     );
   });
-  it('P0 F=0 정책·장수 턴·월간은 조약을 깊이 보존한다', () => {
+  it('P0 형식 3 정책·장수 턴·월간은 조약을 깊이 보존한다', () => {
     const chosen: CapabilitySelection = { ...selection, policy: { version: 1, fromSequence: 0, turnTermMinutes: 30 } };
     const input = origin();
-    input.initial.generals[0]!.userId = 'human';
-    const replay = startCapsReplay(input, chosen);
+    const replay = initialReplayState(input.initial, { policy: { version: 1, turnTermMinutes: 30 } });
+    replay.state.generals[1]!.userId = 'human';
+    replay.residenceAnchors![1] = 0;
+    replay.policy!.lastActiveTicks[1] = 0;
     expect(replay.policy!.lastActiveTicks).toEqual({ 1: 0 });
     expect(replay.state).not.toHaveProperty('treaties');
     const active = accepted(replay, chosen);
@@ -768,28 +738,22 @@ describe('T4-03 / AC-P2-02 형식 6 재생과 해시 보존', () => {
     expect(monthly.state.treaties).not.toBe(active.state.treaties);
     expect(monthly.policy).toEqual(active.policy);
   });
-  it('P1 F>0 표지는 기존 ACTIVE 조약과 사람 T·NPC null을 보존한다', () => {
+  it('P1 형식 3은 ACTIVE 조약과 사람 활동을 보존하고 재활성 표지를 거부한다', () => {
     const replay = accepted();
-    const npc = applyCapsRecordedInput(replay, marker(), { selection: futurePolicy });
-    expect(npc.state.treaties).toEqual(replay.state.treaties);
-    expect(npc.policy!.lastActiveTicks).toEqual({});
-    expect(() => enterCapsPolicyAtMarker(replay, marker(1700), futurePolicy)).toThrow('활동 기준');
+    expect(replay.policy).toBeDefined();
+    expect(replay.policy!.lastActiveTicks).toEqual({});
+    expect(() => enterCapsPolicyAtMarker(replay, marker(), futurePolicy)).toThrow('전환');
     replay.state.generals[1]!.userId = 'human';
-    expect(() => enterCapsPolicyAtMarker(replay, marker(), futurePolicy)).toThrow('활동 기준');
-    const human = enterCapsPolicyAtMarker(replay, marker(1700), futurePolicy);
-    expect(human.policy!.lastActiveTicks).toEqual({ 1: 1700 });
-    expect(human.state.treaties).toEqual(replay.state.treaties);
-    expect(() => enterCapsPolicyAtMarker(human, marker(1700), futurePolicy)).toThrow('전환');
-    for (const result of [
-      { ...(marker(1700).result as object), fromSequence: 21 },
-      { ...(marker(1700).result as object), turnTermMinutes: 31 },
-      { ...(marker(1700).result as object), emptySlots: [1] },
-    ])
-      expect(() => enterCapsPolicyAtMarker(replay, { ...marker(1700), result }, futurePolicy)).toThrow();
+    replay.residenceAnchors![1] = 1700;
+    replay.policy!.lastActiveTicks[1] = 1700;
+    const next = runReplayAction(replay, 'policy-always', testUnits);
+    expect(next.policy!.lastActiveTicks[1]).toBe(1700);
+    expect(next.state.treaties).toEqual(replay.state.treaties);
+    expect(() => enterCapsPolicyAtMarker(replay, marker(1700), futurePolicy)).toThrow('전환');
   });
   it('M1 실제 월간에서 11501 만료는 20000, 61500 응답 기한은 70000에 닫힌다', async () => {
     let active = accepted();
-    active.state.generals = {};
+    for (const general of Object.values(active.state.generals)) general.nextTurnTick = 1000000;
     const before = structuredClone(active);
     active = runCapsReplayAction(active, 'caps-month', undefined, selection);
     expect(active.monthlyTick).toBe(10000);
@@ -799,7 +763,7 @@ describe('T4-03 / AC-P2-02 형식 6 재생과 해시 보존', () => {
     expect(active.monthlyTick).toBe(20000);
     expect(active.state).not.toHaveProperty('treaties');
     let pending = applyCapsRecordedInput(start(), proposal(start()), { selection });
-    pending.state.generals = {};
+    for (const general of Object.values(pending.state.generals)) general.nextTurnTick = 1000000;
     while (pending.monthlyTick < 60000) pending = runCapsReplayAction(pending, 'caps-month', undefined, selection);
     expect(pending.state.treaties).toHaveLength(1);
     pending = runCapsReplayAction(pending, 'caps-month', undefined, selection);

@@ -374,7 +374,17 @@ it('AC-M3-14·AC-INT-24 기본 off PREOPEN을 실제 감독이 운영 API로 열
     (
       await call(
         'general.create',
-        { worldId, name: '직접입장', leadership: 70, strength: 70, intel: 60, portraitId: null },
+        {
+          worldId,
+          name: '직접입장',
+          leadership: 70,
+          strength: 70,
+          intel: 60,
+          sex: 'MALE' as const,
+          politics: 38,
+          charm: 37,
+          portraitId: null,
+        },
         unused.cookie,
       )
     ).status,
@@ -457,6 +467,8 @@ it(
           'leadership',
           'strength',
           'intel',
+          'politics',
+          'charm',
           'officerLevel',
           'recommendedNation',
         ].sort(),
@@ -620,7 +632,17 @@ it('NPC 무장 맡기가 대기 중인 계정은 신규 장수를 함께 만들 
   expect(
     await call(
       'general.create',
-      { worldId, name: '새장수', leadership: 70, strength: 70, intel: 60, portraitId: null },
+      {
+        worldId,
+        name: '새장수',
+        leadership: 70,
+        strength: 70,
+        intel: 60,
+        sex: 'MALE' as const,
+        politics: 38,
+        charm: 37,
+        portraitId: null,
+      },
       ordinary.cookie,
     ),
   ).toMatchObject({ status: 409, code: 'CONFLICT' });

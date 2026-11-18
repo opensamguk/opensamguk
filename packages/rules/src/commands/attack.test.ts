@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { rngFor } from '@opensamguk/shared';
-import { commandWorld, testUnits } from '../../test/commandFixture';
+import { commandWorld, testUnits } from '../../test/builtinCommandFixture';
 import type { WorldState } from '../model/world';
 import { applyEffects } from './effects';
 import { attack } from './attack';
@@ -221,61 +221,61 @@ describe('T4-33 출병 추출 전 골든', () => {
           "calls": 6,
           "name": "수비 둘과 성벽, 마지막 도시 멸망",
           "next": 0.5024574538692832,
-          "sha256": "b842f7449978895d691cd99ab381b7c771e33de5606d1c98500ebe89e8fa0add",
+          "sha256": "f039b41e966a564e1b58cb05c62247d5ea5a3a6a8566e69d4005f1438274db83",
         },
         {
           "calls": 6,
           "name": "동률 수비의 ID 순서",
           "next": 0.8002542273607105,
-          "sha256": "b842f7449978895d691cd99ab381b7c771e33de5606d1c98500ebe89e8fa0add",
+          "sha256": "f039b41e966a564e1b58cb05c62247d5ea5a3a6a8566e69d4005f1438274db83",
         },
         {
           "calls": 20,
           "name": "열 페이즈 뒤 양쪽 생존",
           "next": 0.7206481471657753,
-          "sha256": "eed6a2525a49f7eeec8524274b2e1a8ece410a87a1a11ad4b562cd8795c62d67",
+          "sha256": "3361e25c542b77571d85ec828b9192f78f5cbba1e09a8e06eb394155314eb057",
         },
         {
           "calls": 0,
           "name": "공격군 기아로 전투 전 사기 소진",
           "next": 0.3639177978038788,
-          "sha256": "346622515c80063d8d7fdee816cbe637bde0bc7519bed73417cdde8492affa79",
+          "sha256": "668f6b6dff8e62ee480e3d3c77c563a35ae5b8311b834c9eff9f1543019071a7",
         },
         {
           "calls": 4,
           "name": "수비군 기아로 전투 전 사기 소진",
           "next": 0.08207402820698917,
-          "sha256": "9afc6ba94a491cdcd879fe69f84155ded333f6cfc040278adb5f994863ae5c42",
+          "sha256": "543c706a37ff8cba75f80abe3869dd603241d7cfff53d80c58fef2244acbe07e",
         },
         {
           "calls": 2,
           "name": "병력 하나씩 동시 전멸",
           "next": 0.2810764138121158,
-          "sha256": "3addc6b8fd6e9118df969fe1ca4f2d1b33d64b4d312c1272d965a04286259ae9",
+          "sha256": "af2d84766ba940034112d4b1daea1529cdcb9073759758acfb9a5743a97087e9",
         },
         {
           "calls": 20,
           "name": "양쪽 사기 동시 소진",
           "next": 0.45156482700258493,
-          "sha256": "e42ba1ae50003705c376e148d8a30b82a1eb7e8a4dcda2cfc13fa2f572a56b50",
+          "sha256": "a571f95bf57084ace93ba532fb8286e42c786f031e19486d545b8d052bae4227",
         },
         {
           "calls": 20,
           "name": "수비 없는 성벽과 방어 보정",
           "next": 0.6770514904055744,
-          "sha256": "183d96ce79b0951aab70cf985620392ed555e5f8b836e5c3c13ce4d75db94fef",
+          "sha256": "55022594c46494491d47d99067c964e1fa7b4b9c4697492fcaeca5814722e1ad",
         },
         {
           "calls": 20,
           "name": "병종 상성과 양국 기술",
           "next": 0.1869112327694893,
-          "sha256": "45d777d092968f0f66a106cbbc0a1ea706b10b79be3d3f1a19c78cac96da24dd",
+          "sha256": "a7661a7418f8142c5b717f9e1e9100789799062b849aaf56631e527c8a2f33bb",
         },
         {
           "calls": 0,
           "name": "수비와 성벽이 없는 도시",
           "next": 0.1679761114064604,
-          "sha256": "f782da821fb581ccb566e0a04df1ba3693613ddebe0d4f30710682df71c5cbc0",
+          "sha256": "851199d49ca10ffcc0c6eafc330219b08454d27c2556fd7b344abb251eba5ec0",
         },
         {
           "calls": 0,
@@ -293,13 +293,13 @@ describe('T4-33 출병 추출 전 골든', () => {
           "calls": 6,
           "name": "수도 함락과 같은 인구 도시 천도",
           "next": 0.9483208600431681,
-          "sha256": "80acbea74173c8b31fe2b01129e015849fcd2bdf70fdfacc65db66f48bd3c152",
+          "sha256": "ba44ead6e805f90bd58ff687a3a4dd31bbe47afa0f24f47eec5e0e6812a675b7",
         },
         {
           "calls": 2,
           "name": "훈련 미달과 미등장 수비 제외",
           "next": 0.46699898410588503,
-          "sha256": "04554ec4a7bd7b72d2d9cc8ebcf5c75e5f44eaf523be491465ff914c5ed53067",
+          "sha256": "ee8bc879a2b34e6d69ada8919ffbe7c84ecc39890d9d8efa43bb93cb12d38fe6",
         },
       ]
     `);

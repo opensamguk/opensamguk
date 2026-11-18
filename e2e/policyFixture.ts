@@ -119,8 +119,9 @@ let template: Promise<WorldInit> | undefined;
 let passwordHash: Promise<string> | undefined;
 
 // 월간 fixture(도시 4, 국가 2, NPC 장수 3)를 복사하고 시험 계정의 사람 장수를 더한다. 외교는 비운다.
-function worldState(source: WorldInit, kind: WorldKind, userId: string, name: string): WorldInit {
+export function worldState(source: WorldInit, kind: WorldKind, userId: string, name: string): WorldInit {
   const state = structuredClone(source);
+  state.scenarioKey = 'e2e-policy';
   const npc = state.generals[0]!;
   state.generals.push({
     ...npc,

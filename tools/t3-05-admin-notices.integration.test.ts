@@ -571,6 +571,7 @@ for (const index of [0, 1])
           intel: 55,
           politics: 55,
           charm: 55,
+          sex: 'MALE' as const,
           portraitId: null,
         },
         worldCookie,

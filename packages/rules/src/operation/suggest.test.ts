@@ -61,8 +61,8 @@ describe('작전 제안 사본', () => {
     ]);
     expect(calculateOperationForecast({ ...input, turns: result.slots }).expected).toEqual({
       crew: 200,
-      train: 90,
-      atmos: 90,
+      train: 98,
+      atmos: 94,
     });
   });
 
@@ -73,13 +73,13 @@ describe('작전 제안 사본', () => {
       min: { crew: 600, train: 90, atmos: 90 },
     });
     const result = suggestOperationTurns(input);
-    expect(result.slots[1]).toEqual(directTurn('recruit', { amount: 300, crewType: 1100 }));
-    expect(result.slots.filter((turn) => turn.commandKey === 'train')).toHaveLength(5);
+    expect(result.slots[2]).toEqual(directTurn('recruit', { amount: 300, crewType: 1100 }));
+    expect(result.slots.filter((turn) => turn.commandKey === 'train')).toHaveLength(4);
     expect(result.slots.filter((turn) => turn.commandKey === 'morale')).toHaveLength(5);
     expect(calculateOperationForecast({ ...input, turns: result.slots }).expected).toEqual({
       crew: 600,
-      train: 95,
-      atmos: 95,
+      train: 93,
+      atmos: 100,
     });
   });
 

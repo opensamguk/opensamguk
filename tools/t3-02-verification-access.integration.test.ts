@@ -182,8 +182,8 @@ describe('T3-02 AC-M3-01 실제 PostgreSQL·HTTP 이메일 인증 차단', () =>
     });
   });
 
-  it('47개 변경 API가 미인증·위조·무인증·제재를 거부하고 운영 권한 거절 감사 두 행만 남긴다', async () => {
-    expect(paths).toHaveLength(47);
+  it('54개 변경 API가 미인증·위조·무인증·제재를 거부하고 운영 권한 거절 감사 두 행만 남긴다', async () => {
+    expect(paths).toHaveLength(54);
     expect(paths).toContain('account.setPortrait');
     expect(paths).toContain('entry.possess');
     expect(paths).toContain('admin.game.request');
@@ -303,6 +303,7 @@ describe('T3-02 AC-M3-01 실제 PostgreSQL·HTTP 이메일 인증 차단', () =>
         {
           worldId,
           name: '인증장수',
+          sex: 'MALE' as const,
           portraitId: null,
           leadership: 55,
           strength: 55,
