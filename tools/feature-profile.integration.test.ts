@@ -1,4 +1,5 @@
-import { providedRuleKeys } from '@opensamguk/rules';
+import { ruleRegistry } from '../packages/rules/src/index';
+import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { loadFeatureProfile, loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
@@ -20,8 +21,8 @@ describe('AC-P2-30·31·32·33 확장 생성 설정', () => {
     async (key) => {
       const profile = await loadFeatureProfile(key);
       expect(profile.contentHash).toBe(hashState(profile.value));
-      expect(providedRuleKeys).toHaveLength(key === 'expanded-191-v1' ? 13 : key === 'expanded-191-v2' ? 14 : 15);
-      expect(providedRuleKeys.includes('battle-affinity-v2')).toBe(key === 'expanded-191-v3');
+      expect(providedRuleKeys).toEqual(ruleRegistry.features.map(({ key }) => key).sort());
+      expect(providedRuleKeys).toContain('battle-affinity-v2');
       const lineage = profile.value.featureData['lineage-v1'];
       expect(lineage).toMatchObject({ birth: { chanceBp: 500 }, limits: { maxGenerals: 2500 } });
       expect(profile.value.featureData['logistics-v1'].specialties).toHaveLength(9);

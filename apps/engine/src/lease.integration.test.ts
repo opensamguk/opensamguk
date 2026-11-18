@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, describe, expect, it } from 'vitest';
+import { saveInitialWorld } from './world/persistence';
+import { loadInitialWorldFromDb } from './world/resources';
 import { createDb } from '@opensamguk/db';
 import { acquireLease, assertLease, LeaseLostError, releaseLease, renewLease } from './lease';
 
@@ -13,20 +15,13 @@ afterAll(async () => {
 });
 
 async function create(ownerId = randomUUID()) {
-  const world = await db.world.create({
-    data: {
-      name: '리스 정밀도 회귀',
-      scenarioKey: '1030',
-      mapKey: 'che',
-      unitSetKey: 'test',
-      seed: 'lease-precision',
-      startYear: 200,
-      turnTermMinutes: 10,
-      initialStateHash: 'lease-test',
-      statRules: {},
-      unitSet: {},
-    },
+  const initial = await loadInitialWorldFromDb(db, { scenario: '1030', map: 'che', seed: 'lease-precision' });
+  const { worldId } = await saveInitialWorld(db, initial, {
+    name: '리스 정밀도 회귀',
+    turnTermMinutes: 10,
+    endYear: null,
   });
+  const world = { id: worldId };
   worldIds.push(world.id);
   const lease = await acquireLease(db, world.id, ownerId);
   if (!lease) throw new Error('테스트 리스 획득 실패');

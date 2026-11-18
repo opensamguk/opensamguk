@@ -73,8 +73,8 @@ for (const marker of ['20261104000000_account_world_sanctions', '20261107000000_
     for (const key of source.searchParams.keys())
       if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
         throw new Error('접속 대상 질의 인자는 쓸 수 없습니다.');
-    const name = `t305_sanction_migration_${randomUUID().replaceAll('-', '')}_test`;
-    if (!/^t305_sanction_migration_[a-f0-9]{32}_test$/.test(name)) throw new Error('자체 DB 이름을 확인하세요.');
+    const name = `opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`;
+    if (!/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(name)) throw new Error('자체 DB 이름을 확인하세요.');
     const adminUrl = new URL(source),
       target = new URL(source);
     adminUrl.pathname = '/postgres';

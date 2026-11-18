@@ -5,7 +5,7 @@ import { assertGeneralSex, applySexLedger, sexLedgerSchema } from './sex';
 
 it('AC-P2-32 새 판의 사람 성별은 직접 고르고 기존 판에는 넣지 못한다', () => {
   const rules = commandInitial().statRules,
-    payload = { name: '새장수', leadership: 70, strength: 70, intel: 60, portraitId: null };
+    payload = { name: '새장수', leadership: 55, strength: 55, intel: 55, politics: 55, charm: 55, portraitId: null };
   expect(validateGeneralCreation(payload, rules)).toEqual({ ok: true, value: payload });
   for (const sex of [undefined, 'UNKNOWN', 'other', null])
     expect(validateGeneralCreation({ ...payload, ...(sex === undefined ? {} : { sex }) }, rules, true)).toMatchObject({

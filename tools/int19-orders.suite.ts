@@ -1,4 +1,4 @@
-import { providedRuleKeys } from '@opensamguk/rules';
+import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';

@@ -33,7 +33,7 @@ function world() {
   });
   return state;
 }
-function run(key: string, state = world(), rng: Rng = createRng('stratagem-success'), tick = 0): CommandResult {
+function run(key: string, state = world(), rng: Rng = createRng('stratagem-success-2'), tick = 0): CommandResult {
   const result = resolver.run(state, { ...actor, tick }, key, args, rng);
   if ('code' in result) throw new Error(result.message);
   return result;
@@ -73,27 +73,9 @@ function script(values: number[]) {
 }
 
 const goldens = [
-  {
-    key: 'fire_attack',
-    name: '화계',
-    fields: ['agriculture', 'commerce'],
-    values: [497, 687],
-    amounts: '농업 497, 상업 687 감소',
-  },
-  {
-    key: 'sabotage',
-    name: '파괴',
-    fields: ['defence', 'wall'],
-    values: [497, 600],
-    amounts: '수비 497, 성벽 600 감소',
-  },
-  {
-    key: 'incite',
-    name: '선동',
-    fields: ['security', 'trust'],
-    values: [497, 13.726781917270273],
-    amounts: '치안 497, 민심 13.7 감소',
-  },
+  { key: 'fire_attack', fields: ['agriculture', 'commerce'] },
+  { key: 'sabotage', fields: ['defence', 'wall'] },
+  { key: 'incite', fields: ['security', 'trust'] },
 ] as const;
 
 it.each([['security'], ['commerce', 'agriculture'], ['security', 'commerce', 'agriculture']] as const)(
@@ -127,36 +109,288 @@ it.each([['security'], ['commerce', 'agriculture'], ['security', 'commerce', 'ag
   },
 );
 
-describe('stratagem success seed goldens', () => {
-  for (const golden of goldens)
-    it(golden.key, () => {
-      expect(run(golden.key)).toEqual({
-        effects: [
-          ...growth(269, 179),
-          ...golden.fields.map((field, i) => ({ kind: 'city', id: 2, field, op: 'add', value: -golden.values[i]! })),
-        ],
-        logs: [{ kind: 'success', text: `${golden.name} 성공: 도시2 ${golden.amounts}, 장수 0명 부상` }],
-        reports: [],
-        history: [
-          { nationId: 2, text: `도시2: ${golden.name}${golden.key === 'incite' ? '으로' : '로'} ${golden.amounts}` },
-        ],
-      });
-    });
-  it('plunder', () => {
-    expect(run('plunder')).toEqual({
-      effects: [
-        ...growth(269, 179),
-        { kind: 'nation', id: 2, field: 'gold', op: 'add', value: -447 },
-        { kind: 'nation', id: 2, field: 'rice', op: 'add', value: -653 },
-        { kind: 'nation', id: 1, field: 'gold', op: 'add', value: 313 },
-        { kind: 'nation', id: 1, field: 'rice', op: 'add', value: 457 },
-        { kind: 'general', id: 1, field: 'gold', op: 'add', value: 134 },
-        { kind: 'general', id: 1, field: 'rice', op: 'add', value: 196 },
-      ],
-      logs: [{ kind: 'success', text: '탈취 성공: 도시2 금 447, 쌀 653 획득' }],
-      history: [{ nationId: 2, text: '도시2: 금 447, 쌀 653 도난' }],
-    });
-  });
+it('AC-INT-28 상시 5능력치 네 계략 성공 골든', () => {
+  const results = stratagemCommands.map((definition) => ({ key: definition.key, result: run(definition.key) }));
+  for (const { result } of results) expect(result.history).toBeDefined();
+  expect(results).toMatchInlineSnapshot(`
+    [
+      {
+        "key": "fire_attack",
+        "result": {
+          "effects": [
+            {
+              "field": "gold",
+              "id": 1,
+              "kind": "general",
+              "op": "add",
+              "value": -100,
+            },
+            {
+              "field": "rice",
+              "id": 1,
+              "kind": "general",
+              "op": "add",
+              "value": -100,
+            },
+            {
+              "field": "experience",
+              "id": 1,
+              "kind": "general",
+              "op": "add",
+              "value": 297,
+            },
+            {
+              "field": "dedication",
+              "id": 1,
+              "kind": "general",
+              "op": "add",
+              "value": 209,
+            },
+            {
+              "field": "agriculture",
+              "id": 2,
+              "kind": "city",
+              "op": "add",
+              "value": -453,
+            },
+            {
+              "field": "commerce",
+              "id": 2,
+              "kind": "city",
+              "op": "add",
+              "value": -767,
+            },
+          ],
+          "history": [
+            {
+              "nationId": 2,
+              "text": "도시2: 화계로 농업 453, 상업 767 감소",
+            },
+          ],
+          "logs": [
+            {
+              "kind": "success",
+              "text": "화계 성공: 도시2 농업 453, 상업 767 감소, 장수 0명 부상",
+            },
+          ],
+          "reports": [],
+        },
+      },
+      {
+        "key": "sabotage",
+        "result": {
+          "effects": [
+            {
+              "field": "gold",
+              "id": 1,
+              "kind": "general",
+              "op": "add",
+              "value": -100,
+            },
+            {
+              "field": "rice",
+              "id": 1,
+              "kind": "general",
+              "op": "add",
+              "value": -100,
+            },
+            {
+              "field": "experience",
+              "id": 1,
+              "kind": "general",
+              "op": "add",
+              "value": 297,
+            },
+            {
+              "field": "dedication",
+              "id": 1,
+              "kind": "general",
+              "op": "add",
+              "value": 209,
+            },
+            {
+              "field": "defence",
+              "id": 2,
+              "kind": "city",
+              "op": "add",
+              "value": -453,
+            },
+            {
+              "field": "wall",
+              "id": 2,
+              "kind": "city",
+              "op": "add",
+              "value": -600,
+            },
+          ],
+          "history": [
+            {
+              "nationId": 2,
+              "text": "도시2: 파괴로 수비 453, 성벽 600 감소",
+            },
+          ],
+          "logs": [
+            {
+              "kind": "success",
+              "text": "파괴 성공: 도시2 수비 453, 성벽 600 감소, 장수 0명 부상",
+            },
+          ],
+          "reports": [],
+        },
+      },
+      {
+        "key": "incite",
+        "result": {
+          "effects": [
+            {
+              "field": "gold",
+              "id": 1,
+              "kind": "general",
+              "op": "add",
+              "value": -100,
+            },
+            {
+              "field": "rice",
+              "id": 1,
+              "kind": "general",
+              "op": "add",
+              "value": -100,
+            },
+            {
+              "field": "experience",
+              "id": 1,
+              "kind": "general",
+              "op": "add",
+              "value": 297,
+            },
+            {
+              "field": "dedication",
+              "id": 1,
+              "kind": "general",
+              "op": "add",
+              "value": 209,
+            },
+            {
+              "field": "security",
+              "id": 2,
+              "kind": "city",
+              "op": "add",
+              "value": -453,
+            },
+            {
+              "field": "trust",
+              "id": 2,
+              "kind": "city",
+              "op": "add",
+              "value": -15.33532420778647,
+            },
+          ],
+          "history": [
+            {
+              "nationId": 2,
+              "text": "도시2: 선동으로 치안 453, 민심 15.3 감소",
+            },
+          ],
+          "logs": [
+            {
+              "kind": "success",
+              "text": "선동 성공: 도시2 치안 453, 민심 15.3 감소, 장수 0명 부상",
+            },
+          ],
+          "reports": [],
+        },
+      },
+      {
+        "key": "plunder",
+        "result": {
+          "effects": [
+            {
+              "field": "gold",
+              "id": 1,
+              "kind": "general",
+              "op": "add",
+              "value": -100,
+            },
+            {
+              "field": "rice",
+              "id": 1,
+              "kind": "general",
+              "op": "add",
+              "value": -100,
+            },
+            {
+              "field": "experience",
+              "id": 1,
+              "kind": "general",
+              "op": "add",
+              "value": 297,
+            },
+            {
+              "field": "dedication",
+              "id": 1,
+              "kind": "general",
+              "op": "add",
+              "value": 209,
+            },
+            {
+              "field": "gold",
+              "id": 2,
+              "kind": "nation",
+              "op": "add",
+              "value": -408,
+            },
+            {
+              "field": "rice",
+              "id": 2,
+              "kind": "nation",
+              "op": "add",
+              "value": -729,
+            },
+            {
+              "field": "gold",
+              "id": 1,
+              "kind": "nation",
+              "op": "add",
+              "value": 286,
+            },
+            {
+              "field": "rice",
+              "id": 1,
+              "kind": "nation",
+              "op": "add",
+              "value": 510,
+            },
+            {
+              "field": "gold",
+              "id": 1,
+              "kind": "general",
+              "op": "add",
+              "value": 122,
+            },
+            {
+              "field": "rice",
+              "id": 1,
+              "kind": "general",
+              "op": "add",
+              "value": 219,
+            },
+          ],
+          "history": [
+            {
+              "nationId": 2,
+              "text": "도시2: 금 408, 쌀 729 도난",
+            },
+          ],
+          "logs": [
+            {
+              "kind": "success",
+              "text": "탈취 성공: 도시2 금 408, 쌀 729 획득",
+            },
+          ],
+        },
+      },
+    ]
+  `);
 });
 
 describe.each(stratagemCommands)('$key shared contract', (def) => {
@@ -190,7 +424,8 @@ describe.each(stratagemCommands)('$key shared contract', (def) => {
     expect(state).toEqual(before);
     expect(first.effects.every((e) => e.kind !== 'world')).toBe(true);
     const next = applyEffects(state, first.effects);
-    expect(next.generals[1]!.rice).toBe(def.key === 'plunder' ? 100096 : 99900);
+    const rice = (value: WorldState) => value.generals[1]!.rice + value.nations[1]!.rice + value.nations[2]!.rice;
+    expect(rice(next)).toBe(rice(state) - 100);
     expect(state).toEqual(before);
   });
   it('checks exact cost boundary without preparation turns', () => {
@@ -344,16 +579,16 @@ it('effective stats clamp, cross round and ignore injury', () => {
   expect(effectiveStat({ leadership: -1, strength: 900, intel: 900 }, 'strength')).toBe(255);
   expect(effectiveStat({ leadership: -1, strength: 900, intel: 900 }, 'leadership')).toBe(0);
   const state = world();
-  const before = stratagemProbability(state, actor, 2, 'intel');
+  const before = stratagemProbability(state, actor, 2, 'intel', 'fire_attack');
   state.generals[1]!.injury = 100;
-  expect(stratagemProbability(state, actor, 2, 'intel')).toBe(before);
+  expect(stratagemProbability(state, actor, 2, 'intel', 'fire_attack')).toBe(before);
 });
 
 it('nine hand-calculated probability cells clamp after dividing by distance', () => {
   for (const [stat, numerator] of [
-    ['intel', 0.5],
-    ['strength', 0.5266666666666666],
-    ['leadership', 0.5333333333333333],
+    ['intel', 0.35 + 70 / 300 - 0.15],
+    ['strength', 0.35 + 77 / 300 - 0.15],
+    ['leadership', 0.35 + 70 / 300 - 0.15],
   ] as const) {
     for (const [connections, distance] of [
       [[2], 1],
@@ -363,7 +598,15 @@ it('nine hand-calculated probability cells clamp after dividing by distance', ()
       const state = world();
       state.cities[1]!.connections = [...connections];
       state.cities[3]!.connections = [1, 2];
-      expect(stratagemProbability(state, actor, 2, stat)).toBeCloseTo(Math.min(0.5, numerator / distance), 10);
+      expect(
+        stratagemProbability(
+          state,
+          actor,
+          2,
+          stat,
+          stat === 'strength' ? 'plunder' : stat === 'leadership' ? 'incite' : 'fire_attack',
+        ),
+      ).toBeCloseTo(Math.min(0.5, numerator / distance), 10);
     }
   }
 });
@@ -386,16 +629,16 @@ it('distance BFS finds shortest routes up to five across every ownership and rej
 
 it('zero and exact half probabilities both consume the first next and strict less than decides', () => {
   const state = world();
-  Object.assign(state.generals[2]!, { cityKey: 2, leadership: 255, strength: 255, intel: 255 });
+  Object.assign(state.generals[2]!, { cityKey: 2, leadership: 100, strength: 100, intel: 100 });
   Object.assign(state.generals[1]!, { intel: 0, strength: 0 });
   state.cities[2]!.security = 1000;
-  expect(stratagemProbability(state, actor, 2, 'intel')).toBe(0);
+  expect(stratagemProbability(state, actor, 2, 'intel', 'fire_attack')).toBe(0);
   const zero = script([0, 1, 1]);
   expect(run('fire_attack', state, zero.rng).effects).toEqual(growth(1, 1));
   expect(zero.calls).toEqual(['next', 'int(1,100)', 'int(1,70)']);
   const halfState = world();
   halfState.cities[2]!.security = 0;
-  expect(stratagemProbability(halfState, actor, 2, 'intel')).toBe(0.5);
+  expect(stratagemProbability(halfState, actor, 2, 'intel', 'fire_attack')).toBe(0.5);
   const half = script([0.5, 100, 70]);
   expect(run('fire_attack', halfState, half.rng).effects).toEqual(growth(100, 70));
   expect(half.calls).toEqual(zero.calls);
@@ -564,8 +807,8 @@ it('defence uses the maximum stat and count of active defenders', () => {
   const state = world();
   Object.assign(state.generals[2]!, { cityKey: 2, intel: 40, strength: 40 });
   Object.assign(state.generals[3]!, { cityKey: 2, intel: 20, strength: 20 });
-  const expected = 0.35 + 90 / 300 - (50 / 300 + (Math.log2(3) - 1.25) * 0.04 + 0.1 + 0.1);
-  expect(stratagemProbability(state, actor, 2, 'intel')).toBeCloseTo(expected, 12);
+  const expected = 0.35 + 70 / 300 - (40 / 300 + (Math.log2(3) - 1.25) * 0.04 + 0.1 + 0.1);
+  expect(stratagemProbability(state, actor, 2, 'intel', 'fire_attack')).toBeCloseTo(expected, 12);
 });
 
 it('seeded plunder preserves gold and rice after applying fractional formulae', () => {

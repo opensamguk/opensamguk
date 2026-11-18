@@ -103,6 +103,7 @@ function sexEditionRequest(frozen: 'old' | 'second' | 'latest' | 'missing' | nul
       }),
     },
     publicMapSnapshot: { create: vi.fn(async () => ({})) },
+    worldExtSlice: { create: vi.fn(async () => ({})) },
     nation: { createMany, update: vi.fn(async () => ({})) },
     city: { createMany },
     general: { createMany },
@@ -165,12 +166,15 @@ it.each(['missing', 'tampered'] as const)('AC-P2-32 생성의 %s 고정 해시�
   expect(f.tx.world.create).not.toHaveBeenCalled();
 });
 
-it.each([null, 'latest'] as const)('AC-P2-32 가문을 끈 %s 생성은 성별 판을 읽지 않는다', async (frozen) => {
+it.each([null, 'latest'] as const)('AC-INT-28 별도 가문 설정이 없는 %s 생성도 성별 판을 고정한다', async (frozen) => {
   const f = sexEditionRequest(frozen, false),
     all = vi.spyOn(resources, 'loadSexLedgers'),
     latest = vi.spyOn(resources, 'loadSexLedger');
   await processWorldCreateRequest(f.db, new AbortController().signal);
   expect(f.request.status).toBe('DONE');
-  expect(all).not.toHaveBeenCalled();
-  expect(latest).not.toHaveBeenCalled();
+  if (frozen === null) expect(latest).toHaveBeenCalledWith('1030');
+  else expect(all).toHaveBeenCalledOnce();
+  expect(f.stored()!.lineageState).toBeDefined();
+  const origin = f.stored()!.replayOrigin as { initialStateHash: string };
+  expect(origin.initialStateHash).toBe(f.latestHash);
 });

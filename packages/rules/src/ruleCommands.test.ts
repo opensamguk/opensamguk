@@ -25,14 +25,14 @@ describe('교역의 형식 3 무상태 명령 등록', () => {
         ?.commandBindings?.map((binding) => ({ key: binding.definition.key, sliceKeys: binding.sliceKeys })),
     ).toEqual([{ key: 'trade', sliceKeys: [] }]);
   });
-  it('조약 없이 교역만 선택할 수 없고 끈 기능은 명령을 내지 않는다', () => {
+  it('AC-INT-28 등록표 의존성을 검사하고 월드 선택 없이 모든 명령을 제공한다', () => {
     expect(() => checkRuleFeatures(['treaty-trade'])).toThrow('의존');
-    expect(resolverForRuleFeatures({})).toBeUndefined();
-    expect(resolverForRuleFeatures({})).toBeUndefined();
     const resolver = resolverForRuleFeatures({})!;
     expect(resolver.get('trade')?.name).toBe('교역');
-    expect(resolver.list('general').length + resolver.list('nation').length).toBe(38);
-    expect(resolver.get('fire_attack')).toBeUndefined();
+    for (const feature of ruleRegistry.features)
+      for (const { definition } of feature.commandBindings ?? [])
+        expect(resolver.get(definition.key)?.target).toBe(definition.target);
+    expect(resolver.get('fire_attack')?.name).toBe('화계');
   });
   it('실제 조약 입력을 재현한 뒤 명시 교역 예턴을 같은 기능표 resolver로 실행한다', () => {
     const initial = commandInitial();
@@ -40,6 +40,8 @@ describe('교역의 형식 3 무상태 명령 등록', () => {
     initial.generals[1]!.userId = 'other-human';
     initial.nations[1]!.isNpc = false;
     const before = initialReplayState(initial);
+    before.residenceAnchors = { 1: 0, 2: 0 };
+    before.policy!.lastActiveTicks = { 1: 0, 2: 0 };
     const payload = { toNationId: 2, clauses: [{ kind: 'peace' as const }, { kind: 'trade' as const, months: 3 }] };
     const domain = applyTreatyInput(
       before.state,
@@ -73,16 +75,16 @@ describe('교역의 형식 3 무상태 명령 등록', () => {
       payload: responsePayload,
       result: response.result,
     });
-    const turns = emptyTurns();
-    turns[0] = { commandKey: 'trade', args: { cityKey: 2 } };
+    const turns = emptyTurns().map((turn) => ({ ...turn, explicit: false }));
+    turns[0] = { commandKey: 'trade', args: { cityKey: 2 }, explicit: true };
     const queued = applyRecordedInput(accepted, {
       sequence: 3,
-      tick: null,
+      tick: 60,
       kind: 'turns.set',
       generalId: 1,
       status: 'APPLIED',
       payload: { turns, revision: 0 },
-      result: { revision: 1 },
+      result: { revision: 1, activeTick: 60 },
     });
     const after = runReplayAction(queued, initial.seed, initial.unitSet);
     expect(after.state.generals[1]!.experience).toBe(queued.state.generals[1]!.experience + 10);

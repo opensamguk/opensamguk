@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildInitialWorld } from '../world/bootstrap';
 import { mapFixture, scenarioFixture, unitFixture } from '../world/validate/testFixtures';
 import { statRulesSchema } from '../world/resources';
+import { providedRuleData } from '../providedRuleData';
 import { checkReplayOrigin } from '../ruleRegistry';
 import { applyRecordedInput, initialReplayState } from '../replay';
 import { buildCreatedGeneral, validateGeneralCreation } from './create';
@@ -62,11 +63,17 @@ function resources(five = true) {
 }
 function origin(five = true) {
   const initial = buildInitialWorld(resources(five));
+  if (five)
+    for (const general of initial.generals) {
+      general.sex = 'UNKNOWN';
+      general.crew = 0;
+    }
   return {
     version: five ? 3 : 1,
     initial,
     initialStateHash: 'checked-in-transport',
     resourceHash: 'checked-in-transport',
+    ...(five ? { featureData: providedRuleData(initial, 60) } : {}),
   };
 }
 
@@ -129,13 +136,13 @@ describe('INT-14 / AC-INT-14 5능력치 계약', () => {
     delete bad.initial.generals[0]!.charm;
     expect(() => checkReplayOrigin(bad)).toThrow();
     const mismatch = origin();
-    expect(() => checkStatProfile(mismatch.initial)).toThrow();
+    expect(() => checkStatProfile({ ...mismatch.initial, statRules: { ...legacyRules, count: 3 } })).toThrow();
     expect(buildInitialWorld(resources(false))).toEqual(old.initial);
   });
   it('시드 생성과 재생은 5값을 보존하고 결과 위조를 거부한다', () => {
     const initial = origin().initial;
     const input = {
-      payload,
+      payload: { ...payload, sex: 'MALE' as const },
       seed: initial.seed,
       userId: 'human',
       id: 2,
@@ -153,8 +160,8 @@ describe('INT-14 / AC-INT-14 5능력치 계약', () => {
       kind: 'general.create',
       generalId: 2,
       status: 'APPLIED' as const,
-      payload,
-      result: { general },
+      payload: input.payload,
+      result: { general, activeTick: 0 },
     };
     const replay = initialReplayState(initial);
     expect(applyRecordedInput(replay, recorded).state.generals[2]).toEqual(general);
@@ -166,6 +173,6 @@ describe('INT-14 / AC-INT-14 5능력치 계약', () => {
     void ignored;
     const policyInput = { ...policyRecord, result: { general, activeTick: 0 } };
     expect(() => validatePolicyRecordedInput(policyInput, true)).toThrow();
-    expect(() => validatePolicyRecordedInput(policyInput, true, true)).not.toThrow();
+    expect(() => validatePolicyRecordedInput(policyInput, true, true, true, true)).not.toThrow();
   });
 });

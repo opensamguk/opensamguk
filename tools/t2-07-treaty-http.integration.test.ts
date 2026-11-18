@@ -63,7 +63,7 @@ const requiredPrefix = [
   '20261023072000_world_ext_slices',
   '20261023073000_treaties',
 ];
-const databaseName = `t207_http_${randomUUID().replaceAll('-', '')}_test`;
+const databaseName = `opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`;
 const origin = 'http://treaty-http.test';
 const password = randomUUID();
 const note: TreatyClause[] = [{ kind: 'note', text: '기록' }];

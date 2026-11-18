@@ -3,7 +3,7 @@ import { generateLineageChild, type LineageResources } from './birth';
 import { lineageFixture } from './testFixture';
 
 export const birthResources: LineageResources = {
-  statRules: { total: 180, min: 0, max: 100 },
+  statRules: { count: 5, total: 275, min: 15, max: 90 },
   unitSet: { defaultCrewTypeId: 1 },
 };
 function parents() {
@@ -41,8 +41,8 @@ it('AC-P2-32 출생은 같은 원본·시드에서 재현되며 가주 소속·�
   });
   expect(first.general.name.startsWith('제갈')).toBe(true);
   expect(first.person.parents).toEqual([b, a]);
-  expect(first.general).not.toHaveProperty('politics');
-  expect(first.general).not.toHaveProperty('charm');
+  expect(first.general.politics).toBeTypeOf('number');
+  expect(first.general.charm).toBeTypeOf('number');
 });
 
 it('AC-P2-32 성별 전용 난수는 능력치·이름·수명·턴 순서를 바꾸지 않는다', () => {

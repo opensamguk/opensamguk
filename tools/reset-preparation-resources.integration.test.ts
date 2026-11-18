@@ -1,7 +1,13 @@
-import { providedRuleKeys } from '@opensamguk/rules';
+import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { readFileSync } from 'node:fs';
 import type { Prisma, PrismaClient, PublishedResource } from '../packages/db/src/index';
-import { parsePreset, worldCreateIntent, ADMIN_RESET_KIND, type ReplayOriginV3 } from '../packages/rules/src/index';
+import {
+  ruleRegistry,
+  parsePreset,
+  worldCreateIntent,
+  ADMIN_RESET_KIND,
+  type ReplayOriginV3,
+} from '../packages/rules/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { afterEach, beforeAll, expect, it, vi } from 'vitest';
 import { composeInitialWorld, type InitialResources } from '../apps/engine/src/world/resources';
@@ -73,6 +79,7 @@ async function capture(prepared: PreparedInitialWorld) {
       }),
     },
     publicMapSnapshot: { create: vi.fn(async () => ({})) },
+    worldExtSlice: { create: vi.fn(async () => ({})) },
     nation: { createMany, update: vi.fn(async () => ({})) },
     city: { createMany },
     general: { createMany },
@@ -273,12 +280,12 @@ it('AC-P2-32 최신 판과 맞는 월드도 원장 검토 오류를 감추지 �
   await reject(f, 'RESOURCE_INVALID');
 });
 
-it('AC-P2-32 가문을 끈 초기화는 성별 원장을 읽지 않는다', async () => {
+it('AC-INT-28 별도 가문 설정이 없는 초기화도 생성 당시 성별 원장을 고정한다', async () => {
   const f = fixture(),
     all = vi.spyOn(resourceLoaders, 'loadSexLedgers'),
     latest = vi.spyOn(resourceLoaders, 'loadSexLedger');
   await prepareWorldReset(f.db, worldId, 'off-sex-edition-seed', controller().signal);
-  expect(all).not.toHaveBeenCalled();
+  expect(all).toHaveBeenCalledOnce();
   expect(latest).not.toHaveBeenCalled();
 });
 
@@ -299,19 +306,7 @@ async function san10RequestFixture(
       ...(unitMode === 'expanded'
         ? { unitSet: resource('UNIT_SET', 'expanded', 'resources/unitset/expanded.json') }
         : {}),
-    },
-    san10Features = [
-      ...(unitMode === 'expanded' ? ['battle-affinity-v2'] : []),
-      'campaign-assignment-v2',
-      'campaign-v1',
-      'city-resources-v1',
-      'five-stats',
-      'operational-map',
-      'personnel',
-      'policy',
-      'stratagem-basic',
-      'treaty',
-    ].sort();
+    };
   const initial = composeInitialWorld(selected, oldSeed);
   const f = fixture();
   Object.assign(
@@ -364,18 +359,18 @@ async function san10RequestFixture(
       initialStateHash: f.world.initialStateHash,
     },
   } as unknown as Request;
-  return { f, san10Features };
+  return { f };
 }
 
 it.each(['expanded', 'basic-override'] as const)(
   'AC-INT-22: 새 프리셋의 %s 초기화는 실제 선택한 병종과 자동 전투 기능을 함께 보존한다',
   async (unitMode) => {
-    const { f, san10Features } = await san10RequestFixture('san10-191', unitMode);
+    const { f } = await san10RequestFixture('san10-191', unitMode);
     const result = await prepareWorldReset(f.db, worldId, 'expanded-reset-seed', controller().signal);
     const saved = await capture(result.prepared);
     expect(saved.world.unitSetKey).toBe(unitMode === 'expanded' ? 'expanded' : 'basic');
-    expect(providedRuleKeys).toEqual(san10Features);
-    expect(providedRuleKeys.includes('battle-affinity-v2')).toBe(unitMode === 'expanded');
+    expect(providedRuleKeys).toEqual(ruleRegistry.features.map(({ key }) => key).sort());
+    expect(providedRuleKeys).toContain('battle-affinity-v2');
     expect(result.evidence.provenance).toEqual({ kind: 'request', requestId });
   },
 );
@@ -383,7 +378,7 @@ it.each(['expanded', 'basic-override'] as const)(
 it.each(['san10-191', 'san10-empty'] as const)(
   'AC-INT-18D %s의 생략된 기본 자원도 DONE 출처와155빈원장을 보존해 초기화한다',
   async (scenario) => {
-    const { f, san10Features } = await san10RequestFixture(scenario),
+    const { f } = await san10RequestFixture(scenario),
       before = structuredClone({ world: f.world, requests: f.requests, rows: f.rows });
     const result = await prepareWorldReset(f.db, worldId, 'new-seed', controller().signal),
       saved = await capture(result.prepared),
@@ -396,7 +391,7 @@ it.each(['san10-191', 'san10-empty'] as const)(
     expect(origin.initial.generals).toHaveLength(491);
     expect(origin.initial.generals.every((general) => general.userId === null)).toBe(true);
     expect(origin.initial.cities).toHaveLength(155);
-    expect(providedRuleKeys).toEqual(san10Features);
+    expect(providedRuleKeys).toEqual(ruleRegistry.features.map(({ key }) => key).sort());
     const ledger = saved.world.cityResourcesState as {
       cities: Record<string, { gold: number; rice: number; garrison: unknown[] }>;
     };
@@ -522,6 +517,7 @@ it('원본 초기 상태 자체의 변경과 기능·프리셋 불일치를 거�
   (a.world.replayOrigin as unknown as ReplayOriginV3).initial.cities[0]!.population++;
   await reject(a, 'ORIGIN_INVALID');
   const b = fixture();
+  (b.world.replayOrigin as unknown as ReplayOriginV3).featureData = {};
   await reject(b, 'ORIGIN_INVALID');
   const c = fixture();
   c.world.presetKey = 'absent';
@@ -580,10 +576,11 @@ it('생성 manifest의 자원 선택·고정 해시·프리셋·간격·연도 �
   resolution.resources[0]!.contentHash = '0'.repeat(64);
   await reject(pinned, 'RESOURCE_INVALID');
 });
-it('원본 intent 기능을 바꾸고 재해시해도 원생성 기능과 다르면 거부한다', async () => {
+it('AC-INT-28 원본 intent에 폐지된 기능 선택을 넣고 재해시해도 거부한다', async () => {
   const f = fixture(),
     r = f.requests[0]!,
     intent = r.intent as unknown as object;
+  Object.assign(intent, { ruleFeatures: [] });
   r.intentHash = hashState(intent);
   await reject(f, 'PROVENANCE_INVALID');
 });
@@ -717,6 +714,7 @@ it('D1 공유 settings hash 추출은 승인된 C 원 recipe와 같다', () => {
   expect(resetSourceSettingsHash(w)).toBe(
     hashState({
       name: w.name,
+      fogOfWar: w.fogOfWar,
       seed: w.seed,
       scenario: w.scenarioKey,
       map: w.mapKey,

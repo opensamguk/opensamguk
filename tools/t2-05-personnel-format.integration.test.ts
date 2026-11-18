@@ -1,4 +1,4 @@
-import { providedRuleKeys } from '@opensamguk/rules';
+import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { readdir, readFile } from 'node:fs/promises';
@@ -127,14 +127,17 @@ it('PG-B8-1 인사 표지 migration은 구 SQL fixture를 보존하고 현재 fa
   } catch {
     throw new Error('시험 접속값을 확인하세요.');
   }
-  if (!['127.0.0.1', 'localhost'].includes(source.hostname) || !['5432', '5433'].includes(source.port || '5432'))
+  if (
+    !['127.0.0.1', 'localhost'].includes(source.hostname) ||
+    !['5432', '5433', '5561'].includes(source.port || '5432')
+  )
     throw new Error('loopback 5432 또는 5433 시험 서버가 필요합니다.');
   for (const key of source.searchParams.keys())
     if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
       throw new Error('접속 대상 질의 인자는 쓸 수 없습니다.');
   source.port ||= '5432';
-  const name = `t205_personnel_format_${randomUUID().replaceAll('-', '')}_test`;
-  if (!/^t205_personnel_format_[a-f0-9]{32}_test$/.test(name)) throw new Error('자체 DB 이름을 확인하세요.');
+  const name = `opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`;
+  if (!/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(name)) throw new Error('자체 DB 이름을 확인하세요.');
   const adminUrl = new URL(source),
     target = new URL(source);
   adminUrl.pathname = '/postgres';

@@ -38,6 +38,6 @@ it.each([1, 3])('AC-INT-27·28 확장 지도 %i판과 같은 시나리오 판·�
   if (!profile.available) throw Error('게시 판이 필요합니다.');
   expect(profile.selection.mapKey).toBe(edition === 3 ? 'san10-expanded@3' : 'san10-expanded');
   expect(profile.selection.scenarioKey).toBe(`${profile.id}${edition === 3 ? '@3' : ''}`);
-  expect(providedRuleKeys.includes('capturable-field-v1')).toBe(edition === 3);
+  expect(providedRuleKeys).toContain('capturable-field-v1');
   expect(profile.counts.anchors).toBe(edition === 3 ? 195 : 322);
 });

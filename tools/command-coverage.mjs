@@ -88,8 +88,19 @@ export function readExtensionRegistryKeys(root) {
     'enum',
     'literal',
     'array',
+    'record',
   ]);
-  const zodMethods = new Set(['int', 'positive', 'nonnegative', 'min', 'max', 'length', 'optional', 'nullable']);
+  const zodMethods = new Set([
+    'int',
+    'positive',
+    'nonnegative',
+    'min',
+    'max',
+    'length',
+    'optional',
+    'nullable',
+    'regex',
+  ]);
   const numericLiteral = (node) =>
     ts.isNumericLiteral(node) ||
     (ts.isPrefixUnaryExpression(node) &&
@@ -282,6 +293,7 @@ export function readExtensionRegistryKeys(root) {
       ts.isStringLiteral(node) ||
       numericLiteral(node) ||
       ts.isBigIntLiteral(node) ||
+      ts.isRegularExpressionLiteral(node) ||
       ts.isNoSubstitutionTemplateLiteral(node) ||
       [ts.SyntaxKind.TrueKeyword, ts.SyntaxKind.FalseKeyword, ts.SyntaxKind.NullKeyword].includes(node.kind)
     )
@@ -307,6 +319,10 @@ export function readExtensionRegistryKeys(root) {
         else if (ts.isShorthandPropertyAssignment(property)) argumentBinding(file, property.name.text);
         else fail(file, 'zod 인자의 메서드·접근자는 읽을 수 없다');
       }
+      return;
+    }
+    if (closedRoot(file, node)) {
+      closedInitializer(file, node);
       return;
     }
     if (ts.isCallExpression(node) && zodValue(file, node)) return;

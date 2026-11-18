@@ -17,14 +17,16 @@ function fixture(five = false) {
   }
   const payload = {
     name: '유산장수',
-    leadership: five ? 55 : 70,
-    strength: five ? 55 : 70,
-    intel: five ? 55 : 60,
-    ...(five ? { politics: 55, charm: 55 } : {}),
+    leadership: 55,
+    strength: 55,
+    intel: 55,
+    politics: 55,
+    charm: 55,
+    sex: 'MALE',
     portraitId: null,
     heritage: five ? { politics: 3, charm: 3 } : { leadership: 3, intel: 3 },
   };
-  const checked = validateGeneralCreation(payload, initial.statRules, false, true);
+  const checked = validateGeneralCreation(payload, initial.statRules, true, true);
   if (!checked.ok) throw new Error(checked.message);
   const options = {
     payload: checked.value,
@@ -71,9 +73,7 @@ it.each([false, true])('AC-P2-33 %s 능력치 생성의 유산 배분·최종 �
   expect(next.state.generals[general.id]).toEqual(general);
   expect(recorded.result.heritage.cost).toBe(6);
   expect(Object.hasOwn(general, 'heritage')).toBe(false);
-  expect(five ? [general.politics, general.charm] : [general.leadership, general.intel]).toEqual(
-    five ? [58, 58] : [73, 63],
-  );
+  expect(five ? [general.politics, general.charm] : [general.leadership, general.intel]).toEqual([58, 58]);
 });
 it('AC-P2-33 유산은 기존 도시·친화·턴 offset 난수 소비를 바꾸지 않는다', () => {
   const { options, general } = fixture();
@@ -86,8 +86,8 @@ it('AC-P2-33 유산은 기존 도시·친화·턴 offset 난수 소비를 바꾸
     plain.nextTurnTick,
   ]);
   expect(Object.hasOwn(plain, 'heritage')).toBe(false);
-  expect(validateGeneralCreation(base, { total: 200, min: 10, max: 80 })).toMatchObject({ ok: true });
-  expect(validateGeneralCreation(options.payload, { total: 200, min: 10, max: 80 })).toMatchObject({
+  expect(validateGeneralCreation(base, FIVE_STAT_RULES, true)).toMatchObject({ ok: true });
+  expect(validateGeneralCreation(options.payload, FIVE_STAT_RULES, true)).toMatchObject({
     ok: false,
     code: 'BAD_HERITAGE',
   });

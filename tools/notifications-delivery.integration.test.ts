@@ -29,7 +29,7 @@ type Pg = {
 const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
 if (!['127.0.0.1', 'localhost'].includes(source.hostname) || source.search)
   throw Error('loopback 전용 시험 DB가 필요합니다.');
-const database = `notification_delivery_${randomUUID().replaceAll('-', '')}_test`;
+const database = `opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`;
 const targetUrl = new URL(source),
   adminUrl = new URL(source);
 targetUrl.pathname = '/' + database;

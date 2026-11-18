@@ -175,7 +175,7 @@ describe('AC-P2-30 물류 정본·수량 보존', () => {
     expect(world.generals).toEqual(upgrade.state.generals);
   });
 
-  it.each(['inactive', 'foreign', 'rank', 'future', 'disabled', 'input'] as const)(
+  it.each(['inactive', 'foreign', 'rank', 'future', 'input'] as const)(
     '%s 거부는 원본과 재고를 바꾸지 않는다',
     (kind) => {
       const world = fixture(),

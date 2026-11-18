@@ -43,10 +43,10 @@ it.each([false, true])(
     expect(next.turns).toEqual(before.turns);
     expect(next.revisions).toEqual({ ...before.revisions, 1: 1 });
     expect(replay).toEqual(before);
-    if (policy) {
+    {
       expect(next.policy!.policies).toEqual(before.policy!.policies);
       expect(next.policy!.lastActiveTicks).toEqual({ 1: context.tick });
-    } else expect(next.policy).toBeUndefined();
+    }
   },
 );
 

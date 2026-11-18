@@ -18,8 +18,8 @@ const migrations = new URL('../packages/db/prisma/migrations/', import.meta.url)
 async function withDatabase(mode: 'empty' | 'upgrade', run: (client: PgClient) => Promise<void>) {
   if (!process.env.TEST_DATABASE_URL) throw new Error('조약 저장 전용 테스트 DB가 필요합니다.');
   const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-  const name = `t207_treaty_${randomUUID().replaceAll('-', '')}_${mode}_test`;
-  if (!/^t207_treaty_[a-f0-9]{32}_(empty|upgrade)_test$/.test(name))
+  const name = `opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_${mode}_test`;
+  if (!/^opensamguk_ci_green_[a-f0-9]{20}_(empty|upgrade)_test$/.test(name))
     throw new Error('조약 시험 DB 이름이 올바르지 않습니다.');
   const target = new URL(source),
     adminUrl = new URL(source);

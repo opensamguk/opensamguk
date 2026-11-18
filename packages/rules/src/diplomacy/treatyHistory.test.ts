@@ -21,7 +21,12 @@ import type { ClosedTreatyRow, FirstTreatyClause, TreatyInput, TreatyRecord } fr
 
 const pact: FirstTreatyClause[] = [{ kind: 'peace' }, { kind: 'nonAggression', months: 1 }];
 const note: FirstTreatyClause[] = [{ kind: 'note', text: '기록' }];
-const replayContext = { treaty: { version: 1 }, monthlyTick: 0 };
+const replayContext = {
+  treaty: { version: 1 },
+  treatyTrade: { version: 1 },
+  treatyExpanded: { version: 1 },
+  monthlyTick: 0,
+};
 
 function world(npc = false): TreatyWorldState {
   const state = commandWorld();
@@ -361,16 +366,16 @@ describe('T2-07 / AC-M2-06 과거 완료 조약 decoder', () => {
     expect(record).toEqual(accepted(true).record);
   });
 
-  it('NFC로 바꾸지 않고 실제 BAD_INPUT·연결 전 조항 거절을 읽는다', () => {
+  it('NFC로 바꾸지 않고 실제 BAD_INPUT·전쟁 중 교역 거절을 읽는다', () => {
     const nfd = proposal(false, 1500, [{ kind: 'note', text: '\u1100\u1161' }]).record;
     expect(decodeTreatyRecord(nfd)).toEqual(nfd);
     const unsupported = execute(
       world(),
-      { generalId: 1, kind: 'treaty.propose', payload: { toNationId: 2, clauses: [{ kind: 'trade', months: 1 }] } },
+      { generalId: 1, kind: 'treaty.propose', payload: { toNationId: 2, clauses: [{ kind: 'trade', months: 0 }] } },
       1500,
       10,
     ).record;
-    expect(unsupported).toMatchObject({ status: 'REJECTED', result: { code: 'CLAUSE_NOT_CONNECTED' } });
+    expect(unsupported).toMatchObject({ status: 'REJECTED', result: { code: 'BAD_INPUT' } });
     expect(decodeTreatyRecord(unsupported)).toEqual(unsupported);
   });
 

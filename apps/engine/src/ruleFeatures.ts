@@ -181,6 +181,8 @@ const processPersonnelInput: QueuedInputHandler = async (tx, world, event, { tic
 };
 
 export const builtInEngineFeatures: readonly EngineFeature[] = [
+  { key: 'city-upgrade-v1' },
+  { key: 'construction-v1' },
   { key: 'capturable-field-v1' },
   { key: 'march-supply-v1' },
   { key: 'office-effects' },

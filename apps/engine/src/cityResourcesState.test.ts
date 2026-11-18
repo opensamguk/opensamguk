@@ -19,11 +19,11 @@ const client = (execute = vi.fn(async () => 1)) => ({
 });
 
 describe('AC-INT-18B 도시 저장 경계', () => {
-  it('기존 월드는 NULL을 읽고 새 필드를 덧붙이지 않는다', async () => {
+  it('AC-INT-28 필수 도시 원장 NULL은 읽기와 저장 모두 거부한다', async () => {
     const old = structuredClone(initial);
-    expect(readStoredCityResources(null, old, [])).toBeUndefined();
+    expect(() => readStoredCityResources(null, old, [])).toThrow();
     const { tx, execute } = client();
-    await persistCityResourcesState(tx, 'old', old, structuredClone(old), []);
+    await expect(persistCityResourcesState(tx, 'old', old, structuredClone(old), [])).rejects.toThrow();
     expect(execute).not.toHaveBeenCalled();
     expect(Object.hasOwn(old, 'cityResources')).toBe(false);
   });
@@ -39,10 +39,9 @@ describe('AC-INT-18B 도시 저장 경계', () => {
       expect(() => readStoredCityResources(value, fixture(), [1100])).toThrow();
     },
   );
-  it('OFF 비NULL과 의존 누락·도시 누락·없는 병종을 거부한다', () => {
+  it('원장을 기능 선택 없이 읽고 도시 누락·없는 병종을 거부한다', () => {
     const world = fixture();
-    expect(() => readStoredCityResources(world.cityResources, initial, [1100])).toThrow('끈');
-    expect(() => readStoredCityResources(world.cityResources, { ...world }, [1100])).toThrow('의존');
+    expect(readStoredCityResources(world.cityResources, initial, [1100])).toEqual(world.cityResources);
     const missing = structuredClone(world.cityResources!);
     delete missing.cities[Object.keys(missing.cities)[0]!];
     expect(() => readStoredCityResources(missing, world, [1100])).toThrow('대응');
@@ -76,14 +75,14 @@ describe('AC-INT-18B 도시 저장 경계', () => {
     const current = fixture(),
       old = structuredClone(initial);
     const { tx, execute } = client();
-    await expect(persistCityResourcesState(tx, 'w', old, current, [1100])).rejects.toThrow('추가하거나');
-    await expect(persistCityResourcesState(tx, 'w', current, old, [1100])).rejects.toThrow('추가하거나');
+    await expect(persistCityResourcesState(tx, 'w', old, current, [1100])).rejects.toThrow();
+    await expect(persistCityResourcesState(tx, 'w', current, old, [1100])).rejects.toThrow();
     const invalid = structuredClone(current);
     invalid.cityResources!.cities[Object.keys(invalid.cities)[0]!]!.gold = -1;
     await expect(persistCityResourcesState(tx, 'w', current, invalid, [1100])).rejects.toThrow();
     expect(execute).not.toHaveBeenCalled();
   });
-  it('재생 수출의 OFF 비NULL도 거점 조회 전에 차단한다', async () => {
+  it('구판 재생 수출은 원장 값과 무관하게 거점 조회 전에 차단한다', async () => {
     const findMany = vi.fn();
     const tx = { city: { findMany } } as unknown as Prisma.TransactionClient;
     const world = {
@@ -94,9 +93,11 @@ describe('AC-INT-18B 도시 저장 경계', () => {
       unitSet: {},
       cityResourcesState: {},
     };
-    await expect(assertStoredCityResources(tx, world)).rejects.toThrow('끈');
+    await expect(assertStoredCityResources(tx, world)).rejects.toThrow('새 판 재생 형식');
     expect(findMany).not.toHaveBeenCalled();
-    await assertStoredCityResources(tx, { ...world, cityResourcesState: null });
+    await expect(assertStoredCityResources(tx, { ...world, cityResourcesState: null })).rejects.toThrow(
+      '새 판 재생 형식',
+    );
     expect(findMany).not.toHaveBeenCalled();
   });
 });

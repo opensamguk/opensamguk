@@ -3,6 +3,7 @@ import { commandInitial, commandWorld } from '../../test/commandFixture';
 import { cloneWorld } from '../model/clone';
 import { initialReplayState } from '../replay';
 import { checkReplayOrigin } from '../ruleRegistry';
+import { providedRuleData } from '../providedRuleData';
 import { settleNationLifecycleMonthly } from './monthly';
 import {
   assertInitialNationLifecycle,
@@ -42,7 +43,7 @@ it('생성 원본은 수도와 영토를 함께 검사하고 런타임 방랑의
   world.nationLifecycle = initialNationLifecycle();
   expect(() => assertNationLifecycle(world)).toThrow('방랑 원장이 없습니다');
   delete world.nationLifecycle;
-  expect(() => assertNationLifecycle(world)).toThrow('방랑 원장이 없습니다');
+  expect(() => assertNationLifecycle(world)).toThrow();
 });
 
 it('시작 시각 0의 방랑은 23개월에 남고 정확 24개월 정산에서 한 번 해산된다', () => {
@@ -63,25 +64,30 @@ it('시작 방랑 재생 기원은 형식 3과 명시한 인사·국가 변천 �
   const initial = commandInitial();
   initial.nations[0]!.capitalCityKey = null;
   for (const city of initial.cities) if (city.nationId === 1) city.nationId = null;
-  const origin = { version: 3, initial, initialStateHash: '0'.repeat(64), resourceHash: '0'.repeat(64) };
-  expect(() => checkReplayOrigin(origin)).toThrow('형식 3');
-  expect(() => checkReplayOrigin(origin)).toThrow('형식 3');
+  for (const general of initial.generals) general.crew = 0;
+  const origin = {
+    version: 3,
+    initial,
+    initialStateHash: '0'.repeat(64),
+    resourceHash: '0'.repeat(64),
+    featureData: providedRuleData(initial, 60),
+  };
   expect(() => checkReplayOrigin(origin)).not.toThrow();
   expect(() => checkReplayOrigin({ ...origin, version: 1 })).toThrow('형식 3');
 });
 
-it('꺼진 월드에는 원장을 만들지 않고 누락·null만 허용한다', () => {
+it('상시 제공 원장은 복제에서 보존하며 누락·null을 거부한다', () => {
   const world = commandWorld();
-  expect(readNationLifecycle(undefined)).toBeUndefined();
-  expect(readNationLifecycle(null)).toBeUndefined();
-  expect(() => readNationLifecycle(initialNationLifecycle())).toThrow('기능을 끈');
-  expect(Object.hasOwn(cloneWorld(world), 'nationLifecycle')).toBe(false);
+  expect(() => readNationLifecycle(undefined)).toThrow();
+  expect(() => readNationLifecycle(null)).toThrow();
+  expect(readNationLifecycle(initialNationLifecycle())).toEqual(initialNationLifecycle());
+  expect(cloneWorld(world).nationLifecycle).toEqual(world.nationLifecycle);
   expect(isWandering(world, 1)).toBe(false);
 });
 
 it('켜진 월드는 엄격한 원장과 실제 존재하는 무도시 국가만 허용한다', () => {
   const world = commandWorld();
-  expect(() => assertNationLifecycle(world)).toThrow();
+  expect(() => assertNationLifecycle(world)).not.toThrow();
   world.nationLifecycle = initialNationLifecycle();
   expect(() => assertNationLifecycle(world)).not.toThrow();
   world.nationLifecycle.nations['1'] = { sinceTick: 123 };

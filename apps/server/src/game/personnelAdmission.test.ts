@@ -21,6 +21,7 @@ function fixture() {
     $executeRaw: vi.fn<(sql: TemplateStringsArray, ...values: unknown[]) => Promise<number>>(async () => 1),
     session: { findFirst: vi.fn(async (): Promise<object | null> => ({ id: 'session' })) },
     world: { findUnique: vi.fn(async () => world) },
+    nation: { findUniqueOrThrow: vi.fn(async () => ({ level: 6 })) },
     general: {
       findUnique: vi.fn(async ({ where }: { where: { worldId_userId?: unknown } }) =>
         where.worldId_userId ? actor : target,
@@ -88,11 +89,11 @@ describe('인사 접수 B7 활동 경계', () => {
       expectActivityInsert(f);
     },
   );
-  it('정책을 끄면 인사 접수만 만든다', async () => {
+  it('AC-INT-28 별도 정책 선택 없이 인사 접수와 활동을 만든다', async () => {
     const f = fixture();
     await f.submit();
     expect(f.tx.inputEvent.create).toHaveBeenCalledOnce();
-    expect(f.tx.$executeRaw).not.toHaveBeenCalled();
+    expectActivityInsert(f);
   });
   it.each(['personnel.appoint', 'personnel.dismiss', 'offer.respond'] as const)(
     '기존 PENDING 활동과 충돌한 %s도 접수하고 기존 활동을 덮어쓰지 않는다',

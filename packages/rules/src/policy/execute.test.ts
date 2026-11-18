@@ -13,6 +13,7 @@ it.each([
   ['none', 'rest'],
 ] as const)('AC-M2-17 방침 %s는 실제 %s 명령을 실행한다', (policy, commandKey) => {
   const state = commandWorld();
+  Object.assign(state.logistics!.cities['1']!, { iron: 3000, wood: 3000, horses: 3000 });
   state.generals[1]!.userId = 'human';
   state.generals[1]!.train = 0;
   const result = runPolicyCommand(state, { generalId: 1 }, policy, 'policy');
@@ -23,6 +24,7 @@ it.each([
 
 it.each(['defend', 'drill'] as const)('AC-M2-17 방침 %s의 두 명령이 모두 최대이면 휴식한다', (policy) => {
   const state = commandWorld();
+  Object.assign(state.logistics!.cities['1']!, { iron: 3000, wood: 3000, horses: 3000 });
   state.generals[1]!.userId = 'human';
   state.generals[1]!.train = 100;
   state.generals[1]!.atmos = 100;
@@ -35,6 +37,7 @@ it.each(['defend', 'drill'] as const)('AC-M2-17 방침 %s의 두 명령이 모�
 
 it('AC-M2-17 직접 명령·직접 휴식·옛 휴식은 미접속이어도 방침으로 덮지 않는다', () => {
   const state = commandWorld();
+  Object.assign(state.logistics!.cities['1']!, { iron: 3000, wood: 3000, horses: 3000 });
   state.generals[1]!.userId = 'human';
   const actor = { generalId: 1, tick: 10_000_000 };
   for (const commandKey of ['rest', 'move', 'attack']) {
@@ -54,6 +57,7 @@ it.each([
   ['drill', 'morale'],
 ] as const)('AC-M2-17 방침 %s는 최대치 뒤 %s의 실제 효과를 낸다', (policy, commandKey) => {
   const state = commandWorld();
+  Object.assign(state.logistics!.cities['1']!, { iron: 3000, wood: 3000, horses: 3000 });
   state.generals[1]!.userId = 'human';
   state.generals[1]!.train = 100;
   state.generals[1]!.atmos = 0;
@@ -68,6 +72,7 @@ it.each([
 
 it('AC-M2-17 권농은 실제 명령 효과를 내고 같은 시드로 재현한다', () => {
   const state = commandWorld();
+  Object.assign(state.logistics!.cities['1']!, { iron: 3000, wood: 3000, horses: 3000 });
   state.generals[1]!.userId = 'human';
   const actor = { generalId: 1, tick: 1 };
   const result = runPolicyCommand(state, actor, 'farm', 'policy');
@@ -84,6 +89,7 @@ it.each(['maximum', 'gold', 'supply'] as const)(
   'AC-M2-17 방침 실패 %s는 비용 없이 실제 휴식하고 이유를 남긴다',
   (failure) => {
     const state = commandWorld();
+    Object.assign(state.logistics!.cities['1']!, { iron: 3000, wood: 3000, horses: 3000 });
     const general = state.generals[1]!;
     general.userId = 'human';
     general.injury = 50;

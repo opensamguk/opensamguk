@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { Prisma, PrismaClient } from '@opensamguk/db';
 import { hashState } from '@opensamguk/shared/node';
-import { initialReplayStateWithRegistry, ruleRegistry, ADMIN_RESET_KIND } from '@opensamguk/rules';
+import { initialReplayStateWithRegistry, providedRuleData, ruleRegistry, ADMIN_RESET_KIND } from '@opensamguk/rules';
 import type { Lease } from '../lease';
 import { renewLease } from '../lease';
 import { monthlyFixture } from '../../test/monthlyFixture';
@@ -35,11 +35,18 @@ const worldId = '00000000-0000-4000-8000-000000000001',
 const lease = { worldId, ownerId: 'own-lease', fencingToken: 1, ttlMs: 15000 } satisfies Lease;
 async function fixture() {
   const initial = await monthlyFixture(),
-    origin = { version: 3 as const, initial, initialStateHash: hashState(initial), resourceHash: '' };
+    origin = {
+      version: 3 as const,
+      initial,
+      initialStateHash: hashState(initial),
+      resourceHash: '',
+      featureData: providedRuleData(initial, 30),
+    };
   origin.resourceHash = resourceHashV3(origin);
   const world = {
     id: worldId,
     name: '초기화 원본',
+    fogOfWar: false,
     status: 'PAUSED',
     seed: initial.seed,
     scenarioKey: initial.scenarioKey,
@@ -131,6 +138,7 @@ async function fixture() {
     });
   let collision = false;
   const tx = {
+    heritageEntry: { findMany: vi.fn(async () => []) },
     $queryRaw: vi.fn(async () => [{ id: userId }]),
     user: { findUnique: vi.fn(async () => actor) },
     sanction: { findFirst: vi.fn(async () => null as { id: string } | null) },

@@ -45,8 +45,8 @@ const { Client } = createRequire(requireDb.resolve('@prisma/adapter-pg'))('pg') 
     statement_timeout: number;
   }) => PgClient;
 };
-const databaseName = 'int18_authz_' + randomUUID().replaceAll('-', '') + '_test';
-if (!/^int18_authz_[a-f0-9]{32}_test$/.test(databaseName)) throw new Error('자기 시험 DB 이름이 다릅니다.');
+const databaseName = 'opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test';
+if (!/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(databaseName)) throw new Error('자기 시험 DB 이름이 다릅니다.');
 const target = new URL(url),
   adminUrl = new URL(url);
 target.pathname = '/' + databaseName;

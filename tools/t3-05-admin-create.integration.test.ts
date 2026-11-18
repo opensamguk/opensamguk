@@ -1,4 +1,4 @@
-import { providedRuleKeys } from '@opensamguk/rules';
+import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { readdir, readFile, mkdir, writeFile } from 'node:fs/promises';
@@ -51,7 +51,7 @@ if (!['127.0.0.1', 'localhost'].includes(source.hostname)) throw new Error('loop
 for (const key of source.searchParams.keys())
   if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
     throw new Error('접속 대상 질의 인자는 쓸 수 없습니다.');
-const name = 't305_create_' + randomUUID().replaceAll('-', '') + '_test';
+const name = 'opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test';
 const target = new URL(source),
   adminUrl = new URL(source);
 target.pathname = '/' + name;
@@ -68,7 +68,7 @@ const apps = new Set<Awaited<ReturnType<typeof buildServer>>>(),
   children: OwnedChild[] = [],
   oldWorlds: string[] = [];
 const crashUrl = new URL(target);
-const crashName = 't305_create_crash_' + randomUUID().replaceAll('-', '') + '_test';
+const crashName = 'opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test';
 crashUrl.pathname = '/' + crashName;
 const crash = {
   name: crashName,

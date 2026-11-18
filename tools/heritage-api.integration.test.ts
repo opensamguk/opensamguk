@@ -40,8 +40,8 @@ if (
   source.searchParams.has('port')
 )
   throw Error('loopback 전용 유산 테스트 DB를 확인하세요.');
-const name = `heritage_${randomUUID().replaceAll('-', '')}_test`;
-if (!/^heritage_[a-f0-9]{32}_test$/.test(name)) throw Error('유산 시험 DB 이름을 확인하세요.');
+const name = `opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`;
+if (!/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(name)) throw Error('유산 시험 DB 이름을 확인하세요.');
 const target = new URL(source),
   adminUrl = new URL(source);
 target.pathname = `/${name}`;

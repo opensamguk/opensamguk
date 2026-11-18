@@ -2,6 +2,10 @@
 import type { Context } from '../context';
 import { homeRouter } from './home';
 import { visibilityFixture } from '../../test/visibilityFixture';
+vi.mock('../game/queries', () => ({
+  readView: vi.fn(async () => ({ cities: {}, generals: {}, nations: {}, diplomacies: [] })),
+}));
+vi.mock('../game/cityScale', () => ({ readCityScaleProjection: vi.fn(async () => new Map()) }));
 it('AC-INT-28 위치 미지정 장수의 홈은 city:null이며 도시0을 조회하지 않는다', async () => {
   const general = {
     ...(await visibilityFixture()).generals[0]!,
@@ -32,7 +36,10 @@ it('AC-INT-28 위치 미지정 장수의 홈은 city:null이며 도시0을 조�
     },
     general: { findUnique: async () => general },
     city: { findUniqueOrThrow: city },
-    generalTurn: { findMany: async () => [] },
+    generalTurn: {
+      findMany: async () =>
+        Array.from({ length: 30 }, (_, slot) => ({ slot, commandKey: 'rest', args: {}, explicit: false })),
+    },
     generalLog: { findMany: async () => [] },
   };
   const ctx = {

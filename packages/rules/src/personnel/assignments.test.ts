@@ -22,6 +22,7 @@ function offered(tick = 123): PersonnelState {
 describe('발령 제안과 응답', () => {
   it.each([5, 6, 7, 8, 9, 10, 11, 12])('직책 %i는 사람 장수에게 두 달 기한의 제안을 보낸다', (level) => {
     const state = personnelWorld();
+    state.nations[1]!.level = 7;
     state.generals[4]!.officerLevel = level;
     const outcome = applied(assignGeneral(deepFreeze(state), 4, 3, 4, 123));
     expect(outcome.result).toEqual({ offerId: '123-4-3', cityKey: 4, pending: true });
@@ -36,6 +37,7 @@ describe('발령 제안과 응답', () => {
 
   it.each([0, 1, 2, 4, 13, NaN])('권한 없는 직책 %s의 발령을 거부한다', (level) => {
     const state = personnelWorld();
+    state.nations[1]!.level = 7;
     state.generals[4]!.officerLevel = level;
     expect(assignGeneral(deepFreeze(state), 4, 3, 4, 123)).toMatchObject({ ok: false, code: 'NOT_ALLOWED' });
   });
@@ -54,6 +56,7 @@ describe('발령 제안과 응답', () => {
 
   it('재야와 사라진 국가의 행위자는 발령할 수 없다', () => {
     const state = personnelWorld();
+    state.nations[1]!.level = 7;
     state.generals[4]!.nationId = null;
     expect(assignGeneral(state, 4, 3, 4, 123)).toMatchObject({ ok: false, code: 'NOT_NATION' });
     state.generals[4]!.nationId = 99;
@@ -62,6 +65,7 @@ describe('발령 제안과 응답', () => {
 
   it('NPC는 즉시 이동하고 제안을 만들지 않는다', () => {
     const state = personnelWorld();
+    state.nations[1]!.level = 7;
     state.generals[3]!.userId = null;
     const outcome = applied(assignGeneral(deepFreeze(state), 4, 3, 4, 123));
     expect(outcome.result).toEqual({ offerId: null, cityKey: 4, pending: false });
@@ -317,7 +321,9 @@ describe('U2 수락 전 자동 취소', () => {
   });
 
   it('해임 step에서 닫힌 제안은 재임명 뒤에도 돌아오지 않는다', () => {
-    const dismissed = applied(dismissOfficer(offered(), 1, 4));
+    const state = offered();
+    state.nations[1]!.level = 7;
+    const dismissed = applied(dismissOfficer(state, 1, 4));
     const cancelled = closeInvalidOffers(dismissed.state, 124);
     const appointed = applied(appointOfficer(cancelled.state, 1, 4, 5));
     expect(closeInvalidOffers(appointed.state, 125).closedOffers).toEqual([]);

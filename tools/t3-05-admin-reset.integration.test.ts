@@ -1,4 +1,4 @@
-import { providedRuleKeys } from '@opensamguk/rules';
+import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
@@ -57,7 +57,7 @@ if (!['localhost', '127.0.0.1'].includes(source.hostname)) throw new Error('loop
 for (const key of source.searchParams.keys())
   if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
     throw new Error('접속 대상 질의 인자는 쓸 수 없습니다.');
-const name = 't305_reset_d1_' + randomUUID().replaceAll('-', '') + '_test',
+const name = 'opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test',
   target = new URL(source),
   adminUrl = new URL(source);
 target.pathname = '/' + name;
@@ -213,7 +213,7 @@ async function cleanupWithReservedClose(
   return closed;
 }
 async function dropExactOwnedDatabase(client: Pg, expectedName: string, expectedOid: string, signal: AbortSignal) {
-  if (!/^t305_reset_d1_[a-f0-9]{32}_test$/.test(expectedName) || !/^[1-9]\d*$/.test(expectedOid))
+  if (!/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(expectedName) || !/^[1-9]\d*$/.test(expectedOid))
     throw new Error('자기 시험 DB 식별자를 확인하세요.');
   const identity = (
     await checked(
@@ -227,7 +227,7 @@ async function dropExactOwnedDatabase(client: Pg, expectedName: string, expected
   await checked(() => client.query('DROP DATABASE "' + expectedName + '"'), signal);
 }
 async function createOwnedDatabase(client: Pg, expectedName: string, marker: DatabaseOwnership, signal: AbortSignal) {
-  if (!/^t305_reset_d1_[a-f0-9]{32}_test$/.test(expectedName)) throw new Error('자기 시험 DB 이름을 확인하세요.');
+  if (!/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(expectedName)) throw new Error('자기 시험 DB 이름을 확인하세요.');
   const baseline = (
     await checked(() => client.query('SELECT oid FROM pg_database WHERE datname=$1', [expectedName]), signal)
   ).rows;
@@ -257,7 +257,11 @@ async function auditCreatedDatabase(
 ) {
   receipt.attempted = true;
   receipt.catalog = 'unknown';
-  if (!marker.baselineAbsent || !marker.creationAttempted || !/^t305_reset_d1_[a-f0-9]{32}_test$/.test(expectedName))
+  if (
+    !marker.baselineAbsent ||
+    !marker.creationAttempted ||
+    !/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(expectedName)
+  )
     throw new Error('자기 CREATE 시도 근거 미확인: DB 보존');
   const rows = (
     await checked(

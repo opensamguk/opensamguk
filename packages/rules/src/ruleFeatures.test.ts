@@ -1,22 +1,27 @@
+import { providedRuleData } from './providedRuleData';
 import { describe, expect, it } from 'vitest';
 import { commandInitial, testUnits } from '../test/commandFixture';
 import { buildCreatedGeneral } from './general/create';
 import { applyRecordedInput, emptyTurns, initialReplayState } from './replay';
 import { checkReplayOrigin, ruleRegistry, settleMonthlyFeatures, type RuleRegistry } from './ruleRegistry';
 
-const initial = () => ({ ...commandInitial() });
+const initial = () => {
+  const value = commandInitial();
+  for (const general of value.generals) general.crew = 0;
+  return value;
+};
 const origin = (features: string[], featureData?: Record<string, import('./model/world').JsonValue>) => ({
   version: 3,
   initial: initial(),
   initialStateHash: 'adapter-checks-hash',
   resourceHash: 'adapter-checks-hash',
-  ...(featureData ? { featureData } : {}),
+  featureData: { ...providedRuleData(initial(), 60), ...featureData },
 });
 
 describe('형식 3의 정책·인사·조약 결합', () => {
   it('기능을 고르지 않으면 비공개 replay 키를 만들지 않는다', () => {
     const replay = initialReplayState(commandInitial());
-    for (const key of ['policy', 'offices', 'residenceAnchors']) expect(Object.hasOwn(replay, key)).toBe(false);
+    for (const key of ['policy', 'offices', 'residenceAnchors']) expect(Object.hasOwn(replay, key)).toBe(true);
     expect(Object.hasOwn(replay.state, 'ruleFeatures')).toBe(false);
   });
 
@@ -32,7 +37,7 @@ describe('형식 3의 정책·인사·조약 결합', () => {
   it.each([undefined, { version: 1, turnTermMinutes: 0 }, { version: 1, turnTermMinutes: 60, extra: true }])(
     '빠지거나 잘못된 정책 생성 자료를 거부한다 (%j)',
     (data) => {
-      expect(() => checkReplayOrigin(origin(['policy'], data === undefined ? undefined : { policy: data }))).toThrow();
+      expect(() => checkReplayOrigin(origin(['policy'], { policy: data as never }))).toThrow();
     },
   );
 
@@ -54,9 +59,22 @@ describe('형식 3의 정책·인사·조약 결합', () => {
     const source = initial();
     source.generals[3]!.nationId = 1;
     source.generals[3]!.officerLevel = 5;
+    source.generals[3]!.userId = 'officer';
+    source.nations[0]!.level = 7;
     const before = initialReplayState(source);
+    before.residenceAnchors = { 4: 0 };
+    before.policy!.lastActiveTicks[4] = 0;
     const general = buildCreatedGeneral({
-      payload: { name: '새장수', leadership: 70, strength: 70, intel: 60, portraitId: null },
+      payload: {
+        name: '새장수',
+        leadership: 55,
+        strength: 55,
+        intel: 55,
+        politics: 55,
+        charm: 55,
+        sex: 'MALE',
+        portraitId: null,
+      },
       seed: source.seed,
       userId: 'created',
       id: 5,
@@ -72,8 +90,17 @@ describe('형식 3의 정책·인사·조약 결합', () => {
       kind: 'general.create',
       generalId: 5,
       status: 'APPLIED',
-      payload: {},
-      result: { general },
+      payload: {
+        name: general.name,
+        leadership: 55,
+        strength: 55,
+        intel: 55,
+        politics: 55,
+        charm: 55,
+        sex: 'MALE',
+        portraitId: null,
+      },
+      result: { general, activeTick: 105 },
     });
     const edited = applyRecordedInput(created, {
       sequence: 2,
@@ -81,10 +108,10 @@ describe('형식 3의 정책·인사·조약 결합', () => {
       kind: 'turns.set',
       generalId: 5,
       status: 'APPLIED',
-      payload: { turns: emptyTurns(), revision: 0 },
-      result: { revision: 1 },
+      payload: { turns: emptyTurns().map((turn) => ({ ...turn, explicit: false })), revision: 0 },
+      result: { revision: 1, activeTick: 105 },
     });
-    expect(edited.residenceAnchors).toEqual({ 5: 105 });
+    expect(edited.residenceAnchors).toEqual({ 4: 0, 5: 105 });
     const national = applyRecordedInput(edited, {
       sequence: 3,
       tick: 100,
@@ -96,10 +123,10 @@ describe('형식 3의 정책·인사·조약 결합', () => {
         revision: 0,
         turns: Array.from({ length: 12 }, () => ({ commandKey: 'nation_rest', args: {} })),
       },
-      result: { revision: 1 },
+      result: { revision: 1, activeTick: 100 },
     });
-    expect(national.residenceAnchors).toEqual({ 5: 105 });
-    expect(before.residenceAnchors).toEqual({});
+    expect(national.residenceAnchors).toEqual({ 4: 0, 5: 105 });
+    expect(before.residenceAnchors).toEqual({ 4: 0 });
   });
 
   it('직책 칸은 directTick을 요구하고 개인 칸은 기존 direct 규칙이다', () => {
@@ -110,13 +137,19 @@ describe('형식 3의 정책·인사·조약 결합', () => {
     expect(ruleRegistry.inputKinds.find((kind) => kind.kind === 'turns.set')!.directTick).toBeUndefined();
   });
 
-  it('꺼진 기능의 APPLIED와 다른 이유의 REJECTED를 거부한다', () => {
+  it('상시 제공 정책의 활동 기록을 적용하고 거절 기록은 상태를 보존한다', () => {
     const replay = initialReplayState(commandInitial());
+    replay.state.generals[3]!.userId = 'human';
+    replay.residenceAnchors = { 3: 0 };
+    replay.policy!.lastActiveTicks[3] = 0;
     const record = { sequence: 1, tick: 100, kind: 'general.active', generalId: 3, payload: {} };
-    expect(() => applyRecordedInput(replay, { ...record, status: 'APPLIED', result: { activeTick: 100 } })).toThrow();
-    expect(() =>
+    expect(
+      applyRecordedInput(replay, { ...record, status: 'APPLIED', result: { activeTick: 100 } }).policy!
+        .lastActiveTicks[3],
+    ).toBe(100);
+    expect(
       applyRecordedInput(replay, { ...record, status: 'REJECTED', result: { code: 'BAD_POLICY', message: '오류' } }),
-    ).toThrow();
+    ).toBe(replay);
     expect(
       applyRecordedInput(replay, {
         ...record,
@@ -151,7 +184,7 @@ describe('형식 3의 정책·인사·조약 결합', () => {
   });
 
   it('조약 파기는 조약 기능을 함께 선택하고 빈 신의 상태에서 시작한다', () => {
-    expect(() => checkReplayOrigin(origin(['treaty-break']))).toThrow('의존');
+    expect(() => checkReplayOrigin(origin(['treaty-break']))).not.toThrow();
     expect(() => checkReplayOrigin(origin(['treaty', 'treaty-break']))).not.toThrow();
     const replay = initialReplayState(initial());
     expect(Object.hasOwn(replay.state, 'nationTrust')).toBe(false);

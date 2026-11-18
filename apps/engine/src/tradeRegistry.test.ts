@@ -1,6 +1,6 @@
 import type { Prisma } from '@opensamguk/db';
 import { describe, expect, it, vi } from 'vitest';
-import { projectTreatyRows, ruleRegistry, trade } from '@opensamguk/rules';
+import { projectTreatyRows, providedRuleData, ruleRegistry } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { engineResolver } from './extState';
 import { processTreatyQueuedInput } from './treatyInput';
@@ -12,7 +12,7 @@ vi.mock('./treatyInput', () => ({ processTreatyQueuedInput: vi.fn(async () => ({
 describe('형식 3 교역의 엔진·API·재생 연결', () => {
   it('엔진은 같은 feature 명령을 고르고 legacy 선택은 교역을 노출하지 않는다', () => {
     const modern = { preset: null, replayFormat: 3 };
-    expect(engineResolver(modern).resolver.get('trade')).toBe(trade);
+    expect(engineResolver(modern).resolver.get('trade')).toMatchObject({ key: 'trade', target: 'general' });
     for (const replayFormat of [1, 6])
       expect(engineResolver({ ...modern, replayFormat }).resolver.get('trade')).toBeUndefined();
   });
@@ -36,7 +36,7 @@ describe('형식 3 교역의 엔진·API·재생 연결', () => {
         tick: 100,
         sequence: 5,
         treatyTradeEnabled: true,
-        treatyExpandedEnabled: false,
+        treatyExpandedEnabled: true,
         ...(kind === 'treaty.break' ? { treatyBreakEnabled: true } : {}),
       });
     }
@@ -71,6 +71,7 @@ describe('형식 3 교역의 엔진·API·재생 연결', () => {
       initial,
       initialStateHash: hashState(initial),
       resourceHash: '',
+      featureData: providedRuleData(initial, 60),
     };
     origin.resourceHash = resourceHashV3(origin);
     const archive: ReplayArchiveV3 = {
@@ -101,7 +102,7 @@ describe('형식 3 교역의 엔진·API·재생 연결', () => {
       afterEnd: [],
     };
     expect(() => readArchive(archive)).not.toThrow();
-    archive.origin.initialStateHash = hashState(archive.origin.initial);
+    archive.inputs[0]!.payload = { toNationId: 2, clauses: [{ kind: 'trade', months: 0 }] };
     expect(() => readArchive(archive)).toThrow('조항');
   });
 });

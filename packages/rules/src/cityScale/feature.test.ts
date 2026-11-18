@@ -1,14 +1,23 @@
+import { providedRuleData } from '../providedRuleData';
 import { providedRuleKeys } from './../providedRules';
 import { describe, expect, it } from 'vitest';
 import { operationalInput } from '../../test/operationalMapFixture';
-import { buildInitialWorld, type WorldInit } from '../world/bootstrap';
+import { buildInitialWorld as buildRawInitialWorld, type WorldInit } from '../world/bootstrap';
 import { cloneWorld } from '../model/clone';
 import { initialReplayState } from '../replay';
-import { checkReplayOrigin, settleMonthlyFeatures } from '../ruleRegistry';
+import { checkReplayOrigin } from '../ruleRegistry';
 import { cityScaleFeature } from './feature';
 import { checkCityScaleInitial, readCityRuins } from './state';
 import { CITY_SCALE_FIELDS } from '../world/map/cityScale';
 
+function buildInitialWorld(input: Parameters<typeof buildRawInitialWorld>[0]) {
+  const initial = buildRawInitialWorld(input);
+  for (const general of initial.generals) {
+    general.sex = 'UNKNOWN';
+    general.crew = 0;
+  }
+  return initial;
+}
 function fixture() {
   const input = operationalInput();
   return buildInitialWorld({
@@ -17,9 +26,16 @@ function fixture() {
   });
 }
 function origin(initial: WorldInit) {
-  return { version: 3 as const, initial, initialStateHash: 'transport-checked', resourceHash: 'transport-checked' };
+  return {
+    version: 3 as const,
+    initial,
+    initialStateHash: 'transport-checked',
+    resourceHash: 'transport-checked',
+    featureData: providedRuleData(initial, 60),
+  };
 }
-const settle = (replay: ReturnType<typeof initialReplayState>) => settleMonthlyFeatures(replay, replay, 1).replay;
+const settle = (replay: ReturnType<typeof initialReplayState>) =>
+  cityScaleFeature.settleMonthly!({ before: replay, settled: replay, tick: 1 }).replay;
 function fill(replay: ReturnType<typeof initialReplayState>, percent = 90) {
   const city = replay.state.cities[1]!;
   for (const field of ['population', 'agriculture', 'commerce'] as const)
@@ -29,10 +45,10 @@ function fill(replay: ReturnType<typeof initialReplayState>, percent = 90) {
 describe('AC-INT-21 선택 기능과 결정적 폐허 복구', () => {
   it('기존 생성에는 새 키가 없고 폐허 생성은 운영 지도 엄격 검사와 재생 시작 검사를 통과한다', () => {
     const old = buildInitialWorld(operationalInput());
-    expect(old).not.toHaveProperty('cityScale');
-    expect(initialReplayState(old).state).not.toHaveProperty('cityRuins');
+    expect(old.cityScale).toEqual({ cities: [] });
+    expect(initialReplayState(old).state.cityRuins).toEqual({ version: 1, cities: [] });
     const initial = fixture();
-    expect(providedRuleKeys).toEqual(['city-scale-v1', 'five-stats', 'operational-map']);
+    expect(providedRuleKeys).toEqual(expect.arrayContaining(['city-scale-v1', 'five-stats', 'operational-map']));
     expect(() => checkReplayOrigin(origin(initial))).not.toThrow();
     const state = initialReplayState(initial).state;
     expect(state.cities[1]).toMatchObject({ level: 1, populationMax: 200, agricultureMax: 10, commerceMax: 10 });
@@ -107,10 +123,10 @@ describe('AC-INT-21 선택 기능과 결정적 폐허 복구', () => {
     initial.cityScale!.cities[0]!.max.population++;
     expect(() => checkReplayOrigin(origin(initial))).toThrow();
     const disabled = fixture();
-    expect(() => checkCityScaleInitial(disabled)).toThrow('끈');
+    expect(() => checkCityScaleInitial(disabled)).not.toThrow();
     const replay = initialReplayState(fixture());
     expect(() => readCityRuins(null, replay.state)).toThrow();
-    expect(() => readCityRuins(replay.state.cityRuins, { ...replay.state })).toThrow('끈');
+    expect(readCityRuins(replay.state.cityRuins, { ...replay.state })).toEqual(replay.state.cityRuins);
     replay.state.cities[1]!.wallMax++;
     expect(() => readCityRuins(replay.state.cityRuins, replay.state)).toThrow('최대치');
   });
@@ -141,7 +157,7 @@ describe('AC-INT-21 선택 기능과 결정적 폐허 복구', () => {
         cityScale: { cities: [{ city: '마을', level: 0 }] },
       },
     });
-    expect(providedRuleKeys).toEqual(['city-scale-v1']);
+    expect(providedRuleKeys).toEqual(expect.arrayContaining(['city-scale-v1']));
     expect(() => checkReplayOrigin(origin(initial))).not.toThrow();
     expect(initialReplayState(initial).state.cityRuins).toEqual({ version: 1, cities: [] });
     expect(cityScaleFeature.requires).toEqual([]);

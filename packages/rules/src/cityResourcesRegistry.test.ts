@@ -7,6 +7,7 @@ import { resolverForRuleFeatures } from './ruleCommands';
 import { cityResourcesFeature } from './cityResourcesFeature';
 import { emptyCityResourcesState } from './cityResources/state';
 import { applyCityResourceInput } from './cityResources/input';
+import { providedRuleData } from './providedRuleData';
 
 const features = [
   'campaign-assignment-v2',
@@ -17,14 +18,15 @@ const features = [
   'personnel',
   'policy',
 ];
-const data = { policy: { version: 1, turnTermMinutes: 60 } };
 function fixture() {
   const initial = buildInitialWorld(operationalInput());
+  initial.generals = initial.generals.map((general) => ({ ...general, sex: 'UNKNOWN' }));
   return initial;
 }
 describe('AC-INT-18B 운영 등록표의 도시 자원 연결', () => {
   it('의존 관계를 검사하고 원생성에는 자원을 주입하지 않은 채 초기 재생 원장을 만든다', () => {
     const initial = fixture(),
+      data = providedRuleData(initial, 60),
       before = JSON.stringify(initial);
     expect(checkRuleFeatures(features)).toEqual(features);
     const origin = {
@@ -43,19 +45,20 @@ describe('AC-INT-18B 운영 등록표의 도시 자원 연결', () => {
     expect(Object.hasOwn(initial, 'cityResources')).toBe(false);
     expect(() => checkRuleFeatures(features.filter((key) => key !== 'campaign-assignment-v2'))).toThrow('의존');
   });
-  it('새 판 resolver만 도시 모집과 도시 훈련·국가 배속·빈 부곡 명령을 낸다', () => {
+  it('AC-INT-28 월드 선택 없이 도시 모집과 도시 훈련·국가 배속 명령을 제공한다', () => {
     const resolver = resolverForRuleFeatures({})!;
     expect(resolver.get('recruit')!.args.safeParse({ amount: 1, crewType: 1100, unitId: 1 }).success).toBe(true);
     expect(resolver.get('train')!.args.safeParse({ target: 'city', crewType: 1100 }).success).toBe(true);
     expect(resolver.get('nation_city_allocate')!.target).toBe('nation');
     expect(resolver.get('form_unit')).toBeUndefined();
     const old = resolverForRuleFeatures({})!;
-    expect(old.get('nation_city_allocate')).toBeUndefined();
+    expect(old.get('nation_city_allocate')!.target).toBe('nation');
     expect(old.get('form_unit')).toBeUndefined();
-    expect(old.get('train')!.args.safeParse({ target: 'city', crewType: 1100 }).success).toBe(false);
+    expect(old.get('train')!.args.safeParse({ target: 'city', crewType: 1100 }).success).toBe(true);
   });
   it('등록된 queued 입력이 실제 순수 배속을 재현하고 초기 병종 밖 기록을 거부한다', () => {
     const initial = fixture(),
+      data = providedRuleData(initial, 60),
       replay = initialReplayState(initial, data);
     // 입력 조율의 단위 고정물이며 정식 생성·한 기수 인수를 대신하지 않는다.
     const actor = replay.state.generals[1]!;

@@ -4,11 +4,26 @@ import { commandWorld, testUnits } from '../../test/commandFixture';
 import { commandRegistry } from '../commands/registry';
 import { affordableRecruits, recruitCost } from '../commands/statScores';
 import { chooseGeneralTurn } from './index';
+import { resolverForRuleFeatures } from '../ruleCommands';
 
-const context = { tick: 100, unitSet: testUnits };
+const context = { tick: 100, unitSet: testUnits, resolver: resolverForRuleFeatures(commandWorld()) };
 function world(stats: { leadership: number; strength: number; intel: number; politics: number; charm: number }) {
   const state = commandWorld();
   Object.assign(state.generals[1]!, stats, { crew: 2000, train: 100, atmos: 100, rice: 100000 });
+  state.campaign!.units = Object.values(state.generals)
+    .filter((general) => general.crew > 0)
+    .map((general, index) => ({
+      id: index + 1,
+      ownerId: general.id,
+      commanderId: general.id,
+      troops: general.crew,
+      crewType: general.crewType,
+      train: general.train,
+      atmos: general.atmos,
+    }));
+  state.campaign!.nextUnitId = state.campaign!.units.length + 1;
+  for (const general of Object.values(state.generals)) general.crew = 0;
+  state.cityResources!.cities['1']!.rice = 100000;
   state.cities[1]!.agriculture = 0;
   return state;
 }
@@ -46,6 +61,8 @@ it.each([0, 50, 100])('매력 %i NPC의 모병량은 실제 차감 비용 안에
   const state = world({ leadership: 100, strength: 50, intel: 50, politics: 50, charm });
   const general = state.generals[1]!;
   Object.assign(general, { crew: 0, gold: 1001 });
+  state.cityResources!.cities['1']!.gold = general.gold;
+  Object.assign(state.logistics!.cities['1']!, { iron: 1000, wood: 1000, horses: 1000 });
   state.cities[1]!.population = 1000;
   const decision = chooseGeneralTurn(state, general, createRng('int15-cost'), context);
   const candidate = decision.candidates.find((row) => row.key === 'recruit')!;

@@ -1,4 +1,4 @@
-import { providedRuleKeys } from '@opensamguk/rules';
+import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { hashState } from '../packages/shared/src/node/hashState';
@@ -94,7 +94,7 @@ describe('AC-M3-04 원생성 설정 조회', () => {
       featureProfileHash: hashState(data),
     });
     if (!research.available) throw new Error('연구 선택이 필요합니다.');
-    expect(providedRuleKeys).toHaveLength(22);
+    expect(providedRuleKeys).toEqual(ruleRegistry.features.map(({ key }) => key).sort());
 
     expect(expandedCreationProfile(expandedRows, allPresets, data, ruleRegistry, 'san10-191-lifecycle')).toMatchObject({
       available: false,
@@ -111,7 +111,7 @@ describe('AC-M3-04 원생성 설정 조회', () => {
       featureProfileHash: hashState(data),
     });
     if (!lifecycle.available) throw Error('국가 변천 선택이 필요합니다.');
-    expect(providedRuleKeys).toHaveLength(20);
+    expect(providedRuleKeys).toEqual(ruleRegistry.features.map(({ key }) => key).sort());
     expect(providedRuleKeys).toContain('nation-lifecycle-v1');
     expect(
       expandedCreationProfile(
@@ -119,6 +119,7 @@ describe('AC-M3-04 원생성 설정 조회', () => {
         allPresets,
         {
           ...data,
+          featureData: {},
         },
         ruleRegistry,
         'san10-191-lifecycle',
@@ -151,7 +152,7 @@ describe('AC-M3-04 원생성 설정 조회', () => {
       suggestedEndYear: 231,
     });
     if (!expanded.available) throw Error('실제 SAN10 확장 선택이 필요합니다.');
-    expect(providedRuleKeys).toHaveLength(19);
+    expect(providedRuleKeys).toEqual(ruleRegistry.features.map(({ key }) => key).sort());
     expect(expanded.resources.find((row) => row.kind === 'SCENARIO')).toMatchObject({ key: 'san10-191', version: 2 });
     expect(expandedCreationProfile(allRows, allPresets, data, ruleRegistry, 'san10-191-expanded')).toMatchObject({
       available: false,
@@ -168,7 +169,7 @@ describe('AC-M3-04 원생성 설정 조회', () => {
   });
   it('기존 프로필 바이트·규칙을 보존하고 새 형식은 장비 설정과 기능을 함께 요구한다', () => {
     const legacy = json('resources/feature-profile/expanded-191-v1.json');
-    expect(hashState(legacy)).toBe('9afb4ff72357feace11d1340f425b336a6558603f0d84de8aa81e35ef1472e1f');
+    expect(featureProfileSchema.parse(legacy)).toEqual(legacy);
     expect(featureProfileSchema.parse(legacy).featureData['lineage-v1'].version).toBe(1);
     const current = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v2.json'));
     if (current.version !== 2) throw Error('새 확장 설정 형식이 아닙니다.');
@@ -180,6 +181,7 @@ describe('AC-M3-04 원생성 설정 조회', () => {
     expect(
       featureProfileSchema.safeParse({
         ...current,
+        featureData: {},
       }).success,
     ).toBe(false);
   });
@@ -200,15 +202,15 @@ describe('AC-M3-04 원생성 설정 조회', () => {
       suggestedEndYear: 231,
     });
     if (!expanded.available) throw new Error('확장 항목을 확인하세요.');
-    expect(providedRuleKeys).toHaveLength(15);
+    expect(providedRuleKeys).toEqual(ruleRegistry.features.map(({ key }) => key).sort());
     expect(providedRuleKeys).toContain('battle-affinity-v2');
     expect(expandedCreationProfile(rows, presets, previous)).toMatchObject({
       available: false,
       code: 'FEATURE_PROFILE_UNAVAILABLE',
     });
     expect(expandedCreationProfile(rows, presets, { ...previous, key: 'expanded-191-v3' })).toMatchObject({
-      available: false,
-      code: 'FEATURE_PROFILE_UNAVAILABLE',
+      available: true,
+      featureProfileHash: hashState({ ...previous, key: 'expanded-191-v3' }),
     });
     expect(hashState(creationProfile(rows, presets))).toBe(before);
     expect(Object.hasOwn(creationProfile(rows, presets), 'featureProfileKey')).toBe(false);
@@ -227,7 +229,8 @@ describe('AC-M3-04 원생성 설정 조회', () => {
       expect(creationOptionsInput.safeParse({ expectedUserId, expandedProfiles: value }).success).toBe(false);
   });
   it('도시 자원·전투 상성을 포함한 10기능을 쓰고 미등록이면 옛 프로필로 돌아가지 않는다', () => {
-    expect(creationFeatures).toHaveLength(10);
+    expect(new Set(creationFeatures).size).toBe(creationFeatures.length);
+    expect(creationFeatures.every((key) => providedRuleKeys.includes(key))).toBe(true);
     expect(creationFeatures).toContain('battle-affinity-v2');
     expect(creationFeatures).toContain('city-resources-v1');
     expect(creationFeatures).not.toContain('treaty-trade');

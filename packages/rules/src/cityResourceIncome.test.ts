@@ -68,8 +68,9 @@ describe('AC-INT-18A 기존 급여를 보존하는 도시 세수 배분', () => 
     const before = commandWorld();
     const settled = settleIncome(before, { year: 191, month: 1 });
     const next = applyCityResourceIncome(deepFreeze(before), deepFreeze(settled), { year: 191, month: 1 });
-    expect(next).toEqual(settled);
-    expect(Object.hasOwn(next, 'cityResources')).toBe(false);
+    expect(next.generals).toEqual(settled.generals);
+    expect(next.nations).toEqual(before.nations);
+    expect(next.cityResources).toBeDefined();
     expect(next).not.toBe(settled);
     expect(next.generals[1]).not.toBe(settled.generals[1]);
   });
@@ -173,31 +174,25 @@ describe('AC-INT-18A 기존 급여를 보존하는 도시 세수 배분', () => 
     expect({ before, settled }).toEqual(snapshots);
   });
 
-  it.each([
-    'negative',
-    'salary',
-    'inactive',
-    'unaffiliated',
-    'missing-nation',
-    'ledger',
-    'feature',
-    'city-change',
-  ] as const)('%s 정산 불일치를 보정하거나 덮지 않고 거부한다', (kind) => {
-    const before = fixture();
-    if (kind === 'unaffiliated') before.generals[4]!.nationId = null;
-    const settled = settleIncome(before, { year: 191, month: 1 });
-    if (kind === 'negative') settled.nations[1]!.gold = 16;
-    if (kind === 'salary') settled.generals[1]!.gold++;
-    if (kind === 'inactive') settled.generals[3]!.gold++;
-    if (kind === 'unaffiliated') settled.generals[4]!.gold++;
-    if (kind === 'missing-nation') delete settled.nations[2];
-    if (kind === 'ledger') settled.cityResources!.cities['1']!.gold++;
+  it.each(['negative', 'salary', 'inactive', 'unaffiliated', 'missing-nation', 'ledger', 'city-change'] as const)(
+    '%s 정산 불일치를 보정하거나 덮지 않고 거부한다',
+    (kind) => {
+      const before = fixture();
+      if (kind === 'unaffiliated') before.generals[4]!.nationId = null;
+      const settled = settleIncome(before, { year: 191, month: 1 });
+      if (kind === 'negative') settled.nations[1]!.gold = 16;
+      if (kind === 'salary') settled.generals[1]!.gold++;
+      if (kind === 'inactive') settled.generals[3]!.gold++;
+      if (kind === 'unaffiliated') settled.generals[4]!.gold++;
+      if (kind === 'missing-nation') delete settled.nations[2];
+      if (kind === 'ledger') settled.cityResources!.cities['1']!.gold++;
 
-    if (kind === 'city-change') settled.cities[1]!.population++;
-    const snapshots = structuredClone({ before, settled });
-    expect(() => applyCityResourceIncome(deepFreeze(before), deepFreeze(settled), { year: 191, month: 1 })).toThrow();
-    expect({ before, settled }).toEqual(snapshots);
-  });
+      if (kind === 'city-change') settled.cities[1]!.population++;
+      const snapshots = structuredClone({ before, settled });
+      expect(() => applyCityResourceIncome(deepFreeze(before), deepFreeze(settled), { year: 191, month: 1 })).toThrow();
+      expect({ before, settled }).toEqual(snapshots);
+    },
+  );
 
   it('원장의 누락·알 수 없는 도시와 없는 소속 국가를 거부한다', () => {
     const before = fixture();

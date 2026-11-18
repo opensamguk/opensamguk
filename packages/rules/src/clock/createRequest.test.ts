@@ -1,4 +1,3 @@
-import { providedRuleKeys } from './../providedRules';
 import { describe, expect, it } from 'vitest';
 import {
   requestWorldCreateInput,
@@ -57,21 +56,23 @@ describe('ADMIN-CREATE-B AC-M3-04 생성 요청 계약', () => {
     expect(Object.hasOwn(intent, 'idempotencyKey')).toBe(false);
     expect(Object.hasOwn(intent, 'plannedWorldId')).toBe(false);
   });
-  it('명시한 기능 순서는 canonical intent에서 정렬하고 미지정과 빈 목록을 구분한다', () => {
+  it('AC-INT-28 생성 intent에는 월드별 규칙 선택을 저장하지 않는다', () => {
     const a = worldCreateIntent(requestWorldCreateInput.parse({ ...input }));
     const b = worldCreateIntent(requestWorldCreateInput.parse({ ...input }));
     expect(a).toEqual(b);
-    expect(providedRuleKeys).toEqual(['personnel', 'policy']);
-    expect(providedRuleKeys).toEqual([]);
-    expect(providedRuleKeys).toBeNull();
+    expect(Object.hasOwn(a, 'ruleFeatures')).toBe(false);
+    for (const ruleFeatures of [[], ['personnel', 'policy'], null]) {
+      expect(requestWorldCreateInput.safeParse({ ...input, ruleFeatures }).success).toBe(false);
+      expect(worldCreateIntentSchema.safeParse({ ...a, ruleFeatures }).success).toBe(false);
+    }
   });
-  it('확장 키는 명시한 요청에만 남기고 기능 목록을 함께 요구한다', () => {
+  it('자료 프로필 키는 명시한 요청에만 남기고 클라이언트의 해시 고정을 거부한다', () => {
     const expanded = { ...input, featureProfileKey: 'expanded-191-v1' };
     const intent = worldCreateIntent(requestWorldCreateInput.parse(expanded));
     expect(intent.featureProfileKey).toBe('expanded-191-v1');
     expect(worldCreateIntentSchema.parse(intent)).toEqual(intent);
     expect(Object.hasOwn(worldCreateIntent(requestWorldCreateInput.parse(input)), 'featureProfileKey')).toBe(false);
-    expect(requestWorldCreateInput.safeParse({ ...input, featureProfileKey: 'expanded-191-v1' }).success).toBe(false);
+    expect(requestWorldCreateInput.safeParse({ ...input, featureProfileKey: 'expanded-191-v1' }).success).toBe(true);
     expect(requestWorldCreateInput.safeParse({ ...expanded, featureProfileKey: '../expanded-191-v1' }).success).toBe(
       false,
     );
@@ -104,8 +105,8 @@ describe('ADMIN-CREATE-B AC-M3-04 생성 요청 계약', () => {
     { endYear: 10001 },
     { endYear: 1.5 },
     { seed: '' },
-    {},
-    {},
+    { ruleFeatures: [] },
+    { ruleFeatures: ['policy'] },
     { expectedUserId: 'someone' },
     { idempotencyKey: 'reuse' },
     { actor: 'ADMIN' },

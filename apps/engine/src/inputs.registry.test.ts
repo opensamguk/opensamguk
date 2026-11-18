@@ -10,7 +10,13 @@ import {
   type EngineWorld,
   type QueuedInputHandler,
 } from './features';
-import { featureRegistry, featureArchive } from '../test/replayFeaturesFixture';
+import { featureRegistry } from '../test/replayFeaturesFixture';
+import { monthlyFixture } from '../test/monthlyFixture';
+import { hashState } from '@opensamguk/shared/node';
+import { resourceHashV3 } from './replay';
+
+// 입력 배분 단위 시험: 현재 상태 적재는 별도 loadReplayState 시험의 책임이다.
+vi.mock('./monthly', () => ({ loadReplayState: vi.fn(async () => null) }));
 
 function registry(handler: QueuedInputHandler): EngineRegistry {
   return {
@@ -78,16 +84,16 @@ describe('T2-26 통합 입력 처리기', () => {
       data: { status: 'APPLIED', result: { ok: true }, generalId: 2, sequence: 7, tick: 123 },
     });
   });
-  it('기능이 꺼졌으면 처리기를 부르지 않고 확정 거절한다', async () => {
+  it('AC-INT-28 월드별 선택 없이 등록된 처리기의 거절을 기록한다', async () => {
     const { world, tx, client } = fixture('test-a.queued');
-    const handler = vi.fn<QueuedInputHandler>();
+    const handler = vi.fn<QueuedInputHandler>(async () => ({ status: 'REJECTED', result: { code: 'TEST' } }));
     await processInputs(client, world, 12, registry(handler));
-    expect(handler).not.toHaveBeenCalled();
+    expect(handler).toHaveBeenCalledExactlyOnceWith(client, world, expect.anything(), { tick: 12, sequence: 7 });
     expect(tx.inputEvent.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: {
           status: 'REJECTED',
-          result: { code: 'FEATURE_DISABLED', message: '이 월드에서 켜지 않은 기능입니다.' },
+          result: { code: 'TEST' },
           sequence: 7,
           tick: 12,
         },
@@ -142,31 +148,31 @@ describe('T2-26 통합 입력 처리기', () => {
 describe('T2-26 엔진 시작 대조와 서버 기능 확인', () => {
   it('기존 형식으로 바꾼 뒤 남은 기능 사본은 capability 선택 전에 거부한다', () => {
     for (const replayOrigin of [null, { version: 1, initial: {} }, { version: 6 }]) {
-      expect(() => checkStoredReplayFormat({ replayFormat: 1, replayOrigin })).toThrow('사본');
+      expect(() => checkStoredReplayFormat({ replayFormat: 1, replayOrigin })).toThrow();
     }
-    expect(() => checkStoredReplayFormat({ replayFormat: 1, replayOrigin: { version: 6 } })).not.toThrow();
+    expect(() => checkStoredReplayFormat({ replayFormat: 1, replayOrigin: { version: 6 } })).toThrow();
   });
-  it('형식 1의 null 원본만 허용한다', () => {
-    expect(() => checkWorldReplay({ replayOrigin: null, replayFormat: 1 })).not.toThrow();
+  it('AC-INT-28 형식과 무관하게 null 생성 기록을 거부한다', () => {
     for (const value of [{ replayFormat: 3 }, { replayFormat: 1 }])
       expect(() => checkWorldReplay({ replayOrigin: null, ...value })).toThrow();
   });
   it('S2~S5는 형식·기능 사본과 생성 기록을 대조한다', async () => {
-    const archive = await featureArchive(['test-a']);
+    const initial = await monthlyFixture();
+    const origin = { version: 3 as const, initial, initialStateHash: hashState(initial), resourceHash: '' };
+    origin.resourceHash = resourceHashV3(origin);
     const world = {
-      replayOrigin: archive.origin as unknown as Prisma.JsonValue,
+      replayOrigin: origin as unknown as Prisma.JsonValue,
       replayFormat: 3,
     };
     expect(() => checkWorldReplay(world, featureRegistry)).not.toThrow();
     expect(() => checkWorldReplay({ ...world, replayFormat: 1 }, featureRegistry)).toThrow();
-    expect(() => checkWorldReplay({ ...world }, featureRegistry)).toThrow();
-    expect(() => checkWorldReplay(world)).toThrow('모르는');
-    archive.origin.initialStateHash = 'not checked at startup';
+    expect(() => checkWorldReplay(world)).toThrow();
+    origin.initialStateHash = 'not checked at startup';
     expect(() => checkWorldReplay(world, featureRegistry)).not.toThrow();
     for (const version of [2, 4, 5])
       expect(() =>
         checkWorldReplay(
-          { ...world, replayOrigin: { ...archive.origin, version } as unknown as Prisma.JsonValue },
+          { ...world, replayOrigin: { ...origin, version } as unknown as Prisma.JsonValue },
           featureRegistry,
         ),
       ).toThrow();

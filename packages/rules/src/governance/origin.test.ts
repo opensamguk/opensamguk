@@ -21,15 +21,16 @@ function fixture() {
   };
 }
 describe('AC-P2-31·35 저장 황실과 원생성 계약', () => {
-  it('기능을 끈 기존 판은 null 칸을 상태에 추가하지 않고 남은 데이터는 거부한다', () => {
+  it('상시 제공 황실의 저장 상태 누락은 거부한다', () => {
     const { state, record } = fixture();
-    expect(readStoredGovernance({ ...record, governanceState: null }, state)).toBeUndefined();
-    expect(() => readStoredGovernance({ ...record }, state)).toThrow('끈');
+    expect(() => readStoredGovernance({ ...record, governanceState: null }, state)).toThrow();
   });
   it('의존 기능·원생성 설정·월 tick이 서로 맞아야 한다', () => {
     const { state, record } = fixture();
     expect(readStoredGovernance(record, state)).toEqual(state.governance);
-    expect(() => readStoredGovernance({ ...record }, state)).toThrow('의존');
+    expect(() =>
+      readStoredGovernance({ ...record, replayOrigin: { ...record.replayOrigin, featureData: {} } }, state),
+    ).toThrow();
     expect(() => readStoredGovernance({ ...record, monthlyTick: 10_000 }, state)).toThrow('tick');
     record.governanceState.config.tribute.maxBp++;
     expect(() => readStoredGovernance(record, state)).toThrow('원생성');

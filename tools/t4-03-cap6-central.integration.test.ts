@@ -1,4 +1,4 @@
-import { providedRuleKeys } from '@opensamguk/rules';
+import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
@@ -47,8 +47,9 @@ const pgRequire = createRequire(dbRequire.resolve('@prisma/adapter-pg'));
 const { Client } = pgRequire('pg') as { Client: new (config: { connectionString: string }) => PgClient };
 if (!process.env.TEST_DATABASE_URL) throw new Error('전용 테스트 DB가 필요합니다.');
 const sourceUrl = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-const ownName = process.env.T403_CENTRAL_DB_NAME ?? `t403_caps_${randomUUID().replaceAll('-', '')}_test`;
-if (!/^t403_caps_[a-f0-9]{32}_test$/.test(ownName)) throw new Error('시험 DB 이름을 확인하세요.');
+const ownName =
+  process.env.T403_CENTRAL_DB_NAME ?? `opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`;
+if (!/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(ownName)) throw new Error('시험 DB 이름을 확인하세요.');
 const ownUrl = new URL(sourceUrl);
 const adminUrl = new URL(sourceUrl);
 ownUrl.pathname = `/${ownName}`;

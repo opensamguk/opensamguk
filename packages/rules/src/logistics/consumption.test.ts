@@ -103,7 +103,7 @@ describe('AC-P2-30 모집·건설의 실제 원자재 소비', () => {
   it.each(['wall', 'defence'] as const)('%s는 기존 효과와 RNG를 유지하고 성공당 한 번 소비한다', (key) => {
     const world = fixture(),
       legacy = cloneWorld(world);
-    delete legacy.logistics;
+    legacy.logistics = structuredClone(world.logistics!);
     const rng = createRng('build'),
       oldRng = createRng('build');
     const next = vi.spyOn(rng, 'next'),

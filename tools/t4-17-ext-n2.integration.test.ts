@@ -35,7 +35,7 @@ const pgRequire = createRequire(dbRequire.resolve('@prisma/adapter-pg'));
 const { Client } = pgRequire('pg') as { Client: new (config: { connectionString: string }) => PgClient };
 if (!process.env.TEST_DATABASE_URL) throw new Error('전용 테스트 DB가 필요합니다.');
 const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-const ownName = `t417_n2_${randomUUID().replaceAll('-', '')}_test`;
+const ownName = `opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`;
 const ownUrl = new URL(source),
   adminUrl = new URL(source);
 ownUrl.pathname = `/${ownName}`;

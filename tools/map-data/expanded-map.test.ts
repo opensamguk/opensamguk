@@ -1,4 +1,4 @@
-import { providedRuleKeys } from '@opensamguk/rules';
+import { providedRuleKeys } from '../../packages/rules/src/providedRules';
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 import {
@@ -14,6 +14,7 @@ import {
 } from '../../packages/rules/src/world/map/stored';
 import { publicGeographySchema } from '../../packages/shared/src/publicGeography';
 import { buildInitialWorld } from '../../packages/rules/src/world/bootstrap';
+import { applySexLedger } from '../../packages/rules/src/general/sex';
 import { checkOperationalProfile } from '../../packages/rules/src/world/map/profile';
 import { validateWorldResources } from '../../packages/rules/src/world/validate';
 import { hashState } from '../../packages/shared/src/node/hashState';
@@ -127,19 +128,23 @@ it('AC-INT-27: 새 지도 월드의 재생 원장·종류 재적재와 초기 �
     portraitMap: { portraits: {} },
   };
   expect(validateWorldResources(materials).status).toBe('pass');
-  const initial = buildInitialWorld({ ...materials, seed: 'int27-map', mapKey: 'san10-expanded@3' });
+  const create = () => {
+    const value = buildInitialWorld({ ...materials, seed: 'int27-map', mapKey: 'san10-expanded@3' });
+    value.generals = applySexLedger(value);
+    return value;
+  };
+  const initial = create();
   checkOperationalProfile(initial);
   expect(initial.cities).toHaveLength(323);
   expect(providedRuleKeys).toContain('capturable-field-v1');
   const disabled = structuredClone(initial);
+  disabled.cities.pop();
   expect(() => checkOperationalProfile(disabled)).toThrow();
-  expect(() => readOperationalMap(map)).toThrow();
+  expect(readOperationalMap(map)).toEqual(map);
   expect(initial.cities.every((city) => city.nationId === null)).toBe(true);
   expect(attachOperationalKinds(initial.cities, map)).toEqual(initial.cities);
   expect(readOperationalMap(JSON.parse(JSON.stringify(map)), { initial })).toEqual(map);
-  expect(hashState(initial)).toBe(
-    hashState(buildInitialWorld({ ...materials, seed: 'int27-map', mapKey: 'san10-expanded@3' })),
-  );
+  expect(hashState(initial)).toBe(hashState(create()));
   const replay = initialReplayState(initial);
   const reloaded = initialReplayState(JSON.parse(JSON.stringify(initial)));
   expect(settleReplayMonth(replay, initial.seed, TICKS_PER_MONTH)).toEqual(

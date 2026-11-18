@@ -41,7 +41,7 @@ if (!['localhost', '127.0.0.1'].includes(source.hostname)) throw new Error('loop
 for (const key of source.searchParams.keys())
   if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
     throw new Error('접속 대상 질의 인자는 쓸 수 없습니다.');
-const name = 't305_reset_preparation_' + randomUUID().replaceAll('-', '') + '_test',
+const name = 'opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test',
   target = new URL(source),
   adminUrl = new URL(source);
 target.pathname = '/' + name;
@@ -167,7 +167,7 @@ async function cleanupWithReservedClose(
   return closed;
 }
 async function dropExactOwnedDatabase(client: Pg, expectedName: string, expectedOid: string, signal: AbortSignal) {
-  if (!/^t305_reset_preparation_[a-f0-9]{32}_test$/.test(expectedName) || !/^[1-9]\d*$/.test(expectedOid))
+  if (!/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(expectedName) || !/^[1-9]\d*$/.test(expectedOid))
     throw new Error('자기 시험 DB 식별자를 확인하세요.');
   const identity = (
     await checked(

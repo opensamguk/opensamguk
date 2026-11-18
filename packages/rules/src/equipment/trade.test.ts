@@ -85,14 +85,6 @@ it('AC-P2-12 인공 제안 정책의 교체는 이전 장비 판매 금을 더�
 });
 
 it.each<[string, (world: WorldState) => void, string]>([
-  ['끈 판', () => {}, 'COMMAND_DISABLED'],
-  [
-    '물류 없는 판',
-    (w) => {
-      delete w.logistics;
-    },
-    'COMMAND_DISABLED',
-  ],
   [
     '무소속',
     (w) => {
@@ -188,4 +180,12 @@ it('AC-P2-12 장수 부재와 판매 금 한도를 실행 전에 거부한다', 
   world.equipment!.generals['1'] = { horse: 'horse_01' };
   world.generals[1]!.gold = EQUIPMENT_MAX;
   expect(equipmentTrade.check(world, actor, { slot: 'horse', itemKey: 'none' })?.code).toBe('BAD_STATE');
+});
+
+it('AC-INT-28 필수 물류 원장 누락은 계산 전에 거부한다', () => {
+  const world = fixture();
+  delete world.logistics;
+  const before = structuredClone(world);
+  expect(() => equipmentTrade.check(world, actor, horse)).toThrow();
+  expect(world).toEqual(before);
 });

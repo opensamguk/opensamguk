@@ -84,15 +84,12 @@ describe('AC-M1-14 접경귀환', () => {
     });
   });
 
-  it('새 월드에서만 목록에 추가하고 기존 귀환과 기능 선행 조건을 보존한다', () => {
+  it('항상 목록에 제공하고 기존 귀환과 기능 의존 검사를 보존한다', () => {
     const world = makeWorld();
     const enabled = resolverForRuleFeatures(world)!;
     const previous = resolverForRuleFeatures(world)!;
-    expect(enabled.list('general').map(({ key }) => key)).toEqual([
-      ...previous.list('general').map(({ key }) => key),
-      key,
-    ]);
-    expect(previous.get(key)).toBeUndefined();
+    expect(enabled.list('general').map(({ key }) => key)).toEqual(previous.list('general').map(({ key }) => key));
+    expect(previous.get(key)?.key).toBe(key);
     expect(previous.run(world, actor, 'return', {}, createRng('return'))).toEqual(
       createCommandResolver(null).run(world, actor, 'return', {}, createRng('return')),
     );

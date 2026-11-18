@@ -81,7 +81,7 @@ describe('선택된 인사 입력', () => {
     const outcome = applyPersonnelInput(deepFreeze(before), event(), context);
     expect(before).toEqual(saved);
     if (outcome.status !== 'APPLIED') throw new Error('임명 실패');
-    expect(outcome.result).toEqual({ generalId: 3, officerLevel: 11, title: '참모', tick: 200 });
+    expect(outcome.result).toEqual({ generalId: 3, officerLevel: 11, title: '부두목', tick: 200 });
     const record = validatePersonnelRecord(
       {
         sequence: 2,
@@ -139,7 +139,7 @@ describe('선택된 인사 입력', () => {
   });
   it.each([
     [{ generalId: 3, officerLevel: 12 }, 'BAD_ARGS'],
-    [{ generalId: 3, officerLevel: 5 }, 'BAD_STATE'],
+    [{ generalId: 3, officerLevel: 5 }, 'BAD_ARGS'],
     [{ generalId: 2, officerLevel: 11 }, 'BAD_TARGET'],
   ])('순수 인사 규칙의 거절을 유지한다: %j', (payload, code) => {
     expect(applyPersonnelInput(world(), event({ payload }), context)).toMatchObject({
@@ -345,7 +345,9 @@ describe('인사 기록과 직책 칸', () => {
       record.payload.turns[0],
     );
     expect(state).toEqual(before);
-    expect(() => applyNationTurnsRecord(before, {}, record)).toThrow();
+    expect(applyNationTurnsRecord(before, {}, record).state.officeTurns?.[1]?.[5]?.[0]).toEqual(
+      record.payload.turns[0],
+    );
   });
   it.each(['tenure', 'revision', 'office', 'command', 'args', 'length'] as const)(
     '직책 칸의 %s 불일치를 거부한다',

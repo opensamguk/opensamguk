@@ -25,7 +25,7 @@ if (!['127.0.0.1', 'localhost'].includes(source.hostname)) throw new Error('loop
 for (const key of source.searchParams.keys())
   if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
     throw new Error('대상 변경 인자는 받지 않습니다.');
-const name = `held_cleanup_${randomUUID().replaceAll('-', '')}_test`,
+const name = `opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`,
   target = new URL(source),
   root = new URL(source);
 target.pathname = '/' + name;

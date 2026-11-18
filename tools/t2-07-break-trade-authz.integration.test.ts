@@ -1,4 +1,4 @@
-import { providedRuleKeys } from '@opensamguk/rules';
+import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { readFile, readdir } from 'node:fs/promises';
@@ -39,7 +39,7 @@ type Fixture = {
 };
 const root = fileURLToPath(new URL('../', import.meta.url));
 const migrationRoot = new URL('../packages/db/prisma/migrations/', import.meta.url);
-const databaseName = `t207_authz_${randomUUID().replaceAll('-', '')}_test`;
+const databaseName = `opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`;
 const now = Date.now();
 const origin = 'http://t207-authz.test';
 const features = ['treaty', 'treaty-break', 'treaty-trade'];

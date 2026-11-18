@@ -1,4 +1,5 @@
 import { providedRuleKeys } from './../../../providedRules';
+import { providedRuleData } from '../../../providedRuleData';
 import { describe, expect, it } from 'vitest';
 import { commandInitial, commandWorld } from '../../../../test/commandFixture';
 import { createRng, type Rng } from '@opensamguk/shared';
@@ -118,10 +119,13 @@ describe('AC-INT-17 기본 계략의 5능력치 어댑터', () => {
     const state = world();
     expect(checkRuleFeatures(providedRuleKeys)).toEqual(providedRuleKeys);
     const resolver = resolverForRuleFeatures(state)!;
-    for (const command of stratagemCommands) expect(resolver.get(command.key)).toBe(command);
+    for (const command of stratagemCommands)
+      expect(resolver.get(command.key)).toMatchObject({ key: command.key, name: command.name });
     expect(resolver.get('scout')).toBeUndefined();
     expect(() => checkRuleFeatures(['stratagem-basic'])).toThrow();
     const initial = commandInitial();
+    for (const general of initial.generals) general.crew = 0;
+    for (const general of initial.generals) general.crew = 0;
     initial.statRules = { count: 5, total: 275, min: 15, max: 90 };
     for (const general of initial.generals) Object.assign(general, { politics: 50, charm: 50 });
     const origin = {
@@ -129,7 +133,7 @@ describe('AC-INT-17 기본 계략의 5능력치 어댑터', () => {
       initial,
       initialStateHash: 'checked-by-transport',
       resourceHash: 'checked-by-transport',
-      featureData: { policy: { version: 1, turnTermMinutes: 60 } },
+      featureData: providedRuleData(initial, 60),
     };
     expect(() => checkReplayOrigin(origin)).not.toThrow();
     expect(() =>

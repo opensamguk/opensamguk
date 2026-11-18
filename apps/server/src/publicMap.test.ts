@@ -11,7 +11,7 @@ it('공개 지도 사본은 허용 필드만 남기고 깨진 JSON은 거부한�
       generals: [{ userId: 'secret' }],
     }),
   ).toEqual({
-    cities: [{ key: '1', name: '성', level: 1, x: 2, y: 3, nationId: 1, links: ['2'] }],
+    cities: [{ key: '1', name: '성', level: 1, x: 2, y: 3, nationId: 1, links: ['2'], supplied: true }],
     nations: [{ id: 1, name: '국', color: '#ffffff' }],
   });
   for (const data of [null, {}, { cities: [], nations: 'secret' }, { cities: [{ supplied: true }], nations: [] }])

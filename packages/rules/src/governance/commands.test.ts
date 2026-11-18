@@ -76,8 +76,8 @@ describe('AC-P2-31 봉신 계열의 모든 명령 소비 경계', () => {
     resolver.run(world, actor, 'nation_declare', { nationId: 2 }, random);
     expect(random.pick([1, 2, 3, 4, 5])).toBe(untouched.pick([1, 2, 3, 4, 5]));
     delete world.governance;
-    expect(resolver.run(deepFreeze(world), actor, 'nation_declare', { nationId: 2 }, rngFor('old'))).toEqual(
-      base.run(world, actor, 'nation_declare', { nationId: 2 }, rngFor('old')),
+    expect(() => resolver.run(deepFreeze(world), actor, 'nation_declare', { nationId: 2 }, rngFor('old'))).toThrow(
+      '상태',
     );
   });
 });

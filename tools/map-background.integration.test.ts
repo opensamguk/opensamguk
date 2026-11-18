@@ -12,7 +12,7 @@ import { confirmDisconnectedDatabase } from './test-db-close';
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw Error('전용 시험 DB가 필요합니다.');
 if (!['127.0.0.1', 'localhost'].includes(new URL(url).hostname)) throw Error('자기 loopback 시험 DB가 필요합니다.');
-const name = 'map_background_' + randomUUID().replaceAll('-', '') + '_test';
+const name = 'opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test';
 const target = new URL(url),
   adminUrl = new URL(url);
 target.pathname = '/' + name;

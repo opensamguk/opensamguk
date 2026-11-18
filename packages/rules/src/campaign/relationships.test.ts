@@ -12,6 +12,7 @@ function fixture(seed = 'campaign-relationship-test') {
   Object.assign(world.generals[2]!, { nationId: 1, officerLevel: 1 });
   Object.assign(world.generals[3]!, { nationId: 1, officerLevel: 1, userId: 'target' });
   const campaign = emptyCampaignState(world, seed, 'test-five-stats');
+  world.campaign = campaign;
   const apply = (value: unknown, actorId = 1, tick = 0, userId = 'owner') =>
     applyCampaignRelationship(deepFreeze(world), value, actorId, deepFreeze(campaign), {
       tick,
@@ -42,7 +43,7 @@ describe('AC-INT-06 사람 동의와 NPC 서약의 순수 전이', () => {
     const result = applied(f.apply(offer(3)));
     expect(result.result).toEqual({ accepted: null, offerId: 1, cost: 0, chance: null, roll: null, revision: 1 });
     expect(result.campaign.links).toEqual([]);
-    expect(result.state).toEqual(before);
+    expect(result.state).toEqual({ ...before, campaign: result.campaign });
     const accept = { type: 'respond', offerId: 1, accept: true, revision: 1 };
     expect(
       applyCampaignRelationship(result.state, accept, 1, result.campaign, {
@@ -78,7 +79,7 @@ describe('AC-INT-06 사람 동의와 NPC 서약의 순수 전이', () => {
     expect(result.result).toMatchObject({ accepted: false, cost: 0, roll: null });
     expect(result.campaign.offers[0]!.status).toBe('REJECTED');
     expect(result.campaign.links).toEqual([]);
-    expect(result.state).toEqual(f.world);
+    expect(result.state).toEqual({ ...f.world, campaign: result.campaign });
   });
   it('NPC의 같은 시드·월·행위자·대상은 같은 결과이며 유효한 거절도500금을 쓴다', () => {
     const f = Array.from({ length: 100 }, (_, n) => fixture(`refusal-${n}`)).find((candidate) => {

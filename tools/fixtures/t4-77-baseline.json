@@ -176,8 +176,8 @@
   },
   "fixtures": {
     "monthlyFixture": {
-      "initialStateHash": "209c972a25848dd16cacc05e9f36ebb50124e8c032b9f39f57896556593b5eb8",
-      "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
+      "initialStateHash": "46d8a339d6f66c176b60a764bcc362d60db1176a810207ab39ed1a8f014ab677",
+      "resourceHash": "cd13d86a06e8ed57b9f700a5fd0b9bcb0c5cfbd9ffa8853edad2cbb555441782",
       "cities": 4,
       "nations": 2,
       "generals": 3,

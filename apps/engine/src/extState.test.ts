@@ -16,10 +16,10 @@ const preset = JSON.parse(
   readFileSync(new URL('../../../resources/preset/regular.json', import.meta.url), 'utf8'),
 ) as WorldPreset;
 const initial = (
-  JSON.parse(readFileSync(new URL('../test/fixtures/replay-v1-b8f5074.json', import.meta.url), 'utf8')) as {
-    origin: { initial: WorldInit };
+  JSON.parse(readFileSync(new URL('../test/fixtures/monthly-initial.json', import.meta.url), 'utf8')) as {
+    initial: WorldInit;
   }
-).origin.initial;
+).initial;
 
 function transaction(rows: { key: string; value: unknown }[] = []) {
   const read = vi.fn().mockResolvedValue(rows);
@@ -46,17 +46,19 @@ it('등록된 무상태 계략도 1a-off 생성·적재 대상으로 받지 않�
   expect(write).not.toHaveBeenCalled();
 });
 
-it('선택 대조를 마친 무상태 확장은 빈 행만 복원한다', async () => {
+it('AC-INT-28 필수 intel 조각을 복원하고 누락·고아 조각은 거부한다', async () => {
   const empty = transaction();
-  expect(await loadExt(empty.tx, 'ext')).toBeUndefined();
+  await expect(loadExt(empty.tx, 'ext')).rejects.toThrow('ext');
+  const stored = transaction([{ key: 'intel', value: {} }]);
+  expect(await loadExt(stored.tx, 'ext')).toEqual({ intel: {} });
   const orphan = transaction([{ key: 'orphan', value: null }]);
   await expect(loadExt(orphan.tx, 'ext')).rejects.toThrow();
   expect(orphan.write).not.toHaveBeenCalled();
 });
 
-it('끈 월드의 빈 행은 ext 키를 만들지 않고 남는 조각은 실제 복원 함수가 거부한다', async () => {
+it('AC-INT-28 빈 저장 행과 남는 조각은 실제 복원 함수가 거부한다', async () => {
   const empty = transaction();
-  expect(await loadExt(empty.tx, 'off')).toBeUndefined();
+  await expect(loadExt(empty.tx, 'off')).rejects.toThrow('ext');
   const orphan = transaction([{ key: 'orphan', value: null }]);
   await expect(verifyWorldExt(orphan.tx, { id: 'off', preset: null })).rejects.toThrow();
   expect(orphan.read).toHaveBeenCalledOnce();
@@ -94,19 +96,19 @@ it.each([true, false])('기존 options와 explicit=%s에서 resolver 추가 전�
   expect(resolved).toEqual(direct);
   expect(hashState(resolved.state)).toBe(hashState(direct.state));
   expect(resolved.commandKey).toBe(explicit ? 'rest' : 'farm');
-  expect(Object.hasOwn(resolved.state, 'ext')).toBe(false);
+  expect(resolved.state.ext).toEqual({ intel: {} });
   expect(state).toEqual(before);
 });
 
 it('기존 재생의 넷째 resolver 자리는 상태·RNG 결과를 보존한다', () => {
   let direct = initialReplayState(initial);
   let resolved = initialReplayState(initial);
-  const resolver = engineResolver({ preset: null }).resolver;
+  const resolver = engineResolver({ preset: null, replayFormat: 3 }).resolver;
   for (let step = 0; step < 48; step++) {
     direct = runReplayAction(direct, initial.seed, initial.unitSet);
     resolved = runReplayAction(resolved, initial.seed, initial.unitSet, resolver);
     expect(resolved).toEqual(direct);
     expect(hashState(resolved)).toBe(hashState(direct));
-    expect(Object.hasOwn(resolved.state, 'ext')).toBe(false);
+    expect(resolved.state.ext).toEqual({ intel: {} });
   }
 });

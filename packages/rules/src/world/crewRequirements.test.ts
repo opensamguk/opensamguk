@@ -73,8 +73,7 @@ describe('INT-22 병종 조건의 공통 모집 경계', () => {
       ),
     ).toBe(false);
     const legacy = structuredClone(world);
-    delete legacy.campaign;
-    delete legacy.cityResources;
+    Object.assign(legacy.logistics!.cities['1']!, { iron: 1000, wood: 1000, horses: 1000 });
     legacy.generals[1]!.userId = null;
     const recruit = chooseGeneralTurn(legacy, legacy.generals[1]!, rngFor('crew-choice', 1), {
       unitSet,

@@ -3,8 +3,19 @@ const DEFAULT_TEST_DATABASE_URL = 'postgresql://opensamguk:opensamguk@127.0.0.1:
 export function testDatabaseUrl(env: Record<string, string | undefined>): URL {
   const url = new URL(env.TEST_DATABASE_URL ?? DEFAULT_TEST_DATABASE_URL);
   const databaseName = url.pathname.slice(1);
-  if (!['postgres:', 'postgresql:'].includes(url.protocol) || !/^[a-z][a-z0-9_]*_test$/.test(databaseName)) {
-    throw new Error('통합 테스트 DB 이름은 소문자·숫자·밑줄로 구성하고 _test로 끝나야 합니다.');
+  const selectedDatabase = process.env.TEST_DATABASE_URL;
+  if (
+    selectedDatabase &&
+    new URL(selectedDatabase).pathname === '/opensamguk_ci_green' &&
+    databaseName !== 'opensamguk_ci_green'
+  ) {
+    throw new Error('CI 복구 시험은 opensamguk_ci_green 외의 DB를 사용할 수 없습니다.');
+  }
+  if (
+    !['postgres:', 'postgresql:'].includes(url.protocol) ||
+    (!/^[a-z][a-z0-9_]*_test$/.test(databaseName) && databaseName !== 'opensamguk_ci_green')
+  ) {
+    throw new Error('통합 테스트 DB는 _test로 끝나는 이름 또는 opensamguk_ci_green이어야 합니다.');
   }
   if (env.DATABASE_URL) {
     const development = new URL(env.DATABASE_URL);

@@ -5,10 +5,11 @@ import {
   applyCapsRecordedInput,
   buildYearbook,
   capsResourceHashInput,
+  checkReplayOrigin,
+  replayResourceHashInput,
   emptyQueue,
   monthlyDate,
   nextGameAction,
-  parseCapsOrigin,
   runCapsReplayAction,
   selectSupportedCapabilities,
   startCapsReplay,
@@ -30,6 +31,7 @@ import { commandsRouter, commandList } from '../apps/server/src/routers/commands
 import { authenticate } from '../apps/server/src/auth/session';
 import { createRateLimiter } from '../apps/server/src/security/rateLimit';
 import type { Context } from '../apps/server/src/context';
+import { monthlyFixture } from '../apps/engine/test/monthlyFixture';
 
 const fixed = JSON.parse(
   readFileSync(new URL('../apps/engine/test/fixtures/ext-fire-5bd54b2.json', import.meta.url), 'utf8'),
@@ -89,6 +91,7 @@ function creationDb() {
     generalTurn: { createMany: createMany() },
     diplomacy: { createMany: createMany() },
     nationTurn: { createMany: createMany() },
+    worldExtSlice: { create: vi.fn().mockResolvedValue({}) },
     $queryRaw: vi.fn().mockResolvedValue([]),
     $executeRaw: vi.fn().mockRejectedValue(new Error('조각 쓰기를 허용하지 않습니다.')),
   };
@@ -98,36 +101,30 @@ function creationDb() {
   return { db: { $transaction: transaction } as unknown as PrismaClient, tx, transaction };
 }
 
-it('명시 opt-in 생성은 정규 descriptor와 초기 해시를 쓰고 상태 조각은 만들지 않는다', async () => {
+it('AC-INT-28 별도 선택 없이 전체 제공 규칙의 생성 기록과 정보 조각을 저장한다', async () => {
   const f = creationDb();
-  const unsorted = { ...preset, commands: { general: ['sabotage', 'fire_attack'], nation: [] } };
-  const original = structuredClone(unsorted);
-  const result = await saveInitialWorld(f.db, initial, {
+  const source = await monthlyFixture();
+  source.scenarioKey = 'unit-ext';
+  const original = structuredClone(source);
+  const result = await saveInitialWorld(f.db, source, {
     name: '단위 확장',
     turnTermMinutes: 60,
     endYear: null,
-    extFormat: 1,
-    preset: { key: 'unit-ext', value: unsorted },
   });
   const data = f.tx.world.create.mock.calls[0]![0].data;
-  const parsed = parseCapsOrigin(data.replayOrigin);
-  expect(parsed.capabilities.ext).toMatchObject({
-    version: 1,
-    commands: { general: ['fire_attack', 'sabotage'], nation: [] },
-    resources: {},
-    sliceKeys: [],
-  });
+  const parsed: unknown = data.replayOrigin;
+  checkReplayOrigin(parsed);
+  expect(parsed.version).toBe(3);
   expect(Object.hasOwn(parsed.initial, 'ext')).toBe(false);
   expect(data.initialStateHash).toBe(hashState(parsed.initial));
   expect(result.stateHash).toBe(data.initialStateHash);
-  expect(parsed.resourceHash).toBe(hashState(capsResourceHashInput(parsed)));
-  const stored = { ...world(), ...data, preset: data.preset, replayOrigin: parsed };
-  expect(engineResolver(stored).resolver.get('fire_attack')?.name).toBe('화계');
-  expect(worldResolver(stored).commands?.general).toEqual(['fire_attack', 'sabotage']);
-  expect(data.policyFromSequence).toBe(0);
-  expect(Object.hasOwn(data, 'treatyFormat')).toBe(false);
+  if (parsed.version !== 3) throw new Error('재생 형식 3이 필요합니다.');
+  expect(parsed.resourceHash).toBe(hashState(replayResourceHashInput(parsed.initial, parsed.featureData)));
+  expect(f.tx.worldExtSlice.create).toHaveBeenCalledExactlyOnceWith({
+    data: { worldId: 'unit-ext', key: 'intel', value: {} },
+  });
   expect(f.tx.$executeRaw).not.toHaveBeenCalled();
-  expect(unsorted).toEqual(original);
+  expect(source).toEqual(original);
 });
 
 it('opt-in 누락·조합·형식·초기 조각 오류는 생성 TX 전에 거부한다', async () => {

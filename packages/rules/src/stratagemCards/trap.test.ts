@@ -40,12 +40,13 @@ function fixture(campaign: boolean, armed = true) {
 }
 const selected = (campaign: boolean) => (campaign ? createCampaignCommandResolver(base) : base);
 
-it('AC-P2-23 구판 출병 함정은 병력·사기를 줄이고 한 번만 발동한다', () => {
-  const world = fixture(false),
-    before = structuredClone(world),
+it('AC-P2-23 참전 부곡이 없는 함정은 출병을 취소하고 한 번만 발동한다', () => {
+  const world = fixture(false);
+  for (const general of Object.values(world.generals)) general.crew = 0;
+  const before = structuredClone(world),
     result = triggerStratagemTrap(world, actor, 2)!;
-  expect(result.cancelled).toBe(false);
-  expect(result.state.generals[1]).toMatchObject({ crew: 8000, atmos: 90 });
+  expect(result.cancelled).toBe(true);
+  expect(result.state.generals[1]).toEqual(world.generals[1]);
   expect(result.state.generals[2]).toEqual(world.generals[2]);
   expect(result.state.stratagemCards!.nations[2]!.traps).toEqual([]);
   expect(triggerStratagemTrap(result.state, actor, 2)).toBeNull();

@@ -1,11 +1,16 @@
 import type { Prisma } from '@opensamguk/db';
-import { creationFailure } from '@opensamguk/rules';
-import { expect, it, vi } from 'vitest';
+import { creationFailure, initialReplayState, type WorldState } from '@opensamguk/rules';
+import { beforeAll, expect, it, vi } from 'vitest';
 import legacy from '../test/fixtures/replay-v1-b8f5074.json';
+import { monthlyFixture } from '../test/monthlyFixture';
 import { processPendingInput } from './inputs';
 
 type World = Prisma.WorldGetPayload<Record<string, never>>;
 type Event = Prisma.InputEventGetPayload<Record<string, never>>;
+let lineageState: WorldState['lineage'];
+beforeAll(async () => {
+  lineageState = initialReplayState(await monthlyFixture()).state.lineage;
+});
 
 // 실제 처리 함수의 쓰기 인자를 보는 단위 입력이다. public 인사 선택을 열거나 PG 원자성을 검증하지 않는다.
 function fixture(personnelFormat: 1 | null, policyFromSequence: number | null = null) {
@@ -26,7 +31,7 @@ function fixture(personnelFormat: 1 | null, policyFromSequence: number | null = 
     logisticsState: null,
     equipmentState: null,
     governanceState: null,
-    lineageState: null,
+    lineageState: lineageState as Prisma.JsonObject,
     stratagemCardsState: null,
     presetKey: null,
     scenarioKey: legacy.origin.initial.scenarioKey,
@@ -66,7 +71,7 @@ function fixture(personnelFormat: 1 | null, policyFromSequence: number | null = 
     generalId: null,
     idempotencyKey: 'general.create:request',
     kind: 'general.create',
-    payload: { name: '장수', leadership: 55, strength: 55, intel: 55, portraitId: null },
+    payload: { name: '장수', leadership: 55, strength: 55, intel: 55, sex: 'MALE', portraitId: null },
     status: 'PENDING',
     sequence: null,
     tick: null,
@@ -181,7 +186,7 @@ it.each(
       f.actor.status = 'SUSPENDED';
       f.event.payload = {};
     } else if (reason === 'BAD_STATS') {
-      f.event.payload = { name: '장수', leadership: 0, strength: 0, intel: 0, portraitId: null };
+      f.event.payload = { name: '장수', leadership: 0, strength: 0, intel: 0, sex: 'MALE', portraitId: null };
       f.existing.push({ id: 2, userId: 'other', name: '장수' });
     } else f.existing.push({ id: 2, userId: 'other', name: '장수' });
     const code = reason === 'PREOPEN' || reason === 'PAUSED' || reason === 'ENDED' ? 'WORLD_CLOSED' : reason;

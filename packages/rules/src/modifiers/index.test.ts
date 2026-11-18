@@ -147,7 +147,9 @@ describe('T4-18 제공자 수집', () => {
   });
 
   it('없는 상태에서 빈 배열을 내는 제공자를 수집해도 빈 배열이다', () => {
-    const view = freeze(commandWorld());
+    const world = commandWorld();
+    delete world.ext;
+    const view = freeze(world);
     const provider: ModifierProvider = (state) => (state.ext ? [add('test:a', 1)] : []);
     expect(collectModifiersWith([provider], view, 1, { stage: 'battle.dealt', commandKey: 'attack' })).toEqual([]);
   });

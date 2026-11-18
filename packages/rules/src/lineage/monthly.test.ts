@@ -6,7 +6,10 @@ import { emptyLineagePerson } from './state';
 import { lineageFixture } from './testFixture';
 import { lineageConfigSchema } from './config';
 
-const resources: LineageResources = { statRules: { total: 180, min: 0, max: 100 }, unitSet: { defaultCrewTypeId: 1 } };
+const resources: LineageResources = {
+  statRules: { count: 5, total: 275, min: 15, max: 90 },
+  unitSet: { defaultCrewTypeId: 1 },
+};
 
 function birthWorld() {
   const world = lineageFixture(),

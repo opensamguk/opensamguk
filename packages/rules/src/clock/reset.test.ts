@@ -60,6 +60,7 @@ function record(): RecordedInput {
         contentHash: 'a'.repeat(64),
       })),
       settings: {
+        fogOfWar: false,
         name: ' 원본 이름 ',
         scenarioKey: 'scenario',
         mapKey: 'map',
@@ -160,7 +161,13 @@ it('적용 결과의 양쪽UUID·시드·revision·tick·설정·manifest 변조
     { before: { status: 'PAUSED', tick: 4, revision: 3 } },
     { after: { status: 'ENDED', tick: 5, revision: 3 } },
     { newInitialHash: 'invalid' },
-    { settings: { ...(result.settings as object), name: 'other' } },
+    {
+      settings: {
+        fogOfWar: false,
+        ...(result.settings as object),
+        name: 'other',
+      },
+    },
   ])
     expect(() => validateAdminResetRecord({ ...r, result: { ...result, ...delta } })).toThrow();
   const resources = result.resources as Record<string, unknown>[];
@@ -183,7 +190,11 @@ it('AC-INT-24 변경 뒤 확인 이름과 복원 이름은 분리하되 확인 �
     result: {
       ...result,
       confirmedName: ' 원본 이름 ',
-      settings: { ...(result.settings as object), name: '생성 이름' },
+      settings: {
+        fogOfWar: false,
+        ...(result.settings as object),
+        name: '생성 이름',
+      },
     },
   };
   expect(() => validateAdminResetRecord(renamed)).not.toThrow();

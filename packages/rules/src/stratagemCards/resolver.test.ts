@@ -95,11 +95,15 @@ it('AC-P2-23 같은 국가 두 장수가 한 장을 함께 쓰면 먼저 실행�
 
 it('AC-P2-23 일반 명령과 기능을 끈 월드의 결과·난수 소비는 그대로다', () => {
   const off = commandWorld();
-  for (const key of ['fire_attack', 'farm']) {
+  for (const key of ['farm']) {
     const args = key === 'farm' ? {} : target,
       left = createRng('off-golden'),
       right = createRng('off-golden');
-    expect(resolver.run(off, actor, key, args, left)).toEqual(base.run(off, actor, key, args, right));
+    const wrapped = resolver.run(off, actor, key, args, left);
+    const plain = base.run(off, actor, key, args, right);
+    if ('code' in wrapped || 'code' in plain) throw Error('내정 고정물 실패');
+    expect(applyEffects(off, wrapped.effects)).toEqual(applyEffects(off, plain.effects));
+    expect(wrapped.logs).toEqual(plain.logs);
     expect(left.next()).toBe(right.next());
   }
   const on = setup(),

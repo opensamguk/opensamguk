@@ -28,8 +28,7 @@ function fixture() {
 it('AC-P2-23 명시 원 설정·시드·월 시각의 저장 사본만 적재한다', () => {
   const { state, row } = fixture();
   expect(readStoredStratagemCards(row, state)).toEqual(state.stratagemCards);
-  expect(readStratagemCardsStorage({ ...row, stratagemCardsState: null })).toBeUndefined();
-  expect(() => readStratagemCardsStorage({ ...row })).toThrow();
+  expect(() => readStratagemCardsStorage({ ...row, stratagemCardsState: null })).toThrow();
 });
 
 it.each(['format', 'data', 'state', 'seed', 'config', 'monthlyTick', 'unsupported'])(

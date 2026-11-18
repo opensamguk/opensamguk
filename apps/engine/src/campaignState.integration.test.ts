@@ -13,7 +13,7 @@ const parsed = new URL(url);
 if (
   !['postgres:', 'postgresql:'].includes(parsed.protocol) ||
   !['localhost', '127.0.0.1'].includes(parsed.hostname) ||
-  !['', '5432', '5433'].includes(parsed.port) ||
+  !['', '5432', '5433', '5561'].includes(parsed.port) ||
   !/^\/[a-z][a-z0-9_]*_test$/.test(parsed.pathname) ||
   parsed.searchParams.has('host') ||
   parsed.searchParams.has('port')

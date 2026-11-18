@@ -78,7 +78,7 @@ type Context = { sql: PgClient; db: Db; initial: WorldInit; openSql(): Promise<P
 async function withDatabase(caseId: CaseId, run: (context: Context) => Promise<void>) {
   if (!process.env.TEST_DATABASE_URL) throw new Error('TEST_DATABASE_URL이 필요합니다.');
   const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-  const name = `t205_assignment_codec_${caseId}_${randomUUID().replaceAll('-', '')}_test`;
+  const name = `opensamguk_ci_green_${caseId}_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`;
   identifier(name);
   if (name === source.pathname.slice(1)) throw new Error('원본 URL의 DB 이름은 사용할 수 없습니다.');
   const adminUrl = new URL(source),

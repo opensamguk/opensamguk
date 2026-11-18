@@ -1,4 +1,4 @@
-import { providedRuleKeys } from '@opensamguk/rules';
+import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { readdir, readFile } from 'node:fs/promises';
@@ -42,7 +42,7 @@ const { Client } = createRequire(requireDb.resolve('@prisma/adapter-pg'))('pg') 
 };
 const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
 if (!['127.0.0.1', 'localhost'].includes(source.hostname)) throw Error('자기 loopback 시험 DB가 필요합니다.');
-const name = 'int23_admin_' + randomUUID().replaceAll('-', '') + '_test';
+const name = 'opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test';
 const target = new URL(source),
   adminUrl = new URL(source);
 target.pathname = '/' + name;

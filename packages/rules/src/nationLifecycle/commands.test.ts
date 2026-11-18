@@ -257,7 +257,7 @@ describe('수동·24개월 자동 해산과 통일', () => {
     expect(world).toEqual(before);
   });
 
-  it('새 기능에서만 방랑 국가를 통일 후보에서 빼고 기존 모든 도시 조건은 유지한다', () => {
+  it('방랑 국가를 통일 후보에서 빼고 모든 도시 조건은 유지한다', () => {
     const world = makeWorld();
     for (const city of Object.values(world.cities)) city.nationId = 1;
     world.nationLifecycle!.nations['2'] = { sinceTick: 0 };
@@ -265,7 +265,7 @@ describe('수동·24개월 자동 해산과 통일', () => {
     world.cities[3]!.nationId = null;
     expect(unifiedNation(world)).toBeNull();
     world.cities[3]!.nationId = 1;
-    expect(unifiedNation(world)).toBeNull();
+    expect(unifiedNation(world)).toBe(1);
   });
 
   it('새 명령은 별도 선택이며 기존 내정 settle 명령은 그대로 남는다', () => {

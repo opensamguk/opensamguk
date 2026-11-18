@@ -62,6 +62,7 @@ it('AC-P2-26 남는 동적 자원 소비자는 확인한 위치와 개수 그대
     }),
   );
   expect(found).toEqual({
+    'apps/server/src/admin/artifactEdition.test.ts': 1,
     // 공개 초상 URL과 남는 JSON 입력·출처 메타데이터를 구분한다.
     'apps/web/src/portrait/portraitUrl.ts': 1,
     // D-087: 공개 빌드도 같은 초상 주소를 쓰는지 확인하는 단위 시험.
@@ -69,6 +70,7 @@ it('AC-P2-26 남는 동적 자원 소비자는 확인한 위치와 개수 그대
     'e2e/portrait.spec.ts': 1,
     'tools/battle-sim-resources.integration.test.ts': 1,
     'tools/create-options-resources.integration.test.ts': 1,
+    'tools/int27-server-map.integration.test.ts': 1,
     'tools/integration-resources.ts': 1,
     'tools/map-data/build-san10-resources.ts': 2,
     'tools/map-data/integration-scenario.ts': 2,

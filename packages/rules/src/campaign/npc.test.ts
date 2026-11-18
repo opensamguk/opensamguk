@@ -1,13 +1,12 @@
+import { resolverForRuleFeatures } from '../ruleCommands';
 import { describe, expect, it } from 'vitest';
 import { rngFor } from '@opensamguk/shared';
 import { commandWorld, testUnits } from '../../test/commandFixture';
-import { createCommandResolver } from '../commands/resolve';
 import { runGeneralTurn } from '../commands/turn';
 import { chooseGeneralTurn } from '../npc';
-import { createCampaignCommandResolver } from './commands';
 import { emptyCampaignState } from './state';
 
-const resolver = createCampaignCommandResolver(createCommandResolver(null));
+const resolver = resolverForRuleFeatures({})!;
 const context = { tick: 100, unitSet: testUnits, resolver };
 function fixture() {
   const world = commandWorld();
@@ -19,6 +18,14 @@ function fixture() {
 describe('AC-INT-09 부곡 병력 정본의 기존 NPC 턴', () => {
   it('NPC가 병력 복제 없이 모병·사기·훈련 뒤 실제 출병·점령까지 실행한다', () => {
     let state = fixture();
+    const currentResolver = resolverForRuleFeatures(state)!;
+    state.nations[1]!.isNpc = true;
+    state.cityResources!.cities['1']!.gold = 100000;
+    Object.assign(state.logistics!.cities['1']!, { iron: 1000, wood: 1000, horses: 1000 });
+    state.nations[1]!.isNpc = true;
+    state.cityResources!.cities['1']!.gold = 100000;
+    state.cityResources!.cities['1']!.rice = 100000;
+    Object.assign(state.logistics!.cities['1']!, { iron: 1000, wood: 1000, horses: 1000 });
     const keys: string[] = [];
     for (let turn = 0; turn < 20 && state.cities[2]!.nationId !== 1; turn++) {
       const next = runGeneralTurn(
@@ -27,7 +34,7 @@ describe('AC-INT-09 부곡 병력 정본의 기존 NPC 턴', () => {
         { commandKey: 'rest', args: {} },
         'npc-seed',
         {},
-        resolver,
+        currentResolver,
       );
       expect('code' in next.result).toBe(false);
       keys.push(next.commandKey);

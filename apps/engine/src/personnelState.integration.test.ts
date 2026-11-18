@@ -25,13 +25,13 @@ if (!['postgres:', 'postgresql:'].includes(source.protocol) || !/^[a-z][a-z0-9_]
 source.port ||= '5432';
 if (
   !['127.0.0.1', 'localhost'].includes(source.hostname) ||
-  !['5432', '5433'].includes(source.port) ||
+  !['5432', '5433', '5561'].includes(source.port) ||
   source.searchParams.has('host') ||
   source.searchParams.has('port')
 )
   throw new Error('loopback 5432 또는 5433 시험 서버를 명시하세요.');
-const name = `t205_office_codec_${randomUUID().replaceAll('-', '')}_test`;
-if (!/^t205_office_codec_[a-f0-9]{32}_test$/.test(name)) throw new Error('자체 시험 DB 이름을 확인하세요.');
+const name = `opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`;
+if (!/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(name)) throw new Error('자체 시험 DB 이름을 확인하세요.');
 const adminUrl = new URL(source),
   target = new URL(source);
 adminUrl.pathname = '/postgres';

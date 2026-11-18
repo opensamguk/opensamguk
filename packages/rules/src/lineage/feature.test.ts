@@ -16,10 +16,10 @@ function initial() {
   }
   return value;
 }
-it('AC-P2-32 원생성 자료는 켠 판에서만 보관하고 성별 없는 원생성은 거부한다', () => {
+it('AC-P2-32 원생성 자료는 항상 보관하고 성별 없는 원생성은 거부한다', () => {
   const old = initialReplayState(commandInitial());
-  expect(Object.hasOwn(old, 'lineageResources')).toBe(false);
-  expect(Object.hasOwn(old.state, 'lineage')).toBe(false);
+  expect(Object.hasOwn(old, 'lineageResources')).toBe(true);
+  expect(Object.hasOwn(old.state, 'lineage')).toBe(true);
   const value = initial(),
     replay = initialReplayState(value, { 'lineage-v1': lineageTestConfig });
   expect(replay.lineageResources).toEqual({
@@ -82,7 +82,7 @@ it('AC-P2-32 월 정산 재생은 출생 행의 개인 칸·방침을 인사 정
   replay = enableReplayPolicy(replay, 60, null);
   const before = structuredClone(replay),
     tick = 10_000;
-  const settled = settleMonthlyFeatures(replay, { ...replay, monthlyTick: tick }, tick);
+  const settled = settleMonthlyFeatures(replay, { ...replay, monthlyTick: tick }, tick, undefined, initial().seed);
   const newborn = settled.replay.state.generals[5]!;
   expect(newborn).toMatchObject({ id: 5, userId: null, crew: 0, gold: 0, rice: 0 });
   expect(settled.replay.turns[5]).toHaveLength(30);

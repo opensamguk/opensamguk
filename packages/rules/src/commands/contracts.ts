@@ -61,7 +61,7 @@ Object.assign(commandCases, {
     },
     code: 'NO_POPULATION',
     verify: (a: WorldState) => {
-      expect(a.generals[1]).toMatchObject({ crew: 100, gold: 99100, crewType: 1100, train: 0, atmos: 0 });
+      expect(a.generals[1]).toMatchObject({ crew: 100, gold: 99190, crewType: 1100, train: 0, atmos: 0 });
       expect(a.cities[1]!.population).toBe(19900);
     },
   },
@@ -88,7 +88,7 @@ Object.assign(commandCases, {
       s.generals[1]!.crew = 0;
     },
     code: 'NO_CREW',
-    verify: (a: WorldState) => expect(a.generals[1]).toMatchObject({ train: 30, gold: 99900 }),
+    verify: (a: WorldState) => expect(a.generals[1]).toMatchObject({ train: 32, gold: 99900 }),
   },
   morale: {
     args: {},
@@ -99,7 +99,7 @@ Object.assign(commandCases, {
       s.generals[1]!.crew = 0;
     },
     code: 'NO_CREW',
-    verify: (a: WorldState) => expect(a.generals[1]).toMatchObject({ atmos: 30, gold: 99900 }),
+    verify: (a: WorldState) => expect(a.generals[1]).toMatchObject({ atmos: 31, gold: 99900 }),
   },
   attack: {
     args: { cityKey: 2 },
@@ -372,6 +372,7 @@ Object.assign(commandCases, {
 export function verifySuccess(key: string) {
   const test = commandCases[key]!;
   const state = commandWorld();
+  Object.assign(state.logistics!.cities['1']!, { iron: 1000, wood: 1000, horses: 1000 });
   test.prepare?.(state);
   const before = structuredClone(state);
   const result = runCommand(
@@ -390,6 +391,7 @@ export function verifySuccess(key: string) {
 export function verifyFailure(key: string) {
   const test = commandCases[key]!;
   const state = commandWorld();
+  Object.assign(state.logistics!.cities['1']!, { iron: 1000, wood: 1000, horses: 1000 });
   test.prepare?.(state);
   test.reject(state);
   const before = structuredClone(state);

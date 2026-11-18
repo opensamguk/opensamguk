@@ -142,9 +142,9 @@ describe('AC-INT-18A 실제 도시 수비병·군량·점령', () => {
     expect(state.nations[1]!.gold).toBe(world.nations[1]!.gold);
     expect(state.generals[1]!.gold).toBe(world.generals[1]!.gold);
   });
-  it('기존 기능 판에서 도시 교전을 호출하거나 자국 도시를 공격하면 거부한다', () => {
+  it('상시 제공 도시 교전은 적국만 공격할 수 있다', () => {
     const world = fixture();
-    expect(() => fightCampaignCityGarrison(world, 1, 2, 1100, testUnits, rng())).toThrow('규칙');
+    expect(() => fightCampaignCityGarrison(world, 1, 2, 1100, testUnits, rng())).not.toThrow();
     world.cities[2]!.nationId = 1;
     expect(() => fightCampaignCityGarrison(world, 1, 2, 1100, testUnits, rng())).toThrow('서로 다른');
   });

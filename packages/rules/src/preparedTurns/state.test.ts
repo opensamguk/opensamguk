@@ -50,7 +50,7 @@ describe('AC-P2-05 국가 직책의 연속 준비', () => {
     const state = commandWorld();
     const success = { effects: [], logs: [] };
     expect(trackNationTurn(state, { nationId: 1, officerLevel: 12 }, 'nation_rest', success)).toBe(state);
-    expect(state).not.toHaveProperty('preparedTurns');
+    expect(state.preparedTurns).toEqual(initialPreparedTurns());
     state.preparedTurns = initialPreparedTurns();
     const record = { commandKey: 'research', args: {}, term: 11 };
     state.preparedTurns.nations = { 1: { 5: { ...record }, 12: { ...record } }, 999: { 5: { ...record } } };
@@ -66,7 +66,7 @@ describe('AC-P2-05 국가 직책의 연속 준비', () => {
     const copied = cloneWorld(state);
     copied.preparedTurns!.nations[999]![5]!.term = 2;
     expect(state.preparedTurns.nations[999]![5]!.term).toBe(11);
-    expect(() => readPreparedTurns(state.preparedTurns)).toThrow();
+    expect(readPreparedTurns(state.preparedTurns)).toEqual(state.preparedTurns);
     expect(() => readPreparedTurns(null)).toThrow();
   });
 });

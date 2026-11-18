@@ -89,10 +89,10 @@ describe('T2-07 / AC-M2-14 교역 후보 API leaf', () => {
     );
     expect(JSON.stringify(result)).not.toMatch(/commerce|gold|rice|98765|999999/);
   });
-  it('교역 기능이 없으면 저장 행을 읽기 전에 거절한다', async () => {
+  it('AC-INT-28 별도 기능 선택 없이 교역 후보를 읽는다', async () => {
     const f = fixture();
-    await expect(f.query()).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
-    expect(f.tx.treaty.findMany).not.toHaveBeenCalled();
+    expect(await f.query()).toMatchObject({ fromCityKey: 1, blocked: null });
+    expect(f.tx.treaty.findMany).toHaveBeenCalledOnce();
   });
   it.each(['nation', 'city', 'ended'] as const)('%s 조건에서는 이유와 빈 후보를 반환한다', async (mode) => {
     const f = fixture();

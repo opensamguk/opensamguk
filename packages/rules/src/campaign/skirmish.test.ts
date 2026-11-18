@@ -3,7 +3,7 @@ import { rngFor } from '@opensamguk/shared';
 import { commandWorld, testUnits } from '../../test/commandFixture';
 import { deepFreeze } from '../personnel/testFixture';
 import { simulateBattle } from '../battle/simulate';
-import { fiveStatsBattleModifiers } from '../general/fiveStatsBattle';
+import { commanderBattleModifiers } from '../general/fiveStatsBattle';
 import { STANDARD_EQUIPMENT_CONFIG } from '../equipment/catalog';
 import { initialEquipment } from '../equipment/state';
 import { emptyCampaignState } from './state';
@@ -62,6 +62,7 @@ describe('AC-INT-09 부곡별 실제 교전·군량', () => {
     expect(result.defender).toEqual(baseline.defender);
     expect(secondRng.next()).toBe(firstRng.next());
     delete result.state.equipment;
+    delete baseline.state.equipment;
     expect(result.state).toEqual(baseline.state);
   });
   it('동일 시드로 같은 피해를 재현하며 소유자 쌀만 한 번 차감하고 장수 병력을 만들지 않는다', () => {
@@ -112,17 +113,16 @@ describe('AC-INT-09 부곡별 실제 교전·군량', () => {
     const expected = simulateBattle(
       {
         attacker: { crew: 1000, crewType: 1100, train: 80, atmos: 80 },
+        siege: true,
+        coefMode: 'multiply',
         defender: { crew: 1000, crewType: 1000, train: 100, atmos: 100 },
         attackerTech: world.nations[1]!.tech,
         defenderTech: 0,
         defence: city.defence,
         unitSet: testUnits,
-        attackerModifiers: fiveStatsBattleModifiers({
+        attackerModifiers: commanderBattleModifiers({
           leadership: 80,
           strength: 90,
-          intel: world.generals[2]!.intel,
-          politics: 60,
-          charm: 55,
         }),
       },
       rng(),

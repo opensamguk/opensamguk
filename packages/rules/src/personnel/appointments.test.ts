@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { courtOfficeTitle } from './nationRank';
 import { appointOfficer, dismissOfficer } from './appointments';
 import { APPOINTABLE_OFFICER_LEVELS } from './permissions';
 import { applied, deepFreeze, personnelWorld } from './testFixture';
@@ -7,9 +8,10 @@ import type { PersonnelState } from './types';
 describe('인사 임명·해임 순수 규칙', () => {
   it.each(APPOINTABLE_OFFICER_LEVELS)('군주는 빈 직책 %i에 소속 장수를 임명한다', (level) => {
     const before = personnelWorld();
+    before.nations[1]!.level = 7;
     before.generals[4]!.officerLevel = 1;
     const outcome = applied(appointOfficer(deepFreeze(before), 1, 3, level));
-    expect(outcome.result).toEqual({ generalId: 3, officerLevel: level, title: level === 11 ? '참모' : '수뇌' });
+    expect(outcome.result).toEqual({ generalId: 3, officerLevel: level, title: courtOfficeTitle(7, level) });
     expect(outcome.state.generals[3]!.officerLevel).toBe(level);
     expect(before.generals[3]!.officerLevel).toBe(1);
     expect(outcome.state.generals[3]).toEqual({ ...before.generals[3], officerLevel: level });
@@ -22,6 +24,7 @@ describe('인사 임명·해임 순수 규칙', () => {
 
   it('작위별 관직을 켜면 빈 자리라도 해당 작위에서 열려야 임명한다', () => {
     const state = personnelWorld();
+    state.nations[1]!.level = 7;
     state.nations[1]!.level = 1;
     state.generals[4]!.officerLevel = 1;
     expect(appointOfficer(state, 1, 3, 10)).toMatchObject({ ok: false, code: 'BAD_ARGS' });
@@ -31,6 +34,7 @@ describe('인사 임명·해임 순수 규칙', () => {
 
   it.each([0, 1, 5, 6, 7, 8, 9, 10, 11])('직책 %i는 임명·해임을 할 수 없다', (level) => {
     const state = personnelWorld();
+    state.nations[1]!.level = 7;
     state.generals[1]!.officerLevel = level;
     expect(appointOfficer(state, 1, 3, 11)).toMatchObject({ ok: false, code: 'NOT_RULER' });
     expect(dismissOfficer(state, 1, 4)).toMatchObject({ ok: false, code: 'NOT_RULER' });
@@ -65,6 +69,7 @@ describe('인사 임명·해임 순수 규칙', () => {
   ];
   it.each(invalidActors)('%s의 요청을 거부한다', (_name, prepare, code) => {
     const state = personnelWorld();
+    state.nations[1]!.level = 7;
     prepare(state);
     const snapshot = structuredClone(state);
     expect(appointOfficer(deepFreeze(state), 1, 3, 11)).toMatchObject({ ok: false, code });
@@ -80,18 +85,22 @@ describe('인사 임명·해임 순수 규칙', () => {
 
   it('자리가 차 있으면 같은 사람의 재임명도 먼저 해임하도록 거부한다', () => {
     const state = personnelWorld();
+    state.nations[1]!.level = 7;
     expect(appointOfficer(state, 1, 3, 5)).toEqual({ ok: false, code: 'BAD_STATE', message: '먼저 해임하세요' });
     expect(appointOfficer(state, 1, 4, 5)).toEqual({ ok: false, code: 'BAD_STATE', message: '먼저 해임하세요' });
   });
 
   it('다른 국가의 같은 직책은 임명을 막지 않는다', () => {
     const state = personnelWorld();
+    state.nations[1]!.level = 7;
     state.generals[2]!.officerLevel = 11;
     expect(applied(appointOfficer(state, 1, 3, 11)).state.generals[3]!.officerLevel).toBe(11);
   });
 
   it('직책을 옮기면 원래 직책을 비우고 다른 장수를 임명할 수 있다', () => {
-    const promoted = applied(appointOfficer(deepFreeze(personnelWorld()), 1, 4, 11));
+    const state = personnelWorld();
+    state.nations[1]!.level = 7;
+    const promoted = applied(appointOfficer(deepFreeze(state), 1, 4, 11));
     const next = applied(appointOfficer(deepFreeze(promoted.state), 1, 3, 5));
     expect(next.state.generals[4]!.officerLevel).toBe(11);
     expect(next.state.generals[3]!.officerLevel).toBe(5);
@@ -99,6 +108,7 @@ describe('인사 임명·해임 순수 규칙', () => {
 
   it.each(APPOINTABLE_OFFICER_LEVELS)('직책 %i를 해임하면 일반 장수로 돌아간다', (level) => {
     const state = personnelWorld();
+    state.nations[1]!.level = 7;
     state.generals[4]!.officerLevel = level;
     const outcome = applied(dismissOfficer(deepFreeze(state), 1, 4));
     expect(outcome.result).toEqual({ generalId: 4, officerLevel: 1, title: '장수' });
@@ -110,6 +120,7 @@ describe('인사 임명·해임 순수 규칙', () => {
 
   it('대상 재야 장수를 임명·해임할 수 없다', () => {
     const state = personnelWorld();
+    state.nations[1]!.level = 7;
     state.generals[3]!.nationId = null;
     expect(appointOfficer(state, 1, 3, 11)).toMatchObject({ ok: false, code: 'BAD_TARGET' });
     expect(dismissOfficer(state, 1, 3)).toMatchObject({ ok: false, code: 'BAD_TARGET' });
@@ -117,6 +128,7 @@ describe('인사 임명·해임 순수 규칙', () => {
 
   it('임명과 해임이 대기 중 제안이나 기존 명령 상태를 떨어뜨리지 않는다', () => {
     const state = personnelWorld();
+    state.nations[1]!.level = 7;
     state.assignmentOffers = {
       3: { id: '0-4-3', nationId: 1, issuerGeneralId: 4, cityKey: 4, createdTick: 0, expiresTick: 20000 },
     };

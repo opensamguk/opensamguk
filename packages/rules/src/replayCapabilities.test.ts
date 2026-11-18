@@ -164,7 +164,7 @@ describe('T4-17 / AC-P2-03 (나) B 무상태 확장 선택과 재생', () => {
       const before = structuredClone(input);
       const chosen = selectSupportedCapabilities(input, { ...config, policy: extPolicy });
       expect(chosen).toEqual({ ext: input.capabilities.ext, policy: extPolicy });
-      expect(startCapsReplay(input, chosen).state).not.toHaveProperty('ext');
+      expect(startCapsReplay(input, chosen).state.ext).toEqual(initialReplayState(input.initial).state.ext);
       expect(input).toEqual(before);
       if (!('ext' in chosen)) throw new Error('확장 선택이 아닙니다.');
       chosen.ext.preset.name = '복제 확인';

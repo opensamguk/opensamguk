@@ -35,7 +35,7 @@ describe('AC-INT-09 기존 월 정산의 부곡 연결', () => {
   it('국력은 소유 부곡 병력을 한 번 합산하며 미등장 지휘관은 제외한다', () => {
     const world = fixture();
     const baseline = structuredClone(world);
-    delete baseline.campaign;
+    baseline.campaign!.units = [];
     expect(buildYearbook(world, 191).nations[0]!.power - buildYearbook(baseline, 191).nations[0]!.power).toBe(3000);
     world.generals[4]!.activeFromYear = 200;
     expect(buildYearbook(world, 191).nations[0]!.power - buildYearbook(baseline, 191).nations[0]!.power).toBe(1000);
@@ -43,7 +43,7 @@ describe('AC-INT-09 기존 월 정산의 부곡 연결', () => {
   it('월급·세입과 기존 군량은 보존하고 새 월 유지비나 휴대 군량을 만들지 않는다', () => {
     const world = fixture();
     const legacy = structuredClone(world);
-    delete legacy.campaign;
+    legacy.campaign!.units = [];
     const source = () => rngFor('monthly-seed', 'monthly', 191, 1);
     const next = runMonthly(deepFreeze(world), 10000, source()).state;
     const original = runMonthly(deepFreeze(legacy), 10000, source()).state;

@@ -8,31 +8,39 @@ import { emptyCampaignState } from '../campaign/state';
 import { applyCampaignPreparation } from '../campaign/preparation';
 
 describe('AC-INT-15 명령 미리보기', () => {
-  it('구형 판과 알 수 없는 행위자·명령에는 새 계약을 추가하지 않는다', () => {
+  it('상시 제공 내정 점수를 계산하고 알 수 없는 행위자·명령은 거부한다', () => {
     const state = commandWorld();
-    expect(commandStatPreview(state, { generalId: 1 }, 'farm', {})).toBeNull();
+    for (const general of Object.values(state.generals)) general.crew = 0;
+    expect(commandStatPreview(state, { generalId: 1 }, 'farm', {})).toEqual({ statScore: 70, goldCost: 100 });
     expect(commandStatPreview(state, { generalId: 999 }, 'farm', {})).toBeNull();
     expect(commandStatPreview(state, { generalId: 1 }, 'rest', {})).toBeNull();
   });
 
   it('반복 미리보기는 상태를 바꾸지 않고 실제 차감·확정 훈련량과 같다', () => {
     const state = commandWorld();
-    Object.assign(state.generals[1]!, { politics: 90, charm: 70, train: 95, atmos: 80, crew: 100 });
+    for (const general of Object.values(state.generals)) general.crew = 0;
+    Object.assign(state.generals[1]!, { politics: 90, charm: 70, train: 95, atmos: 80, crew: 0 });
+    state.campaign!.units = [{ id: 1, ownerId: 1, commanderId: 1, troops: 100, crewType: 1100, train: 95, atmos: 80 }];
+    state.campaign!.nextUnitId = 2;
     const before = structuredClone(state);
     const actor = { generalId: 1, unitSet: testUnits };
     for (const key of ['farm', 'train', 'morale', 'recruit', 'conscript']) {
       const args = key === 'recruit' || key === 'conscript' ? { amount: 100, crewType: 1100 } : {};
       const preview = commandStatPreview(state, actor, key, args)!;
       expect(commandStatPreview(state, actor, key, args)).toEqual(preview);
-      const after = applyEffects(
-        state,
-        commandRegistry.get(key)!.execute(state, actor, args, createRng('preview')).effects,
-      );
+      const outcome =
+        key === 'farm'
+          ? null
+          : applyCampaignPreparation(state, actor, key as 'train' | 'morale' | 'recruit' | 'conscript', args);
+      if (outcome && !outcome.ok) throw new Error(outcome.message);
+      const after = outcome?.ok
+        ? outcome.state
+        : applyEffects(state, commandRegistry.get(key)!.execute(state, actor, args, createRng('preview')).effects);
       expect(state.generals[1]!.gold - after.generals[1]!.gold).toBe(preview.goldCost);
       if (key === 'farm') expect(preview).toHaveProperty('statScore', 90);
       if (key === 'train' || key === 'morale') {
         const stat = key === 'train' ? 'train' : 'atmos';
-        expect(after.generals[1]![stat] - state.generals[1]![stat]).toBe(preview.gain);
+        expect(after.campaign!.units[0]![stat] - state.campaign!.units[0]![stat]).toBe(preview.gain);
       }
     }
     expect(state).toEqual(before);
@@ -40,6 +48,7 @@ describe('AC-INT-15 명령 미리보기', () => {
 
   it('잘못된 모병 인자·부대에는 비용을 꾸며 내지 않는다', () => {
     const state = commandWorld();
+    for (const general of Object.values(state.generals)) general.crew = 0;
     Object.assign(state.generals[1]!, { politics: 50, charm: 50 });
     for (const args of [{}, { amount: -1, crewType: 1100 }, { amount: 10, crewType: 1000 }])
       expect(commandStatPreview(state, { generalId: 1, unitSet: testUnits }, 'recruit', args)).toBeNull();
@@ -47,6 +56,7 @@ describe('AC-INT-15 명령 미리보기', () => {
 
   it('부곡 미리보기는 실제 부장과 해당 부곡의 훈련·사기를 쓰고 비용은 소유자에게 계산한다', () => {
     const state = commandWorld();
+    for (const general of Object.values(state.generals)) general.crew = 0;
     for (const general of Object.values(state.generals)) Object.assign(general, { politics: 50, charm: 50, crew: 0 });
     Object.assign(state.generals[1]!, { leadership: 25, charm: 20, train: 0, atmos: 0 });
     Object.assign(state.generals[4]!, { nationId: 1, cityKey: 1, leadership: 100, charm: 100 });

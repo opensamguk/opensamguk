@@ -1,4 +1,4 @@
-import { providedRuleKeys } from '@opensamguk/rules';
+import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { execFileSync } from 'node:child_process';
 import { afterAll, expect, it, onTestFailed } from 'vitest';
 import { createDb } from '../packages/db/src/index';

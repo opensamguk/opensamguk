@@ -48,8 +48,8 @@ for (const enabled of [false, true]) {
     const random = () => rngFor('int22-adapter', Number(enabled), path);
     const reference = random(),
       actual = random();
-    const expected = simulateBattle({ ...input, coefMode: enabled ? 'multiply' : 'divide' }, reference);
-    expect(expected).not.toEqual(simulateBattle({ ...input, coefMode: enabled ? 'divide' : 'multiply' }, random()));
+    const expected = simulateBattle({ ...input, coefMode: 'multiply' }, reference);
+    expect(expected).not.toEqual(simulateBattle({ ...input, coefMode: 'divide' }, random()));
     if (path === 'general' || path === 'wall') {
       Object.assign(world.generals[1]!, attacker);
       if (!wall) Object.assign(world.generals[2]!, defender);

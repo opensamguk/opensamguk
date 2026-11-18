@@ -12,6 +12,8 @@ import {
   type WorldState,
 } from '../packages/rules/src/index';
 import { STRATAGEM } from '../packages/rules/src/commands/ext/stratagem/base';
+import { initialEquipment } from '../packages/rules/src/equipment/state';
+import { STANDARD_EQUIPMENT_CONFIG } from '../packages/rules/src/equipment/catalog';
 
 const keys = ['sabotage', 'incite', 'plunder'] as const;
 const cases = ['success', 'badTargetOwnCity', 'probabilityMiss'] as const;
@@ -103,6 +105,7 @@ for (const key of keys)
       });
       expect(value.options).toEqual({ policy: 'none' });
       const before = toWorldState(structuredClone(value.initial));
+      before.equipment = initialEquipment(STANDARD_EQUIPMENT_CONFIG);
       const snapshot = structuredClone(before);
       const turn = runGeneralTurn(
         before,
@@ -116,7 +119,7 @@ for (const key of keys)
       expect(turn.commandKey).toBe(key);
       expect(turn.nation).toBeUndefined();
       expect(turn.result).toEqual(value.expected.result);
-      expect(turn.state).toEqual(value.expected.afterRuleTurnState);
+      expect(turn.state).toEqual({ ...value.expected.afterRuleTurnState, equipment: before.equipment });
       expect(Object.hasOwn(turn.state, 'ext')).toBe(false);
       if (name === 'badTargetOwnCity') {
         expect(turn.result).toMatchObject({ code: 'BAD_TARGET' });

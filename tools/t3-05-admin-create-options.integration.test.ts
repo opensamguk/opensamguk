@@ -1,4 +1,4 @@
-import { providedRuleKeys } from '@opensamguk/rules';
+import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { randomUUID } from 'node:crypto';
 import { readFile, readdir, mkdir, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -29,8 +29,8 @@ if (!['localhost', '127.0.0.1'].includes(source.hostname)) throw new Error('loop
 for (const key of source.searchParams.keys())
   if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
     throw new Error('접속 대상 인자는 쓸 수 없습니다.');
-const suffix = randomUUID().replaceAll('-', '');
-const name = 't305_create_options_' + suffix + '_test',
+const suffix = randomUUID().replaceAll('-', '').slice(0, 20);
+const name = 'opensamguk_ci_green_' + suffix + '_test',
   primaryApplicationName = 't305_create_options_admin_' + suffix;
 const target = new URL(source),
   adminUrl = new URL(source);

@@ -10,13 +10,29 @@ const firstMonthOf195 = 36 * TICKS_PER_MONTH;
 function fixture() {
   const world = commandWorld();
   world.startYear = 192;
+  world.campaign!.units = Object.values(world.generals)
+    .filter((g) => g.crew > 0 && g.nationId !== null)
+    .map((g) => ({
+      id: g.id,
+      ownerId: g.id,
+      commanderId: g.id,
+      troops: g.crew,
+      crewType: g.crewType,
+      train: g.train,
+      atmos: g.atmos,
+    }));
+  world.campaign!.nextUnitId = 4;
+  for (const general of Object.values(world.generals)) {
+    general.crew = 0;
+    general.userId = `recruitment-${general.id}`;
+  }
   world.nations[1]!.isNpc = false;
   world.commandMeta = { nextNationId: 3, offers: { 4: 1 }, lastNationRecruitmentLock: { fromYear: 195 } };
   return world;
 }
 
 function run(state: WorldState, tick: number, generalId: number, commandKey: string, args: unknown = {}) {
-  return runGeneralTurn(
+  const outcome = runGeneralTurn(
     state,
     { generalId, tick, unitSet: testUnits },
     { commandKey, args },
@@ -24,6 +40,8 @@ function run(state: WorldState, tick: number, generalId: number, commandKey: str
     {},
     resolverForRuleFeatures(state),
   );
+  if (commandKey === 'attack') expect(outcome.result, JSON.stringify(outcome.result)).not.toHaveProperty('code');
+  return outcome;
 }
 
 it('AC-P2-24 195년 전 멸망은 임관을 막지 않고 경계일에도 소급하지 않는다', () => {

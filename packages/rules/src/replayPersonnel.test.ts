@@ -7,18 +7,27 @@ import { runGeneralTurn } from './commands/turn';
 import { monthlyDate, runMonthly } from './monthly';
 import { assignGeneral } from './personnel/assignments';
 import { completePersonnelStep } from './personnel/step';
+import { ruleRegistry, settleMonthlyFeatures } from './ruleRegistry';
 import { applied, deepFreeze, personnelWorld } from './personnel/testFixture';
 import { emptyTurn } from './policy';
 import { enableReplayPolicy } from './policy/replay';
 import { initialReplayState, runReplayAction, type ReplayState } from './replay';
 
 const seed = 'replay-office-contract';
-const rest = { commandKey: 'rest', args: {} };
 const nationRest = { commandKey: 'nation_rest', args: {} };
 
+function baseReplay() {
+  const initial = commandInitial();
+  for (const general of initial.generals) general.crew = 0;
+  return initialReplayState(initial);
+}
+
 function officeReplay(): ReplayState {
-  const replay = initialReplayState(commandInitial());
+  const replay = baseReplay();
   replay.state = personnelWorld();
+  replay.state.nations[1]!.level = 7;
+  replay.residenceAnchors = { 3: 0, 4: 0 };
+  replay.policy!.lastActiveTicks = { 3: 0, 4: 0 };
   for (const general of Object.values(replay.state.generals)) general.nextTurnTick = 5000;
   replay.state.generals[4]!.nextTurnTick = 100;
   replay.state.officeTurns = { 1: { 5: Array.from({ length: 12 }, () => structuredClone(nationRest)) } };
@@ -56,7 +65,7 @@ describe('인사 재생의 순수 턴 연결', () => {
     expect(next.state.generals[3]!.gold).toBe(before.state.generals[3]!.gold + 10);
     expect(next.state.cities[1]!.agriculture).toBeGreaterThan(before.state.cities[1]!.agriculture);
     expect(next.state.generals[4]!.nextTurnTick).toBe(10100);
-    expect(next.turns[4]).toEqual([...before.turns[4]!.slice(1), policy ? emptyTurn() : rest]);
+    expect(next.turns[4]).toEqual([...before.turns[4]!.slice(1), emptyTurn()]);
     expect(next.revisions[4]).toBe(6);
     expect(next.revisions[1]).toBe(before.revisions[1]);
     expect(next.policy).toEqual(before.policy);
@@ -124,7 +133,7 @@ describe('인사 재생의 순수 턴 연결', () => {
     expect(Object.hasOwn(next.state, 'assignmentOffers')).toBe(false);
   });
 
-  it('월간 갈래는 기존 월간 결과와 offices를 보존하고 인사 마무리를 붙이지 않는다', () => {
+  it('월간 갈래는 모든 상시 규칙을 정산하고 직책 카운터를 보존하며 무효 발령을 닫는다', () => {
     const replay = officeReplay();
     replay.state = applied(assignGeneral(replay.state, 4, 3, 4, 50)).state;
     replay.state.cities[4]!.nationId = 2;
@@ -133,9 +142,16 @@ describe('인사 재생의 순수 턴 연결', () => {
     const date = monthlyDate(replay.state.startYear, TICKS_PER_MONTH);
     const expected = runMonthly(replay.state, TICKS_PER_MONTH, rngFor(seed, 'monthly', date.year, date.month));
     const next = runReplayAction(deepFreeze(replay), seed, testUnits);
-    expect(next).toEqual({ ...before, state: expected.state, monthlyTick: TICKS_PER_MONTH });
-    expect(next.offices).toBe(replay.offices);
-    expect(next.state.assignmentOffers).toEqual(before.state.assignmentOffers);
+    const settled = settleMonthlyFeatures(
+      replay,
+      { ...before, state: expected.state, monthlyTick: TICKS_PER_MONTH },
+      TICKS_PER_MONTH,
+      ruleRegistry,
+      seed,
+    ).replay;
+    expect(next).toEqual(settled);
+    expect(next.offices).toEqual(replay.offices);
+    expect(next.state.assignmentOffers).toBeUndefined();
     expect(next.state.officeTurns).toEqual(before.state.officeTurns);
     expect(replay).toEqual(before);
   });
@@ -197,12 +213,12 @@ describe('인사 재생의 순수 턴 연결', () => {
 
 describe('인사 offices 키가 없는 기존 재생', () => {
   it.each([false, true])('초기화와 턴 결과에 인사 키를 붙이지 않는다 (방침 %s)', (policy) => {
-    let replay = initialReplayState(commandInitial());
+    let replay = baseReplay();
     if (policy) replay = enableReplayPolicy(replay, 30, null);
     const next = runReplayAction(deepFreeze(replay), seed, testUnits);
     expect(Object.keys(next).sort()).toEqual(Object.keys(replay).sort());
     for (const value of [replay, next]) {
-      expect(Object.hasOwn(value, 'offices')).toBe(false);
+      expect(Object.hasOwn(value, 'offices')).toBe(true);
       expect(Object.hasOwn(value, 'personnel')).toBe(false);
       expect(Object.hasOwn(value.state, 'officeTurns')).toBe(false);
       expect(Object.hasOwn(value.state, 'assignmentOffers')).toBe(false);
@@ -210,11 +226,11 @@ describe('인사 offices 키가 없는 기존 재생', () => {
   });
 
   it('상속된 offices 값으로 인사 갈래를 켜지 않는다', () => {
-    const replay = initialReplayState(commandInitial());
+    const replay = baseReplay();
     const expected = runReplayAction(replay, seed, testUnits);
     Object.setPrototypeOf(replay, { offices: {} });
     const next = runReplayAction(replay, seed, testUnits);
     expect(next).toEqual(expected);
-    expect(Object.hasOwn(next, 'offices')).toBe(false);
+    expect(Object.hasOwn(next, 'offices')).toBe(true);
   });
 });

@@ -231,9 +231,10 @@ export const generalRouter = router({
     ctx.db.$transaction(
       async (tx) => {
         const world = await requireWorld(tx, input.worldId);
+        const statRules = statRulesSchema.parse({ stat: world.statRules }).stat;
         const creationRules = {
-          ...statRulesSchema.parse({ stat: world.statRules }).stat,
-          count: 5 as const,
+          ...statRules,
+          count: statRules.count ?? 3,
 
           generalCreationEnabled:
             effectiveWorldOptions(world.preset === null ? null : parsePreset(world.preset), world.runtimeOptions).entry

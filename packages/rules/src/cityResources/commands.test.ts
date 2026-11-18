@@ -15,6 +15,7 @@ const base = createCampaignCommandResolver(createCommandResolver(null));
 const resolver = createCityResourceCommandResolver(base);
 function fixture() {
   const world = commandWorld();
+  Object.assign(world.logistics!.cities['1']!, { iron: 3000, wood: 3000, horses: 3000 });
   for (const general of Object.values(world.generals)) Object.assign(general, { politics: 60, charm: 55, crew: 0 });
   Object.assign(world.generals[1]!, {
     userId: null,

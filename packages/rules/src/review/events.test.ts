@@ -20,8 +20,9 @@ function execute(before: WorldState, commandKey: string, generalId = 1, args: un
 }
 
 it.each(DOMESTIC_SPECS)('T3-07 AC-M3-15 실제 $key가 최대치에 닿은 경우만 내정 평판이다', (spec) => {
-  const before = commandWorld(),
-    city = before.cities[1]!;
+  const before = commandWorld();
+  Object.assign(before.logistics!.cities['1']!, { iron: 3000, wood: 3000, horses: 3000 });
+  const city = before.cities[1]!;
   if (spec.field === 'tech') before.nations[1]!.tech = BALANCE.MAX_TECH - 1;
   else city[spec.field] = (spec.field === 'trust' ? BALANCE.MAX_TRUST : city[`${spec.field}Max`]) - 1;
   const done = execute(before, spec.key);
@@ -43,7 +44,7 @@ it('T3-07 AC-M3-15 실제 교전의 승패와 점령만 세며 기존 전투·�
   const old = execute(legacy, 'attack', 1, { cityKey: 2 });
   if ('code' in done.result || 'code' in old.result) throw Error('출병 고정물 실패');
   expect(done.result.battleOutcomes).toEqual([{ winnerId: 1, loserId: 2 }]);
-  expect(old.result).not.toHaveProperty('battleOutcomes');
+  expect(old.result.battleOutcomes).toEqual(done.result.battleOutcomes);
   expect(done.result.battleAwards).toEqual(old.result.battleAwards);
   expect(done.result.logs).toEqual(old.result.logs);
   expect(done.rng.next()).toBe(old.rng.next());
@@ -162,9 +163,9 @@ it('T3-07 AC-M3-15 순수 재생에서 사건과 월단평을 같은 달에 남�
   expect(settledNew.reputation?.reviews[0]?.entries[0]).toMatchObject({ generalId: 1, score: 2 });
   const same = { ...settledNew.state };
   expect(same).toEqual(settledOld.state);
-  expect(settledOld).not.toHaveProperty('reputation');
+  expect(settledOld.reputation).toBeDefined();
   expect(settledNew.turns).toEqual(settledOld.turns);
   expect(settledNew.revisions).toEqual(settledOld.revisions);
-  expect(() => settleReplayMonth(settledNew, initial.seed, 10000)).toThrow('같은 달');
+  expect(() => settleReplayMonth(settledNew, initial.seed, 10000)).toThrow('월 정산');
   expect(() => reputationFeature.checkOrigin!({ initial, data: {} })).toThrow('빈 원장');
 });

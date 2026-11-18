@@ -57,7 +57,7 @@ it('복원할 조각 key는 정렬한 합집합이며 명령 결합을 검증한
 });
 
 it('조각이 없는 월드는 undefined만 복원하고 운영 목록은 시험 key를 거부한다', () => {
-  expect(restoreExtState(undefined)).toBeUndefined();
+  expect(() => restoreExtState(undefined)).toThrow();
   for (const input of [null, { general: [], nation: [] }, { general: ['t_free'], nation: [] }]) {
     expect(restoreExtStateWithRegistry(input, undefined, fixture())).toBeUndefined();
     for (const raw of [null, {}, [], { s_shared: { nested: [] } }])
@@ -159,14 +159,14 @@ it('중복 조각·중복 행·행 안 중복·없는 참조는 null에서도 �
     expect(() => createExtStateWithRegistry(null, commandWorld(), registry)).toThrow();
 });
 
-it('빈 ext와 미등록 조각은 초기화·복제에서 거부하고 끈 월드는 키가 없다', () => {
+it('빈 ext와 미등록 조각은 초기화·복제에서 거부하고 초기 재생은 필수 첩보 조각을 보관한다', () => {
   for (const ext of [{}, { missing: 1 }]) {
     expect(() => cloneWorld({ ...commandWorld(), ext })).toThrow();
     expect(() => toWorldState({ ...commandInitial(), ext })).toThrow();
   }
   expect(Object.hasOwn(commandInitial(), 'ext')).toBe(false);
   expect(Object.hasOwn(toWorldState(commandInitial()), 'ext')).toBe(false);
-  expect(Object.hasOwn(cloneWorld(commandWorld()), 'ext')).toBe(false);
+  expect(Object.hasOwn(cloneWorld(commandWorld()), 'ext')).toBe(true);
 });
 
 const cyclic: unknown[] = [];

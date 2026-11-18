@@ -145,7 +145,7 @@ export async function auditOwnedCreate(
   query: Query,
   receipt: OwnedCreateAudit,
 ) {
-  if (!/^t305_create_options_[a-f0-9]{32}_test$/.test(state.name))
+  if (!/^(?:t305_create_options_[a-f0-9]{32}|opensamguk_ci_green_[a-f0-9]{20})_test$/.test(state.name))
     throw new Error('자기 UUID 시험 DB 이름을 확인하세요.');
   if (!state.createSent) return;
   receipt.attempted = true;

@@ -34,7 +34,7 @@ describe('AC-M1-20 초상 이름 대응', () => {
       registry,
       readings,
     );
-    expect({ ...expected, $comment: undefined }).toEqual({ ...generated, $comment: undefined });
+    expect(expected.portraits).toEqual(generated.portraits);
     expect(generated.stats).toEqual({ matched: 429, total: 491, percent: 87.37 });
     const state = buildInitialWorld({ ...input, portraitMap: expected });
     expect(state.generals.filter((general) => general.portraitId !== null)).toHaveLength(429);

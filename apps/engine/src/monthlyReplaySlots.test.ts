@@ -1,6 +1,16 @@
 import { providedRuleKeys } from '@opensamguk/rules';
 import type { Prisma } from '@opensamguk/db';
-import { assertSlotSet, emptyTurns, isPolicyMode, toWorldState, type ReplayState } from '@opensamguk/rules';
+import {
+  assertSlotSet,
+  campaignArmyTypes,
+  emptyTurns,
+  isPolicyMode,
+  providedRuleData,
+  toWorldState,
+  type ReplayOriginV3,
+  type ReplayState,
+  type WorldInit,
+} from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { monthlyFixture } from '../test/monthlyFixture';
@@ -20,6 +30,8 @@ type General = {
 type Slot = { generalId: number; slot: number; commandKey: string; args: unknown; explicit: boolean };
 type World = {
   replayFormat: number;
+  replayOrigin: ReplayOriginV3;
+  unitSet: WorldInit['unitSet'];
 
   policyFromSequence: number | null;
   actionSequence: number;
@@ -52,6 +64,14 @@ async function fixture(count?: number) {
   ).flat();
   const world: World = {
     replayFormat: 3,
+    replayOrigin: {
+      version: 3,
+      initial,
+      initialStateHash: hashState(initial),
+      resourceHash: '',
+      featureData: providedRuleData(initial, 60),
+    },
+    unitSet: initial.unitSet,
 
     policyFromSequence: null,
     actionSequence: 10,
@@ -96,6 +116,12 @@ function previousProjection(f: Fixture): ReplayState {
     turns,
     revisions: Object.fromEntries(generals.map(({ id, turnRevision }) => [id, turnRevision])),
     monthlyTick: world.monthlyTick,
+    lineageResources: {
+      statRules: f.initial.statRules,
+      unitSet: { defaultCrewTypeId: f.initial.unitSet.defaultCrewTypeId },
+    },
+    campaignArmyTypes: campaignArmyTypes(f.initial),
+    campaignUnitSet: f.initial.unitSet,
     ...(modern
       ? {
           policy: {

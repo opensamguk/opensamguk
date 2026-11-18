@@ -1,5 +1,5 @@
 import type { Prisma } from '@opensamguk/db';
-import { toWorldState, type WorldState } from '@opensamguk/rules';
+import { initialReplayState, providedRuleData, type WorldState } from '@opensamguk/rules';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { monthlyFixture } from '../test/monthlyFixture';
 import { persistCommandState } from './commandPersistence';
@@ -7,7 +7,11 @@ import { persistEffects } from './persist';
 import { loadWorld } from './worldLoader';
 
 vi.mock('./worldLoader', () => ({ loadWorld: vi.fn() }));
-beforeEach(() => vi.clearAllMocks());
+let initial: Awaited<ReturnType<typeof monthlyFixture>>;
+beforeEach(async () => {
+  vi.clearAllMocks();
+  initial = await monthlyFixture();
+});
 
 const worldId = '00000000-0000-4000-8000-000000000001';
 const at = { sequence: 7, tick: 100 };
@@ -26,7 +30,23 @@ function transaction() {
     commandProposal: { updateMany: write('commandProposal.updateMany') },
     diplomacy: { deleteMany: write('diplomacy.deleteMany'), createMany: write('diplomacy.createMany') },
     nationTurn: { deleteMany: write('nationTurn.deleteMany'), createMany: write('nationTurn.createMany') },
-    world: { update: write('world.update') },
+    world: {
+      update: write('world.update'),
+      updateMany: vi.fn((...args: unknown[]) => {
+        calls.push({ method: 'world.updateMany', args: structuredClone(args) });
+        return { count: 1 };
+      }),
+      findUniqueOrThrow: vi.fn(async () => ({
+        unitSet: initial.unitSet,
+        replayOrigin: {
+          version: 3,
+          initial,
+          initialStateHash: '',
+          resourceHash: '',
+          featureData: providedRuleData(initial, 60),
+        },
+      })),
+    },
     removedNation: { create: write('removedNation.create') },
     publicNationEvent: { createMany: write('publicNationEvent.createMany') },
     $executeRaw: write('$executeRaw'),
@@ -36,7 +56,7 @@ function transaction() {
 }
 
 async function transition(): Promise<{ before: WorldState; after: WorldState }> {
-  const before = toWorldState(await monthlyFixture());
+  const before = initialReplayState(await monthlyFixture()).state;
   const after = structuredClone(before);
   after.generals[1]!.gold += 1;
   after.generals[1]!.nextTurnTick += 30_000;
@@ -109,7 +129,7 @@ it('같은 트랜잭션의 이전 상태를 넘기면 재조회 없이 기존과
 });
 
 it('이전 상태와 같은 결과는 조회와 행 쓰기를 모두 생략한다', async () => {
-  const before = toWorldState(await monthlyFixture());
+  const before = initialReplayState(await monthlyFixture()).state;
   const supplied = transaction();
   await persistCommandState(supplied.tx, worldId, structuredClone(before), at, before);
   expect(loadWorld).not.toHaveBeenCalled();

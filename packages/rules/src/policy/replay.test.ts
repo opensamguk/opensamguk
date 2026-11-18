@@ -49,17 +49,26 @@ it('정책 재생은 예턴 저장·방침·활동을 반영하고 활동 tick�
   initial.generals[0]!.userId = 'human';
   initial.generals[0]!.nextTurnTick = 1;
   let replay = enableReplayPolicy(initialReplayState(initial), 30, 0);
-  const applied = { sequence: 1, generalId: 1, status: 'APPLIED' as const };
+  replay.residenceAnchors = { 1: 0 };
+  const applied = { sequence: 1, tick: 0, generalId: 1, status: 'APPLIED' as const };
   replay = applyRecordedInput(replay, {
     ...applied,
+    tick: 10,
     kind: 'general.setPolicy',
     payload: { policy: 'farm' },
     result: { policy: 'farm', activeTick: 10 },
   });
-  replay = applyRecordedInput(replay, { ...applied, kind: 'general.active', payload: {}, result: { activeTick: 5 } });
+  replay = applyRecordedInput(replay, {
+    ...applied,
+    tick: 5,
+    kind: 'general.active',
+    payload: {},
+    result: { activeTick: 5 },
+  });
   expect(replay.policy!.lastActiveTicks[1]).toBe(10);
   replay = applyRecordedInput(replay, {
     ...applied,
+    tick: 11,
     kind: 'turns.set',
     payload: { revision: 0, turns: emptyQueue() },
     result: { revision: 1, activeTick: 11 },

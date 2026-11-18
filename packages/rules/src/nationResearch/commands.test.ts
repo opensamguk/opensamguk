@@ -1,3 +1,4 @@
+import { providedRuleData } from '../providedRuleData';
 import { describe, expect, it } from 'vitest';
 import type { Rng } from '@opensamguk/shared';
 import { commandInitial, commandWorld } from '../../test/commandFixture';
@@ -118,11 +119,18 @@ describe('AC-P2-06 D-077 특수 병종 연구 7종', () => {
 
   it('생성·저장·복제는 새 두 상태를 보존하며 옛 월드와 잘못된 판에는 켜지지 않는다', () => {
     const initial = commandInitial();
-    expect(initialReplayState(initial).state).not.toHaveProperty('nationResearch');
-    expect(initialReplayState(initial).state).not.toHaveProperty('preparedTurns');
+    for (const general of initial.generals) general.crew = 0;
+    expect(initialReplayState(initial).state.nationResearch).toEqual(initialNationResearch());
+    expect(initialReplayState(initial).state.preparedTurns).toEqual(initialPreparedTurns());
     for (const general of initial.generals) general.userId = null;
-    const origin = { version: 3 as const, initial, initialStateHash: 'checked', resourceHash: 'checked' };
-    expect(() => checkReplayOrigin(origin)).toThrow('연구 조건');
+    const origin = {
+      version: 3 as const,
+      initial,
+      initialStateHash: 'checked',
+      resourceHash: 'checked',
+      featureData: providedRuleData(initial, 60),
+    };
+    expect(() => checkReplayOrigin(origin)).not.toThrow();
     initial.unitSet.crewTypes[1]!.requirements = [{ kind: 'research', name: 'greatsword' }];
     expect(() => checkReplayOrigin(origin)).not.toThrow();
     const replay = initialReplayState(initial);
@@ -143,8 +151,8 @@ describe('AC-P2-06 D-077 특수 병종 연구 7종', () => {
       'repeater',
     ]);
     const old = commandWorld();
-    expect(canExecuteResearchNationCommand(old, 12, 'nation_research_greatsword')).toBe(false);
-    expect(readNationResearch(null)).toBeUndefined();
-    expect(() => readNationResearch(initialNationResearch())).toThrow();
+    expect(canExecuteResearchNationCommand(old, 12, 'nation_research_greatsword')).toBe(true);
+    expect(() => readNationResearch(null)).toThrow();
+    expect(readNationResearch(initialNationResearch())).toEqual(initialNationResearch());
   });
 });
