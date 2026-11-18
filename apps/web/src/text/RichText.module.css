@@ -1,20 +1,22 @@
-/* 이름 효과 (INT-29). 줄 높이를 거의 바꾸지 않게 아이콘은 1em 안팎으로 둔다. */
+/* 이름 효과 (INT-29). 이름 글자는 둘레 글자와 기준선을 같이 쓴다(줄 안 요소). 얼굴, 색 네모, 도시 표시는
+   한글 가운데 높이(--glyph-mid)에 가운데를 맞추고 줄 높이를 늘리지 않는다(tokens.css 규칙). */
 .general,
 .nation,
 .city {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  vertical-align: -2px;
   white-space: nowrap;
 }
-.general :global(img),
 .general > :first-child {
-  flex: none;
+  display: inline-block;
   width: 18px;
   height: 18px;
+  margin-right: 3px;
   border-radius: 50%;
   box-shadow: 0 0 0 1.5px var(--tint);
+  vertical-align: calc(var(--glyph-mid) - 9px);
+  margin-block: min(0px, calc((1em - 18px) / 2));
+}
+.general :global(img) {
+  border-radius: 50%;
 }
 .general b,
 .nation b {
@@ -25,22 +27,24 @@
   line-height: 1.15;
 }
 .nation i {
-  flex: none;
+  display: inline-block;
   width: 0.8em;
   height: 0.8em;
+  margin-right: 3px;
+  vertical-align: calc(var(--glyph-mid) - 0.4em);
   background: var(--tint);
   box-shadow:
     0 0 0 1px rgb(0 0 0 / 55%),
     inset 0 0 0 1px rgb(255 255 255 / 25%);
 }
 .city {
-  gap: 2px;
   text-decoration: underline dotted var(--tint);
   text-decoration-thickness: 2px;
   text-underline-offset: 3px;
 }
 .city svg {
-  flex: none;
+  /* 줄 맞춤은 StageIcon이 한다(--glyph-mid 규칙). */
+  margin-right: 2px;
   color: var(--tint);
 }
 .num {
@@ -59,25 +63,26 @@
   display: inline-grid;
   flex: none;
   place-items: center;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   margin-right: 4px;
-  vertical-align: -5px;
-  color: #fff8e6;
-  border: 1px solid rgb(0 0 0 / 45%);
+  /* 24px 아이콘: 한글 가운데에 맞추고 줄 높이를 늘리지 않는다(tokens.css 규칙). */
+  vertical-align: calc(var(--glyph-mid) - 12px);
+  margin-block: min(0px, calc((1em - 24px) / 2));
 }
-.war {
-  background: #8a2414;
+.kind img {
+  display: block;
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 55%));
 }
-.good {
-  background: #2f6e5e;
-}
-.bad {
-  background: #4a4033;
-}
-.state {
-  background: #a8822f;
-}
+
+/* 색조 갈래는 아이콘이 풀컬러가 되며 배경 대신 이름표로만 남긴다. */
+.war,
+.good,
+.bad,
+.state,
 .calm {
-  background: #3c5a78;
+  background: none;
 }

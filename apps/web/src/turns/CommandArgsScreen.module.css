@@ -466,3 +466,73 @@
     overflow-x: auto;
   }
 }
+
+/* 단계식 인자 창 (D-100). 지금 단계가 아닌 칸은 화면에서만 숨기고 값은 그대로 둔다. */
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  list-style: none;
+  background: #2a1d14;
+}
+.steps li[aria-current='step'] .stepButton {
+  background: linear-gradient(180deg, #c95a36, #8e2c1c);
+  color: #fff4dc;
+}
+.steps li[data-done='true'] .stepButton {
+  background: #4a3a28;
+  color: #f1dfb8;
+}
+.stepButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 1px solid #5a3a22;
+  border-radius: 0;
+  background: #3a2c20;
+  color: #c9b896;
+  font-weight: 700;
+}
+.stepNo {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  background: rgb(0 0 0 / 35%);
+  font-size: var(--text-sm);
+}
+.stepValue {
+  max-width: 14ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 400;
+  color: #ffe2a4;
+}
+.body[data-step] [data-arg-step]:not([data-arg-step-current='true']) {
+  display: none;
+}
+.stepNav {
+  display: flex;
+  gap: var(--space-2);
+}
+.nextButton {
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: 2px solid #3a2416;
+  border-radius: 0;
+  background: linear-gradient(180deg, #c95a36, #8e2c1c);
+  color: #fff4dc;
+  font-weight: 700;
+}
+.put[data-final='false'] {
+  display: none;
+}
+.put {
+  display: flex;
+  gap: var(--space-2);
+}

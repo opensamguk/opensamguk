@@ -14,7 +14,6 @@ import { NoGeneral, QueryError } from '../game/QueryState';
 import { useHome, useWorldId } from '../game/queries';
 import { CAMPAIGN_RELATIONS } from '../personnel/CampaignPanel';
 import { personnelKeys, usePersonnelApi } from '../personnel/contract';
-import { usePersonnelEnabled } from '../personnel/usePersonnelEnabled';
 import { OfferBox } from '../personnel/OfferBox';
 import { Portrait } from '../portrait/Portrait';
 import { useTRPC } from '../trpc';
@@ -35,14 +34,7 @@ export function InboxPage() {
   else if (home.isError)
     body = <QueryError error={home.error} notFound="월드를 찾을 수 없습니다" onRetry={() => void home.refetch()} />;
   else if (!home.data) body = <LoadingState />;
-  else
-    body = (
-      <Inbox
-        worldId={worldId}
-        hasNation={home.data.nation !== null}
-        campaign={Boolean(mine.data?.general && mine.data.creationRules.campaignEnabled)}
-      />
-    );
+  else body = <Inbox worldId={worldId} hasNation={home.data.nation !== null} campaign={Boolean(mine.data?.general)} />;
 
   return (
     <section className={styles.page}>
@@ -50,7 +42,6 @@ export function InboxPage() {
         <img className="pixel-art" src={messagesIcon} alt="" width={48} height={48} />
         <h1>받은 제안함</h1>
       </div>
-      <p className={styles.lead}>발령·휘하·외교 제안을 한곳에서 봅니다.</p>
       {body}
     </section>
   );
@@ -59,12 +50,10 @@ export function InboxPage() {
 export function Inbox({ worldId, hasNation, campaign }: { worldId: string; hasNation: boolean; campaign: boolean }) {
   const trpc = useTRPC();
   const api = usePersonnelApi();
-  const personnel = usePersonnelEnabled(worldId);
-  // 메인의 발령 상자와 같은 키다. 주기 조회는 상자가 한다. 인사 기능이 없는 월드는 묻지 않는다.
+  // 메인의 발령 상자와 같은 키다. 주기 조회는 상자가 한다.
   const offers = useQuery({
     queryKey: personnelKeys.offers(worldId),
     queryFn: () => api.offers({ worldId }),
-    enabled: personnel,
     retry: false,
   });
   const board = useQuery({ ...trpc.campaign.get.queryOptions({ worldId }), enabled: campaign, retry: false });
@@ -78,7 +67,7 @@ export function Inbox({ worldId, hasNation, campaign }: { worldId: string; hasNa
     retry: false,
   });
 
-  const loading = (personnel && offers.isPending) || (campaign && board.isPending) || (hasNation && treaties.isPending);
+  const loading = offers.isPending || (campaign && board.isPending) || (hasNation && treaties.isPending);
   const retinue = campaign ? retinueOffers(board.data) : [];
   const incoming = hasNation ? incomingTreaties(treaties.data) : [];
   const people = new Map(board.data?.people.map((person) => [person.id, person]) ?? []);
@@ -149,7 +138,9 @@ export function Inbox({ worldId, hasNation, campaign }: { worldId: string; hasNa
       ) : null}
 
       {loading ? <LoadingState /> : null}
-      {empty ? <EmptyState title="받은 제안이 없습니다">발령·휘하·외교 제안이 오면 여기에 모입니다.</EmptyState> : null}
+      {empty ? (
+        <EmptyState title="받은 제안이 없습니다">발령, 휘하, 외교 제안이 오면 여기에 모입니다.</EmptyState>
+      ) : null}
     </div>
   );
 }

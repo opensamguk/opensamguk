@@ -12,10 +12,10 @@ export function hasCityBranch(schema: unknown): boolean {
 }
 // 고른 갈래의 입력 schema. 도시 자원 판이 아니거나(월드 규칙을 받기 전 포함) 알 수 없는 union이면 null로 입력을 막는다.
 // 도시 수비병을 골랐는데 서버 schema에 그 갈래가 없어도 null이다.
-export function cityPreparationSchema(schema: unknown, enabled: boolean, target: PreparationTarget) {
+export function cityPreparationSchema(schema: unknown, target: PreparationTarget) {
   const variants = record(schema).anyOf;
-  if (!Array.isArray(variants)) return enabled && target === 'city' ? null : schema;
-  if (!enabled || !hasCityBranch(schema)) return null;
+  if (!Array.isArray(variants)) return target === 'city' ? null : schema;
+  if (!hasCityBranch(schema)) return null;
   const selected = variants.find((value) => {
     const properties = record(record(value).properties);
     return target === 'city' ? record(properties.target).const === 'city' : 'unitId' in properties;
@@ -31,14 +31,12 @@ export function cityPreparationSchema(schema: unknown, enabled: boolean, target:
     required: Array.isArray(branch.required) ? branch.required.filter((key) => key !== 'target') : [],
   };
 }
-export function cityPreparationNote(enabled: boolean, key: string, target: PreparationTarget): string | null {
-  if (!enabled) return null;
+export function cityPreparationNote(key: string, target: PreparationTarget): string | null {
   if (key === 'recruit' || key === 'conscript')
-    return '현재 도시의 금과 인구를 써서 도시 수비병을 모집합니다. 부곡에 직접 충원하지 않습니다. 비용과 민심은 서버 사전 검사로 확인합니다.';
+    return '현재 도시의 금과 인구를 써서 도시 수비병을 모집합니다. 부곡에 직접 충원하지 않습니다. 비용과 민심은 사전 검사에서 확인합니다.';
   if (key === 'train' || key === 'morale')
     return target === 'city'
       ? '현재 도시의 금을 써서 고른 병종의 도시 수비병을 준비합니다. 개인 예약 한 칸을 씁니다.'
       : '기존 부곡을 준비하며 개인 금을 씁니다. 도시 금과 수비병은 바꾸지 않습니다.';
-  if (key === 'form_unit') return '병력이 없는 부곡을 편성합니다. 도시 병력 배속은 권한자가 별도로 처리합니다.';
   return null;
 }

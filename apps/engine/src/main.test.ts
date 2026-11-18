@@ -9,8 +9,9 @@ describe('엔진 오류 출력', () => {
 
   it('DB 오류에 포함된 연결 정보는 출력하지 않는다', () => {
     const sensitive = 'postgresql://example:private@db.invalid/game';
-    expect(engineFailureMessage(new Error(sensitive))).toBe(
-      '[engine] 실행 실패. 월드 ID·DB 연결·migration·실행권을 확인하세요.',
-    );
+    const message = engineFailureMessage(new Error(sensitive));
+    expect(message).toContain('실행 실패');
+    expect(message).toContain('Error');
+    expect(message).not.toContain(sensitive);
   });
 });

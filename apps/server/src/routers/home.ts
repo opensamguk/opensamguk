@@ -1,7 +1,7 @@
 import { protectedProcedure, router } from '../trpc';
 import { nextTurnAt, turnSchedule, readWorld, requireGeneral, worldClock, worldInput } from '../queries';
 import { cityInfo, ownGeneralInfo, logInfo, logSelect, nationInfo } from '../visibility';
-import { nowTick, policyOptions, courtOfficeTitle } from '@opensamguk/rules';
+import { nowTick, policyOptions, courtOfficeTitle, cityLandInfo } from '@opensamguk/rules';
 import { displaySlots, readSlots } from '../game/slots';
 import { readCityScaleProjection } from '../game/cityScale';
 import { nationPopulation, projectNationFinance, salaryRate } from '../game/nationFinance';
@@ -99,6 +99,10 @@ export const homeRouter = router({
                 salaryRate,
                 ...(finance ? { financeEstimate: finance.financeEstimate } : {}),
               },
+        land:
+          city && general.nationId !== null && city.nationId === general.nationId
+            ? cityLandInfo(state, city.cityKey, { generalId: general.id })
+            : null,
         nextTurnAt: nextTurnAt(world, general.nextTurnTick),
         turnSchedule: turnSchedule(world, general.nextTurnTick),
         turnsPreview: Array.from({ length: 5 }, (_, slot) => ({ slot, ...turns[slot]! })),

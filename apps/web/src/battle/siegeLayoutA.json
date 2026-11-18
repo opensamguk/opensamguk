@@ -1,0 +1,212 @@
+{
+  "canvas": [1600, 900],
+  "grid": 12,
+  "layers": [
+    {
+      "file": "ground.png",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "file": "sky-<weather>.png",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "file": "<m>-wall-left.png",
+      "x": 0,
+      "y": 120
+    },
+    {
+      "file": "<m>-corner.png",
+      "x": 720,
+      "y": 120
+    },
+    {
+      "file": "<m>-wall-right.png",
+      "x": 816,
+      "y": 120
+    },
+    {
+      "file": "pavilion.png",
+      "x": 252,
+      "y": 72
+    },
+    {
+      "file": "corner-tower.png",
+      "x": 660,
+      "y": 192
+    },
+    {
+      "file": "<m>-gate-<gate>.png",
+      "x": 1116,
+      "y": 408
+    },
+    {
+      "file": "<m>-damage-left-<damage>.png",
+      "x": 84,
+      "y": 300,
+      "when": "damage"
+    },
+    {
+      "file": "<m>-damage-right-<damage>.png",
+      "x": 1308,
+      "y": 240,
+      "when": "damage"
+    },
+    {
+      "file": "defenders.png",
+      "points": "wall_top",
+      "anchor": "bottom_center",
+      "scale": 0.85
+    },
+    {
+      "file": "<m>-walk-1.png",
+      "x": 0,
+      "y": 192
+    },
+    {
+      "file": "<m>-walk-2.png",
+      "x": 720,
+      "y": 336
+    },
+    {
+      "file": "<m>-walk-3.png",
+      "x": 816,
+      "y": 192
+    },
+    {
+      "file": "@ground_objects"
+    }
+  ],
+  "gate": {
+    "x": 1116,
+    "y": 408
+  },
+  "damage_left": [
+    {
+      "x": 84,
+      "y": 300
+    }
+  ],
+  "damage_right": [
+    {
+      "x": 1308,
+      "y": 240
+    }
+  ],
+  "wall_top": [
+    [120, 276],
+    [360, 336],
+    [552, 384],
+    [936, 396],
+    [1068, 360],
+    [1428, 288]
+  ],
+  "gate_front": [1248, 708],
+  "ladder": [
+    [492, 684],
+    [1032, 792]
+  ],
+  "ladder_scale": [1.1, 1.14],
+  "attack_zone": [
+    [168, 660],
+    [324, 756],
+    [636, 840],
+    [1440, 696],
+    [1368, 816]
+  ],
+  "catapult": [[888, 864]],
+  "scale_by_y": [
+    [360, 0.5],
+    [600, 0.75],
+    [720, 0.9],
+    [900, 1.15]
+  ],
+  "wall_ranges": [
+    [0, 720],
+    [720, 816],
+    [816, 1600]
+  ],
+  "sizes": {
+    "attackers-1": [135, 84],
+    "attackers-2": [125, 84],
+    "attackers-3": [146, 102],
+    "brick-corner": [96, 780],
+    "brick-damage-left-1": [216, 432],
+    "brick-damage-left-2": [216, 432],
+    "brick-damage-left-3": [216, 432],
+    "brick-damage-left-4": [216, 432],
+    "brick-damage-left-5": [216, 432],
+    "brick-damage-left-6": [216, 432],
+    "brick-damage-right-1": [216, 432],
+    "brick-damage-right-2": [216, 432],
+    "brick-damage-right-3": [216, 432],
+    "brick-damage-right-4": [216, 432],
+    "brick-damage-right-5": [216, 432],
+    "brick-damage-right-6": [216, 432],
+    "brick-gate-0": [144, 216],
+    "brick-gate-1": [144, 216],
+    "brick-gate-2": [144, 216],
+    "brick-walk-1": [720, 288],
+    "brick-walk-2": [96, 168],
+    "brick-walk-3": [784, 288],
+    "brick-wall-left": [720, 780],
+    "brick-wall-right": [784, 780],
+    "corner-tower": [164, 216],
+    "defenders": [138, 48],
+    "earth-corner": [96, 780],
+    "earth-damage-left-1": [216, 432],
+    "earth-damage-left-2": [216, 432],
+    "earth-damage-left-3": [216, 432],
+    "earth-damage-left-4": [216, 432],
+    "earth-damage-left-5": [216, 432],
+    "earth-damage-left-6": [216, 432],
+    "earth-damage-right-1": [216, 432],
+    "earth-damage-right-2": [216, 432],
+    "earth-damage-right-3": [216, 432],
+    "earth-damage-right-4": [216, 432],
+    "earth-damage-right-5": [216, 432],
+    "earth-damage-right-6": [216, 432],
+    "earth-gate-0": [144, 216],
+    "earth-gate-1": [144, 216],
+    "earth-gate-2": [144, 216],
+    "earth-walk-1": [720, 288],
+    "earth-walk-2": [96, 168],
+    "earth-walk-3": [784, 288],
+    "earth-wall-left": [720, 780],
+    "earth-wall-right": [784, 780],
+    "engines-catapult": [155, 120],
+    "engines-ladder": [250, 324],
+    "engines-ram": [174, 132],
+    "ground": [1600, 900],
+    "pavilion": [305, 240],
+    "sky-clear": [1600, 120],
+    "sky-cloud": [1600, 120],
+    "sky-rain": [1600, 120],
+    "sky-snow": [1600, 120],
+    "stone-corner": [96, 780],
+    "stone-damage-left-1": [216, 432],
+    "stone-damage-left-2": [216, 432],
+    "stone-damage-left-3": [216, 432],
+    "stone-damage-left-4": [216, 432],
+    "stone-damage-left-5": [216, 432],
+    "stone-damage-left-6": [216, 432],
+    "stone-damage-right-1": [216, 432],
+    "stone-damage-right-2": [216, 432],
+    "stone-damage-right-3": [216, 432],
+    "stone-damage-right-4": [216, 432],
+    "stone-damage-right-5": [216, 432],
+    "stone-damage-right-6": [216, 432],
+    "stone-gate-0": [144, 216],
+    "stone-gate-1": [144, 216],
+    "stone-gate-2": [144, 216],
+    "stone-walk-1": [720, 288],
+    "stone-walk-2": [96, 168],
+    "stone-walk-3": [784, 288],
+    "stone-wall-left": [720, 780],
+    "stone-wall-right": [784, 780]
+  },
+  "_doc": "Codex siegeA/layout.json에 공개 그림 크기(sizes)를 더했다. layers는 아래부터 그린다. points 층은 바닥 중앙 기준이다. 왼쪽 사다리는 성벽 면 쪽으로 기울게 뒤집고(ladder_flip), 손상 얼룩은 사다리와 겹치지 않는 자리로 옮겼다(사용자 2026-11-15 \"왼쪽 사다리는 좌우를 뒤집어야지\", \"사다리 때문에 성벽이 무너질리는 없거\").",
+  "ladder_flip": [true, false]
+}

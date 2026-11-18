@@ -14,13 +14,10 @@ import sys
 import numpy as np
 from PIL import Image
 
-src, out = sys.argv[1], sys.argv[2]
-names = sys.argv[3:] or [f[:-4] for f in os.listdir(src) if f.endswith('.png') and f != 'contact.png']
-os.makedirs(out, exist_ok=True)
-meta_path = os.path.join(out, 'sprites.json')
-meta = json.load(open(meta_path)) if os.path.exists(meta_path) else {}
-for name in names:
-    im = np.asarray(Image.open(os.path.join(src, f'{name}.png')).convert('RGB')).astype(np.float64)
+
+def key(path):
+    """마젠타 배경 그림 한 장을 투명 정사각 그림과 기준 정보(size·anchor·basePx)로 바꾼다. 불투명 영역이 없으면 None."""
+    im = np.asarray(Image.open(path).convert('RGB')).astype(np.float64)
     r, g, b = im[..., 0], im[..., 1], im[..., 2]
     # 마젠타스러움: 빨강·파랑이 초록보다 얼마나 높은가.
     mag = np.clip((np.minimum(r, b) - g) / 255.0, 0, 1)
@@ -33,25 +30,41 @@ for name in names:
     rgb = np.clip(rgb, 0, 255)
     ys, xs = np.nonzero(alpha > 0.5)
     if not len(xs):
-        print(name, '불투명 영역 없음')
-        continue
+        return None
     x0, x1, y0, y1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
     base = x1 - x0
     side = int(max(base, y1 - y0) * 1.04) + 2
     canvas = np.zeros((side, side, 4), np.uint8)
     ox = (side - base) // 2 - x0
     oy = side - 1 - y1 + 1 - 2
-    crop_rgb = rgb[y0:y1, x0:x1]
-    crop_a = alpha[y0:y1, x0:x1]
-    canvas[y0 + oy:y1 + oy, x0 + ox:x1 + ox, :3] = crop_rgb.astype(np.uint8)
-    canvas[y0 + oy:y1 + oy, x0 + ox:x1 + ox, 3] = (crop_a * 255).astype(np.uint8)
-    Image.fromarray(canvas, 'RGBA').save(os.path.join(out, f'{name}.png'), optimize=True)
+    canvas[y0 + oy:y1 + oy, x0 + ox:x1 + ox, :3] = rgb[y0:y1, x0:x1].astype(np.uint8)
+    canvas[y0 + oy:y1 + oy, x0 + ox:x1 + ox, 3] = (alpha[y0:y1, x0:x1] * 255).astype(np.uint8)
     bottom = y1 + oy
     thickness = base * 0.035
-    meta[name] = {
+    meta = {
         'size': side,
         'anchor': [round(side / 2, 1), round(bottom - base / 4 - thickness, 1)],
         'basePx': int(base),
     }
-    print(name, meta[name])
-json.dump(meta, open(meta_path, 'w'), indent=1)
+    return Image.fromarray(canvas, 'RGBA'), meta
+
+
+def main():
+    src, out = sys.argv[1], sys.argv[2]
+    names = sys.argv[3:] or [f[:-4] for f in os.listdir(src) if f.endswith('.png') and f != 'contact.png']
+    os.makedirs(out, exist_ok=True)
+    meta_path = os.path.join(out, 'sprites.json')
+    meta = json.load(open(meta_path)) if os.path.exists(meta_path) else {}
+    for name in names:
+        result = key(os.path.join(src, f'{name}.png'))
+        if result is None:
+            print(name, '불투명 영역 없음')
+            continue
+        im, meta[name] = result
+        im.save(os.path.join(out, f'{name}.png'), optimize=True)
+        print(name, meta[name])
+    json.dump(meta, open(meta_path, 'w'), indent=1)
+
+
+if __name__ == '__main__':
+    main()

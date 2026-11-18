@@ -1,0 +1,100 @@
+/* 중원 정세 띠: 화면 아래에 붙는 키트 아래 띠(kit-bar-bottom). 한 줄로 흐르고, 펼치면 여러 줄 목록. */
+.bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  font-size: var(--text-sm);
+  box-shadow: 0 -6px 18px rgb(0 0 0 / 35%);
+}
+.open {
+  flex-direction: column;
+  align-items: stretch;
+  padding: var(--space-2) var(--space-3);
+}
+.head {
+  flex: none;
+  font-weight: 800;
+  color: #ffd77a;
+  white-space: nowrap;
+}
+.note {
+  font-size: var(--text-sm);
+  color: #cdb68a;
+}
+.toggle {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.toggleText {
+  padding: 1px 6px;
+  font-size: var(--text-xs);
+  color: #1a120a;
+  background: #c9a35a;
+}
+.track {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);
+}
+.run {
+  display: inline-flex;
+  gap: var(--space-5);
+  white-space: nowrap;
+  animation: ticker-run 60s linear infinite;
+}
+.track:hover .run,
+.track:focus-within .run {
+  animation-play-state: paused;
+}
+.repeat {
+  display: inline-flex;
+  gap: var(--space-5);
+}
+.item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-sm);
+}
+.date {
+  color: #cdb68a;
+}
+.list {
+  display: grid;
+  gap: 4px;
+  max-height: 40vh;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+@keyframes ticker-run {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .run {
+    animation: none;
+  }
+  .repeat {
+    display: none;
+  }
+}

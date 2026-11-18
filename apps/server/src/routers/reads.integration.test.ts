@@ -191,6 +191,8 @@ beforeAll(async () => {
   await db.world.deleteMany();
   await db.user.deleteMany();
   state = await readFixture();
+  // 조회 공개 범위 검사는 생성 기록과 별도로 병력이 있는 상태를 직접 저장한다.
+  state.generals = state.generals.map((general, index) => ({ ...general, crew: 13001 + index }));
   for (let index = 0; index < 4; index++) {
     const session = newSession(now);
     const user = await db.user.create({

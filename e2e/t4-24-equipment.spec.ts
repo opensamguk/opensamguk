@@ -11,7 +11,7 @@ import { TEST_EQUIPMENT_LOGISTICS_CONFIG } from '../packages/rules/src/equipment
 import { newSession } from '../apps/server/src/auth/session';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { test, expect, type LegalStack } from './legalFixture';
 
@@ -88,6 +88,7 @@ test('T4-24 장비 카드 예약·실제 매매·100 초과 표시와 세 화면
   const initial = buildInitialWorld(input),
     payload = {
       name: '장비화면',
+      sex: 'MALE' as const,
       leadership: 40,
       strength: 90,
       intel: 40,
@@ -117,27 +118,14 @@ test('T4-24 장비 카드 예약·실제 매매·100 초과 표시와 세 화면
     }
   }
   expect(selected).toBe(true);
-  const features = [
-    'campaign-assignment-v2',
-    'campaign-v1',
-    'city-resources-v1',
-    'equipment-v1',
-    'five-stats',
-    'logistics-v1',
-    'operational-map',
-    'personnel',
-    'policy',
-  ].sort();
-  initial.ruleFeatures = features;
   const logistics = structuredClone(TEST_EQUIPMENT_LOGISTICS_CONFIG);
   logistics.capacity.base = 10000;
   logistics.specialties = [{ cityKey: 3, good: 'iron', perMonth: 500 }];
-  const { worldId } = await saveInitialWorld(stack.db, initial, {
+  const { worldId } = await saveFixtureWorld(stack.db, initial, {
     name: '장비 화면 검증',
     turnTermMinutes: 60,
     endYear: null,
     replayFormat: 3,
-    ruleFeatures: features,
     featureData: { 'logistics-v1': logistics, 'equipment-v1': STANDARD_EQUIPMENT_CONFIG },
   });
   const advance = async (tick: number) => {

@@ -16,7 +16,7 @@ export const heritageFeature: RuleFeatureDefinition = {
       if (input.kind !== 'general.create' || input.status !== 'APPLIED') continue;
       const checked = validateGeneralCreation(input.payload, origin.initial.statRules, true, true);
       if (!checked.ok) throw new Error('유산 생성 입력의 능력치·배분을 확인하세요.');
-      assertHeritageCreationResult(checked.value, input.result, true, true);
+      assertHeritageCreationResult(checked.value, input.result, true, origin.initial.statRules.count === 5);
     }
   },
 };

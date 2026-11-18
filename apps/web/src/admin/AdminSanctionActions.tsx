@@ -85,7 +85,7 @@ export function AdminSanctionActions({
     enableBeforeUnload: command !== null,
     shouldBlockFn: ({ next }) => {
       if (['/login', '/verify-email', '/legal/agree'].includes(next.pathname)) return false;
-      setError('제재 처리 결과를 먼저 확인하세요. 같은 요청 다시 확인으로 이어갈 수 있습니다.');
+      setError('제재 처리 결과를 먼저 확인하세요. 같은 요청 다시 확인을 눌러 주세요.');
       return true;
     },
   });
@@ -140,7 +140,7 @@ export function AdminSanctionActions({
         return;
       }
       if (own !== generation.current) {
-        setError('처리 결과를 다시 확인하세요. 같은 요청 다시 확인으로 이어갈 수 있습니다.');
+        setError('처리 결과를 다시 확인하세요. 같은 요청 다시 확인을 눌러 주세요.');
         return;
       }
       release();
@@ -175,7 +175,7 @@ export function AdminSanctionActions({
     if (!target || command || busy.current) return;
     const trimmed = reason.trim();
     if (!confirmed || !trimmed || trimmed.length > 200) {
-      setError('대상·범위와 사유를 확인하고 확인란을 선택하세요.');
+      setError('대상, 범위, 사유를 확인하고 확인란을 선택하세요.');
       return;
     }
     let value: Command;
@@ -358,7 +358,7 @@ export function AdminSanctionActions({
                 disabled={locked}
                 onChange={(event) => setConfirmed(event.target.checked)}
               />
-              대상·범위·사유와 조치를 확인했습니다.
+              대상, 범위, 사유와 조치를 확인했습니다.
             </label>
             <button
               type="submit"

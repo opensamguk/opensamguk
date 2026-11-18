@@ -585,7 +585,7 @@ test('장수 생성 API로 만든 재야 장수는 메인에서 바로 재야 �
   const name = `E${String(Date.now() % 100_000).padStart(5, '0')}`;
   // 서버는 /trpc POST에 화면과 같은 출처의 Origin을 요구한다 (T3-04). page.request는 Origin을 붙이지 않는다.
   const created = await page.request.post('/trpc/general.create', {
-    data: { worldId: ctx.worldId, name, leadership: 55, strength: 55, intel: 55, portraitId: null },
+    data: { worldId: ctx.worldId, name, sex: 'MALE', leadership: 55, strength: 55, intel: 55, portraitId: null },
     headers: { Origin: appOrigin() },
   });
   expect(created.ok()).toBe(true);

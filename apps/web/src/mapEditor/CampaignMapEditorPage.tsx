@@ -169,7 +169,7 @@ export function CampaignMapEditorPage() {
   };
   const addRoute = () => {
     if (from === to || !map.sites.some((s) => s.id === from) || !map.sites.some((s) => s.id === to)) {
-      setError('서로 다른 출발·도착 거점을 고르세요.');
+      setError('출발과 도착 거점을 서로 다르게 고르세요.');
       return;
     }
     const id = nextId('route', map.routes);
@@ -235,8 +235,8 @@ export function CampaignMapEditorPage() {
         </div>
       </header>
       <p className={styles.notice}>
-        파일 편집용 개발 화면입니다. 실제 지리 데이터는 Natural Earth v5.1.2이며 운영 DB에 저장하지 않습니다. 거점은
-        게임에 맞게 편집할 수 있습니다. 초기 경로는 비어 있습니다.
+        파일 편집용 개발 화면입니다. 지리 데이터는 Natural Earth v5.1.2이며 운영 DB에 저장하지 않습니다. 초기 경로는
+        비어 있습니다.
       </p>
       {error && (
         <p role="alert" className={styles.error}>
@@ -255,7 +255,7 @@ export function CampaignMapEditorPage() {
                   setPoints([]);
                 }}
               >
-                <option value="select">선택·이동</option>
+                <option value="select">선택과 이동</option>
                 <option value="site">거점 추가</option>
                 <option value="terrain">지형 그리기</option>
                 <option value="place">선택 거점 배치</option>
@@ -342,10 +342,7 @@ export function CampaignMapEditorPage() {
             <input type="checkbox" checked={showRelief} onChange={(e) => setShowRelief(e.target.checked)} />
             실제 지형 음영
           </label>
-          <p className={styles.help}>
-            Natural Earth 실제 지형 · WGS84. 거점 배치는 게임에 맞게 편집할 수 있습니다. 모든 거점을 같은 방식으로
-            표시합니다.
-          </p>
+          <p className={styles.help}>Natural Earth 실제 지형 · WGS84</p>
           <svg
             ref={svgRef}
             className={styles.canvas}
@@ -407,7 +404,7 @@ export function CampaignMapEditorPage() {
               }
             }}
           >
-            <title>통합 지도 초안. 목록과 좌표 입력으로도 편집할 수 있습니다.</title>
+            <title>통합 지도 초안. 목록과 좌표 입력으로도 편집합니다.</title>
             <defs>
               <marker
                 id="campaign-arrow"
@@ -775,9 +772,7 @@ export function CampaignMapEditorPage() {
               </button>
             )}
             {site?.kind === 'CITY' && (
-              <p className={styles.help}>
-                도시 삭제 시 소속 항구와 연결 경로도 지웁니다. 되돌리기로 복구할 수 있습니다.
-              </p>
+              <p className={styles.help}>도시 삭제 시 소속 항구와 연결 경로도 지웁니다. 되돌리기로 복구합니다.</p>
             )}
           </section>
           <section>
@@ -805,8 +800,7 @@ export function CampaignMapEditorPage() {
                 : '이 조건으로 이동할 경로가 없습니다.'}
             </p>
             <p className={styles.help}>
-              연결 확인용입니다. 실제 이동은 main의 기존 이동 규칙을 유지합니다. 이동 기간·속도·거리 비용은 계산하지
-              않습니다.
+              연결 확인용입니다. 실제 이동은 기존 이동 규칙을 따릅니다. 이동 기간, 속도, 거리 비용은 계산하지 않습니다.
             </p>
           </section>
           <section>

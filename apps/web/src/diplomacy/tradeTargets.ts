@@ -9,7 +9,7 @@ import { TRADE_COMMAND_KEY } from './contract';
 // 기능이 없는 월드에 남은 편집기는 빈 후보와 이유를 표시한다.
 export const TRADE_UNSUPPORTED: CityChoices = {
   options: [],
-  note: '교역 조항을 아직 지원하지 않아 교역할 도시를 고를 수 없습니다.',
+  note: '이 월드는 교역 조항을 쓰지 않아 교역할 도시를 고를 수 없습니다.',
 };
 
 // 후보와 거부 이유는 서버가 계산한다. 목록에 교역이 있을 때만 조회한다.

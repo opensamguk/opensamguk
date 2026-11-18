@@ -1,6 +1,7 @@
 import { useId, useState, type ReactNode } from 'react';
 import { useNarrowTable } from './useNarrowTable';
 import styles from './DataTable.module.css';
+import frame from './kitFrame.module.css';
 
 export interface Column<T> {
   key: string;
@@ -15,6 +16,7 @@ export interface Column<T> {
 type Sort = { key: string; dir: 'asc' | 'desc' } | null;
 
 // 정렬 가능한 표. 숫자 열은 오른쪽 정렬·고정폭이며 머리글을 누르면 정렬이 바뀐다 (T1-16 결정).
+// 머리 줄은 키트 표 머리, 몸 줄은 키트 표 줄(짝과 홀이 다른 그림)로 그린다 (INT-29 화면 개편 초안).
 export function DataTable<T>({
   rows,
   columns,
@@ -69,6 +71,8 @@ export function DataTable<T>({
           </select>
           <button
             type="button"
+            className="kit-button"
+            data-kind="secondary"
             disabled={!column}
             onClick={() => column && toggle(column.key, Boolean(column.numeric))}
             aria-label={`${caption ?? '표'} 정렬 방향 ${direction}, 바꾸기`}
@@ -79,8 +83,8 @@ export function DataTable<T>({
       ) : null}
       <table className={styles.table}>
         {caption ? <caption className={styles.caption}>{caption}</caption> : null}
-        <thead>
-          <tr>
+        <thead className={frame.head}>
+          <tr className="kit-thead">
             {visible.map((c) => {
               const active = sort?.key === c.key;
               return (
@@ -105,9 +109,9 @@ export function DataTable<T>({
             })}
           </tr>
         </thead>
-        <tbody>
+        <tbody className={frame.body}>
           {sorted.map((row) => (
-            <tr key={rowKey(row)} aria-label={rowLabel?.(row)}>
+            <tr key={rowKey(row)} className="kit-row" aria-label={rowLabel?.(row)}>
               {visible.map((c, i) => (
                 <td key={c.key} className={c.numeric ? 'num' : undefined} title={c.title?.(row)}>
                   {c.render(row)}

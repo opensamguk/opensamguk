@@ -176,7 +176,7 @@ function CreateForm({ worldId, nationId }: { worldId: string; nationId: number }
   const blocked = create.isPending
     ? '만드는 중입니다.'
     : input === null
-      ? '목표 도시, 목표 연월(월은 1~12), 기준 병력·훈련·사기, 참여 장수를 모두 채우세요.'
+      ? '목표 도시, 목표 연월(월은 1~12), 기준 병력, 기준 훈련, 기준 사기, 참여 장수를 모두 채우세요.'
       : null;
 
   return (

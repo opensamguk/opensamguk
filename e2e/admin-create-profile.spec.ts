@@ -8,39 +8,16 @@ import { initializeSan10Resources } from '../tools/san10-resources';
 import { initializeExpandedResources } from '../tools/expanded-resources';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { hashState } from '../packages/shared/src/node/hashState';
-import { creationFeatures } from '../apps/server/src/admin/worldCreateOptions';
-import { defaultOfficeEffects, OFFICE_EFFECTS_FEATURE } from '../packages/rules/src/index';
+import { defaultOfficeEffects } from '../packages/rules/src/index';
 import type { CreateInput, CreateOptions, CreateReply } from '../apps/web/src/admin/adminCreateModel';
 import type { WorldMap } from '../apps/web/src/game/types';
 
 // AC-M3-04/AC-INT-04: 관리자 화면 선택→접수→원생성→지도 연결만 검사한다.
 // 인접 san10-map의 월 정산·재생·도로·기수 인수와 기존 legacy12의 인수 주장을 대신하지 않는다.
 // AC-P2-23: san10-191-expanded(expanded-191-v4)도 같은 실제 선택→접수→원생성→지도 경로로 검사한다.
-// AC-P2-08·09: san10-191-lifecycle(expanded-191-v5)도 같은 경로로 검사한다. v4 선택과 19기능 단언은 그대로 둔다.
+// AC-P2-08·09: san10-191-lifecycle(expanded-191-v5)도 같은 경로로 검사한다. 모든 규칙이 늘 켜져 있어 규칙 목록은 단언하지 않는다.
 test.describe.configure({ mode: 'serial' });
-type FeatureProfileSource = { key: string; ruleFeatures: string[]; featureData: Record<string, unknown> };
-// resources/feature-profile/expanded-191-v4.json의 ruleFeatures 정확 목록(19개). 아래에서 파일 원문과도 대조한다.
-const v4Features = [
-  'battle-affinity-v2',
-  'campaign-assignment-v2',
-  'campaign-v1',
-  'city-resources-v1',
-  'city-scale-v1',
-  'equipment-v1',
-  'five-stats',
-  'governance-v1',
-  'heritage-v1',
-  'lineage-v1',
-  'logistics-v1',
-  'nation-strategy-v1',
-  'operational-map',
-  'personnel',
-  'policy',
-  'reputation-v1',
-  'stratagem-basic',
-  'stratagem-cards-v1',
-  'treaty',
-] as const;
+type FeatureProfileSource = { key: string; featureData: Record<string, unknown> };
 const v4FeatureData = [
   'equipment-v1',
   'governance-v1',
@@ -49,30 +26,6 @@ const v4FeatureData = [
   'logistics-v1',
   'stratagem-cards-v1',
 ] as const;
-// resources/feature-profile/expanded-191-v5.json의 ruleFeatures 정확 목록(20개). v4의 19개에 nation-lifecycle-v1만 더한 정렬 목록이다.
-const v5Features = [
-  'battle-affinity-v2',
-  'campaign-assignment-v2',
-  'campaign-v1',
-  'city-resources-v1',
-  'city-scale-v1',
-  'equipment-v1',
-  'five-stats',
-  'governance-v1',
-  'heritage-v1',
-  'lineage-v1',
-  'logistics-v1',
-  'nation-lifecycle-v1',
-  'nation-strategy-v1',
-  'operational-map',
-  'personnel',
-  'policy',
-  'reputation-v1',
-  'stratagem-basic',
-  'stratagem-cards-v1',
-  'treaty',
-] as const;
-const featureCounts = { 'expanded-191-v3': 15, 'expanded-191-v4': 19, 'expanded-191-v5': 20 } as const;
 const modes = [
   { id: 'san10-191', year: 191, nations: 21, preset: 'regular', endYear: 201, anchors: 155, profile: null },
   { id: 'san10-empty', year: 180, nations: 0, preset: 'empty', endYear: 190, anchors: 155, profile: null },
@@ -198,14 +151,6 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
   const db = stack.db;
   const expanded = mode.profile !== null;
   const unitSetKey = mode.id === 'integration-v01-expanded' ? 'basic' : 'expanded';
-  const features =
-    mode.profile === 'expanded-191-v5'
-      ? [...v5Features]
-      : mode.profile === 'expanded-191-v4'
-        ? [...v4Features]
-        : expanded
-          ? [...creationFeatures, 'equipment-v1', 'governance-v1', 'heritage-v1', 'lineage-v1', 'logistics-v1'].sort()
-          : [...creationFeatures];
   const actor = await step(run, () => createActor(page, stack));
   const legacy = await step(run, () => creationSource(stack));
   // 새 scenario san10-191@2 게시는 기존 SAN10 초기화를 포함하는 initializeExpandedResources로만 한다.
@@ -242,8 +187,7 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
   expect(profile?.available).toBe(true);
   if (!profile?.available) throw new Error('실제 게시 SAN10 프로필을 확인하세요.');
   expect([profile.startYear, profile.counts.nations, profile.counts.generals]).toEqual([mode.year, mode.nations, 491]);
-  expect(profile.ruleFeatures).toEqual(features);
-  expect(profile.ruleFeatures).toHaveLength(mode.profile === null ? 10 : featureCounts[mode.profile]);
+  expect(profile).not.toHaveProperty('ruleFeatures');
   expect(profile.resources).toHaveLength(5);
   expect(profile.selection.unitSetKey).toBe(unitSetKey);
   expect(profile.featureProfileKey).toBe(mode.profile ?? undefined);
@@ -261,19 +205,17 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
     const sourceUrl = new URL(`../resources/feature-profile/${mode.profile}.json`, import.meta.url);
     const source = JSON.parse(await step(run, () => readFile(sourceUrl, 'utf8'))) as FeatureProfileSource;
     expect(source.key).toBe(mode.profile);
-    expect(source.ruleFeatures).toEqual(features);
+    expect(source).not.toHaveProperty('ruleFeatures');
     expect(Object.keys(source.featureData).sort()).toEqual([...v4FeatureData]);
     if (mode.id === 'san10-191-lifecycle') {
-      // v5 원본은 v4 원본과 key·nation-lifecycle-v1만 다르다. 자원 키 5개와 featureData 6개는 그대로다.
+      // v5 원본은 v4 원본과 key만 다르다. 자원 키 5개와 featureData 6개는 그대로다.
       const v4Url = new URL('../resources/feature-profile/expanded-191-v4.json', import.meta.url);
       const v4Source = JSON.parse(await step(run, () => readFile(v4Url, 'utf8'))) as FeatureProfileSource;
-      expect(v4Source.ruleFeatures).toEqual([...v4Features]);
-      expect(source).toEqual({ ...v4Source, key: 'expanded-191-v5', ruleFeatures: [...v5Features] });
-      // 같은 목록의 기존 v4 선택은 같은 5자원·19기능으로 그대로 남는다.
+      expect(source).toEqual({ ...v4Source, key: 'expanded-191-v5' });
+      // 같은 목록의 기존 v4 선택은 같은 5자원으로 그대로 남는다.
       expect(options.profiles.find((entry) => entry.id === 'san10-191-expanded')).toMatchObject({
         available: true,
         featureProfileKey: 'expanded-191-v4',
-        ruleFeatures: [...v4Features],
         selection: profile.selection,
         resources: profile.resources,
       });
@@ -307,7 +249,7 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
     const originalViewport = page.viewportSize();
     for (const width of [375, 1440]) {
       await step(run, () => page.setViewportSize({ width, height: 900 }));
-      await step(run, () => expect(controls.getByText(/철·목재·말과 수송망/)).toBeVisible());
+      await step(run, () => expect(controls.getByText(/철, 목재, 말과 수송망/)).toBeVisible());
       await step(run, async () => {
         const screenshot = run.info.outputPath(`expanded-world-selection-${width}.png`);
         await page.screenshot({ path: screenshot, fullPage: true });
@@ -371,7 +313,7 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
     turnTermMinutes: profile.presets.find((entry) => entry.key === mode.preset)!.turnTermMinutes,
     endYear: mode.endYear,
     seed,
-    ruleFeatures: features,
+    fogOfWar: false,
   });
   const requests = await step(run, () => db.worldCreateRequest.findMany({ where: { requestedBy: actor.id } }));
   expect(requests).toHaveLength(1);
@@ -409,7 +351,7 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
     seed,
     presetKey: mode.preset,
     endYear: mode.endYear,
-    ruleFeatures: [...new Set([...features, OFFICE_EFFECTS_FEATURE])].sort(),
+    fogOfWar: false,
     officeEffects: defaultOfficeEffects,
   });
   expect(result.resolution).toMatchObject({
@@ -501,7 +443,7 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
     engineStatus: result.status,
     worldStatus: world.status,
     pinned,
-    ruleFeatures: world.ruleFeatures,
+    fogOfWar: world.fogOfWar,
     zeroLedgerRows: keys.length,
     uiAnchorRows: keys.length,
     legacyFingerprint: legacy.fingerprint,

@@ -296,7 +296,7 @@ test('병력에 1.5·-1·10001·빈칸을 넣으면 이유가 보이고 실행�
     await expect(dashed).toHaveAttribute('data-unavailable', 'true');
     expect(await dashed.evaluate((el) => getComputedStyle(el).borderStyle)).toBe('dashed');
     await dashed.click();
-    await expect(page.getByRole('note').filter({ hasText: '표시한 칸을 고치면' })).toBeVisible();
+    await expect(page.getByRole('note').filter({ hasText: '표시한 칸을 먼저 고치세요' })).toBeVisible();
     await dashed.click();
   }
   await expect(result(page)).toHaveAttribute('data-state', 'idle');
@@ -311,7 +311,7 @@ test('Worker 파일을 못 받으면 오류와 다시 실행이 보이고 풀면
   await page.route('**/battle.worker*', (route) => route.abort());
   await page.getByRole('button', { name: '실행', exact: true }).click();
   await expect(result(page)).toHaveAttribute('data-state', 'error');
-  await expect(result(page).getByRole('alert')).toContainText('계산 Worker를 실행하지 못했습니다.');
+  await expect(result(page).getByRole('alert')).toContainText('계산기를 실행하지 못했습니다.');
   await shot(page, 't4-34-worker-error.png');
 
   await page.unroute('**/battle.worker*');
@@ -415,7 +415,7 @@ test('T4-86 AC-P2-26 확장 병종표 월드에서 시뮬레이터와 개인 예
     );
     await initializeSan10Resources(db);
   });
-  const worldId = await e2eFeatureWorld([], {
+  const worldId = await e2eFeatureWorld({
     resources: ['--scenario', 'san10-191', '--map', 'san10', '--unit-set', 'expanded'],
   });
   const world = await worldUnitSet(worldId);

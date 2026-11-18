@@ -11,6 +11,10 @@ export function checkOperationalProfile(
   const opening = Object.hasOwn(initial, 'openingCityProfile');
   if (opening && initial.openingCityProfile !== LEGACY_OPENING_CITY_PROFILE)
     throw new Error('운영 지도의 개막 도시 설정을 확인하세요.');
+  if (initial.operationalMap === undefined) {
+    if (opening) throw new Error('운영 지도의 개막 도시 설정을 확인하세요.');
+    return;
+  }
   const map = operationalMapSchema.parse(initial.operationalMap);
 
   if (validateMap(map, { scenarios: [] }).status !== 'pass') throw new Error('운영 지도의 연결망을 확인하세요.');

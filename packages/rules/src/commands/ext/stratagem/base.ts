@@ -49,6 +49,11 @@ export function stratagemAttackScore(
   commandKey: string,
   view?: WorldView,
 ): number {
+  if (!Object.hasOwn(general, 'politics') && !Object.hasOwn(general, 'charm'))
+    return effectiveStat(
+      general,
+      commandKey === 'plunder' ? 'strength' : commandKey === 'incite' ? 'leadership' : 'intel',
+    );
   const { leadership, strength, intel, politics, charm } = general;
   const base = fiveStatsSchema.parse({ leadership, strength, intel, politics, charm });
   const stats = view ? withEquipmentBonus(view, general.id, base) : base;

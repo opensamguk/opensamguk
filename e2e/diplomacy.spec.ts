@@ -10,7 +10,7 @@ test.describe.configure({ timeout: 180_000 });
 
 const ownedWorlds = new Set<string>();
 async function diplomacyWorld() {
-  const id = await e2eFeatureWorld(['policy', 'treaty', 'treaty-break', 'treaty-trade'], { npcNations: false });
+  const id = await e2eFeatureWorld({ npcNations: false });
   ownedWorlds.add(id);
   return id;
 }

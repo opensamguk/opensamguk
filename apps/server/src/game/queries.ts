@@ -35,6 +35,8 @@ import {
   readStoredRelations,
   assertNationLifecycle,
   officeEffectsSchema,
+  storedGeneralStats,
+  statRulesSchema,
 } from '@opensamguk/rules';
 import { z } from 'zod';
 import { worldResolver } from './resolver';
@@ -95,6 +97,7 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
     omit: { defaultPolicy: true, lastActiveTick: true, lastActiveAt: true, residenceTick: true },
   });
   const diplomacies = await tx.diplomacy.findMany({ where: { worldId } });
+  const fiveStats = statRulesSchema.parse({ stat: world.statRules }).stat.count === 5;
   const state = toWorldState({
     ...(rules ? { presetRules: rules } : {}),
     ...(recruitmentLocation === 'city' ? { recruitmentLocation } : {}),
@@ -102,9 +105,15 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
     ...(ext ? { ext } : {}),
     fogOfWar: world.fogOfWar,
     startYear: world.startYear,
-    cities: attachOperationalKinds(cities, readOperationalMap(world.operationalMap, world.replayOrigin)),
+    cities: attachOperationalKinds(
+      cities,
+      readOperationalMap(world.operationalMap, world.replayOrigin),
+      world.campaignState,
+    ),
     nations,
-    generals: generals.map((general) => storedGeneralRemoval(storedGeneralSex(general, true), world.replayFormat)),
+    generals: generals.map((general) =>
+      storedGeneralStats(storedGeneralRemoval(storedGeneralSex(general, true), world.replayFormat), fiveStats),
+    ),
     diplomacies,
     ...(world.commandMeta ? { commandMeta: world.commandMeta } : {}),
   } as unknown as WorldInit);

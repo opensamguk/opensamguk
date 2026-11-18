@@ -48,6 +48,16 @@ describe('planTileRoutes', () => {
     expect(plan.land[2]).toBe(0);
   });
 
+  it('섬 안쪽 성에서도 해로가 바다로 나간다(두 끝 3칸 안의 땅은 지난다)', () => {
+    // 왼쪽 섬 안쪽(7)에서 오른쪽 섬 안쪽(16)으로. 둘 다 사방이 땅이다.
+    const g = grid(['.........', '...===...', '.........']);
+    const plan = planTileRoutes(g.columns, g.rows, g.at, [{ id: 'i', mode: 'SEA', from: 10, to: 16 }]);
+    const path = plan.paths.get('i')!;
+    expect(path[0]).toBe(10);
+    expect(path[path.length - 1]).toBe(16);
+    expect(path.some((i) => g.at(i) === 'sea')).toBe(true);
+  });
+
   it('닿을 수 없으면 경로가 없다', () => {
     const g = grid(['.#.']);
     const plan = planTileRoutes(g.columns, g.rows, g.at, [{ id: 'x', mode: 'LAND', from: 0, to: 2 }]);

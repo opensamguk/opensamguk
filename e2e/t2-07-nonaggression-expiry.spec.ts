@@ -6,20 +6,19 @@ import { newSession } from '../apps/server/src/auth/session';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { controlClock } from '../apps/engine/src/world/clock';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld, attachFixtureOwners } from './worldFixture';
 import { test, expect, type LegalStack } from './legalFixture';
 
 // T2-07 · AC-M2-06 불가침 기한 만료 공개 Chromium 사례.
 // 실제 공개 dist·HTTP·PG와 시험이 직접 돌리는 실제 TurnLoop을 쓴다. 중립인 두 사람 국가의 이름 붙인 군주 세션이
 // 외교실 화면에서 1개월 불가침을 제안하고 수락한다. 조약·외교·입력 행은 DB에 쓰지 않고 읽기만 한다.
 // 시험이 DB에 직접 쓰는 것은 계정·세션, 월드 생성(장수 이름·첫 턴)과 생성 직후 두 군주 장수의 계정 연결뿐이다.
-// 월드는 형식 3 생성 기록에 personnel·policy·treaty·treaty-break 기능을 켠다. personnel 생성 기록은 사람 장수를
+// 월드는 형식 3 생성 기록으로 만들고 모든 규칙이 늘 켜져 있다. 생성 기록은 사람 장수를
 // 받지 않으므로 계정 연결은 생성 뒤에 마지막 활동 시각과 함께 쓴다.
 //
 // 시각: 제안 PROPOSE_TICK, 수락 ACCEPT_TICK(월 중간). 원 기한 E = 수락 + 1개월(raw endTick).
 // 실제 종료는 E 다음 월 정산 B = ceil(E ÷ 월) × 월이다. E와 B−1에는 ACTIVE·불가침 관계가 그대로 있고 B에서 ENDED가 된다.
 // 마지막 단언은 끝남 카드의 '끝' 날짜가 실제 정산 월 B의 연월인지 본다.
-const FEATURES = ['personnel', 'policy', 'treaty', 'treaty-break'];
 const MONTH = TICKS_PER_MONTH;
 const PROPOSE_TICK = 1_000;
 const ACCEPT_TICK = 1_500;
@@ -106,7 +105,6 @@ test('AC-M2-06 1개월 불가침은 원 기한 E가 지나도 다음 월 정산 
   try {
     const initial = commandInitial();
     initial.seed = `t207-nonaggression-expiry-${randomUUID()}`;
-    initial.ruleFeatures = FEATURES;
     initial.nations = initial.nations.map((nation) => ({ ...nation, isNpc: false }));
     initial.diplomacies = [];
     initial.generals = initial.generals.map((general) => ({
@@ -118,35 +116,28 @@ test('AC-M2-06 1개월 불가침은 원 기한 E가 지나도 다음 월 정산 
     expect(initial.generals[0]).toMatchObject({ id: A.generalId, nationId: A.nationId, officerLevel: 12 });
     expect(initial.generals[1]).toMatchObject({ id: B.generalId, nationId: B.nationId, officerLevel: 12 });
     expect(initial.generals.every((general) => general.userId === null)).toBe(true);
-    ({ worldId } = await saveInitialWorld(db, initial, {
+    ({ worldId } = await saveFixtureWorld(db, initial, {
       name: 'AC-M2-06 불가침 만료 공개 화면',
       turnTermMinutes: 60,
       endYear: null,
       replayFormat: 3,
-      ruleFeatures: FEATURES,
     }));
     const id = worldId;
     const stored = await db.world.findUniqueOrThrow({
       where: { id },
-      select: { ruleFeatures: true, replayOrigin: true, clockTick: true },
+      select: { fogOfWar: true, replayOrigin: true, clockTick: true },
     });
-    expect(stored.ruleFeatures).toEqual(FEATURES);
-    expect(stored.replayOrigin).toMatchObject({ version: 3, initial: { ruleFeatures: FEATURES } });
+    // 모든 규칙이 늘 켜져 있고 월드에는 안개 설정만 남는다.
+    expect(stored.fogOfWar).toBe(false);
+    expect(stored.replayOrigin).toMatchObject({ version: 3, initial: { fogOfWar: false } });
+    expect(stored.replayOrigin).not.toHaveProperty('initial.ruleFeatures');
     expect(stored.replayOrigin).not.toHaveProperty('capabilities');
     // 두 군주 장수를 각 계정에 연결하고 마지막 활동을 생성 시각으로 둔다.
     for (const [who, generalId] of [
       [a, A.generalId],
       [b, B.generalId],
     ] as const)
-      await db.general.update({
-        where: { worldId_id: { worldId: id, id: generalId } },
-        data: {
-          userId: who.userId,
-          lastActiveTick: stored.clockTick,
-          lastActiveAt: new Date(),
-          residenceTick: stored.clockTick,
-        },
-      });
+      await attachFixtureOwners(db, id, [{ id: generalId, userId: who.userId }]);
     await controlClock(db, id, 'start');
 
     const advance = async (tick: number) => {
@@ -291,7 +282,7 @@ test('AC-M2-06 1개월 불가침은 원 기한 E가 지나도 다음 월 정산 
     await a.page.goto(`/w/${id}/diplomacy?tab=active`);
     const activeCard = card(a.page, treatyId);
     await expect(activeCard).toContainText('진행 중');
-    await expect(activeCard.getByRole('region', { name: '서버가 집행하는 조항' })).toContainText('불가침');
+    await expect(activeCard.getByRole('region', { name: '집행되는 조항' })).toContainText('불가침');
     await a.page.evaluate(() => {
       (window as unknown as { __t207NoReload?: boolean }).__t207NoReload = true;
     });
@@ -346,7 +337,7 @@ test('AC-M2-06 1개월 불가침은 원 기한 E가 지나도 다음 월 정산 
     await a.page.goto(`/w/${id}/diplomacy?tab=ended`);
     const endedCard = card(a.page, treatyId);
     await expect(endedCard).toContainText('끝남');
-    await expect(endedCard.getByRole('region', { name: '서버가 집행하는 조항' })).toContainText('불가침');
+    await expect(endedCard.getByRole('region', { name: '집행되는 조항' })).toContainText('불가침');
     await expect(fact(endedCard, '시작')).toHaveText(yearMonth(ACCEPT_TICK));
     await expect(fact(endedCard, '끝')).toHaveCount(1);
     expect(errors).toEqual([]);

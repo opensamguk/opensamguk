@@ -1,26 +1,62 @@
-/* 장수 생성 (INT-20 한지 군략도): 왼쪽 초상 첩, 오른쪽 이름·능력치 첩. */
+/* 장수 생성 (INT-29 화면 개편, 사용자 승인 시안): 큰 키트 창 하나. 왼쪽 기둥은 얼굴 틀과 초상 고르기,
+   오른쪽 기둥은 이름, 성별, 능력치 막대, 유산, 요약(한지), 단추. 틀 그림은 전역 키트 클래스와 --kit-* 변수로 그린다.
+   같은 모듈을 쓰는 유산 첩, NPC 맡기 첩도 키트 모양을 따르도록 입력칸과 단추를 여기서 키트 그림으로 그린다. */
+
 .page {
-  max-width: 1040px;
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+/* 어두운 창 안의 공용 색 이름. 꼬리표, 오류 판, 안내 부품이 창 위에서 읽힌다. */
+.window {
+  --color-text: #f5e6c8;
+  --color-text-muted: #d9c59c;
+  --color-surface: rgb(0 0 0 / 22%);
+  --color-surface-muted: rgb(0 0 0 / 30%);
+  --color-surface-raised: rgb(255 240 210 / 8%);
+  --color-border: rgb(201 163 90 / 40%);
+  --color-border-strong: #c9a35a;
+  --color-ink: #0c0605;
+  --color-accent: #f0a060;
+  --color-accent-text: #1a0a04;
+  --color-gold: #c9a24a;
+  --color-success: #8fd9b4;
+  --color-danger: #ff9a86;
+  --color-warning: #f0c060;
+  --color-info: #a8c4f0;
+  --frame: 1px solid rgb(201 163 90 / 55%);
+  --frame-inset: none;
+  --shadow-step: none;
+  --shadow-button: none;
+  padding: var(--space-2);
+  color: var(--color-text);
+}
+.window a {
+  color: #ffd77a;
 }
 
 .page h1 {
+  justify-content: center;
+  flex-basis: 100%;
   margin: 0;
   font-size: var(--title-md);
-  line-height: 1.1;
+  line-height: 1.2;
 }
 
-/* 머리: 출사표 현판, 제목, 한 줄 안내 */
+/* 머리: 장식 제목, 한 줄 안내, 서버 정보 */
 .intro {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2) var(--space-4);
-  margin-bottom: var(--space-4);
+  justify-content: center;
+  gap: var(--space-1) var(--space-4);
+  margin-bottom: var(--space-3);
+  text-align: center;
 }
 
 .lead {
   flex-basis: 100%;
   margin: 0;
+  font-size: var(--text-sm);
   color: var(--color-text-muted);
 }
 
@@ -34,8 +70,7 @@
 
 .glance {
   margin-bottom: var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  border: var(--frame);
   background: var(--color-surface);
 }
 
@@ -48,33 +83,112 @@
 }
 
 .glanceMap {
+  --color-surface: #f4ecd8;
+  --color-text: #221d17;
+  --color-text-muted: #5a5044;
   display: grid;
   gap: var(--space-2);
   min-width: 0;
   padding: 0 var(--space-3) var(--space-3);
 }
 
-/* 꾸밈 현판. 제목이 아니라 글자 띠다. */
+/* 작은 제목 띠(요약 「이 장수는」). */
 .plaque {
   display: inline-flex;
   align-self: flex-start;
-  padding: 6px 12px 5px;
-  font-family: var(--font-title);
   font-size: var(--title-sm);
-  line-height: 1;
-  color: var(--color-accent-text);
-  background: var(--color-accent);
-  border: var(--frame);
+  font-weight: 900;
+  line-height: 1.2;
+  color: #7a1e12;
 }
 
 .muted {
   color: var(--color-text-muted);
 }
 
+/* NPC 맡기 첩이 쓰는 세로 양식 */
 .form {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+}
+
+/* 장수 만들기 양식: 넓은 화면은 왼쪽 얼굴 기둥, 오른쪽 입력 기둥 */
+.createForm {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-4) var(--space-6);
+}
+
+.formTop {
+  grid-column: 1 / -1;
+}
+
+.faceColumn {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.fieldColumn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+/* 얼굴 틀(키트 B portrait-frame): 고른 초상을 틀 안쪽에 크게 보인다. 틀 그림이 없으면 금빛 선만 남는다. */
+.faceFrame {
+  position: relative;
+  width: 200px;
+  aspect-ratio: 4 / 5;
+  background: linear-gradient(#6b5a44, #3a2c1e);
+}
+
+.faceFrame[data-frame='false'] {
+  outline: 2px solid #c9a35a;
+}
+
+.faceFrame > .facePic {
+  position: absolute;
+  inset: 10% 12%;
+  width: auto;
+  height: auto;
+}
+
+.faceFrame > .facePic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.faceRing {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* 얼굴 고르기 단추: 파일 칸은 단추 글 안에 숨겨 두고 키보드 초점은 단추 테두리로 보인다. */
+.upload {
+  position: relative;
+}
+
+.upload:focus-within {
+  outline: 2px solid #ffd77a;
+  outline-offset: 2px;
+}
+
+.upload input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .field {
@@ -84,26 +198,43 @@
 }
 
 .field > label {
-  font-weight: 500;
+  font-weight: 700;
 }
 
+/* 키트 입력칸(kit-input과 같은 그림). 유산, NPC 첩의 칸도 이 모양을 쓴다. */
 .input {
   min-width: 0;
   min-height: 44px;
+  padding: 0 12px 0 16px;
+  border: 8px solid transparent;
+  border-image: var(--kit-input-text-0) 16 fill / 8px stretch;
+  background-color: #efe0bf;
+  color: #2a1d14;
   font: inherit;
-  padding: 0 var(--space-3);
-  border: var(--frame);
-  border-radius: var(--radius);
-  background: var(--color-surface-raised);
-  color: var(--color-text);
+  box-sizing: border-box;
+}
+
+.input:focus {
+  border-image-source: var(--kit-input-text-1);
+  outline: none;
+}
+
+.input:focus-visible {
+  outline: 2px solid #ffd77a;
+  outline-offset: 1px;
+}
+
+.input[aria-invalid='true'] {
+  border-image-source: var(--kit-input-text-2);
+  box-shadow: 0 0 0 2px var(--color-danger);
+}
+
+.input:disabled {
+  border-image-source: var(--kit-input-text-3);
 }
 
 .field .input {
   font-size: var(--text-xl);
-}
-
-.input[aria-invalid='true'] {
-  border-color: var(--color-danger);
 }
 
 .hint {
@@ -112,7 +243,7 @@
   color: var(--color-text-muted);
 }
 
-/* 첩: 먹 테두리, 금니 실선, 계단 그림자. 제목은 주칠 현판. */
+/* 첩: 창 안에서는 금빛 실선 하나, 제목은 금빛 글자 */
 .stats,
 .portraits,
 .sexGroup,
@@ -123,35 +254,47 @@
   gap: var(--space-3);
   min-width: 0;
   margin: 0;
-  padding: var(--space-4);
+  padding: var(--space-3) var(--space-4) var(--space-4);
   border: var(--frame);
-  border-radius: var(--radius);
   background: var(--color-surface);
-  box-shadow: var(--frame-inset), var(--shadow-step);
 }
 
 .stats legend,
 .portraits legend,
 .sexGroup legend,
 .heritage legend {
-  padding: 6px 12px 5px;
-  font-family: var(--font-title);
-  font-size: var(--title-sm);
-  line-height: 1;
-  color: var(--color-accent-text);
-  background: var(--color-accent);
-  border: var(--frame);
+  padding: 0 var(--space-2);
+  font-size: var(--text-md);
+  font-weight: 800;
+  line-height: 1.4;
+  color: #ffd77a;
+}
+
+/* 능력치 한 줄: 아이콘, 이름, 막대(kit-gauge), −/숫자/+ */
+.stats {
+  display: grid;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .stat {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-weight: 500;
+  display: grid;
+  grid-template-columns: 28px 3em minmax(60px, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .stat > label {
-  font-weight: 600;
+  font-weight: 700;
+}
+
+.statIcon {
+  width: 26px;
+  height: 26px;
+}
+
+.gauge {
+  min-width: 0;
 }
 
 .stepper {
@@ -160,45 +303,109 @@
   gap: var(--space-1);
 }
 
-.step {
-  width: 44px;
-  height: 44px;
-  font: inherit;
-  font-size: var(--text-xl);
-  line-height: 1;
-  border: var(--frame);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-button);
-  background: var(--color-surface);
-  color: var(--color-text);
-  cursor: pointer;
-}
-
-.step:disabled {
-  border-style: dashed;
-  border-color: var(--color-text-muted);
-  box-shadow: none;
-  background: transparent;
-  color: var(--color-text-muted);
-  cursor: not-allowed;
-}
-
 .stat input {
-  width: 4em;
-  font-family: var(--font-pixel);
-  font-size: var(--text-xl);
+  width: 4.5em;
+  font-size: var(--text-lg);
   text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.statTools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .remaining {
-  margin: 0;
+  margin: 0 auto 0 0;
   padding: var(--space-1) 0;
 }
 
 .remaining strong {
-  font-family: var(--font-pixel);
   font-size: var(--text-2xl);
   color: var(--color-success);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 키트 단추 그림(kit-button과 같은 그림). 유산, NPC 첩의 단추도 이 모양을 쓴다. */
+.step,
+.secondary,
+.submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 10px solid transparent;
+  border-image: var(--kit-button-secondary-0) 20 fill / 10px stretch;
+  background-color: #5a1a10;
+  color: #fff3d6;
+  font: inherit;
+  font-weight: 700;
+  white-space: nowrap;
+  text-shadow: 0 1px 0 #1a0a04;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.step:hover,
+.secondary:hover {
+  border-image-source: var(--kit-button-secondary-1);
+}
+
+.step:active,
+.secondary:active {
+  border-image-source: var(--kit-button-secondary-2);
+}
+
+.step:disabled,
+.secondary:disabled {
+  border-image-source: var(--kit-button-secondary-3);
+  color: #b9a88c;
+  cursor: not-allowed;
+}
+
+.step {
+  width: 44px;
+  min-width: 44px;
+  padding: 0;
+  font-size: var(--text-xl);
+  line-height: 1;
+}
+
+.step:focus-visible,
+.secondary:focus-visible,
+.submit:focus-visible {
+  outline: 2px solid #ffd77a;
+  outline-offset: 2px;
+}
+
+.submit {
+  min-width: 200px;
+  min-height: 52px;
+  padding: 0 var(--space-6);
+  font-size: var(--text-lg);
+  border-image-source: var(--kit-button-accent-0);
+  background-color: #7a1e12;
+}
+
+.submit:hover {
+  border-image-source: var(--kit-button-accent-1);
+}
+
+.submit:active {
+  border-image-source: var(--kit-button-accent-2);
+}
+
+.submit:disabled {
+  border-image-source: var(--kit-button-accent-3);
+  color: #b9a88c;
+  cursor: progress;
+}
+
+.portraits {
+  justify-content: center;
 }
 
 .portraitOption {
@@ -212,17 +419,17 @@
   cursor: pointer;
 }
 
-.portraitOption input {
-  accent-color: var(--color-accent);
+.portraitOption input,
+.sexOption input {
+  accent-color: #c9902a;
 }
 
 .portraitOption:has(input:checked) {
-  outline: 3px solid var(--color-accent);
+  outline: 3px solid #ffd77a;
   outline-offset: -1px;
 }
 
-/* 성별 고르기(가문 월드). 초상 칸과 같은 첩 틀에 44px 이상의 선택 칸을 둔다.
-   .portraits를 같이 쓰면 넓은 화면에서 초상 첩과 같은 왼쪽 칸에 겹쳐 선택 칸이 가려지므로 따로 이름을 둔다. */
+/* 성별 고르기. 44px 이상의 선택 칸을 둔다. */
 .sexGroup {
   align-items: center;
 }
@@ -235,7 +442,6 @@
   min-height: 44px;
   padding: var(--space-1) var(--space-3);
   border: var(--frame);
-  border-radius: var(--radius);
   background: var(--color-surface);
   cursor: pointer;
 }
@@ -244,13 +450,12 @@
   min-width: 20px;
   min-height: 20px;
   margin: 0;
-  accent-color: var(--color-accent);
 }
 
 .sexOption:has(input:checked) {
-  outline: 3px solid var(--color-accent);
+  outline: 3px solid #ffd77a;
   outline-offset: -1px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 /* 유산 능력치 첩 (T4-96). 같은 첩 틀에 4칸 수치와 기본·유산·최종 표를 세로로 쌓는다. */
@@ -400,14 +605,15 @@
   }
 }
 
+/* 이 장수는: 한지 틀(kit-paper) 위 먹색 글자. 시안의 열전 자리다. */
 .summary {
+  --color-text: #2a1d14;
+  --color-text-muted: #5a4632;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-4);
-  background: var(--color-surface);
-  border: var(--frame);
-  box-shadow: var(--frame-inset), var(--shadow-step);
+  color: var(--color-text);
+  line-height: 1.7;
 }
 
 .summary p {
@@ -432,7 +638,6 @@
 .alert {
   padding: var(--space-3);
   border: 2px solid var(--color-warning);
-  border-radius: var(--radius);
   background: var(--color-surface);
 }
 
@@ -442,50 +647,12 @@
 
 .actions {
   display: flex;
-}
-
-.submit {
-  min-width: 200px;
-  min-height: 56px;
-  font: inherit;
-  font-size: var(--text-lg);
-  font-weight: 600;
-  padding: 0 var(--space-6);
-  border: var(--frame);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-button);
-  background: var(--color-accent);
-  color: var(--color-accent-text);
-  cursor: pointer;
-}
-
-.submit:disabled {
-  border-style: dashed;
-  border-color: var(--color-text-muted);
-  box-shadow: none;
-  background: transparent;
-  color: var(--color-text-muted);
-  cursor: progress;
-}
-
-.secondary {
-  min-width: 44px;
-  min-height: 44px;
-  font: inherit;
-  font-weight: 500;
-  padding: 0 var(--space-3);
-  border: var(--frame);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-button);
-  background: var(--color-surface);
-  color: var(--color-text);
-  cursor: pointer;
+  justify-content: flex-end;
 }
 
 .pending {
   padding: var(--space-4);
   border: 2px dashed var(--color-border-strong);
-  border-radius: var(--radius);
   background: var(--color-surface);
 }
 
@@ -494,16 +661,15 @@
   gap: var(--space-3);
   align-items: center;
   padding: var(--space-4);
-  background: var(--color-surface);
   border: var(--frame);
-  box-shadow: var(--frame-inset), var(--shadow-step);
+  background: var(--color-surface);
 }
 
 .done p {
   margin: 0 0 var(--space-2);
 }
 
-/* 넓은 화면: 초상 첩을 왼쪽 세로로, 나머지는 오른쪽에 쌓는다. 빈 줄이 틈을 만들지 않게 행 간격은 여백으로 준다. */
+/* NPC 맡기 첩: 넓은 화면에서 후보 목록을 왼쪽 칸에 둔다. */
 @media (min-width: 900px) {
   .form {
     display: grid;
@@ -521,6 +687,47 @@
   .form > .portraits {
     grid-column: 1;
     grid-row: 1 / span 8;
+  }
+}
+
+/* 좁은 화면(세로로 든 전화, 좁은 태블릿): 얼굴 기둥을 위로 올리고 얼굴 틀을 줄인다. */
+@media (max-width: 767px) {
+  .createForm {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .faceColumn {
+    grid-template-columns: auto minmax(0, 1fr);
+    justify-items: start;
+    align-items: start;
+  }
+
+  .faceFrame {
+    width: 120px;
+    grid-row: span 3;
+  }
+}
+
+/* 아주 좁은 화면: 능력치 막대를 이름과 −/+ 아래 줄로 내린다. */
+@media (max-width: 479px) {
+  .stat {
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+  }
+
+  .gauge {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+/* 가로로 든 전화처럼 낮은 화면: 얼굴 틀을 줄여 입력 칸이 먼저 보이게 한다. */
+@media (max-height: 480px) {
+  .faceFrame {
+    width: 140px;
+  }
+
+  .createForm {
+    grid-template-columns: 180px minmax(0, 1fr);
   }
 }
 

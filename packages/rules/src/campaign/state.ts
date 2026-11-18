@@ -1,7 +1,10 @@
+import { cityUpgradeStateSchema, readCityUpgrade } from '../cityUpgrade/state';
+import { readCityLand } from '../construction/land';
+import { cityLandStateSchema } from '../construction/catalog';
 import { supplyLedgerSchema, unitSupplySchema } from './supply';
 import { z } from 'zod';
 import type { WorldView } from '../model/world';
-import { readGeneralFiveStats } from '../general/fiveStats';
+import { generalStats } from '../general/fiveStats';
 import { buildRetinueHierarchy, INITIAL_RENOWN_CAPACITY, type RetinuePerson } from './retinue';
 import { campaignOrdersSchema } from './orderTypes';
 import { tacticalStateSchema } from '../tactical/state';
@@ -28,6 +31,8 @@ export const campaignOfferSchema = z.strictObject({
   createdTick: integer,
 });
 export const campaignStateSchema = z.strictObject({
+  land: cityLandStateSchema.optional(),
+  cityUpgrade: cityUpgradeStateSchema.optional(),
   version: z.literal(1),
   seed: z.string().min(1),
   revision: integer,
@@ -45,14 +50,14 @@ export const campaignStateSchema = z.strictObject({
 export type CampaignState = z.infer<typeof campaignStateSchema>;
 export type CampaignUnitState = z.infer<typeof campaignUnitSchema>;
 
-// sources는 검증한 생성 기록이나 general.create 입력을 가리킨다. 능력치를 보간하지 않는다.
+// sources는 검증한 생성 기록이나 general.create 입력을 가리킨다. 없는 두 능력치는 보간하지 않는다.
 export function campaignPeople(world: WorldView, campaign: Readonly<CampaignState>): RetinuePerson[] {
   return Object.values(world.generals).map((general) => ({
     id: general.id,
     worldId: 'campaign-v1',
     nationId: general.nationId,
     stats: {
-      ...readGeneralFiveStats(general),
+      ...generalStats(general),
       source: campaign.sources[String(general.id)] ?? '',
     },
   }));
@@ -61,6 +66,8 @@ export function campaignPeople(world: WorldView, campaign: Readonly<CampaignStat
 // DB와 재생에서 같은 상태를 검사하며 잘못된 관계를 빈 목록으로 읽지 않는다.
 export function readCampaignState(value: unknown, world: WorldView, expectedSeed?: string): CampaignState {
   const state = campaignStateSchema.parse(value);
+  if (state.cityUpgrade) readCityUpgrade(state.cityUpgrade, world);
+  if (state.land) readCityLand({ ...world, campaign: state });
   if (expectedSeed !== undefined && state.seed !== expectedSeed) throw new Error('휘하 상태와 월드 시드가 다릅니다.');
   const people = campaignPeople(world, state);
   if (

@@ -1,4 +1,5 @@
 import type { AppRouter } from '@opensamguk/server/router';
+import { hasPublicImage, publicImageUrl } from '@opensamguk/shared/public-images';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { inferRouterOutputs } from '@trpc/server';
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
@@ -29,6 +30,25 @@ import { HeritageAllocation } from './HeritageAllocation';
 import { NpcPossession } from './NpcPossession';
 import { stepStat, summarizeStats } from './statSummary';
 import { WorldGlanceMap, WorldStatusLine } from './WorldGlance';
+
+// 키트 B 그림(INT-29 화면 개편): 얼굴 틀과 능력치 아이콘. 승인 목록에 없으면 그리지 않는다.
+const kitB = (name: string) => {
+  const source = `apps/web/src/art/ui/kit-b/${name}.webp`;
+  return hasPublicImage(source) ? publicImageUrl(source) : null;
+};
+const FACE_FRAME_URL = kitB('portrait-frame');
+const STAT_ICON_URL: Partial<Record<StatKey, string | null>> = {
+  leadership: kitB('icon-stat-leadership'),
+  strength: kitB('icon-stat-strength'),
+  intel: kitB('icon-stat-intel'),
+  politics: kitB('icon-stat-politics'),
+  charm: kitB('icon-stat-charm'),
+};
+// 능력치 막대 채움 비율(0~100). 숫자가 아니면 비운다.
+const gaugePercent = (value: string | undefined, max: number) => {
+  const n = Number(value);
+  return Number.isFinite(n) && max > 0 ? Math.min(100, Math.max(0, (n / max) * 100)) : 0;
+};
 
 const EVEN: StatValues = { leadership: '55', strength: '55', intel: '55', politics: '55', charm: '55' };
 
@@ -171,7 +191,6 @@ function CreateGeneral({ worldId }: { worldId: string }) {
             key={draft.owner ?? ''}
             worldId={worldId}
             rules={mine.data.creationRules}
-            lineage={'lineageEnabled' in mine.data.creationRules && mine.data.creationRules.lineageEnabled === true}
             heritage={'heritage' in mine.data.creationRules ? mine.data.creationRules.heritage : undefined}
             currentOwner={owner}
             heritageState={heritageState}
@@ -217,13 +236,11 @@ function CreateGeneral({ worldId }: { worldId: string }) {
   }
 
   return (
-    <section className={styles.page}>
+    // 화면 개편 시안(INT-29): 큰 키트 창 하나에 장식 제목, 안내, 양식을 담는다.
+    <section className={`kit-window ${styles.page} ${styles.window}`}>
       <div className={styles.intro}>
-        <span className={styles.plaque}>출사표</span>
-        <h1>장수 생성</h1>
-        <p className={styles.lead}>
-          이름과 초상, 능력치를 정해 이 월드의 내 장수를 만듭니다. 한 월드에 장수는 하나입니다.
-        </p>
+        <h1 className="kit-title">장수 생성</h1>
+        <p className={styles.lead}>한 월드에 장수는 하나입니다.</p>
         {/* 원작 장수 선택 화면의 안내와 서버 정보 (INT-25 단계 3). 새 장수는 무작위 도시에서 재야로 시작한다. */}
         <p className={styles.lead}>무작위 도시에서 재야로 시작합니다. 임관과 건국은 들어간 뒤 명령으로 합니다.</p>
         <WorldStatusLine worldId={worldId} />
@@ -250,7 +267,6 @@ type Created = NonNullable<inferRouterOutputs<AppRouter>['general']['mine']['gen
 function CreateForm({
   worldId,
   rules,
-  lineage,
   heritage,
   currentOwner,
   heritageState,
@@ -266,8 +282,6 @@ function CreateForm({
 }: {
   worldId: string;
   rules: CreationRules;
-  // lineage-v1 월드면 성별을 꼭 고른다. 다른 월드에는 성별 칸이 없고 보내지도 않는다.
-  lineage: boolean;
   // heritage-v1 월드에만 있다. 없으면 유산 첩도 heritage 키도 없다.
   heritage: HeritageRules | undefined;
   // 마지막으로 읽은 세션 계정. 입력을 묶은 draft.owner와 다르면 보내지 않는다.
@@ -345,11 +359,7 @@ function CreateForm({
   const [touched, setTouched] = useState(false);
   const check = checkCreation(name, stats, rules);
   const heritageCheck = heritage ? checkHeritage(bonus, stats, rules, heritage, heritageState === 'stale') : null;
-  const problems = [
-    ...check.problems,
-    ...(lineage && sex === '' ? [SEX_REQUIRED] : []),
-    ...(heritageCheck?.problems ?? []),
-  ];
+  const problems = [...check.problems, ...(sex === '' ? [SEX_REQUIRED] : []), ...(heritageCheck?.problems ?? [])];
   const problemsId = useId();
   const nameId = useId();
   const statId = useId();
@@ -380,7 +390,7 @@ function CreateForm({
         name: check.name,
         ...check.stats,
         portraitId,
-        ...(lineage && sex !== '' ? { sex } : {}),
+        ...(sex !== '' ? { sex } : {}),
         ...heritagePayload,
         // 유산 월드에서는 입력을 시작한 계정을 함께 보낸다. 세션이 바뀌었으면 서버가 입력·잔액을 건드리기 전에 거절한다.
         ...(portraitId !== null && account.data
@@ -409,248 +419,275 @@ function CreateForm({
   const reason = problems[0] ?? null;
 
   return (
-    <form className={styles.form} onSubmit={submit} noValidate>
+    <form className={styles.createForm} onSubmit={submit} noValidate>
       {rejected && !create.error ? (
-        <p className={styles.errorText} role="alert">
+        <p className={`${styles.errorText} ${styles.formTop}`} role="alert">
           지난 생성 요청이 거절되었습니다. {rejected}
         </p>
       ) : null}
 
-      <div className={styles.field}>
-        <label htmlFor={nameId}>이름</label>
-        <input
-          id={nameId}
-          className={styles.input}
-          value={name}
-          maxLength={12}
-          autoComplete="off"
-          aria-invalid={touched && check.problems.some((p) => p.startsWith('이름'))}
-          aria-describedby={problemsId}
-          onChange={(e) => setName(e.target.value)}
-          onBlur={() => setTouched(true)}
-        />
-        <p className={styles.hint}>한글·한자·영문·숫자 1~6글자. 같은 월드에서 이미 쓰는 이름은 쓸 수 없습니다.</p>
-      </div>
-
-      <fieldset className={styles.stats} aria-describedby={problemsId}>
-        <legend>
-          능력치 (합계 {rules.total}, 각각 {rules.min}~{rules.max})
-        </legend>
-        {(rules.count === 5 ? FIVE_STATS : STATS).map((stat) => {
-          // 숫자 칸이 기준이다. −/+는 칸 값을 한 칸씩 옮기기만 한다.
-          const down = stepStat(stats[stat.key], -1, rules, check.remaining);
-          const up = stepStat(stats[stat.key], 1, rules, check.remaining);
-          const set = (value: string) => setStats((prev) => ({ ...prev, [stat.key as StatKey]: value }));
-          return (
-            <div key={stat.key} className={styles.stat}>
-              <label htmlFor={`${statId}-${stat.key}`}>{stat.label}</label>
-              <div className={styles.stepper}>
-                <button
-                  type="button"
-                  className={styles.step}
-                  aria-label={`${stat.label} 줄이기`}
-                  disabled={down === null}
-                  onClick={() => {
-                    if (down !== null) set(down);
-                  }}
-                >
-                  −
-                </button>
-                <input
-                  id={`${statId}-${stat.key}`}
-                  type="number"
-                  inputMode="numeric"
-                  className={`${styles.input} num`}
-                  min={rules.min}
-                  max={rules.max}
-                  step={1}
-                  value={stats[stat.key] ?? ''}
-                  onChange={(e) => set(e.target.value)}
-                />
-                <button
-                  type="button"
-                  className={styles.step}
-                  aria-label={`${stat.label} 늘리기`}
-                  disabled={up === null}
-                  onClick={() => {
-                    if (up !== null) set(up);
-                  }}
-                >
-                  +
-                </button>
-              </div>
-            </div>
-          );
-        })}
-        <p className={styles.remaining} aria-live="polite" data-testid="remaining">
-          남은 점수 <strong className="num">{check.remaining}</strong>
-        </p>
-        <button type="button" className={styles.secondary} onClick={() => setStats(() => EVEN)}>
-          고르게 나누기
-        </button>
-        {rules.count === 5
-          ? FIVE_STAT_PRESETS.map((preset) => (
-              <button
-                type="button"
-                className={styles.secondary}
-                key={preset.name}
-                onClick={() =>
-                  setStats(
-                    () =>
-                      Object.fromEntries(
-                        FIVE_STATS.map((stat, index) => [stat.key, String(preset.values[index])]),
-                      ) as StatValues,
-                  )
-                }
-              >
-                {preset.name}
-              </button>
-            ))
-          : null}
-      </fieldset>
-      {rules.count === 5 ? (
-        <p className={styles.hint}>
-          통솔은 지휘 병력·피해 방어, 무력은 공격 피해, 지력은 연구·계략, 정치는 내정, 매력은 모병 비용·민심·NPC 서약에
-          씁니다. 휘하 명망은 별도로 계산합니다.
-        </p>
-      ) : null}
-
-      {heritage && heritageCheck ? (
-        <HeritageAllocation
-          heritage={heritage}
-          rules={rules}
-          result={heritageCheck}
-          check={heritageState}
-          onStep={setBonus}
-          onRefresh={onHeritageRefresh}
-        />
-      ) : null}
-
-      {lineage ? (
-        <>
-          {/* 초상 첩(.portraits)은 넓은 화면에서 왼쪽 칸 전체를 차지한다. 성별 첩은 같은 틀만 쓰고 오른쪽 칸에 둔다. */}
-          <fieldset className={styles.sexGroup} aria-describedby={sexHelpId}>
-            <legend>성별 (필수)</legend>
-            {(
-              [
-                ['MALE', '남'],
-                ['FEMALE', '여'],
-              ] as const
-            ).map(([value, label]) => (
-              <label key={value} className={styles.sexOption}>
-                <input
-                  type="radio"
-                  name="sex"
-                  value={value}
-                  required
-                  checked={sex === value}
-                  onChange={() => setSex(value)}
-                />
-                <span>{label}</span>
-              </label>
-            ))}
-          </fieldset>
-          <p id={sexHelpId} className={styles.hint}>
-            기본 선택이 없습니다. 이 월드는 가문 규칙을 써서 혼인과 출생이 남·여 짝만 됩니다. 성별은 만든 뒤 바꿀 수
-            없습니다. 「미상」은 출처가 성별을 밝히지 않은 시나리오 인물에게만 붙으며 고를 수 없습니다.
-          </p>
-        </>
-      ) : null}
-
-      <fieldset className={styles.portraits}>
-        <legend>초상</legend>
-        <label className={styles.portraitOption}>
-          <input type="radio" name="portrait" checked={portraitId === null} onChange={() => setPortraitId(null)} />
-          <Portrait id={null} name={check.name || '장수'} variant="thumb" />
-          <span>초상 없음</span>
-        </label>
-        {ownPortrait !== null ? (
+      {/* 왼쪽 기둥: 얼굴 틀과 초상 고르기, 내 초상 올리기(시안의 「얼굴 고르기」). */}
+      <div className={styles.faceColumn}>
+        <span className={styles.faceFrame} data-frame={FACE_FRAME_URL ? 'true' : 'false'}>
+          <Portrait
+            key={`${portraitId ?? 'none'}-${portraitRevision}`}
+            id={portraitId}
+            name={check.name || '장수'}
+            variant="portrait"
+            decorative
+            className={styles.facePic}
+          />
+          {FACE_FRAME_URL ? <img className={styles.faceRing} src={FACE_FRAME_URL} alt="" /> : null}
+        </span>
+        <fieldset className={styles.portraits}>
+          <legend>초상</legend>
           <label className={styles.portraitOption}>
+            <input type="radio" name="portrait" checked={portraitId === null} onChange={() => setPortraitId(null)} />
+            <Portrait id={null} name={check.name || '장수'} variant="thumb" />
+            <span>초상 없음</span>
+          </label>
+          {ownPortrait !== null ? (
+            <label className={styles.portraitOption}>
+              <input
+                type="radio"
+                name="portrait"
+                checked={portraitId === ownPortrait}
+                onChange={() => setPortraitId(ownPortrait)}
+              />
+              <Portrait key={portraitRevision} id={ownPortrait} name={check.name || '장수'} variant="thumb" />
+              <span>내 초상</span>
+            </label>
+          ) : null}
+        </fieldset>
+        {account.data ? (
+          <label className={`kit-button ${styles.secondary} ${styles.upload}`} data-kind="secondary">
+            {ownPortrait === null ? '내 초상 등록' : '내 초상 변경'}
             <input
-              type="radio"
-              name="portrait"
-              checked={portraitId === ownPortrait}
-              onChange={() => setPortraitId(ownPortrait)}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              disabled={uploading}
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0];
+                event.currentTarget.value = '';
+                if (file && account.data) void registerPortrait(file, account.data.userId);
+              }}
             />
-            <Portrait key={portraitRevision} id={ownPortrait} name={check.name || '장수'} variant="thumb" />
-            <span>내 초상</span>
           </label>
         ) : null}
-      </fieldset>
-      {account.data ? (
-        <label>
-          {ownPortrait === null ? '내 초상 등록' : '내 초상 변경'}
-          <input
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            disabled={uploading}
-            onChange={(event) => {
-              const file = event.currentTarget.files?.[0];
-              event.currentTarget.value = '';
-              if (file && account.data) void registerPortrait(file, account.data.userId);
-            }}
-          />
-        </label>
-      ) : null}
-      {uploading ? <p role="status">초상을 등록하는 중입니다.</p> : null}
-      {uploadError ? (
-        <p role="alert" className={styles.errorText}>
-          {uploadError}
-        </p>
-      ) : null}
-
-      <div id={problemsId} className={styles.problems} aria-live="polite">
-        {problems.length > 0 ? (
-          <ul>
-            {problems.map((problem) => (
-              <li key={problem}>{problem}</li>
-            ))}
-          </ul>
+        {uploading ? <p role="status">초상을 등록하는 중입니다.</p> : null}
+        {uploadError ? (
+          <p role="alert" className={styles.errorText}>
+            {uploadError}
+          </p>
         ) : null}
       </div>
 
-      {error ? (
-        <div className={styles.errorText} role="alert">
-          {code === 'UNAUTHORIZED' ? (
+      {/* 오른쪽 기둥: 이름, 성별, 능력치 막대, 유산, 요약, 단추. */}
+      <div className={styles.fieldColumn}>
+        <div className={styles.field}>
+          <label htmlFor={nameId}>이름</label>
+          <input
+            id={nameId}
+            className={`kit-input ${styles.input}`}
+            value={name}
+            maxLength={12}
+            autoComplete="off"
+            aria-invalid={touched && check.problems.some((p) => p.startsWith('이름'))}
+            aria-describedby={problemsId}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={() => setTouched(true)}
+          />
+          <p className={styles.hint}>한글, 한자, 영문, 숫자 1~6글자. 같은 월드에서 이미 쓰는 이름은 쓸 수 없습니다.</p>
+        </div>
+
+        <fieldset className={styles.sexGroup} aria-describedby={sexHelpId}>
+          <legend>성별 (필수)</legend>
+          {(
+            [
+              ['MALE', '남'],
+              ['FEMALE', '여'],
+            ] as const
+          ).map(([value, label]) => (
+            <label key={value} className={styles.sexOption}>
+              <input
+                type="radio"
+                name="sex"
+                value={value}
+                required
+                checked={sex === value}
+                onChange={() => setSex(value)}
+              />
+              <span>{label}</span>
+            </label>
+          ))}
+        </fieldset>
+        <p id={sexHelpId} className={styles.hint}>
+          이 월드는 가문 규칙을 써서 혼인과 출생이 남녀 짝으로만 됩니다. 성별은 만든 뒤 바꿀 수 없습니다. 「미상」은
+          출처가 성별을 밝히지 않은 시나리오 인물에게만 붙으며 고를 수 없습니다.
+        </p>
+
+        <fieldset className={styles.stats} aria-describedby={problemsId}>
+          <legend>
+            능력치 (합계 {rules.total}, 각각 {rules.min}~{rules.max})
+          </legend>
+          {(rules.count === 5 ? FIVE_STATS : STATS).map((stat) => {
+            // 숫자 칸이 기준이다. −/+는 칸 값을 한 칸씩 옮기기만 한다. 막대는 최댓값에 대한 비율이다.
+            const down = stepStat(stats[stat.key], -1, rules, check.remaining);
+            const up = stepStat(stats[stat.key], 1, rules, check.remaining);
+            const set = (value: string) => setStats((prev) => ({ ...prev, [stat.key as StatKey]: value }));
+            const icon = STAT_ICON_URL[stat.key];
+            return (
+              <div key={stat.key} className={styles.stat}>
+                {icon ? <img className={styles.statIcon} src={icon} alt="" width={26} height={26} /> : <span />}
+                <label htmlFor={`${statId}-${stat.key}`}>{stat.label}</label>
+                <span className={`kit-gauge ${styles.gauge}`} aria-hidden="true">
+                  <i style={{ width: `${gaugePercent(stats[stat.key], rules.max)}%` }} />
+                </span>
+                <div className={styles.stepper}>
+                  <button
+                    type="button"
+                    className={`kit-button ${styles.step}`}
+                    data-kind="secondary"
+                    aria-label={`${stat.label} 줄이기`}
+                    disabled={down === null}
+                    onClick={() => {
+                      if (down !== null) set(down);
+                    }}
+                  >
+                    −
+                  </button>
+                  <input
+                    id={`${statId}-${stat.key}`}
+                    type="number"
+                    inputMode="numeric"
+                    className={`kit-input ${styles.input} num`}
+                    min={rules.min}
+                    max={rules.max}
+                    step={1}
+                    value={stats[stat.key] ?? ''}
+                    onChange={(e) => set(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className={`kit-button ${styles.step}`}
+                    data-kind="secondary"
+                    aria-label={`${stat.label} 늘리기`}
+                    disabled={up === null}
+                    onClick={() => {
+                      if (up !== null) set(up);
+                    }}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+          <div className={styles.statTools}>
+            <p className={styles.remaining} aria-live="polite" data-testid="remaining">
+              남은 점수 <strong className="num">{check.remaining}</strong>
+            </p>
+            <button
+              type="button"
+              className={`kit-button ${styles.secondary}`}
+              data-kind="secondary"
+              onClick={() => setStats(() => EVEN)}
+            >
+              고르게 나누기
+            </button>
+            {rules.count === 5
+              ? FIVE_STAT_PRESETS.map((preset) => (
+                  <button
+                    type="button"
+                    className={`kit-button ${styles.secondary}`}
+                    data-kind="secondary"
+                    key={preset.name}
+                    onClick={() =>
+                      setStats(
+                        () =>
+                          Object.fromEntries(
+                            FIVE_STATS.map((stat, index) => [stat.key, String(preset.values[index])]),
+                          ) as StatValues,
+                      )
+                    }
+                  >
+                    {preset.name}
+                  </button>
+                ))
+              : null}
+          </div>
+        </fieldset>
+        {rules.count === 5 ? (
+          <p className={styles.hint}>
+            통솔은 지휘 병력과 피해 방어, 무력은 공격 피해, 지력은 연구와 계략, 정치는 내정, 매력은 모병 비용과 민심,
+            NPC 서약에 씁니다. 휘하 명망은 따로 계산합니다.
+          </p>
+        ) : null}
+
+        {heritage && heritageCheck ? (
+          <HeritageAllocation
+            heritage={heritage}
+            rules={rules}
+            result={heritageCheck}
+            check={heritageState}
+            onStep={setBonus}
+            onRefresh={onHeritageRefresh}
+          />
+        ) : null}
+
+        <div id={problemsId} className={styles.problems} aria-live="polite">
+          {problems.length > 0 ? (
+            <ul>
+              {problems.map((problem) => (
+                <li key={problem}>{problem}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+
+        {error ? (
+          <div className={styles.errorText} role="alert">
+            {code === 'UNAUTHORIZED' ? (
+              <>
+                로그인이 풀렸습니다.{' '}
+                <Link to="/login" search={{ next: `/w/${worldId}/create` }}>
+                  다시 로그인
+                </Link>
+              </>
+            ) : (
+              (serverMessage(error) ?? '생성 요청을 보내지 못했습니다. 연결을 확인하고 다시 누르세요.')
+            )}
+          </div>
+        ) : null}
+
+        <aside className={`kit-paper ${styles.summary}`} aria-labelledby={`${statId}-summary`}>
+          <span id={`${statId}-summary`} className={styles.plaque}>
+            이 장수는
+          </span>
+          {summary ? (
             <>
-              로그인이 풀렸습니다.{' '}
-              <Link to="/login" search={{ next: `/w/${worldId}/create` }}>
-                다시 로그인
-              </Link>
+              <p>{summary.strong}</p>
+              {summary.caution ? <p className={styles.muted}>{summary.caution}</p> : null}
+              {spent > 0 ? <p className={styles.muted}>유산을 더한 최종 능력치로 봅니다.</p> : null}
             </>
           ) : (
-            (serverMessage(error) ?? '생성 요청을 보내지 못했습니다. 연결을 확인하고 다시 누르세요.')
+            <p className={styles.muted}>능력치를 모두 정수로 넣으면 이 장수의 강점을 보입니다.</p>
+          )}
+        </aside>
+
+        <div className={styles.actions}>
+          {create.isPending ? (
+            <button type="submit" className={`kit-button ${styles.submit}`} data-kind="accent" disabled>
+              만드는 중…
+            </button>
+          ) : reason ? (
+            <DisabledReason reason={reason}>{submitLabel}</DisabledReason>
+          ) : (
+            <button type="submit" className={`kit-button ${styles.submit}`} data-kind="accent">
+              {submitLabel}
+            </button>
           )}
         </div>
-      ) : null}
-
-      <aside className={styles.summary} aria-labelledby={`${statId}-summary`}>
-        <span id={`${statId}-summary`} className={styles.plaque}>
-          이 장수는
-        </span>
-        {summary ? (
-          <>
-            <p>{summary.strong}</p>
-            {summary.caution ? <p className={styles.muted}>{summary.caution}</p> : null}
-            {spent > 0 ? <p className={styles.muted}>유산을 더한 최종 능력치로 봅니다.</p> : null}
-          </>
-        ) : (
-          <p className={styles.muted}>능력치를 모두 정수로 넣으면 이 장수의 강점을 보입니다.</p>
-        )}
-      </aside>
-
-      <div className={styles.actions}>
-        {create.isPending ? (
-          <button type="submit" className={styles.submit} disabled>
-            만드는 중…
-          </button>
-        ) : reason ? (
-          <DisabledReason reason={reason}>{submitLabel}</DisabledReason>
-        ) : (
-          <button type="submit" className={styles.submit}>
-            {submitLabel}
-          </button>
-        )}
       </div>
     </form>
   );

@@ -52,7 +52,7 @@ test.afterEach(async ({ page }) => {
 async function confirm(controls: Locator, reason = '시계 화면 실제 검사') {
   await controls.getByLabel('시계 조치 사유 (1~200자)', { exact: true }).fill(reason);
   await controls
-    .getByRole('checkbox', { name: '대상·현재 상태·사유와 시계 조치를 확인했습니다.', exact: true })
+    .getByRole('checkbox', { name: '대상, 현재 상태, 사유와 시계 조치를 확인했습니다.', exact: true })
     .check();
 }
 async function result(controls: Locator, text: string) {
@@ -196,9 +196,6 @@ test('T3-06 AC-M3-04 재조회로 시작이 일시정지로 바뀌면 확인을 
         replayFormat: 2,
         campaignState: Prisma.DbNull,
         operationalMap: Prisma.DbNull,
-        ruleFeatures: original.ruleFeatures.filter(
-          (feature) => !['campaign-v1', 'operational-map', 'campaign-assignment-v2'].includes(feature),
-        ),
       },
     });
     await page.getByRole('button', { name: '월드 조회', exact: true }).click();
@@ -212,7 +209,6 @@ test('T3-06 AC-M3-04 재조회로 시작이 일시정지로 바뀌면 확인을 
         replayFormat: 3,
         campaignState: original.campaignState ?? Prisma.DbNull,
         operationalMap: original.operationalMap ?? Prisma.DbNull,
-        ruleFeatures: original.ruleFeatures,
         status: 'ENDED',
       },
     });

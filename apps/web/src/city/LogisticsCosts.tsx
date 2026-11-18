@@ -34,11 +34,11 @@ export function LogisticsCosts({ board }: { board: OwnLogisticsBoard }) {
   const { wall, defence } = board.costs.build;
   return (
     <details className={styles.costs}>
-      <summary>모병·투자 재화 비용</summary>
+      <summary>모병과 투자 재화 비용</summary>
       <div className={styles.costBody}>
         <p className={styles.note}>
-          모병·징병과 성벽·수비 투자는 이 도시의 철·목재·말을 씁니다. 이 칸은 비용만 미리 보며 명령을 넣지 않습니다.
-          명령은 예턴에서 넣습니다.
+          모병과 징병, 성벽 투자와 수비 투자는 이 도시의 철, 목재, 말을 씁니다. 여기서는 비용만 보고 명령은 예턴에서
+          넣습니다.
         </p>
         {board.recruitUnits.length ? (
           <div className={styles.form}>

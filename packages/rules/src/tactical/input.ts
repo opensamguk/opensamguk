@@ -12,6 +12,7 @@ import {
   battleStateHash,
   canEnter,
 } from './battle';
+import { canIgnite } from './environment';
 import { battleCancellation, settleTacticalBattle } from './world';
 import type { UnitSetResource } from '../world/resources';
 
@@ -119,8 +120,8 @@ export function applyBattleInput(view: WorldView, kind: string, payload: unknown
           t.kind === 'water' ||
           t.kind === 'poison' ||
           (t.kind === 'rock' && terrain !== 'mountain') ||
-          (t.kind === 'pit' && terrain !== 'plain') ||
-          (t.kind === 'fire' && !['plain', 'grass', 'forest'].includes(terrain ?? ''))
+          (t.kind === 'pit' && !['grass', 'plain', 'road'].includes(terrain ?? '')) ||
+          (t.kind === 'fire' && !['grass', 'bridge'].includes(terrain ?? ''))
         )
           return deny('BAD_TERRAIN');
       }
@@ -130,9 +131,12 @@ export function applyBattleInput(view: WorldView, kind: string, payload: unknown
     if (data.schemes) {
       if (
         new Set(data.schemes.map((s) => `${s.turn}:${s.kind}`)).size !== data.schemes.length ||
-        data.schemes.some((s) => s.x >= b.board.width || s.y >= b.board.height)
+        data.schemes.some(
+          (s) => s.x >= b.board.width || s.y >= b.board.height || !b.cells[s.y * b.board.width + s.x]?.sourceTileId,
+        )
       )
         return deny('BAD_INPUT');
+      if (data.schemes.some((s) => s.kind === 'fire' && !canIgnite(b, s))) return deny('BAD_TERRAIN');
       b.schemes = b.schemes
         .filter((s) => s.side !== side)
         .concat(data.schemes.map((s) => ({ ...s, side, used: false })));

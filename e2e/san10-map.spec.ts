@@ -7,7 +7,7 @@ import { holdLease, type LeaseHold } from './game';
 import { releaseLease } from '../apps/engine/src/lease';
 import { initializeSan10Resources } from '../tools/san10-resources';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
-import { saveInitialWorld, readWorldState } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld, readWorldState } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { loadReplayState } from '../apps/engine/src/monthly';
@@ -17,17 +17,6 @@ import type { WorldMap } from '../apps/web/src/game/types';
 
 // AC-INT-02/03/04/10: 새 지도 두 모드의 공개 dist·실제 PG·입력·월 정산·재생이다.
 // 기존 61거점/132개월 인수는 이 154거점 판의 기수 완료로 세지 않는다.
-const features = [
-  'campaign-assignment-v2',
-  'campaign-v1',
-  'city-resources-v1',
-  'five-stats',
-  'operational-map',
-  'personnel',
-  'policy',
-  'stratagem-basic',
-  'treaty',
-];
 type Run = {
   controller: AbortController;
   holds: LeaseHold[];
@@ -156,7 +145,7 @@ async function verifyMode(stack: LegalStack, page: Page, info: TestInfo, run: Ru
   );
   expect(legacy.cities).toHaveLength(61);
   const old = await step(run, () =>
-    saveInitialWorld(db, legacy, {
+    saveFixtureWorld(db, legacy, {
       name: 'SAN10 기존 판 보존',
       turnTermMinutes: 60,
       endYear: 201,
@@ -176,20 +165,18 @@ async function verifyMode(stack: LegalStack, page: Page, info: TestInfo, run: Ru
     scenario === 'san10-empty' ? [180, 0, 491] : [191, 21, 491],
   );
   expect(hashState(initial)).toBe(hashState(await step(run, () => loadInitialWorldFromDb(db, selection))));
-  initial.ruleFeatures = [...features];
   const saved = await step(run, () =>
-    saveInitialWorld(db, initial, {
+    saveFixtureWorld(db, initial, {
       name: scenario,
       turnTermMinutes: 60,
       endYear: 300,
-      ruleFeatures: [...features],
     }),
   );
   run.worlds.push(saved.worldId);
   const { worldId } = saved;
   const world = await step(run, () => db.world.findUniqueOrThrow({ where: { id: worldId } }));
   expect(world.replayFormat).toBe(3);
-  expect(world.ruleFeatures).toEqual(features);
+  expect(world.fogOfWar).toBe(false);
   const before = await step(run, () => db.$transaction((tx) => loadReplayState(tx, worldId)));
   expect(Object.keys(before.state.cityResources!.cities).sort()).toEqual(
     initial.cities.map((row) => String(row.cityKey)).sort(),
@@ -213,6 +200,7 @@ async function verifyMode(stack: LegalStack, page: Page, info: TestInfo, run: Ru
       worldId,
       name: '지도검증',
       portraitId: null,
+      sex: 'MALE',
       leadership: 55,
       strength: 55,
       intel: 55,

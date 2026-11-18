@@ -1,4 +1,4 @@
-import { buildSupplyLedger } from './supply';
+import { buildSupplyLedger, supplyLedgerSchema } from './supply';
 import { z } from 'zod';
 import type { RuleFeatureDefinition, InputKindDefinition } from '../ruleRegistry';
 import type { WorldInit } from '../world/bootstrap';
@@ -146,11 +146,17 @@ export const marchSupplyFeature: RuleFeatureDefinition = {
   requires: ['campaign-v1', 'city-resources-v1', 'operational-map'],
   conflicts: [],
   checkOrigin({ initial, data }) {
-    if (data !== undefined || !initial.operationalMap) throw new Error('행군 보급에는 운영 지도가 필요합니다.');
-    buildSupplyLedger(initial.operationalMap);
+    if (!initial.operationalMap) {
+      if (supplyLedgerSchema.parse(data).routes.length !== 0)
+        throw new Error('운영 지도 없는 행군 보급의 경로 자료는 비어 있어야 합니다.');
+      return;
+    }
+    if (data !== undefined) throw new Error('행군 보급은 생성 기록의 지도 원장을 사용합니다.');
+    if (initial.operationalMap) buildSupplyLedger(initial.operationalMap);
   },
   initReplayState(replay, { initial }) {
-    if (!initial.operationalMap || !replay.state.campaign) throw new Error('행군 경로 원장의 선행 자료가 없습니다.');
+    if (!initial.operationalMap) return replay;
+    if (!replay.state.campaign) throw new Error('행군 경로 원장의 선행 자료가 없습니다.');
     return {
       ...replay,
       state: {

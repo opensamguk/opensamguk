@@ -117,7 +117,7 @@
   height: 10px;
   margin-right: var(--space-1);
   border: 1px solid var(--color-border-strong);
-  vertical-align: middle;
+  vertical-align: calc(var(--glyph-mid) - 10px / 2);
 }
 .specialty {
   padding: var(--space-1) var(--space-2);

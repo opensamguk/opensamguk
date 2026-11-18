@@ -1,4 +1,4 @@
-import type { BattleTerrain } from '@opensamguk/shared';
+import type { BattleTerrain, BattleObject } from '@opensamguk/shared';
 import type { WorldView } from '../model/world';
 import type { DeepReadonly } from '../model/world';
 import type { SupplyLedger } from '../campaign/supply';
@@ -23,6 +23,7 @@ export function tacticalMap(
   const local = (c: { x: number; y: number }) => ({ x: grid(c).x - minX, y: grid(c).y - minY });
   const terrain: BattleTerrain[] = Array.from({ length: width * height }, () => 'plain');
   const cells = Array.from({ length: width * height }, () => ({ sourceTileId: '', spCost: 1, defendSpCost: 1 }));
+  const objects = new Map<number, BattleObject>();
   const defendingNation = world.cities[target]!.nationId;
   const all = world.campaign!.supplyLedger!.routes.flatMap((r) =>
     r.segments.flatMap((s) => s.cells.map((c) => ({ ...c, mode: s.mode }))),
@@ -31,9 +32,19 @@ export function tacticalMap(
     const p = local(c);
     if (p.x < 0 || p.y < 0 || p.x >= width || p.y >= height) continue;
     const index = p.y * width + p.x;
-    terrain[index] = c.mountain
-      ? 'mountain'
-      : ({ LAND: 'plain', FORD: 'ford', BRIDGE: 'bridge', RIVER: 'river', SEA: 'sea' } as const)[c.mode];
+    terrain[index] =
+      c.terrain ??
+      (c.mountain
+        ? 'mountain'
+        : ({ LAND: 'plain', FORD: 'ford', BRIDGE: 'bridge', RIVER: 'river', SEA: 'sea' } as const)[c.mode]);
+    if (c.object) objects.set(index, { ...c.object, ...p });
+    else if (terrain[index] === 'bridge') {
+      const adjacent = source.find(
+        (v) => v.cellId !== c.cellId && Math.max(Math.abs(local(v).x - p.x), Math.abs(local(v).y - p.y)) === 1,
+      );
+      const q = adjacent ? local(adjacent) : p;
+      objects.set(index, { ...p, kind: 'bridge', direction: (q.x - p.x) * (q.y - p.y) < 0 ? 'NE-SW' : 'NW-SE' });
+    }
     const owner = c.ownerAnchorKey === null ? null : world.cities[c.ownerAnchorKey]?.nationId;
     const cost = (nation: number | null) =>
       supplyCellCost(
@@ -63,7 +74,7 @@ export function tacticalMap(
       if (!edges.some((e) => e[0] === pair[0] && e[1] === pair[1])) edges.push(pair);
     }
   return {
-    board: { width, height, terrain },
+    board: { width, height, terrain, objects: [...objects.values()] },
     cells,
     edges,
     path: distinct.map(local),

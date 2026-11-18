@@ -1,5 +1,6 @@
 import { commandMoveTargets, commandAttackTargets } from '../commandPaths';
 import { z } from 'zod';
+import { battleTerrainSchema, battleObjectDetailsSchema } from '@opensamguk/shared';
 import type { WorldView, WorldState } from '../model/world';
 import type { OperationalMapResource } from '../world/map/operational';
 import { isStrategicSite } from '../world/map/operational';
@@ -14,6 +15,8 @@ const cell = z.strictObject({
   y: natural,
   mountain: z.boolean(),
   remote: z.boolean(),
+  terrain: battleTerrainSchema.optional(),
+  object: battleObjectDetailsSchema.optional(),
   ownerAnchorKey: id.nullable(),
 });
 export const supplyLedgerSchema = z.strictObject({
@@ -65,6 +68,7 @@ function revision(value: unknown): string {
 // 기존 지도에는 산·오지 폴리곤이 없다. 없는 지형을 추측하지 않고 평지로 고정한다.
 // 칸 소유는 경제 도시의 최근접 영지이며 PASS·FIELD는 자기 칸만 소유한다.
 export function buildSupplyLedger(map: OperationalMapResource): SupplyLedger {
+  const tacticalCells = new Map(map.tacticalCells?.map((cell) => [`${cell.x}:${cell.y}`, cell]));
   const anchors = map.sites.filter((site) => isStrategicSite(map, site));
   const byId = new Map(map.sites.map((site) => [site.id, site]));
   const economic = anchors
@@ -85,6 +89,12 @@ export function buildSupplyLedger(map: OperationalMapResource): SupplyLedger {
       )[0];
     return {
       cellId: `cell:${x}:${y}`,
+      ...(tacticalCells.get(`${x}:${y}`)?.terrain !== undefined
+        ? { terrain: tacticalCells.get(`${x}:${y}`)!.terrain }
+        : {}),
+      ...(tacticalCells.get(`${x}:${y}`)?.object !== undefined
+        ? { object: tacticalCells.get(`${x}:${y}`)!.object }
+        : {}),
       x: Math.min(map.canvas.width, px),
       y: Math.min(map.canvas.height, py),
       mountain: false,
@@ -154,7 +164,7 @@ export function buildSupplyLedger(map: OperationalMapResource): SupplyLedger {
 }
 
 export function verifySupplyLedger(value: unknown, map: OperationalMapResource | undefined, enabled: boolean): void {
-  if (!enabled) {
+  if (!enabled || map === undefined) {
     if (value !== undefined) throw new Error('행군 보급을 끈 월드에 칸 원장이 있습니다.');
     return;
   }

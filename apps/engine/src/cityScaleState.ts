@@ -1,17 +1,28 @@
 import { isDeepStrictEqual } from 'node:util';
 import type { Prisma } from '@opensamguk/db';
-import { checkReplayOrigin, readCityRuins, type WorldView, type CityRuinsState } from '@opensamguk/rules';
+import {
+  campaignStateSchema,
+  checkReplayOrigin,
+  readCityRuins,
+  type WorldView,
+  type CityRuinsState,
+} from '@opensamguk/rules';
 
 type StoredWorld = Pick<
   Prisma.WorldGetPayload<Record<string, never>>,
   'id' | 'replayFormat' | 'replayOrigin' | 'cityRuinsState'
->;
+> & { campaignState?: unknown };
 
-export function readStoredCityRuins(world: StoredWorld, state: Pick<WorldView, 'cities'>): CityRuinsState | undefined {
+export function readStoredCityRuins(
+  world: StoredWorld,
+  state: Pick<WorldView, 'cities'> & Partial<Pick<WorldView, 'campaign'>>,
+): CityRuinsState | undefined {
   const origin: unknown = world.replayOrigin;
   checkReplayOrigin(origin);
   if (world.replayFormat !== 3 || origin.version !== 3) throw new Error('폐허의 재생 형식이나 생성 원장이 다릅니다.');
-  return readCityRuins(world.cityRuinsState, state, origin.initial.cityScale);
+  const campaign =
+    state.campaign ?? (world.campaignState == null ? undefined : campaignStateSchema.parse(world.campaignState));
+  return readCityRuins(world.cityRuinsState, { ...state, ...(campaign ? { campaign } : {}) }, origin.initial.cityScale);
 }
 
 export async function assertStoredCityRuins(tx: Prisma.TransactionClient, world: StoredWorld): Promise<void> {

@@ -30,7 +30,7 @@ export function simulateGame(
     ...initial,
     generals: initial.generals.every((general) => general.sex !== undefined)
       ? structuredClone(initial.generals)
-      : applySexLedger(initial, loadSexLedger()),
+      : applySexLedger(initial, loadSexLedger(initial.scenarioKey)),
   };
   let replay = initialReplayState(normalized);
   let state = replay.state;

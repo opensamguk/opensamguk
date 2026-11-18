@@ -1,3 +1,4 @@
+import { initialCityUpgrade } from '@opensamguk/rules';
 import { providedRuleData } from '@opensamguk/rules';
 import { buildSupplyLedger } from '@opensamguk/rules';
 import { OFFICE_EFFECTS_FEATURE, officeEffectsSchema } from '@opensamguk/rules';
@@ -105,7 +106,7 @@ export function prepareInitialWorld(
     fogOfWar: options.fogOfWar ?? frozen.fogOfWar ?? false,
     ...(preset ? { presetRules: presetRules(preset) } : {}),
   };
-  initial.generals = applySexLedger(initial, sexLedger ?? loadSexLedger());
+  initial.generals = applySexLedger(initial, sexLedger ?? loadSexLedger(initial.scenarioKey));
   if (initial.generals.some((general) => Object.hasOwn(general, 'officerCityKey')))
     throw new Error('초기 장수에는 도시 관직을 배정할 수 없습니다.');
   const stateHash = hashState(initial);
@@ -168,6 +169,9 @@ export function prepareInitialWorld(
         ...{
           campaignState: {
             ...emptyCampaignState(toWorldState(creationState), creationState.seed, creationState.scenarioKey),
+            ...(featureData['city-upgrade-v1'] === undefined
+              ? {}
+              : { cityUpgrade: initialCityUpgrade(creationState, featureData['city-upgrade-v1']) }),
             ...(creationState.operationalMap ? { supplyLedger: buildSupplyLedger(creationState.operationalMap) } : {}),
           } as Prisma.InputJsonValue,
         },
@@ -351,7 +355,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
         startYear: world.startYear,
         statRules: statRulesSchema.parse({ stat: world.statRules }).stat,
         unitSet: unitSetSchema.parse(world.unitSet),
-        cities: attachOperationalKinds(cities.map(stripWorldId), operationalMap),
+        cities: attachOperationalKinds(cities.map(stripWorldId), operationalMap, world.campaignState),
         nations: nations.map((nation) => {
           return { ...stripWorldId(nation), capitalCityKey: nation.capitalCityKey };
         }),
@@ -367,7 +371,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
               ),
               world.replayFormat,
             ),
-            true,
+            statRulesSchema.parse({ stat: world.statRules }).stat.count === 5,
           );
         }),
         diplomacies: diplomacies.map(stripWorldId),

@@ -35,7 +35,7 @@ import styles from './AdminCreateActions.module.css';
 
 type Phase = 'idle' | 'unknown' | 'pending' | 'limited' | 'notAccepted' | 'done' | 'failed';
 const expandedProfileHelp =
-  '철·목재·말과 수송망, 장비, 황실·봉신, 혼인·월 출산·계승, 기수 유산을 사용하는 확장 월드입니다.';
+  '철, 목재, 말과 수송망, 장비, 황실과 봉신, 혼인, 월 출산, 계승, 기수 유산을 쓰는 확장 월드입니다.';
 const resourceLabels = {
   scenarioKey: '시나리오 자원',
   mapKey: '지도 자원',
@@ -516,10 +516,7 @@ export function AdminCreateActions({
                   이름 {command.input.name} · 턴 {command.input.turnTermMinutes}분
                 </p>
               ) : (
-                <p>
-                  이 탭에는 원래 입력이 없습니다. 상태 조회만 할 수 있습니다. 접수 기록이 없더라도 새 요청으로 바꾸지
-                  않습니다.
-                </p>
+                <p>이 탭에는 원래 입력이 없어 상태만 조회합니다. 접수 기록이 없더라도 새 요청으로 바꾸지 않습니다.</p>
               )}
               <button type="button" disabled={sending || remaining > 0} onClick={read}>
                 요청 상태 확인
@@ -529,7 +526,7 @@ export function AdminCreateActions({
                   같은 요청 접수 확인
                 </button>
               ) : null}
-              {command ? <p>같은 이름·설정·시드·요청 번호로 접수 여부를 확인합니다.</p> : null}
+              {command ? <p>같은 이름, 설정, 시드, 요청 번호로 접수 여부를 확인합니다.</p> : null}
             </div>
           ) : null}
           {fresh && reply?.status === 'DONE' ? (
@@ -619,15 +616,12 @@ export function AdminCreateActions({
                   </label>
                   {available?.featureProfileKey ? (
                     <p id="create-profile-help">
-                      {expandedProfileHelp} 종료 연도는 {available.suggestedEndYear}년을 권장하며 바꿀 수 있습니다.
+                      {expandedProfileHelp} 종료 연도는 {available.suggestedEndYear}년을 권장합니다.
                     </p>
                   ) : null}
                   {options.profiles.some((entry) => !entry.available) ? (
                     <div role="note" aria-label="사용할 수 없는 시나리오">
-                      <p>
-                        사용할 수 없는 시나리오는 선택할 수 없습니다. 다른 시나리오를 직접 선택하거나 설정을 다시
-                        확인하세요.
-                      </p>
+                      <p>아래 시나리오는 지금 고를 수 없습니다. 다른 시나리오를 고르거나 설정을 다시 확인하세요.</p>
                       {options.profiles.map((entry) =>
                         !entry.available ? (
                           <div key={entry.id}>
@@ -650,7 +644,7 @@ export function AdminCreateActions({
                           {available.startYear}년 · {available.counts.nations}국 · NPC {available.counts.generals}명 ·
                           도시 {available.counts.cities} · 관문 {available.counts.gates}
                           <br />
-                          5능력치 · 휘하·부곡 · 도시 자원 규칙을 포함합니다.
+                          5능력치, 휘하·부곡, 도시 자원 규칙을 포함합니다.
                         </p>
                       )}
                       <details className={styles.resources}>
@@ -669,8 +663,9 @@ export function AdminCreateActions({
                         {listsPending ? <p role="status">게시된 생성 자원을 확인하고 있습니다.</p> : null}
                         {locked.length ? (
                           <p>
-                            확장 묶음은 {locked.length === resourceFieldList.length ? '다섯 자원' : '시나리오·지도'}를
-                            묶어서 보냅니다. 다른 판은 일반 시나리오에서 고르세요.
+                            확장 묶음은{' '}
+                            {locked.length === resourceFieldList.length ? '다섯 자원을' : '시나리오와 지도를'} 묶어서
+                            보냅니다. 다른 판은 일반 시나리오에서 고르세요.
                           </p>
                         ) : null}
                         {resourceFieldList.map((field) => {
@@ -818,6 +813,16 @@ export function AdminCreateActions({
                           <option value="custom">직접 지정</option>
                         </select>
                       </label>
+                      <label>
+                        <input
+                          type="checkbox"
+                          name="fogOfWar"
+                          checked={draft.fogOfWar}
+                          disabled={sending}
+                          onChange={(e) => change({ fogOfWar: e.target.checked })}
+                        />
+                        안개 (다른 나라 정보 가리기)
+                      </label>
                       {draft.seedMode === 'custom' ? (
                         <label>
                           시드
@@ -895,10 +900,8 @@ export function AdminCreateActions({
               {review.startYear !== null && review.counts
                 ? `${review.startYear}년 · ${review.counts.nations}국 · NPC ${review.counts.generals}명 · 도시${review.counts.cities} · 관문${review.counts.gates}`
                 : '자원 판을 바꾼 조합이라 시작 연도와 규모는 생성할 때 서버가 확인합니다.'}
-              {shownInput.ruleFeatures
-                ? ` · ${shownInput.ruleFeatures.length}개 기능`
-                : ' · 규칙 기능은 서버가 판에서 계산'}
-              . 현재 조회한 프리셋과 게시 자원을 사용하며 최종 설정은 생성 처리 때 확정됩니다.
+              {shownInput.fogOfWar ? ' · 안개 켬' : ' · 안개 끔'}. 현재 조회한 프리셋과 게시 자원을 씁니다. 최종 설정은
+              생성할 때 정해집니다.
             </p>
             {shownInput.featureProfileKey ? <p>{expandedProfileHelp}</p> : null}
             <ul>
@@ -913,7 +916,7 @@ export function AdminCreateActions({
                 disabled={sending}
                 onChange={(e) => setChecked(e.target.checked)}
               />
-              이름·현재 설정·시드와 개장 전 생성을 확인했습니다.
+              이름, 현재 설정, 시드와 개장 전 생성을 확인했습니다.
             </label>
             <button type="button" disabled={!checked || sending} onClick={submit}>
               개장 전 월드 생성 요청
@@ -925,8 +928,8 @@ export function AdminCreateActions({
         ) : null}
         {open && error ? <ErrorState title={error} /> : null}
       </dialog>
-      {sending ? <LoadingState>계정·생성 설정과 요청을 확인하고 있습니다.</LoadingState> : null}
-      {remaining > 0 ? <p role="status">{remaining}초 뒤 같은 요청을 직접 확인할 수 있습니다.</p> : null}
+      {sending ? <LoadingState>계정과 생성 설정, 요청을 확인하고 있습니다.</LoadingState> : null}
+      {remaining > 0 ? <p role="status">{remaining}초 뒤에 같은 요청을 직접 확인하세요.</p> : null}
       {storageWarning ? (
         <p role="alert">이 탭의 복구 정보를 보관하지 못했습니다. 탭을 닫기 전에 요청 번호와 결과를 확인하세요.</p>
       ) : null}

@@ -30,7 +30,7 @@ export function recordedArchive(
     end: null,
     afterEnd: [],
   };
-  let replay = initialReplayState(initial);
+  let replay = initialReplayState(initial, {});
   const bySequence = new Map(inputs.map((input) => [input.sequence, input]));
   for (let sequence = 1; sequence <= sequences; sequence++) {
     const input = bySequence.get(sequence);

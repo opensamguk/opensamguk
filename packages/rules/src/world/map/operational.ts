@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { battleTerrainSchema, battleObjectDetailsSchema } from '@opensamguk/shared';
 
 const id = z.string().regex(/^[a-z][a-z0-9:_-]{0,63}$/);
 const name = z.string().trim().min(1).max(60);
@@ -79,9 +80,31 @@ export const operationalMapSchema = z
     defaults: z.strictObject({ trust: z.number().min(0).max(100), supplyState: z.union([z.literal(0), z.literal(1)]) }),
     sites: z.array(site).min(1).max(500),
     routes: z.array(route).max(2000),
+    tacticalCells: z
+      .array(
+        z.strictObject({
+          x: natural.max(256),
+          y: natural.max(256),
+          terrain: battleTerrainSchema.optional(),
+          object: battleObjectDetailsSchema.optional(),
+        }),
+      )
+      .max(65536)
+      .optional(),
   })
   .superRefine((map, context) => {
     const fail = (path: PropertyKey[], message: string) => context.addIssue({ code: 'custom', path, message });
+    const tacticalCoordinates = new Set<string>();
+    map.tacticalCells?.forEach((cell, index) => {
+      const key = `${cell.x}:${cell.y}`;
+      if (
+        tacticalCoordinates.has(key) ||
+        cell.x > Math.round(map.canvas.width / 16) ||
+        cell.y > Math.round(map.canvas.height / 16)
+      )
+        fail(['tacticalCells', index], '야전 칸 좌표가 중복되거나 지도 범위를 벗어났습니다.');
+      tacticalCoordinates.add(key);
+    });
     const [west, south, east, north] = map.basemap.bounds;
     if (west >= east || south >= north) fail(['basemap', 'bounds'], '지도 범위의 순서를 확인하세요.');
     if (map.canvas.width * map.canvas.height > 4194304) fail(['canvas'], '지도 면적이 너무 큽니다.');

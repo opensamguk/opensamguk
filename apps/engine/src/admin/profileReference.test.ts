@@ -26,6 +26,19 @@ it.each(['expanded-191-v1', 'expanded-191-v3', 'expanded-191-v7'])(
       },
     } as unknown as ReplayOriginV3;
     expect(matchesPinnedFeatureProfile(origin, selection, reference)).toBe(true);
+    const disabledProfile = featureProfileSchema.parse({
+      ...profile,
+      featureData: { ...profile.featureData, 'city-upgrade-v1': { version: 1, enabled: false } },
+    });
+    const disabledOrigin = {
+      ...origin,
+      featureData: { ...origin.featureData, ...disabledProfile.featureData },
+    } as ReplayOriginV3;
+    const disabledReference = { key, contentHash: hashState(disabledProfile) };
+    expect(matchesPinnedFeatureProfile(disabledOrigin, selection, disabledReference)).toBe(true);
+    const enabledOrigin = structuredClone(disabledOrigin);
+    enabledOrigin.featureData!['city-upgrade-v1'] = { version: 1, enabled: true };
+    expect(matchesPinnedFeatureProfile(enabledOrigin, selection, disabledReference)).toBe(false);
     const changed = structuredClone(origin);
     (changed.featureData!['lineage-v1'] as { version: number }).version = 99;
     expect(matchesPinnedFeatureProfile(changed, selection, reference)).toBe(false);

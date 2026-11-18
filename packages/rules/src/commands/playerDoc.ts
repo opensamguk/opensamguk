@@ -1,3 +1,4 @@
+import { CITY_UPGRADE_RULES } from '../cityUpgrade/upgrade';
 import { BALANCE } from '../balance';
 import { STRATAGEM } from './ext/stratagem/base';
 import { INTEL } from './ext/intel/base';
@@ -30,6 +31,26 @@ const domesticSummary: Readonly<Record<string, string>> = {
 
 // 화면 설명은 명령 키에 붙인다. 카탈로그가 등록부와 설명의 누락·잔여를 함께 검사한다.
 export const commandPlayerDocs: Readonly<Record<string, PlayerDoc>> = {
+  nation_expand: {
+    summary: '자기 국가 도시를 한 등급 증축합니다.',
+    requires: ['수뇌', ownCity, '경 미만 도시', '같은 도시와 명령으로 국가 예턴 다섯 칸 연속 예약'],
+    cost: `실행 때 국고 금 ${CITY_UPGRADE_RULES.cost}, 지금 도시 수치는 유지`,
+  },
+  nation_shrink: {
+    summary: '증축한 도시를 지도 원래 규모까지 한 등급 감축합니다.',
+    requires: ['수뇌', ownCity, '지도 원래 규모보다 큰 도시', '같은 도시와 명령으로 국가 예턴 다섯 칸 연속 예약'],
+    cost: `실행 때 국고 금 ${CITY_UPGRADE_RULES.refund} 환급, 사라지는 칸의 건물과 공사는 환급 없이 철거`,
+  },
+  build: {
+    summary: '빈 자리에 건물을 짓습니다.',
+    requires: [ownCity, '건물의 자리·등급·지형 조건 충족'],
+    cost: '건물표의 금·도시 목재, 1~2회 월 정산',
+  },
+  demolish: {
+    summary: '건물이나 진행 중인 공사를 철거합니다.',
+    requires: [ownCity, '선택한 자리에 건물 또는 공사'],
+    cost: '자원 환급 없음',
+  },
   ...Object.fromEntries(
     DOMESTIC_SPECS.map((spec) => {
       const summary = domesticSummary[spec.key];

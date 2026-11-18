@@ -5,6 +5,9 @@ import {
   initialReplayState,
   runReplayAction,
   providedRuleKeys,
+  applyRecordedInput,
+  buildCreatedGeneral,
+  ruleRegistry,
   type ReplayOriginV3,
 } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
@@ -12,8 +15,27 @@ import { monthlyFixture } from '../../test/monthlyFixture';
 import { prepareInitialWorld, savePreparedInitialWorld, readWorldState } from './persistence';
 
 describe('AC-INT-28 전체 규칙 저장 계약', () => {
-  it.each([false, true])('안개 %j에서도 모든 상태를 저장하고 원생성 해시를 복원한다', async (fogOfWar) => {
+  it.each([
+    { fogOfWar: false, five: true },
+    { fogOfWar: true, five: true },
+    { fogOfWar: false, five: false },
+  ])('안개·능력치 $fogOfWar/$five 저장과 원생성 해시를 복원한다', async ({ fogOfWar, five }) => {
     const initial = await monthlyFixture();
+    if (!five) {
+      delete initial.operationalMap;
+      delete initial.openingCityProfile;
+      initial.statRules = { total: 165, min: 15, max: 80 };
+      for (const general of initial.generals) {
+        delete general.politics;
+        delete general.charm;
+      }
+      for (const city of initial.cities) {
+        delete city.kind;
+        delete city.state;
+        delete city.stateTerm;
+        delete city.parentCityKey;
+      }
+    }
     initial.fogOfWar = fogOfWar;
     initial.scenarioKey = 'always-on-test';
     const rows: Record<string, Record<string, unknown>[]> = {};
@@ -56,6 +78,17 @@ describe('AC-INT-28 전체 규칙 저장 계약', () => {
     expect(stored.fogOfWar).toBe(fogOfWar);
     const origin = stored.replayOrigin as ReplayOriginV3;
     checkReplayOrigin(origin);
+    if (five) {
+      const invalid = structuredClone(origin);
+      invalid.initial.statRules = { total: 165, min: 15, max: 80 };
+      for (const general of invalid.initial.generals) {
+        delete general.politics;
+        delete general.charm;
+      }
+      expect(() => checkReplayOrigin(invalid)).toThrow('운영 지도는 5능력치');
+    } else {
+      expect(origin.featureData?.['march-supply-v1']).toEqual({ version: 1, cellSize: 16, routes: [] });
+    }
     const replay = initialReplayState(origin.initial, origin.featureData);
     const fields = {
       campaign: 'campaignState',
@@ -80,6 +113,39 @@ describe('AC-INT-28 전체 규칙 저장 계약', () => {
     const restored = await readWorldState(db, 'always-on');
     expect(restored).toEqual(origin.initial);
     expect(hashState(restored)).toBe(prepared.stateHash);
-    expect(providedRuleKeys).toHaveLength(32);
+    expect(providedRuleKeys).toHaveLength(34);
+    const payload = {
+      name: '새사람',
+      leadership: 55,
+      strength: 55,
+      intel: 55,
+      portraitId: null,
+      sex: 'MALE' as const,
+      ...(five ? { politics: 55, charm: 55 } : {}),
+    };
+    const general = buildCreatedGeneral({
+      payload,
+      id: Math.max(...initial.generals.map((general) => general.id)) + 1,
+      userId: 'new-person',
+      seed: initial.seed,
+      startYear: initial.startYear,
+      monthlyTick: 0,
+      tick: 0,
+      cityKeys: initial.cities
+        .filter((city) => city.kind !== 'PASS' && city.kind !== 'FIELD')
+        .map((city) => city.cityKey),
+      unitSet: initial.unitSet,
+    });
+    const input = {
+      sequence: 1,
+      tick: 0,
+      generalId: general.id,
+      kind: 'general.create',
+      status: 'APPLIED' as const,
+      payload,
+      result: { general, activeTick: 0 },
+    };
+    for (const feature of ruleRegistry.features) feature.checkArchive?.({ origin, inputs: [input] });
+    expect(applyRecordedInput(replay, input).state.generals[general.id]).toEqual(general);
   });
 });

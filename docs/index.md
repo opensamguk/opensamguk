@@ -99,7 +99,7 @@
 | [T4-17 확장 명령 첫 운영 등록 (계략 4종 한정)](./plans/T4-17.md) (AC-P2-03 (나) 등록 몫, AC-M1-14 후속. 정적 대조 도구가 읽는 정의 모양과 T4-03 경계. 계획 기술 검토·채택 전) | 제안 | MVP |
 | [T4-91 종료 월드 타임랩스 공개 조회 API](./plans/T4-91.md) (가칭 T4-37b. AC-P2-17 2차 공유의 서버 몫, T4-37 3.3 요청. 계획 기술 검토(G-03) 통과, D-030 채택. 구현 선행 T4-56 (가)와 실제 검증 전) | 구현 | Phase 2 |
 
-통합 상세 작업은 [INT-02](./plans/INT-02.md), [INT-03](./plans/INT-03.md), [INT-04](./plans/INT-04.md), [INT-06](./plans/INT-06.md), [INT-09](./plans/INT-09.md), [INT-10](./plans/INT-10.md), [INT-11](./plans/INT-11.md), [INT-12](./plans/INT-12.md), [INT-14](./plans/INT-14.md), [INT-15](./plans/INT-15.md), [INT-16](./plans/INT-16.md), [INT-17](./plans/INT-17.md), [INT-20 한지 군략도 화면 개편](./plans/INT-20.md), [INT-22 병종 확장](./plans/INT-22.md), [INT-23 운영자 게임 안 개입](./plans/INT-23.md), [INT-24 서버 속성·NPC 플레이·휴전 토글](./plans/INT-24.md), [INT-25 원작 배치 화면 개편](./plans/INT-25.md), [INT-26 원작 정보 동등성](./plans/INT-26.md)·[대조표](./plans/INT-26-parity.md), [INT-27 2.5D~3D 군략도](./plans/INT-27.md), [INT-28 영지 칸 내정(초안)](./plans/INT-28.md), [INT-29 지도 바탕 게임 화면](./plans/INT-29.md)에 둔다. v0.1에서 보류한 기능의 재편입은 [보류·제외 항목 재편입 목록](./plans/deferred-reintake.md)에 둔다. 2026-10-29 추가 요청의 [INT-18 도시 자원·수비병·부곡 배속](./plans/INT-18.md)은 기존 완료 증거와 분리한 후속 계획이다. 도시 세수 적립과 모병·수비 비용의 도시 부담은 사용자 확정이며 규칙 검토·구현·실제 인수는 남아 있다.
+통합 상세 작업은 [INT-02](./plans/INT-02.md), [INT-03](./plans/INT-03.md), [INT-04](./plans/INT-04.md), [INT-06](./plans/INT-06.md), [INT-09](./plans/INT-09.md), [INT-10](./plans/INT-10.md), [INT-11](./plans/INT-11.md), [INT-12](./plans/INT-12.md), [INT-14](./plans/INT-14.md), [INT-15](./plans/INT-15.md), [INT-16](./plans/INT-16.md), [INT-17](./plans/INT-17.md), [INT-20 한지 군략도 화면 개편](./plans/INT-20.md), [INT-22 병종 확장](./plans/INT-22.md), [INT-23 운영자 게임 안 개입](./plans/INT-23.md), [INT-24 서버 속성·NPC 플레이·휴전 토글](./plans/INT-24.md), [INT-25 원작 배치 화면 개편](./plans/INT-25.md), [INT-26 원작 정보 동등성](./plans/INT-26.md)·[대조표](./plans/INT-26-parity.md), [INT-27 2.5D~3D 군략도](./plans/INT-27.md), [INT-28 영지 칸 내정(초안)](./plans/INT-28.md), [INT-29 지도 바탕 게임 화면](./plans/INT-29.md), [INT-30 거점 승격(초안)](./plans/INT-30.md)에 둔다. v0.1에서 보류한 기능의 재편입은 [보류·제외 항목 재편입 목록](./plans/deferred-reintake.md)에 둔다. 2026-10-29 추가 요청의 [INT-18 도시 자원·수비병·부곡 배속](./plans/INT-18.md)은 기존 완료 증거와 분리한 후속 계획이다. 도시 세수 적립과 모병·수비 비용의 도시 부담은 사용자 확정이며 규칙 검토·구현·실제 인수는 남아 있다.
 
 2026-10-30 추가 범위인 [INT-19 장수 지시·수신·실행](./plans/INT-19.md)은 AC-INT-19A~C의 계획·검증 경계를 기록한다. 기존 통합판의 완료 기록과 별도로 인수한다.
 
@@ -171,8 +171,13 @@
 | [설계 문서 틀](./design/README.md)             | 초안                 | 차별화 기능 착수 전 |
 | [화면 레퍼런스](./design/references/README.md) | 확정 (A10 확인 완료) | 지금                |
 | [화면 정체성: 한지 군략도](./design/visual-identity.md) | 구현 중 (D-047) | INT-20 |
+| [삼국지 7 모티브 분석](./design/sam7-motif.md) | 분석 완료 (D-099) | INT-29 |
 
 ## 운영·품질
+
+[INT-27 후속 2 작업 보고](../REPORT-int27-data-driven-2.md)는 합성 월드·성별 원장 분리와 남은 검증 실패를 기록한다.
+
+[INT-27 후속 3 작업 보고](../REPORT-int27-data-driven-3.md)는 E2E 생성 기록·소유자 입력·부곡 고정물과 실제 DB 검증 결과를 기록한다.
 
 [T4-89 지도 판별 바탕 그림 메타데이터](./plans/T4-89.md)는 AC-P2-28의 DB·조회 API 계약을 정리한다.
 
@@ -187,3 +192,9 @@
 | [관리자 콘솔](./admin-console.md)           | 역할·감사·제재 검증 중 | M3        |
 
 관리자 초기화 확인·접수·결과 조회 후보와 미완료 인수 범위는 [관리자 콘솔](./admin-console.md#초기화-확인-화면-후보-ac-m3-04-부분)과 [T3-05](./plans/T3-05.md#초기화-화면-연결-후보-ac-m3-04-부분)에 있다.
+
+[야전 규칙 작업 보고](../REPORT-field-rules.md)는 AC-INT-28의 모래톱·날씨·불·시야·지물 수치와 프런트 응답 계약, 검증 결과를 기록한다.
+
+[시험 서버 장애 조사 보고](../REPORT-server-500.md)는 AC-INT-28의 조회 500·엔진 정지 진단 로그 수정과 DB 접근 제한, 남은 검증을 기록한다.
+
+[성 건설 작업 보고](../REPORT-build-rules.md)는 AC-INT-28의 세 능력 조회 회귀 수정, 건설 수치·저장·서버 응답과 실제 DB 롤백 검증을 기록한다.

@@ -15,7 +15,7 @@ import { replayArchive, resourceHash, type ReplayArchiveV5 } from './replay';
 async function transitionArchive(baselineActiveTick: number | null = null, human = false) {
   const initial = await monthlyFixture();
   if (human) initial.generals[0]!.userId = 'human';
-  let replay = initialReplayState(initial);
+  let replay = initialReplayState(initial, {});
   let sequence = 0;
   const months: ReplayArchiveV5['months'] = [];
   const step = () => {

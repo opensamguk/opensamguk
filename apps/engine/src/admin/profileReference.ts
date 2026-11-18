@@ -27,6 +27,14 @@ export function matchesPinnedFeatureProfile(
         : {}),
       featureData: Object.fromEntries(keys.map((key) => [key, origin.featureData?.[key]])),
     });
-    return parsed.success && hashState(parsed.data) === reference.contentHash;
+    if (!parsed.success) return false;
+    if (hashState(parsed.data) === reference.contentHash) return true;
+    const upgrade = origin.featureData?.['city-upgrade-v1'];
+    if (upgrade === undefined) return false;
+    const configured = featureProfileSchema.safeParse({
+      ...parsed.data,
+      featureData: { ...parsed.data.featureData, 'city-upgrade-v1': upgrade },
+    });
+    return configured.success && hashState(configured.data) === reference.contentHash;
   });
 }

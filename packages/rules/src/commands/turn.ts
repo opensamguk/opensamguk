@@ -1,3 +1,4 @@
+import { canExecuteCityUpgradeCommand, shiftCityLandTurns } from '../cityUpgrade/upgrade';
 import type { CommandResolver } from './resolve';
 import { rngFor } from '@opensamguk/shared';
 import { BALANCE } from '../balance';
@@ -92,6 +93,7 @@ export function runGeneralTurn(
       if (
         !canExecuteNationCommand(take.officerLevel, slot.commandKey) &&
         !canExecuteCityNationCommand(next, take.officerLevel, slot.commandKey) &&
+        !canExecuteCityUpgradeCommand(next, take.officerLevel, slot.commandKey) &&
         !canExecuteResearchNationCommand(next, take.officerLevel, slot.commandKey)
       )
         throw new PersonnelInvariantError('직책 칸 명령과 인자가 올바르지 않습니다.');
@@ -154,6 +156,12 @@ export function runGeneralTurn(
       );
     }
     nation = { commandKey: slot.commandKey, result, nationId };
+  }
+  const resize = nation && !('code' in nation.result) ? nation.result.cityResize : undefined;
+  if (resize && state.generals[actor.generalId]?.cityKey === resize.cityKey) {
+    const shifted = structuredClone(command);
+    shiftCityLandTurns([shifted], resize);
+    command = shifted;
   }
   const instructed = pendingMove?.length
     ? { state: next, order: undefined }

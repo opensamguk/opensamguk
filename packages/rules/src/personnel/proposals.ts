@@ -1,3 +1,4 @@
+import { canExecuteCityUpgradeCommand } from '../cityUpgrade/upgrade';
 import { z } from 'zod';
 import { canExecuteNationCommand } from './permissions';
 import { canExecuteCityNationCommand } from '../cityResources/commands';
@@ -30,6 +31,7 @@ export function canApproveProposal(
   return (
     canExecuteNationCommand(level, key) ||
     canExecuteCityNationCommand(world, level, key) ||
+    canExecuteCityUpgradeCommand(world, level, key) ||
     canExecuteResearchNationCommand(world, level, key)
   );
 }

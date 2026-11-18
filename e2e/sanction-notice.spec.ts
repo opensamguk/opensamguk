@@ -4,7 +4,7 @@ import type { CDPSession, Route, TestInfo } from '@playwright/test';
 import { test, expect, apiMutate, apiQuery, type T210World } from './t210-fixture';
 import { TEST_PASSWORD } from './account';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { holdLease, releaseHold } from './game';
@@ -95,18 +95,9 @@ async function prepare(world: T210World) {
         portraitMap: '191-map',
         seed: `sanction-notice-${index}`,
       });
-      initial.ruleFeatures = [
-        'campaign-v1',
-        'five-stats',
-        'operational-map',
-        'personnel',
-        'policy',
-        'stratagem-basic',
-        'treaty',
-      ];
       expect(initial.nations).toHaveLength(21);
       expect(initial.generals).toHaveLength(491);
-      const { worldId } = await saveInitialWorld(db, initial, {
+      const { worldId } = await saveFixtureWorld(db, initial, {
         name: `제재 안내 정식191 ${index}`,
         turnTermMinutes: 60,
         endYear: 201,
@@ -120,6 +111,7 @@ async function prepare(world: T210World) {
           worldId,
           name: `안내장수${human}`,
           portraitId: null,
+          sex: 'MALE',
           leadership: 55,
           strength: 55,
           intel: 55,

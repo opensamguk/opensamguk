@@ -25,6 +25,7 @@ const prepareRecordSchema = z.strictObject({
   commandKey: storedString.min(1),
   args: preparedArgsSchema,
   term: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  cityLevel: z.number().int().min(1).max(9).optional(),
 });
 const nationKey = z
   .string()

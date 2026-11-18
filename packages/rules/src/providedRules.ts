@@ -7,6 +7,8 @@ export const providedRuleKeys: readonly string[] = Object.freeze([
   'capturable-field-v1',
   'city-resources-v1',
   'city-scale-v1',
+  'city-upgrade-v1',
+  'construction-v1',
   'court-rank-v1',
   'equipment-v1',
   'five-stats',

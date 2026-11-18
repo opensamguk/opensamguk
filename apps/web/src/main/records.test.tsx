@@ -10,6 +10,7 @@ afterEach(cleanup);
 // AppRouter 출력 모양의 synthetic summary다. 시작 연도 300, 한 달 10,000 tick(turnTermMinutes 1, msPerTick 6),
 // 종료 연도 결과 300년 12월, 결정 tick 120,000, 로그 tick 119,999. 실제 API 증거가 아니다.
 const running: WorldSummary = {
+  fogOfWar: false,
   name: '시험 월드',
   status: 'RUNNING',
   startYear: 300,
@@ -31,6 +32,7 @@ const running: WorldSummary = {
 };
 
 const ended = (): WorldSummary => ({
+  fogOfWar: false,
   name: '시험 월드',
   status: 'ENDED',
   startYear: 300,

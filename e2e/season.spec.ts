@@ -93,6 +93,7 @@ async function createGeneral(page: Page, worldId: string, world: Awaited<ReturnT
   await mutate(page, 'general.create', {
     worldId,
     name: newGeneralName(),
+    sex: 'MALE',
     leadership: 55,
     strength: 55,
     intel: 55,

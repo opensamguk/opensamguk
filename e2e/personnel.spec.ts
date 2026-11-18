@@ -10,7 +10,7 @@ import {
 import { writeFile } from 'node:fs/promises';
 import { setTimeout as delay } from 'node:timers/promises';
 import { controlClock } from '../apps/engine/src/world/clock';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld } from './worldFixture';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { createAccount, withE2eDb } from './account';
@@ -50,13 +50,12 @@ async function personnelWorld(): Promise<string> {
       map: 'che',
       seed: `e2e-personnel-${Date.now()}`,
     });
-    return saveInitialWorld(db, initial, {
+    return saveFixtureWorld(db, initial, {
       name: 'E2E 인사 대기 월드',
       // 인사 접수 시험에 실시간 월간 캐치업이 끼지 않게 한다. 실행권만 쥐어도 시계는 흐른다.
       turnTermMinutes: 60,
       endYear: 300,
       replayFormat: 3,
-      ruleFeatures: ['personnel', 'policy'],
     });
   });
   hold = await holdLease(worldId);
@@ -417,7 +416,7 @@ test('재접속: 처리 중에 새로 고치면 다시 처리 중이고 결과 �
 });
 
 // 아래 사례(탭을 닫은 사이 끝난 접수)의 CI 간헐 실패 진단 (T4-77 AC-P2-26 B). 실패할 때만 고정 구조 JSON을 남긴다.
-// 화이트리스트만 적는다: 세 조회의 절차 이름·HTTP status·tRPC 오류 code·상대 시각, mine의 인사 플래그,
+// 화이트리스트만 적는다: 세 조회의 절차 이름·HTTP status·tRPC 오류 code·상대 시각,
 // recent의 kind/status 개수와 이번 접수 포함 여부, 이번 접수의 InputEvent 상태·안내 이력 포함 여부(boolean).
 // URL·본문·헤더·쿠키·계정·requestId 원문은 적지 않는다. DOM은 Playwright error-context가 맡는다.
 const RECOVERY_RPCS = ['auth.me', 'general.mine', 'personnel.recent'] as const;
@@ -429,7 +428,6 @@ interface RecoveryCall {
   httpStatus: number | null;
   networkFailed: boolean;
   errorCode: string | null;
-  personnelEnabled?: boolean | null;
   recent?: { count: number; byKindStatus: Record<string, number>; includesCurrent: boolean } | null;
 }
 const RECOVERY_KINDS = ['personnel.appoint', 'personnel.dismiss', 'offer.respond'];
@@ -512,12 +510,6 @@ function recoveryDiagnostic(context: BrowserContext, currentRequestId: () => str
             entry.errorCode =
               typeof code === 'string' && /^[A-Z_]{1,40}$/.test(code) ? code : item?.error ? 'other' : null;
             const data = item?.result?.data;
-            if (entry.procedure === 'general.mine')
-              entry.personnelEnabled =
-                data && typeof data === 'object'
-                  ? (data as { creationRules?: { personnelEnabled?: unknown } }).creationRules?.personnelEnabled ===
-                    true
-                  : null;
             if (entry.procedure === 'personnel.recent') {
               if (!Array.isArray(data)) {
                 entry.recent = null;

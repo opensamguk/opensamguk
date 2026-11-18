@@ -683,7 +683,7 @@ export function OperationalWorldMap({
         </div>
       ) : null}
       <p className={styles.help}>
-        드래그나 방향키로 이동 · 확대 뒤 도시·관문 선택 · 항구는 도시 시설 · 전장은 지명 표시
+        드래그나 방향키로 이동 · 확대 뒤 도시와 관문 선택 · 항구는 도시 시설 · 전장은 지명 표시
       </p>
     </div>
   );

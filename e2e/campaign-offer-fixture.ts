@@ -13,7 +13,7 @@ import {
 import type { OfferRuntime } from './campaign-offer-ci-stack';
 import type { readCampaignBoard } from '../apps/server/src/game/campaignApi';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -378,20 +378,11 @@ export class OfferFixture {
               portraitMap: '191-map',
               seed: 'int11-offer-controlled-npc-v1',
             });
-            initial.ruleFeatures = [
-              'campaign-v1',
-              'five-stats',
-              'operational-map',
-              'personnel',
-              'policy',
-              'stratagem-basic',
-              'treaty',
-            ];
             expect(initial.generals).toHaveLength(491);
             expect(initial.nations).toHaveLength(21);
             this.scope.check();
             this.progress('world-persist');
-            const result = await saveInitialWorld(db, initial, {
+            const result = await saveFixtureWorld(db, initial, {
               name: `휘하 실제 대조 ${i}`,
               turnTermMinutes: 60,
               endYear: 201,
@@ -415,6 +406,8 @@ export class OfferFixture {
         await user.page.getByLabel('이름', { exact: true }).fill(`제안장수${index}`);
         await user.page.getByRole('button', { name: '고르게 나누기' }).click();
         this.progress('human-create-input');
+        // 성별은 늘 필수다(가문 규칙 상시, D-104).
+        await user.page.getByRole('radio', { name: '남', exact: true }).check();
         await user.page.getByRole('button', { name: '장수 만들기', exact: true }).click();
         await expect
           .poll(() => hold.db.inputEvent.count({ where: { worldId, kind: 'general.create', status: 'PENDING' } }))

@@ -6,7 +6,7 @@ import { lineageStateSchema } from '../packages/rules/src/index';
 import { newSession } from '../apps/server/src/auth/session';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { test, expect, type LegalStack } from './legalFixture';
 
@@ -41,12 +41,11 @@ test('AC-P2-32 실제 성별 선택·사람 혼인 수락·계승 동의와 세 
   initial.diplomacies = initial.diplomacies.map((row) => ({ ...row, state: 'NON_AGGRESSION', untilTick: 300000 }));
   const config = structuredClone(lineageTestConfig);
   config.birth.comingOfAgeYears = 1;
-  const { worldId } = await saveInitialWorld(stack.db, initial, {
+  const { worldId } = await saveFixtureWorld(stack.db, initial, {
     name: '가문 화면 검증',
     turnTermMinutes: 60,
     endYear: null,
     replayFormat: 3,
-    ruleFeatures: ['lineage-v1', 'personnel', 'policy'],
     featureData: { 'lineage-v1': config },
   });
   await controlClock(stack.db, worldId, 'start');

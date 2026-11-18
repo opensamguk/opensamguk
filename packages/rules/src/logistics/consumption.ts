@@ -41,7 +41,7 @@ function costFailure(
   const stock = state.cities[String(cityKey)];
   if (!stock) throw new Error('물류 소비 거점이 없습니다.');
   if (LOGISTICS_GOODS.some((good) => stock[good] < cost[good]))
-    return { code: 'NO_GOODS', message: '도시의 철·목재·말이 부족합니다.' };
+    return { code: 'NO_GOODS', message: '도시의 철, 목재, 말이 부족합니다.' };
   if (LOGISTICS_GOODS.some((good) => cost[good] > 0) && !logisticsQuantity.safeParse(state.revision + 1).success)
     return { code: 'BAD_STATE', message: '물류 변경 횟수의 한도에 도달했습니다.' };
   return null;

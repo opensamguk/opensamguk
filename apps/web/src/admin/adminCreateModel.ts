@@ -28,6 +28,8 @@ export type CreateDraft = {
   endYear: string;
   seedMode: 'auto' | 'custom';
   seed: string;
+  /** 안개(다른 나라 정보 가리기). 모든 규칙은 늘 켜지고 이것만 월드마다 고른다 (D-104). */
+  fogOfWar: boolean;
 };
 export type CreateReview = Readonly<{
   revision: string;
@@ -55,6 +57,7 @@ export const createDraft = (): CreateDraft => ({
   endYear: '',
   seedMode: 'auto',
   seed: '',
+  fogOfWar: false,
 });
 export function initialCreateProfile(options: CreateOptions, preferredId = 'san10-191') {
   return (
@@ -165,11 +168,7 @@ export function reviewCreation(
         : integer(draft.endYear, changed.length ? 1 : profile.startYear, 10000, 'endYear'),
     seed,
     recruitmentLocation: 'city' as const,
-    // 일반 조합에서 칸을 바꾸면 생략하고 서버가 판에서 기능을 계산한다.
-    // 확장 묶음은 서버가 featureProfileKey와 ruleFeatures의 정확한 묶음 일치를 요구하므로 바꿔도 프로필 목록을 유지한다.
-    ...(profile.featureProfileKey === undefined && changed.length > 0
-      ? {}
-      : { ruleFeatures: Object.freeze([...profile.ruleFeatures]) as string[] }),
+    fogOfWar: draft.fogOfWar,
   };
   return Object.freeze({
     revision: options.revision,
@@ -187,14 +186,7 @@ export function reviewCreation(
 }
 export function freezeCreation(review: CreateReview, idempotencyKey: string): CreateCommand {
   if (!uuid(idempotencyKey)) throw new Error('요청 번호를 준비하지 못했습니다.');
-  // ruleFeatures를 생략한 검토는 생략한 채 보낸다. 빈 배열로 바꾸면 서버 계산과 다른 요청이 된다.
-  const input = {
-    ...review.input,
-    ...(review.input.ruleFeatures === undefined
-      ? {}
-      : { ruleFeatures: Object.freeze([...review.input.ruleFeatures]) as string[] }),
-    idempotencyKey,
-  };
+  const input = { ...review.input, idempotencyKey };
   return Object.freeze({ review, input: Object.freeze(input) });
 }
 /** FAILED 응답은 서버 문구를 우선 보이고, 비어 있을 때만 고정 문구를 쓴다. */

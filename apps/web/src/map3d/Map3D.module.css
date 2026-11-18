@@ -85,6 +85,58 @@
   margin-left: -1px;
   background: #3b2f22;
 }
+/* 세력 깃발 그림(tools/map-data/flag-strip.py 띠, 네 장면 68×160). 흰 천에 세력색을 곱하고, 그림의 알파로 가린다.
+   천은 장면 가로 21~71%, 세로 19~83% 자리다. */
+.banner {
+  --frame: 17px;
+  position: relative;
+  display: block;
+  width: var(--frame);
+  height: 40px;
+  background-color: var(--nation);
+  background-image: var(--flag);
+  background-size: calc(var(--frame) * 4) 100%;
+  background-blend-mode: multiply;
+  mask-image: var(--flag);
+  mask-size: calc(var(--frame) * 4) 100%;
+  animation: banner-wave 1.2s steps(4) infinite;
+}
+.bannerText {
+  position: absolute;
+  left: 21%;
+  width: 50%;
+  top: 24%;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+  color: #fff;
+  text-shadow:
+    0 0 2px rgb(0 0 0 / 70%),
+    0 1px 1px rgb(0 0 0 / 60%);
+}
+@keyframes banner-wave {
+  from {
+    background-position-x: 0;
+    mask-position: 0 0;
+  }
+  to {
+    background-position-x: calc(var(--frame) * -4);
+    mask-position: calc(var(--frame) * -4) 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .banner {
+    animation: none;
+  }
+}
+.site[data-compact='true'] .banner {
+  --frame: 12px;
+  height: 28px;
+}
+.site[data-compact='true'] .bannerText {
+  font-size: 7px;
+}
 .site:disabled {
   cursor: default;
 }
@@ -111,6 +163,21 @@
   background: rgb(34 26 18 / 80%);
   border: 1px solid rgb(201 164 92 / 85%);
   pointer-events: none;
+}
+/* 전장·나루 이름(D-096): 깃발 없이 작은 이름만, 크게 볼 때만 보인다. */
+.minor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 0 4px;
+  font-size: 10px;
+  line-height: 15px;
+  color: #3b2d1e;
+  background: rgb(244 236 216 / 78%);
+  border-radius: 2px;
+  white-space: nowrap;
+  pointer-events: none;
+  visibility: hidden;
 }
 .stats {
   position: absolute;

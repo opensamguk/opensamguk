@@ -1,5 +1,5 @@
 import { TRPCError } from '@trpc/server';
-import { equipmentSlotSchema, equipmentBonus, fiveStatsSchema, withEquipmentBonus } from '@opensamguk/rules';
+import { equipmentSlotSchema, equipmentBonus, generalStats, withEquipmentBonus } from '@opensamguk/rules';
 import { requirePersonnelSession } from './personnelAdmission';
 import { personnelIdentity, type PersonnelActorContext } from './personnelApi';
 import { requireWorld, requireGeneral, readView } from './queries';
@@ -20,7 +20,13 @@ export function readEquipmentBoard(ctx: PersonnelActorContext, worldId: string, 
       const slots = equipment.generals[String(general.id)] ?? {};
       const actor = { generalId: general.id };
       const { leadership, strength, intel, politics, charm } = state.generals[general.id]!;
-      const baseStats = fiveStatsSchema.parse({ leadership, strength, intel, politics, charm });
+      const baseStats = generalStats({
+        leadership,
+        strength,
+        intel,
+        ...(politics === undefined ? {} : { politics }),
+        ...(charm === undefined ? {} : { charm }),
+      });
       return {
         generalId: general.id,
         slots,

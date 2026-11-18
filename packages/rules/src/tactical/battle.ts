@@ -6,6 +6,7 @@ import {
   type TacticalFrame,
   type TacticalEvent,
 } from '@opensamguk/shared';
+import { visionRange, movementCost, ignite, updateWeather, resolveFire, terrainDefense } from './environment';
 import { simulateBattle } from '../battle/simulate';
 import { BALANCE } from '../balance';
 import type { DeepReadonly } from '../model/world';
@@ -30,6 +31,10 @@ export function battleStateHash(b: BattleState) {
     traps: b.traps,
     schemes: b.schemes,
     siege: b.siege,
+    weather: b.weather,
+    wind: b.wind,
+    burningCells: b.burningCells,
+    board: b.board,
     result: b.result,
   });
 }
@@ -81,9 +86,17 @@ export function visibleTo(b: DeepReadonly<BattleState>, s: BattleSide, cell: { x
   const origins = [
     ...b.units
       .filter((u) => u.side === s && u.troops > 0 && u.status !== 'routed')
-      .map((u) => ({ x: u.x, y: u.y, range: 3 })),
-    ...b.bases.filter((o) => o.owner === s).map((o) => ({ x: o.x, y: o.y, range: 2 })),
+      .map((u) => ({ x: u.x, y: u.y, range: visionRange(b, u) })),
+    ...b.bases.filter((o) => o.owner === s).map((o) => ({ x: o.x, y: o.y, range: visionRange(b, o, 2) })),
   ];
+  if (
+    cell.x < 0 ||
+    cell.y < 0 ||
+    cell.x >= b.board.width ||
+    cell.y >= b.board.height ||
+    !b.cells[cell.y * b.board.width + cell.x]?.sourceTileId
+  )
+    return false;
   return origins.some((o) => {
     const steps = distance(o, cell);
     if (steps > o.range) return false;
@@ -98,6 +111,8 @@ export function visibleTo(b: DeepReadonly<BattleState>, s: BattleSide, cell: { x
 export function recordBattleFrame(b: BattleState, events: TacticalEvent[]) {
   const frame: TacticalFrame = {
     turn: b.turn,
+    environment: { weather: b.weather, wind: b.wind },
+    burningCells: structuredClone(b.burningCells),
     units: b.units.map((u) => ({
       id: u.id,
       side: u.side,
@@ -110,8 +125,10 @@ export function recordBattleFrame(b: BattleState, events: TacticalEvent[]) {
       y: u.y,
       status: u.status,
       role: u.role,
+      vision: visionRange(b, u),
+      injury: u.injury,
     })),
-    bases: b.bases.map((o) => ({ id: o.id, x: o.x, y: o.y, kind: o.kind, owner: o.owner })),
+    bases: b.bases.map((o) => ({ id: o.id, x: o.x, y: o.y, kind: o.kind, structure: o.structure, owner: o.owner })),
     totals: Object.fromEntries(
       sides.map((s) => {
         const units = b.units.filter((u) => u.side === s && alive(u));
@@ -134,7 +151,12 @@ export function recordBattleFrame(b: BattleState, events: TacticalEvent[]) {
   else b.frames[existing] = frame;
   for (const s of sides) {
     const view = structuredClone(frame);
-    view.units = view.units.filter((u) => u.side === s || visibleTo(b, s, u));
+    view.units = view.units.filter((u) => u.side === s || (u.status !== 'ambush' && visibleTo(b, s, u)));
+    view.visibleCells = b.cells.flatMap((_, index) => {
+      const cell = { x: index % b.board.width, y: Math.floor(index / b.board.width) };
+      return visibleTo(b, s, cell) ? [cell] : [];
+    });
+    view.burningCells = (view.burningCells ?? []).filter((c) => visibleTo(b, s, c));
     const ids = new Set(view.units.map((u) => u.id));
     view.events = view.events.filter(
       (e) =>
@@ -156,7 +178,9 @@ export function closeCouncil(b: BattleState) {
     b.sides.attack.morale = 100;
     b.sides.defend.morale = 70;
   }
-  if (b.defense === 'ambush') for (const u of b.units.filter((u) => u.side === 'defend')) u.status = 'ambush';
+  if (b.defense === 'ambush')
+    for (const u of b.units.filter((u) => u.side === 'defend'))
+      if (['forest', 'mountain'].includes(b.board.terrain[u.y * b.board.width + u.x]!)) u.status = 'ambush';
   b.frames = [];
   b.views = { attack: [], defend: [] };
   recordBattleFrame(b, []);
@@ -172,7 +196,14 @@ function selectedAction(b: BattleState, u: BattleUnitState): BattleAction | null
       (c.kind === 'troopsBelow' && u.troops < c.value) ||
       (c.kind === 'atCell' && c.x === u.x && c.y === u.y) ||
       (c.kind === 'enemyVisible' &&
-        b.units.some((v) => v.side !== u.side && alive(v) && visibleTo(b, u.side, v) && distance(u, v) <= c.range))
+        b.units.some(
+          (v) =>
+            v.side !== u.side &&
+            alive(v) &&
+            v.status !== 'ambush' &&
+            visibleTo(b, u.side, v) &&
+            distance(u, v) <= c.range,
+        ))
     )
       return rule.then;
   }
@@ -210,7 +241,9 @@ function move(
     if (!next) break;
     if (!canBattleStep(b, u, u, next)) break;
     const terrain = b.board.terrain[next.y * b.board.width + next.x]!;
-    const cost = terrain === 'mountain' ? 3 : ['forest', 'marsh'].includes(terrain) ? 2 : 1;
+    const cost =
+      movementCost(terrain) +
+      (b.board.objects.some((o) => o.kind === 'rubble' && o.x === next.x && o.y === next.y) ? 1 : 0);
     if (cost > remaining) break;
     const cell = b.cells[next.y * b.board.width + next.x]!;
     const sp = u.side === 'attack' ? cell.spCost : cell.defendSpCost;
@@ -221,6 +254,7 @@ function move(
       break;
     }
     if (u.sp !== null) u.sp -= sp;
+    if (u.status === 'ambush') u.status = 'normal';
     u.x = next.x;
     u.y = next.y;
     remaining -= cost;
@@ -229,9 +263,10 @@ function move(
     if (trap) {
       trap.spent = true;
       trap.revealed = true;
+      if (trap.kind === 'fire') ignite(b, u, 'trap');
       if (trap.kind === 'pit') remaining = 0;
       else if (trap.kind === 'poison') morale(b, u.side, -5);
-      else u.troops = Math.max(0, u.troops - Math.ceil(u.troops * 0.05));
+      else if (trap.kind !== 'fire') u.troops = Math.max(0, u.troops - Math.ceil(u.troops * 0.05));
       events.push({ kind: 'trap', targetId: u.id, text: `${trap.kind} 함정 발동` });
       if (!u.troops || !b.sides[u.side].morale) break;
     }
@@ -330,9 +365,14 @@ export function resolveBattleTurn(
   const beforeHash = battleStateHash(b),
     events: TacticalEvent[] = [];
   b.turn++;
+  updateWeather(b);
   const haste = new Set<BattleSide>();
   for (const scheme of b.schemes.filter((s) => !s.used && s.turn === b.turn)) {
     scheme.used = true;
+    if (scheme.kind === 'fire' && b.weather === 'downpour') {
+      events.push({ kind: 'scheme', text: `${scheme.side} 호우로 화계 취소` });
+      continue;
+    }
     const cost = scheme.kind === 'search' ? 2 : 3;
     if (b.sides[scheme.side].schemePoints < cost) {
       events.push({ kind: 'scheme', text: `${scheme.side} 책략 점수 부족` });
@@ -341,7 +381,12 @@ export function resolveBattleTurn(
     b.sides[scheme.side].schemePoints -= cost;
     if (scheme.kind === 'inspire') morale(b, scheme.side, 10);
     if (scheme.kind === 'haste') haste.add(scheme.side);
-    if (scheme.kind === 'search') for (const t of b.traps) if (distance(t, scheme) <= 1) t.revealed = true;
+    if (scheme.kind === 'fire') ignite(b, scheme, `scheme:${scheme.side}`);
+    if (scheme.kind === 'search') {
+      for (const t of b.traps) if (distance(t, scheme) <= 1) t.revealed = true;
+      for (const u of b.units)
+        if (u.side !== scheme.side && u.status === 'ambush' && distance(u, scheme) <= 1) u.status = 'normal';
+    }
     events.push({ kind: 'scheme', text: `${scheme.side} ${scheme.kind}` });
   }
   const resolved: BattleOrder[] = [];
@@ -355,7 +400,7 @@ export function resolveBattleTurn(
     if (b.phase === 'ended') break;
     if (!alive(u)) continue;
     const enemies = b.units
-      .filter((v) => v.side !== u.side && alive(v) && visibleTo(b, u.side, v))
+      .filter((v) => v.side !== u.side && alive(v) && v.status !== 'ambush' && visibleTo(b, u.side, v))
       .sort((a, c) => distance(u, a) - distance(u, c) || a.id - c.id);
     const direct = orders.find((o) => o.unitId === u.id)?.action;
     const action =
@@ -376,8 +421,10 @@ export function resolveBattleTurn(
         (b.siege.gate > 0 || b.siege.defense > 0) &&
         distance(u, b.exits.defend) <= u.range
       ) {
+        if (u.status === 'ambush') u.status = 'normal';
         siegeExchange(b, u, unitSet, events);
       } else if (target && distance(u, target) <= u.range) {
+        if (u.status === 'ambush') u.status = 'normal';
         const beforeA = u.troops,
           beforeD = target.troops;
         const result = simulateBattle(
@@ -394,8 +441,17 @@ export function resolveBattleTurn(
             unitSet,
             attackerFirstVolleyUsed: u.volley,
             siege: target.volley,
-            attackerModifiers: u.combat,
-            defenderModifiers: target.combat,
+            attackerModifiers: {
+              ...u.combat,
+              taken: [...u.combat.taken, { source: 'field:earthwork', op: 'mul', value: terrainDefense(b, u) }],
+            },
+            defenderModifiers: {
+              ...target.combat,
+              taken: [
+                ...target.combat.taken,
+                { source: 'field:earthwork', op: 'mul', value: terrainDefense(b, target) },
+              ],
+            },
             coefMode: 'multiply',
           },
           rngFor(b.seed, 'tactical', b.rulesVersion, b.id, b.turn, u.id, 'exchange'),
@@ -442,6 +498,10 @@ export function resolveBattleTurn(
       }
     }
     if (defeat(b, events) || b.phase !== original.phase) break;
+  }
+  if (b.phase !== 'ended') {
+    resolveFire(b, events);
+    defeat(b, events);
   }
   if (b.phase !== 'ended') {
     for (const base of b.phase !== original.phase ? [] : b.bases) {

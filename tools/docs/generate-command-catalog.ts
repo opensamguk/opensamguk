@@ -18,6 +18,8 @@ const presetDir = new URL('../../resources/preset/', import.meta.url);
 const catalogFile = new URL('../../docs/user/command-catalog.generated.md', import.meta.url);
 const headings = { domestic: '내정', military: '군사', strategy: '전략', personal: '개인', nation: '국가' };
 const fieldLabels = {
+  slotId: '건설 자리',
+  building: '건물 종류',
   cityKey: '대상 도시',
   nationId: '대상 국가',
   generalId: '대상 장수',

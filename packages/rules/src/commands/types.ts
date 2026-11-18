@@ -13,6 +13,7 @@ export interface Actor {
   campaignOrderId?: number;
 }
 export interface Failure {
+  clearPreparation?: boolean;
   code:
     | 'NO_ACTOR'
     | 'NOT_NATION'
@@ -48,6 +49,7 @@ export interface LogEntry {
 }
 export interface CommandResult {
   effects: Effect[];
+  cityResize?: import('../cityUpgrade/upgrade').CityResize;
   logs: LogEntry[];
   reports?: { generalId: number; text: string }[];
   // 실제로 해결한 공격의 점령 전 대상이다. 알림·보고용이며 상태에는 넣지 않는다.

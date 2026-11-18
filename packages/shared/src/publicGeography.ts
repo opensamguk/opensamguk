@@ -9,6 +9,7 @@ const site = z
     name: z.string().min(1).max(60),
     kind: z.enum(['CITY', 'PASS', 'PORT', 'FIELD']),
     position: point,
+    /** 거점 설명(시나리오 기획판 아티팩트의 사서 요약, 사용자 2026-11-14: "설명을 아티팩트에 있는거를 가져와"). */
     description: z.string().max(600).optional(),
     siteLevel: z.number().int().min(0).max(9).optional(),
     anchorKey: z.number().int().positive().optional(),

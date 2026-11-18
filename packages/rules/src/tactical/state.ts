@@ -1,5 +1,10 @@
 import { z } from 'zod';
 import {
+  battleTerrainSchema,
+  battleWeatherSchema,
+  battleWindSchema,
+  battleObjectSchema,
+  battleStructureSchema,
   battlePlanSchema,
   battleActionSchema,
   battleCellSchema,
@@ -27,6 +32,7 @@ export const tacticalUnitSchema = z.object({
   intelligence: n,
   leadership: n,
   strength: n,
+  injury: n.max(100).default(0),
   x: n.max(63),
   y: n.max(63),
   sp: n.max(100).nullable(),
@@ -84,12 +90,14 @@ export const tacticalBattleSchema = z.object({
   turnMs: n,
   councilMs: n,
   mapHash: z.string(),
+  weather: battleWeatherSchema.default('clear'),
+  wind: battleWindSchema.default('E'),
+  burningCells: z.array(battleCellSchema).default([]),
   board: z.object({
     width: n.max(64),
     height: n.max(64),
-    terrain: z.array(
-      z.enum(['plain', 'grass', 'forest', 'mountain', 'river', 'ford', 'bridge', 'road', 'marsh', 'sea']),
-    ),
+    terrain: z.array(battleTerrainSchema),
+    objects: z.array(battleObjectSchema).default([]),
   }),
   exits: z.object({ attack: battleCellSchema, defend: battleCellSchema }),
   cells: z.array(z.object({ sourceTileId: z.string(), spCost: n.min(1).max(12), defendSpCost: n.min(1).max(12) })),
@@ -103,6 +111,7 @@ export const tacticalBattleSchema = z.object({
       id: n,
       ...battleCellSchema.shape,
       kind: z.enum(['contest', 'supply']),
+      structure: battleStructureSchema.default('camp'),
       owner: side.nullable(),
       rewarded: z.boolean(),
     }),
@@ -118,7 +127,7 @@ export const tacticalBattleSchema = z.object({
   schemes: z.array(
     z.object({
       side,
-      kind: z.enum(['inspire', 'haste', 'search']),
+      kind: z.enum(['inspire', 'haste', 'search', 'fire']),
       turn: n,
       ...battleCellSchema.shape,
       used: z.boolean(),

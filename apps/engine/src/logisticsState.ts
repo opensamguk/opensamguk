@@ -25,7 +25,11 @@ export function readStoredLogistics(value: unknown, state: Pick<WorldView, 'citi
 
 export async function assertStoredLogistics(tx: Prisma.TransactionClient, world: World): Promise<void> {
   const cities = await tx.city.findMany({ where: { worldId: world.id } });
-  const attached = attachOperationalKinds(cities, readOperationalMap(world.operationalMap, world.replayOrigin));
+  const attached = attachOperationalKinds(
+    cities,
+    readOperationalMap(world.operationalMap, world.replayOrigin),
+    world.campaignState,
+  );
   const state = {
     cities: Object.fromEntries(attached.map((city) => [city.cityKey, city])),
   };

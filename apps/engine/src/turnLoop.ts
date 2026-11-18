@@ -25,7 +25,7 @@ import {
 import { appendNationHistory, persistCommandReports, commandRealtimeSignals } from './commandPersistence';
 import { assertLease, databaseNow, lockLease, type Lease } from './lease';
 import { loadWorld, loadWorldAfterCapabilityCheck } from './worldLoader';
-import { persistEffects, shiftTurns } from './persist';
+import { persistEffects, shiftTurns, persistCityLandTurns } from './persist';
 import { persistMonthly, loadReplayState } from './monthly';
 import { hashState } from '@opensamguk/shared/node';
 import { processInputs, processPendingInput } from './inputs';
@@ -337,6 +337,8 @@ export class TurnLoop {
             treatiesHash !== hashState(turn.state.treaties ? { treaties: turn.state.treaties } : {})
           )
             throw new Error('턴 실행 중 조약 목록이 바뀌었습니다.');
+          const resize = turn.nation && !('code' in turn.nation.result) ? turn.nation.result.cityResize : undefined;
+          if (resize) await persistCityLandTurns(tx, worldId, state, resize, actor, slots);
           const commandKey = turn.commandKey;
           const result = turn.result;
           const failed = 'code' in result;

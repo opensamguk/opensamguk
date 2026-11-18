@@ -118,7 +118,7 @@ beforeEach(() => {
   wire.handlers.clear();
   on('auth.me', () => ({ user: { id: 'u1' } }));
   on('home.get', () => ({ nation: null }));
-  on('general.mine', () => ({ general: null, creationRules: { campaignEnabled: false } }));
+  on('general.mine', () => ({ general: null, creationRules: {} }));
   on('offers.mine', () => []);
   on('personnel.recent', () => []);
 });
@@ -136,7 +136,7 @@ describe('받은 제안함', () => {
     on('home.get', () => ({ nation: { id: 1 } }));
     on('general.mine', () => ({
       general: { id: 1 },
-      creationRules: { campaignEnabled: true, personnelEnabled: true },
+      creationRules: {},
     }));
     on('offers.mine', () => [offer]);
     on('campaign.get', () => board);
@@ -162,20 +162,6 @@ describe('받은 제안함', () => {
     expect(screen.queryByText('받은 제안이 없습니다')).toBeNull();
   });
 
-  // 서버 general.mine의 personnelEnabled가 정본이다. false이거나 키가 없으면(구형 서버) 인사 조회를 부르지 않는다 (PR377).
-  it.each([{ personnelEnabled: false }, {}])(
-    '인사 기능이 없는 월드는 발령·인사 조회 없이 빈 상태를 보인다 %o',
-    async (rules) => {
-      on('general.mine', () => ({ general: { id: 1 }, creationRules: { campaignEnabled: false, ...rules } }));
-      on('offers.mine', () => {
-        throw serverError('PRECONDITION_FAILED', '인사 기능이 없는 월드입니다.');
-      });
-      renderPage();
-      expect(await screen.findByText('받은 제안이 없습니다')).toBeTruthy();
-      expect(wire.calls.some((call) => call.path === 'offers.mine' || call.path === 'personnel.recent')).toBe(false);
-    },
-  );
-
   it('조약을 볼 수 없는 월드는 오류 없이 빈 상태로 둔다', async () => {
     on('home.get', () => ({ nation: { id: 1 } }));
     on('treaty.list', () => {
@@ -200,7 +186,7 @@ describe('메뉴의 제안함 수', () => {
     return <span>제안 수 {useInboxCount('w1')}</span>;
   }
   it('권한자가 받은 열린 상신을 조회해 메뉴 수에 더한다', async () => {
-    on('general.mine', () => ({ general: { id: 1 }, creationRules: { personnelEnabled: true } }));
+    on('general.mine', () => ({ general: { id: 1 }, creationRules: {} }));
     on('proposals.list', () => [{ id: 'proposal-1' }, { id: 'proposal-2' }]);
     render(
       <QueryClientProvider client={client}>

@@ -2,7 +2,7 @@
 // react-three-fiber는 쓰지 않는다. 그 패키지 정보(외부 주소)가 번들에 들어가 공개 자산 검사에 걸리고,
 // three 전체를 묶어 덩어리가 커진다. 필요한 부품만 가져온다.
 import {
-  Box3,
+  CanvasTexture,
   DataTexture,
   NearestFilter,
   SRGBColorSpace,
@@ -12,7 +12,6 @@ import {
   Color,
   ConeGeometry,
   IcosahedronGeometry,
-  CylinderGeometry,
   DoubleSide,
   Fog,
   PCFShadowMap,
@@ -28,25 +27,26 @@ import {
   Object3D,
   OrthographicCamera,
   PlaneGeometry,
-  RingGeometry,
   Scene,
   Vector3,
   WebGLRenderer,
   Vector4,
   NoToneMapping,
 } from 'three';
-import { loadGlbMesh } from './glbMesh';
 import { PaintPass } from './paintPass';
 import { GradePass, STYLE, styleMaterial } from './style';
 import { RepeatWrapping, TextureLoader, type Texture } from 'three';
-import { pickModel, regionTint, TIER_LOD, tileFill, zoomTier, type ZoomTier } from './siteModels';
+import { pickModel, regionTint, tileFill, zoomTier, type ZoomTier } from './siteModels';
 import type { PublicGeography } from '@opensamguk/shared';
 import { roadWalks, TERRAINS, waterLanes, type Terrain } from '../main/terrainTiles';
 import { ROAD_CELL } from '../main/roadPixels';
 import { bounds as riverBounds, lines as riverData } from './data/rivers';
 import { along, cellsToPoints, dashLine, simplify } from './routes3d';
 import { fromTile, territoryTiles, tileBounds, toTile } from './territory3d';
+import { buildRoadNetwork, type PassOrient, type RoadSegment, type RoadSite } from './roadNetwork';
+import { paintRoads } from './roadPaint';
 import { planTileRoutes, type RouteMode, type TileTerrain } from './tileRoutes';
+import { shoreDistance, snapToChannel, type WaterDetail } from './waterLine';
 import type { DrawnNation } from '../main/siteMarkers';
 import type { ModelCity } from '../main/mapModel';
 import {
@@ -84,21 +84,26 @@ export const TILE = 8;
 /** 2D 지도 거점 그림 한 장: 정사각 그림 한 변(px), 바닥 가운데 픽셀(왼쪽 위 기준), 바닥 마름모 가로(px), 원래 너비·키. */
 type SiteSprite = {
   texture: Texture;
-  /** 그림 크기(px). 정사각이면 한 변, 아니면 [가로, 세로](조립한 성 그림). */
+  /** 그림 크기(px). 정사각이면 한 변, 아니면 [가로, 세로]. */
   size: number | [number, number];
   anchor: [number, number];
   basePx: number;
   /** Blender로 찍은 모형 그림만: 원래 너비·키(높은 모형을 줄일 때). 그린 그림에는 없다. */
   width?: number;
   height?: number;
-  /** 가장 크게 볼 때 쓰는 고해상도 그림(`sprites/hd/<이름>.png`, 같은 틀을 키운 것)이 있는지. */
+  /** 가장 크게 볼 때 쓰는 고해상도 그림(`sprites/hd/<이름>.<ext>`, 같은 틀을 키운 것)이 있는지. */
   hd?: boolean;
+  /** 그림 파일 확장자. 이미지 저장소판은 'webp'(publish-map-assets.py), 개발 폴더는 없음(png). */
+  ext?: string;
 };
-const NEUTRAL = '#d6d0c4';
+/** 거점 그림 닿음 판정에 쓰는 불투명 판의 한 변 칸 수. */
+const MASK = 96;
 const TERRAIN_TEXTURES = ['grass', 'field', 'dirt', 'forest', 'rock', 'cliff', 'snow', 'sand'] as const;
 /** 노멀맵을 쓰는 질감(땅 결·바위 결). 표본기 수를 아끼려고 둘만 쓴다. */
 const TERRAIN_NORMALS = ['grass', 'rock'] as const;
 const LAKE = TERRAINS.indexOf('lake');
+const RIVER = TERRAINS.indexOf('river');
+const SEA_CELLS = new Set(['sea', 'deepSea', 'shallow'].map((name) => TERRAINS.indexOf(name as never)));
 
 // 영지 칸 그리기. 월드 xz를 45° 돌린 칸 좌표로 바꿔 칸 자료를 읽고,
 // - 가는 칸 격자(멀리서는 흐린다)와 소유국 색 옅은 칠,
@@ -200,7 +205,9 @@ vec3 territoryColor(vec3 base, vec2 xz) {
   float edge = min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y));
   // 칸 격자는 칸이 화면에서 약 60px 넘게 보일 때만(확대 3·4단계). 그보다 멀면 국경·나라 색만 남긴다.
   // 화풍 규격(STYLE-GUIDE 2.6): 격자는 지도 전체에 가는 흰 선(약 28%), 산 위에도 그린다. 칸이 화면에서 너무 작아지면(약 8px 미만) 뺀다.
-  float grid = (1.0 - smoothstep(0.0, pxTile * 1.1, edge)) * (1.0 - smoothstep(0.06, 0.12, pxTile));
+  // 격자는 천하 전도의 것이다(사용자 2026-11-14: "저 격자는 전체 맵에 쓰는거고"). 크게 볼 때(칸이 화면에서 약
+  // 180px 넘게) 흐려져 400px에서 없어진다. 참고 그림의 확대 장면(e94d)에는 격자가 없다.
+  float grid = (1.0 - smoothstep(0.0, pxTile * 1.1, edge)) * (1.0 - smoothstep(0.06, 0.12, pxTile)) * smoothstep(0.0025, 0.0056, pxTile);
   color = mix(color, vec3(1.0, 0.98, 0.92), grid * (own.a > 0.0 ? 0.28 : 0.2));
   vec4 sides[4];
   sides[0] = tileAt(cell + vec2(-1.0, 0.0));
@@ -229,8 +236,10 @@ vec3 territoryColor(vec3 base, vec2 xz) {
     bool nation = distance(own.rgb, other.rgb) > 0.01 || ((own.a > 0.0) != (other.a > 0.0));
     bool city = abs(own.a - other.a) > 0.001;
     if (!nation && !city) continue;
-    // 주인 없는 땅끼리의 도시 경계는 긋지 않는다(빈 땅이 금줄로 어지럽지 않게).
-    if (!nation && !hasNation(own) && !hasNation(other)) continue;
+    // 땅 위 도시 영지 경계(금줄)는 주인과 상관없이 모두 긋는다(INT-27 기록, 사용자 2026-11-14: "땅도 경계를
+    // 그리기로 하지 않았나?"). 주인 없는 영지와 물·오지 사이는 긋지 않는다. 호수·강가 땅 한 칸이 테두리에 갇혀
+    // 그림 빠진 거점 칸처럼 보였다(사용자 2026-11-14: "빠진 아이콘이 있는거 같은데 전체맵에서").
+    if (nation && !hasNation(own) && !hasNation(other)) continue;
     float width = nation ? 2.6 : 1.3;
     float line = 1.0 - smoothstep(pxTile * width * 0.5, pxTile * (width * 0.5 + 1.0), dist[k]);
     vec3 ink = vec3(0.93, 0.8, 0.5);
@@ -239,8 +248,6 @@ vec3 territoryColor(vec3 base, vec2 xz) {
   }
   return color;
 }`;
-
-const WALL = '#cbbd9e';
 
 // 지형·물 셰이더가 함께 쓰는 잡음. hash2·noise2·fbm은 부드러운 얼룩, ridged는 산 능선처럼 날 선 기복이다.
 const TERRAIN_NOISE = `
@@ -301,13 +308,67 @@ export class MapScene {
   private readonly grid: TerrainCells;
   private models: Mesh[] = [];
   /** 받아 둔 GLB 거점 모형(이름 → 거리 단계별 기하·재질). 개발 미리보기(?models=)와 승인 모형이 채운다. */
-  private modelSet = new Map<string, Array<{ geometry: BufferGeometry; material: Mesh['material']; box: Box3 }>>();
   private siteModelMeshes: Array<{ lod: number; mesh: InstancedMesh }> = [];
   private spriteSet = new Map<string, SiteSprite>();
   private waterMesh: Mesh | null = null;
   private spriteBase = '';
   /** 거점 그림 이름 → 그 그림의 재질과 그림이 놓인 지도 자리(고해상도 교체용). */
   private spriteUses = new Map<string, { material: MeshBasicMaterial; spots: Array<{ x: number; z: number }> }>();
+  /** 거점 그림이 놓인 판(월드 xz, 왼쪽 위·크기). 그림 위에 마우스를 올렸는지 가린다(`siteAtScreen`). */
+  private spriteHits: Array<{
+    siteId: string;
+    name: string;
+    flip: boolean;
+    x0: number;
+    z0: number;
+    w: number;
+    h: number;
+  }> = [];
+  /** 그림마다 줄인 불투명 판(가로·세로 MASK칸). 투명한 곳은 그림에 닿은 것으로 치지 않는다. */
+  private spriteMasks = new Map<string, Uint8Array | null>();
+  private terrainGeometry: PlaneGeometry | null = null;
+  /** 육로 칸 경로와 거점 칸(길 그물 다시 만들기용). */
+  private landPlan: {
+    paths: Array<{ tiles: number[]; major: boolean }>;
+    centre: (tile: number) => { x: number; y: number };
+    sites: Array<{ site: Site; tile: number }>;
+  } | null = null;
+  private landMeshes: Mesh[] = [];
+  /** 다리(길 방향·자리·길이)와 나룻배 길(물을 길게 건너는 구간). 굽기에 쓴다. */
+  private bridges: Array<{ x: number; y: number; angle: number; length: number }> = [];
+  private ferries: Array<Array<{ x: number; y: number }>> = [];
+  /** 수로·해로 뱃길(굽기에 쓴다)과 그 점선 띠(굽고 나면 감춘다). */
+  private waterRoutes: Array<{ sea: boolean; points: Array<{ x: number; y: number }> }> = [];
+  /** 물 지도가 들어오면 칸 길을 다시 찾을 때 쓴다(applyWaterMask). */
+  private geography: PublicGeography;
+  /** 정밀 물 지도와 기슭까지 거리(waterLine.ts). 수로를 강 가운데로 그린다. */
+  private waterDetail: WaterDetail | null = null;
+  /** 그림 지도에 길이 이미 구워져 있다(loadPaintedRegion prebaked). bakeRoads가 다시 칠하지 않는다. */
+  private roadsPrebaked = false;
+  private shore: Float32Array | null = null;
+  private waterRibbons: Mesh[] = [];
+  /** 육로 띠(굽고 나면 감춘다). */
+  private roadRibbons: Mesh[] = [];
+  /** 그림 지도 원본(길을 다시 구울 때 쓴다). */
+  private paintedSource: { image: HTMLImageElement; rect: [number, number, number, number] } | null = null;
+  /** 길 그물 토막(그림 지도 굽기에 쓴다). */
+  private roadSegments: RoadSegment[] = [];
+  /** 관문마다 길에 맞춘 그림 방향. */
+  private passOrient = new Map<string, PassOrient>();
+  private levelOf: (anchorKey: number) => number | undefined = () => undefined;
+  private readonly minorSites: AnchorSite[];
+  /** 그림 지도에서 읽은 물 지도(지형 꼭짓점마다 1 물). 있으면 땅·물 판정의 기준이다(applyWaterMask). */
+  private waterMask: Uint8Array | null = null;
+  private lastTerritory: Parameters<MapScene['setTerritory']> | null = null;
+  /** 영지 칸 주인(도시 key, 없으면 -1)과 칸 원점·크기. 빈 칸 풍선(`tileAtScreen`)에 쓴다. */
+  private territoryOwner: {
+    owner: Int32Array;
+    data: Uint8Array;
+    originX: number;
+    originY: number;
+    columns: number;
+    rows: number;
+  } | null = null;
   /** 고해상도 그림: 받는 중이면 null. */
   private spriteHd = new Map<string, Texture | null>();
   /** 2D 지도: 거점 id → 이름판을 그림 꼭대기로 올릴 지도 거리. */
@@ -400,15 +461,26 @@ transformed += normalize(normal) * 0.012;`,
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = PCFShadowMap;
     this.canvasSize = map.canvas;
+    this.geography = map;
+    // 전장·나루(D-096 싸움터·명소, 항구): 소유·영지가 없는 지도 표현이라 그림만 얹는다.
+    this.minorSites = map.sites
+      .filter((site) => site.kind === 'FIELD' || site.kind === 'PORT')
+      .map((site) => ({ ...site, anchorKey: -1 }) as AnchorSite);
     this.grid = grid;
     const metres = heights ? decodeMetres(heights) : null;
     const depth = heights ? decodeDepth(heights, grid.columns, grid.rows) : null;
     this.field = metres ? heightFieldFromMetres(grid, metres, depth) : heightField(grid);
     this.flattenSitePads(map);
-    // 2D 그림 지도: 땅은 평평하게(물 칸만 물높이 아래로 둬 바다·호수가 보이게).
-    if (FLAT_MAP)
+    // 2D 그림 지도: 땅은 평평하게(물 칸만 물높이 아래로 둬 바다·호수가 보이게). 땅·물은 지형 칸 종류로만 정한다.
+    // 높이 자료로 정하면 해수면 아래로 잡힌 땅(산동 반도 동쪽 끝 등)이 물이 되어 격자·영지가 빠지고 오지로 남았다
+    // (사용자 2026-11-14: "해안에 오지가 남아있는데").
+    if (FLAT_MAP) {
+      const waterCells = new Set(
+        ['sea', 'deepSea', 'shallow', 'lake', 'river'].map((name) => TERRAINS.indexOf(name as never)),
+      );
       for (let i = 0; i < this.field.length; i++)
-        this.field[i] = this.field[i]! <= WATER_LEVEL ? WATER_LEVEL - 0.6 : 0.02;
+        this.field[i] = waterCells.has(this.grid.cells[i]!) ? WATER_LEVEL - 0.6 : 0.02;
+    }
 
     // 하늘빛(위)과 땅에서 되비치는 흙빛(아래). 해가 낮아 능선의 명암이 또렷하다.
     // 화풍 규격(style.ts): 하늘빛 채움 하나 + 해 하나. 그늘에 바탕색의 약 45%가 남는다.
@@ -454,6 +526,7 @@ transformed += normalize(normal) * 0.012;`,
     const { width, height } = this.canvasSize;
     const geometry = new PlaneGeometry(width, height, this.grid.columns - 1, this.grid.rows - 1);
     geometry.rotateX(-Math.PI / 2);
+    this.terrainGeometry = geometry;
     const position = geometry.getAttribute('position');
     for (let i = 0; i < position.count; i++) position.setY(i, this.field[i]!);
     const colors = realisticColors(this.grid, palette, this.field, metres);
@@ -600,8 +673,9 @@ float snow = smoothstep(${(4300 * UNITS_PER_METRE).toFixed(2)}, ${(5200 * UNITS_
 diffuseColor.rgb = mix(diffuseColor.rgb, mix(vec3(0.93, 0.94, 0.96), sampleTex(t_snow, vGround.xz) * 1.05, uTexOn * 0.7), snow * (1.0 - pIn));
 if (vGround.y > 0.0) diffuseColor.rgb = territoryColor(diffuseColor.rgb, vGround.xz);
 // 육로는 칸 직선(drawRoads) 대신 곡선 띠 메시로 그린다(사용자 2026-11-14: 길이 부자연스럽다). 칸 길 자료는 규칙용으로 남긴다.
-// 오지(무대 밖 땅): 색을 빼고 어둡게 해 게임 무대 밖임을 보인다.
-if (vGround.y > 0.05 && tileAt(floor(vec2(vGround.x * 0.5 + vGround.z, vGround.z - vGround.x * 0.5) / ${TILE.toFixed(1)})).a == 0.0) {
+// 오지(무대 밖 땅): 색을 빼고 어둡게 해 게임 무대 밖임을 보인다. 2D 그림 지도는 땅 높이가 0.02라 기준을 0으로 둔다.
+vec4 landTile = tileAt(floor(vec2(vGround.x * 0.5 + vGround.z, vGround.z - vGround.x * 0.5) / ${TILE.toFixed(1)}));
+if (landTile.a == 0.0 && landTile.b > 0.0) {
   float grey = dot(diffuseColor.rgb, vec3(0.3, 0.55, 0.15));
   diffuseColor.rgb = mix(diffuseColor.rgb, vec3(grey) * 0.72, 0.65);
 }`,
@@ -781,19 +855,40 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
       const to = siteById.get(route.to);
       if (!route.enabled || !from || !to) return [];
       const mode: RouteMode = seaIds.has(route.id) ? 'SEA' : (route.mode as RouteMode);
+      const size = (site: Site) =>
+        site.kind === 'PASS' ? 7 : site.kind === 'CITY' ? ((site as { level?: number }).level ?? 5) : 0;
       return [
         {
           id: route.id,
           mode,
           from: indexOf(from.position.x, from.position.y),
           to: indexOf(to.position.x, to.position.y),
+          priority: size(from) + size(to),
         },
       ];
     });
     const siteTiles = map.sites
       .filter((site) => site.kind === 'CITY' || site.kind === 'PASS')
       .map((site) => indexOf(site.position.x, site.position.y));
-    const plan = planTileRoutes(columns, rows, terrainAt, routes, siteTiles);
+    // 칸 안 아홉 점 중 하나라도 그림 속 물이면 수로가 지날 수 있는 칸이다(칸보다 가는 황하). 정밀 물 지도가 있으면 그것을 본다.
+    const detail = this.waterDetail;
+    const wetPoint = (x: number, y: number) => {
+      if (!detail) return this.rawGround(x, y) < 0;
+      const px = Math.floor((x / this.canvasSize.width) * detail.width);
+      const py = Math.floor((y / this.canvasSize.height) * detail.height);
+      return px >= 0 && py >= 0 && px < detail.width && py < detail.height && detail.data[py * detail.width + px] === 1;
+    };
+    const wetAt = (index: number) => {
+      const u = originX + (index % columns);
+      const v = originY + Math.floor(index / columns);
+      for (const du of [0.2, 0.5, 0.8])
+        for (const dv of [0.2, 0.5, 0.8]) {
+          const { x, y } = fromTile(u + du, v + dv, this.canvasSize, TILE);
+          if (wetPoint(x, y)) return true;
+        }
+      return false;
+    };
+    const plan = planTileRoutes(columns, rows, terrainAt, routes, siteTiles, wetAt);
     // 셰이더 질감: R 육로, G 물길, B 표시.
     const data = new Uint8Array(columns * rows * 4);
     for (let i = 0; i < columns * rows; i++) {
@@ -824,59 +919,49 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
         if (cells) this.routeLines.set(route.id, simplify(cellsToPoints(cells)));
       }
     }
-    // 육로: 칸 경로를 곡선으로 다듬어 땅에 붙는 두 겹 띠로 그린다(어두운 테두리 + 흙색 길).
-    // 성·관문 칸의 모형 자리 안쪽은 잘라 길이 모형을 뚫지 않게 한다.
-    const siteCentres = map.sites
-      .filter((site) => site.kind === 'CITY' || site.kind === 'PASS')
-      .map((site) => this.tileCentre(site.position.x, site.position.y));
-    const cut = TILE * 0.42;
-    const landLines: Array<Array<{ x: number; y: number }>> = [];
-    for (const route of routes) {
-      if (route.mode === 'RIVER' || route.mode === 'SEA') continue;
-      const line = this.routeLines.get(route.id);
-      if (!line || line.length < 2) continue;
-      const smooth = smoothLine(line, 0.6);
-      let piece: Array<{ x: number; y: number }> = [];
-      for (const point of smooth) {
-        const inside = siteCentres.some((c) => Math.hypot(point.x - c.x, point.y - c.y) < cut);
-        if (inside) {
-          if (piece.length > 1) landLines.push(piece);
-          piece = [];
-        } else piece.push(point);
-      }
-      if (piece.length > 1) landLines.push(piece);
-    }
-    const roadEdge = new Mesh(
-      this.ribbon(landLines, 0.78, 0.1),
-      styleMaterial({
-        color: '#5b4630',
-        roughness: 1,
-        depthWrite: false,
-        side: DoubleSide,
-        polygonOffset: true,
-        polygonOffsetFactor: -1,
-        polygonOffsetUnits: -4,
+    // 육로: 칸 경로를 길 그물로 모아(roadNetwork.ts) 토막마다 한 번 그린다. 성문·관문 문에 붙이므로 도시 규모가 들어오면
+    // 다시 만든다(setSites → landRoads).
+    const levelOfSite = new Map(map.sites.map((site) => [site.id, (site as { level?: number }).level]));
+    const weight = (id: string) => {
+      const site = siteById.get(id);
+      if (!site) return 0;
+      if (site.kind === 'PASS') return 7;
+      if (site.kind !== 'CITY') return 0;
+      return levelOfSite.get(id) ?? 5;
+    };
+    this.landPlan = {
+      paths: routes.flatMap((route) => {
+        if (route.mode === 'RIVER' || route.mode === 'SEA') return [];
+        const tiles = plan.paths.get(route.id);
+        const source = map.routes.find((item) => item.id === route.id)!;
+        return tiles ? [{ tiles, major: Math.min(weight(source.from), weight(source.to)) >= 7 }] : [];
       }),
-    );
-    roadEdge.renderOrder = 1;
-    const roadFill = new Mesh(
-      this.ribbon(landLines, 0.5, 0.12),
-      styleMaterial({
-        color: '#cdb487',
-        roughness: 1,
-        side: DoubleSide,
-        polygonOffset: true,
-        polygonOffsetFactor: -1,
-        polygonOffsetUnits: -6,
-      }),
-    );
-    roadFill.renderOrder = 2;
+      centre,
+      sites: map.sites.map((site) => ({ site, tile: indexOf(site.position.x, site.position.y) })),
+    };
     // 물길 점선: 수로는 옅은 물빛, 해로는 흰색.
     const dashes: Record<'RIVER' | 'SEA', Array<Array<{ x: number; y: number }>>> = { RIVER: [], SEA: [] };
+    this.waterRoutes = [];
     for (const route of routes) {
       if (route.mode !== 'RIVER' && route.mode !== 'SEA') continue;
-      const line = this.routeLines.get(route.id);
-      if (line) dashes[route.mode].push(...dashLine(line, 1.4, 1.0));
+      let line = this.routeLines.get(route.id);
+      if (route.mode === 'RIVER') {
+        // 그림에 없는 운하(백구)는 칸 경로가 없어 두 거점을 곧게 잇는다.
+        if (!line) {
+          const source = map.routes.find((item) => item.id === route.id)!;
+          const from = siteById.get(source.from);
+          const to = siteById.get(source.to);
+          if (from && to) line = [from.position, to.position];
+        }
+        // 강을 따라가는 수로는 강 한가운데로(사용자 2026-11-14 "수로는 만약 강에 있으면 강 안에 수로를 그려").
+        if (line && this.waterDetail && this.shore)
+          line = snapToChannel(line, this.waterDetail, this.shore, this.waterDetail.width / this.canvasSize.width);
+        if (line) this.routeLines.set(route.id, line);
+      }
+      if (!line) continue;
+      dashes[route.mode].push(...dashLine(line, 1.4, 1.0));
+      // 굽기용: 칸 경로를 부드럽게 다듬은 뱃길(사용자 2026-11-14: "수로도 구워주고").
+      this.waterRoutes.push({ sea: route.mode === 'SEA', points: smoothLine(line, 0.6) });
     }
     const meshes: Mesh[] = (['RIVER', 'SEA'] as const).map(
       (mode) =>
@@ -891,6 +976,78 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
           }),
         ),
     );
+    this.waterRibbons = meshes;
+    this.landRoads();
+    return meshes;
+  }
+
+  /**
+   * 육로 그물을 띠와 다리로 그린다. 도시 규모(성 그림 크기)가 바뀌면 다시 부른다. 대로는 넓고 소로는 좁다.
+   * 2D 그림 지도에 굽기(loadPaintedRegion)도 이 토막을 쓴다.
+   */
+  private landRoads(levelOf: (anchorKey: number) => number | undefined = () => undefined) {
+    if (!this.landPlan) return;
+    for (const mesh of this.landMeshes) {
+      this.scene.remove(mesh);
+      mesh.geometry.dispose();
+    }
+    this.landMeshes = [];
+    const passOrients: PassOrient[] = [
+      'a',
+      'b',
+      ...(['h', 'v'] as const).filter((o) => this.spriteSet.has(`pass-${o}`)),
+    ];
+    const byTile = new Map<number, RoadSite>();
+    for (const { site, tile } of this.landPlan.sites) {
+      const level =
+        site.anchorKey === undefined ? undefined : (levelOf(site.anchorKey) ?? (site as { level?: number }).level);
+      byTile.set(tile, {
+        id: site.id,
+        kind: site.kind,
+        centre: this.tileCentre(site.position.x, site.position.y),
+        width: 2 * TILE * tileFill(site.kind, level),
+        passOrients: FLAT_MAP ? passOrients : ['a', 'b'],
+      });
+    }
+    const { segments, passOrient } = buildRoadNetwork(this.landPlan.paths, this.landPlan.centre, (tile) =>
+      byTile.get(tile),
+    );
+    this.passOrient = passOrient;
+    this.roadSegments = segments;
+    const landLines = segments.map((segment) => segment.points);
+    const built: Mesh[] = [];
+    // 옛길: 어두운 테두리 대신 흙빛 가장자리, 대로는 조금 넓다(사용자 2026-11-14: "현대식으로 만들지 말고").
+    for (const major of [false, true]) {
+      const lines = segments.filter((segment) => segment.major === major).map((segment) => segment.points);
+      if (!lines.length) continue;
+      const edge = new Mesh(
+        this.ribbon(lines, major ? 0.72 : 0.5, 0.1),
+        styleMaterial({
+          color: '#8a6e48',
+          roughness: 1,
+          depthWrite: false,
+          side: DoubleSide,
+          polygonOffset: true,
+          polygonOffsetFactor: -1,
+          polygonOffsetUnits: -4,
+        }),
+      );
+      edge.renderOrder = 1;
+      const fill = new Mesh(
+        this.ribbon(lines, major ? 0.5 : 0.32, 0.12),
+        styleMaterial({
+          color: major ? '#d2ba8c' : '#c4a978',
+          roughness: 1,
+          side: DoubleSide,
+          polygonOffset: true,
+          polygonOffsetFactor: -1,
+          polygonOffsetUnits: -6,
+        }),
+      );
+      fill.renderOrder = 2;
+      built.push(edge, fill);
+    }
+    this.roadRibbons = built.slice();
     // 다리: 강 칸을 지나는 육로 칸에 판자 다리를 세운다(길 방향으로 눕힌 상자). 다리 모형이 오면 바꾼다.
     // 다리: 곡선 길이 강 띠를 실제로 건너는 구간마다 하나. 자리·방향·길이를 그 구간에서 정한다.
     // 강을 따라 나란히 가는 길에는 다리를 놓지 않는다: 길이 강과 35° 넘게 엇갈리고 짧게 건너는 구간만.
@@ -920,7 +1077,7 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
           }
       return best;
     };
-    const bridges: Array<{ x: number; y: number; angle: number; length: number }> = [];
+    let bridges: Array<{ x: number; y: number; angle: number; length: number }> = [];
     for (const line of landLines) {
       let run: Array<{ x: number; y: number; dx: number; dy: number }> = [];
       const close = () => {
@@ -952,6 +1109,31 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
       }
       close();
     }
+    // 그림 지도의 물 지도가 있으면 길이 보이는 물을 건너는 구간마다 다리를 놓는다(짧으면 나무다리, 길면 나룻배 길).
+    // Natural Earth 강 선은 그림 속 강과 자리가 달랐다(사용자 2026-11-14: "다리도 수정해야 할 것 같은데").
+    this.ferries = [];
+    if (this.waterMask) {
+      bridges = [];
+      const wet = (p: { x: number; y: number }) => this.rawGround(p.x, p.y) < 0;
+      for (const segment of segments) {
+        const points = segment.points;
+        let start = -1;
+        for (let i = 0; i <= points.length; i++) {
+          const inWater = i < points.length && wet(points[i]!);
+          if (inWater && start < 0) start = i;
+          if (!inWater && start >= 0) {
+            const a = points[Math.max(start - 1, 0)]!;
+            const b = points[Math.min(i, points.length - 1)]!;
+            const span = Math.hypot(b.x - a.x, b.y - a.y);
+            const angle = Math.atan2(b.y - a.y, b.x - a.x);
+            if (span <= 6) bridges.push({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, angle, length: span + 1.2 });
+            else this.ferries.push(points.slice(Math.max(start - 1, 0), Math.min(i + 1, points.length)));
+            start = -1;
+          }
+        }
+      }
+    }
+    this.bridges = bridges;
     if (bridges.length) {
       const deck = new InstancedMesh(new BoxGeometry(1, 1, 1), styleMaterial({ color: '#7a5634' }), bridges.length);
       const matrix = new Matrix4();
@@ -967,10 +1149,12 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
       });
       deck.castShadow = true;
       deck.receiveShadow = true;
-      meshes.push(deck);
+      built.push(deck);
+      this.roadRibbons.push(deck);
     }
-    meshes.push(roadEdge, roadFill);
-    return meshes;
+    for (const mesh of built) this.scene.add(mesh);
+    this.landMeshes = built;
+    this.bakeRoads();
   }
 
   // 강: Natural Earth 강 선을 땅 위 물 띠로 그린다. 강 선은 통합 지도(1000×700) 좌표라
@@ -1124,138 +1308,22 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
       mesh.geometry.dispose();
     }
     this.setTerritory(anchors, cityByKey, nationById);
-    const parts = anchors.length * 4;
-    // 성 받침: 성벽보다 조금 넓은 흙 단. 모형이 비탈에 묻히지 않고 놓인 것처럼 보인다.
-    const plinths = new InstancedMesh(
-      new BoxGeometry(1, 1, 1),
-      styleMaterial({ color: '#8f7a58', roughness: 0.95 }),
-      anchors.length,
-    );
-    // 영지 고리: 모든 도시 둘레에 소유국 색 고리(주인 없으면 옅은 회색). 고른 거점의 붉은 고리는 따로 둔다.
-    const rings = new InstancedMesh(
-      new RingGeometry(0.88, 1, 48).rotateX(-Math.PI / 2),
-      new MeshBasicMaterial({ transparent: true, opacity: 0.85, depthWrite: false }),
-      anchors.length,
-    );
-    const walls = new InstancedMesh(new BoxGeometry(1, 1, 1), styleMaterial({ roughness: 0.85 }), parts);
-    const towers = new InstancedMesh(new CylinderGeometry(0.5, 0.6, 1, 6), styleMaterial({ roughness: 0.85 }), parts);
-    const keeps = new InstancedMesh(new BoxGeometry(1, 1, 1), styleMaterial({ roughness: 0.8 }), anchors.length);
-    const roofs = new InstancedMesh(
-      new ConeGeometry(0.75, 1, 4),
-      styleMaterial({ roughness: 0.6 }),
-      anchors.length * 5,
-    );
-    const matrix = new Matrix4();
-    const color = new Color();
-    let w = 0;
-    let t = 0;
-    let r = 0;
-    const roof = (x: number, y: number, z: number, side: number, height: number, tint: string) => {
-      matrix
-        .makeRotationY(Math.PI / 4)
-        .scale(new Vector3(side, height, side))
-        .setPosition(x, y + height / 2, z);
-      roofs.setMatrixAt(r, matrix);
-      roofs.setColorAt(r++, color.set(tint));
-    };
-    anchors.forEach((site, index) => {
-      const city = cityByKey.get(site.anchorKey);
-      const nation = city?.nationId == null ? undefined : nationById.get(city.nationId);
-      const tint = nation?.color ?? NEUTRAL;
-      const { side, height } = siteSize(site.kind, city?.level);
-      const base = this.world(site.position.x, site.position.y);
-      const pad = site.kind === 'PASS' ? side * 1.9 : side * 1.35;
-      matrix.makeScale(pad, 1.2, site.kind === 'PASS' ? side * 0.7 : pad).setPosition(base.x, base.y - 0.3, base.z);
-      plinths.setMatrixAt(index, matrix);
-      const ringSize = side * (site.kind === 'PASS' ? 1.25 : 1.15);
-      matrix.makeScale(ringSize, 1, ringSize).setPosition(base.x, base.y + 0.35, base.z);
-      rings.setMatrixAt(index, matrix);
-      rings.setColorAt(index, color.set(nation?.color ?? '#9d968a'));
-      const half = side / 2;
-      const thick = Math.max(side * 0.1, 0.6);
-      const towerSize = thick * 2.2;
-      const sides =
-        site.kind === 'PASS'
-          ? [{ dx: 0, dz: 0, sx: side * 1.6, sz: thick * 1.6 }]
-          : [
-              { dx: 0, dz: -half, sx: side, sz: thick },
-              { dx: 0, dz: half, sx: side, sz: thick },
-              { dx: -half, dz: 0, sx: thick, sz: side },
-              { dx: half, dz: 0, sx: thick, sz: side },
-            ];
-      for (const wall of sides) {
-        matrix.makeScale(wall.sx, height, wall.sz).setPosition(base.x + wall.dx, base.y + height / 2, base.z + wall.dz);
-        walls.setMatrixAt(w, matrix);
-        walls.setColorAt(w++, color.set(WALL));
-      }
-      const corners =
-        site.kind === 'PASS'
-          ? [
-              [-side * 0.8, 0],
-              [side * 0.8, 0],
-            ]
-          : [
-              [-half, -half],
-              [half, -half],
-              [-half, half],
-              [half, half],
-            ];
-      for (const [dx, dz] of corners) {
-        const towerHeight = height * 1.5;
-        matrix
-          .makeScale(towerSize, towerHeight, towerSize)
-          .setPosition(base.x + dx!, base.y + towerHeight / 2, base.z + dz!);
-        towers.setMatrixAt(t, matrix);
-        towers.setColorAt(t++, color.set(WALL));
-        roof(base.x + dx!, base.y + towerHeight, base.z + dz!, towerSize * 1.5, towerSize * 0.9, tint);
-      }
-      const keepSide = site.kind === 'PASS' ? side * 0.5 : side * 0.45;
-      const keepHeight = height * (site.kind === 'PASS' ? 1.2 : 1.7);
-      matrix.makeScale(keepSide, keepHeight, keepSide).setPosition(base.x, base.y + keepHeight / 2, base.z);
-      keeps.setMatrixAt(index, matrix);
-      keeps.setColorAt(index, color.set('#e9dfc8'));
-      roof(base.x, base.y + keepHeight, base.z, keepSide * 1.45, keepSide * 0.7, tint);
-    });
-    walls.count = w;
-    towers.count = t;
-    roofs.count = r;
-    this.models = [plinths, walls, towers, keeps, roofs];
-    for (const mesh of this.models) {
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      this.scene.add(mesh);
-    }
-    this.rings = [rings];
-    this.scene.add(rings);
+    // 성 크기(규모)가 정해졌으니 길을 성문에 다시 붙인다.
+    this.levelOf = (key) => cityByKey.get(key)?.level;
+    this.landRoads(this.levelOf);
+    // 임시 상자 모형과 도시 둘레 고리(동그라미)는 지웠다(사용자 2026-11-14: "임시 상자모형도 지워", "동그라미 없애도
+    // 되지 않을까? 난잡해보인다"). 거점은 그림만, 소속은 깃발·영지 색으로 보인다.
+    this.models = [];
+    this.rings = [];
     this.lastSites = { anchors, cityByKey };
     this.placeSiteModels();
   }
 
   /**
-   * GLB 거점 모형을 받는다. 파일은 `<base>/<이름>-lod<0|1|2>.glb`이고 없는 이름은 건너뛴다.
-   * 모형마다 메시 하나(Rodin 결과)를 기대하며, 여럿이면 첫 메시를 쓴다.
+   * 거점 그림을 받는다(2D 그림 지도). 3D 모형(GLB)은 쓰지 않는다(사용자 2026-11-14: "3D 모델 가져오는거 빼버려").
    */
   async loadSiteModels(base: string, names: readonly string[]) {
-    if (FLAT_MAP) {
-      await this.loadSiteSprites(base, names);
-      return;
-    }
-    await Promise.all(
-      names.map(async (name) => {
-        try {
-          const lods = await Promise.all(
-            [0, 1, 2].map(async (lod) => {
-              const { geometry, material } = await loadGlbMesh(`${base}/${name}-lod${lod}.glb`);
-              return { geometry, material, box: geometry.boundingBox!.clone() };
-            }),
-          );
-          this.modelSet.set(name, lods);
-        } catch {
-          // 없는 모형은 건너뛴다(다음 후보나 임시 상자 모형을 쓴다).
-        }
-      }),
-    );
-    this.placeSiteModels();
+    await this.loadSiteSprites(base, names);
   }
 
   /**
@@ -1273,7 +1341,7 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
         .filter((name) => meta[name])
         .map(async (name) => {
           try {
-            const texture = await loader.loadAsync(`${base}/sprites/${name}.png`);
+            const texture = await loader.loadAsync(`${base}/sprites/${name}.${meta[name]!.ext ?? 'png'}`);
             texture.colorSpace = SRGBColorSpace;
             texture.anisotropy = 4;
             this.spriteSet.set(name, { ...meta[name]!, texture });
@@ -1282,6 +1350,8 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
           }
         }),
     );
+    // 가로·세로 관문 그림이 있는지 알았으니 관문 방향과 길을 다시 정한다.
+    this.landRoads(this.levelOf);
     this.placeSiteModels();
   }
 
@@ -1298,84 +1368,27 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     this.spriteHd.clear();
     for (const use of this.spriteUses.values()) use.material.dispose();
     this.spriteUses.clear();
-    const source: ReadonlyMap<string, unknown> = FLAT_MAP ? this.spriteSet : this.modelSet;
+    const source: ReadonlyMap<string, unknown> = this.spriteSet;
     if (!this.lastSites || source.size === 0) return;
     const available = new Set(source.keys());
     const groups = new Map<string, AnchorSite[]>();
-    for (const site of this.lastSites.anchors) {
+    for (const site of [...this.lastSites.anchors, ...this.minorSites]) {
       const level = this.lastSites.cityByKey.get(site.anchorKey)?.level;
-      const name = pickModel(site.kind, level, available);
+      let name = pickModel(site.kind, level, available, {
+        name: site.name,
+        region: this.lastSites.cityByKey.get(site.anchorKey)?.region,
+      });
+      // 관문은 길이 지나는 방향의 그림(가로·세로 성벽)을 고른다. 대각선 둘은 같은 그림을 좌우로 뒤집는다.
+      const orient = site.kind === 'PASS' ? this.passOrient.get(site.id) : undefined;
+      if (orient === 'h' && available.has('pass-h')) name = 'pass-h';
+      if (orient === 'v' && available.has('pass-v')) name = 'pass-v';
       if (!name) continue;
       const list = groups.get(name) ?? [];
       list.push(site);
       groups.set(name, list);
     }
-    const matrix = new Matrix4();
-    const scaleMatrix = new Matrix4();
-    const moveMatrix = new Matrix4();
-    const turn = new Matrix4().makeRotationY(Math.PI / 4);
-    const tint = new Color();
-    if (FLAT_MAP) this.placeSiteSprites(groups);
-    else
-      for (const [name, sites] of groups) {
-        const lods = this.modelSet.get(name)!;
-        lods.forEach(({ geometry, material, box }, lod) => {
-          const mesh = new InstancedMesh(geometry, material, sites.length);
-          const width = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) || 1;
-          sites.forEach((site, index) => {
-            const level = this.lastSites!.cityByKey.get(site.anchorKey)?.level;
-            // 모형은 영지 칸 한 칸 안에 든다. 거점이 놓인 칸의 가운데에 세우고 단계별 비율로 칸을 채운다.
-            const footprint = TILE * tileFill(site.kind, level);
-            // 발자국에 맞추되 키는 발자국을 넘지 않게 묶는다(관문 바위처럼 높은 모형이 탑처럼 솟지 않게).
-            const height = box.max.y - box.min.y || 1;
-            const scale = Math.min(footprint / width, (footprint * 0.55) / height);
-            const centre = this.tileCentre(site.position.x, site.position.y);
-            const base = this.world(centre.x, centre.y);
-            const cx = (box.min.x + box.max.x) / 2;
-            const cz = (box.min.z + box.max.z) / 2;
-            // 가운데를 원점에 두고 키우고, 45° 돌려 성벽이 마름모 영지 칸과 나란하게 한 뒤 거점 자리로 옮긴다.
-            matrix
-              .makeTranslation(-cx, -box.min.y, -cz)
-              .premultiply(scaleMatrix.makeScale(scale, scale, scale))
-              .premultiply(turn)
-              .premultiply(moveMatrix.makeTranslation(base.x, base.y - 0.25, base.z));
-            mesh.setMatrixAt(index, matrix);
-            mesh.setColorAt(index, tint.set(regionTint(this.lastSites!.cityByKey.get(site.anchorKey)?.region)));
-          });
-          mesh.castShadow = true;
-          mesh.receiveShadow = true;
-          mesh.visible = lod === 2;
-          this.scene.add(mesh);
-          this.siteModelMeshes.push({ lod, mesh });
-          // 카툰 윤곽선: 가까이 보는 두 단계(0·1)만. 같은 기하를 법선 방향으로 조금 부풀린 뒷면을 짙게 칠한다.
-          if (lod < 2) {
-            const outline = new InstancedMesh(geometry, this.outlineMaterial, sites.length);
-            outline.instanceMatrix.copy(mesh.instanceMatrix);
-            outline.visible = false;
-            this.scene.add(outline);
-            this.siteModelMeshes.push({ lod, mesh: outline });
-          }
-        });
-      }
-    // 영지 고리도 모형 크기·칸 가운데에 맞춘다.
-    const ringMesh = this.rings[0] as InstancedMesh | undefined;
-    if (ringMesh) {
-      const placed = new Set([...groups.values()].flat().map((site) => site.id));
-      this.lastSites.anchors.forEach((site, index) => {
-        if (!placed.has(site.id)) return;
-        const level = this.lastSites!.cityByKey.get(site.anchorKey)?.level;
-        const centre = this.tileCentre(site.position.x, site.position.y);
-        const base = this.world(centre.x, centre.y);
-        const radius = TILE * tileFill(site.kind, level) * 0.78;
-        matrix.makeScale(radius, 1, radius).setPosition(base.x, base.y + 0.7, base.z);
-        ringMesh.setMatrixAt(index, matrix);
-      });
-      ringMesh.instanceMatrix.needsUpdate = true;
-    }
+    this.placeSiteSprites(groups);
     if (this.selectedArgs[0]) this.setSelected(...this.selectedArgs);
-    const covered = [...groups.values()].reduce((sum, list) => sum + list.length, 0);
-    const allCovered = covered === this.lastSites.anchors.length;
-    for (const mesh of this.models) mesh.visible = !allCovered;
   }
 
   // 영지 칸 자료를 셰이더 질감으로 올린다. 도시만 영지를 갖고, 관문·항구·전장은 갖지 않는다.
@@ -1384,8 +1397,10 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     cityByKey: ReadonlyMap<number, ModelCity>,
     nationById: ReadonlyMap<number, DrawnNation>,
   ) {
+    this.lastTerritory = [anchors, cityByKey, nationById];
+    // D-096: 단계 3 이하(무·수·현·관 코드) 도시는 소유·영지 대상이 아니다. 그 칸은 이웃 큰 도시의 영지가 된다.
     const cities = anchors
-      .filter((site) => site.kind === 'CITY')
+      .filter((site) => site.kind === 'CITY' && (cityByKey.get(site.anchorKey)?.level ?? 5) > 3)
       .map((site) => {
         const city = cityByKey.get(site.anchorKey);
         const nation = city?.nationId == null ? undefined : nationById.get(city.nationId);
@@ -1401,8 +1416,19 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
       cities,
       this.canvasSize,
       TILE,
-      (x, y) => groundAt(this.field, this.grid, this.canvasSize, x, y) > 0 && this.rawGround(x, y) > 0.05,
-      (x, y) => this.cellAt(x, y) === LAKE,
+      // 2D 그림 지도는 땅 높이를 모두 0.02로 눕힌다(물만 물높이 아래). 높이 0.05 기준을 그대로 쓰면 성 칸 말고는
+      // 땅이 없어져 영지가 한 칸이 됐다(사용자 2026-11-14: "도시 영지 경계가 한개인데?").
+      // 2D 지도에서는 이웃 격자점을 섞는 groundAt이 물(-0.6) 가까운 땅(0.02)을 음수로 읽어 바닷가·강가 땅이 주인 없이
+      // 남았다(구멍 213칸). 가장 가까운 격자점 값만 본다.
+      (x, y) =>
+        FLAT_MAP
+          ? this.rawGround(x, y) > 0
+          : groundAt(this.field, this.grid, this.canvasSize, x, y) > 0 && this.rawGround(x, y) > 0.05,
+      // 영지에 드는 물(호수·강). 물 지도가 있으면 그림의 물 가운데 옛 지형 자료가 바다라고 하지 않는 곳이다.
+      (x, y) =>
+        this.waterMask
+          ? this.rawGround(x, y) < 0 && !SEA_CELLS.has(this.cellAt(x, y))
+          : this.cellAt(x, y) === LAKE || this.cellAt(x, y) === RIVER,
     );
     const texture = new DataTexture(tiles.data, tiles.columns, tiles.rows);
     texture.magFilter = NearestFilter;
@@ -1411,6 +1437,7 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     texture.needsUpdate = true;
     this.territory.map.value.dispose();
     this.territory.map.value = texture;
+    this.territoryOwner = tiles;
     this.territory.origin.value.set(tiles.originX, tiles.originY);
     this.territory.count.value.set(tiles.columns, tiles.rows);
   }
@@ -1429,17 +1456,27 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
   // 그림의 바닥 마름모가 영지 칸 마름모(가로 2·TILE)에 단계별 비율로 맞게 키우고, 바닥 가운데를 칸 가운데에 둔다.
   // 남쪽(화면 아래) 그림이 북쪽 그림을 덮도록 남쪽일수록 조금 높이 둔다.
   private placeSiteSprites(groups: Map<string, AnchorSite[]>) {
+    this.spriteHits = [];
     const matrix = new Matrix4();
     const tint = new Color();
     const plane = new PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
     for (const [name, sites] of groups) {
       const sprite = this.spriteSet.get(name)!;
-      const material = new MeshBasicMaterial({ map: sprite.texture, alphaTest: 0.35, alphaToCoverage: true });
+      // 좌우로 뒤집은 관문은 판의 뒷면이 보이므로 양면으로 그린다.
+      const material = new MeshBasicMaterial({
+        map: sprite.texture,
+        alphaTest: 0.35,
+        alphaToCoverage: true,
+        side: DoubleSide,
+      });
       const mesh = new InstancedMesh(plane, material, sites.length);
       const spots: Array<{ x: number; z: number }> = [];
       this.spriteUses.set(name, { material, spots });
       // 높은 모형(관문 바위 등)은 키가 바닥 너비의 0.55배를 넘지 않게 함께 줄인다(3D 때와 같은 규칙).
       const squeeze = sprite.width && sprite.height ? Math.min(1, (0.55 * sprite.width) / sprite.height) : 1;
+      const mask = this.spriteMask(name);
+      const firstRow = mask ? mask.findIndex((value) => value === 1) : -1;
+      const top = firstRow >= 0 ? Math.floor(firstRow / MASK) / MASK : 0.08;
       sites.forEach((site, index) => {
         const level = this.lastSites!.cityByKey.get(site.anchorKey)?.level;
         const perPx = ((2 * TILE * tileFill(site.kind, level)) / sprite.basePx) * squeeze;
@@ -1449,10 +1486,21 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
         const z = centre.y - this.canvasSize.height / 2 + (h / 2 - sprite.anchor[1]) * perPx;
         const lift = 2 + centre.y / this.canvasSize.height;
         spots.push({ x: centre.x - this.canvasSize.width / 2, z: centre.y - this.canvasSize.height / 2 });
-        matrix.makeScale(w * perPx, 1, h * perPx).setPosition(x, lift, z);
+        const flip = name === 'pass' && this.passOrient.get(site.id) === 'b';
+        matrix.makeScale((flip ? -1 : 1) * w * perPx, 1, h * perPx).setPosition(x, lift, z);
+        this.spriteHits.push({
+          siteId: site.id,
+          name,
+          flip,
+          x0: x - (w * perPx) / 2,
+          z0: z - (h * perPx) / 2,
+          w: w * perPx,
+          h: h * perPx,
+        });
         mesh.setMatrixAt(index, matrix);
         mesh.setColorAt(index, tint.set(regionTint(this.lastSites!.cityByKey.get(site.anchorKey)?.region)));
-        this.labelLift.set(site.id, sprite.anchor[1] * perPx * 0.92);
+        // 이름판은 그림의 그려진 위 끝 바로 위(틀 위쪽 빈 곳을 빼고)에 둔다.
+        this.labelLift.set(site.id, (sprite.anchor[1] - top * h) * perPx);
       });
       this.scene.add(mesh);
       this.siteModelMeshes.push({ lod: -1, mesh });
@@ -1477,7 +1525,7 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
       const held = this.spriteHd.get(name);
       if (wanted && held === undefined) {
         this.spriteHd.set(name, null);
-        void new TextureLoader().loadAsync(`${this.spriteBase}/sprites/hd/${name}.png`).then(
+        void new TextureLoader().loadAsync(`${this.spriteBase}/sprites/hd/${name}.${sprite.ext ?? 'png'}`).then(
           (texture) => {
             texture.colorSpace = SRGBColorSpace;
             texture.anisotropy = 8;
@@ -1527,17 +1575,78 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
    * 다 받으면 uTexOn을 켠다.
    */
   /** 구운 그림 지도 한 구역을 씌운다(개발 미리보기). rect는 캔버스 좌표 [x0, y0, x1, y1](위 = 북). */
-  async loadPaintedRegion(url: string, rect: [number, number, number, number]) {
-    const texture = await new TextureLoader().loadAsync(url);
+  /**
+   * 그림 지도를 씌운다. prebaked가 있으면 길을 미리 구워 둔 그림(painted/national-roads.jpg)을 쓰고 굽지 않는다
+   * (사용자 2026-11-15 "길 굽는거 이제 중지시키고 현재 길 저장해둬"). 못 받으면 원본 그림에 길을 굽는다.
+   */
+  async loadPaintedRegion(url: string, rect: [number, number, number, number], prebaked: readonly string[] = []) {
+    const loader = new TextureLoader();
+    // 이미지 저장소판은 WebP, 개발 폴더는 JPEG다. 앞에서부터 받아지는 것을 쓴다.
+    let baked: Texture | null = null;
+    for (const candidate of prebaked) {
+      baked = await loader.loadAsync(candidate).catch(() => null);
+      if (baked) break;
+    }
+    this.roadsPrebaked = baked !== null;
+    const texture = baked ?? (await loader.loadAsync(url));
     texture.colorSpace = SRGBColorSpace;
     texture.anisotropy = 8;
     const { width, height } = this.canvasSize;
     this.painted.map.value = texture;
+    this.paintedSource = { image: texture.image as HTMLImageElement, rect };
     this.painted.rect.value.set(rect[0] - width / 2, rect[1] - height / 2, rect[2] - width / 2, rect[3] - height / 2);
     this.painted.on.value = 1;
     // 2D 지도에서 그림이 지도 전체를 덮으면 바다·강도 그림에 그려져 있다. 실시간 물 판은 끈다.
     if (FLAT_MAP && rect[0] <= 0 && rect[1] <= 0 && rect[2] >= width && rect[3] >= height && this.waterMesh)
       this.waterMesh.visible = false;
+    // 같은 폴더의 물 지도(water-mask.png, painted-water.py)가 있으면 땅·물을 보이는 그림에 맞춘다.
+    if (FLAT_MAP) {
+      const sibling = (name: string) => url.replace(/[^/?#]*([?#].*)?$/, name);
+      // 정밀 물 지도(water-detail.png): 지형용 물 지도에서 사라지는 가는 강까지 있다. 수로 길찾기·강 가운데 맞추기용.
+      const [mask, detail] = await Promise.all([
+        loadWaterMask(sibling('water-mask.png')),
+        loadMaskImage(sibling('water-detail.png')),
+      ]);
+      if (detail) {
+        this.waterDetail = detail;
+        this.shore = shoreDistance(detail);
+      }
+      if (mask) this.applyWaterMask(mask);
+    }
+    this.bakeRoads();
+  }
+
+  /**
+   * 길 그물을 그림 지도에 굽는다(roadPaint.ts). 원본 그림 위에 다시 칠하므로 길 그물이 바뀔 때마다 부른다.
+   * 구운 뒤에는 띠 모양 길을 감추고 다리만 남긴다.
+   */
+  private bakeRoads() {
+    const source = this.paintedSource;
+    if (!FLAT_MAP || !source || !this.roadSegments.length || typeof document === 'undefined') return;
+    // 미리 구운 그림을 쓰면 길은 이미 그림에 있다. 띠 모양 길만 감춘다.
+    if (this.roadsPrebaked) {
+      for (const mesh of [...this.roadRibbons, ...this.waterRibbons]) mesh.visible = false;
+      this.onDetail?.();
+      return;
+    }
+    const { image, rect } = source;
+    const canvas = document.createElement('canvas');
+    canvas.width = image.naturalWidth || image.width;
+    canvas.height = image.naturalHeight || image.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(image, 0, 0);
+    const scale = canvas.width / (rect[2] - rect[0]);
+    const toPx = (p: { x: number; y: number }) => ({ x: (p.x - rect[0]) * scale, y: (p.y - rect[1]) * scale });
+    paintRoads(ctx, this.roadSegments, toPx, scale, this.bridges, this.ferries, this.waterRoutes);
+    const baked = new CanvasTexture(canvas);
+    baked.colorSpace = SRGBColorSpace;
+    baked.anisotropy = 8;
+    const old = this.painted.map.value as Texture;
+    this.painted.map.value = baked;
+    if (old !== baked && old !== undefined && (old as CanvasTexture).isCanvasTexture) old.dispose();
+    for (const mesh of [...this.roadRibbons, ...this.waterRibbons]) mesh.visible = false;
+    this.onDetail?.();
   }
 
   async loadTerrainTextures(base: string) {
@@ -1747,20 +1856,7 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
       this.ring.geometry.dispose();
       this.ring = null;
     }
-    if (!site) return;
-    // 모형을 쓰면 칸 크기에 맞춘 고리, 아니면 임시 상자 모형 크기의 고리.
-    const modelled = this.siteModelMeshes.length > 0;
-    const radius = modelled ? TILE * tileFill(site.kind, level) * 0.86 : siteSize(site.kind, level).side * 0.85;
-    const width = modelled ? 0.7 : 2;
-    const ring = new Mesh(
-      new RingGeometry(radius, radius + width, 48),
-      new MeshBasicMaterial({ color: '#b23a2a', depthWrite: false }),
-    );
-    ring.rotation.x = -Math.PI / 2;
-    const centre = modelled ? this.tileCentre(site.position.x, site.position.y) : site.position;
-    ring.position.copy(this.world(centre.x, centre.y, 0.8));
-    this.ring = ring;
-    this.scene.add(ring);
+    // 고른 거점은 이름판 강조로 보인다(지도 위 고리는 그리지 않는다).
   }
 
   resize(width: number, height: number) {
@@ -1818,13 +1914,103 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     // 거점 모형 거리 단계: 특 도시 한 변(약 16단위)이 화면에서 몇 px인지로 정한다.
     this.tier = zoomTier(this.width / (state.zoom || 1));
     this.updateSpriteDetail(state);
-    if (this.siteModelMeshes.length) {
-      const lod = TIER_LOD[this.tier];
-      for (const entry of this.siteModelMeshes) if (entry.lod >= 0) entry.mesh.visible = entry.lod === lod;
-    }
     this.waterTime.value = performance.now() / 1000;
     if (this.painterly) this.paint.render(this.renderer, this.scene, camera);
     else this.grade.render(this.renderer, this.scene, camera);
+  }
+
+  /**
+   * 화면 좌표(px)에 놓인 거점 그림의 거점 id. 그림의 그려진 부분에 닿아야 한다(사용자 2026-11-14: "툴팁은 도시의
+   * 아이콘에 대야 나오는게 맞지"). 겹치면 남쪽(위에 그려진) 그림이 먼저다.
+   */
+  siteAtScreen(px: number, py: number): string | null {
+    if (!this.spriteHits.length || !this.width || !this.height) return null;
+    const point = new Vector3((px / this.width) * 2 - 1, 1 - (py / this.height) * 2, 0).unproject(this.camera);
+    let best: { id: string; z: number } | null = null;
+    for (const hit of this.spriteHits) {
+      const u0 = (point.x - hit.x0) / hit.w;
+      const u = hit.flip ? 1 - u0 : u0;
+      const v = (point.z - hit.z0) / hit.h;
+      if (u < 0 || u >= 1 || v < 0 || v >= 1) continue;
+      const mask = this.spriteMask(hit.name);
+      if (mask && !mask[Math.floor(v * MASK) * MASK + Math.floor(u * MASK)]) continue;
+      const bottom = hit.z0 + hit.h;
+      if (!best || bottom > best.z) best = { id: hit.siteId, z: bottom };
+    }
+    return best?.id ?? null;
+  }
+
+  /**
+   * 화면 좌표(px)가 놓인 영지 칸의 주인 도시 key(사용자 2026-11-14: "비어있는 칸도 일단 어디소속인지를 툴팁으로").
+   * 주인 없는 칸은 null이고, 그 칸이 물인지(바다·강·호수)도 알려 준다.
+   */
+  tileAtScreen(px: number, py: number): { cityKey: number | null; water: boolean; outland: boolean } | null {
+    const tiles = this.territoryOwner;
+    if (!tiles || !this.width || !this.height) return null;
+    const point = new Vector3((px / this.width) * 2 - 1, 1 - (py / this.height) * 2, 0).unproject(this.camera);
+    const x = point.x + this.canvasSize.width / 2;
+    const y = point.z + this.canvasSize.height / 2;
+    if (x < 0 || y < 0 || x > this.canvasSize.width || y > this.canvasSize.height) return null;
+    const { u, v } = toTile(x, y, this.canvasSize, TILE);
+    const column = Math.floor(u) - tiles.originX;
+    const row = Math.floor(v) - tiles.originY;
+    if (column < 0 || row < 0 || column >= tiles.columns || row >= tiles.rows) return null;
+    const key = tiles.owner[row * tiles.columns + column]!;
+    const terrain = TERRAINS[this.cellAt(x, y)];
+    const water = this.waterMask
+      ? this.rawGround(x, y) < 0
+      : terrain === 'sea' ||
+        terrain === 'deepSea' ||
+        terrain === 'shallow' ||
+        terrain === 'lake' ||
+        terrain === 'river';
+    return {
+      cityKey: key >= 0 ? key : null,
+      water,
+      outland: key < 0 && tiles.data[(row * tiles.columns + column) * 4 + 2]! > 0,
+    };
+  }
+
+  private spriteMask(name: string): Uint8Array | null {
+    if (this.spriteMasks.has(name)) return this.spriteMasks.get(name)!;
+    const image = this.spriteSet.get(name)?.texture.image as CanvasImageSource | undefined;
+    let mask: Uint8Array | null = null;
+    if (image && typeof document !== 'undefined') {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = MASK;
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+      if (context) {
+        context.drawImage(image, 0, 0, MASK, MASK);
+        const pixels = context.getImageData(0, 0, MASK, MASK).data;
+        mask = new Uint8Array(MASK * MASK);
+        for (let index = 0; index < mask.length; index += 1) mask[index] = pixels[index * 4 + 3]! > 90 ? 1 : 0;
+      }
+    }
+    this.spriteMasks.set(name, mask);
+    return mask;
+  }
+
+  /**
+   * 그림 지도의 물 지도(지형 꼭짓점 수와 같은 크기, 0 땅·1 물)로 땅·물을 다시 정한다(2D 그림 지도). 땅 높이, 영지,
+   * 풍선의 땅·물이 화면에 보이는 그림과 같아진다(사용자 2026-11-14: "여기에 물이라고 나오면 어떡해?").
+   */
+  applyWaterMask(water: Uint8Array) {
+    if (!FLAT_MAP || water.length !== this.field.length) return;
+    this.waterMask = water;
+    for (let i = 0; i < this.field.length; i++) this.field[i] = water[i] ? WATER_LEVEL - 0.6 : 0.02;
+    const position = this.terrainGeometry?.getAttribute('position');
+    if (position) {
+      for (let i = 0; i < position.count; i++) position.setY(i, this.field[i]!);
+      position.needsUpdate = true;
+    }
+    if (this.lastTerritory) this.setTerritory(...this.lastTerritory);
+    // 칸 길을 보이는 물로 다시 찾는다(그림 속 가는 강을 따라가는 황하 수로). 다리 자리도 보이는 물에 맞춘다.
+    for (const mesh of this.waterRibbons) {
+      this.scene.remove(mesh);
+      mesh.geometry.dispose();
+    }
+    for (const mesh of this.tileRoads(this.geography)) this.scene.add(mesh);
+    this.landRoads(this.levelOf);
   }
 
   /** 3D 위치의 화면 좌표(px). */
@@ -1844,5 +2030,31 @@ normal = normalize(normal + (viewMatrix * vec4(-wg.x, 0.0, -wg.y, 0.0)).xyz);`,
     this.paint.dispose();
     this.grade.dispose();
     this.renderer.dispose();
+  }
+}
+
+/** 흑백 물 지도 PNG(물 255)를 꼭짓점 순서의 0/1 배열로 읽는다. 없으면 null. */
+export async function loadWaterMask(url: string): Promise<Uint8Array | null> {
+  return (await loadMaskImage(url))?.data ?? null;
+}
+
+/** 흑백 물 지도 PNG를 픽셀마다 1 물, 0 뭍으로 읽는다. */
+export async function loadMaskImage(url: string): Promise<WaterDetail | null> {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const bitmap = await createImageBitmap(await response.blob());
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const context = canvas.getContext('2d');
+    if (!context) return null;
+    context.drawImage(bitmap, 0, 0);
+    const pixels = context.getImageData(0, 0, bitmap.width, bitmap.height).data;
+    const water = new Uint8Array(bitmap.width * bitmap.height);
+    for (let index = 0; index < water.length; index++) water[index] = pixels[index * 4]! > 127 ? 1 : 0;
+    return { data: water, width: bitmap.width, height: bitmap.height };
+  } catch {
+    return null;
   }
 }

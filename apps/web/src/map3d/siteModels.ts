@@ -1,14 +1,43 @@
-// 거점 모형 고르기 (INT-27, D-094·D-095). Rodin 등으로 만든 GLB 모형을 거점 종류·단계에 맞춰 고른다.
+// 거점 그림 고르기 (INT-27, D-097). Codex가 그린 거점 그림을 거점 종류·단계·지역에 맞춰 고른다. 3D 모형(GLB)은 쓰지 않는다.
 // 단계 0~4는 원작의 거점 종류 코드이고 5~9가 크기다(D-092). 모형이 아직 없는 단계는 다음 후보로 대신한다.
-import type { PublicGeography } from '@opensamguk/shared';
+import { EAST_SPRITES, REGION_GROUPS, TRIBE_SPRITES, type PublicGeography } from '@opensamguk/shared';
 
-type SiteKind = PublicGeography['sites'][number]['kind'];
+export type SiteKind = PublicGeography['sites'][number]['kind'];
 
-/** 거점에 쓸 모형 이름 후보(앞이 우선). 파일은 `<이름>-lod<0|1|2>.glb`이다. */
-export function modelCandidates(kind: SiteKind, level: number | undefined): string[] {
+// 양식 판정 표(지역 무리, 종족, 동이 나라 이름)는 규칙과 함께 쓰려고 shared로 옮겼다(INT-29 지역 고유 건물, 2026-11-17).
+export { EAST_SPRITES, REGION_GROUPS, TRIBE_SPRITES, castleStyle } from '@opensamguk/shared';
+/** 동이 그림의 크기별 판(큰 것부터). 5(소)는 이름 그대로인 기본 판이다. */
+const EAST_SIZES = [9, 8, 7, 6] as const;
+// 지역 그림이 있는 기준 그림. 현 마을(houses)도 지역마다 다르다(사용자 2026-11-15 "현도 지역마다 다르게 수정했던가?").
+const SIZE_SPRITES = ['city-9', 'capital', 'city-7', 'city-6', 'city-5', 'houses'] as const;
+
+/** 거점에 쓸 그림·모형 이름 후보(앞이 우선). 종족·동이 그림, 지역 무리 그림, 기준 그림 순이다. */
+export function modelCandidates(
+  kind: SiteKind,
+  level: number | undefined,
+  place?: { name?: string | undefined; region?: number | undefined },
+): string[] {
+  const base = baseCandidates(kind, level);
+  if (kind !== 'CITY' || !place) return base;
+  const special = (place.name && (TRIBE_SPRITES[place.name] ?? EAST_SPRITES.get(place.name))) || null;
+  // 동이 나라도 중(6)·대(7) 거점은 크기별 판을 먼저 쓴다(사용자 2026-11-15 "한반도쪽이나 왜는 크기별 아이콘이 없네?").
+  // 없으면 한 단계씩 작은 판, 마지막에 소 판(이름 그대로).
+  const sized = special?.startsWith('east-')
+    ? EAST_SIZES.filter((size) => size <= (level ?? 5)).map((size) => `${special}-${size}`)
+    : [];
+  if (special) return [...sized, special, ...(special === 'east-eupru' ? ['east-okjeo-ye'] : []), ...base];
+  const group = place.region === undefined ? undefined : REGION_GROUPS[place.region];
+  if (!group || group === 'central') return base;
+  return [
+    ...base.filter((name) => (SIZE_SPRITES as readonly string[]).includes(name)).map((name) => `${group}-${name}`),
+    ...base,
+  ];
+}
+
+function baseCandidates(kind: SiteKind, level: number | undefined): string[] {
   if (kind === 'PASS') return ['pass'];
   if (kind === 'PORT') return ['port', 'houses'];
-  if (kind === 'FIELD') return ['camp'];
+  if (kind === 'FIELD') return ['battlefield', 'camp'];
   const step = level ?? 5;
   if (step >= 9) return ['city-9', 'capital'];
   if (step === 8) return ['capital'];
@@ -16,29 +45,29 @@ export function modelCandidates(kind: SiteKind, level: number | undefined): stri
   if (step === 6) return ['city-6', 'city-5', 'houses'];
   if (step === 5) return ['city-5', 'houses'];
   if (step === 4) return ['nomad-camp', 'camp'];
-  if (step === 2 || step === 3) return ['camp'];
-  if (step === 1) return ['water-fort', 'camp'];
+  // D-096: 현(2, 원작 진)은 현성(부속 현)이라 마을 그림, 수(1)는 나루·수채 그림.
+  if (step === 2 || step === 3) return ['houses', 'camp'];
+  if (step === 1) return ['water-fort', 'port', 'camp'];
   return ['houses'];
 }
 
 /** 받아 둔 모형 가운데 이 거점에 쓸 것. 하나도 없으면 null(임시 상자 모형을 쓴다). */
-export function pickModel(kind: SiteKind, level: number | undefined, available: ReadonlySet<string>): string | null {
-  return modelCandidates(kind, level).find((name) => available.has(name)) ?? null;
-}
-
-/** 거점 한 변이 화면에서 몇 px인지로 거리 단계를 고른다. 크게 보이면 자세한 모형(0)이다. */
-export function lodForPixels(px: number): 0 | 1 | 2 {
-  if (px > 140) return 0;
-  if (px > 45) return 1;
-  return 2;
+export function pickModel(
+  kind: SiteKind,
+  level: number | undefined,
+  available: ReadonlySet<string>,
+  place?: { name?: string | undefined; region?: number | undefined },
+): string | null {
+  return modelCandidates(kind, level, place).find((name) => available.has(name)) ?? null;
 }
 
 /**
  * 모형이 영지 칸 한 칸(한 변 TILE)을 얼마나 채우는지(사용자 2026-11-14: 크기는 1칸 안).
- * 클수록 칸을 꽉 채운다. 경 96%, 특 90%, 대 84%, 중 78%, 소 72%, 진·수 60%.
+ * 클수록 칸을 꽉 채운다. 경 96%, 특 90%, 대 84%, 중 78%, 소 72%, 현·수 60%.
  */
 export function tileFill(kind: SiteKind, level: number | undefined): number {
-  if (kind === 'PASS') return 0.85;
+  // 관문은 소 도시(72%)보다 작게(사용자 2026-11-14: "관의 크기가 너무 큰데?"). 바위 덩이가 커서 85%면 중 도시보다 커 보였다.
+  if (kind === 'PASS') return 0.6;
   if (kind === 'PORT') return 0.6;
   if (kind === 'FIELD') return 0.55;
   const step = level ?? 5;
@@ -88,7 +117,6 @@ export function zoomTier(viewWidth: number): ZoomTier {
 }
 
 /** 단계별 모형 거리 단계(0 자세함 ~ 2 단순)와 이름판 배율. */
-export const TIER_LOD: Record<ZoomTier, 0 | 1 | 2> = { 1: 2, 2: 2, 3: 1, 4: 0 };
 export const TIER_LABEL_SCALE: Record<ZoomTier, number> = { 1: 0.9, 2: 1, 3: 1.4, 4: 2 };
 
 export const MODEL_NAMES = [
@@ -98,9 +126,20 @@ export const MODEL_NAMES = [
   'city-6',
   'city-5',
   'pass',
+  'pass-h',
+  'pass-v',
   'camp',
   'houses',
   'port',
   'water-fort',
   'nomad-camp',
-] as const;
+  'battlefield',
+  'flag-castle',
+  'flag-pennant',
+  ...Object.values(TRIBE_SPRITES),
+  ...new Set(EAST_SPRITES.values()),
+  ...[...new Set(EAST_SPRITES.values())].flatMap((east) => EAST_SIZES.map((size) => `${east}-${size}`)),
+  ...[...new Set(Object.values(REGION_GROUPS))]
+    .filter((group) => group !== 'central')
+    .flatMap((group) => SIZE_SPRITES.map((size) => `${group}-${size}`)),
+];

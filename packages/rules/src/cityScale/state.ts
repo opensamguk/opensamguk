@@ -1,3 +1,4 @@
+import { landPopulationBonus } from '../construction/catalog';
 import { z } from 'zod';
 import type { WorldInit } from '../world/bootstrap';
 import type { WorldView } from '../model/world';
@@ -77,17 +78,23 @@ export function initialCityRuins(initial: WorldInit): CityRuinsState {
 
 export function readCityRuins(
   value: unknown,
-  world: Pick<WorldView, 'cities'>,
+  world: Pick<WorldView, 'cities'> & Partial<Pick<WorldView, 'campaign'>>,
   expected?: CityScaleRecord,
 ): CityRuinsState | undefined {
   const state = cityRuinsSchema.parse(value);
+  const maximumMatches = (cityKey: number, field: (typeof CITY_SCALE_FIELDS)[number], baseline: number) => {
+    const land = world.campaign?.land;
+    if (land?.managed[String(cityKey)]?.some((managed) => managed === field)) return true;
+    const housing = field === 'population' ? landPopulationBonus(world, cityKey) : 0;
+    return world.cities[cityKey]?.[`${field}Max`] === baseline + housing;
+  };
   for (const row of state.cities) {
     const city = world.cities[row.cityKey];
     if (!city || city.kind === 'PASS' || city.kind === 'FIELD' || city.level !== row.level)
       throw new Error('폐허의 도시나 원래 규모가 다릅니다.');
     const max = ruinMaximum(row.baseMax, RUIN_PERCENT[row.stage]);
     for (const field of CITY_SCALE_FIELDS)
-      if (row.baseMax[field] > 2_147_483_647 || city[`${field}Max`] !== max[field])
+      if (row.baseMax[field] > 2_147_483_647 || !maximumMatches(row.cityKey, field, max[field]))
         throw new Error('폐허 단계의 최대치가 저장 상태와 다릅니다.');
   }
   if (expected) {
@@ -107,8 +114,15 @@ export function readCityRuins(
         const city = world.cities[row.cityKey];
         if (
           !city ||
-          city.level !== row.level ||
-          CITY_SCALE_FIELDS.some((field) => city[`${field}Max`] !== row.max[field])
+          city.level !== (world.campaign?.cityUpgrade?.completed[String(row.cityKey)]?.level ?? row.level) ||
+          CITY_SCALE_FIELDS.some(
+            (field) =>
+              !maximumMatches(
+                row.cityKey,
+                field,
+                row.max[field] + (world.campaign?.cityUpgrade?.completed[String(row.cityKey)]?.increase[field] ?? 0),
+              ),
+          )
         )
           throw new Error('폐허가 해제된 도시의 최대치가 생성 원장과 다릅니다.');
       }

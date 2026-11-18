@@ -7,8 +7,8 @@ import {
   campaignUnitResultSchema,
   campaignOrderResultSchema,
   validateCampaignRecord,
-  FIVE_STAT_KEYS,
-  fiveStatsSchema,
+  generalStats,
+  pledgeChance,
   checkReplayOrigin,
   campaignArmyTypes,
   TICKS_PER_MONTH,
@@ -234,7 +234,7 @@ export async function readCampaignBoard(ctx: ActorContext, worldId: string) {
       const people = campaignPeople(view, campaign);
       const person = (id: number) => {
         const general = view.generals[id]!,
-          stats = fiveStatsSchema.parse(Object.fromEntries(FIVE_STAT_KEYS.map((key) => [key, general[key]])));
+          stats = generalStats(general);
         return {
           id,
           name: general.name,
@@ -265,7 +265,7 @@ export async function readCampaignBoard(ctx: ActorContext, worldId: string) {
           ),
         npcPledge: {
           cost: 500,
-          chance: 25 + Math.floor(view.generals[actor.id]!.charm! / 2),
+          chance: pledgeChance(view.generals[actor.id]!),
           month: Math.floor(world.clockTick / TICKS_PER_MONTH),
           attempts: campaign.attempts.filter((attempt) => attempt.masterId === actor.id),
         },

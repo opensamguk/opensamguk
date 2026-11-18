@@ -34,8 +34,8 @@ async function scenarioDetails(key: string, db: Pick<Prisma.TransactionClient, '
       .parse(resource!.content);
     if (value.id !== ref.name) throw new Error();
     return value;
-  } catch {
-    throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+  } catch (cause) {
+    throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', cause });
   }
 }
 

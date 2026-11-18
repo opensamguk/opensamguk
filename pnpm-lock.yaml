@@ -99,6 +99,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@fontsource-variable/noto-serif-kr':
+        specifier: 5.3.1
+        version: 5.3.1
       '@fontsource/dotgothic16':
         specifier: 5.3.1
         version: 5.3.1
@@ -516,6 +519,9 @@ packages:
 
   '@fastify/proxy-addr@5.1.2':
     resolution: {integrity: sha512-uqB4QsgVoro0XDC+DIftIMGXHdBPn+lK6Ek3xXAIxPMCJfqxnbtyEoMCm2KPUVOuIosd7Cyw9HawEqMFM/UA+g==}
+
+  '@fontsource-variable/noto-serif-kr@5.3.1':
+    resolution: {integrity: sha512-cf29V+FWfw7/9dyzwCK6zKmf0z7XkdPPoq5UxgczmjZkV3RW1mr02/1LbEsRtiCKagRgVCb9/wQ+uYci1KzRMg==}
 
   '@fontsource/dotgothic16@5.3.1':
     resolution: {integrity: sha512-alvxJchrFDFohce0s8YfHsFiRm2zUM+FrwEeWtLyc14WIl3heSG1/8BPD7Sm001YuVPL1bU14UmM5P2KO5/gnQ==}
@@ -2494,6 +2500,8 @@ snapshots:
     dependencies:
       '@fastify/forwarded': 3.1.1
       ipaddr.js: 2.5.0
+
+  '@fontsource-variable/noto-serif-kr@5.3.1': {}
 
   '@fontsource/dotgothic16@5.3.1': {}
 

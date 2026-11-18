@@ -1,10 +1,13 @@
 // 게임 아이콘 (INT-29, 사용자 2026-11-14: 웹사이트가 아니라 게임처럼). 게임 화면 틀과 기록 줄 앞 아이콘이 함께 쓴다.
 // 외부 그림 없이 24×24 선 그림으로만 그린다. 색은 currentColor를 따른다.
 import type { SVGProps } from 'react';
+import { hasPublicImage, publicImageUrl } from '@opensamguk/shared/public-images';
 
 export type StageIconName =
   | 'general'
   | 'city'
+  | 'map'
+  | 'realm'
   | 'nation'
   | 'records'
   | 'turns'
@@ -37,6 +40,10 @@ const PATHS: Record<StageIconName, string> = {
     'M12 3c-3.3 0-6 2.5-6 6v2h12V9c0-3.5-2.7-6-6-6Zm0 0v3M6 11l-1 3h14l-1-3M8 14v2a4 4 0 0 0 8 0v-2M7 21c.5-2 2.6-3 5-3s4.5 1 5 3',
   // 성문과 성가퀴
   city: 'M3 21V9h3V6h3v3h6V6h3v3h3v12M3 21h18M10 21v-5a2 2 0 0 1 4 0v5M3 12h18',
+  // 접은 지도(전체 지도)
+  map: 'M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2V6Zm6-2v14m6-12v14',
+  // 천하 형세(세력 견주기)
+  realm: 'M4 20h16M6 20V10h3v10M10.5 20V6h3v14M15 20v-7h3v7',
   // 깃발
   nation: 'M5 21V3M5 4h11l-2 4 2 4H5',
   // 두루마리
@@ -81,11 +88,54 @@ const PATHS: Record<StageIconName, string> = {
   review: 'M14 4l6 6-8 8-4 1 1-4 8-8M4 21c2 0 3-1 3-3',
 };
 
+// 쇼케이스 UI 키트 B 아이콘(INT-29). 그림이 승인 목록에 있으면 선 그림 대신 이 그림을 쓴다.
+// 사용자 2026-11-15: "그리고 왜 아이콘 만든게 안나오지?" 기록 종류 아이콘(전투, 승리 등)은 글자 줄 안에 들어가 선 그림을 둔다.
+const KIT_ICONS: Partial<Record<StageIconName, string>> = {
+  general: 'icon-nav-account',
+  city: 'icon-nav-logout',
+  map: 'icon-nav-map',
+  realm: 'icon-nav-ranking',
+  nation: 'icon-nav-nation',
+  records: 'icon-nav-records',
+  turns: 'icon-nav-turns',
+  message: 'icon-nav-messages',
+  menu: 'icon-nav-settings',
+  gold: 'icon-res-gold',
+  rice: 'icon-res-rice',
+  troops: 'icon-res-troops',
+};
+
+export function kitIconUrl(name: StageIconName): string | null {
+  const file = KIT_ICONS[name];
+  if (!file) return null;
+  const source = `apps/web/src/art/ui/kit-b/${file}.webp`;
+  return hasPublicImage(source) ? publicImageUrl(source) : null;
+}
+
 export function StageIcon({
   name,
   size = 24,
   ...rest
 }: { name: StageIconName; size?: number } & SVGProps<SVGSVGElement>) {
+  const kit = kitIconUrl(name);
+  if (kit)
+    // 키트 그림은 테두리가 없어 같은 칸에서 조금 크게 그린다.
+    return (
+      <img
+        src={kit}
+        alt=""
+        aria-hidden="true"
+        width={Math.round(size * 1.25)}
+        height={Math.round(size * 1.25)}
+        className={typeof rest.className === 'string' ? rest.className : undefined}
+        style={{
+          objectFit: 'contain',
+          verticalAlign: `calc(var(--glyph-mid) - ${(size * 1.25) / 2}px)`,
+          marginBlock: `min(0px, calc((1em - ${size * 1.25}px) / 2))`,
+        }}
+        data-icon={name}
+      />
+    );
   return (
     <svg
       width={size}
@@ -99,6 +149,13 @@ export function StageIcon({
       aria-hidden="true"
       focusable="false"
       {...rest}
+      // 글자 줄 안에 들어가면 한글 가운데 높이에 가운데를 맞추고 줄 높이를 늘리지 않는다(tokens.css --glyph-mid 규칙).
+      // flex, grid 안에서는 이 두 속성이 쓰이지 않는다.
+      style={{
+        verticalAlign: `calc(var(--glyph-mid) - ${size / 2}px)`,
+        marginBlock: `min(0px, calc((1em - ${size}px) / 2))`,
+        ...rest.style,
+      }}
     >
       <path d={PATHS[name]} />
     </svg>

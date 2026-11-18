@@ -252,7 +252,7 @@ export function AdminEndActions({
       setError(
         seconds === null
           ? '요청이 많습니다. 결과를 조회하세요. 재접수 대기 시간을 확인하지 못했습니다.'
-          : '요청 한도로 접수하지 못했습니다. 남은 시간이 지난 뒤 같은 요청을 수동 접수할 수 있습니다.',
+          : '요청 한도로 접수하지 못했습니다. 남은 시간이 지난 뒤 같은 요청을 수동 접수하세요.',
       );
       return;
     }
@@ -263,7 +263,7 @@ export function AdminEndActions({
     }
     setError(
       !attempted
-        ? '계정·월드 상태를 확인하지 못해 보내지 않았습니다. 다시 확인하세요.'
+        ? '계정과 월드 상태를 확인하지 못해 보내지 않았습니다. 다시 확인하세요.'
         : '결과를 확인하지 못했습니다. 같은 요청 번호로 수동 조회하세요. 조회에 실패해도 미접수를 뜻하지 않습니다.',
     );
   }
@@ -339,7 +339,7 @@ export function AdminEndActions({
           return;
         }
         if (!ownEndReply(result, value)) {
-          setError('응답의 계정·월드·요청 번호가 다릅니다. 현재 요청의 결과를 다시 조회하세요.');
+          setError('응답의 계정, 월드, 요청 번호가 다릅니다. 현재 요청의 결과를 다시 조회하세요.');
           return;
         }
         setReply(result);
@@ -514,7 +514,7 @@ export function AdminEndActions({
                   disabled={sending}
                   onChange={(event) => setChecked(event.target.checked)}
                 />
-                대상·상태·사유와 종료의 영향을 확인했습니다.
+                대상, 상태, 사유와 종료의 영향을 확인했습니다.
               </label>
               <button type="submit" disabled={sending || !endConfirmation(world, name, reason, checked)}>
                 월드 종료 요청 확정
@@ -525,11 +525,11 @@ export function AdminEndActions({
             </form>
           ) : null
         ) : null}
-        {sending ? <p role="status">현재 계정·권한과 종료 요청을 확인하고 있습니다…</p> : null}
-        {remaining > 0 ? <p role="status">{remaining}초 뒤 같은 요청을 수동 접수할 수 있습니다.</p> : null}
+        {sending ? <p role="status">현재 계정과 권한, 종료 요청을 확인하고 있습니다…</p> : null}
+        {remaining > 0 ? <p role="status">{remaining}초 뒤에 같은 요청을 수동 접수하세요.</p> : null}
         {error && fresh ? <p role="alert">{error}</p> : null}
       </dialog>
-      {sending && !open ? <p role="status">현재 계정·권한과 월드를 확인하고 있습니다…</p> : null}
+      {sending && !open ? <p role="status">현재 계정과 권한, 월드를 확인하고 있습니다…</p> : null}
       {!open && error ? <p role="alert">{error}</p> : null}
     </section>
   );

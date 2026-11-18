@@ -2,7 +2,7 @@ import type { AppRouter } from '../apps/server/src/router';
 import type { inferRouterOutputs } from '@trpc/server';
 import { TICKS_PER_MONTH } from '../packages/rules/src/index';
 import { monthlyFixture } from '../apps/engine/test/monthlyFixture';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { createAccount, withE2eDb } from './account';
@@ -91,7 +91,7 @@ test('AC-M3-13 공지 지시를 우선 표시하고 조언을 누르면 첫 예�
   await editor.getByRole('button', { name: '2번 칸에 넣기', exact: true }).click();
   await expect(editor.getByTestId('draft-state')).toHaveText('저장하지 않은 편집 1건');
   await noticeRow.getByRole('button', { name: '1칸에 넣기 (사용 불가)', exact: true }).click();
-  await expect(noticeRow.getByRole('note')).toContainText('편집 중인 예턴을 저장하거나 취소하면 넣을 수 있습니다');
+  await expect(noticeRow.getByRole('note')).toContainText('편집 중인 예턴을 먼저 저장하거나 취소하세요');
   expect((await apiQuery<Output['turns']['get']>(member, 'turns.get', { worldId })).revision).toBe(current.revision);
 
   const updated = '농업을 계속 보강합니다';
@@ -205,11 +205,10 @@ test('AC-M3-15 실제 월간 정산이 기록 화면에 순위와 한 줄 평을
     gold: 100000,
   });
   const { worldId } = await withE2eDb((db) =>
-    saveInitialWorld(db, initial, {
+    saveFixtureWorld(db, initial, {
       name: '월단평 화면 검증',
       turnTermMinutes: 60,
       endYear: null,
-      ruleFeatures: ['policy', 'reputation-v1'],
     }),
   );
   const hold = await holdLease(worldId);
@@ -217,7 +216,7 @@ test('AC-M3-15 실제 월간 정산이 기록 화면에 순위와 한 줄 평을
     await controlClock(hold.db, worldId, 'start');
     const result = await page.request.post('/trpc/turns.edit', {
       headers: { Origin: t210Stack.webOrigin },
-      data: { worldId, revision: 0, op: { put: { from: 0, to: 0, commandKey: 'farm', args: {} } } },
+      data: { worldId, revision: 1, op: { put: { from: 0, to: 0, commandKey: 'farm', args: {} } } },
     });
     expect(result.ok()).toBe(true);
     expect(await result.json()).toMatchObject({ result: { data: { ok: true } } });

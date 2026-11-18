@@ -104,14 +104,15 @@ lateOnboardingTest('AC-INT-11 C 선행 정상 입력 뒤 engine STALE은 비용�
     const gate = await offer.gateRead(npc.name);
     await gate.click();
     const fresh = await gate.seen;
-    const formRequests = await settleIndependentJoins(
+    const priorRequests = await settleIndependentJoins(
       [main!, control!].map((world) => async () => {
         const b = await offer.board(world, 1);
         const requestId = randomUUID();
-        await mutate(offer.users[1]!.page, 'campaign.unit', {
+        await mutate(offer.users[1]!.page, 'campaign.relationship', {
           worldId: world.id,
           requestId,
-          payload: { type: 'form', commanderId: 493, crewType: b.armyTypes[0]!.id, revision: b.revision },
+          expectedUserId: offer.users[1]!.id,
+          payload: { type: 'offer', targetId: 492, relation: 'STAFF', revision: b.revision },
         });
         return requestId;
       }),
@@ -131,7 +132,7 @@ lateOnboardingTest('AC-INT-11 C 선행 정상 입력 뒤 engine STALE은 비용�
     for (const [index, world] of [main!, control!].entries())
       expect(
         await world.hold.db.inputEvent.findFirstOrThrow({
-          where: { worldId: world.id, idempotencyKey: `campaign:${formRequests[index]}` },
+          where: { worldId: world.id, idempotencyKey: `campaign:${priorRequests[index]}` },
         }),
       ).toMatchObject({ status: 'APPLIED' });
     const left = await offer.snapshot(main!),

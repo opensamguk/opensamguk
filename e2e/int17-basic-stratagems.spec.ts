@@ -1,7 +1,7 @@
 import { test, expect, apiMutate, apiQuery } from './t210-fixture';
 import { commandInitial } from '../packages/rules/test/commandFixture';
 import { FIVE_STAT_RULES, TICKS_PER_MONTH } from '../packages/rules/src/index';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { holdLease, releaseHold } from './game';
@@ -11,7 +11,6 @@ test('INT-17 네 계략이 실제 명령 목록·30칸·출사한 장수의 엔�
   const db = world.hold.db;
   const initial = commandInitial();
   initial.statRules = { ...FIVE_STAT_RULES };
-  initial.ruleFeatures = ['five-stats', 'personnel', 'policy', 'stratagem-basic', 'treaty'];
   initial.nations = initial.nations.map((nation) => ({ ...nation, isNpc: false }));
   initial.generals = initial.generals.map((general) => ({
     ...general,
@@ -19,7 +18,7 @@ test('INT-17 네 계략이 실제 명령 목록·30칸·출사한 장수의 엔�
     charm: 50,
     nextTurnTick: 1000000,
   }));
-  const { worldId } = await saveInitialWorld(db, initial, {
+  const { worldId } = await saveFixtureWorld(db, initial, {
     name: 'INT17 계략 화면',
     turnTermMinutes: 60,
     endYear: null,
@@ -31,6 +30,7 @@ test('INT-17 네 계략이 실제 명령 목록·30칸·출사한 장수의 엔�
       worldId,
       name: '계략화면',
       portraitId: null,
+      sex: 'MALE',
       leadership: 55,
       strength: 70,
       intel: 80,

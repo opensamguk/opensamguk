@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
@@ -15,19 +16,21 @@ import { basemapForOperationalMap } from '../main/operationalGeography';
 import { useTerrainGrid } from '../main/TerrainTileLayer';
 import type { DrawnNation } from '../main/siteMarkers';
 import type { MapGeneral } from '../main/mapGeneralList';
-import { buildMapModel, describeSite, mapLabel, SITE_SHORT_LABELS, type ModelCity } from '../main/mapModel';
+import { buildMapModel, describeSite, mapLabel, type ModelCity } from '../main/mapModel';
 import { MapSiteChooser, MapTooltip, tooltipPlacement } from '../main/MapParts';
 import { compactLabels, type HeightData, type LabelBox } from './terrain3d';
 import { TIER_LABEL_SCALE } from './siteModels';
+import { DETAIL_ENTER_WIDTH, mapModeOfTier, showsSiteLabel, type MapMode, type MapModeRequest } from './mapMode';
 import { ELEVATION, MapScene } from './mapScene';
 import { pathPoints, routePath } from './routes3d';
 import styles from './Map3D.module.css';
+import tileStyles from '../main/OperationalWorldMap.module.css';
 
 type DrawnCity = ModelCity;
 type Site = PublicGeography['sites'][number];
 
-// 칸 하나가 화면 높이 대부분을 차지할 만큼 들어간다(사용자 2026-11-14: 최대 확대는 칸 높이 하나가 화면 대부분).
-const MAX_ZOOM_FACTOR = 80;
+// 사용자 2026-11-14: "더 크게 확대시킬 수 있게 해줘." 고해상도 성 그림(가로 약 5600px)을 1920px 화면에서 다 쓰는 배율.
+const MAX_ZOOM_FACTOR = 200;
 
 type Control = { x: number; z: number; zoom: number; fit: number; version: number };
 
@@ -47,6 +50,10 @@ export type Map3DProps = {
   focusZoom?: number | undefined;
   /** 지도 바탕 화면(INT-29): 판이 화면을 꽉 채우고(빈 띠 없이), 배율 단추는 오른쪽 아래 떠 있는 줄, 도움말은 뺀다. */
   stage?: boolean | undefined;
+  /** 전체/세부 모드가 바뀔 때(확대 단계 3 경계를 넘을 때) 알린다(INT-29). */
+  onModeChange?: ((mode: MapMode) => void) | undefined;
+  /** 모드 바꾸기 요청. 세부는 고른 거점(없으면 내 거점)을 가운데 두고 성 몇 개가 보이게, 전체는 지도 전체로. */
+  modeRequest?: MapModeRequest | null | undefined;
 };
 
 export default function Map3D({
@@ -62,6 +69,8 @@ export default function Map3D({
   focusKey = null,
   focusZoom = 3,
   stage = false,
+  onModeChange,
+  modeRequest = null,
 }: Map3DProps) {
   const basemap = basemapForOperationalMap(map);
   const grid = useTerrainGrid(basemap?.pixels, basemap?.palette);
@@ -86,7 +95,18 @@ export default function Map3D({
   const drag = useRef<{ id: number; x: number; y: number; moved: boolean } | null>(null);
   const invalidateRef = useRef<() => void>(() => undefined);
   const started = useRef(performance.now());
-  const [hover, setHover] = useState<{ siteId: string; x: number; y: number } | null>(null);
+  // 풍선: 거점(그림·이름판) 또는 빈 칸(그 칸의 주인 도시). label은 이름판 단추가 띄운 것.
+  const [hover, setHover] = useState<
+    | { siteId: string; x: number; y: number; label?: boolean; tile?: undefined }
+    | {
+        siteId?: undefined;
+        x: number;
+        y: number;
+        label?: undefined;
+        tile: { cityKey: number | null; water: boolean; outland: boolean };
+      }
+    | null
+  >(null);
   const [factor, setFactor] = useState(1);
 
   const model = useMemo(() => buildMapModel({ map, cities, nations, generals }), [map, cities, nations, generals]);
@@ -94,6 +114,13 @@ export default function Map3D({
     () => model.anchors.filter((site): site is Site & { anchorKey: number } => site.anchorKey !== undefined),
     [model],
   );
+  // 전장·나루(D-096): 이름만 작게, 크게 볼 때(확대 3·4단계) 보인다.
+  const minorSites = useMemo(() => map.sites.filter((site) => site.kind === 'FIELD' || site.kind === 'PORT'), [map]);
+  // 세력 깃발 그림(flag-strip.py 띠). 개발 미리보기의 그림 주소(?models=)에서만 받는다. 없으면 네모 깃발을 쓴다.
+  const flagStrip = useMemo(() => {
+    const base = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('models') : null;
+    return base ? `url("${base.replace(/\/$/, '')}/sprites/flag-castle-strip.png")` : null;
+  }, []);
   const focusSite = focusKey === null ? undefined : anchors.find((site) => site.anchorKey === focusKey);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sceneRef = useRef<MapScene | null>(null);
@@ -102,6 +129,9 @@ export default function Map3D({
   // 그릴 때마다 이름판에 쓰는 값. 렌더 함수가 늘 최신 값을 보게 ref로 둔다.
   const latest = useRef({ anchors, model, selectedKey, myCityKey });
   latest.current = { anchors, model, selectedKey, myCityKey };
+  const modeRef = useRef<MapMode | null>(null);
+  const onModeChangeRef = useRef(onModeChange);
+  onModeChangeRef.current = onModeChange;
 
   // 이름판·고르기 단추를 거점의 화면 위치로 옮긴다. 겹치는 이름판은 중요도 순으로 작은 점으로 줄인다.
   const placeLabels = (scene: MapScene) => {
@@ -112,12 +142,19 @@ export default function Map3D({
     const byId = new Map(sites.map((site) => [site.id, site]));
     const boxes: LabelBox[] = [];
     const labelScale = TIER_LABEL_SCALE[scene.tier];
+    const mode = mapModeOfTier(scene.tier);
     for (const button of buttons) {
       const site = byId.get(button.dataset.siteId!);
       if (!site) continue;
       const city = current.cityByKey.get(site.anchorKey);
       const { x, y } = scene.project(scene.labelAnchor(site, city?.level));
-      const inside = x > -40 && x < box.clientWidth + 40 && y > -20 && y < box.clientHeight + 20;
+      // 전체 지도는 큰 도시·관문 이름만, 세부는 모두(INT-29 모드 나누기). 고른 거점·내 거점은 늘 보인다.
+      const shown = showsSiteLabel(
+        mode,
+        { kind: site.kind, level: city?.level },
+        site.anchorKey === chosen || site.anchorKey === home,
+      );
+      const inside = shown && x > -40 && x < box.clientWidth + 40 && y > -20 && y < box.clientHeight + 20;
       // 확대 단계에 따라 이름판을 키운다(크게 볼 때 2배).
       button.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%) scale(${labelScale})`;
       button.style.transformOrigin = '50% 100%';
@@ -137,6 +174,14 @@ export default function Map3D({
     }
     const compact = compactLabels(boxes);
     for (const button of buttons) button.dataset.compact = compact.has(button.dataset.siteId!) ? 'true' : 'false';
+    for (const label of overlay.current?.querySelectorAll<HTMLElement>('[data-minor-id]') ?? []) {
+      const site = current.siteById.get(label.dataset.minorId!);
+      if (!site) continue;
+      const { x, y } = scene.project(scene.labelAnchor({ ...site, anchorKey: -1 }, undefined));
+      const inside = scene.tier >= 3 && x > -40 && x < box.clientWidth + 40 && y > -20 && y < box.clientHeight + 20;
+      label.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%) scale(${labelScale})`;
+      label.style.visibility = inside ? 'visible' : 'hidden';
+    }
   };
 
   const draw = () => {
@@ -146,6 +191,13 @@ export default function Map3D({
     scene.tick(performance.now());
     scene.render(control.current);
     placeLabels(scene);
+    // 전체/세부 모드: 확대 단계가 3 경계를 넘으면 알린다.
+    const mode = mapModeOfTier(scene.tier);
+    if (mode !== modeRef.current) {
+      modeRef.current = mode;
+      frame.current?.setAttribute('data-map-mode', mode);
+      onModeChangeRef.current?.(mode);
+    }
     if (statLine.current) {
       const f = frames.current;
       const now = performance.now();
@@ -246,8 +298,25 @@ export default function Map3D({
     if (event.button !== 0) return;
     drag.current = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
   };
+  // 도시 그림(아이콘) 위에 마우스를 올리면 풍선을 띄운다. 이름판 단추 위는 단추가 직접 띄운다.
+  // 그림이 없는 칸은 그 칸이 어느 도시 영지인지 보인다(사용자 2026-11-14).
+  const hoverSprite = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== 'mouse' || (event.target as HTMLElement).closest?.('button[data-site-id]')) return;
+    const box = frame.current?.getBoundingClientRect();
+    if (!box) return;
+    const x = event.clientX - box.left;
+    const y = event.clientY - box.top;
+    const siteId = sceneRef.current?.siteAtScreen(x, y) ?? null;
+    if (siteId) {
+      setHover({ siteId, x, y });
+      return;
+    }
+    const tile = sceneRef.current?.tileAtScreen(x, y) ?? null;
+    setHover((old) => (old?.label ? old : tile ? { x, y, tile } : null));
+  };
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     const d = drag.current;
+    if (!d?.moved) hoverSprite(event);
     if (!d || d.id !== event.pointerId) return;
     const dx = event.clientX - d.x;
     const dy = event.clientY - d.y;
@@ -313,10 +382,8 @@ export default function Map3D({
       bounds: basemap.bounds,
     });
     sceneRef.current = scene;
-    // 개발 서버에서만 장면을 들여다볼 수 있게 둔다.
-    if (import.meta.env.DEV) (window as unknown as { __map3d?: MapScene }).__map3d = scene;
-    // 개발 미리보기: 주소에 ?models=<주소>를 주면 그 아래 GLB 거점 모형을 받아 세운다(INT-27 D-094).
-    // 공개 빌드에서는 승인한 원격 모형만 쓰므로 이 경로를 열지 않는다.
+    // 개발 미리보기: 주소에 ?models=<주소>를 주면 그 아래 거점 그림(sprites/)·지형 질감·그림 지도를 받는다(INT-27).
+    // 공개 빌드는 이미지 저장소의 고정 주소로 옮길 때까지 이 경로를 열지 않는다.
     const modelBase = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('models') : null;
     if (modelBase)
       void scene
@@ -337,9 +404,14 @@ export default function Map3D({
     const paintedRect = (new URLSearchParams(window.location.search).get('prect') ?? '0,0,1400,1000')
       .split(',')
       .map(Number);
+    // 길을 미리 구운 그림(painted/national-roads.jpg)을 쓴다. 길을 다시 굽을 때만 주소에 ?bake=1을 준다(INT-27, 2026-11-15).
+    const prebaked =
+      modelBase && !new URLSearchParams(window.location.search).has('bake')
+        ? ['webp', 'jpg'].map((ext) => `${modelBase.replace(/\/$/, '')}/painted/national-roads.${ext}`)
+        : [];
     if (paintedUrl && paintedRect?.length === 4 && paintedRect.every(Number.isFinite))
       void scene
-        .loadPaintedRegion(paintedUrl, paintedRect as [number, number, number, number])
+        .loadPaintedRegion(paintedUrl, paintedRect as [number, number, number, number], prebaked)
         .then(() => invalidateRef.current())
         .catch(() => undefined);
     scene.setSites(latest.current.anchors, latest.current.model.cityByKey, latest.current.model.nationById);
@@ -386,6 +458,30 @@ export default function Map3D({
     invalidateRef.current();
   }, [anchors, model, ready]);
 
+  // 모드 바꾸기 요청(지도 바탕 화면의 전체/세부 단추).
+  useEffect(() => {
+    if (!modeRequest) return;
+    const c = control.current;
+    const box = frame.current;
+    if (!c.fit || !box) return;
+    if (modeRequest.mode === 'overview') {
+      c.x = 0;
+      c.z = 0;
+      c.zoom = c.fit;
+    } else {
+      const { selectedKey: chosen, myCityKey: home } = latest.current;
+      const site = anchors.find((item) => item.anchorKey === (chosen ?? home));
+      if (site) {
+        c.x = site.position.x - map.canvas.width / 2;
+        c.z = site.position.y - map.canvas.height / 2;
+      }
+      c.zoom = Math.min(Math.max(box.clientWidth / DETAIL_ENTER_WIDTH, c.fit), c.fit * MAX_ZOOM_FACTOR);
+    }
+    clampCenter();
+    changed();
+    // nonce가 바뀔 때만 움직인다.
+  }, [modeRequest?.nonce]);
+
   // 행군 연출: 인자 입력 화면처럼 출발 거점(focusKey)이 있으면 출발지에서 고른 거점까지 길을 따라 걷는다.
   // 내 장수가 다른 거점으로 옮겨 가면(턴 결과) 이전 거점에서 새 거점까지 한 번 걷는다.
   const previousHome = useRef(myCityKey);
@@ -418,7 +514,9 @@ export default function Map3D({
     scene.setMarch(points, nationColor);
     invalidateRef.current();
   }, [anchors, focusKey, map.routes, model, moved, myNationId, ready, selectedKey]);
-  const hovered = hover ? model.siteById.get(hover.siteId) : undefined;
+  const hovered = hover?.siteId ? model.siteById.get(hover.siteId) : undefined;
+  const tileCity = hover?.tile?.cityKey != null ? model.cityByKey.get(hover.tile.cityKey) : undefined;
+  const tileNation = tileCity?.nationId != null ? model.nationById.get(tileCity.nationId) : undefined;
   return (
     <div className={[styles.wrap, fill ? styles.wrapFill : '', stage ? styles.stage : ''].filter(Boolean).join(' ')}>
       <div className={stage ? styles.stageTools : styles.toolbar}>
@@ -465,6 +563,7 @@ export default function Map3D({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={() => (drag.current = null)}
+        onPointerLeave={() => setHover(null)}
       >
         {ready ? (
           <canvas ref={canvasRef} className={styles.canvas} />
@@ -493,26 +592,43 @@ export default function Map3D({
                     onPointerMove={(event) => {
                       if (event.pointerType !== 'mouse' || drag.current?.moved) return;
                       const box = frame.current?.getBoundingClientRect();
-                      if (box) setHover({ siteId: site.id, x: event.clientX - box.left, y: event.clientY - box.top });
+                      if (box)
+                        setHover({
+                          siteId: site.id,
+                          x: event.clientX - box.left,
+                          y: event.clientY - box.top,
+                          label: true,
+                        });
                     }}
                     onPointerLeave={() => setHover((old) => (old?.siteId === site.id ? null : old))}
                   >
-                    {/* 깃발: 소유국 이름 첫 글자(주인 없는 도시는 '무', 관문·항구는 종류 글자). 이름은 깃발 아래 판에. */}
-                    <span
-                      className={styles.flag}
-                      style={{ background: view.nation?.color ?? '#7d776b' }}
-                      aria-hidden="true"
-                    >
-                      {view.nation
-                        ? view.nation.name.slice(0, 1)
-                        : site.kind === 'CITY'
-                          ? '무'
-                          : SITE_SHORT_LABELS[site.kind].slice(0, 1)}
-                    </span>
+                    {/* 깃발: 소유국 이름 첫 글자. 공백지는 깃발을 달지 않는다(사용자 2026-11-14: "공백지를 무라고 표시하지말고
+                        깃발을 빼버려"). 이름은 깃발 아래 판에. */}
+                    {view.nation && flagStrip ? (
+                      // 깃발 그림: 흰 천에 세력색을 곱하고 첫 글자를 세로로 얹는다(사용자 2026-11-14: "깃발도 넣기로 하고").
+                      <span
+                        className={styles.banner}
+                        style={{ '--flag': flagStrip, '--nation': view.nation.color } as CSSProperties}
+                        aria-hidden="true"
+                      >
+                        <span className={styles.bannerText}>{view.nation.name.slice(0, 1)}</span>
+                      </span>
+                    ) : view.nation ? (
+                      <span className={styles.flag} style={{ background: view.nation.color }} aria-hidden="true">
+                        {view.nation.name.slice(0, 1)}
+                      </span>
+                    ) : null}
                     <span className={styles.name}>{view.plate}</span>
                   </button>
                 );
               })
+            : null}
+          {ready
+            ? minorSites.map((site) => (
+                <span key={site.id} className={styles.minor} data-minor-id={site.id} aria-hidden="true">
+                  {site.name}
+                </span>
+              ))
             : null}
         </div>
         {hover && hovered ? (
@@ -524,6 +640,36 @@ export default function Map3D({
               height: frame.current?.clientHeight ?? 0,
             })}
           />
+        ) : hover?.tile ? (
+          <div
+            className={tileStyles.tooltip}
+            data-testid="map-tile-tooltip"
+            aria-hidden="true"
+            style={tooltipPlacement(hover, {
+              width: frame.current?.clientWidth ?? 0,
+              height: frame.current?.clientHeight ?? 0,
+            })}
+          >
+            <p className={tileStyles.tooltipTitle}>
+              <span>{tileCity ? `${tileCity.name} 영지` : hover.tile.outland ? '오지' : '바다'}</span>
+            </p>
+            <p className={tileStyles.tooltipOwner}>
+              {tileCity ? (
+                <>
+                  <span className={tileStyles.tooltipSwatch} style={{ background: tileNation?.color ?? '#d6d0c4' }} />
+                  {tileNation?.name ?? '공백지'}
+                </>
+              ) : hover.tile.outland ? (
+                hover.tile.water ? (
+                  '무대 밖 강과 호수'
+                ) : (
+                  '무대 밖 땅'
+                )
+              ) : (
+                '주인 없는 바다'
+              )}
+            </p>
+          </div>
         ) : null}
         {stats ? <p ref={statLine} className={styles.stats} data-testid="map-3d-stats" /> : null}
       </div>

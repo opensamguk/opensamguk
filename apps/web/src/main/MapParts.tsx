@@ -35,6 +35,7 @@ export function MapTooltip({ view, model, style }: { view: SiteView; model: MapM
           {note}
         </p>
       ))}
+      {site.description ? <p className={styles.tooltipDescription}>{site.description}</p> : null}
       {city ? <MapGenerals generals={model.generalsAt.get(city.key) ?? []} /> : null}
     </div>
   );
@@ -77,7 +78,7 @@ export function MapSiteChooser({
       지도 거점
       <select value={selectedKey ?? ''} onChange={(event) => onChoose(Number(event.target.value))}>
         <option value="" disabled>
-          도시·관문 선택
+          도시와 관문 선택
         </option>
         {myNationId === undefined
           ? model.anchors.map((site) => option(site))

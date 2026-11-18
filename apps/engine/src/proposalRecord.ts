@@ -2,7 +2,11 @@ import { proposalRecordPayload, proposalReward } from '@opensamguk/rules';
 import type { QueuedInputHandler } from './features';
 import { appendNationHistory } from './commandPersistence';
 
-export const processProposalRecord: QueuedInputHandler = async (tx, world, event, { tick, sequence }) => {
+// 순환 import 중 등록표가 읽을 수 있도록 함수 선언으로 둔다.
+export function processProposalRecord(...args: Parameters<QueuedInputHandler>): ReturnType<QueuedInputHandler> {
+  return handleProposalRecord(...args);
+}
+const handleProposalRecord: QueuedInputHandler = async (tx, world, event, { tick, sequence }) => {
   const payload = proposalRecordPayload.parse(event.payload);
   const dedication = proposalReward(payload);
   if (dedication)

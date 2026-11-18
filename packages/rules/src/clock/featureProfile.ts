@@ -1,3 +1,4 @@
+import { cityUpgradeConfigSchema } from '../cityUpgrade/state';
 import { z } from 'zod';
 import { logisticsConfigSchema } from '../logistics/state';
 import { governanceConfigSchema } from '../governance/config';
@@ -20,6 +21,7 @@ const legacyFeatureProfileSchema = z.strictObject({
   mapKey: key,
 
   featureData: z.strictObject({
+    'city-upgrade-v1': cityUpgradeConfigSchema.optional(),
     'logistics-v1': logisticsConfigSchema,
     'governance-v1': governanceConfigSchema,
     'lineage-v1': lineageConfigSchema,

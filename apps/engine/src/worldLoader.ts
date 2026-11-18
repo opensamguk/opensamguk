@@ -5,6 +5,7 @@ import {
   effectiveWorldOptions,
   OFFICE_EFFECTS_FEATURE,
   officeEffectsSchema,
+  statRulesSchema,
   readOperationalMap,
   attachOperationalKinds,
   readStoredGovernance,
@@ -89,7 +90,10 @@ export async function loadWorldAfterCapabilityCheck(
     fogOfWar: world.fogOfWar,
     startYear: world.startYear,
     cities: Object.fromEntries(
-      attachOperationalKinds(cities.map(stripWorldId), operationalMap).map((city) => [city.cityKey, city]),
+      attachOperationalKinds(cities.map(stripWorldId), operationalMap, world.campaignState).map((city) => [
+        city.cityKey,
+        city,
+      ]),
     ),
     nations: Object.fromEntries(
       nations.map((nation) => {
@@ -113,7 +117,7 @@ export async function loadWorldAfterCapabilityCheck(
               ),
               world.replayFormat,
             ),
-            true,
+            statRulesSchema.parse({ stat: world.statRules }).stat.count === 5,
           ),
         ];
       }),

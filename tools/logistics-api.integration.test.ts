@@ -720,7 +720,7 @@ describe('AC-P2-30 실제 HTTP 물류 접수·조회·엔진', () => {
           await db.generalLog.findFirst({ where: { worldId: world.id, generalId: ruler.id, tick, kind: 'failure' } }),
         ).toMatchObject({
           commandKey: 'recruit',
-          text: expect.stringContaining('도시의 철·목재·말이 부족합니다.'),
+          text: expect.stringContaining('도시의 철, 목재, 말이 부족합니다.'),
         });
       }
       await advance(world.id, Math.ceil(tick / TICKS_PER_MONTH) * TICKS_PER_MONTH);
@@ -789,7 +789,7 @@ describe('AC-P2-30 실제 HTTP 물류 접수·조회·엔진', () => {
       select: { commandKey: true, kind: true, text: true },
     });
     expect(
-      logs.some((row) => row.commandKey === 'recruit' && row.text.includes('도시의 철·목재·말이 부족합니다.')),
+      logs.some((row) => row.commandKey === 'recruit' && row.text.includes('도시의 철, 목재, 말이 부족합니다.')),
       JSON.stringify(logs),
     ).toBe(true);
     expect(after.state.logistics).toEqual(before.state.logistics);

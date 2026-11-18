@@ -467,6 +467,15 @@ const mapEditorRoute = import.meta.env.DEV
     })
   : null;
 
+// 성 화면 확인 판(INT-29). 서버 없이 양식, 등급, 건물 단계를 바꿔 본다.
+const devCastleRoute = import.meta.env.DEV
+  ? createRoute({
+      getParentRoute: () => rootRoute,
+      path: 'dev/castle',
+      component: lazyRouteComponent(() => import('./stage/DevCastlePage'), 'DevCastlePage'),
+    })
+  : null;
+
 const campaignMapEditorRoute = import.meta.env.DEV
   ? createRoute({
       getParentRoute: () => rootRoute,
@@ -564,6 +573,7 @@ const routeTree = rootRoute.addChildren([
   ...(import.meta.env.DEV ? [devUiRoute] : []),
   ...(mapEditorRoute ? [mapEditorRoute] : []),
   ...(campaignMapEditorRoute ? [campaignMapEditorRoute] : []),
+  ...(devCastleRoute ? [devCastleRoute] : []),
 ]);
 
 export const router = createRouter({ routeTree, context: { queryClient, trpc } });

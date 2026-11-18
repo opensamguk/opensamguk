@@ -174,7 +174,7 @@ describe('계정 교체 안내의 수명', () => {
         } else {
           act(() => view.changeAccount(nextUserId));
           await screen.findByText(accountChanged);
-          expect(screen.queryByText('엔진이 요청을 처리하는 중입니다.')).toBeNull();
+          expect(screen.queryByText('요청을 처리하는 중입니다.')).toBeNull();
           await act(async () => result.reject(forbidden()));
         }
         await screen.findByText(accountChanged);
@@ -184,7 +184,7 @@ describe('계정 교체 안내의 수명', () => {
         expect(view.mutations[0]!.input).toEqual(original);
         expect(sessionStorage.getItem(`campaign.pending:${userId}:${worldId}`)).toBeNull();
         expect(sessionStorage.getItem(`campaign.pending:${nextUserId}:${worldId}`)).toBeNull();
-        expect(screen.queryByText('엔진이 요청을 처리하는 중입니다.')).toBeNull();
+        expect(screen.queryByText('요청을 처리하는 중입니다.')).toBeNull();
 
         // 현재 계정이 새로 누른 조작만 새 UUID로 보낸다. 과거 오류 안내가 새 결과를 덮지 않는다.
         fireEvent.click(screen.getByRole('button', { name: '대상에게 제안' }));

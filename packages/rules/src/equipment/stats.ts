@@ -17,7 +17,11 @@ export function equipmentBonus(world: WorldView, generalId: number) {
 }
 
 // D-070: 검증한 기본 능력치는 그대로 두고 계산할 때만 장비를 더한다.
-export function withEquipmentBonus(world: WorldView, generalId: number, stats: FiveStats): FiveStats {
+export function withEquipmentBonus<T extends Pick<FiveStats, 'leadership' | 'strength' | 'intel'>>(
+  world: WorldView,
+  generalId: number,
+  stats: T,
+): T {
   const bonus = equipmentBonus(world, generalId);
   return {
     ...stats,

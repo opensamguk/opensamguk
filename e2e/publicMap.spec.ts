@@ -169,16 +169,16 @@ const iso = (time: number) => new Date(time).toISOString();
 test.beforeAll(async ({ publicMapStack }) => {
   // 아래에서 DB를 쓰는 도우미가 모두 이 파일의 DB를 가리키는지 먼저 확인한다.
   if (e2eDatabaseUrl() !== publicMapStack.databaseUrl) throw new Error('공개 지도 E2E가 자기 DB를 쓰지 않습니다.');
-  const [{ monthlyFixture }, { saveInitialWorld }, { TurnLoop }] = await Promise.all([
+  const [{ monthlyFixture }, { saveFixtureWorld }, { TurnLoop }] = await Promise.all([
     import('../apps/engine/test/monthlyFixture'),
-    import('../apps/engine/src/world/persistence'),
+    import('./worldFixture'),
     import('../apps/engine/src/turnLoop'),
   ]);
   const template = await monthlyFixture();
   const tag = `${Date.now() % 100_000}`;
   await withE2eDb(async (db) => {
     const create = async (spec: WorldSpec, name: string, status: Made['status']): Promise<Made> => {
-      const { worldId } = await saveInitialWorld(db, shape(template, spec), {
+      const { worldId } = await saveFixtureWorld(db, shape(template, spec), {
         name,
         turnTermMinutes: 60,
         endYear: null,

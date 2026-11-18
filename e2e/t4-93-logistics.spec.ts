@@ -5,7 +5,7 @@ import { newSession } from '../apps/server/src/auth/session';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { controlClock } from '../apps/engine/src/world/clock';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld, attachFixtureOwners } from './worldFixture';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { initializeIntegrationResources } from '../tools/integration-resources';
 import { test as legalTest, expect, type LegalStack } from './legalFixture';
@@ -23,17 +23,6 @@ async function fixture(stack: LegalStack, browser: Browser) {
     portraitMap: '191-map',
     seed: randomUUID(),
   });
-  const features = [
-    'campaign-assignment-v2',
-    'campaign-v1',
-    'city-resources-v1',
-    'five-stats',
-    'logistics-v1',
-    'operational-map',
-    'personnel',
-    'policy',
-  ];
-  initial.ruleFeatures = features;
   const cavalry = initial.unitSet.crewTypes.find((unit) => unit.armType === 3)!;
   cavalry.name = '긴 이름의 기병 부대 비용 확인';
   initial.generals = initial.generals.map((row) => ({ ...row, crew: 0, nextTurnTick: 1_000_000 }));
@@ -66,6 +55,8 @@ async function fixture(stack: LegalStack, browser: Browser) {
     (general) =>
       general.nationId !== null && general.nationId !== source.nationId && general.activeFromYear <= initial.startYear,
   )!;
+  ruler.cityKey = source.cityKey;
+  other.cityKey = source.cityKey;
   const config = {
     version: 1,
     specialties: [{ cityKey: source.cityKey, good: 'iron', perMonth: 1000 }],
@@ -80,12 +71,11 @@ async function fixture(stack: LegalStack, browser: Browser) {
     build: { wall: { iron: 0, wood: 1, horses: 0 }, defence: { iron: 1, wood: 1, horses: 0 } },
     trade: { iron: { buy: 3, sell: 1 }, wood: { buy: 3, sell: 1 }, horses: { buy: 3, sell: 1 } },
   };
-  const { worldId } = await saveInitialWorld(stack.db, initial, {
+  const { worldId } = await saveFixtureWorld(stack.db, initial, {
     name: '물류 화면 검증',
     turnTermMinutes: 60,
     endYear: initial.startYear + 10,
     replayFormat: 3,
-    ruleFeatures: features,
     featureData: { 'logistics-v1': config },
   });
   const advance = async (tick: number) => {
@@ -113,16 +103,7 @@ async function fixture(stack: LegalStack, browser: Browser) {
         sessions: { create: { id: session.id, expiresAt: session.expiresAt } },
       },
     });
-    await stack.db.general.update({
-      where: { worldId_id: { worldId, id: generalId } },
-      data: {
-        userId: id,
-        cityKey: source.cityKey,
-        lastActiveTick: 10_000,
-        lastActiveAt: new Date(),
-        residenceTick: 10_000,
-      },
-    });
+    await attachFixtureOwners(stack.db, worldId, [{ id: generalId, userId: id }]);
     await context.addCookies([
       { name: 'sid', value: session.token, url: stack.origin, httpOnly: true, sameSite: 'Lax' },
     ]);
@@ -325,7 +306,7 @@ test('AC-P2-30 비용 미리보기는 큰 수와 긴 이름을 표시하고 재�
   });
   const costs = panel(page)
     .locator('details')
-    .filter({ has: page.getByText('모병·투자 재화 비용', { exact: true }) });
+    .filter({ has: page.getByText('모병과 투자 재화 비용', { exact: true }) });
   await costs.locator('summary').focus();
   await page.keyboard.press('Enter');
   await costs.getByRole('combobox', { name: '병종', exact: true }).selectOption(String(game.cavalryId));

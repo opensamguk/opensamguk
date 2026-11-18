@@ -343,3 +343,17 @@ export * from './tactical/battle';
 export * from './tactical/world';
 export * from './tactical/input';
 export * from './tactical/clock';
+
+export { storedGeneralStats, generalStats, pledgeChance } from './general/fiveStats';
+
+export { cityLandInfo, readCityLand } from './construction/land';
+export { BUILDINGS } from './construction/catalog';
+
+export { initialCityUpgrade, CITY_UPGRADE_FEATURE, cityUpgradeConfigSchema } from './cityUpgrade/state';
+export {
+  cityUpgradeInfo,
+  cityUpgradeCommands,
+  canExecuteCityUpgradeCommand,
+  shiftCityLandTurns,
+  CITY_UPGRADE_RULES,
+} from './cityUpgrade/upgrade';

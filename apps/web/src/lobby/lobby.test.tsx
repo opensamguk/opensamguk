@@ -258,7 +258,10 @@ describe('지난 기수', { timeout: 30_000 }, () => {
     expect(screen.getByRole('heading', { name: '지난 기수' })).toBeTruthy();
     const [third, fourth] = screen.getAllByTestId('past-season');
     expect(third!.textContent).toBe('3기통일위230년 7월 끝남영토 재생기록 보기');
-    expect(within(third!).getByText('위').getAttribute('style')).toContain('background: rgb(51, 102, 153)');
+    // 이름표는 무채색 칩 그림에 국가색(--nation)을 곱해 칠한다 (NationBadge).
+    expect(within(third!).getByText('위').parentElement!.style.getPropertyValue('--nation').toLowerCase()).toBe(
+      '#336699',
+    );
     expect(within(third!).getByRole('link', { name: '3기 영토 재생 보기' }).getAttribute('href')).toBe(
       '/share/timelapse/00000000-0000-4000-8000-000000000003',
     );

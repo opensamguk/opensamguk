@@ -1,7 +1,7 @@
 import type { inferRouterOutputs } from '@trpc/server';
 import type { AppRouter } from '../apps/server/src/router';
 import { readFixture } from '../apps/server/test/readFixture';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld, attachFixtureOwners } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { holdLease, releaseHold } from './game';
 import { test, expect, apiQuery } from './t210-fixture';
@@ -14,20 +14,18 @@ test('T4-97 메인 HUD 계정 메뉴·예턴 상태·도시에서 명령 고르�
   test.setTimeout(120_000);
   const actor = await world.user('ruler');
   const initial = await readFixture();
-  initial.ruleFeatures = ['personnel'];
   initial.generals[0] = { ...initial.generals[0]!, nextTurnTick: 1_000_000 };
-  const { worldId } = await saveInitialWorld(world.hold.db, initial, {
+  const { worldId } = await saveFixtureWorld(world.hold.db, initial, {
     name: '메인 HUD 인수',
     turnTermMinutes: 60,
     endYear: 201,
     replayFormat: 3,
-    ruleFeatures: ['personnel'],
   });
   const hold = await holdLease(worldId);
   const { page } = actor;
   const generalId = initial.generals[0]!.id;
   try {
-    await hold.db.general.update({ where: { worldId_id: { worldId, id: generalId } }, data: { userId: actor.userId } });
+    await attachFixtureOwners(hold.db, worldId, [{ id: generalId, userId: actor.userId }]);
     await controlClock(hold.db, worldId, 'start');
     await page.goto(`/w/${worldId}`);
     const editor = page.getByTestId('turn-editor');

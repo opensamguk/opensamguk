@@ -57,6 +57,10 @@ export function tileCost(mode: RouteMode, terrain: TileTerrain): number {
   return LAND_COST[terrain];
 }
 
+/** 물길이 두 끝 거점 둘레에서 지날 수 있는 땅의 범위(칸)와 그 비용. */
+const PORT_REACH = 3;
+const PORT_LAND = 4;
+
 export const FLAG_MAJOR = 1;
 export const FLAG_BRIDGE = 2;
 export const FLAG_FORD = 4;
@@ -73,10 +77,12 @@ export type TileRoutePlan = {
   paths: Map<string, number[]>;
 };
 
-type Route = { id: string; mode: RouteMode; from: number; to: number };
+/** priority가 클수록 먼저 놓는다(큰 도시 사이 길). 뒤에 놓는 작은 길이 먼저 난 큰 길에 붙어 가다 갈라진다. */
+type Route = { id: string; mode: RouteMode; from: number; to: number; priority?: number };
 
 /**
- * 칸 경로 찾기(A*, 8방향). 이미 같은 갈래(육로/물길) 길이 난 칸은 비용을 절반으로 쳐서 길이 큰길로 모인다.
+ * 칸 경로 찾기(A*, 8방향). 이미 같은 갈래(육로/물길) 길이 난 칸은 비용을 0.35배로 쳐서 길이 큰길로 모인다
+ * (사용자 2026-11-14: 나란히 가다 갈라지는 작은 삼각형 대신 한 줄기에서 갈라지는 갈림길).
  * 대각선으로 갈 때는 옆 두 칸 가운데 하나는 지날 수 있어야 한다(물 사이 모서리로 빠져나가지 않게).
  * 출발·도착 칸은 성질과 상관없이 들어간다(바닷가 성, 강가 항구).
  */
@@ -86,6 +92,11 @@ export function planTileRoutes(
   terrainAt: (index: number) => TileTerrain,
   routes: readonly Route[],
   siteTiles: Iterable<number> = [],
+  /**
+   * 칸 안 어디든 물이 지나는 칸(그림 지도의 가는 강). 수로만 이 칸을 강으로 친다. 칸 가운데만 보면 칸보다 가는
+   * 황하가 끊겨 황하 수로가 칸 경로를 못 찾았다(사용자 2026-11-14 황하 수로).
+   */
+  wetAt: (index: number) => boolean = () => false,
 ): TileRoutePlan {
   const size = columns * rows;
   const land = new Uint8Array(size);
@@ -95,10 +106,16 @@ export function planTileRoutes(
   const paths = new Map<string, number[]>();
   const terrain = new Array<TileTerrain>(size);
   for (let i = 0; i < size; i++) terrain[i] = terrainAt(i);
+  const wet = new Uint8Array(size);
+  if (routes.some((route) => route.mode === 'RIVER')) for (let i = 0; i < size; i++) wet[i] = wetAt(i) ? 1 : 0;
   for (const index of siteTiles) if (index >= 0 && index < size) flags[index]! |= FLAG_SITE;
 
   const ordered = [...routes].sort((a, b) =>
-    a.mode === b.mode ? (a.id < b.id ? -1 : a.id > b.id ? 1 : 0) : a.mode < b.mode ? -1 : 1,
+    a.mode !== b.mode
+      ? a.mode < b.mode
+        ? -1
+        : 1
+      : (b.priority ?? 0) - (a.priority ?? 0) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
   );
   const cost = new Float64Array(size);
   const came = new Int32Array(size);
@@ -106,10 +123,23 @@ export function planTileRoutes(
     if (route.from < 0 || route.to < 0 || route.from >= size || route.to >= size) continue;
     const isWater = route.mode === 'RIVER' || route.mode === 'SEA';
     const bits = isWater ? water : land;
+    // 물길은 두 끝 거점 둘레 PORT_REACH칸 안의 땅도 지난다(비용 PORT_LAND). 섬 안쪽 성(이주)·강 어귀 안쪽 항구(후관)에서
+    // 물까지 나가지 못해 해로가 칸 경로를 못 찾았다(사용자 2026-11-15 "이주가 길이 없는거 같은데?").
+    const nearEnd = (index: number) => {
+      const u = index % columns;
+      const v = Math.floor(index / columns);
+      return [route.from, route.to].some(
+        (end) => Math.max(Math.abs((end % columns) - u), Math.abs(Math.floor(end / columns) - v)) <= PORT_REACH,
+      );
+    };
     const step = (index: number) => {
       if (index === route.from || index === route.to) return 1;
-      const base = tileCost(route.mode, terrain[index]!);
-      return bits[index] ? base * 0.5 : base;
+      let base =
+        route.mode === 'RIVER' && wet[index]
+          ? Math.min(1, tileCost(route.mode, terrain[index]!))
+          : tileCost(route.mode, terrain[index]!);
+      if (isWater && !Number.isFinite(base) && terrain[index] !== 'void' && nearEnd(index)) base = PORT_LAND;
+      return bits[index] ? base * 0.35 : base;
     };
     const passable = (index: number) => index === route.from || index === route.to || Number.isFinite(step(index));
     cost.fill(Infinity);

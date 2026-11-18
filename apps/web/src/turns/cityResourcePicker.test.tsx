@@ -5,8 +5,27 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { TEST_UNIT_SET } from '../battleSim/testUnitSet';
 import { worldUnits } from '../battleSim/unitChoices';
 import { CommandPicker } from './CommandPicker';
+
+// 명령은 띠 위 세부 메뉴에서 고른다(띠 아래 목록과 검색 칸은 없다). 시험은 그 명령이 든 묶음 패를 차례로 눌러
+// 세부 메뉴에 띄운 뒤 그 단추를 돌려준다. 인자 없는 명령은 누르면 바로 들어가고, 인자가 있으면 인자 창이 열린다.
+function commandButton(name: string, root: HTMLElement = document.body): HTMLButtonElement {
+  const scope = within(root);
+  const find = () =>
+    scope.queryAllByRole('button', { name }).find((button) => button.closest('[aria-label$="세부 명령"]')) as
+      HTMLButtonElement | undefined;
+  const open = find();
+  if (open) return open;
+  for (const bandGroup of scope.getAllByRole('group', { name: '명령 분류' })) {
+    for (const plaque of within(bandGroup).getAllByRole('button')) {
+      if (plaque.getAttribute('aria-expanded') !== 'true') fireEvent.click(plaque);
+      const found = find();
+      if (found) return found;
+    }
+  }
+  throw new Error(`세부 메뉴에서 ${name} 명령을 찾지 못했습니다.`);
+}
 afterEach(cleanup);
-it('INT-18C AC-INT-18C 구판의 인자 없는 훈련은 검색 Enter로 바로 넣는다', () => {
+it('INT-18C AC-INT-18C 구판의 인자 없는 훈련은 세부 명령을 누르면 바로 넣는다', () => {
   const onPut = vi.fn();
   render(
     <CommandPicker
@@ -18,13 +37,13 @@ it('INT-18C AC-INT-18C 구판의 인자 없는 훈련은 검색 Enter로 바로 
       units={worldUnits(TEST_UNIT_SET)}
       blockedReason={null}
       targetLabel="선택"
-      searchRef={createRef()}
+      focusRef={createRef()}
       onPut={onPut}
     />,
   );
-  fireEvent.keyDown(screen.getByRole('searchbox', { name: '명령 찾기' }), { key: 'Enter' });
+  fireEvent.click(commandButton('훈련'));
   expect(onPut).toHaveBeenCalledWith({ commandKey: 'train', args: {}, explicit: true });
-  expect(screen.queryByRole('combobox', { name: '훈련·사기 대상' })).toBeNull();
+  expect(screen.queryByRole('combobox', { name: '훈련과 사기 대상' })).toBeNull();
 });
 it('INT-18C AC-INT-18C 도시 훈련 선택은 target city를 보내며 부곡 전환 뒤 숨은 병종을 남기지 않는다', () => {
   const onPut = vi.fn();
@@ -57,13 +76,12 @@ it('INT-18C AC-INT-18C 도시 훈련 선택은 target city를 보내며 부곡 �
       units={worldUnits(TEST_UNIT_SET)}
       blockedReason={null}
       targetLabel="선택"
-      searchRef={createRef()}
+      focusRef={createRef()}
       onPut={onPut}
-      cityResources
     />,
   );
-  fireEvent.click(screen.getByRole('radio', { name: '훈련' }));
-  fireEvent.change(screen.getByRole('combobox', { name: '훈련·사기 대상' }), { target: { value: 'city' } });
+  fireEvent.click(commandButton('훈련'));
+  fireEvent.change(screen.getByRole('combobox', { name: '훈련과 사기 대상' }), { target: { value: 'city' } });
   const crewGroup = () => screen.getByRole('radiogroup', { name: '병종' });
   expect((within(crewGroup()).getByRole('radio', { checked: true }) as HTMLInputElement).value).toBe('1100');
   fireEvent.click(within(crewGroup()).getByRole('radio', { name: /궁병/ }));
@@ -74,8 +92,8 @@ it('INT-18C AC-INT-18C 도시 훈련 선택은 target city를 보내며 부곡 �
     explicit: true,
   });
   // 넣으면 입력 화면이 닫힌다. 다시 고르면 기존 부곡 갈래부터 시작한다.
-  fireEvent.click(screen.getByRole('radio', { name: '훈련' }));
-  expect((screen.getByRole('combobox', { name: '훈련·사기 대상' }) as HTMLSelectElement).value).toBe('unit');
+  fireEvent.click(commandButton('훈련'));
+  expect((screen.getByRole('combobox', { name: '훈련과 사기 대상' }) as HTMLSelectElement).value).toBe('unit');
   expect(screen.queryByRole('radiogroup', { name: '병종' })).toBeNull();
   fireEvent.change(screen.getByRole('spinbutton', { name: '부곡 번호' }), { target: { value: '7' } });
   fireEvent.click(screen.getByRole('button', { name: '선택에 넣기' }));

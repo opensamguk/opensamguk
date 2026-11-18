@@ -39,6 +39,25 @@ import {
 import { TRADE_UNSUPPORTED } from './tradeTargets';
 import { brokenByText, estimateText, nationName, paidText, TreatyCard } from './TreatyCard';
 
+// 명령은 띠 위 세부 메뉴에서 고른다(띠 아래 목록과 검색 칸은 없다). 시험은 그 명령이 든 묶음 패를 차례로 눌러
+// 세부 메뉴에 띄운 뒤 그 단추를 돌려준다. 인자 없는 명령은 누르면 바로 들어가고, 인자가 있으면 인자 창이 열린다.
+function commandButton(name: string, root: HTMLElement = document.body): HTMLButtonElement {
+  const scope = within(root);
+  const find = () =>
+    scope.queryAllByRole('button', { name }).find((button) => button.closest('[aria-label$="세부 명령"]')) as
+      HTMLButtonElement | undefined;
+  const open = find();
+  if (open) return open;
+  for (const bandGroup of scope.getAllByRole('group', { name: '명령 분류' })) {
+    for (const plaque of within(bandGroup).getAllByRole('button')) {
+      if (plaque.getAttribute('aria-expanded') !== 'true') fireEvent.click(plaque);
+      const found = find();
+      if (found) return found;
+    }
+  }
+  throw new Error(`세부 메뉴에서 ${name} 명령을 찾지 못했습니다.`);
+}
+
 afterEach(cleanup);
 
 // 실제 AppRouter treaty.list 출력 타입으로 만든 시험용 조약. 타입에 없는 칸(신의·남은 개월·파기)은 넣을 수 없다.
@@ -397,7 +416,7 @@ describe('외교실 국가 탭 계산', () => {
 describe('조약 카드', () => {
   it('받은 제안은 조항을 집행·기록으로 나누고 내 쪽 추정 비용(estimate)을 보인다', () => {
     render(<TreatyCard treaty={treaty()} busy={null} onRespond={vi.fn()} />);
-    expect(screen.getByRole('region', { name: '서버가 집행하는 조항' }).textContent).toContain('불가침 24개월');
+    expect(screen.getByRole('region', { name: '집행되는 조항' }).textContent).toContain('불가침 24개월');
     expect(screen.getByRole('region', { name: '기록만 남는 조항' }).textContent).toContain('서로 사신을 보낸다');
     expect(screen.getByTestId('treaty-estimate').textContent).toBe(
       '우리 금 1,200 · 상대 금 900 (지금 도시 수 기준, 수락 때 다시 계산)',
@@ -519,12 +538,12 @@ describe('예턴 편집의 교역 대상', () => {
         units={worldUnits(TEST_UNIT_SET)}
         blockedReason={null}
         targetLabel="1번 칸"
-        searchRef={{ current: null }}
+        focusRef={{ current: null }}
         onPut={vi.fn()}
         cityChoicesFor={(key) => (key === 'trade' ? TRADE_UNSUPPORTED : null)}
       />,
     );
-    fireEvent.click(screen.getByRole('radio', { name: '교역' }));
+    fireEvent.click(commandButton('교역'));
     // 인자 입력 화면(INT-25)의 도시 목록에 후보가 없다.
     expect(within(screen.getByRole('radiogroup', { name: '대상 도시' })).queryAllByRole('radio')).toHaveLength(0);
     expect(screen.getByText(TRADE_UNSUPPORTED.note!)).toBeTruthy();

@@ -817,7 +817,7 @@ describe('T4-03 / AC-P2-02 형식 6 재생과 해시 보존', () => {
     const input = origin();
     input.initial.generals = [];
     let caps = startCapsReplay(input, selection);
-    let legacy = initialReplayState(input.initial);
+    let legacy = initialReplayState(input.initial, {});
     while (caps.monthlyTick < 120000) {
       caps = runCapsReplayAction(caps, 'caps-golden', undefined, selection);
       legacy = runReplayAction(legacy, 'caps-golden');

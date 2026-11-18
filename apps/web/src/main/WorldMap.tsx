@@ -1,4 +1,5 @@
 import type { PublicGeography } from '@opensamguk/shared';
+import type { MapMode, MapModeRequest } from '../map3d/mapMode';
 import { lazy, Suspense, useMemo, useRef, useState } from 'react';
 import { OperationalWorldMap } from './OperationalWorldMap';
 import { CAPITAL_MARK, isCapital, levelName, type DrawnNation } from './siteMarkers';
@@ -92,6 +93,8 @@ export function WorldMap({
   focusKey = null,
   generals,
   stage = false,
+  onModeChange,
+  modeRequest,
 }: {
   cities: readonly DrawnCity[];
   nations: readonly DrawnNation[];
@@ -108,6 +111,9 @@ export function WorldMap({
   focusKey?: number | null;
   /** 지도 바탕 화면(INT-29). WebGL2가 되면 주소와 상관없이 3D로, 화면을 꽉 채워 그린다. */
   stage?: boolean;
+  /** 전체/세부 모드(3D 지도만, INT-29). */
+  onModeChange?: (mode: MapMode) => void;
+  modeRequest?: MapModeRequest | null;
 }) {
   // 장수를 받은 고전 지도는 마우스를 올린 도시의 풍선을 띄운다 (운영 지도 풍선과 같은 모양, INT-26).
   const [hover, setHover] = useState<{ key: number; x: number; y: number } | null>(null);
@@ -128,6 +134,8 @@ export function WorldMap({
           fill={fill}
           focusKey={focusKey}
           stage={stage}
+          onModeChange={onModeChange}
+          modeRequest={modeRequest}
         />
       </Suspense>
     );

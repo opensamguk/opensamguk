@@ -119,7 +119,7 @@ export function EquipmentTradeFields({
         </p>
       ) : null}
       <p className={styles.muted}>
-        매매는 고른 예턴에서 실행합니다. 경고가 있어도 넣을 수 있고 실행할 때 금·재료·도시 조건을 다시 검사합니다.
+        매매는 고른 예턴에서 실행합니다. 경고가 있어도 넣을 수 있고 실행할 때 금, 재료, 도시 조건을 다시 검사합니다.
       </p>
     </div>
   );

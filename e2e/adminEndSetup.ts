@@ -62,7 +62,7 @@ export async function endControls(page: Page, stack: LegalStack, worldId: string
 export async function confirmEnd(dialog: Locator, name: string, reason = '실제 종료 화면 인수') {
   await dialog.getByLabel('현재 월드 이름 그대로 입력', { exact: true }).fill(name);
   await dialog.getByLabel('종료 사유 (1~200자)', { exact: true }).fill(reason);
-  await dialog.getByRole('checkbox', { name: '대상·상태·사유와 종료의 영향을 확인했습니다.', exact: true }).check();
+  await dialog.getByRole('checkbox', { name: '대상, 상태, 사유와 종료의 영향을 확인했습니다.', exact: true }).check();
 }
 export const endSubmit = (dialog: Locator) => dialog.getByRole('button', { name: '월드 종료 요청 확정', exact: true });
 export const endQuery = (dialog: Locator) => dialog.getByRole('button', { name: '종료 요청 결과 조회', exact: true });

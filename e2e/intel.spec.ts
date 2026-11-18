@@ -6,7 +6,7 @@ import { newSession } from '../apps/server/src/auth/session';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { controlClock } from '../apps/engine/src/world/clock';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld, attachFixtureOwners } from './worldFixture';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { initializeIntegrationResources } from '../tools/integration-resources';
 import { ageLabel, crewText, levelLabel } from '../apps/web/src/intel/view';
@@ -16,10 +16,7 @@ import { TEST_PASSWORD } from './account';
 
 // T4-13 AC-P2-07 기록 화면 몫. 공개 dist·실제 PG·HTTP·엔진 TurnLoop로 첩보를 실제로 실행한 기록을 본다.
 // 원생성은 국가 둘·도시 넷·장수 셋으로 줄이고(저장 전 통제), 계정은 DB로 장수에 묶는다(t4-93 첫 고정물과 같은 통제).
-// 기능은 월드 생성 옵션의 ruleFeatures로만 켠다. 제품 프리셋은 고치지 않는다.
-const INTEL_FEATURES = ['five-stats', 'intel-v1', 'operational-map', 'policy'];
-const PLAIN_FEATURES = ['five-stats', 'operational-map', 'policy'];
-const NEAR_CREW = 6_000;
+// 첩보는 모든 월드에서 늘 켜져 있다. 제품 프리셋은 고치지 않는다.
 
 async function advanceWorld(stack: LegalStack, worldId: string, tick: number) {
   const lease = await acquireLease(stack.db, worldId);
@@ -48,7 +45,7 @@ function distances(cities: ReadonlyArray<{ cityKey: number; connections: readonl
   return result;
 }
 
-async function world(stack: LegalStack, features: string[], name: string) {
+async function world(stack: LegalStack, name: string) {
   const source = await loadInitialWorldFromDb(stack.db, {
     scenario: 'integration191',
     map: 'integration',
@@ -56,7 +53,7 @@ async function world(stack: LegalStack, features: string[], name: string) {
     portraitMap: '191-map',
     seed: 'intel-records-ui',
   });
-  source.ruleFeatures = [...features];
+  source.scenarioKey = 'test-intel';
   const cityKinds = source.cities.filter((city) => city.kind !== 'PASS');
   let picked: { base: number; near: number; mid: number; far: number } | undefined;
   for (const city of cityKinds) {
@@ -97,7 +94,7 @@ async function world(stack: LegalStack, features: string[], name: string) {
     ...ruler(nationB!.id),
     cityKey: near,
     activeFromYear: source.startYear,
-    crew: NEAR_CREW,
+    crew: 0,
     rice: 100_000,
     nextTurnTick: 1_000_000,
   };
@@ -110,12 +107,11 @@ async function world(stack: LegalStack, features: string[], name: string) {
     nextTurnTick: 1_000_000,
   };
   source.generals = [spyRuler, targetRuler, ronin];
-  const { worldId } = await saveInitialWorld(stack.db, source, {
+  const { worldId } = await saveFixtureWorld(stack.db, source, {
     name,
     turnTermMinutes: 60,
     endYear: source.startYear + 10,
     replayFormat: 3,
-    ruleFeatures: features,
   });
   await controlClock(stack.db, worldId, 'start');
   const nameOf = (key: number) => source.cities.find((city) => city.cityKey === key)!.name;
@@ -135,10 +131,7 @@ async function account(stack: LegalStack, worldId: string, generalId: number) {
       sessions: { create: { id: session.id, expiresAt: session.expiresAt } },
     },
   });
-  await stack.db.general.update({
-    where: { worldId_id: { worldId, id: generalId } },
-    data: { userId: id, lastActiveTick: 0, lastActiveAt: new Date() },
-  });
+  await attachFixtureOwners(stack.db, worldId, [{ id: generalId, userId: id }]);
   return { id, email, token: session.token, cookie: `sid=${session.token}` };
 }
 
@@ -186,7 +179,7 @@ test('AC-P2-07 실제 첩보 기록을 자기 국가만 보고 세션이 바뀌�
   browser,
 }, info) => {
   await initializeIntegrationResources(stack.db);
-  const game = await world(stack, INTEL_FEATURES, 'T4-13 첩보 기록 화면');
+  const game = await world(stack, 'T4-13 첩보 기록 화면');
   const { worldId, near, mid, far, nameOf } = game;
   const [spy, target, ronin] = [
     await account(stack, worldId, game.spyRuler.id),
@@ -244,7 +237,7 @@ test('AC-P2-07 실제 첩보 기록을 자기 국가만 보고 세션이 바뀌�
     await loginByForm(page, spy.email);
     await expect(page).toHaveURL(atRecords);
     const { raw, data } = await intelData(await spyResponse);
-    expect(data.enabled).toBe(true);
+    expect(data).not.toHaveProperty('enabled');
     const byKey = (a: number, b: number) => a - b;
     expect(data.items.map((item) => item.cityKey).sort(byKey)).toEqual([near, mid, far].sort(byKey));
 
@@ -270,8 +263,6 @@ test('AC-P2-07 실제 첩보 기록을 자기 국가만 보고 세션이 바뀌�
       await expect(row).toContainText(`${item.year}년 ${item.month}월 · ${ageLabel(item.ageMonths)}`);
       await expect(row).toContainText(crewText(item.crew));
     }
-    const nearRow = view.getByRole('row', { name: new RegExp(`^${nameOf(near)} 첩보 기록`) });
-    await expect(nearRow).not.toContainText(NEAR_CREW.toLocaleString('ko-KR'));
     const farRow = view.getByRole('row', { name: new RegExp(`^${nameOf(far)} 첩보 기록`) });
     await expect(farRow.locator('td[title="정보를 어느 정도 이상 얻었을 때만 기록됩니다"]')).toHaveCount(5);
     await expect(farRow.locator('td[title="정보를 많이 얻었을 때만 기록됩니다"]')).toHaveCount(2);
@@ -318,7 +309,7 @@ test('AC-P2-07 실제 첩보 기록을 자기 국가만 보고 세션이 바뀌�
     await expect(page.getByText(nameOf(far), { exact: true })).toHaveCount(0);
     release();
     const other = await intelData(await targetResponse);
-    expect(other.data).toMatchObject({ enabled: true, items: [] });
+    expect(other.data).toMatchObject({ items: [] });
     await expect(panel(page).getByText('아직 첩보 기록이 없습니다', { exact: true })).toBeVisible();
     await expect(page.getByRole('row', { name: /첩보 기록, / })).toHaveCount(0);
     await page.unroute('**/trpc/**');
@@ -335,18 +326,5 @@ test('AC-P2-07 실제 첩보 기록을 자기 국가만 보고 세션이 바뀌�
     ).toBeVisible();
   } finally {
     await roninView.context.close();
-  }
-
-  // 첩보를 켜지 않은 월드는 안내만 나온다.
-  const plain = await world(stack, PLAIN_FEATURES, 'T4-13 첩보 꺼진 월드');
-  const plainUser = await account(stack, plain.worldId, plain.spyRuler.id);
-  const plainView = await cookiePage(browser, stack, plainUser.token);
-  try {
-    const response = plainView.page.waitForResponse(isIntelRecords);
-    await plainView.page.goto(`/w/${plain.worldId}/records?tab=intel`);
-    expect((await intelData(await response)).data).toEqual({ enabled: false, items: [] });
-    await expect(panel(plainView.page).getByText('이 월드에서는 첩보를 쓰지 않습니다', { exact: true })).toBeVisible();
-  } finally {
-    await plainView.context.close();
   }
 });

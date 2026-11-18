@@ -38,7 +38,11 @@ async function allowed(tx: Prisma.TransactionClient, worldId: string, userId: st
     },
   }));
 }
-export const processTacticalInput: QueuedInputHandler = async (tx, world, event) => {
+// 함수 선언으로 둔다. ruleFeatures.ts와 순환 import가 있어 const 처리기는 등록표를 만들 때 아직 초기화되지 않는다.
+export function processTacticalInput(...args: Parameters<QueuedInputHandler>): ReturnType<QueuedInputHandler> {
+  return handleTacticalInput(...args);
+}
+const handleTacticalInput: QueuedInputHandler = async (tx, world, event) => {
   const reject = (code: string) => ({ status: 'REJECTED' as const, result: { code, message: code } });
   if (world.status !== 'RUNNING') return reject('WORLD_CLOSED');
   const payload = envelope.parse(event.payload),

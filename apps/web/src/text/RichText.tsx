@@ -9,6 +9,7 @@ import { displayName } from '../game/names';
 import { useWorldMap } from '../game/queries';
 import { Portrait } from '../portrait/Portrait';
 import { StageIcon, type StageIconName } from '../ui/GameIcon';
+import { publicImageUrl } from '@opensamguk/shared/public-images';
 import { buildMatcher, type EntityMatcher, type TextEntity, type TextPiece } from './entities';
 import styles from './RichText.module.css';
 
@@ -144,7 +145,8 @@ export function LogKindIcon({ kind }: { kind: string }) {
   if (!entry) return null;
   return (
     <span className={`${styles.kind} ${styles[entry.tone]}`} data-log-icon={kind}>
-      <StageIcon name={entry.icon} size={14} />
+      {/* 풀컬러 삼국지풍 아이콘 (사용자 2026-11-15 "로그의 아이콘은 삼국지스럽게. 풀컬러로.", Codex 생성) */}
+      <img src={publicImageUrl(`apps/web/src/art/log/icons/${entry.icon}.webp`)} alt="" width={22} height={22} />
     </span>
   );
 }

@@ -8,6 +8,25 @@ import { NationTargetPicker } from './CommandArgsScreen';
 import { CommandPicker, type CommandInfo } from './CommandPicker';
 import type { EquipmentBoard } from '../equipment/useEquipment';
 
+// 명령은 띠 위 세부 메뉴에서 고른다(띠 아래 목록과 검색 칸은 없다). 시험은 그 명령이 든 묶음 패를 차례로 눌러
+// 세부 메뉴에 띄운 뒤 그 단추를 돌려준다. 인자 없는 명령은 누르면 바로 들어가고, 인자가 있으면 인자 창이 열린다.
+function commandButton(name: string, root: HTMLElement = document.body): HTMLButtonElement {
+  const scope = within(root);
+  const find = () =>
+    scope.queryAllByRole('button', { name }).find((button) => button.closest('[aria-label$="세부 명령"]')) as
+      HTMLButtonElement | undefined;
+  const open = find();
+  if (open) return open;
+  for (const bandGroup of scope.getAllByRole('group', { name: '명령 분류' })) {
+    for (const plaque of within(bandGroup).getAllByRole('button')) {
+      if (plaque.getAttribute('aria-expanded') !== 'true') fireEvent.click(plaque);
+      const found = find();
+      if (found) return found;
+    }
+  }
+  throw new Error(`세부 메뉴에서 ${name} 명령을 찾지 못했습니다.`);
+}
+
 afterEach(cleanup);
 
 // 인자 입력 화면(INT-25)은 대상을 목록의 radio로 고른다.
@@ -73,7 +92,7 @@ const equipmentCommand: CommandInfo = {
 it('T4-24 AC-P2-12 장비는 이름·가격·재료로 고르고 현재 조건이 부족해도 다음 예턴에 예약할 수 있다', () => {
   const input = props({ commands: [equipmentCommand], equipment: { kind: 'ready', data: equipmentBoard() } });
   render(<CommandPicker {...input} />);
-  fireEvent.click(screen.getByRole('radio', { name: '장비매매' }));
+  fireEvent.click(commandButton('장비매매'));
   fireEvent.change(screen.getByLabelText('장비 칸'), { target: { value: 'weapon' } });
   const select = screen.getByLabelText('매매할 장비');
   expect(select.tagName).toBe('SELECT');
@@ -94,7 +113,7 @@ it('T4-24 AC-P2-12 장비는 이름·가격·재료로 고르고 현재 조건�
 it('T4-24 AC-P2-12 장비 칸을 바꾸면 이전 선택을 비워 다른 종류의 장비를 넣지 않는다', () => {
   const input = props({ commands: [equipmentCommand], equipment: { kind: 'ready', data: equipmentBoard() } });
   render(<CommandPicker {...input} />);
-  fireEvent.click(screen.getByRole('radio', { name: '장비매매' }));
+  fireEvent.click(commandButton('장비매매'));
   fireEvent.change(screen.getByLabelText('장비 칸'), { target: { value: 'weapon' } });
   fireEvent.change(screen.getByLabelText('매매할 장비'), { target: { value: 'weapon_06' } });
   fireEvent.change(screen.getByLabelText('장비 칸'), { target: { value: 'horse' } });
@@ -106,7 +125,7 @@ it('T4-24 AC-P2-12 장비 칸을 바꾸면 이전 선택을 비워 다른 종류
 it('T4-24 AC-P2-12 AC-P2-34 장비 재조회가 실패하면 이미 고른 인자도 넣지 않고 공통 오류 칸에서 다시 시도한다', () => {
   const input = props({ commands: [equipmentCommand], equipment: { kind: 'ready', data: equipmentBoard() } });
   const view = render(<CommandPicker {...input} />);
-  fireEvent.click(screen.getByRole('radio', { name: '장비매매' }));
+  fireEvent.click(commandButton('장비매매'));
   fireEvent.change(screen.getByLabelText('매매할 장비'), { target: { value: 'horse_01' } });
   const retry = vi.fn();
   view.rerender(<CommandPicker {...input} equipment={{ kind: 'error', retry }} />);
@@ -142,49 +161,49 @@ function props(overrides: Partial<Omit<ComponentProps<typeof CommandPicker>, 'on
     units: worldUnits(TEST_UNIT_SET),
     blockedReason: null,
     targetLabel: '1번 칸',
-    searchRef: { current: null },
+    focusRef: { current: null },
     onPut: vi.fn(),
     ...overrides,
   };
 }
 
-it('T4-92 AC-P2-29 서버의 새 분류도 카드와 분류 단추에 보이며 검색과 함께 거른다', () => {
+it('T4-92 AC-P2-29 서버의 새 분류도 분류 패와 세부 명령에 보이며 그 분류의 명령만 띄운다', () => {
   render(<CommandPicker {...props()} />);
-  expect(screen.getAllByRole('radio')).toHaveLength(commands.length);
-  const card = screen.getByRole('radio', { name: '새 명령' });
+  fireEvent.click(screen.getByRole('button', { name: 'new-category' }));
+  const sub = screen.getByRole('group', { name: 'new-category 세부 명령' });
+  const card = within(sub).getByRole('button', { name: '새 명령' });
+  expect(within(sub).getAllByRole('button')).toEqual([card]);
   expect(card.getAttribute('aria-describedby')).toBeTruthy();
   expect(document.getElementById(card.getAttribute('aria-describedby')!)?.textContent).toBe(
     'new-category · 고를 것 없음',
   );
+  // 패를 다시 누르면 세부 명령을 닫고, 다른 분류의 명령은 그 분류 패에서 고른다.
   fireEvent.click(screen.getByRole('button', { name: 'new-category' }));
-  expect(screen.getAllByRole('radio')).toEqual([card]);
-  fireEvent.change(screen.getByRole('searchbox'), { target: { value: '농지' } });
-  expect(screen.queryByRole('radio')).toBeNull();
-  fireEvent.click(screen.getByRole('button', { name: '전체' }));
-  expect(screen.getByRole('radio', { name: '농지 개간' })).toBeTruthy();
+  expect(screen.queryByRole('group', { name: /세부 명령$/ })).toBeNull();
+  expect(commandButton('농지 개간')).toBeTruthy();
 });
 
-it('카드 선택은 하나이고 선택만으로 명령을 넣지 않으며 같은 명령을 반복해서 넣을 수 있다', () => {
+it('세부 명령을 누르면 인자 없는 명령은 바로 넣고 같은 명령을 다시 누르면 다시 넣는다', () => {
   const input = props();
   render(<CommandPicker {...input} />);
-  fireEvent.click(screen.getByRole('radio', { name: '농지 개간' }));
-  fireEvent.click(screen.getByRole('radio', { name: '휴식' }));
-  expect((screen.getByRole('radio', { name: '농지 개간' }) as HTMLInputElement).checked).toBe(false);
-  expect((screen.getByRole('radio', { name: '휴식' }) as HTMLInputElement).checked).toBe(true);
-  expect(input.onPut).not.toHaveBeenCalled();
-  const put = screen.getByRole('button', { name: '1번 칸에 넣기' });
-  fireEvent.click(put);
-  fireEvent.click(put);
+  fireEvent.click(commandButton('농지 개간'));
+  fireEvent.click(commandButton('휴식'));
+  fireEvent.click(commandButton('휴식'));
+  expect(commandButton('농지 개간').getAttribute('aria-pressed')).toBe('false');
+  expect(commandButton('휴식').getAttribute('aria-pressed')).toBe('true');
   expect(input.onPut.mock.calls).toEqual([
+    [{ commandKey: 'farm', args: {}, explicit: true }],
     [{ commandKey: 'rest', args: {}, explicit: true }],
     [{ commandKey: 'rest', args: {}, explicit: true }],
   ]);
+  // 넣기 단추는 없다.
+  expect(screen.queryByRole('button', { name: /칸에 넣기/ })).toBeNull();
 });
 
 it('필수 인자는 카드 설명과 입력에서 같고 도시를 고른 뒤 숫자 인자를 넣는다', () => {
   const input = props();
   render(<CommandPicker {...input} />);
-  const card = screen.getByRole('radio', { name: '이동' });
+  const card = commandButton('이동');
   expect(document.getElementById(card.getAttribute('aria-describedby')!)?.textContent).toBe('군사 · 대상 도시 (필수)');
   fireEvent.click(card);
   fireEvent.click(screen.getByRole('button', { name: /^1번 칸에 넣기\s*\(사용 불가\)$/ }));
@@ -197,43 +216,47 @@ it('필수 인자는 카드 설명과 입력에서 같고 도시를 고른 뒤 �
   expect(screen.queryByTestId('command-args-screen')).toBeNull();
 });
 
-it('저장 불가 사유가 있으면 카드·넣기·검색 Enter로도 입력을 보내지 않는다', () => {
+it('저장 불가 사유가 있으면 세부 명령을 눌러도 넣지 않고 이유를 적는다', () => {
   const input = props({ blockedReason: '끝난 판이라 예턴을 바꿀 수 없습니다.' });
   render(<CommandPicker {...input} />);
-  fireEvent.click(screen.getByRole('radio', { name: '농지 개간' }));
-  fireEvent.click(screen.getByRole('button', { name: /^1번 칸에 넣기\s*\(사용 불가\)$/ }));
+  fireEvent.click(commandButton('농지 개간'));
   expect(screen.getByRole('note').textContent).toBe(input.blockedReason);
-  fireEvent.change(screen.getByRole('searchbox'), { target: { value: '농지' } });
-  fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'Enter' });
   expect(input.onPut).not.toHaveBeenCalled();
 });
 
-it('서버가 고른 명령과 분류를 없애면 입력을 차단하고 새 목록의 전체 카드를 보인다', () => {
+it('서버가 고른 명령과 분류를 없애면 고른 상태를 지우고 새 목록으로 고른다', () => {
   const input = props();
   const view = render(<CommandPicker {...input} />);
   fireEvent.click(screen.getByRole('button', { name: 'new-category' }));
-  fireEvent.click(screen.getByRole('radio', { name: '새 명령' }));
+  fireEvent.click(commandButton('새 명령'));
+  input.onPut.mockClear();
   view.rerender(<CommandPicker {...input} commands={[commands[0]!]} />);
-  expect(screen.queryByRole('radio', { name: '새 명령' })).toBeNull();
-  expect(screen.getByRole('button', { name: '전체' }).getAttribute('aria-pressed')).toBe('true');
-  expect(screen.getByRole('radio', { name: '농지 개간' })).toBeTruthy();
-  fireEvent.click(screen.getByRole('button', { name: /^1번 칸에 넣기\s*\(사용 불가\)$/ }));
-  expect(screen.getByRole('note').textContent).toBe('명령을 고르세요.');
+  expect(screen.queryByRole('button', { name: '새 명령' })).toBeNull();
+  expect(screen.queryByRole('button', { pressed: true })).toBeNull();
+  expect(commandButton('농지 개간')).toBeTruthy();
   expect(input.onPut).not.toHaveBeenCalled();
 });
 
-it('개인·국가 두 선택기의 이름 연결과 radio 그룹은 서로 독립이다', () => {
+it('개인 선택기와 국가 선택기의 이름 연결과 고른 상태는 서로 독립이다', () => {
+  const personal = props();
+  const nation = props({ targetLabel: '국가 1번 칸' });
   render(
     <>
-      <CommandPicker {...props()} />
-      <CommandPicker {...props({ targetLabel: '국가 1번 칸' })} />
+      <CommandPicker {...personal} />
+      <CommandPicker {...nation} />
     </>,
   );
-  const pickers = screen.getAllByRole('region', { name: '명령 고르기' });
-  for (const picker of pickers) fireEvent.click(within(picker).getByRole('radio', { name: '농지 개간' }));
-  const selected = screen.getAllByRole('radio', { name: '농지 개간' }) as HTMLInputElement[];
-  expect(selected.every((radio) => radio.checked)).toBe(true);
-  expect(selected[0]!.name).not.toBe(selected[1]!.name);
+  const [first, second] = screen.getAllByRole('region', { name: '명령 고르기' });
+  fireEvent.click(commandButton('농지 개간', first!));
+  expect(commandButton('농지 개간', first!).getAttribute('aria-pressed')).toBe('true');
+  expect(commandButton('농지 개간', second!).getAttribute('aria-pressed')).toBe('false');
+  expect(nation.onPut).not.toHaveBeenCalled();
+  fireEvent.click(commandButton('농지 개간', second!));
+  const selected = [commandButton('농지 개간', first!), commandButton('농지 개간', second!)];
+  expect(selected.map((button) => button.getAttribute('aria-pressed'))).toEqual(['true', 'true']);
+  expect(selected[0]!.getAttribute('aria-labelledby')).not.toBe(selected[1]!.getAttribute('aria-labelledby'));
+  expect(personal.onPut).toHaveBeenCalledTimes(1);
+  expect(nation.onPut).toHaveBeenCalledTimes(1);
 });
 
 it('도시 수비병과 부곡 훈련의 카드 설명은 고른 schema 갈래를 따르고 잘못된 갈래를 인자 없음으로 숨기지 않는다', () => {
@@ -252,11 +275,11 @@ it('도시 수비병과 부곡 훈련의 카드 설명은 고른 schema 갈래�
       ],
     },
   };
-  const input = props({ commands: [train], cityResources: true });
+  const input = props({ commands: [train] });
   const view = render(<CommandPicker {...input} />);
-  fireEvent.click(screen.getByRole('radio', { name: '훈련' }));
+  fireEvent.click(commandButton('훈련'));
   expect(screen.getByText('군사 · 부곡 번호')).toBeTruthy();
-  fireEvent.change(screen.getByRole('combobox', { name: '훈련·사기 대상' }), { target: { value: 'city' } });
+  fireEvent.change(screen.getByRole('combobox', { name: '훈련과 사기 대상' }), { target: { value: 'city' } });
   expect(screen.getByText('군사 · 병종 (필수)')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: '1번 칸에 넣기' }));
   expect(input.onPut).toHaveBeenCalledWith({
@@ -266,25 +289,15 @@ it('도시 수비병과 부곡 훈련의 카드 설명은 고른 schema 갈래�
   });
   input.onPut.mockClear();
   // 넣으면 입력 화면이 닫히므로 도시 수비병 갈래를 다시 고른 상태에서 서버 schema가 바뀌는 경우를 본다.
-  fireEvent.click(screen.getByRole('radio', { name: '훈련' }));
-  fireEvent.change(screen.getByRole('combobox', { name: '훈련·사기 대상' }), { target: { value: 'city' } });
+  fireEvent.click(commandButton('훈련'));
+  fireEvent.change(screen.getByRole('combobox', { name: '훈련과 사기 대상' }), { target: { value: 'city' } });
   view.rerender(<CommandPicker {...input} commands={[{ ...train, argsSchema: empty }]} />);
   expect(screen.getByText('군사 · 입력 형식 확인 필요')).toBeTruthy();
-  fireEvent.click(screen.getByRole('button', { name: /^1번 칸에 넣기\s*\(사용 불가\)$/ }));
+  // 형식을 모르면 인자 창을 닫고 넣지 않으며 이유를 적는다.
+  expect(screen.queryByTestId('command-args-screen')).toBeNull();
+  expect(screen.getByRole('note').textContent).toBe('명령 입력 형식을 확인하지 못했습니다.');
+  fireEvent.click(commandButton('훈련'));
   expect(input.onPut).not.toHaveBeenCalled();
-});
-
-it('검색 Enter는 서버 응답 순서가 아니라 화면 분류 순서의 첫 카드를 넣는다', () => {
-  const input = props({
-    commands: [
-      { key: 'rest', name: '휴식', category: 'personal', argsSchema: empty },
-      { key: 'farm', name: '농지 개간', category: 'domestic', argsSchema: empty },
-    ],
-  });
-  render(<CommandPicker {...input} />);
-  expect(screen.getAllByRole('radio').map((radio) => radio.getAttribute('value'))).toEqual(['farm', 'rest']);
-  fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'Enter' });
-  expect(input.onPut).toHaveBeenCalledWith({ commandKey: 'farm', args: {}, explicit: true });
 });
 
 it('대상 장수를 이름으로 고르는 칸은 카드·입력·누락 안내가 같은 이름을 쓴다', () => {
@@ -296,7 +309,7 @@ it('대상 장수를 이름으로 고르는 칸은 카드·입력·누락 안내
   };
   const input = props({ commands: [appoint], generals: [{ id: 7, name: '조운' }] });
   render(<CommandPicker {...input} />);
-  const card = screen.getByRole('radio', { name: '임명' });
+  const card = commandButton('임명');
   expect(document.getElementById(card.getAttribute('aria-describedby')!)?.textContent).toBe('국가 · 대상 장수 (필수)');
   fireEvent.click(card);
   fireEvent.click(screen.getByRole('button', { name: /^1번 칸에 넣기\s*\(사용 불가\)$/ }));
@@ -322,16 +335,16 @@ it('훈련에서 고른 도시 수비병 갈래를 고르지 않은 사기 카�
       ],
     },
   });
-  const input = props({ commands: [drill('train', '훈련'), drill('morale', '사기진작')], cityResources: true });
+  const input = props({ commands: [drill('train', '훈련'), drill('morale', '사기진작')] });
   render(<CommandPicker {...input} />);
   const hint = (name: string) =>
-    document.getElementById(screen.getByRole('radio', { name }).getAttribute('aria-describedby')!)?.textContent;
-  fireEvent.click(screen.getByRole('radio', { name: '훈련' }));
-  fireEvent.change(screen.getByRole('combobox', { name: '훈련·사기 대상' }), { target: { value: 'city' } });
+    document.getElementById(commandButton(name).getAttribute('aria-describedby')!)?.textContent;
+  fireEvent.click(commandButton('훈련'));
+  fireEvent.change(screen.getByRole('combobox', { name: '훈련과 사기 대상' }), { target: { value: 'city' } });
   expect(hint('훈련')).toBe('군사 · 병종 (필수)');
   expect(hint('사기진작')).toBe('군사 · 부곡 번호');
-  fireEvent.click(screen.getByRole('radio', { name: '사기진작' }));
-  expect((screen.getByRole('combobox', { name: '훈련·사기 대상' }) as HTMLSelectElement).value).toBe('unit');
+  fireEvent.click(commandButton('사기진작'));
+  expect((screen.getByRole('combobox', { name: '훈련과 사기 대상' }) as HTMLSelectElement).value).toBe('unit');
   expect(hint('훈련')).toBe('군사 · 부곡 번호');
   fireEvent.click(screen.getByRole('button', { name: '1번 칸에 넣기' }));
   expect(input.onPut).toHaveBeenCalledWith({ commandKey: 'morale', args: {}, explicit: true });
@@ -340,30 +353,29 @@ it('훈련에서 고른 도시 수비병 갈래를 고르지 않은 사기 카�
 it('서버 목록에서 빠졌다가 다시 온 명령은 옛 선택과 입력값을 되살리지 않는다', () => {
   const input = props();
   const view = render(<CommandPicker {...input} />);
-  fireEvent.click(screen.getByRole('radio', { name: '이동' }));
+  fireEvent.click(commandButton('이동'));
   pickIn('대상 도시', /^진류/);
   view.rerender(<CommandPicker {...input} commands={commands.filter((c) => c.key !== 'move')} />);
   view.rerender(<CommandPicker {...input} />);
-  expect((screen.getByRole('radio', { name: '이동' }) as HTMLInputElement).checked).toBe(false);
+  expect(commandButton('이동').getAttribute('aria-pressed') === 'true').toBe(false);
   expect(screen.queryByRole('radiogroup', { name: '대상 도시' })).toBeNull();
-  fireEvent.click(screen.getByRole('button', { name: /^1번 칸에 넣기\s*\(사용 불가\)$/ }));
-  expect(screen.getByRole('note').textContent).toBe('명령을 고르세요.');
-  fireEvent.click(screen.getByRole('radio', { name: '이동' }));
+  fireEvent.click(commandButton('이동'));
   expect(checkedIn('대상 도시')).toBeUndefined();
   expect(input.onPut).not.toHaveBeenCalled();
 });
 
-it('월드 규칙을 받기 전 union을 인자 없음으로 표시하거나 검색 Enter로 빈 인자를 넣지 않는다', () => {
+it('월드 규칙을 받기 전 union을 인자 없음으로 표시하거나 눌러도 빈 인자를 넣지 않는다', () => {
   const input = props({
     commands: [{ key: 'train', name: '훈련', category: 'military', argsSchema: { anyOf: [empty, empty] } }],
   });
   render(<CommandPicker {...input} />);
+  commandButton('훈련');
   expect(screen.getByText('군사 · 입력 형식 확인 필요')).toBeTruthy();
-  fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'Enter' });
+  fireEvent.click(commandButton('훈련'));
   expect(input.onPut).not.toHaveBeenCalled();
 });
 
-it('넣기 전에 고른 명령의 서버 사전 검사 경고를 보이고 휴식과 덜 찬 명령은 검사하지 않는다', async () => {
+it('고른 명령의 서버 사전 검사 경고를 보이고 휴식과 덜 찬 명령은 검사하지 않는다', async () => {
   const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
   const asked: string[] = [];
   const precheck = (turn: { commandKey: string; args: Record<string, unknown> }) => ({
@@ -380,16 +392,19 @@ it('넣기 전에 고른 명령의 서버 사전 검사 경고를 보이고 휴�
       <CommandPicker {...props()} onPut={onPut} precheck={precheck} />
     </QueryClientProvider>,
   );
-  fireEvent.click(screen.getByRole('radio', { name: '이동' }));
-  fireEvent.click(screen.getByRole('radio', { name: '휴식' }));
+  fireEvent.click(commandButton('이동'));
+  fireEvent.click(commandButton('휴식'));
   expect(screen.queryByRole('status')).toBeNull();
-  fireEvent.click(screen.getByRole('radio', { name: '농지 개간' }));
+  fireEvent.click(commandButton('농지 개간'));
   expect((await screen.findByRole('status')).textContent).toBe(
     '사전 검사 경고: 국가에 소속되어야 합니다. 경고가 있어도 넣을 수 있습니다. 실행할 때 다시 검사합니다.',
   );
   expect(asked).toEqual(['farm']);
-  fireEvent.click(screen.getByRole('button', { name: /1번 칸에 넣기/ }));
-  expect(onPut).toHaveBeenCalledWith({ commandKey: 'farm', args: {}, explicit: true });
+  // 인자 없는 명령은 누르는 순간 들어가고, 경고는 넣은 명령에 대해 그 뒤에 보인다.
+  expect(onPut.mock.calls).toEqual([
+    [{ commandKey: 'rest', args: {}, explicit: true }],
+    [{ commandKey: 'farm', args: {}, explicit: true }],
+  ]);
 });
 
 it('T4-86 AC-P2-26 병종 칸은 월드 병종표로 고르고 병종표를 불러오는 중에도 병종 없는 명령은 넣는다', () => {
@@ -408,17 +423,17 @@ it('T4-86 AC-P2-26 병종 칸은 월드 병종표로 고르고 병종표를 불�
   };
   const input = props({ commands: [recruit, ...commands], units: worldUnits(undefined), unitNote: '불러오는 중' });
   const view = render(<CommandPicker {...input} />);
-  fireEvent.click(screen.getByRole('radio', { name: '징병' }));
+  fireEvent.click(commandButton('징병'));
   expect(within(screen.getByRole('radiogroup', { name: '병종' })).queryAllByRole('radio')).toHaveLength(0);
-  expect(screen.getByRole('note').textContent).toBe('불러오는 중');
-  fireEvent.click(screen.getByRole('radio', { name: '농지 개간' }));
-  fireEvent.click(screen.getByRole('button', { name: '1번 칸에 넣기' }));
+  // 모병은 도시 자원 안내 줄도 note로 함께 보인다.
+  expect(screen.getAllByRole('note').map((note) => note.textContent)).toContain('불러오는 중');
+  fireEvent.click(commandButton('농지 개간'));
   expect(input.onPut).toHaveBeenLastCalledWith({ commandKey: 'farm', args: {}, explicit: true });
 
   // 병종표가 오면 지금 거느린 병종, 월드 기본 병종, 첫 장수 병종 순으로 유효한 값을 고른다.
   const loaded = worldUnits(TEST_UNIT_SET);
   view.rerender(<CommandPicker {...input} units={loaded} unitNote={null} defaultCrewType={1300} />);
-  fireEvent.click(screen.getByRole('radio', { name: '징병' }));
+  fireEvent.click(commandButton('징병'));
   expect(
     within(screen.getByRole('radiogroup', { name: '병종' }))
       .getAllByRole('radio')
@@ -426,13 +441,13 @@ it('T4-86 AC-P2-26 병종 칸은 월드 병종표로 고르고 병종표를 불�
   ).toEqual(['1100', '1200', '1300']);
   expect(crewValue()).toBe('1300');
   view.rerender(<CommandPicker {...input} units={loaded} unitNote={null} defaultCrewType={1000} />);
-  fireEvent.click(screen.getByRole('radio', { name: '농지 개간' }));
-  fireEvent.click(screen.getByRole('radio', { name: '징병' }));
+  fireEvent.click(commandButton('농지 개간'));
+  fireEvent.click(commandButton('징병'));
   expect(crewValue()).toBe('1100');
   const noDefault = worldUnits({ ...TEST_UNIT_SET, defaultCrewTypeId: 1000 });
   view.rerender(<CommandPicker {...input} units={noDefault} unitNote={null} defaultCrewType={undefined} />);
-  fireEvent.click(screen.getByRole('radio', { name: '농지 개간' }));
-  fireEvent.click(screen.getByRole('radio', { name: '징병' }));
+  fireEvent.click(commandButton('농지 개간'));
+  fireEvent.click(commandButton('징병'));
   expect(crewValue()).toBe('1100');
   // 모집 조건이 있는 1300도 고르고 넣을 수 있다. 지금 조건 판정은 서버 사전 검사가 한다.
   pickIn('병종', /기병/);
@@ -477,7 +492,7 @@ it('INT-25 AC-INT-25 포상 대상은 금이 적은 장수부터 `이름 (도시
     },
   });
   render(<CommandPicker {...input} />);
-  fireEvent.click(screen.getByRole('radio', { name: '포상' }));
+  fireEvent.click(commandButton('포상'));
   expect(screen.getByTestId('args-treasury').textContent).toBe('국고 금 52,000 · 쌀 31,000');
   expect(screen.queryByTestId('args-wallet')).toBeNull();
   const rows = within(screen.getByRole('radiogroup', { name: '대상 장수' })).getAllByRole('radio');
@@ -533,7 +548,7 @@ it('INT-25 AC-INT-25 모병은 현황 줄과 통솔 한도까지의 절반·채�
     },
   });
   render(<CommandPicker {...input} />);
-  fireEvent.click(screen.getByRole('radio', { name: '모병' }));
+  fireEvent.click(commandButton('모병'));
   expect(screen.getByTestId('recruit-status').textContent).toBe(
     '통솔 75(최대 병력 7,500) · 현재 병종 시험 보병 · 현재 병력 3,000 · 금 4,200 · 국가 기술 1,200',
   );
@@ -572,7 +587,7 @@ it('INT-25 AC-INT-25 천도 대상 도시는 `도시명 (국가명)`이고 같�
     argContext: { here: 1, ownNationId: 1, map: targetMap as never },
   });
   render(<CommandPicker {...input} />);
-  fireEvent.click(screen.getByRole('radio', { name: '천도' }));
+  fireEvent.click(commandButton('천도'));
   const names = within(screen.getByRole('radiogroup', { name: '대상 도시' }))
     .getAllByRole('radio')
     .map((radio) => radio.textContent);
@@ -638,15 +653,16 @@ it('INT-25 AC-INT-26 명령 도움말이 오면 카드 둘째 줄에 비용을, 
     reason: '대상이나 값을 고르면 실행 가능 여부를 확인합니다.',
   };
   render(<CommandPicker {...props({ commands: [documented, commands[0]!] })} />);
-  const card = screen.getByRole('radio', { name: '이동' });
+  const card = commandButton('이동');
   const described = card
     .getAttribute('aria-describedby')!
     .split(' ')
     .map((id) => document.getElementById(id)?.textContent);
   expect(described).toEqual(['금 50', '군사 · 대상 도시 (필수)']);
   // 도움말이 없는 명령은 둘째 줄이 없다.
-  expect(screen.getByRole('radio', { name: '농지 개간' }).getAttribute('aria-describedby')!.split(' ')).toHaveLength(1);
-  fireEvent.click(card);
+  expect(commandButton('농지 개간').getAttribute('aria-describedby')!.split(' ')).toHaveLength(1);
+  // 농지 개간을 찾느라 다른 묶음을 펼쳤으므로 이동 단추를 다시 찾는다.
+  fireEvent.click(commandButton('이동'));
   expect(screen.getByTestId('command-description').textContent).toBe('이웃 도시로 옮깁니다.');
   expect(screen.getByTestId('command-cost').textContent).toBe('비용: 금 50');
   expect(screen.getByTestId('command-requirements').textContent).toBe('조건: 이웃 도시 · 보급선');
@@ -664,21 +680,22 @@ it('INT-25 INT-26 AC-INT-26 지금 실행할 수 없는 명령은 흐리게 두�
   const ok: CommandInfo = { ...commands[1]!, available: true, reason: null };
   const input = props({ commands: [blocked, needsArgs, ok] });
   render(<CommandPicker {...input} />);
-  const card = screen.getByRole('radio', { name: '농지 개간' });
-  expect(card.closest('label')!.getAttribute('data-available')).toBe('false');
+  const card = commandButton('농지 개간');
+  expect(card.getAttribute('data-available')).toBe('false');
   const described = card
     .getAttribute('aria-describedby')!
     .split(' ')
     .map((id) => document.getElementById(id)?.textContent);
   expect(described).toEqual(['금 30', '자기 국가 도시가 아닙니다.', '내정 · 고를 것 없음']);
   // null은 인자를 골라야 판정하므로 흐리지 않고 사유도 적지 않는다. true도 그대로다.
-  for (const name of ['이동', '휴식']) {
-    const radio = screen.getByRole('radio', { name });
-    expect(radio.closest('label')!.getAttribute('data-available')).toBeNull();
-  }
+  // 세부 메뉴는 한 묶음씩 펼치므로 사유 줄도 묶음마다 센다.
   expect(screen.getAllByTestId('command-reason')).toHaveLength(1);
-  fireEvent.click(card);
-  fireEvent.click(screen.getByRole('button', { name: '1번 칸에 넣기' }));
+  for (const name of ['이동', '휴식']) {
+    expect(commandButton(name).getAttribute('data-available')).toBeNull();
+    expect(screen.queryAllByTestId('command-reason')).toHaveLength(0);
+  }
+  // 흐린 명령도 누르면 바로 넣는다.
+  fireEvent.click(commandButton('농지 개간'));
   expect(input.onPut).toHaveBeenCalledWith({ commandKey: 'farm', args: {}, explicit: true });
 });
 
@@ -707,7 +724,7 @@ it('INT-25 INT-26 AC-INT-26 등용은 번호 대신 등용 후보 재야 장수�
     },
   });
   render(<CommandPicker {...input} />);
-  const card = screen.getByRole('radio', { name: '등용' });
+  const card = commandButton('등용');
   expect(document.getElementById(card.getAttribute('aria-describedby')!)?.textContent).toBe('개인 · 대상 장수 (필수)');
   fireEvent.click(card);
   expect(onNeed).toHaveBeenCalledWith('recruits');
@@ -732,7 +749,7 @@ it('INT-26 AC-INT-26 등용 후보를 불러오는 중이면 빈 목록 대신 �
     argContext: { here: null, ownNationId: 1, recruits: { list: [], note: '등용 후보를 불러오는 중입니다.' } },
   });
   render(<CommandPicker {...input} />);
-  fireEvent.click(screen.getByRole('radio', { name: '등용' }));
+  fireEvent.click(commandButton('등용'));
   const group = screen.getByRole('radiogroup', { name: '대상 장수' });
   expect(within(group).getByRole('note').textContent).toBe('등용 후보를 불러오는 중입니다.');
   expect(within(group).queryByText('등용할 수 있는 재야 장수가 없습니다')).toBeNull();
@@ -759,11 +776,40 @@ it('INT-25 AC-INT-25 개인 예턴의 선양은 같은 국가 장수(나 제외)
     },
   });
   render(<CommandPicker {...input} />);
-  const card = screen.getByRole('radio', { name: '선양' });
+  const card = commandButton('선양');
   expect(document.getElementById(card.getAttribute('aria-describedby')!)?.textContent).toBe('전략 · 대상 장수 (필수)');
   fireEvent.click(card);
   const rows = within(screen.getByRole('radiogroup', { name: '대상 장수' })).getAllByRole('radio');
   expect(rows.map((row) => row.getAttribute('data-value'))).toEqual(['10']);
   expect(rows[0]!.textContent).toContain('조비 (업)');
   expect(rows[0]!.textContent).toContain('통솔 70 · 무력 60 · 지력 80');
+});
+
+it('D-099 묶음 패를 누르면 세부 명령 띠가 펼쳐지고 띠에서 명령을 고른다', () => {
+  render(<CommandPicker {...props()} />);
+  expect(screen.queryByRole('group', { name: /세부 명령$/ })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: '내정' }));
+  const sub = screen.getByRole('group', { name: '내정 세부 명령' });
+  // 세부 명령은 깃발, 이름표 모양 단추로 고른다. 띠 아래 목록과 라디오는 없다.
+  const farm = within(sub).getByRole('button', { name: '농지 개간' });
+  expect(farm.getAttribute('aria-pressed')).toBe('false');
+  fireEvent.click(farm);
+  expect(farm.getAttribute('aria-pressed')).toBe('true');
+  expect(farm.getAttribute('data-checked')).toBe('true');
+  expect(screen.queryByRole('radio')).toBeNull();
+  expect(document.querySelector('fieldset legend')).toBeNull();
+});
+
+it('D-100 권한 밖 명령은 넣기 대신 사유를 적어 권한자에게 제안한다', () => {
+  const onPropose = vi.fn();
+  const input = props({ propose: { to: '군주', onPropose } });
+  render(<CommandPicker {...input} />);
+  fireEvent.click(commandButton('농지 개간'));
+  expect(screen.queryByRole('button', { name: /에 넣기/ })).toBeNull();
+  fireEvent.change(screen.getByRole('textbox', { name: /군주에게 올릴 사유/ }), {
+    target: { value: '군량이 모자랍니다' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: '군주에게 제안하기' }));
+  expect(onPropose).toHaveBeenCalledWith(expect.objectContaining({ commandKey: 'farm' }), '군량이 모자랍니다');
+  expect(input.onPut).not.toHaveBeenCalled();
 });

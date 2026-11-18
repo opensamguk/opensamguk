@@ -209,7 +209,7 @@ test('2 엔진이 처리하기 전에는 처리 중이고 5초 뒤 pending을 �
   await expect(policyStatus(page)).toHaveText('처리 중');
   await expect(policySelect(page)).toBeDisabled();
   await expect(policySelect(page)).toHaveValue('drill');
-  await expect(sentence(page)).toHaveText('빈 칸은 휴식합니다. 엔진이 처리하면 훈련으로 바뀝니다.');
+  await expect(sentence(page)).toHaveText('빈 칸은 휴식합니다. 처리되면 훈련으로 바뀝니다.');
   const outcome = await responded;
   evidence.setPolicy = outcome;
   expect(outcome).toEqual({ input: { worldId: world.id, policy: 'drill' }, data: { status: 'pending' } });

@@ -110,6 +110,8 @@ test.describe('장수 생성', () => {
     expect((await request.get(portraitUrl)).status()).toBe(404);
     await portraits.getByRole('radio', { name: /내 초상/ }).check();
     await page.screenshot({ path: 'test-results/t1-15-create.png', fullPage: true });
+    // 성별은 늘 필수다(가문 규칙 상시, D-104).
+    await page.getByRole('radio', { name: '남', exact: true }).check();
     await page.getByRole('button', { name: '장수 만들기', exact: true }).click();
 
     await expect(page).toHaveURL(`/w/${world}`);
@@ -124,6 +126,7 @@ test.describe('장수 생성', () => {
     const second = await mutate(page, 'general.create', {
       worldId: world,
       name: newGeneralName(),
+      sex: 'MALE',
       leadership: 55,
       strength: 55,
       intel: 55,
@@ -142,10 +145,12 @@ test.describe('장수 생성', () => {
 
     await page.goto(`/w/${world}/create`);
     await page.getByLabel('이름').fill('조 운');
-    await expect(page.getByText('이름은 한글·한자·영문·숫자만 씁니다.')).toBeVisible();
+    await expect(page.getByText('이름은 한글, 한자, 영문, 숫자만 씁니다.')).toBeVisible();
     await expect(page.getByRole('button', { name: '장수 만들기 (사용 불가)' })).toBeVisible();
 
     await page.getByLabel('이름').fill(taken);
+    // 성별은 늘 필수다(가문 규칙 상시, D-104).
+    await page.getByRole('radio', { name: '남', exact: true }).check();
     await page.getByRole('button', { name: '장수 만들기', exact: true }).click();
     await expect(page.getByRole('alert').filter({ hasText: '이미 사용 중인 장수 이름입니다.' })).toBeVisible();
     expect((await mine(page, world)).general).toBeNull();
@@ -157,6 +162,8 @@ test.describe('장수 생성', () => {
     await page.goto(`/w/${world}/create`);
     await page.getByLabel('이름').fill(newGeneralName());
     await setUserStatus(email, 'SANCTIONED');
+    // 성별은 늘 필수다(가문 규칙 상시, D-104).
+    await page.getByRole('radio', { name: '남', exact: true }).check();
     await page.getByRole('button', { name: '장수 만들기', exact: true }).click();
     await expect(page.getByRole('alert').filter({ hasText: '로그인이 풀렸습니다.' })).toBeVisible();
     await expect(page.getByRole('link', { name: '다시 로그인' })).toBeVisible();
@@ -186,6 +193,8 @@ test.describe('장수 생성', () => {
     const { portraitId } = await uploadPortrait(page);
     await page.getByRole('radio', { name: /내 초상/ }).check();
     const first = page.waitForResponse((r) => r.url().includes('general.create'));
+    // 성별은 늘 필수다(가문 규칙 상시, D-104).
+    await page.getByRole('radio', { name: '남', exact: true }).check();
     await page.getByRole('button', { name: '장수 만들기', exact: true }).click();
     expect(JSON.stringify(await (await first).json())).toContain('"status":"pending"');
     await expect(making).toBeVisible();
@@ -210,6 +219,8 @@ test.describe('장수 생성', () => {
     // 엔진을 끈 채 다시 보내 pending → created도 본다.
     await nameInput.fill(name);
     const second = page.waitForResponse((r) => r.url().includes('general.create'));
+    // 성별은 늘 필수다(가문 규칙 상시, D-104).
+    await page.getByRole('radio', { name: '남', exact: true }).check();
     await page.getByRole('button', { name: '장수 만들기', exact: true }).click();
     expect(JSON.stringify(await (await second).json())).toContain('"status":"pending"');
     await expect(making).toBeVisible();
@@ -237,6 +248,8 @@ test.describe('장수 생성', () => {
 
     await page.goto(`/w/${world}/create`);
     await page.getByLabel('이름', { exact: true }).fill(name);
+    // 성별은 늘 필수다(가문 규칙 상시, D-104).
+    await page.getByRole('radio', { name: '남', exact: true }).check();
     await page.getByRole('button', { name: '장수 만들기', exact: true }).click();
     await expect(making).toBeVisible({ timeout: 15_000 });
 
@@ -256,7 +269,7 @@ test.describe('장수 생성', () => {
 
 test.describe('예턴 편집', () => {
   test('AC-M1-14 내정 8종과 휴식을 고르고 한 번 저장하면 다시 열어도 유지된다', async ({ page }) => {
-    const world = await e2eFeatureWorld([], { turnTermMinutes: 60 });
+    const world = await e2eFeatureWorld({ turnTermMinutes: 60 });
     await openEditor(page, world);
     const initial = await turns(page, world);
     const domestic = [

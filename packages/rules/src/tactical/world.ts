@@ -1,4 +1,4 @@
-import type { BattleSide } from '@opensamguk/shared';
+import { rngFor, battleStructureSchema, type BattleSide } from '@opensamguk/shared';
 import { BALANCE } from '../balance';
 import { captureCounties } from '../cityAffiliation';
 import { removeNation } from '../commands/support';
@@ -9,9 +9,10 @@ import type { UnitSetResource } from '../world/resources';
 import { battleHash, type BattleState, type BattleUnitState } from './state';
 import { recordBattleFrame, canEnter, canBattleStep } from './battle';
 import { tacticalMap } from './map';
+import { rollEnvironment } from './environment';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import { collectModifiers } from '../modifiers';
-import { fiveStatsBattleModifiers } from '../general/fiveStatsBattle';
+import { commanderBattleModifiers } from '../general/fiveStatsBattle';
 import { equipmentBonus } from '../equipment/stats';
 import { resolveMarchRoute } from '../campaign/supply';
 import { disbandCityGarrison } from '../cityResources/ownership';
@@ -130,6 +131,10 @@ export function openTacticalBattle(
     turnMs: 0,
     councilMs: 120000,
     mapHash: battleHash(map),
+    ...rollEnvironment(
+      rngFor(state.campaign!.seed, 'tactical', 'tactical-v1', tick, ledger.nextId - 1, 'weather-start'),
+    ),
+    burningCells: [],
     board: map.board,
     cells: map.cells,
     edges: map.edges,
@@ -154,13 +159,10 @@ export function openTacticalBattle(
   const combat = (id: number) => {
     const g = state.generals[id]!,
       bonus = equipmentBonus(state, id);
-    const base = fiveStatsBattleModifiers(
+    const base = commanderBattleModifiers(
       {
         leadership: g.leadership,
         strength: g.strength,
-        intel: g.intel,
-        politics: g.politics ?? 0,
-        charm: g.charm ?? 0,
       },
       { leadership: bonus.leadership, strength: bonus.strength },
     );
@@ -202,6 +204,7 @@ export function openTacticalBattle(
       intelligence: general?.intel ?? 0,
       leadership: general?.leadership ?? 0,
       strength: general?.strength ?? 0,
+      injury: 0,
       x: 0,
       y: 0,
       sp: row.supply?.remaining ?? null,
@@ -333,8 +336,37 @@ export function openTacticalBattle(
   const objectives = map.path.filter((c) => !occupied.has(`${c.x}:${c.y}`));
   for (let i = 1; i <= Math.min(5, objectives.length); i++) {
     const cell = objectives[Math.floor(((i - 0.5) * objectives.length) / Math.min(5, objectives.length))]!;
-    b.bases.push({ id: i, ...cell, kind: 'contest', owner: null, rewarded: false });
+    const scenery = b.board.objects.find((o) => o.x === cell.x && o.y === cell.y);
+    const baseStructure = battleStructureSchema.safeParse(scenery?.kind);
+    b.bases.push({
+      id: i,
+      ...cell,
+      kind: 'contest',
+      structure: baseStructure.success ? baseStructure.data : 'camp',
+      owner: null,
+      rewarded: false,
+    });
+    if (!b.board.objects.some((o) => o.x === cell.x && o.y === cell.y)) b.board.objects.push({ ...cell, kind: 'camp' });
   }
+  const structure =
+    city.kind === 'PASS'
+      ? 'gate'
+      : city.kind === 'FIELD'
+        ? 'camp'
+        : city.level <= 2
+          ? 'village'
+          : city.level <= 4
+            ? 'fort-small'
+            : city.level <= 7
+              ? 'fort-medium'
+              : 'fort-large';
+  const targetCell = b.exits.defend;
+  if (!b.board.objects.some((o) => o.x === targetCell.x && o.y === targetCell.y))
+    b.board.objects.push({
+      ...targetCell,
+      kind: state.cityRuins?.cities.some((r) => r.cityKey === targetCityKey) ? 'rubble' : structure,
+    });
+  b.mapHash = battleHash({ board: b.board, cells: b.cells, edges: b.edges, exits: b.exits });
   recordBattleFrame(b, []);
   ledger.battles.push(b);
   state.campaign!.revision++;
@@ -371,6 +403,14 @@ export function battleCancellation(view: WorldView, b: DeepReadonly<BattleState>
 export function settleTacticalBattle(state: WorldState, b: BattleState) {
   if (b.settled) return;
   if (b.phase !== 'ended') throw Error('끝나지 않은 전투입니다.');
+  const injuries = new Map<number, number>();
+  for (const u of b.units)
+    if (u.commanderId !== null) injuries.set(u.commanderId, Math.max(injuries.get(u.commanderId) ?? 0, u.injury));
+  for (const [id, injury] of injuries) {
+    const general = state.generals[id];
+    if (general && general.removedAt === undefined)
+      general.injury = Math.max(general.injury, Math.min(80, general.injury + injury));
+  }
   for (const u of b.units) {
     if (u.sourceId !== null) {
       const row = state.campaign!.units.find((v) => v.id === u.sourceId);

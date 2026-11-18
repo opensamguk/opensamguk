@@ -1,3 +1,5 @@
+import { applyLandScore } from '../construction/land';
+import { LAND_FIELDS, type LandField } from '../construction/catalog';
 import { BALANCE } from '../balance';
 import type { WorldState, WorldView } from '../model/world';
 import { cloneWorld } from '../model/clone';
@@ -19,6 +21,12 @@ export function applyEffects(state: WorldView, effects: readonly Effect[]): Worl
     }
     if (!Number.isFinite(effect.value)) throw new Error('효과 값은 유한한 수여야 합니다.');
     next ??= cloneWorld(state);
+    if (
+      effect.kind === 'city' &&
+      LAND_FIELDS.includes(effect.field as LandField) &&
+      applyLandScore(next, effect.id, effect.field as LandField, effect.op, effect.value)
+    )
+      continue;
     const entity =
       effect.kind === 'city'
         ? next.cities[effect.id]

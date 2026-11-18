@@ -50,7 +50,11 @@ export function trackNationTurn(
   result: CommandResult | Failure,
 ): WorldState {
   const ledger = readPreparedTurns(state.preparedTurns);
-  if (!ledger || 'code' in result) return state;
+  if (!ledger) return state;
+  if ('code' in result) {
+    if (result.clearPreparation) clearRecord(state, actor.nationId, actor.officerLevel);
+    return state;
+  }
   const record = ledger.nations[actor.nationId]?.[actor.officerLevel];
   if (record && record.commandKey !== commandKey) clearRecord(state, actor.nationId, actor.officerLevel);
   return state;

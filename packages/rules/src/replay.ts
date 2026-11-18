@@ -1,3 +1,4 @@
+import { shiftCityLandTurns } from './cityUpgrade/upgrade';
 import { providedRuleData } from './providedRuleData';
 import { emptyTurns, validatePolicyInput } from './replayInputs';
 import { ruleRegistry, settleMonthlyFeatures, type RuleRegistry } from './ruleRegistry';
@@ -63,7 +64,9 @@ export function initialReplayStateWithRegistry(
   registry: RuleRegistry,
   featureData?: ReplayOriginData,
 ): ReplayState {
+  const hasUpgrade = featureData === undefined || Object.hasOwn(featureData, 'city-upgrade-v1');
   featureData = { ...providedRuleData(initial, 60), ...featureData };
+  if (!hasUpgrade) delete featureData['city-upgrade-v1'];
   let replay: ReplayState = {
     state: toWorldState(initial),
     turns: Object.fromEntries(initial.generals.map(({ id }) => [id, emptyTurns()])),
@@ -168,6 +171,18 @@ function replayAction(
     personnel ? { offices: next.offices! } : undefined,
   );
   next.state = result.state;
+  const resize = result.nation && !('code' in result.nation.result) ? result.nation.result.cityResize : undefined;
+  if (resize) {
+    next.turns[action.generalId] = turns;
+    for (const [id, queue] of Object.entries(next.turns)) {
+      if (replay.state.generals[Number(id)]?.cityKey !== resize.cityKey) continue;
+      const shifted = structuredClone(queue);
+      if (shiftCityLandTurns(shifted, resize)) {
+        next.turns[Number(id)] = shifted;
+        next.revisions[Number(id)] = (next.revisions[Number(id)] ?? 0) + 1;
+      }
+    }
+  }
   next.state.generals[action.generalId]!.nextTurnTick += TICKS_PER_MONTH;
   if (personnel) {
     const packet = completePersonnelStep(
@@ -201,7 +216,10 @@ function replayAction(
       }),
     );
   }
-  next.turns[action.generalId] = [...turns.slice(1), next.policy ? emptyTurn() : { commandKey: 'rest', args: {} }];
+  next.turns[action.generalId] = [
+    ...(next.turns[action.generalId] ?? turns).slice(1),
+    next.policy ? emptyTurn() : { commandKey: 'rest', args: {} },
+  ];
   next.revisions[action.generalId] = (next.revisions[action.generalId] ?? 0) + 1;
   return {
     replay: next,
@@ -221,7 +239,7 @@ export function applyRecordedInput(
   if (isAdminSettingKind(input.kind)) validateAdminSettingRecord(input);
   if (input.kind === POSSESSION_KIND) validatePossessionRecord(input);
   if (replay.policy && ['turns.set', 'general.create', 'general.setPolicy', 'general.active'].includes(input.kind))
-    validatePolicyInput(input, true, true, true);
+    validatePolicyInput(input, replay.lineageResources?.statRules.count === 5, true, true);
   const kind = registry.inputKinds.find((kind) => kind.kind === input.kind);
   if (input.status === 'REJECTED') return replay;
   if (!kind) throw new Error(`알 수 없는 입력 종류입니다: ${input.kind}`);

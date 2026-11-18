@@ -52,6 +52,11 @@ export async function persistCampaignState(
   if (!original || !final) throw new Error('진행 중인 월드의 휘하 기능을 추가하거나 지울 수 없습니다.');
   const originalState = readStoredCampaign(original, before, original.seed);
   const finalState = readStoredCampaign(final, next, original.seed);
+  if (
+    !isDeepStrictEqual(originalState?.cityUpgrade?.originalLevels, finalState?.cityUpgrade?.originalLevels) ||
+    originalState?.cityUpgrade?.enabled !== finalState?.cityUpgrade?.enabled
+  )
+    throw new Error('증축·감축의 원래 규모와 설정을 변경할 수 없습니다.');
   if (!isDeepStrictEqual(originalState?.supplyLedger, finalState?.supplyLedger))
     throw new Error('불변 행군 원장을 변경할 수 없습니다.');
   if (isDeepStrictEqual(originalState, finalState)) return;

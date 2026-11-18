@@ -1,4 +1,6 @@
 .shell {
+  position: relative;
+  isolation: isolate;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto 1fr;
@@ -13,24 +15,42 @@
     'top top'
     'navigation main';
 }
+/* 전용 화면의 게임 바탕: 화면 전체를 덮는 성 화면 바닥 그림. 창이 떠 보이게 살짝 어둡게 누른다. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-color: #2c2416;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+.backdrop::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, rgb(10 4 2 / 10%) 40%, rgb(10 4 2 / 45%) 100%);
+}
+/* 위 띠: 키트 bar-top(양 끝 장식, 가운데 늘림). 글자는 한지색. */
 .topbar {
   grid-area: top;
   display: flex;
   align-items: center;
   gap: var(--space-4);
-  padding: 0 var(--space-4);
-  background: var(--color-banner);
-  color: var(--color-banner-text);
-  border-bottom: 4px solid var(--color-accent);
+  padding: var(--space-1) var(--space-4);
+  color: #f5e6c8;
   min-width: 0;
   min-height: var(--topbar-height);
   flex-wrap: wrap;
-  padding-block: var(--space-2);
+  position: relative;
+  z-index: 2;
 }
 .world {
   font-family: var(--font-title);
   font-size: var(--title-sm);
-  color: var(--color-banner-gold);
+  color: #ffd77a;
+  text-shadow: 0 2px 0 #1a0a04;
 }
 .topbar button,
 .topbar a {
@@ -38,7 +58,7 @@
   min-height: 44px;
 }
 .meta {
-  color: var(--color-banner-text);
+  color: #f5e6c8;
   font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
 }
@@ -46,32 +66,12 @@
 .date {
   font-family: var(--font-pixel);
   font-size: var(--title-sm);
-  color: var(--color-banner-gold);
-}
-.nav {
-  margin-left: auto;
-  display: flex;
-  gap: var(--space-1);
+  color: #ffd77a;
+  text-shadow: 0 2px 0 #1a0a04;
 }
 .navLink {
-  display: inline-flex;
-  align-items: center;
-  min-width: 44px;
-  min-height: 44px;
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius);
-  color: var(--color-banner-text);
+  font-size: var(--text-sm);
   text-decoration: none;
-}
-.navLink:hover {
-  background: rgb(255 255 255 / 8%);
-}
-.active {
-  background: var(--color-accent);
-  color: var(--color-accent-text);
-}
-.active:hover {
-  background: var(--color-accent);
 }
 .content {
   grid-area: main;
@@ -81,14 +81,7 @@
 .logout {
   min-width: 44px;
   min-height: 44px;
-  font: inherit;
   font-size: var(--text-sm);
-  padding: var(--space-1) var(--space-3);
-  border: 2px solid var(--color-banner-text);
-  border-radius: var(--radius);
-  background: transparent;
-  color: var(--color-banner-text);
-  cursor: pointer;
 }
 .account {
   display: inline-flex;
@@ -96,7 +89,106 @@
   min-width: 44px;
   min-height: 44px;
   font-size: var(--text-sm);
-  color: var(--color-banner-text);
+  color: #f5e6c8;
+}
+
+/*
+ * 전용 화면 창: 키트 A 창 틀 하나에 화면을 담는다. 넓은 화면은 창이 바탕 위 가운데에 떠 있고
+ * 길면 창 안에서 내려 읽는다. 아래 150px은 명령 띠 자리로 비운다.
+ */
+.window {
+  composes: tokens from '../ui/kitFrame.module.css';
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  width: min(100%, 1480px);
+  margin-inline: auto;
+  padding: var(--space-2) var(--space-3);
+  min-width: 0;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 55%);
+}
+.window > * {
+  min-width: 0;
+}
+@media (min-width: 768px) {
+  .shell[data-windowed='true'] {
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+  }
+  .shell[data-windowed='true'] .content {
+    display: flex;
+    min-height: 0;
+    padding: var(--space-4) var(--space-6) 150px;
+  }
+  .shell[data-windowed='true'] .window {
+    max-height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-color: #c9902a #2a1208;
+  }
+}
+
+/* 창 안 화면 제목: 키트 제목 장식을 양옆에 붙인다(.kit-title과 같은 모양). 글 크기는 화면이 정한다. */
+.window :global(h1) {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: #fff3d6;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-shadow: 0 2px 0 #1a0a04;
+}
+.window :global(h1)::before,
+.window :global(h1)::after {
+  content: '';
+  flex: 0 0 72px;
+  height: 24px;
+  background: var(--kit-title-ornament-0) center / contain no-repeat;
+}
+.window :global(h1)::after {
+  transform: scaleX(-1);
+}
+
+/*
+ * 창 안 가로 탭(.kit-tab-h와 같은 모양). 화면마다 탭 마크업이 달라 여기서 한 번에 입힌다.
+ * 링크로 된 구역 탭(nav 바로 아래 링크, aria-current)과 role="tab" 단추(aria-selected)가 대상이다.
+ */
+.window :global(nav[aria-label]),
+.window :global([role='tablist']) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  border-bottom: 0;
+}
+.window :global(nav[aria-label]) > :global(a[href]),
+.window :global([role='tablist']) :global([role='tab']) {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  margin: 0;
+  padding: 0 12px;
+  border: 8px solid transparent;
+  border-image: var(--kit-tab-horizontal-1) 16 fill / 8px stretch;
+  border-radius: 0;
+  background-color: #4a120c;
+  color: #e9d7b0;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.window :global(nav[aria-label]) > :global(a[href][aria-current='page']),
+.window :global([role='tablist']) :global([role='tab'][aria-selected='true']) {
+  border-image-source: var(--kit-tab-horizontal-0);
+  background-color: #7a1e12;
+  color: #fff3d6;
+}
+.window :global(nav[aria-label]) > :global(a[href]):focus-visible,
+.window :global([role='tablist']) :global([role='tab']):focus-visible {
+  outline: 2px solid #ffd77a;
+  outline-offset: 2px;
 }
 
 @media (max-width: 767px) {
@@ -112,15 +204,24 @@
     gap: var(--space-2);
     padding-block: var(--space-2);
   }
-  .nav {
-    flex-wrap: wrap;
-    margin-left: 0;
-  }
   .account {
     overflow-wrap: anywhere;
   }
   .world {
     overflow-wrap: anywhere;
     min-width: 0;
+  }
+  .shell[data-windowed='true'] .content {
+    padding: var(--space-2) var(--space-1);
+  }
+  /* 좁은 화면은 틀을 반 폭으로 그려 본문 자리를 넓힌다. */
+  .window {
+    border-width: 16px;
+    border-image-width: 16px;
+    padding: var(--space-1);
+  }
+  .window :global(h1)::before,
+  .window :global(h1)::after {
+    flex-basis: 32px;
   }
 }

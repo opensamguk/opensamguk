@@ -90,14 +90,6 @@ afterEach(() => {
   sessionStorage.clear();
 });
 
-it('T4-94 AC-P2-31 기능을 끈 월드는 황실 조회를 하지 않고 칸도 그리지 않는다', async () => {
-  mocks.enabled = false;
-  const client = mount();
-  await waitFor(() => expect(client.getQueryData(['summary'])).toBeDefined());
-  expect(mocks.get).not.toHaveBeenCalled();
-  expect(screen.queryByRole('region', { name: '황실' })).toBeNull();
-});
-
 it('T4-94 AC-P2-31 서버가 기능 꺼짐(412)을 알리면 칸을 지우고 focus에도 다시 묻지 않는다', async () => {
   mocks.get.mockRejectedValue(refused('PRECONDITION_FAILED'));
   mount();
@@ -295,7 +287,7 @@ it('T4-94 AC-P2-31 봉신 탭은 내 계열과 제안 보내기를 먼저 보이
   expect(mocks.submit).not.toHaveBeenCalled();
 });
 
-it('T4-94 AC-P2-31 재야 장수도 통치 화면에서 공개 황실 칸을 보고, 기능을 끈 월드면 묻지 않는다', async () => {
+it('T4-94 AC-P2-31 재야 장수도 통치 화면에서 공개 황실 칸을 본다', async () => {
   const neutral = () =>
     testBoard(mocks.user, WORLD, testView({ viewerGeneralId: 30, ownNationId: null, realmNationId: null }));
   mocks.get.mockImplementation(async () => neutral());
@@ -311,18 +303,6 @@ it('T4-94 AC-P2-31 재야 장수도 통치 화면에서 공개 황실 칸을 보
   expect(screen.queryByRole('button', { name: '즉위 요청' })).toBeNull();
   view.unmount();
   client.clear();
-
-  mocks.get.mockClear();
-  mocks.enabled = false;
-  const off = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
-  clients.push(off);
-  render(
-    <QueryClientProvider client={off}>
-      <GovernancePanel worldId={WORLD} />
-    </QueryClientProvider>,
-  );
-  await waitFor(() => expect(off.getQueryData(['summary'])).toBeDefined());
-  expect(mocks.get).not.toHaveBeenCalled();
   expect(screen.queryByRole('region', { name: '황실' })).toBeNull();
 });
 

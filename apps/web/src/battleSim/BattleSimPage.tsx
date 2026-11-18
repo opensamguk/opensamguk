@@ -28,10 +28,10 @@ import styles from './BattleSimPage.module.css';
 // 저장소(sessionStorage 등)를 읽거나 쓰지 않는다.
 
 const ERROR_TEXT: Record<Exclude<BattleWorkerState, { status: 'idle' | 'running' | 'done' }>['code'], string> = {
-  INVALID_INPUT: 'Worker가 입력을 받지 않았습니다.',
+  INVALID_INPUT: '계산기가 입력을 받지 않았습니다.',
   UNIT_SET_INVALID: '병종표를 읽지 못했습니다.',
   FAILED: '계산하지 못했습니다.',
-  WORKER: '계산 Worker를 실행하지 못했습니다.',
+  WORKER: '계산기를 실행하지 못했습니다.',
 };
 
 export function BattleSimPage() {
@@ -78,8 +78,8 @@ function BattleSimForm({ unitSetKey, unitSet }: { unitSetKey: string; unitSet: W
   return (
     <>
       <p className={styles.muted}>
-        양쪽 값과 시드를 직접 넣으면 교전 한 번을 계산합니다. 다른 국가의 값은 불러오지 않습니다. 병종표는 이 월드의
-        병종표({unitSetKey}) 기준입니다.
+        양쪽 값과 시드는 직접 넣습니다. 다른 국가의 값은 불러오지 않습니다. 병종표는 이 월드의 병종표({unitSetKey})
+        기준입니다.
       </p>
 
       <form
@@ -104,7 +104,7 @@ function BattleSimForm({ unitSetKey, unitSet }: { unitSetKey: string; unitSet: W
           </select>
         </label>
         <p className={styles.muted}>
-          월드의 규칙에 맞춰 고릅니다. 지휘관 값은 가정을 직접 입력하며 실제 장수의 비공개 수치를 불러오지 않습니다.
+          월드의 규칙에 맞춰 고르세요. 지휘관 값은 직접 넣는 가정값이며 실제 장수의 비공개 수치는 불러오지 않습니다.
         </p>
         <div className={styles.sides}>
           <fieldset className={styles.side}>
@@ -242,7 +242,7 @@ function BattleSimForm({ unitSetKey, unitSet }: { unitSetKey: string; unitSet: W
               실행
             </button>
           ) : (
-            <DisabledReason reason="표시한 칸을 고치면 실행할 수 있습니다.">실행</DisabledReason>
+            <DisabledReason reason="표시한 칸을 먼저 고치세요.">실행</DisabledReason>
           )}
         </div>
       </form>

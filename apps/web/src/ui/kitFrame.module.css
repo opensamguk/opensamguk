@@ -1,0 +1,99 @@
+/*
+ * 어두운 키트 틀(창, 표 머리와 줄) 안의 색 토큰.
+ * 화면과 칸의 CSS는 색을 토큰으로 쓰므로, 틀 안에서는 토큰만 밤 군막 쪽으로 바꿔
+ * 먹 글자가 붉은 틀 위에서 묻히지 않고 한지 글자(#f5e6c8)로 읽히게 한다.
+ * :root의 --frame 같은 묶음 토큰은 :root에서 값이 굳으므로 여기서 다시 짓는다.
+ */
+.tokens {
+  color-scheme: dark;
+  --color-bg: transparent;
+  --color-surface: rgb(20 6 2 / 42%);
+  --color-surface-muted: rgb(20 6 2 / 26%);
+  --color-surface-raised: #4a1a10;
+  --color-text: #f5e6c8;
+  --color-text-muted: #d4bf98;
+  --color-border: rgb(217 180 90 / 32%);
+  --color-border-strong: #d9b45a;
+  --color-accent: #ff9a7a;
+  --color-accent-text: #2a1208;
+  --color-gold: #e0b45a;
+  --color-ink: #120604;
+  --color-success: #8fd6ae;
+  --color-danger: #ff9a8a;
+  --color-warning: #f2c46a;
+  --color-info: #a9c4f2;
+  --frame: 2px solid rgb(217 180 90 / 55%);
+  --frame-inset: inset 0 0 0 3px rgb(20 6 2 / 42%), inset 0 0 0 4px #e0b45a;
+  --shadow-step: 4px 4px 0 rgb(0 0 0 / 35%);
+  --shadow-button: 2px 2px 0 rgb(0 0 0 / 50%);
+  color: var(--color-text);
+}
+
+/*
+ * 키트 표 머리(table-head)와 줄(table-row 짝, 홀, 고름). 칸은 <table>이라 줄(tr)에는 테두리 그림이 그려지지 않으므로
+ * 줄마다 그림을 변수로 정하고 칸마다 border-image로 나눠 그린다. 표는 border-collapse: separate여야 그림이 보인다.
+ * 줄에는 전역 .kit-thead, .kit-row도 붙여 키트 대체 색과 글자색을 함께 받는다.
+ * 머리 그림은 양 끝 장식(원본 20px)이 있어 첫 칸과 끝 칸에만 끝 조각을 둔다.
+ * 줄 그림(256×32)은 장식 없이 가운데 띠만 있고 좌우 31px가 비어 있으므로, 빈 곳을 잘라 낸 가운데를 칸마다 늘려 깐다.
+ */
+.head {
+  composes: tokens;
+}
+.body {
+  composes: tokens;
+}
+.head > tr {
+  --kit-cell: var(--kit-table-head);
+  height: 34px;
+}
+.body > tr {
+  --kit-cell: var(--kit-table-row-0);
+  height: 32px;
+}
+.body > tr:nth-child(even) {
+  --kit-cell: var(--kit-table-row-1);
+  background-color: #561a10;
+}
+.body > tr:is([aria-selected='true'], [aria-current='true'], [data-selected='true']) {
+  --kit-cell: var(--kit-table-row-2);
+  --color-text: #2a1208;
+  --color-text-muted: #4a2c18;
+  --color-accent: #8a1a0c;
+  color: #2a1208;
+}
+.head > tr > :is(th, td),
+.body > tr > :is(th, td) {
+  border-style: solid;
+  border-color: transparent;
+  border-width: 0;
+  border-image-source: var(--kit-cell);
+  border-image-width: 0;
+  border-image-repeat: stretch;
+  box-sizing: border-box;
+}
+.body > tr > :is(th, td) {
+  border-image-slice: 0 32 fill;
+}
+.head > tr > :is(th, td) {
+  border-image-slice: 0 20 fill;
+  background-color: #5a1a10;
+  color: #f5e6c8;
+  font-weight: 700;
+}
+.head > tr > :first-child,
+.body > tr > :first-child {
+  border-left-width: 10px;
+}
+.head > tr > :last-child,
+.body > tr > :last-child {
+  border-right-width: 10px;
+}
+.head > tr > :first-child {
+  border-image-width: 0 0 0 10px;
+}
+.head > tr > :last-child {
+  border-image-width: 0 10px 0 0;
+}
+.head > tr > :only-child {
+  border-image-width: 0 10px;
+}

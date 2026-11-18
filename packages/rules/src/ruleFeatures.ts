@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { applyProposalRecord } from './personnel/proposals';
 import { createdHeritageStat } from './heritage/creation';
-import { FIVE_STAT_KEYS, FIVE_STAT_RULES, checkStatProfile } from './general/fiveStats';
+import { FIVE_STAT_KEYS, checkStatProfile } from './general/fiveStats';
 import { validateGeneralCreation } from './general/create';
 import type { InputKindDefinition, RuleFeatureDefinition } from './ruleRegistry';
 import type { RecordedInput, ReplayState } from './replay';
@@ -67,15 +67,18 @@ export const fiveStatsFeature: RuleFeatureDefinition = {
     if (data !== undefined) throw new Error('5능력치 기능의 별도 초기 자료는 없습니다.');
     checkStatProfile(initial);
   },
-  checkArchive({ inputs }) {
+  checkArchive({ origin, inputs }) {
+    const five = origin.initial.statRules.count === 5;
     for (const input of inputs) {
       if (input.kind !== 'general.create' || input.status !== 'APPLIED') continue;
-      const parsed = validateGeneralCreation(input.payload, FIVE_STAT_RULES, true, true);
+      const parsed = validateGeneralCreation(input.payload, origin.initial.statRules, true, true);
       const general = (input.result as { general?: Record<string, unknown> } | null)?.general;
       if (
         !parsed.ok ||
         !general ||
-        FIVE_STAT_KEYS.some((key) => general[key] !== createdHeritageStat(parsed.value, key))
+        (five ? FIVE_STAT_KEYS : FIVE_STAT_KEYS.slice(0, 3)).some(
+          (key) => general[key] !== createdHeritageStat(parsed.value, key),
+        )
       )
         throw new Error('5능력치 생성 입력과 결과가 다릅니다.');
     }
@@ -92,10 +95,10 @@ export const policyFeature: RuleFeatureDefinition = {
   checkOrigin({ data }) {
     policyDataSchema.parse(data);
   },
-  checkArchive({ inputs }) {
+  checkArchive({ origin, inputs }) {
     for (const input of inputs)
       if (['turns.set', 'general.create', 'general.setPolicy', 'general.active'].includes(input.kind))
-        validatePolicyInput(input, true, true, true);
+        validatePolicyInput(input, origin.initial.statRules.count === 5, true, true);
   },
   initReplayState(replay, { data }) {
     const config = policyDataSchema.parse(data);

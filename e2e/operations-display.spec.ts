@@ -56,7 +56,7 @@ interface Prepared extends Label {
 }
 
 const EMPTY_TURN: StoredTurn = { commandKey: 'rest', args: {}, explicit: false };
-const EMPTY_SLOT_TITLE = '비워 둔 칸입니다. 그 장수의 기본 방침대로 실행합니다.';
+const EMPTY_SLOT_TITLE = '빈 칸은 그 장수의 기본 방침대로 실행합니다.';
 
 const monthIndex = (date: GameDate) => date.year * 12 + date.month - 1;
 const monthAfter = (date: GameDate, count: number): GameDate => {

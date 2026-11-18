@@ -490,8 +490,8 @@ function validatePolicyArchive(archive: ReplayArchiveV5) {
 function startReplay(archive: Archive, registry: RuleRegistry = ruleRegistry) {
   const initial =
     archive.version === 3
-      ? initialReplayStateWithRegistry(archive.origin.initial, registry, archive.origin.featureData)
-      : initialReplayState(archive.origin.initial);
+      ? initialReplayStateWithRegistry(archive.origin.initial, registry, archive.origin.featureData ?? {})
+      : initialReplayState(archive.origin.initial, {});
   return archive.version === 5 && archive.config.policy.fromSequence === 0
     ? enableReplayPolicy(initial, archive.config.policy.turnTermMinutes, 0)
     : initial;

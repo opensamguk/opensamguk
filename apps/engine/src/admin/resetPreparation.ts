@@ -393,7 +393,8 @@ function requestRefs(
       scenario,
       map,
       unitSet: intent.unitSetKey ?? preset?.unitSet ?? 'basic',
-      ...(intent.statRulesKey === null ? {} : { statRules: intent.statRulesKey }),
+      // 자료에 따라 골랐던 기본 판도 생성 때 고정한 참조로 복원한다.
+      statRules: intent.statRulesKey ?? resolution.selection.statRules,
       ...(intent.portraitMapKey === null ? {} : { portraitMap: intent.portraitMapKey }),
     });
     if (

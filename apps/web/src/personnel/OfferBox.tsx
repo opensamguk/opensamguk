@@ -4,23 +4,20 @@ import { personnelKeys, usePersonnelApi, type AssignmentOfferView } from './cont
 import styles from './Personnel.module.css';
 import { euro, iGa, type Notice } from './request';
 import { usePersonnelAction } from './usePersonnelAction';
-import { usePersonnelEnabled } from './usePersonnelEnabled';
 
 const KINDS = ['offer.respond'] as const;
 
 // 메인 위쪽 발령 제안 상자 (T2-06, D11). 사람 장수가 턴을 쓰지 않고 수락·거절한다.
-// 제안이 없거나 인사 기능이 없는 월드면 아무것도 그리지 않는다. 결과 안내는 상자가 사라져도 남는다.
+// 제안이 없으면 아무것도 그리지 않는다. 결과 안내는 상자가 사라져도 남는다.
 export function OfferBox({ worldId }: { worldId: string }) {
   const api = usePersonnelApi();
   const queryClient = useQueryClient();
   const action = usePersonnelAction({ worldId, kinds: KINDS });
-  const personnel = usePersonnelEnabled(worldId);
   const offers = useQuery({
     queryKey: personnelKeys.offers(worldId),
     queryFn: () => api.offers({ worldId }),
-    enabled: personnel,
     retry: false,
-    // 발령은 엔진이 턴에 만든다. 인사 기능이 없는 월드는 묻지 않고, 서버가 거부해도 다시 묻지 않는다.
+    // 발령은 엔진이 턴에 만든다. 서버가 거부하면 다시 묻지 않는다.
     refetchInterval: (query) => (query.state.status === 'error' ? false : 15_000),
   });
   const offer = offers.data?.[0];

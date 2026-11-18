@@ -306,8 +306,8 @@ export const LEGEND_NATIONS: StoredNation[] = Array.from({ length: 16 }, (_, i) 
 
 // E8만 쓰는 실제 DB 월드. 국가마다 도시 하나와 공백 도시 하나를 두고 첫 달 저장값을 넣는다.
 export async function createLegendWorld(db: PrismaClient): Promise<PreparedWorld> {
-  const [{ saveInitialWorld }, { toGameDate }] = await Promise.all([
-    import('../apps/engine/src/world/persistence'),
+  const [{ saveFixtureWorld }, { toGameDate }] = await Promise.all([
+    import('./worldFixture'),
     import('../packages/rules/src/index'),
   ]);
   const initial = await borderWorld();
@@ -324,8 +324,7 @@ export async function createLegendWorld(db: PrismaClient): Promise<PreparedWorld
   }));
   initial.nations = LEGEND_NATIONS.map((entry) => ({ ...nation, ...entry, capitalCityKey: entry.id }));
   const name = `E2E 범례 ${randomUUID().slice(0, 8)}`;
-  const { worldId } = await saveInitialWorld(db, initial, {
-    replayFormat: 'legacy',
+  const { worldId } = await saveFixtureWorld(db, initial, {
     name,
     turnTermMinutes: 60,
     endYear: null,
@@ -350,8 +349,8 @@ export async function createLegendWorld(db: PrismaClient): Promise<PreparedWorld
 }
 
 async function prepareWorlds(db: PrismaClient): Promise<PreparedWorlds> {
-  const [{ saveInitialWorld }, { controlClock }, lease, { TurnLoop }, rules, dbModule] = await Promise.all([
-    import('../apps/engine/src/world/persistence'),
+  const [{ saveFixtureWorld }, { controlClock }, lease, { TurnLoop }, rules, dbModule] = await Promise.all([
+    import('./worldFixture'),
     import('../apps/engine/src/world/clock'),
     import('../apps/engine/src/lease'),
     import('../apps/engine/src/turnLoop'),
@@ -361,8 +360,7 @@ async function prepareWorlds(db: PrismaClient): Promise<PreparedWorlds> {
   const tag = randomUUID().slice(0, 8);
   const save = async (label: string, initial: Awaited<ReturnType<typeof borderWorld>>) => {
     const name = `E2E 영토 ${tag} ${label}`;
-    const { worldId } = await saveInitialWorld(db, initial, {
-      replayFormat: 'legacy',
+    const { worldId } = await saveFixtureWorld(db, initial, {
       name,
       turnTermMinutes: 60,
       endYear: null,

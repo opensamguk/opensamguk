@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { controlClock } from '../apps/engine/src/world/clock';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld } from './worldFixture';
 import { newSession } from '../apps/server/src/auth/session';
 import { commandInitial } from '../packages/rules/test/commandFixture';
 import { expect, test } from './legalFixture';
@@ -21,11 +21,10 @@ test('AC-M3-14 네 역할에서 NPC를 맡고 이미 맡긴 무장을 제외하�
     intel: 60,
   });
   for (const general of initial.generals) general.nextTurnTick = 1_000_000;
-  const { worldId } = await saveInitialWorld(db, initial, {
+  const { worldId } = await saveFixtureWorld(db, initial, {
     name: '역할별 입장 인수 검증',
     turnTermMinutes: 60,
     endYear: null,
-    ruleFeatures: ['policy'],
   });
   const worldUrl = `/w/${worldId}`;
   const lease = await acquireLease(db, worldId, randomUUID(), 180_000);
@@ -113,6 +112,8 @@ test('AC-M3-14 네 역할에서 NPC를 맡고 이미 맡긴 무장을 제외하�
     await page.getByLabel('통솔', { exact: true }).fill('70');
     await page.getByLabel('무력', { exact: true }).fill('70');
     await page.getByLabel('지력', { exact: true }).fill('60');
+    // 성별은 늘 필수다(가문 규칙 상시, D-104).
+    await page.getByRole('radio', { name: '남', exact: true }).check();
     await page.getByRole('button', { name: '장수 만들기', exact: true }).click();
     await processEntry(id, 'general.create');
     await expect(page).toHaveURL(new URL(worldUrl, origin).href);

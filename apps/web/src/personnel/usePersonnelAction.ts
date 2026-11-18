@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTRPC } from '../trpc';
 import { errorCode } from '../turns/apiError';
 import { personnelKeys, usePersonnelApi, type ActionInput, type PersonnelKind } from './contract';
-import { usePersonnelEnabled } from './usePersonnelEnabled';
 import {
   announcedKey,
   checkAction,
@@ -51,7 +50,6 @@ export function usePersonnelAction({ worldId, kinds, nameOf }: Options) {
   const href = useRouterState({ select: (state) => state.location.href });
   const me = useQuery({ ...trpc.auth.me.queryOptions(), retry: false });
   const userId = me.data?.user?.id;
-  const personnel = usePersonnelEnabled(worldId);
   const storageKey = userId ? announcedKey(userId, worldId) : null;
   const kindsKey = kinds.join(',');
   const scope = storageKey ? storageKey + ':' + kindsKey : null;
@@ -211,7 +209,7 @@ export function usePersonnelAction({ worldId, kinds, nameOf }: Options) {
   const recent = useQuery({
     queryKey: [...personnelKeys.recent(worldId), userId],
     queryFn: () => api.recent({ worldId }),
-    enabled: scope !== null && personnel,
+    enabled: scope !== null,
     retry: false,
     staleTime: 0,
     gcTime: 0,

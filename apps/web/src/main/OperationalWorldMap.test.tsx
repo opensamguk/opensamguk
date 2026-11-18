@@ -297,7 +297,7 @@ it('휠 방향과 줄·쪽 단위를 같은 비율로 바꾸고 한 번에 2배�
 it('도시 표식의 접근성 이름에 툴팁과 같은 규모를 넣고 관문은 그대로 둔다', () => {
   draw();
   // 허창은 규모 2(진). 툴팁(aria-hidden)에만 있는 정보가 없도록 이름에도 같은 규모를 둔다.
-  expect(screen.getByRole('button', { name: /^허창, 진 도시, / })).toBeTruthy();
+  expect(screen.getByRole('button', { name: /^허창, 현 도시, / })).toBeTruthy();
   expect(screen.getByRole('button', { name: '관문, 관문, 위' })).toBeTruthy();
 });
 
@@ -312,7 +312,7 @@ it('D-053 수도는 이름표 앞 별표와 접근성 이름 「수도」로 누
   );
   const plates = [...container.querySelectorAll('svg text')].map((text) => text.textContent);
   expect(plates).toEqual(expect.arrayContaining(['★허창', '관문']));
-  expect(screen.getByRole('button', { name: /^허창, 진 도시, 위, 수도$/ })).toBeTruthy();
+  expect(screen.getByRole('button', { name: /^허창, 현 도시, 위, 수도$/ })).toBeTruthy();
   expect(screen.getByRole('button', { name: '관문, 관문, 위' })).toBeTruthy();
   unmount();
   // 공개 지도 사본처럼 수도를 모르는 국가는 별표를 달지 않는다.
@@ -382,10 +382,10 @@ it('INT-26 거점 읽기 이름에 지역·장수 수를 넣고 풍선에 지역
       ]}
     />,
   );
-  const xuchang = screen.getByRole('button', { name: '허창, 진 도시, 예주, 위, 장수 2명' });
+  const xuchang = screen.getByRole('button', { name: '허창, 현 도시, 예주, 위, 장수 2명' });
   expect(screen.getByRole('button', { name: '관문, 관문, 위' })).toBeTruthy();
   fireEvent.pointerMove(xuchang, { pointerType: 'mouse', clientX: 20, clientY: 20 });
   const balloon = screen.getByTestId('map-tooltip');
-  expect(balloon.textContent).toContain('예주 · 진');
+  expect(balloon.textContent).toContain('예주 · 현');
   expect(screen.getByTestId('map-tooltip-generals').textContent).toBe('장수 2명조조전위NPC');
 });

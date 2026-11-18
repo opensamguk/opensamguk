@@ -8,8 +8,8 @@ import { createGeneralByApi, mutate, query } from './game';
 import { externalOrigin } from './imageRequestPolicy';
 
 // T2-07 첫 세 조항 브라우저 시험의 월드 fixture (AC-M2-06).
-// 실제 1030·che 초기 상태에서 국가 20개의 국고·NPC 여부·관계만 정한 뒤 실제 saveInitialWorld로 조약 월드 T(treatyFormat 1)와
-// 같은 입력의 대조 월드 L(형식 플래그 없음)을 만든다. 시작은 실제 controlClock이고 엔진은 실행 중인 감독이 띄운다.
+// 실제 1030·che 초기 상태에서 국가 20개의 국고·NPC 여부·관계만 정한 뒤 실제 saveFixtureWorld로 조약 월드 T를 만든다.
+// 모든 규칙은 늘 켜져 있어 형식 플래그나 대조 월드를 두지 않는다. 시작은 실제 controlClock이고 엔진은 실행 중인 감독이 띄운다.
 // 이 파일이 DB에 직접 쓰는 것은 계정·세션, 장수의 소속·직위·첫 턴, B5의 국고 비우기뿐이다. 모두 시험 준비이며 게임 증거가 아니다.
 // 조약·입력·외교 행은 읽기만 한다. 실행권을 잡거나 TurnLoop을 직접 돌리거나 heartbeat를 쓰지 않는다.
 
@@ -45,9 +45,6 @@ export const PAIRS = {
   P10: { a: 19, b: 20, goldB: 0, relation: null, npcB: true },
 } as const satisfies Record<string, { a: number; b: number; goldB: number; relation: Relation | null; npcB: boolean }>;
 
-// 화면 사례(B10)의 국가. 쌍에 들지 않는 시나리오의 21번째 국가를 그대로 쓴다.
-const SCREEN_NATION = 21;
-
 // 사람 장수 역할. 키는 공개값이고 세션 토큰 유도에도 쓴다. N10은 NPC 국가라 사람 군주를 두지 않는다.
 // p3chief는 B3 국가의 권한 없는 직위(수뇌 5)다. B3 군주의 직위는 바꾸지 않는다.
 export const ACTORS = {
@@ -70,9 +67,7 @@ export const ACTORS = {
   p9a: { world: 'treaty', nationId: 17, officerLevel: 12 },
   p9b: { world: 'treaty', nationId: 18, officerLevel: 12 },
   p10a: { world: 'treaty', nationId: 19, officerLevel: 12 },
-  screen: { world: 'treaty', nationId: SCREEN_NATION, officerLevel: 12 },
-  legacy: { world: 'legacy', nationId: 1, officerLevel: 12 },
-} as const satisfies Record<string, { world: 'treaty' | 'legacy'; nationId: number; officerLevel: number }>;
+} as const satisfies Record<string, { world: 'treaty'; nationId: number; officerLevel: number }>;
 export type ActorKey = keyof typeof ACTORS;
 
 // 역할마다 장수 이름을 고정한다. 무작위 이름(newGeneralName, 'E'+5자리)은 같은 월드의 다른 역할과 드물게 겹쳐
@@ -144,7 +139,7 @@ function shapeWorld(initial: WorldInit): WorldInit {
     plan.set(pair.b, { gold: pair.goldB, isNpc: pair.npcB });
     if (pair.relation) relations.push({ nationA: pair.a, nationB: pair.b, ...pair.relation });
   }
-  for (const id of [...plan.keys(), SCREEN_NATION]) {
+  for (const id of plan.keys()) {
     if (!state.nations.some((n) => n.id === id)) throw new Error(`시나리오에 국가 ${id}가 없습니다.`);
     if (!state.cities.some((c) => c.nationId === id)) throw new Error(`국가 ${id}에 도시가 없습니다.`);
   }
@@ -169,19 +164,18 @@ export class TreatyFixture {
     readonly db: PrismaClient,
     readonly runId: string,
     readonly treatyWorldId: string,
-    readonly legacyWorldId: string,
     readonly startYear: number,
     private readonly names: ReadonlyMap<number, string>,
     private readonly toGameDate: ToGameDate,
   ) {}
 
-  // 두 월드를 만들고 형식을 DB에서 확인한 뒤 실제 controlClock으로 시작한다.
+  // 조약 월드를 만들고 실제 controlClock으로 시작한다.
   static async open(): Promise<TreatyFixture> {
-    const [{ createDb }, { loadInitialWorldFromDb }, { saveInitialWorld }, { controlClock }, rules] = await Promise.all(
+    const [{ createDb }, { loadInitialWorldFromDb }, { saveFixtureWorld }, { controlClock }, rules] = await Promise.all(
       [
         import('../packages/db/src/index'),
         import('../apps/engine/src/world/resources'),
-        import('../apps/engine/src/world/persistence'),
+        import('./worldFixture'),
         import('../apps/engine/src/world/clock'),
         import('../packages/rules/src/index'),
       ],
@@ -192,28 +186,14 @@ export class TreatyFixture {
       const state = shapeWorld(
         await loadInitialWorldFromDb(db, { scenario: '1030', map: 'che', seed: `t207-first3-${runId}` }),
       );
-      const common = { turnTermMinutes: TURN_TERM_MINUTES, endYear: null, replayFormat: 'legacy' } as const;
-      const treaty = await saveInitialWorld(db, structuredClone(state), {
-        ...common,
+      const treaty = await saveFixtureWorld(db, structuredClone(state), {
+        turnTermMinutes: TURN_TERM_MINUTES,
+        endYear: null,
         name: `첫 세 조항 시험 ${runId.slice(0, 8)}`,
-        treatyFormat: 1,
-      });
-      const legacy = await saveInitialWorld(db, structuredClone(state), {
-        ...common,
-        name: `형식 1 대조 ${runId.slice(0, 8)}`,
       });
 
       const t = await db.world.findUniqueOrThrow({ where: { id: treaty.worldId } });
-      const l = await db.world.findUniqueOrThrow({ where: { id: legacy.worldId } });
-      expect(t.treatyFormat).toBe(1);
-      expect(t.policyFromSequence).toBeNull();
-      expect(rules.selectWorldCapabilities(t).kind).toBe('caps');
-      expect(t.replayOrigin).toMatchObject({ version: 6, capabilities: { version: 1, treaty: { version: 1 } } });
-      expect(l.treatyFormat).toBeNull();
-      expect(l.policyFromSequence).toBeNull();
-      expect(rules.selectWorldCapabilities(l).kind).toBe('legacy');
-      expect(l.replayOrigin).toMatchObject({ version: 1 });
-      expect(l.replayOrigin).not.toHaveProperty('capabilities');
+      expect(t.replayOrigin).toMatchObject({ version: 3 });
 
       // 저장된 국고·NPC 여부·관계가 계획과 같은지 읽어 본다.
       const nations = await db.nation.findMany({ where: { worldId: t.id }, orderBy: { id: 'asc' } });
@@ -229,13 +209,11 @@ export class TreatyFixture {
       expect(relations).toEqual(state.diplomacies);
 
       await controlClock(db, t.id, 'start');
-      await controlClock(db, l.id, 'start');
-      note('fixture-world', `조약 월드 ${t.id}, 대조 월드 ${l.id}`);
+      note('fixture-world', `조약 월드 ${t.id}`);
       return new TreatyFixture(
         db,
         runId,
         t.id,
-        l.id,
         t.startYear,
         new Map(nations.map((n) => [n.id, n.name] as const)),
         rules.toGameDate,
@@ -246,11 +224,11 @@ export class TreatyFixture {
     }
   }
 
-  // 실행 중인 감독이 두 월드의 엔진을 띄워 실행권을 잡고 heartbeat를 쓸 때까지 읽기만 하며 기다린다.
+  // 실행 중인 감독이 조약 월드의 엔진을 띄워 실행권을 잡고 heartbeat를 쓸 때까지 읽기만 하며 기다린다.
   // 제한 시간은 따로 두지 않는다. hook의 기본 제한 시간 안에 준비되지 않으면 실패로 남는다.
   async waitEngines(): Promise<void> {
     const { HEARTBEAT_MS } = await import('../apps/engine/src/main');
-    for (const worldId of [this.treatyWorldId, this.legacyWorldId]) {
+    for (const worldId of [this.treatyWorldId]) {
       for (;;) {
         const rows = await this.db.$queryRaw<Array<{ ready: boolean }>>`
           SELECT w.status = 'RUNNING'
@@ -265,7 +243,7 @@ export class TreatyFixture {
         await delay(500);
       }
     }
-    note('engine-ready', '두 월드 모두 감독이 띄운 엔진의 실행권과 최근 heartbeat를 읽었다');
+    note('engine-ready', '감독이 띄운 엔진의 실행권과 최근 heartbeat를 읽었다');
   }
 
   nationName(id: number): string {
@@ -286,7 +264,7 @@ export class TreatyFixture {
     const existing = this.actors.get(key);
     if (existing) return existing;
     const plan = ACTORS[key];
-    const worldId = plan.world === 'treaty' ? this.treatyWorldId : this.legacyWorldId;
+    const worldId = this.treatyWorldId;
     const [{ hashPassword }, { hashToken, newSession }] = await Promise.all([
       import('../apps/server/src/auth/password'),
       import('../apps/server/src/auth/session'),

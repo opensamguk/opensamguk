@@ -91,7 +91,7 @@ describe('AC-M1-12 월간 정산 규칙', () => {
 describe('AC-M1-13 재생 기록 검사', () => {
   it('같은 시드 12개월을 비교하고 변조·누락·순서·revision 오류를 거부한다', async () => {
     const initial = await monthlyFixture();
-    let replay = initialReplayState(initial);
+    let replay = initialReplayState(initial, {});
     const archive: ReplayArchive = {
       version: 1,
       origin: { version: 1, initial, initialStateHash: hashState(initial), resourceHash: resourceHash(initial) },

@@ -31,7 +31,7 @@ function describe(entry: Entry, first: number) {
   }
   if (entry.kind === 'CREATION_SPEND') return '장수 생성에 사용';
   if (entry.kind === 'CREATION_REFUND') {
-    const cause = entry.refund ? REFUND[entry.refund.reason] : '관리자 강제 종료·초기화';
+    const cause = entry.refund ? REFUND[entry.refund.reason] : '관리자 강제 종료나 초기화';
     return `${cause}로 이 월드에서 장수 생성에 쓴 점수 반환`;
   }
   return entry.worldId === null ? '탈퇴 처리로 남은 점수 몰수' : '탈퇴한 계정이라 반환분을 몰수';

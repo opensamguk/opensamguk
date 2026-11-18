@@ -29,7 +29,7 @@ describe('territoryTiles', () => {
     );
     expect(count(tiles.owner, 1)).toBeGreaterThan(count(tiles.owner, 2));
     expect(reachOf(8)).toBeGreaterThan(reachOf(1));
-    // 이(4, 이민족 본거)는 종류 코드라 소(5)보다 넓다. 진(2)은 소보다 좁다.
+    // 이(4, 이민족 본거)는 종류 코드라 소(5)보다 넓다. 현(2)은 소보다 좁다.
     expect(reachOf(4)).toBeGreaterThan(reachOf(5));
     expect(reachOf(2)).toBeLessThan(reachOf(5));
   });
@@ -97,14 +97,23 @@ describe('territoryTiles', () => {
       expect([...tiles.data.slice(index * 4, index * 4 + 3)]).toEqual([0, 0, 0]);
       expect(tiles.data[index * 4 + 3]).toBe(1);
     }
-    // 오른쪽(물)에는 주인 칸이 없다.
-    const centreOf = (index: number) =>
-      fromTile(
-        tiles.originX + (index % tiles.columns) + 0.5,
-        tiles.originY + Math.floor(index / tiles.columns) + 0.5,
-        canvas,
-        8,
+    // 오른쪽(물)에는 주인 칸이 없다. 칸 가운데·네 쪽 가운데 중 한 곳이라도 땅이면 해안 칸으로 영지에 든다.
+    const samples = (index: number) =>
+      [
+        [0.5, 0.5],
+        [0.2, 0.5],
+        [0.8, 0.5],
+        [0.5, 0.2],
+        [0.5, 0.8],
+      ].map(([du, dv]) =>
+        fromTile(
+          tiles.originX + (index % tiles.columns) + du!,
+          tiles.originY + Math.floor(index / tiles.columns) + dv!,
+          canvas,
+          8,
+        ),
       );
-    expect(owned.every((index) => centreOf(index).x < 100)).toBe(true);
+    expect(owned.every((index) => samples(index).some((point) => point.x < 100))).toBe(true);
+    expect(owned.some((index) => samples(index)[0]!.x >= 100)).toBe(true);
   });
 });

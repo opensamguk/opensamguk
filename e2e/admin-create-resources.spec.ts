@@ -131,7 +131,7 @@ test('T4-90 게시한 2판 시나리오·지도를 화면에서 따로 골라 �
     portraitMapKey: '191-map',
     presetKey: 'regular',
   });
-  // 칸을 바꾼 요청은 ruleFeatures를 생략하고 서버가 판에서 기능을 계산한다.
+  // 모든 규칙이 늘 켜져 있어 요청에 규칙 선택 목록을 싣지 않는다.
   expect(Object.keys(input)).not.toContain('ruleFeatures');
   expect(Object.keys(input)).not.toContain('featureProfileKey');
   const request = await db.worldCreateRequest.findFirstOrThrow({ where: { requestedBy: actor.id } });
@@ -139,8 +139,8 @@ test('T4-90 게시한 2판 시나리오·지도를 화면에서 따로 골라 �
   expect(request.intent).toMatchObject({
     scenarioKey: 'integration191@2',
     mapKey: 'integration@2',
-    ruleFeatures: null,
   });
+  expect(request.intent).not.toHaveProperty('ruleFeatures');
 
   const result = await applyCreation(legalStack, actor.id);
   expect(result).toMatchObject({ status: 'DONE', errorCode: null, worldId: request.plannedWorldId });
@@ -214,8 +214,8 @@ test('T4-90 통합판 확장의 병종 판을 바꿔도 서버가 묶음 기능�
   expect(result.intent).toMatchObject({
     featureProfileKey: 'expanded-191-v3',
     unitSetKey: 'basic@2',
-    ruleFeatures: expect.arrayContaining(['logistics-v1', 'treaty']),
   });
+  expect(result.intent).not.toHaveProperty('ruleFeatures');
   expect(result.resolution).toMatchObject({ selection: { unitSet: 'basic@2' } });
   await createdResult(page, result);
 });

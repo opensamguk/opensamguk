@@ -128,9 +128,7 @@ describe('도시 제목과 관직', () => {
   });
 
   it('태수·군사·종사는 얼굴·이름·NPC·주재를 쓰고 빈 자리는 없음이다', () => {
-    render(
-      <CityOffices officers={[officer(4, '순욱(荀彧)', false), officer(10, '하후돈', true, false)]} secretaryEnabled />,
-    );
+    render(<CityOffices officers={[officer(4, '순욱(荀彧)', false), officer(10, '하후돈', true, false)]} />);
     const panel = screen.getByRole('region', { name: '도시 관직' });
     const seat = (title: string) => panel.querySelector(`[data-office="${title}"]`);
     expect(seat('태수')?.textContent).toBe('태수순욱NPC주재');
@@ -140,8 +138,8 @@ describe('도시 제목과 관직', () => {
     expect(seat('수뇌')?.textContent).toBe('수뇌하후돈부재');
   });
 
-  it('종사 설정이 꺼진 월드는 종사 자리를 두지 않는다', () => {
-    expect(cityOfficeSeats([], false).map((seat) => seat.title)).toEqual(['태수', '군사']);
+  it('빈 도시도 태수, 군사, 종사 자리를 모두 둔다', () => {
+    expect(cityOfficeSeats([]).map((seat) => seat.title)).toEqual(['태수', '군사', '종사']);
   });
 
   it('장수 행의 isHuman이 false면 감찰 자료 없이도 NPC 딱지를 단다', () => {

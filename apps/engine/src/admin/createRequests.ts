@@ -56,13 +56,20 @@ async function resolveCreation(db: PrismaClient, request: Request) {
     map = intent.mapKey ?? preset?.map;
   const turnTermMinutes = intent.turnTermMinutes ?? preset?.turnTermMinutes;
   if (!scenario || !map || turnTermMinutes === undefined) throw new CreationRejected('INPUT_INVALID');
-  const selection = resolveWorldResourceSelection({
+  const requestedSelection = {
     scenario,
     map,
     unitSet: intent.unitSetKey ?? preset?.unitSet ?? 'basic',
     ...(intent.statRulesKey === null ? {} : { statRules: intent.statRulesKey }),
     ...(intent.portraitMapKey === null ? {} : { portraitMap: intent.portraitMapKey }),
-  });
+  };
+  let resources;
+  try {
+    resources = await readInitialResources(db, requestedSelection);
+  } catch (error) {
+    resourceFailure(error);
+  }
+  const selection = resolveWorldResourceSelection(requestedSelection, resources.scenario.content);
   let featureProfile: Awaited<ReturnType<typeof loadFeatureProfile>> | undefined;
   if (intent.featureProfileKey !== undefined) {
     try {
@@ -93,12 +100,6 @@ async function resolveCreation(db: PrismaClient, request: Request) {
     )
       throw new CreationRejected('INPUT_INVALID');
   }
-  let resources;
-  try {
-    resources = await readInitialResources(db, selection);
-  } catch (error) {
-    resourceFailure(error);
-  }
   let state;
   try {
     state = composeInitialWorld(resources, request.effectiveSeed);
@@ -118,7 +119,9 @@ async function resolveCreation(db: PrismaClient, request: Request) {
       ...(featureProfile || officeEffects
         ? {
             featureData: {
-              ...featureProfile?.value.featureData,
+              ...Object.fromEntries(
+                Object.entries(featureProfile?.value.featureData ?? {}).filter(([, value]) => value !== undefined),
+              ),
               ...(officeEffects ? { [OFFICE_EFFECTS_FEATURE]: officeEffects } : {}),
             },
           }

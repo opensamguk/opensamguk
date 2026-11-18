@@ -6,6 +6,7 @@ import {
   canExecuteNationCommand,
   canExecuteCityNationCommand,
   canExecuteResearchNationCommand,
+  canExecuteCityUpgradeCommand,
   officerTitle,
   nationRank,
   type QueuedTurn,
@@ -42,6 +43,7 @@ export function parseOfficeTurn(
     !(
       canExecuteNationCommand(level, def.key) ||
       canExecuteCityNationCommand(world, level, def.key) ||
+      canExecuteCityUpgradeCommand(world, level, def.key) ||
       canExecuteResearchNationCommand(world, level, def.key)
     ) ||
     !args?.success

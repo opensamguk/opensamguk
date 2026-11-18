@@ -1,51 +1,103 @@
-/* 아이콘 레일: 먹색 띠에 도트 아이콘과 작은 이름 (INT-19). */
+/* 게임 메뉴: 바탕 위에 키트 A 둥근 단추를 세로로 세우고 이름을 아래에 적는다 (INT-29 화면 개편 초안). */
 .navigation {
   grid-area: navigation;
   min-width: 0;
-  border-right: var(--frame);
-  background: var(--color-rail);
+  min-height: 0;
+  background: linear-gradient(90deg, rgb(26 8 4 / 72%), rgb(26 8 4 / 40%));
+  position: relative;
+  z-index: 1;
 }
 .rail {
   display: grid;
   align-content: start;
-  gap: 2px;
-  padding: var(--space-2) var(--space-1);
+  justify-items: center;
+  gap: 4px;
+  padding: var(--space-2) 2px;
   position: sticky;
   top: 0;
   max-height: 100dvh;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #c9902a transparent;
+}
+/* 넓은 전용 화면은 화면 높이에 맞춰 고정되므로(GameLayout data-windowed) 메뉴 칸 안에서 내려 본다. */
+@media (min-width: 768px) {
+  :global([data-windowed='true']) > .navigation {
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #c9902a transparent;
+  }
+  :global([data-windowed='true']) > .navigation > .rail {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
 }
 .link,
 .close {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 2px;
+  width: 100%;
   min-width: 44px;
   min-height: 44px;
-  padding: var(--space-1) 2px;
+  padding: 2px;
   border-radius: var(--radius);
-  color: var(--color-rail-text);
+  color: #f5e6c8;
   font: inherit;
   font-size: var(--text-xs);
+  font-weight: 700;
   line-height: 1.2;
   text-align: center;
   text-decoration: none;
+  text-shadow:
+    0 1px 2px #000,
+    0 0 4px rgb(0 0 0 / 80%);
   overflow-wrap: anywhere;
+  box-sizing: border-box;
+}
+/* 둥근 단추 그림(키트 A button-round). 그림이 없으면 주칠 원으로 남는다. */
+.round {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--kit-button-round-0, #7a1e12) center / contain no-repeat;
 }
 .icon {
-  image-rendering: pixelated;
+  width: 24px;
+  height: 24px;
   flex: none;
 }
-/* 제안함의 대기 수: 주칠 바탕 작은 패 (INT-20). 숫자 뒤의 설명은 화면 읽기에만 읽힌다. */
+.link:hover .round {
+  background-image: var(--kit-button-round-1);
+}
+.link:active .round,
+.active .round,
+.link[aria-current] .round {
+  background-image: var(--kit-button-round-2);
+}
+.link:focus-visible {
+  outline: 2px solid #ffd77a;
+  outline-offset: -2px;
+}
+/* 제안함의 대기 수: 둥근 단추 오른쪽 위의 주칠 작은 패 (INT-20). 숫자 뒤의 설명은 화면 읽기에만 읽힌다. */
 .badge {
-  min-width: 20px;
+  position: absolute;
+  top: 0;
+  right: 2px;
+  min-width: 18px;
   padding: 0 4px;
-  border: 1px solid var(--color-rail-text);
-  background: var(--color-accent);
-  color: var(--color-accent-text);
+  border: 1px solid #ffd77a;
+  background: #9b2c1f;
+  color: #fff3d6;
   line-height: 16px;
+  text-shadow: none;
 }
 .hidden {
   position: absolute;
@@ -55,25 +107,20 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
-.link:hover {
-  background: rgb(255 255 255 / 8%);
-}
 .link:is(button) {
   border: 0;
   background: transparent;
   cursor: pointer;
 }
+/* 지금 화면: 이름을 금빛으로 올린다. */
 .active,
 .active:hover {
-  background: var(--color-accent);
-  color: var(--color-accent-text);
+  color: #ffd77a;
 }
 .mobile {
   display: none;
 }
 .close {
-  border: 2px solid var(--color-rail-text);
-  background: transparent;
   cursor: pointer;
 }
 @media (max-width: 767px) {
@@ -81,8 +128,7 @@
     position: sticky;
     bottom: 0;
     z-index: 10;
-    border-right: 0;
-    border-top: 3px solid var(--color-accent);
+    background: transparent;
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
   .rail {
@@ -92,10 +138,11 @@
   .navigation[data-main-page='true'] {
     display: none;
   }
+  /* 아래 막대: 키트 A bar-bottom 띠 위에 둥근 단추 넷. */
   .mobile {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    padding: var(--space-1);
+    padding: var(--space-1) 0;
   }
   .mobile > .link,
   .more > summary {
@@ -111,9 +158,10 @@
   .more > summary::-webkit-details-marker {
     display: none;
   }
-  .more[open] > summary {
-    background: rgb(255 255 255 / 12%);
+  .more[open] > summary .round {
+    background-image: var(--kit-button-round-2);
   }
+  /* 전체 메뉴: 키트 A 풀이 틀(kit-tooltip) 안에 단추를 넷씩 늘어놓는다. */
   .menu {
     position: absolute;
     bottom: 100%;
@@ -123,11 +171,8 @@
     display: none;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: var(--space-1);
-    padding: var(--space-2);
-    background: var(--color-rail);
-    border: var(--frame);
-    border-radius: var(--radius);
-    box-shadow: 0 -4px 0 rgb(34 29 23 / 30%);
+    padding: var(--space-1);
+    box-shadow: 0 -4px 12px rgb(0 0 0 / 45%);
   }
   .more[open] > .menu {
     display: grid;
@@ -135,6 +180,7 @@
   .close {
     grid-column: 1 / -1;
     justify-content: center;
+    flex-direction: row;
   }
   /* 위 띠에서 옮긴 계정 링크. 게임 메뉴와 구분하도록 한 줄을 띄우고 위에 선을 긋는다 (T4-97 U1). */
   .accountLinks {
@@ -143,6 +189,6 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--space-1);
     padding-top: var(--space-1);
-    border-top: 1px solid var(--color-rail-text);
+    border-top: 1px solid rgb(217 180 90 / 45%);
   }
 }

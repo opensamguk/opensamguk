@@ -1,3 +1,4 @@
+import { canExecuteCityUpgradeCommand, cityUpgradeCommands } from '../cityUpgrade/upgrade';
 import { z } from 'zod';
 import { commandRegistry } from '../commands/registry';
 import type { DeepReadonly } from '../model/world';
@@ -308,6 +309,7 @@ export function applyNationTurnsRecord(
     }
     const command =
       commandRegistry.get(turn.commandKey) ??
+      cityUpgradeCommands.find((definition) => definition.key === turn.commandKey) ??
       nationStrategyCommands.find((definition) => definition.key === turn.commandKey) ??
       (canExecuteResearchNationCommand(view, actor.officerLevel, turn.commandKey)
         ? nationResearchCommands.find((definition) => definition.key === turn.commandKey)
@@ -317,6 +319,7 @@ export function applyNationTurnsRecord(
       command.target !== 'nation' ||
       !(
         canExecuteNationCommand(actor.officerLevel, turn.commandKey) ||
+        canExecuteCityUpgradeCommand(view, actor.officerLevel, turn.commandKey) ||
         canExecuteResearchNationCommand(view, actor.officerLevel, turn.commandKey)
       ) ||
       !command.args.safeParse(turn.args).success

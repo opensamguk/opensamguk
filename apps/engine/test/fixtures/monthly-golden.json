@@ -1,5 +1,5 @@
 {
-  "stateHash": "916e84064ad4a66a8e6fec25bf0c69a6486a12db2b08dc626809d7d756ecaf86",
+  "stateHash": "4177102adac3e845abcfb95dc1f9cf327ff553ac415ece2180a428d030a3eff0",
   "replay": {
     "state": {
       "fogOfWar": false,
@@ -862,6 +862,17 @@
         }
       },
       "campaign": {
+        "cityUpgrade": {
+          "version": 1,
+          "enabled": true,
+          "originalLevels": {
+            "1": 8,
+            "2": 8,
+            "3": 8,
+            "4": 8
+          },
+          "completed": {}
+        },
         "version": 1,
         "seed": "monthly-golden",
         "revision": 1,

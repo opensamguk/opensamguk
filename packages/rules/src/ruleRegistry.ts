@@ -1,3 +1,5 @@
+import { cityUpgradeFeature } from './cityUpgrade/feature';
+import { constructionFeature } from './construction/feature';
 import { COURT_RANK_FEATURE } from './personnel/nationRank';
 import { tacticalInputKinds } from './tactical/input';
 import type { JsonValue } from './model/world';
@@ -122,6 +124,8 @@ export interface RuleRegistry {
 }
 export const ruleRegistry: RuleRegistry = {
   features: [
+    constructionFeature,
+    cityUpgradeFeature,
     preparedTurnsFeature,
     nationResearchFeature,
     relationsFeature,
@@ -203,6 +207,8 @@ export const ruleRegistry: RuleRegistry = {
     'stratagem-cards-v1',
     'reputation-v1',
     'city-scale-v1',
+    'construction-v1',
+    'city-upgrade-v1',
   ],
   inputKinds: [
     ...ADMIN_SETTING_KINDS.map((kind) => ({
@@ -309,6 +315,8 @@ export function checkReplayOrigin(
   if (origin.initial.generals.some((general) => Object.hasOwn(general, 'officerCityKey')))
     throw new Error('초기 장수에는 도시 관직을 배정할 수 없습니다.');
   checkStatProfile(origin.initial);
+  if (origin.initial.operationalMap && origin.initial.statRules.count !== 5)
+    throw new Error('운영 지도는 5능력치 프로필이 필요합니다.');
   checkInitialNpcStatLimits(origin.initial, origin.version === 3 ? 'current' : 'legacy');
   checkCityScaleInitial(origin.initial);
   checkOperationalProfile(origin.initial);

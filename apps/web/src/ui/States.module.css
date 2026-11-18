@@ -69,15 +69,8 @@
     animation: none;
   }
 }
+/* 다시 시도: 키트 보조 단추(.kit-button[data-kind='secondary']). */
 .retry {
-  font: inherit;
-  font-weight: 500;
   min-height: 44px;
   padding: 0 var(--space-4);
-  border: var(--frame);
-  border-radius: var(--radius);
-  background: var(--color-surface);
-  color: var(--color-text);
-  box-shadow: var(--shadow-button);
-  cursor: pointer;
 }

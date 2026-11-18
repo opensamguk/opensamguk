@@ -1,5 +1,11 @@
 import type { Prisma } from '@opensamguk/db';
-import { checkReplayOrigin, readCityRuins, RUIN_PERCENT, type WorldState } from '@opensamguk/rules';
+import {
+  campaignStateSchema,
+  checkReplayOrigin,
+  readCityRuins,
+  RUIN_PERCENT,
+  type WorldState,
+} from '@opensamguk/rules';
 
 type RuinInfo = { percent: (typeof RUIN_PERCENT)[number] } | null;
 type City = Prisma.CityGetPayload<Record<string, never>>;
@@ -12,13 +18,14 @@ export async function readCityScaleProjection(
 ): Promise<Map<number, RuinInfo> | undefined> {
   const world = await tx.world.findUniqueOrThrow({
     where: { id: worldId },
-    select: { replayFormat: true, replayOrigin: true, cityRuinsState: true },
+    select: { replayFormat: true, replayOrigin: true, cityRuinsState: true, campaignState: true },
   });
   const origin: unknown = world.replayOrigin;
   checkReplayOrigin(origin);
   if (world.replayFormat !== 3 || origin.version !== 3) throw new Error('폐허의 재생 형식이나 생성 원장이 다릅니다.');
   const rows = cities ?? (await tx.city.findMany({ where: { worldId } }));
-  const state: Pick<WorldState, 'cities'> = {
+  const state: Pick<WorldState, 'cities'> & Partial<Pick<WorldState, 'campaign'>> = {
+    ...(world.campaignState == null ? {} : { campaign: campaignStateSchema.parse(world.campaignState) }),
     cities: Object.fromEntries(
       rows.map(({ kind, ...city }): [number, WorldState['cities'][number]] => {
         if (kind !== null && kind !== 'CITY' && kind !== 'PASS' && kind !== 'FIELD')

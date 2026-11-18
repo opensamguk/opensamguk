@@ -1,10 +1,13 @@
+import { syncLandScores } from '../construction/land';
 import type { PresetRules } from '../world/preset';
 import { cloneExtStateWithRegistry, extRegistryForRuleFeatures, type ExtStateRegistry } from '../commands/ext/state';
 import type { WorldState, WorldView } from './world';
 
 // 모든 가변 필드를 복제한다. 평평한 장수 수백 명을 매 턴 직렬화하지 않는다.
 export function cloneWorld(view: WorldView): WorldState {
-  return cloneWorldWithRegistry(view, extRegistryForRuleFeatures());
+  const state = cloneWorldWithRegistry(view, extRegistryForRuleFeatures());
+  syncLandScores(state);
+  return state;
 }
 
 export function cloneWorldWithRegistry(view: WorldView, registry: ExtStateRegistry): WorldState {

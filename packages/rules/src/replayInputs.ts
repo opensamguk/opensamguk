@@ -20,7 +20,7 @@ export function validatePolicyInput(input: RecordedInput, five = false, lineage 
 export const emptyTurns = (): QueuedTurn[] => Array.from({ length: 30 }, () => ({ commandKey: 'rest', args: {} }));
 
 export function applyTurnsInput(replay: ReplayState, input: RecordedInput): ReplayState {
-  if (replay.policy) validatePolicyInput(input, true, true, true);
+  if (replay.policy) validatePolicyInput(input, replay.lineageResources?.statRules.count === 5, true, true);
   const next = structuredClone(replay);
   const payload = input.payload as { turns?: QueuedTurn[]; revision?: number };
   const result = input.result as { revision?: number };
@@ -47,7 +47,9 @@ export function applyTurnsInput(replay: ReplayState, input: RecordedInput): Repl
 }
 
 export function applyCreationInput(replay: ReplayState, input: RecordedInput): ReplayState {
-  if (replay.policy) validatePolicyInput(input, true, true, true);
+  const rules = replay.lineageResources?.statRules ?? FIVE_STAT_RULES;
+  const five = rules.count === 5;
+  if (replay.policy) validatePolicyInput(input, five, true, true);
   const next = structuredClone(replay);
   const general = (input.result as { general?: InitialGeneral }).general;
   if (
@@ -63,8 +65,8 @@ export function applyCreationInput(replay: ReplayState, input: RecordedInput): R
   ) {
     throw new Error('장수 생성 결과가 올바르지 않습니다.');
   }
-  assertGeneralStatProfile(general, true);
-  assertHeritageCreationResult(input.payload, input.result, true, true);
+  assertGeneralStatProfile(general, five);
+  assertHeritageCreationResult(input.payload, input.result, true, five);
   assertGeneralSex(general, true);
   const payload = input.payload as Record<string, unknown>;
   {
@@ -73,8 +75,13 @@ export function applyCreationInput(replay: ReplayState, input: RecordedInput): R
       throw Error('가문 판의 장수 정원을 넘었습니다.');
   }
   {
-    const creation = validateGeneralCreation(input.payload, FIVE_STAT_RULES, true, true);
-    if (!creation.ok || FIVE_STAT_KEYS.some((key) => createdHeritageStat(creation.value, key) !== general[key]))
+    const creation = validateGeneralCreation(input.payload, rules, true, true);
+    if (
+      !creation.ok ||
+      (five ? FIVE_STAT_KEYS : FIVE_STAT_KEYS.slice(0, 3)).some(
+        (key) => createdHeritageStat(creation.value, key) !== general[key],
+      )
+    )
       throw new Error('5능력치 생성 입력과 결과가 다릅니다.');
   }
   next.state.generals[general.id] = structuredClone(general);
@@ -89,7 +96,7 @@ export function applyCreationInput(replay: ReplayState, input: RecordedInput): R
 }
 
 export function applyPolicyInput(replay: ReplayState, input: RecordedInput): ReplayState {
-  validatePolicyInput(input, true, true, true);
+  validatePolicyInput(input, replay.lineageResources?.statRules.count === 5, true, true);
   const next = structuredClone(replay);
   const id = input.generalId;
   if (!next.policy || id === null || !next.state.generals[id] || next.state.generals[id]!.userId === null)
