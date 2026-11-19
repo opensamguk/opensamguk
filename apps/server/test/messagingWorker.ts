@@ -1,9 +1,9 @@
-import { createDb } from '@opensamguk/db';
+import { createServerDb } from '../src/db';
 import { buildServer } from '../src/server';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 DB가 필요합니다.');
-const db = createDb(url);
+const db = createServerDb(url);
 const app = await buildServer({
   db,
   logging: false,
