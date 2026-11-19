@@ -928,7 +928,9 @@ export function CommandPicker({
           >
             {cityDrill ? (
               <label className={styles.argLabel} {...stepProps('content')}>
-                <span>{command.key === 'recruit' || command.key === 'conscript' ? '모집 대상' : '훈련과 사기 대상'}</span>
+                <span>
+                  {command.key === 'recruit' || command.key === 'conscript' ? '모집 대상' : '훈련과 사기 대상'}
+                </span>
                 <select
                   value={preparationTarget}
                   onChange={(event) => {
