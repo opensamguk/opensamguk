@@ -101,10 +101,13 @@ test('T4-97 메인 HUD 계정 메뉴·예턴 상태·도시에서 명령 고르�
     const map = await apiQuery<Outputs['world']['map']>(actor, 'world.map', { worldId });
     const target = map.cities.find((city) => city.key !== initial.generals[0]!.cityKey)!;
     const commands = await apiQuery<Outputs['commands']['list']>(actor, 'commands.list', { worldId });
+    // 인자가 도시 하나뿐인 이동 명령을 고른다. cityKey만 보고 첫 명령을 고르면 INT-29의 성 건물 명령처럼 다른 인자도
+    // 필요한 명령이 잡혀 넣기 단추가 막힌다.
     const move = commands.find((command) => {
       const properties = (command.argsSchema as { properties?: Record<string, unknown> }).properties ?? {};
-      return 'cityKey' in properties;
+      return command.key === 'move' && Object.keys(properties).join() === 'cityKey';
     })!;
+    expect(move).toBeDefined();
     await page.getByTestId('world-map').locator(`[data-city-key="${target.key}"]`).click();
     await expect(page).toHaveURL(new RegExp(`[?&]city=${target.key}`));
     await editor.getByRole('button', { name: '선택 해제', exact: true }).click();

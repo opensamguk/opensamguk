@@ -77,12 +77,25 @@ const B_NATION = { id: 2, name: '사본 B 오', color: '#00aa00', capitalCityKey
 const NOW_NATION = { name: '지금 오', color: '#123456' };
 
 // 서버 원본 응답의 기대값. 도시 key·links는 문자열이다 (T2-24).
+// 공개 사본은 도시마다 성 상태와 폐허, 분리 여부를 함께 싣고 황제가 있는 도시를 따로 적는다(visibility.ts publicMapInfo).
+const CITY_STATE = { ruin: null, state: 0, stateTerm: 0, parentCityKey: null, detached: false };
 const RAW_GA = {
+  emperorCityKey: 3,
   cities: [
-    { key: '1', name: '업', level: 7, x: 120, y: 90, nationId: 1, links: ['2'], supplied: true },
-    { key: '2', name: '허창', level: 6, x: 300, y: 220, nationId: 2, links: ['1', '3', '4'], supplied: true },
-    { key: '3', name: '낙양', level: 8, x: 480, y: 120, nationId: 1, links: ['2'], supplied: true },
-    { key: '4', name: '완', level: 5, x: 320, y: 400, nationId: 2, links: ['2'], supplied: true },
+    { ...CITY_STATE, key: '1', name: '업', level: 7, x: 120, y: 90, nationId: 1, links: ['2'], supplied: true },
+    {
+      ...CITY_STATE,
+      key: '2',
+      name: '허창',
+      level: 6,
+      x: 300,
+      y: 220,
+      nationId: 2,
+      links: ['1', '3', '4'],
+      supplied: true,
+    },
+    { ...CITY_STATE, key: '3', name: '낙양', level: 8, x: 480, y: 120, nationId: 1, links: ['2'], supplied: true },
+    { ...CITY_STATE, key: '4', name: '완', level: 5, x: 320, y: 400, nationId: 2, links: ['2'], supplied: true },
   ],
   nations: [
     { id: 1, name: '위', color: '#000080', capitalCityKey: 1 },
@@ -90,11 +103,12 @@ const RAW_GA = {
   ],
 };
 const RAW_NA = {
+  emperorCityKey: 1,
   cities: [
-    { key: '1', name: '성도', level: 8, x: 25, y: 20, nationId: 1, links: ['2'], supplied: true },
-    { key: '2', name: '면죽', level: 4, x: 250, y: 200, nationId: null, links: ['1', '3'] },
-    { key: '3', name: '한중', level: 6, x: 460, y: 300, nationId: 1, links: ['2', '4'], supplied: true },
-    { key: '4', name: '장안', level: 8, x: 680, y: 480, nationId: 2, links: ['3'], supplied: true },
+    { ...CITY_STATE, key: '1', name: '성도', level: 8, x: 25, y: 20, nationId: 1, links: ['2'], supplied: true },
+    { ...CITY_STATE, key: '2', name: '면죽', level: 4, x: 250, y: 200, nationId: null, links: ['1', '3'] },
+    { ...CITY_STATE, key: '3', name: '한중', level: 6, x: 460, y: 300, nationId: 1, links: ['2', '4'], supplied: true },
+    { ...CITY_STATE, key: '4', name: '장안', level: 8, x: 680, y: 480, nationId: 2, links: ['3'], supplied: true },
   ],
   nations: [
     { id: 1, name: '촉', color: '#008000', capitalCityKey: 1 },
@@ -160,26 +174,14 @@ function shape(template: WorldInit, spec: WorldSpec): WorldInit {
     return { ...city, name, level, x, y, nationId, connections: links };
   });
   state.diplomacies = [];
-  // 생성 검사는 도시 행과 운영 지도 앵커(이름, 위치, 등급, 연결)가 같아야 받는다. 지도 쪽도 같은 사양으로 바꾼다.
-  const map = state.operationalMap;
-  if (map) {
-    map.sites = map.sites.map((site) => {
-      const city = site.kind === 'CITY' ? spec.cities.find((entry) => entry.key === site.anchorKey) : undefined;
-      return city ? { ...site, name: city.name, level: city.level, position: { x: city.x, y: city.y } } : site;
-    });
-    map.routes = spec.cities.flatMap((city) =>
-      city.links
-        .filter((other) => other > city.key)
-        .map((other) => ({
-          id: `route:${city.key}:${other}`,
-          from: `city:${city.key}`,
-          to: `city:${other}`,
-          mode: 'LAND' as const,
-          direction: 'BOTH' as const,
-          enabled: true,
-        })),
-    );
-  }
+  // 이 시험은 운영 지도 없는 단순 지도 월드의 공개 지도를 본다. 월 정산 고정물의 운영 지도와 거점 종류는 뺀다.
+  // 운영 지도가 있으면 공개 응답과 화면이 운영 지도 갈래로 바뀐다(publicMap 운영 지도 갈래는 이 시험의 범위가 아니다).
+  delete state.operationalMap;
+  state.cities = state.cities.map((city) => {
+    const plain = { ...city };
+    delete plain.kind;
+    return plain;
+  });
   return state;
 }
 

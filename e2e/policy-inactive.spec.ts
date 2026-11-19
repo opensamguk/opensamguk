@@ -400,8 +400,10 @@ for (const c of CASES) {
     await page.reload();
     await expect(row(page, 30)).toBeVisible();
     await expect(policySelect(page)).toHaveValue(c.policy);
-    await expect(records(page)).toHaveCount(1);
+    // 최근 기록은 최신순이다. 맨 아래는 고정물의 소유자 부착(general.possess) 기록이다.
+    await expect(records(page)).toHaveCount(2);
     await expectPolicyRecord(page, 0, c);
+    await expect(records(page).nth(1)).toContainText('이 장수를 맡았습니다.');
     await expect(row(page, 1)).not.toHaveAttribute('data-empty', 'true');
     await expect(commandCell(page, 1)).toHaveText('휴식');
     await expect(commandCell(page, 2)).toHaveText('농지 개간');
@@ -444,12 +446,13 @@ for (const c of CASES) {
     await page.reload();
     await expect(row(page, 30)).toBeVisible();
     await expect(policySelect(page)).toHaveValue(c.policy);
-    await expect(records(page)).toHaveCount(3);
+    await expect(records(page)).toHaveCount(4);
     await expect(records(page).nth(0)).toContainText('농지 개간');
     await expect(records(page).nth(0)).not.toContainText('기본 방침');
     await expect(records(page).nth(1)).toContainText('휴식');
     await expect(records(page).nth(1)).not.toContainText('기본 방침');
     await expectPolicyRecord(page, 2, c);
+    await expect(records(page).nth(3)).toContainText('이 장수를 맡았습니다.');
     await expect(row(page, 1)).not.toHaveAttribute('data-empty', 'true');
     await expect(commandCell(page, 1)).toHaveText('상업 투자');
     for (const slot of [2, 30]) {

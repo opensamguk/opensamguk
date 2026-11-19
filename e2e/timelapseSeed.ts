@@ -434,6 +434,15 @@ export async function prepareWorlds(db: PrismaClient): Promise<PreparedWorlds> {
   const { commandInitial } = await import('../packages/rules/test/commandFixture');
   initial.operationalMap = {
     ...commandInitial().operationalMap!,
+    // 화면의 운영 지도는 실제 GIS 바탕 지도의 해시와 경계가 맞을 때만 그린다(apps/web/src/main/operationalGeography.ts의
+    // OPERATIONAL_GIS_SHA256, mapEditor/geodata/natural-earth.json의 bounds). 규칙 고정물의 가짜 해시로는 영토 재생 지도가
+    // "지도 판이 맞지 않습니다"로 그려지지 않는다.
+    basemap: {
+      source: 'natural-earth-5.1.2',
+      projection: 'WGS84 plate carree',
+      sha256: '7aebb196cd19b2edf936cc5d6ef401d5582e0cb5662f5521b9016930d84da11e',
+      bounds: [94, 17, 132.57142857142856, 44],
+    },
     sites: initial.cities.map((city) => {
       city.kind = 'CITY';
       return {

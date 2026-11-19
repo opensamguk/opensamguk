@@ -80,23 +80,15 @@ const recordTab = (page: Page, name: string) => recordTabs(page).getByRole('link
 const button = (page: Page, name: string) => panel(page).getByRole('button', { name, exact: true });
 const position = (text: string | null) => Number(/\((\d+)\/\d+\)/.exec(text ?? '')?.[1] ?? Number.NaN);
 
-// 저장된 색 문자열을 브라우저가 계산한 rgb 값으로 바꾼다. 점 채움의 계산값과 견준다.
-const cssColor = (page: Page, color: string) =>
-  page.evaluate((value) => {
-    const probe = document.createElement('i');
-    probe.style.color = value;
-    document.body.append(probe);
-    const computed = getComputedStyle(probe).color;
-    probe.remove();
-    return computed;
-  }, color);
 const city = (page: Page, cityKey: number) =>
   panel(page).locator(`[data-testid="timelapse-map"] [data-city-key="${cityKey}"]`);
-async function fillOf(page: Page, cityKey: number) {
-  const dot = city(page, cityKey).locator('circle');
-  return dot.evaluate((node) => getComputedStyle(node).fill);
-}
 const legend = (page: Page) => panel(page).getByLabel('이 달의 국가별 도시 수');
+// P는 전술 전투를 위해 운영 지도가 있어 재생 지도도 운영 지도로 그린다(OperationalWorldMap). 도시 이름과 국가는
+// 거점의 읽기 이름(이름, 등급, 지역, 국가 순)에, 국가 색은 이름판 바탕에 있다.
+const siteLabel = (cityName: string, nationName: string) => new RegExp(`^${cityName}, (.+, )?${nationName}(, |$)`);
+async function plateColor(page: Page, cityKey: number) {
+  return (await city(page, cityKey).locator('rect[rx="1"]').getAttribute('fill'))?.toLowerCase();
+}
 
 test('E1 위쪽 메뉴 기록에서 영토 재생 탭으로 가고 새로고침 뒤에도 같은 탭이며 다른 기록 탭 3종은 그대로 열린다', async ({
   page,
@@ -273,8 +265,8 @@ test('E4 실제 출병으로 멸망한 국가 2는 첫 달에 저장된 이름·
   await expect(panel(page).locator(`[data-frame-tick="${p.ticks[0]}"]`)).toBeVisible();
   await expect(dateLine(page)).not.toContainText('국가 기록 없음');
   await expect(city(page, 2)).toHaveAttribute('data-nation-id', '2');
-  await expect(city(page, 2).locator('title')).toHaveText(`도시2, ${pSaved.removed.name}`);
-  expect(await fillOf(page, 2)).toBe(await cssColor(page, pSaved.removed.color));
+  await expect(city(page, 2)).toHaveAttribute('aria-label', siteLabel('도시2', pSaved.removed.name));
+  expect(await plateColor(page, 2)).toBe(pSaved.removed.color.toLowerCase());
   await expect(legend(page).locator('[data-nation-id="2"]')).toContainText(pSaved.removed.name);
 
   for (let frame = 1; frame < p.ticks.length; frame++) await button(page, '다음').click();
@@ -308,12 +300,11 @@ test('E5 국가 1의 지금 이름·색을 바꾸면 응답의 currentNations만
     );
 
     await page.reload();
-    const savedColor = await cssColor(page, pSaved.first.color);
     for (const tick of p.ticks) {
       await expect(panel(page).locator(`[data-frame-tick="${tick}"]`)).toBeVisible();
       await expect(city(page, 1)).toHaveAttribute('data-nation-id', '1');
-      await expect(city(page, 1).locator('title')).toHaveText(`도시1, ${pSaved.first.name}`);
-      expect(await fillOf(page, 1)).toBe(savedColor);
+      await expect(city(page, 1)).toHaveAttribute('aria-label', siteLabel('도시1', pSaved.first.name));
+      expect(await plateColor(page, 1)).toBe(pSaved.first.color.toLowerCase());
       await expect(legend(page).locator('[data-nation-id="1"]')).toContainText(pSaved.first.name);
       await expect(panel(page)).not.toContainText(now.name);
       if (tick !== p.ticks.at(-1)) await button(page, '다음').click();

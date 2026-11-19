@@ -41,5 +41,7 @@ export default defineConfig({
     url: 'http://127.0.0.1:5173',
     reuseExistingServer: !isCI,
     timeout: 60_000,
+    // CI에서는 감독과 엔진 자식의 출력을 기록에 남긴다. 엔진이 반복 종료되면 heartbeat에는 일반 문구만 남아 원인을 볼 수 없다.
+    stdout: isCI ? 'pipe' : 'ignore',
   },
 });
