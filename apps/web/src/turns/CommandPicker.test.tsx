@@ -191,6 +191,22 @@ it('명령 찾기로 이름을 걸러 라디오로 고르고, 인자 없는 명�
   expect(input.onPut).toHaveBeenLastCalledWith({ commandKey: 'rest', args: {}, explicit: true });
 });
 
+it('명령 찾기는 직위 띠가 감춘 명령도 찾는다(재야의 지금 쓸 수 없는 내정 명령)', () => {
+  const input = props({
+    role: 'free',
+    commands: commands.map((command) => (command.key === 'farm' ? { ...command, available: false } : command)),
+  });
+  render(<CommandPicker {...input} />);
+  // 재야 띠에는 내정 묶음이 없고, 지금 쓸 수 없는 명령은 띠에 남지 않는다.
+  expect(screen.queryByRole('button', { name: '농지 개간' })).toBeNull();
+  fireEvent.change(screen.getByLabelText('명령 찾기'), { target: { value: '농지' } });
+  fireEvent.click(
+    within(screen.getByRole('radiogroup', { name: '찾은 명령' })).getByRole('radio', { name: '농지 개간' }),
+  );
+  fireEvent.click(screen.getByRole('button', { name: '1번 칸에 넣기' }));
+  expect(input.onPut).toHaveBeenCalledWith({ commandKey: 'farm', args: {}, explicit: true });
+});
+
 it('T4-92 AC-P2-29 서버의 새 분류도 분류 패와 세부 명령에 보이며 그 분류의 명령만 띄운다', () => {
   render(<CommandPicker {...props()} />);
   fireEvent.click(screen.getByRole('button', { name: 'new-category' }));

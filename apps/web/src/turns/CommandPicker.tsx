@@ -218,10 +218,12 @@ export function CommandPicker({
   const found = useMemo(() => {
     const q = query.trim();
     if (q === '') return [];
-    // 화면 띠 순서대로 놓는다. 검색 Enter는 이 순서의 첫 명령을 고른다.
-    const order = band.flatMap((group) => group.items);
+    // 화면 띠 순서대로 놓고, 띠에 없는 명령(직위 띠 밖의 명령)은 그 뒤에 서버 순서로 붙인다. 찾기는 받은 명령 전체에서 한다.
+    // 검색 Enter는 이 순서의 첫 명령을 고른다.
+    const inBand = band.flatMap((group) => group.items);
+    const order = [...inBand, ...commands.filter((command) => !inBand.includes(command))];
     return order.filter((item, index) => item.name.includes(q) && order.indexOf(item) === index);
-  }, [band, query]);
+  }, [band, commands, query]);
   // 명령 띠 바탕: 신분별 담장 조각(왼끝, 이음, 가운데 문, 바닥)과 직위 인수 표지 (Codex walls2/, badges4/).
   const bandArt = useMemo(() => {
     const url = (source: string) => (hasPublicImage(source) ? `url(${publicImageUrl(source)})` : null);
