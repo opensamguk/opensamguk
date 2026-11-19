@@ -138,7 +138,8 @@ type CityRun = {
   reject(error: unknown): void;
   closeContexts(): Promise<void>;
 };
-const CASE_BUDGET_MS = 600_000;
+// 정식 491명 한 달 진행이 CI에서 52~86초, 가끔 120초를 넘는다(PR #674). 한 사례가 네 달까지 진행한다.
+const CASE_BUDGET_MS = 900_000;
 const LIFECYCLE_BUDGET_MS = 180_000;
 // Three separate AC cases have a NEW aggregate scheduling budget; old single-case performance did not pass.
 const SUITE_BUDGET_MS = 3 * CASE_BUDGET_MS + 2 * LIFECYCLE_BUDGET_MS;
@@ -510,7 +511,7 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
     if (world.hold.lost) throw world.hold.lost;
     const started = performance.now();
     progress('advance', 'start', started, tick);
-    const signal = AbortSignal.any([cityRun.controller.signal, AbortSignal.timeout(120_000)]);
+    const signal = AbortSignal.any([cityRun.controller.signal, AbortSignal.timeout(240_000)]);
     const executions = await track(world.loop.advanceTo(tick, signal));
     signal.throwIfAborted();
     if (world.hold.lost) throw world.hold.lost;
