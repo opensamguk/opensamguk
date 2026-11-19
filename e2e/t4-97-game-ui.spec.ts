@@ -172,12 +172,14 @@ test('T4-97 메인 HUD 계정 메뉴·예턴 상태·도시에서 명령 고르�
       await expect(lateShortcut).toHaveAttribute('aria-selected', 'true');
       await late.getByRole('button', { name: '선택 해제', exact: true }).click();
       await late.locator('tr[data-slot="29"]').click();
+      await late.getByLabel('명령 찾기').fill('농지 개간');
       await late.getByRole('radio', { name: '농지 개간', exact: true }).check();
       await late.getByRole('button', { name: '29번 칸에 넣기', exact: true }).click();
       await expect(lateShortcut).toHaveAttribute('data-status', 'unsaved');
       await expect(lateShortcut.locator('[aria-hidden="true"]')).toHaveText('1');
       await editor.getByRole('button', { name: '선택 해제', exact: true }).click();
       await editor.locator('tr[data-slot="30"]').click();
+      await editor.getByLabel('명령 찾기').fill('농지 개간');
       await editor.getByRole('radio', { name: '농지 개간', exact: true }).check();
       await editor.getByRole('button', { name: '30번 칸에 넣기', exact: true }).click();
       await editor.getByRole('button', { name: '저장', exact: true }).click();

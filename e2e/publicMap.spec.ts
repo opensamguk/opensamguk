@@ -372,9 +372,10 @@ test('로그인 뒤 /lobby의 월드 목록 위에 같은 탭과 지도가 있�
   const card = page.getByRole('article', { name: ga.name, exact: true });
   await expect(card).toBeVisible();
   const mapBox = await area(page).boundingBox();
-  // INT-29 로비의 월드 목록 제목은 '서버 선택'이다(apps/web/src/lobby/LobbyPage.tsx).
+  // INT-29 로비는 월드 목록('서버 선택')이 본문이고 공개 지도는 옆 칸(aside)에 있다(apps/web/src/lobby/LobbyPage.tsx).
+  // 넓은 화면에서는 지도가 목록 오른쪽에 놓인다.
   const listBox = await page.getByRole('heading', { level: 2, name: '서버 선택', exact: true }).boundingBox();
-  expect(mapBox && listBox && mapBox.y + mapBox.height <= listBox.y).toBe(true);
+  expect(mapBox && listBox && mapBox.x > listBox.x + listBox.width / 2).toBe(true);
 
   // 지도 탭을 바꿔도 월드 카드와 주소는 그대로다.
   const cards = await page.getByRole('article').allTextContents();
