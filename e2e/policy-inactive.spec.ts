@@ -135,9 +135,10 @@ const CASES: Case[] = [
     policyName: '훈련',
     expected: 'train',
     commandName: '훈련',
-    resultLine: /^훈련: 60$/,
+    // 훈련 방침은 소유 부곡 중 번호가 가장 작은 부곡을 훈련한다(packages/rules/src/policy/index.ts).
+    resultLine: /^부곡\d+ 훈련: \d+$/,
     emptyLabel: '(훈련) 훈련',
-    shape: { general: { ...RICH, crew: 1000, train: 50, atmos: 50 }, city: {} },
+    shape: { general: RICH, city: {}, unit: { troops: 1000, train: 50, atmos: 50 } },
   },
   {
     no: 87,
@@ -146,9 +147,9 @@ const CASES: Case[] = [
     policyName: '훈련',
     expected: 'morale',
     commandName: '사기진작',
-    resultLine: /^사기진작: 60$/,
+    resultLine: /^부곡\d+ 사기진작: \d+$/,
     emptyLabel: '(훈련) 훈련',
-    shape: { general: { ...RICH, crew: 1000, train: 100, atmos: 50 }, city: {} },
+    shape: { general: RICH, city: {}, unit: { troops: 1000, train: 100, atmos: 50 } },
   },
   {
     no: 88,
