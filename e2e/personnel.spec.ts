@@ -332,7 +332,9 @@ test('국가 칸 저장: 고친 뒤 해임·재임명되면 저장이 거부되�
     const reply = (await response.json()) as Reply | Reply[];
     expect((Array.isArray(reply) ? reply[held!.index] : reply)?.error?.data?.code).toBe('PRECONDITION_FAILED');
     await expect(page.getByTestId('office-changed')).toBeVisible();
-    await expect(page.getByTestId('draft-state')).toHaveText('저장된 목록');
+    // 거부 뒤 국가 예턴을 다시 받아 편집기를 새로 그린다. 해임과 재임명 사이에 편집기의 10초 재조회가 걸리면 잠깐
+    // 권한 오류 화면이 되고, 무효화한 재조회가 돌아와야 편집기가 돌아온다. CI에서 응답이 4초를 넘겨 15초를 기다린다.
+    await expect(page.getByTestId('draft-state')).toHaveText('저장된 목록', { timeout: 15_000 });
     await page.reload();
     await expect(page.getByTestId('draft-state')).toHaveText('저장된 목록');
     await expect(editor.locator('tr[data-slot]')).toHaveCount(12);
