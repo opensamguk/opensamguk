@@ -181,11 +181,12 @@ test('E2 장수 없는 새 계정으로 A를 열면 첫 페이지와 cursor 3000
   const where = { worldId_id: { worldId: a.id, id: general.id } };
   // 사람 장수에는 활동 tick과 물리 거주 앵커가 있어야 엔진이 월드를 읽는다(apps/engine/src/ruleFeatures.ts, residenceState.ts).
   // 붙이는 동안 지금 시각을 넣고, 끝나면 원래 값(NPC는 앵커 없음)으로 되돌린다.
-  const { clockTick } = await withE2eDb((db) =>
-    db.world.findUniqueOrThrow({ where: { id: a.id }, select: { clockTick: true } }),
+  // 거주 앵커는 앞으로 처리할 tick보다 늦으면 안 되므로 마지막 월 정산 tick을 쓴다(packages/rules/src/personnel/npcMonth.ts).
+  const { clockTick, monthlyTick } = await withE2eDb((db) =>
+    db.world.findUniqueOrThrow({ where: { id: a.id }, select: { clockTick: true, monthlyTick: true } }),
   );
   await withE2eDb((db) =>
-    db.general.update({ where, data: { userId: user.id, lastActiveTick: clockTick, residenceTick: clockTick } }),
+    db.general.update({ where, data: { userId: user.id, lastActiveTick: clockTick, residenceTick: monthlyTick } }),
   );
   try {
     // useWorldEvents는 서버가 닫은 연결을 1·2·5·10·30초 간격으로 다시 연다. 다음 시도가 맡긴 장수를 보고 이어진다.
