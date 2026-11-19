@@ -1,5 +1,6 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { createAccount, withE2eDb } from './account';
+import { putPicked } from './commandPicker';
 import {
   createGeneralByApi,
   e2eFeatureWorld,
@@ -319,7 +320,7 @@ test.describe('예턴 편집의 교역 대상', () => {
     await editor.locator('tr[data-slot="3"]').click();
     await editor.getByLabel('명령 찾기').fill('훈련');
     await editor.getByRole('radio', { name: '훈련' }).check();
-    await editor.getByRole('button', { name: /3번 칸에 넣기/ }).click();
+    await putPicked(a.page, editor, '3번 칸에 넣기');
     await editor.locator('tr[data-slot="5"]').click();
     await editor.getByLabel('명령 찾기').fill('교역');
     await editor.getByRole('radio', { name: '교역' }).check();

@@ -5,6 +5,7 @@ import { adminRole } from './adminSetup';
 import { TEST_PASSWORD } from './account';
 import { holdLease, type LeaseHold } from './game';
 import { cleanupHeldWorld } from './heldWorldCleanup';
+import { openLobbyNotice } from './lobbyNotices';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveFixtureWorld, readWorldState } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
@@ -223,12 +224,14 @@ test('T3-06 AC-M3-04 실제 정식 두 월드·로비 공지 발행 수정 숨�
       expect(await row.locator('img,script').count()).toBe(0);
       expect(await page.evaluate(() => 'noticeInjected' in window)).toBe(false);
       await actor.page.goto('/lobby');
+      await openLobbyNotice(actor.page, title);
       await expect(actor.page.getByText(body, { exact: true })).toBeVisible();
       await row.getByRole('button', { name: '수정 또는 숨김', exact: true }).click();
       await fillNotice(page, title + ' 수정', body + ' 수정');
       await page.getByRole('button', { name: '수정 저장', exact: true }).click();
       await expect(page.getByText('공지를 수정했습니다.', { exact: true })).toBeVisible();
       await actor.page.reload();
+      await openLobbyNotice(actor.page, title + ' 수정');
       await expect(actor.page.getByText(body + ' 수정', { exact: true })).toBeVisible();
       await page
         .getByRole('listitem')

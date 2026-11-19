@@ -288,7 +288,7 @@ export function CityStats({ rows }: { rows: readonly CityStatRow[] }) {
               <td className={statStyles.barCell}>
                 {row.max !== undefined && row.value !== null ? (
                   <span
-                    className={statStyles.bar}
+                    className={`${statStyles.bar} kit-gauge`}
                     role="meter"
                     aria-label={`${row.label} ${row.value} / ${row.max}`}
                     aria-valuenow={row.value}

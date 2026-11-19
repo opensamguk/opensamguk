@@ -209,7 +209,8 @@ test.describe('국가 작전판', () => {
 
     await chief.page.goto(`/w/${s.world}`);
     await chief.page.getByRole('link', { name: '감찰' }).click();
-    await expect(chief.page.getByTestId('inspection-table')).toBeVisible();
+    // 감찰 표는 소속 장수마다 예턴 30칸을 읽어 CI에서 5초를 넘긴 적이 있다(PR #674).
+    await expect(chief.page.getByTestId('inspection-table')).toBeVisible({ timeout: 20_000 });
   });
 
   // U62-4a대로 출병 tick이 목표 연월 첫 tick보다 작아야 제때이고 같으면 늦음이다. 기준을 0/0/0으로 두어 준비 부족이 아닌 시간 경계만 본다.

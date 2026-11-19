@@ -4,7 +4,7 @@ import type { Page, TestInfo } from '@playwright/test';
 import { test, expect, type LegalStack } from './legalFixture';
 import { sanctionAccount } from './adminSanctionSetup';
 import { holdLease, type LeaseHold } from './game';
-import { releaseLease } from '../apps/engine/src/lease';
+import { releaseLease, renewLease } from '../apps/engine/src/lease';
 import { initializeSan10Resources } from '../tools/san10-resources';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveFixtureWorld, readWorldState } from './worldFixture';
@@ -217,7 +217,8 @@ async function verifyMode(stack: LegalStack, page: Page, info: TestInfo, run: Ru
       )
       .toBe(1),
   );
-  const loop = new TurnLoop(hold.db, hold.lease);
+  // 턴 트랜잭션이 실행권 행을 잠그므로 외부 타이머 대신 각 커밋 안에서도 갱신한다.
+  const loop = new TurnLoop(hold.db, hold.lease, { beforeCommit: (tx) => renewLease(tx, hold.lease) });
   await step(run, () => loop.advanceTo(0, signal));
   expect((await step(run, () => creating)).status).toBe('created');
   const human = await step(run, () =>

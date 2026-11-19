@@ -1,5 +1,6 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { newEmail, createAccount, TEST_PASSWORD } from './account';
+import { argsScreen, toFirstStep, toLastStep, toStepWith } from './commandPicker';
 import {
   ApiError,
   createGeneralByApi,
@@ -46,30 +47,6 @@ async function openEditor(page: Page, targetWorld?: string) {
   await expect(page.getByRole('heading', { level: 1, name: '예턴 편집' })).toBeVisible();
   await expect(row(page, 30)).toBeVisible();
   return { email, world };
-}
-
-// 단계가 여럿인 인자 화면(dialog)의 맨 끝, 맨 앞 단계로 간다. 넣기 단추는 마지막 단계에만 보인다(CommandArgsScreen).
-const argsScreen = (page: Page) => page.getByTestId('command-args-screen');
-async function toLastStep(page: Page) {
-  for (let guard = 0; guard < 5; guard++) {
-    const next = argsScreen(page).getByRole('button', { name: /^다음: / });
-    if ((await next.count()) === 0) return;
-    await next.click();
-  }
-}
-// 그 칸이 보이는 단계까지 다음 단계로 간다.
-async function toStepWith(page: Page, target: Locator) {
-  for (let guard = 0; guard < 5 && !(await target.isVisible()); guard++)
-    await argsScreen(page)
-      .getByRole('button', { name: /^다음: / })
-      .click();
-}
-async function toFirstStep(page: Page) {
-  for (let guard = 0; guard < 5; guard++) {
-    const back = argsScreen(page).getByRole('button', { name: '이전', exact: true });
-    if ((await back.count()) === 0 || !(await back.isEnabled())) return;
-    await back.click();
-  }
 }
 
 async function pick(page: Page, command: string) {

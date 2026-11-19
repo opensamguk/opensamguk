@@ -36,11 +36,35 @@ export async function findCommand(picker: Locator, name: string): Promise<Locato
 // 인자 화면에서 넣는다. 단계가 여럿인 인자 화면은 마지막 단계에서만 넣기 단추를 보이므로(CommandArgsScreen의 data-final)
 // '다음:' 단추로 끝 단계까지 간 뒤 누른다. 인자 화면은 dialog라 페이지에서 찾는다.
 export async function putFromArgsScreen(page: Page, label: string) {
-  const screen = page.getByTestId('command-args-screen');
+  await toLastStep(page);
+  await argsScreen(page).getByRole('button', { name: label, exact: true }).click();
+}
+
+// 단계가 여럿인 인자 화면(dialog)의 맨 끝, 맨 앞, 또는 그 칸이 보이는 단계로 간다. 넣기 단추는 마지막 단계에만 보인다.
+export const argsScreen = (page: Page) => page.getByTestId('command-args-screen');
+export async function toLastStep(page: Page) {
   for (let guard = 0; guard < 5; guard++) {
-    const next = screen.getByRole('button', { name: /^다음: / });
-    if ((await next.count()) === 0) break;
+    const next = argsScreen(page).getByRole('button', { name: /^다음: / });
+    if ((await next.count()) === 0) return;
     await next.click();
   }
-  await screen.getByRole('button', { name: label, exact: true }).click();
+}
+export async function toStepWith(page: Page, target: Locator) {
+  for (let guard = 0; guard < 5 && !(await target.isVisible()); guard++)
+    await argsScreen(page)
+      .getByRole('button', { name: /^다음: / })
+      .click();
+}
+export async function toFirstStep(page: Page) {
+  for (let guard = 0; guard < 5; guard++) {
+    const back = argsScreen(page).getByRole('button', { name: '이전', exact: true });
+    if ((await back.count()) === 0 || !(await back.isEnabled())) return;
+    await back.click();
+  }
+}
+
+// 고른 명령을 칸에 넣는다. 인자가 있어 인자 화면이 열렸으면 그 끝 단계의 넣기 단추를, 아니면 편집기의 넣기 단추를 누른다.
+export async function putPicked(page: Page, scope: Locator, label: string) {
+  if (await argsScreen(page).isVisible()) await putFromArgsScreen(page, label);
+  else await scope.getByRole('button', { name: label, exact: true }).click();
 }

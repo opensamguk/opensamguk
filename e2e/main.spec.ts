@@ -393,8 +393,9 @@ test.describe('장수가 있는 계정', () => {
       .map((d) => d.name);
     expect(expectedNames).toHaveLength(owned.length);
     await expect(cityTable.locator('tbody tr td:first-child')).toHaveText(expectedNames);
-    await nation.getByRole('button', { name: /^병력/ }).click();
-    await expect(nation.getByRole('columnheader', { name: /^병력/ })).toHaveAttribute('aria-sort', 'descending');
+    // 병력 열은 장수가 지휘하는 부곡 병력의 합이다(늘 켠 규칙, 결정 19).
+    await nation.getByRole('button', { name: /^지휘 병력/ }).click();
+    await expect(nation.getByRole('columnheader', { name: /^지휘 병력/ })).toHaveAttribute('aria-sort', 'descending');
     await shot(page, '03-main-nation-tables.png');
   });
 
@@ -505,8 +506,8 @@ test.describe('장수가 있는 계정', () => {
         await expect(nav.locator('details')).not.toHaveAttribute('open');
         await summary.click();
       }
-      // 구형 월드에는 없는 휘하 앵커를 표시하지 않는다.
-      await expect(nav.getByRole('link', { name: '휘하·부곡', exact: true })).toHaveCount(0);
+      // 늘 켠 규칙에서 모든 월드가 휘하 원장(campaign)을 가지므로 휘하·부곡 앵커가 늘 있다(결정 19).
+      await expect(nav.getByRole('link', { name: '휘하·부곡', exact: true })).toHaveCount(1);
       const targets = await nav.locator('a:visible,summary:visible,button:visible').evaluateAll((nodes) =>
         nodes.map((node) => {
           const { width, height } = node.getBoundingClientRect();
