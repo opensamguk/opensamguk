@@ -1283,7 +1283,8 @@ it('AC-M3-04 Context 뒤 만료·이메일·동의·정책 변경도 현재 생�
     ).rejects.toMatchObject({ code: expected });
     expect(await footprint()).toBe(before);
   }
-});
+  // 네 경우마다 DB 전체 지문을 잰다. 늘 켠 규칙의 큰 World 행 때문에 바쁜 CI에서 30초를 넘긴 적이 있다(PR #674에서 세 번).
+}, 90_000);
 for (const mode of ['role', 'withdrawn', 'sanction', 'logout'] as const)
   it('AC-M3-04 접수 뒤 ' + mode + '와 엔진의 현재 행위자 경계를 구분한다', async (signal) => {
     const owner = await user(),
