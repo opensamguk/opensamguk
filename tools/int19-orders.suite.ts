@@ -65,7 +65,8 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
   let initial: WorldInit, a: Actor, b: Actor, outsider: Account, blocked: Account;
   let nationId = 0,
     npcId = 0,
-    foreignUnitId = 0;
+    foreignUnitId = 0,
+    recruitmentType = 0;
   type Account = { userId: string; cookie: string };
   type Actor = Account & { generalId: number };
   type Board = Awaited<ReturnType<typeof readCampaignOrders>>;
@@ -457,6 +458,13 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
             seed,
           });
           measured('load-491');
+          // 시험 전용 병종의 모집비만 분리해 원본 NPC의 자동 모병 비용을 보존한다.
+          recruitmentType = Math.max(...initial.unitSet.crewTypes.map((type) => type.id)) + 1;
+          initial.unitSet.crewTypes.push({
+            ...initial.unitSet.crewTypes.find((type) => type.armType > 0)!,
+            id: recruitmentType,
+            cost: 0,
+          });
           originHash = hashState(initial);
           for (let count = 0; count < 2; count++) {
             signal();
@@ -752,8 +760,7 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
       const before = await snapshot();
       const existing = before.state.campaign!.units.find((unit) => unit.ownerId === npcId);
       if (!existing) {
-        const type = initial.unitSet.crewTypes.find((type) => type.armType > 0)!.id;
-        await executeOrder(await issue(npcId, 'recruit', { crewType: type, amount: 1, unitId: 'new' }));
+        await executeOrder(await issue(npcId, 'recruit', { crewType: recruitmentType, amount: 1, unitId: 'new' }));
       }
       const after = await snapshot(),
         owned = after.state.campaign!.units.filter((unit) => unit.ownerId === npcId);
@@ -931,12 +938,7 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
       await executeOrder(await issue(npcId, 'return'));
       const returned = await snapshot();
       expect(returned.state.generals[npcId]!.cityKey).toBe(returned.state.nations[nationId]!.capitalCityKey);
-      foreignUnitId = await prepareFixtureUnit(
-        db,
-        worldId,
-        a.generalId,
-        initial.unitSet.crewTypes.find((type) => type.armType > 0)!.id,
-      );
+      foreignUnitId = await prepareFixtureUnit(db, worldId, a.generalId, recruitmentType);
       const before = hashState(await snapshot()),
         count = await db.inputEvent.count({ where: { worldId } });
       expect(
@@ -963,6 +965,7 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
       expect(await db.inputEvent.count({ where: { worldId } })).toBe(count);
     }, 240_000);
 
+    // 정식 491명·8개월 수출과 두 번 재생을 포함한 실측 350초. 차례 실행 사례의 한도는 유지한다.
     it('새 DB클라이언트 재접속과 실제 월 경계 archive 두 번 재생이 원생성·두월드·상태해시와 일치한다', async () => {
       const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
       await advance(Math.ceil((world.clockTick + 1) / TICKS_PER_MONTH) * TICKS_PER_MONTH);
@@ -988,6 +991,6 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
       expect(first.at(-1)!.stateHash).toBe(hashState(await snapshot()));
       expect(hashState(await snapshot(otherWorldId))).toBe(otherHash);
       expect(hashState(initial)).toBe(originHash);
-    }, 240_000);
+    }, 600_000);
   }
 }

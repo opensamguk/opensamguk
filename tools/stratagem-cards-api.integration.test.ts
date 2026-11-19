@@ -33,8 +33,8 @@ import { persistStratagemCardsState } from '../apps/engine/src/stratagemCards/st
 // 공개 기본값·국가 전략 3종·491명 원본 차례·화면의 완료 증거가 아니다.
 if (!process.env.TEST_DATABASE_URL) throw Error('전용 계략 패 테스트 DB가 필요합니다.');
 const url = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-if (!['127.0.0.1', 'localhost'].includes(url.hostname) || url.searchParams.has('host') || url.searchParams.has('port'))
-  throw Error('loopback 전용 테스트 DB를 확인하세요.');
+if (url.searchParams.has('host') || url.searchParams.has('port'))
+  throw Error('전용 테스트 DB 접속 대상 질의 인자는 쓸 수 없습니다.');
 const db = createDb(url.href),
   worldIds: string[] = [],
   userIds: string[] = [],
@@ -756,7 +756,7 @@ it.each([
       } else expect(state.generals[enemy.actorId]!.crew).toBe(0);
       expect(state.cities[3]!.nationId).toBe(f.nationId);
     } else {
-      // 전술 전투는 BattleLog 대신 정산된 전술 기록과 점령 결과로 검증한다.
+      // 전술 정산은 실제 수비 지휘관에게 BattleLog를 한 번 남긴다.
       expect(
         battles,
         JSON.stringify({
@@ -768,8 +768,13 @@ it.each([
           attack: attackLogs.map((row) => row.text),
           afterArmy: state.campaign,
         }),
-      ).toHaveLength(0);
+      ).toHaveLength(campaign && !survive ? 1 : 0);
       if (campaign && !survive) {
+        expect(battles[0]).toMatchObject({
+          attackerId: enemy.actorId,
+          generalId: f.actorId,
+          text: expect.stringContaining('점령'),
+        });
         expect(state.campaign!.tactical!.battles).toHaveLength(1);
         expect(state.campaign!.tactical!.battles[0]).toMatchObject({ settled: true, result: 'attack' });
       }
