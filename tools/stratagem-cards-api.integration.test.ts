@@ -107,6 +107,8 @@ async function advance(id: string, tick: number, fail = false) {
 const snapshot = (id: string) => db.$transaction((tx) => loadReplayState(tx, id));
 async function replay(id: string) {
   const current = await db.world.findUniqueOrThrow({ where: { id } });
+  // 밀린 월 정산 뒤 처리되는 대기 입력을 먼저 비워 다음 월 기록에 포함한다.
+  await advance(id, current.clockTick);
   await advance(id, current.monthlyTick + 10_000);
   const archive = await exportReplay(db, id);
   const hashes = replayArchive(archive, archive.months.length).map((row) => row.stateHash);
@@ -521,6 +523,21 @@ it('AC-P2-23 설정을 생략한 월드도 카드 원장·조회·명령을 제�
   });
   expect((await rpc('stratagemCards.setTrap', request(f), f.player)).status).not.toBe(412);
   await replay(f.id);
+});
+
+it('AC-P2-23 재생 검증은 대기 중인 함정 설치를 마지막 월 기록에 포함한다', async () => {
+  const f = await fixture(),
+    input = request(f);
+  expect((await rpc('stratagemCards.setTrap', input, f.player)).data).toMatchObject({ status: 'pending' });
+  await replay(f.id);
+  const archive = await exportReplay(db, f.id);
+  const event = await db.inputEvent.findFirstOrThrow({
+    where: { worldId: f.id, userId: f.player.id, idempotencyKey: `stratagem-cards:${input.requestId}` },
+  });
+  expect(event.status).toBe('APPLIED');
+  expect(event.sequence).toBeLessThan(archive.months.at(-1)!.sequence);
+  expect(archive.inputs.some((row) => row.sequence === event.sequence)).toBe(true);
+  expect((await snapshot(f.id)).state.stratagemCards!.nations[f.nationId]!.traps).toHaveLength(1);
 });
 
 it('AC-P2-23 저장 시드 변조는 조회·내보내기에서 거부하고 원 상태로 복구한다', async () => {
