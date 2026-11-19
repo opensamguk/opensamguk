@@ -130,11 +130,12 @@ test.describe('국가 작전판', () => {
       Array.from({ length: 30 }, (_, i) => (i === 20 ? { commandKey: 'farm' } : null)),
     );
 
-    // 메인에서 저장하지 않은 편집 하나를 만든다.
+    // 메인에서 저장하지 않은 편집 하나를 만든다. 훈련은 부곡을 고르는 인자가 있어(결정 19) 부곡 없는 장수로는 넣지 못하므로
+    // 인자 없는 상업 투자를 넣는다. 이 시험이 보는 것은 명령 종류가 아니라 초안 보존과 덮기 확인이다.
     await chief.page.goto(`/w/${s.world}`);
     await editor(chief.page).locator('tr[data-slot="25"]').click();
-    await editor(chief.page).getByLabel('명령 찾기').fill('훈련');
-    await editor(chief.page).getByRole('radio', { name: '훈련' }).check();
+    await editor(chief.page).getByLabel('명령 찾기').fill('상업 투자');
+    await editor(chief.page).getByRole('radio', { name: '상업 투자' }).check();
     await editor(chief.page)
       .getByRole('button', { name: /25번 칸에 넣기/ })
       .click();
@@ -158,7 +159,7 @@ test.describe('국가 작전판', () => {
 
     const saved = await turns(chief.page, s.world);
     expect(saved.slots.some((slot) => slot.commandKey === 'attack')).toBe(true);
-    expect(saved.slots[24]!.commandKey).toBe('train');
+    expect(saved.slots[24]!.commandKey).toBe('commerce');
   });
 
   test('미리보기 중 다른 탭에서 예턴을 바꾸면 저장 때 충돌 안내와 다시 받은 비교를 보이고 고치던 초안은 남는다', async ({

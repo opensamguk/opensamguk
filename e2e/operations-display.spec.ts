@@ -112,10 +112,61 @@ async function member(browser: Browser, world: string, nationId: number, officer
   return { page, generalId: general.id, name: general.name };
 }
 
-// 시험 fixture 전용: 이 시험이 만든 장수 행 하나의 다음 턴 tick과 병력·훈련·사기만 바꾼다.
-// 다른 열, 다른 장수, 월드 시계, 예상·판정·로그 값은 쓰지 않는다.
+// 시험 fixture 전용: 이 시험이 만든 장수 하나의 다음 턴 tick과, 그 장수가 거느리고 지휘하는 부곡 하나의 병력, 훈련, 사기만 정한다.
+// 늘 켠 규칙에서 병력 정본은 부곡(campaign.units)이고 장수 개인 병력은 0이어야 한다(결정 19). 다른 장수의 부곡, 월드 시계,
+// 예상, 판정, 로그 값은 쓰지 않는다.
 async function shape(world: string, generalId: number, data: Readiness & { nextTurnTick: number }) {
-  await withE2eDb((db) => db.general.update({ where: { worldId_id: { worldId: world, id: generalId } }, data }));
+  await withE2eDb((db) =>
+    db.$transaction(async (tx) => {
+      await tx.general.update({
+        where: { worldId_id: { worldId: world, id: generalId } },
+        data: { nextTurnTick: data.nextTurnTick, crew: 0 },
+      });
+      const row = await tx.world.findUniqueOrThrow({ where: { id: world }, select: { campaignState: true } });
+      const campaign = row.campaignState as unknown as CampaignFixture;
+      const unit = {
+        id: campaign.nextUnitId,
+        ownerId: generalId,
+        commanderId: generalId,
+        troops: data.crew,
+        crewType: 1100,
+        train: data.train,
+        atmos: data.atmos,
+      };
+      const next = {
+        ...campaign,
+        revision: campaign.revision + 1,
+        nextUnitId: campaign.nextUnitId + 1,
+        units: [...campaign.units.filter((u) => u.ownerId !== generalId), unit],
+      };
+      await tx.world.update({ where: { id: world }, data: { campaignState: next as object } });
+    }),
+  );
+}
+
+interface CampaignUnitFixture {
+  id: number;
+  ownerId: number;
+  commanderId: number;
+  troops: number;
+  crewType: number;
+  train: number;
+  atmos: number;
+}
+interface CampaignFixture {
+  revision: number;
+  nextUnitId: number;
+  units: CampaignUnitFixture[];
+  [key: string]: unknown;
+}
+
+// 서버 작전 조회와 같은 집계: 그 장수가 거느린 부곡의 병력 합과 병력 가중 훈련, 사기(operation.ts operationReadiness).
+function unitReadiness(units: CampaignUnitFixture[], generalId: number): Readiness {
+  const own = units.filter((unit) => unit.ownerId === generalId);
+  const crew = own.reduce((sum, unit) => sum + unit.troops, 0);
+  const weighted = (key: 'train' | 'atmos') =>
+    crew ? Math.floor(own.reduce((sum, unit) => sum + unit.troops * unit[key], 0) / crew) : 0;
+  return { crew, train: weighted('train'), atmos: weighted('atmos') };
 }
 
 async function setup(page: Page) {
@@ -253,18 +304,18 @@ async function nationSnapshot(world: string, nationId: number): Promise<Snapshot
         officerLevel: true,
         userId: true,
         cityKey: true,
-        crew: true,
-        train: true,
-        atmos: true,
       },
       orderBy: { id: 'asc' },
     });
+    const stored = await db.world.findUniqueOrThrow({ where: { id: world }, select: { campaignState: true } });
+    const units = (stored.campaignState as unknown as CampaignFixture).units;
     const rows = await db.generalTurn.findMany({
       where: { worldId: world, generalId: { in: generals.map((g) => g.id) }, slot: { lt: 5 } },
       select: { generalId: true, slot: true, commandKey: true, args: true, explicit: true },
     });
     return generals.map((general) => ({
       ...general,
+      ...unitReadiness(units, general.id),
       turns: Array.from({ length: 5 }, (_, slot) => {
         const row = rows.find((r) => r.generalId === general.id && r.slot === slot);
         return row ? { commandKey: row.commandKey, args: row.args, explicit: row.explicit } : EMPTY_TURN;
