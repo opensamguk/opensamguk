@@ -115,8 +115,6 @@ export function MainPage() {
     ...trpc.lobby.worlds.queryOptions(summary.data?.status === 'ENDED' ? { includeEnded: true } : undefined),
     enabled: summary.data !== undefined,
     retry: retryUnlessClientError,
-    // 끝난 판의 로비 줄은 더 바뀌지 않는다. 칸이 다시 그려져도 다시 묻지 않는다(종료 뒤 조용함, season e2e).
-    ...(summary.data?.status === 'ENDED' ? { staleTime: Infinity } : {}),
   });
   const lobbyWorld = lobbyWorlds.data?.find((world) => world.id === worldId);
   const season = summary.data ? seasonOf(summary.data.gameDate.month) : null;

@@ -8,7 +8,7 @@ export { prepareInitialWorld, savePreparedInitialWorld, readWorldState } from '.
 // 로비는 월드의 시나리오 키를 게시 자원에서 읽어 제목을 붙이고, 하나라도 없으면 조회 전체가 500이다(apps/server/src/routers/lobby.ts).
 // 합성 고정물의 시험 전용 키(예: engine-monthly-fixture)도 같은 DB의 로비를 깨지 않게, 없으면 제목만 담은 시나리오 자원을 게시한다.
 // tools/int24-world-settings.integration.test.ts가 tools-int24-fixture를 게시하는 것과 같은 방식이다.
-async function ensureFixtureScenario(db: PrismaClient, initial: WorldInit) {
+export async function ensureFixtureScenario(db: PrismaClient, initial: Pick<WorldInit, 'scenarioKey' | 'startYear'>) {
   const { parseResourceKey } = await import('../packages/rules/src/index');
   const { hashState } = await import('../packages/shared/src/node/hashState');
   const ref = parseResourceKey(initial.scenarioKey);

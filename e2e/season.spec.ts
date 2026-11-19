@@ -1,5 +1,6 @@
 import { expect, test, type Browser, type Locator, type Page } from '@playwright/test';
 import { createAccount, withE2eDb } from './account';
+import { ensureFixtureScenario } from './worldFixture';
 import {
   ApiError,
   e2eWorld,
@@ -79,6 +80,9 @@ async function seasonWorld(reason: 'END_YEAR' | 'UNIFIED') {
     }),
   );
   if (!hold) throw new Error('시험 월드의 실행권을 잡지 못했습니다.');
+  // 엔진 시험 고정물(engine-season-fixture)은 게시 시나리오가 없다. 끝난 월드를 함께 읽는 로비 목록이
+  // 이 월드 때문에 500이 되어 화면이 다시 묻지 않게, 다른 e2e 고정물처럼 제목만 담은 시나리오를 게시한다.
+  await withE2eDb((db) => ensureFixtureScenario(db, initial));
   const { TurnLoop } = await import('../apps/engine/src/turnLoop');
   return { worldId, startYear: initial.startYear, hold, loop: new TurnLoop(hold.db, hold.lease) };
 }
