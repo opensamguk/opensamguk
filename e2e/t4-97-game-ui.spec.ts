@@ -127,14 +127,16 @@ test('T4-97 메인 HUD 계정 메뉴·예턴 상태·도시에서 명령 고르�
       page.getByRole('radiogroup', { name: '대상 도시' }).getByRole('radio', { name: new RegExp(`^${target.name}`) }),
     ).toHaveAttribute('aria-checked', 'true');
     const slot = Number(await editor.locator('tr[aria-selected="true"]').getAttribute('data-slot'));
-    // 막힌 넣기 단추는 이름에 '(사용 불가)'가 붙어 정확한 이름으로는 찾지 못한다. 막혀 있으면 이유를 펼쳐 실패 문구에 담는다.
-    const blocked = editor.getByRole('button', { name: `${slot}번 칸에 넣기 (사용 불가)`, exact: true });
+    // 인자가 있는 명령은 인자 화면(대상 도시 목록이 있는 dialog)에서 넣는다. 성 화면에서는 이 화면이 예턴 편집기 밖에
+    // 그려지므로 화면 전체에서 찾는다. 막힌 단추는 이름에 '(사용 불가)'가 붙으니, 막혀 있으면 이유를 펼쳐 실패 문구에 담는다.
+    const argsScreen = page.getByTestId('command-args-screen');
+    const blocked = argsScreen.getByRole('button', { name: `${slot}번 칸에 넣기 (사용 불가)`, exact: true });
     if ((await blocked.count()) > 0) {
       await blocked.first().click();
-      const reason = await editor.getByRole('note').first().textContent();
+      const reason = await argsScreen.getByRole('note').first().textContent();
       throw new Error(`${slot}번 칸에 넣기 단추가 막혀 있습니다: ${reason ?? '이유 없음'}`);
     }
-    await editor.getByRole('button', { name: `${slot}번 칸에 넣기`, exact: true }).click();
+    await argsScreen.getByRole('button', { name: `${slot}번 칸에 넣기`, exact: true }).click();
     await expect(turnShortcut).toHaveAttribute('data-turn-status', 'unsaved');
     await expect(turnStatus).toHaveText('저장하지 않은 편집 1건');
     await expect(turnShortcut.locator('[aria-hidden="true"]')).toHaveText('1');
