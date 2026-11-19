@@ -21,15 +21,9 @@ import { monthlyFixture } from '../test/monthlyFixture';
 import { prepareInitialWorld, savePreparedInitialWorld } from './world/persistence';
 import { loadReplayState, persistMonthly } from './monthly';
 
+// 다른 엔진 통합 시험과 같은 전용 시험 DB 가드다. 특정 로컬 주소나 DB 이름에 묶지 않아 CI에서도 돈다.
 const url = process.env.TEST_DATABASE_URL;
-if (
-  !url ||
-  new URL(url).host !== '127.0.0.1:5561' ||
-  !['/opensamguk_int30_test', '/opensamguk_ci_green_engine_test', '/opensamguk_ci_green_engine4_test'].includes(
-    new URL(url).pathname,
-  )
-)
-  throw new Error('INT-30 전용 시험 DB가 필요합니다.');
+if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
 const db = createDb(url);
 afterAll(() => db.$disconnect());
 

@@ -10,9 +10,10 @@ import { hashState } from '../packages/shared/src/node/hashState';
 import { saveFixtureWorld, attachFixtureOwners } from '../e2e/worldFixture';
 import { commandInitial } from '../packages/rules/test/commandFixture';
 import { loadReplayState } from '../apps/engine/src/monthly';
-import { testDatabaseUrl } from './test-database';
 
-const url = testDatabaseUrl(process.env).href;
+// CI의 통합 실행은 DATABASE_URL과 TEST_DATABASE_URL을 같은 시험 DB로 둔다(tools/run-integration.ts). 다른 통합 시험과 같은 가드를 쓴다.
+const url = process.env.TEST_DATABASE_URL;
+if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
 const db = createDb(url);
 afterAll(() => db.$disconnect());
 
