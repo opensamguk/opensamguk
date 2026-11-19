@@ -38,7 +38,13 @@ import { bandGroups, letteringSource, plaqueSource, ROLE_LABEL, type BandRole } 
 import { PLAQUE_FACES } from './plaqueFaces';
 import { hasPublicImage, publicImageUrl } from '@opensamguk/shared/public-images';
 import styles from './TurnEditor.module.css';
-import { cityPreparationNote, cityPreparationSchema, hasCityBranch, type PreparationTarget } from './cityResourceArgs';
+import {
+  cityBranchUsesTarget,
+  cityPreparationNote,
+  cityPreparationSchema,
+  hasCityBranch,
+  type PreparationTarget,
+} from './cityResourceArgs';
 import { EquipmentTradeFields, equipmentUiSchema } from '../equipment/EquipmentTradeFields';
 import type { EquipmentRead } from '../equipment/useEquipment';
 
@@ -206,7 +212,7 @@ export function CommandPicker({
   // 대상 장수를 이름으로 고르면 카드 설명·입력 칸·누락 안내가 같은 이름을 쓴다.
   const fieldsFor = (target: unknown, key?: string): ArgField[] =>
     target
-      ? argFields(target, units.all).map((field) =>
+      ? argFields(target, units.all, argContext.campaignUnits).map((field) =>
           field.key === 'generalId' && generalsFor(key) ? { ...field, label: '대상 장수' } : field,
         )
       : [];
@@ -317,6 +323,8 @@ export function CommandPicker({
           [own, fallback].find((v) => field.options.some((o) => o.value === v)) ?? field.options[0]?.value ?? '';
       }
       if (field.kind === 'boolean') initial[field.key] = 'true';
+      // 부곡 칸은 새 부곡(모병, 징병)이나 첫 내 부곡을 먼저 고른다.
+      if (field.kind === 'campaignUnit') initial[field.key] = field.options[0]?.value ?? '';
       if (field.kind === 'enum') initial[field.key] = field.options[0]?.value ?? '';
       if (field.kind === 'color') initial[field.key] = '#8a5a2b';
     }
@@ -336,7 +344,10 @@ export function CommandPicker({
     command && schema && equipmentWait === null && built.missing.length === 0
       ? {
           commandKey: command.key,
-          args: cityDrill && preparationTarget === 'city' ? { ...built.args, target: 'city' } : built.args,
+          args:
+            cityDrill && preparationTarget === 'city' && cityBranchUsesTarget(command.argsSchema)
+              ? { ...built.args, target: 'city' }
+              : built.args,
           explicit: true,
         }
       : null;
@@ -917,14 +928,16 @@ export function CommandPicker({
           >
             {cityDrill ? (
               <label className={styles.argLabel} {...stepProps('content')}>
-                <span>훈련과 사기 대상</span>
+                <span>{command.key === 'recruit' || command.key === 'conscript' ? '모집 대상' : '훈련과 사기 대상'}</span>
                 <select
                   value={preparationTarget}
                   onChange={(event) => {
                     choose(command.key, event.target.value === 'city' ? 'city' : 'unit');
                   }}
                 >
-                  <option value="unit">기존 부곡</option>
+                  <option value="unit">
+                    {command.key === 'recruit' || command.key === 'conscript' ? '부곡' : '기존 부곡'}
+                  </option>
                   <option value="city">현재 도시 수비병</option>
                 </select>
               </label>
@@ -1056,7 +1069,8 @@ function ArgInput({
     field.kind === 'nation' ||
     field.kind === 'boolean' ||
     field.kind === 'enum' ||
-    field.kind === 'unit'
+    field.kind === 'unit' ||
+    field.kind === 'campaignUnit'
   ) {
     const options =
       field.kind === 'city'
@@ -1074,7 +1088,8 @@ function ArgInput({
         {/* 병종표를 늦게 받아 고른 값이 없으면 첫 병종이 고른 것처럼 보이지 않게 빈 선택을 둔다. */}
         {field.kind === 'city' ||
         field.kind === 'nation' ||
-        (field.kind === 'unit' && !field.options.some((option) => option.value === value)) ? (
+        ((field.kind === 'unit' || field.kind === 'campaignUnit') &&
+          !field.options.some((option) => option.value === value)) ? (
           <option value="">고르세요</option>
         ) : null}
         {options.map((option) => (

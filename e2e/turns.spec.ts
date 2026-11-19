@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { newEmail, createAccount, TEST_PASSWORD } from './account';
 import {
   ApiError,
@@ -46,6 +46,30 @@ async function openEditor(page: Page, targetWorld?: string) {
   await expect(page.getByRole('heading', { level: 1, name: '예턴 편집' })).toBeVisible();
   await expect(row(page, 30)).toBeVisible();
   return { email, world };
+}
+
+// 단계가 여럿인 인자 화면(dialog)의 맨 끝, 맨 앞 단계로 간다. 넣기 단추는 마지막 단계에만 보인다(CommandArgsScreen).
+const argsScreen = (page: Page) => page.getByTestId('command-args-screen');
+async function toLastStep(page: Page) {
+  for (let guard = 0; guard < 5; guard++) {
+    const next = argsScreen(page).getByRole('button', { name: /^다음: / });
+    if ((await next.count()) === 0) return;
+    await next.click();
+  }
+}
+// 그 칸이 보이는 단계까지 다음 단계로 간다.
+async function toStepWith(page: Page, target: Locator) {
+  for (let guard = 0; guard < 5 && !(await target.isVisible()); guard++)
+    await argsScreen(page)
+      .getByRole('button', { name: /^다음: / })
+      .click();
+}
+async function toFirstStep(page: Page) {
+  for (let guard = 0; guard < 5; guard++) {
+    const back = argsScreen(page).getByRole('button', { name: '이전', exact: true });
+    if ((await back.count()) === 0 || !(await back.isEnabled())) return;
+    await back.click();
+  }
 }
 
 async function pick(page: Page, command: string) {
@@ -388,19 +412,16 @@ test.describe('예턴 편집', () => {
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('Space');
     await expect(editor(page).getByTestId('selection')).toHaveText('선택: 1~3번 칸');
+    // 칸에서 Enter를 누르면 명령 띠의 첫 패로 간다(INT-29). 명령 찾기는 띠 바로 앞에 있어 Shift+Tab으로 닿는다.
     await page.keyboard.press('Enter');
+    const firstPlaque = editor(page).getByRole('group', { name: '명령 분류' }).first().getByRole('button').first();
+    await expect(firstPlaque).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
     await expect(editor(page).getByLabel('명령 찾기')).toBeFocused();
     await page.keyboard.type('상업');
+    // 찾기의 Enter는 첫 결과를 띠에서 누른 것과 같다. 인자 없는 명령은 고른 칸들에 바로 들어가 저장된다.
     await page.keyboard.press('Enter');
     for (const slot of [1, 2, 3]) await expect(row(page, slot)).toContainText('상업 투자');
-    await expect(row(page, 3)).toBeFocused();
-
-    for (let i = 0; i < 20; i++) {
-      if (await saveButton(page).evaluate((el) => el === document.activeElement)) break;
-      await page.keyboard.press('Shift+Tab');
-    }
-    await expect(saveButton(page)).toBeFocused();
-    await page.keyboard.press('Enter');
     await expect(editor(page).getByText('저장했습니다.')).toBeVisible();
     const saved = await turns(page, world);
     expect(saved.slots.slice(0, 4).map((s) => s.commandKey)).toEqual(['commerce', 'commerce', 'commerce', 'rest']);
@@ -410,20 +431,32 @@ test.describe('예턴 편집', () => {
     const { world } = await openEditor(page);
     await row(page, 1).click();
     await pick(page, '이동');
-    await expect(editor(page).getByRole('button', { name: '1번 칸에 넣기 (사용 불가)' })).toBeVisible();
+    // 대상 도시를 고르지 않고 확인 단계로 가면 넣기 단추가 막혀 있다. 돌아와 고른 뒤 넣는다.
+    await toLastStep(page);
+    await expect(argsScreen(page).getByRole('button', { name: '1번 칸에 넣기 (사용 불가)' })).toBeVisible();
+    await toFirstStep(page);
     await page.getByRole('radiogroup', { name: '대상 도시' }).getByRole('radio', { name: /^낙양/ }).click();
-    await editor(page).getByRole('button', { name: '1번 칸에 넣기', exact: true }).click();
+    await toLastStep(page);
+    await argsScreen(page).getByRole('button', { name: '1번 칸에 넣기', exact: true }).click();
     await expect(row(page, 1)).toContainText('이동');
     await expect(row(page, 1)).toContainText('낙양');
 
     await row(page, 1).click();
     await row(page, 2).click();
     await pick(page, '모병');
-    await editor(page).getByRole('spinbutton', { name: '수량' }).fill('0');
-    await editor(page).getByRole('button', { name: '2번 칸에 넣기 (사용 불가)' }).click();
-    await expect(editor(page).getByRole('note')).toHaveText('수량 칸을 채우세요.');
-    await editor(page).getByRole('spinbutton', { name: '수량' }).fill('100');
-    await editor(page).getByRole('button', { name: '2번 칸에 넣기', exact: true }).click();
+    const amount = argsScreen(page).getByRole('spinbutton', { name: '수량' });
+    await toStepWith(page, amount);
+    await amount.fill('0');
+    await toLastStep(page);
+    await argsScreen(page).getByRole('button', { name: '2번 칸에 넣기 (사용 불가)' }).click();
+    await expect(argsScreen(page).getByRole('note').filter({ hasText: '칸을 채우세요.' })).toHaveText(
+      '수량 칸을 채우세요.',
+    );
+    await toFirstStep(page);
+    await toStepWith(page, amount);
+    await amount.fill('100');
+    await toLastStep(page);
+    await argsScreen(page).getByRole('button', { name: '2번 칸에 넣기', exact: true }).click();
     await expect(row(page, 2)).toContainText('모병');
     await expect(row(page, 2)).toContainText('수량 100');
 

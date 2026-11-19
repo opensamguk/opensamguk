@@ -299,6 +299,17 @@ function Editor<S extends DisplaySlot>({
     staleTime: 15_000,
     retry: retryUnlessClientError,
   });
+  // 내 부곡 (늘 켠 규칙의 병력 정본, 결정 19). 개인 예턴의 모병, 훈련, 사기 인자 화면에서 부곡을 고른다.
+  const campaign = useQuery({
+    ...trpc.campaign.get.queryOptions({ worldId }),
+    enabled: source.walletKind === 'general',
+    staleTime: 15_000,
+    retry: false,
+  });
+  const campaignUnits = useMemo(
+    () => campaign.data?.units.map((unit) => ({ id: unit.id, troops: unit.troops, crewType: unit.crewType })),
+    [campaign.data],
+  );
   const gameDate = summary.data?.gameDate;
 
   const recruits = useMemo((): RecruitChoices => {
@@ -365,6 +376,7 @@ function Editor<S extends DisplaySlot>({
       tech: nation && isMemberNation(nation) ? nation.tech : undefined,
       security: city && isDetailedCity(city) ? city.security : undefined,
       members,
+      campaignUnits,
       nationFacts: ranking.data
         ? new Map(
             ranking.data.items.map((row) => [
@@ -395,6 +407,7 @@ function Editor<S extends DisplaySlot>({
     treatyTargets,
     gameDate,
     recruits,
+    campaignUnits,
   ]);
   const names: ArgNames = useMemo(
     () => ({

@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { WorldMap as WorldMapData } from '../game/types';
 import type { WorldUnitSet } from '../battleSim/unitChoices';
+import type { CampaignUnitChoice } from './args';
 import { levelName, isCapital } from '../main/siteMarkers';
 import { SchematicMap } from '../main/SchematicMap';
 import { WorldMap } from '../main/WorldMap';
@@ -73,6 +74,8 @@ export interface ArgContext {
   relations?: ReadonlyMap<number, string> | undefined;
   // 등용 후보 (개인 예턴만). 없으면 등용 대상은 번호로 넣는다.
   recruits?: RecruitChoices | undefined;
+  // 내 부곡 (campaign.get). 모병, 훈련, 사기의 부곡 칸 선택지다. 없으면 모병은 새 부곡만 고를 수 있다.
+  campaignUnits?: readonly CampaignUnitChoice[] | undefined;
 }
 
 const num = (value: number) => value.toLocaleString('ko-KR');

@@ -39,3 +39,68 @@ it('INT-18C AC-INT-18C 도시 갈래가 없는 스키마와 잘못된 union은 �
   expect(cityPreparationNote('recruit', 'city')).toContain('도시 수비병');
   expect(cityPreparationNote('morale', 'unit')).toContain('개인 금');
 });
+
+// 서버 commands.list의 모병 인자(z.union([cityRecruitArgs, campaignRecruitArgs])의 z.toJSONSchema 결과).
+const recruitSchema = {
+  anyOf: [
+    {
+      type: 'object',
+      properties: {
+        amount: { type: 'integer', minimum: 1, maximum: 1000000 },
+        crewType: { type: 'integer', minimum: 1, maximum: 1000000 },
+      },
+      required: ['amount', 'crewType'],
+      additionalProperties: false,
+    },
+    {
+      type: 'object',
+      properties: {
+        amount: { type: 'integer', minimum: 1, maximum: 1000000 },
+        crewType: { type: 'integer', minimum: 1, maximum: 1000000 },
+        unitId: {
+          anyOf: [
+            { type: 'integer', minimum: 1, maximum: 2147483647 },
+            { type: 'string', const: 'new' },
+          ],
+        },
+      },
+      required: ['amount', 'crewType'],
+      additionalProperties: false,
+    },
+  ],
+};
+it('모병의 도시 수비병 갈래는 unitId 없는 갈래이고, 부곡 갈래는 새 부곡이나 내 부곡을 고른다', () => {
+  expect(hasCityBranch(recruitSchema)).toBe(true);
+  const garrison = cityPreparationSchema(recruitSchema, 'city');
+  expect(argFields(garrison).map((field) => field.key)).toEqual(['amount', 'crewType']);
+  const branch = cityPreparationSchema(recruitSchema, 'unit');
+  expect(branch).toBe(recruitSchema.anyOf[1]);
+  // 내 부곡을 받기 전에도 새 부곡은 고를 수 있다.
+  const before = argFieldsOf(branch, worldUnits(TEST_UNIT_SET).all);
+  expect(before.find((field) => field.key === 'unitId')).toMatchObject({
+    kind: 'campaignUnit',
+    options: [{ value: 'new', label: '새 부곡' }],
+  });
+  const fields = argFieldsOf(branch, worldUnits(TEST_UNIT_SET).all, [{ id: 3, troops: 1200, crewType: 1100 }]);
+  const unitField = fields.find((field) => field.key === 'unitId');
+  expect(unitField).toMatchObject({ kind: 'campaignUnit', label: '부곡' });
+  expect(unitField?.kind === 'campaignUnit' ? unitField.options.map((option) => option.value) : []).toEqual([
+    'new',
+    '3',
+  ]);
+  const required = requiredKeys(branch);
+  expect(buildArgs(fields, required, { amount: '100', crewType: '1100', unitId: 'new' }).args).toEqual({
+    amount: 100,
+    crewType: 1100,
+    unitId: 'new',
+  });
+  expect(buildArgs(fields, required, { amount: '100', crewType: '1100', unitId: '3' }).args).toEqual({
+    amount: 100,
+    crewType: 1100,
+    unitId: 3,
+  });
+  // 목록에 없는 부곡 번호는 넣지 않는다.
+  expect(buildArgs(fields, required, { amount: '100', crewType: '1100', unitId: '9' }).missing).toEqual(['부곡']);
+  expect(cityPreparationNote('recruit', 'unit')).toContain('부곡');
+  expect(cityPreparationNote('recruit', 'city')).toContain('도시 수비병');
+});

@@ -1,14 +1,26 @@
 const record = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 export type PreparationTarget = 'unit' | 'city';
-// 서버 schema에 도시 수비병 갈래(target: 'city')가 있는지 본다. 어떤 명령이 갈래를 갖는지는 서버 명령 계약이 정하고
+const hasUnitId = (variant: unknown) => 'unitId' in record(record(variant).properties);
+const isTargetCity = (variant: unknown) => record(record(record(variant).properties).target).const === 'city';
+// 도시 수비병 갈래. 훈련과 사기는 target: 'city'로 가르고, 모병과 징병은 부곡 갈래(unitId가 있는 갈래)와 나란한
+// unitId 없는 갈래가 도시 수비병 모병이다(packages/rules/src/cityResources/commands.ts의 union).
+function cityVariant(variants: unknown[]): unknown {
+  return (
+    variants.find(isTargetCity) ??
+    (variants.some(hasUnitId) ? variants.find((variant) => !hasUnitId(variant) && !isTargetCity(variant)) : undefined)
+  );
+}
+// 도시 수비병 갈래가 target: 'city'로 가르는 갈래인지 본다(훈련, 사기). 모병, 징병의 도시 갈래는 target을 받지 않는다.
+export function cityBranchUsesTarget(schema: unknown): boolean {
+  const variants = record(schema).anyOf;
+  return Array.isArray(variants) && variants.some(isTargetCity);
+}
+// 서버 schema에 도시 수비병 갈래가 있는지 본다. 어떤 명령이 갈래를 갖는지는 서버 명령 계약이 정하고
 // 화면은 명령 키 목록을 따로 두지 않는다 (T4-92·AC-P2-35 레이어 분리).
 export function hasCityBranch(schema: unknown): boolean {
   const variants = record(schema).anyOf;
-  return (
-    Array.isArray(variants) &&
-    variants.some((value) => record(record(record(value).properties).target).const === 'city')
-  );
+  return Array.isArray(variants) && cityVariant(variants) !== undefined;
 }
 // 고른 갈래의 입력 schema. 도시 자원 판이 아니거나(월드 규칙을 받기 전 포함) 알 수 없는 union이면 null로 입력을 막는다.
 // 도시 수비병을 골랐는데 서버 schema에 그 갈래가 없어도 null이다.
@@ -16,10 +28,7 @@ export function cityPreparationSchema(schema: unknown, target: PreparationTarget
   const variants = record(schema).anyOf;
   if (!Array.isArray(variants)) return target === 'city' ? null : schema;
   if (!hasCityBranch(schema)) return null;
-  const selected = variants.find((value) => {
-    const properties = record(record(value).properties);
-    return target === 'city' ? record(properties.target).const === 'city' : 'unitId' in properties;
-  });
+  const selected = target === 'city' ? cityVariant(variants) : variants.find(hasUnitId);
   if (!selected) return null;
   if (target === 'unit') return selected;
   const branch = record(selected),
@@ -33,7 +42,9 @@ export function cityPreparationSchema(schema: unknown, target: PreparationTarget
 }
 export function cityPreparationNote(key: string, target: PreparationTarget): string | null {
   if (key === 'recruit' || key === 'conscript')
-    return '현재 도시의 금과 인구를 써서 도시 수비병을 모집합니다. 부곡에 직접 충원하지 않습니다. 비용과 민심은 사전 검사에서 확인합니다.';
+    return target === 'city'
+      ? '현재 도시의 금과 인구를 써서 도시 수비병을 모집합니다. 부곡에 직접 충원하지 않습니다. 비용과 민심은 사전 검사에서 확인합니다.'
+      : '현재 도시의 금과 인구를 써서 고른 부곡(새 부곡 또는 내 부곡)에 병력을 모읍니다. 비용과 민심은 사전 검사에서 확인합니다.';
   if (key === 'train' || key === 'morale')
     return target === 'city'
       ? '현재 도시의 금을 써서 고른 병종의 도시 수비병을 준비합니다. 개인 예약 한 칸을 씁니다.'

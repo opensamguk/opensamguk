@@ -10,6 +10,8 @@ export type ArgField =
   | { key: string; kind: 'unit'; label: string; options: Array<{ value: string; label: string }> }
   | { key: string; kind: 'boolean'; label: string; options: [string, string] }
   | { key: string; kind: 'enum'; label: string; options: Array<{ value: string; label: string }> }
+  // 부곡 고르기. 값은 부곡 번호이거나 새 부곡('new')이다(packages/rules/src/campaign/preparation.ts).
+  | { key: string; kind: 'campaignUnit'; label: string; options: Array<{ value: string; label: string }> }
   | { key: string; kind: 'color'; label: string }
   | { key: string; kind: 'text'; label: string; maxLength: number };
 
@@ -32,6 +34,7 @@ const ENUM_LABELS: Record<string, string> = { gold: '금', rice: '쌀', horse: '
 
 interface JsonProperty {
   type?: string;
+  anyOf?: unknown[];
   enum?: unknown[];
   pattern?: string;
   maximum?: number;
@@ -45,8 +48,37 @@ function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
 }
 
+// 인자 화면이 고를 수 있는 내 부곡(campaign.get의 units). 늘 켠 규칙에서 병력 정본은 부곡이다(결정 19).
+export interface CampaignUnitChoice {
+  id: number;
+  troops: number;
+  crewType: number;
+}
+
+// 부곡 칸의 선택지. 새 부곡('new')을 받는 명령(모병, 징병)이면 맨 앞에 둔다. 병종 이름은 월드 병종표에서 읽는다.
+function campaignUnitOptions(
+  prop: JsonProperty,
+  ownUnits: readonly CampaignUnitChoice[] | undefined,
+  units: readonly UnitInfo[],
+): Array<{ value: string; label: string }> {
+  const allowsNew = (prop.anyOf ?? []).some((branch) => asRecord(branch).const === 'new');
+  const name = (crewType: number) => units.find((unit) => unit.id === crewType)?.name ?? `병종 ${crewType}`;
+  return [
+    ...(allowsNew ? [{ value: 'new', label: '새 부곡' }] : []),
+    ...(ownUnits ?? []).map((unit) => ({
+      value: String(unit.id),
+      label: `부곡 ${unit.id} · ${name(unit.crewType)} ${unit.troops.toLocaleString('ko-KR')}명`,
+    })),
+  ];
+}
+
 // units는 월드 병종표의 병종이다 (T4-86, worldUnits().all). 불러오는 중·오류면 빈 목록이라 병종 칸 선택지가 빈다.
-export function argFields(schema: unknown, units: readonly UnitInfo[]): ArgField[] {
+// ownUnits는 내 부곡이다. 부곡 칸(unitId)은 번호를 치지 않고 이 목록과 새 부곡에서 고른다.
+export function argFields(
+  schema: unknown,
+  units: readonly UnitInfo[],
+  ownUnits?: readonly CampaignUnitChoice[],
+): ArgField[] {
   const properties = asRecord(asRecord(schema).properties);
   const fields: ArgField[] = [];
   for (const [key, raw] of Object.entries(properties)) {
@@ -54,6 +86,11 @@ export function argFields(schema: unknown, units: readonly UnitInfo[]): ArgField
     // { not: {} }는 넣으면 안 되는 인자다 (무작위 임관의 nationId).
     if (prop.not !== undefined) continue;
     const label = LABELS[key] ?? key;
+    // 부곡 칸: 새 부곡을 받는 형식(모병, 징병)이거나 내 부곡 목록을 받았으면 고르기 칸이다. 목록을 못 받은 번호 칸은 번호로 넣는다.
+    if (key === 'unitId' && (Array.isArray(prop.anyOf) || (prop.type === 'integer' && ownUnits !== undefined))) {
+      fields.push({ key, kind: 'campaignUnit', label: '부곡', options: campaignUnitOptions(prop, ownUnits, units) });
+      continue;
+    }
     if (prop.type === 'integer') {
       if (key === 'cityKey') fields.push({ key, kind: 'city', label });
       else if (key === 'nationId') fields.push({ key, kind: 'nation', label });
@@ -127,6 +164,12 @@ export function buildArgs(
         continue;
       }
       args[field.key] = n;
+    } else if (field.kind === 'campaignUnit') {
+      if (!field.options.some((option) => option.value === raw)) {
+        missing.push(field.label);
+        continue;
+      }
+      args[field.key] = raw === 'new' ? 'new' : Number(raw);
     } else if (field.kind === 'boolean') {
       args[field.key] = raw === 'true';
     } else {
@@ -163,6 +206,7 @@ export function describeArgs(args: Record<string, unknown>, names: ArgNames): st
     else if (key === 'itemKey' && typeof value === 'string')
       parts.push(value === 'none' ? '판매' : (names.equipment?.(value) ?? `장비 ${value}`));
     else if (key === 'target' && value === 'city') parts.push('도시 수비병');
+    else if (key === 'unitId') parts.push(value === 'new' ? '새 부곡' : `부곡 ${String(value)}`);
     else parts.push(`${LABELS[key] ?? key} ${String(value)}`);
   }
   return parts.join(' · ');

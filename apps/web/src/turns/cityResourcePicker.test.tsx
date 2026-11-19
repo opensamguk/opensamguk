@@ -99,3 +99,74 @@ it('INT-18C AC-INT-18C 도시 훈련 선택은 target city를 보내며 부곡 �
   fireEvent.click(screen.getByRole('button', { name: '선택에 넣기' }));
   expect(onPut).toHaveBeenLastCalledWith({ commandKey: 'train', args: { unitId: 7 }, explicit: true });
 });
+
+// 서버 commands.list의 모병 인자: 도시 수비병 갈래(unitId 없음)와 부곡 갈래(unitId: 번호 또는 'new').
+const recruitArgs = {
+  anyOf: [
+    {
+      type: 'object',
+      properties: {
+        amount: { type: 'integer', minimum: 1, maximum: 1000000 },
+        crewType: { type: 'integer', minimum: 1, maximum: 1000000 },
+      },
+      required: ['amount', 'crewType'],
+      additionalProperties: false,
+    },
+    {
+      type: 'object',
+      properties: {
+        amount: { type: 'integer', minimum: 1, maximum: 1000000 },
+        crewType: { type: 'integer', minimum: 1, maximum: 1000000 },
+        unitId: {
+          anyOf: [
+            { type: 'integer', minimum: 1, maximum: 2147483647 },
+            { type: 'string', const: 'new' },
+          ],
+        },
+      },
+      required: ['amount', 'crewType'],
+      additionalProperties: false,
+    },
+  ],
+};
+it('모병은 새 부곡이나 내 부곡에 넣고, 도시 수비병을 고르면 부곡과 target 없이 넣는다', () => {
+  const onPut = vi.fn();
+  render(
+    <CommandPicker
+      commands={[{ key: 'recruit', name: '모병', category: 'military', argsSchema: recruitArgs }]}
+      cities={[]}
+      nations={[]}
+      selectedCityKey={null}
+      defaultCrewType={1100}
+      units={worldUnits(TEST_UNIT_SET)}
+      blockedReason={null}
+      targetLabel="선택"
+      focusRef={createRef()}
+      onPut={onPut}
+      argContext={{ here: 1, ownNationId: 1, campaignUnits: [{ id: 3, troops: 1200, crewType: 1100 }] }}
+    />,
+  );
+  fireEvent.click(commandButton('모병'));
+  // 입력 형식을 풀어 인자 화면이 열리고, 모집 대상은 부곡부터 시작해 새 부곡을 먼저 고른다.
+  expect((screen.getByRole('combobox', { name: '모집 대상' }) as HTMLSelectElement).value).toBe('unit');
+  const unitChoice = screen.getByRole('combobox', { name: '부곡' }) as HTMLSelectElement;
+  expect(unitChoice.value).toBe('new');
+  expect([...unitChoice.options].map((option) => option.text)).toEqual(['새 부곡', '부곡 3 · 시험 보병 1,200명']);
+  fireEvent.change(screen.getByRole('spinbutton', { name: '수량' }), { target: { value: '100' } });
+  fireEvent.click(screen.getByRole('button', { name: '선택에 넣기' }));
+  expect(onPut).toHaveBeenLastCalledWith({
+    commandKey: 'recruit',
+    args: { amount: 100, crewType: 1100, unitId: 'new' },
+    explicit: true,
+  });
+  fireEvent.click(commandButton('모병'));
+  fireEvent.change(screen.getByRole('combobox', { name: '모집 대상' }), { target: { value: 'city' } });
+  expect(screen.queryByRole('combobox', { name: '부곡' })).toBeNull();
+  fireEvent.change(screen.getByRole('spinbutton', { name: '수량' }), { target: { value: '50' } });
+  fireEvent.click(screen.getByRole('button', { name: '선택에 넣기' }));
+  expect(onPut).toHaveBeenLastCalledWith({
+    commandKey: 'recruit',
+    args: { amount: 50, crewType: 1100 },
+    explicit: true,
+  });
+});
