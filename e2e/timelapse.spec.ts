@@ -263,7 +263,10 @@ test('E4 실제 출병으로 멸망한 국가 2는 첫 달에 저장된 이름·
     ]),
   );
   expect(alive).toBeNull();
-  expect(removed).not.toBeNull();
+  // 실제 모병 60,100 → 사기 70,100 → 전술 점령 80,100 뒤 첫 월간이 90,000이다.
+  expect(removed).toMatchObject({ removedTick: 80_100 });
+  expect(p.ticks).toHaveLength(9);
+  expect(p.ticks.at(-1)).toBe(90_000);
 
   await login(page);
   await page.goto(tabUrl(p));

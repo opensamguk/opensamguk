@@ -6,6 +6,7 @@ import { commandRegistry } from './registry';
 import { commandStatPreview } from './statPreview';
 import { emptyCampaignState } from '../campaign/state';
 import { applyCampaignPreparation } from '../campaign/preparation';
+import { applyCityPreparation, applyCityUnitRecruitment } from '../cityResources/preparation';
 
 describe('AC-INT-15 명령 미리보기', () => {
   it('상시 제공 내정 점수를 계산하고 알 수 없는 행위자·명령은 거부한다', () => {
@@ -22,21 +23,29 @@ describe('AC-INT-15 명령 미리보기', () => {
     Object.assign(state.generals[1]!, { politics: 90, charm: 70, train: 95, atmos: 80, crew: 0 });
     state.campaign!.units = [{ id: 1, ownerId: 1, commanderId: 1, troops: 100, crewType: 1100, train: 95, atmos: 80 }];
     state.campaign!.nextUnitId = 2;
+    state.cityResources!.cities['1']!.gold = 10000;
+    state.logistics!.cities['1']!.iron = 1000;
     const before = structuredClone(state);
     const actor = { generalId: 1, unitSet: testUnits };
     for (const key of ['farm', 'train', 'morale', 'recruit', 'conscript']) {
-      const args = key === 'recruit' || key === 'conscript' ? { amount: 100, crewType: 1100 } : {};
+      const args = key === 'recruit' || key === 'conscript' ? { amount: 100, crewType: 1100, unitId: 1 } : {};
       const preview = commandStatPreview(state, actor, key, args)!;
       expect(commandStatPreview(state, actor, key, args)).toEqual(preview);
       const outcome =
         key === 'farm'
           ? null
-          : applyCampaignPreparation(state, actor, key as 'train' | 'morale' | 'recruit' | 'conscript', args);
+          : key === 'recruit' || key === 'conscript'
+            ? applyCityUnitRecruitment(state, actor, key, args)
+            : applyCampaignPreparation(state, actor, key as 'train' | 'morale', args);
       if (outcome && !outcome.ok) throw new Error(outcome.message);
       const after = outcome?.ok
         ? outcome.state
         : applyEffects(state, commandRegistry.get(key)!.execute(state, actor, args, createRng('preview')).effects);
-      expect(state.generals[1]!.gold - after.generals[1]!.gold).toBe(preview.goldCost);
+      expect(
+        key === 'recruit' || key === 'conscript'
+          ? state.cityResources!.cities['1']!.gold - after.cityResources!.cities['1']!.gold
+          : state.generals[1]!.gold - after.generals[1]!.gold,
+      ).toBe(preview.goldCost);
       if (key === 'farm') expect(preview).toHaveProperty('statScore', 90);
       if (key === 'train' || key === 'morale') {
         const stat = key === 'train' ? 'train' : 'atmos';
@@ -64,19 +73,49 @@ describe('AC-INT-15 명령 미리보기', () => {
     state.campaign.links = [{ masterId: 1, personId: 4, relation: 'LIEUTENANT' }];
     state.campaign.units = [{ id: 1, ownerId: 1, commanderId: 4, troops: 100, crewType: 1100, train: 98, atmos: 99 }];
     state.campaign.nextUnitId = 2;
+    state.cityResources!.cities['1']!.gold = 10000;
+    state.logistics!.cities['1']!.iron = 1000;
     const before = structuredClone(state),
       actor = { generalId: 1, unitSet: testUnits };
     for (const key of ['train', 'morale', 'recruit', 'conscript'] as const) {
       const args = key === 'recruit' || key === 'conscript' ? { amount: 10, crewType: 1100, unitId: 1 } : { unitId: 1 };
       const preview = commandStatPreview(state, actor, key, args)!;
-      const outcome = applyCampaignPreparation(state, actor, key, args);
+      const outcome =
+        key === 'recruit' || key === 'conscript'
+          ? applyCityUnitRecruitment(state, actor, key, args)
+          : applyCampaignPreparation(state, actor, key, args);
       if (!outcome.ok) throw new Error(outcome.message);
-      expect(preview.goldCost).toBe(state.generals[1]!.gold - outcome.state.generals[1]!.gold);
+      expect(preview.goldCost).toBe(
+        key === 'recruit' || key === 'conscript'
+          ? state.cityResources!.cities['1']!.gold - outcome.state.cityResources!.cities['1']!.gold
+          : state.generals[1]!.gold - outcome.state.generals[1]!.gold,
+      );
       if (key === 'train') expect(preview.gain).toBe(2);
       if (key === 'morale') expect(preview.gain).toBe(1);
       expect(outcome.state.generals[4]!.gold).toBe(state.generals[4]!.gold);
     }
     expect(commandStatPreview(state, actor, 'train', { unitId: 99 })).toBeNull();
+    expect(state).toEqual(before);
+  });
+  it('도시 모집·훈련은 도시 금과 수비병을 실제 명령과 같이 계산한다', () => {
+    const state = commandWorld();
+    state.cityResources!.cities['1']!.gold = 10000;
+    state.cityResources!.cities['1']!.garrison = [{ crewType: 1100, troops: 100, train: 98, atmos: 99 }];
+    state.logistics!.cities['1']!.iron = 1000;
+    state.generals[1]!.gold = 0;
+    const actor = { generalId: 1, unitSet: testUnits },
+      before = structuredClone(state);
+    for (const key of ['recruit', 'conscript', 'train', 'morale'] as const) {
+      const args =
+        key === 'recruit' || key === 'conscript' ? { amount: 10, crewType: 1100 } : { target: 'city', crewType: 1100 };
+      const outcome = applyCityPreparation(state, actor, key, args);
+      if (!outcome.ok) throw new Error(outcome.message);
+      const preview = commandStatPreview(state, actor, key, args)!;
+      expect(preview.goldCost).toBe(10000 - outcome.state.cityResources!.cities['1']!.gold);
+      expect(outcome.state.generals[1]!.gold).toBe(0);
+      if (key === 'train') expect(preview.gain).toBe(2);
+      if (key === 'morale') expect(preview.gain).toBe(1);
+    }
     expect(state).toEqual(before);
   });
 });

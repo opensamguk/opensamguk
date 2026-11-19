@@ -506,7 +506,9 @@ function applyArchiveInput(
 ) {
   if (
     archive.version === 3 &&
-    registry.inputKinds.find((kind) => kind.kind === input.kind)!.route === 'queued' &&
+    registry.inputKinds.some(
+      (kind) => kind.kind === input.kind && (kind.route === 'queued' || kind.kind === 'battle.step'),
+    ) &&
     (input.tick! < replay.monthlyTick || input.tick! >= replay.monthlyTick + TICKS_PER_MONTH)
   )
     throw new Error('입력의 처리 tick이 재생 월 창을 벗어났습니다.');

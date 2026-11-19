@@ -110,6 +110,43 @@ export async function persistPersonnelPacket(
   await persistResidenceAnchors(tx, worldId, before.residenceAnchors!, anchors);
 }
 
+export async function persistQueuedPersonnelStep(
+  tx: Prisma.TransactionClient,
+  world: import('./features').EngineWorld,
+  before: ReplayState,
+  input: import('@opensamguk/rules').RecordedInput,
+  afterState?: WorldState,
+): Promise<void> {
+  const state = afterState ?? (await loadWorld(tx, world.id));
+  const packet = completePersonnelStep(
+    before.state,
+    before.offices!,
+    { state, offices: before.offices!, closedOffers: [], logs: [] },
+    input.tick!,
+  );
+  const anchors = updateResidenceAnchors({
+    before: before.state,
+    after: packet.state,
+    anchors: before.residenceAnchors!,
+    tick: input.tick!,
+    createdHumanId: input.kind === 'general.create' ? input.generalId : null,
+    succession: recordedLineageSuccession(input),
+    possession: recordedPossession(input),
+  });
+  await persistEffects(
+    tx,
+    world.id,
+    packet.state,
+    [{ kind: 'world', state: packet.state }],
+    { tick: input.tick!, sequence: input.sequence },
+    afterState ? before.state : state,
+    () =>
+      persistPersonnelPacket(tx, world.id, before, packet, anchors, {
+        tick: input.tick!,
+        sequence: input.sequence,
+      }),
+  );
+}
 const processPolicyInput: QueuedInputHandler = async (tx, world, event, { tick }) => {
   const reject = (code: string, message: string) => ({ status: 'REJECTED' as const, result: { code, message } });
   if (world.status === 'ENDED') return reject('WORLD_CLOSED', '종료된 월드입니다.');
@@ -284,36 +321,7 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
       'offer.respond': processPersonnelInput,
       'proposal.record': processProposalRecord,
     },
-    async afterQueuedInput(tx, world, before, input) {
-      const state = await loadWorld(tx, world.id);
-      const packet = completePersonnelStep(
-        before.state,
-        before.offices!,
-        { state, offices: before.offices!, closedOffers: [], logs: [] },
-        input.tick!,
-      );
-      const anchors = updateResidenceAnchors({
-        before: before.state,
-        after: packet.state,
-        anchors: before.residenceAnchors!,
-        tick: input.tick!,
-        createdHumanId: input.kind === 'general.create' ? input.generalId : null,
-        succession: recordedLineageSuccession(input),
-        possession: recordedPossession(input),
-      });
-      await persistEffects(
-        tx,
-        world.id,
-        packet.state,
-        [{ kind: 'world', state: packet.state }],
-        { tick: input.tick!, sequence: input.sequence },
-        state,
-      );
-      await persistPersonnelPacket(tx, world.id, before, packet, anchors, {
-        tick: input.tick!,
-        sequence: input.sequence,
-      });
-    },
+    afterQueuedInput: persistQueuedPersonnelStep,
     async persistMonthly(tx, worldId, before, next, effects, { tick, sequence }) {
       const result = effects as PersonnelMonthResult;
       await persistPersonnelPacket(tx, worldId, before, result.packet, next.residenceAnchors!, { tick, sequence });

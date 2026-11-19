@@ -269,6 +269,7 @@ export const tacticalInputKinds: readonly InputKindDefinition[] = [
     kind: 'battle.step',
     feature: 'campaign-v1',
     route: 'direct',
+    directTick: true,
     apply(replay, input) {
       if (!replay.campaignUnitSet) throw Error('전술 병종 자원이 없습니다.');
       const state = applyBattleStep(replay.state, input.payload, replay.campaignUnitSet, input.tick ?? undefined);

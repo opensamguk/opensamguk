@@ -172,7 +172,8 @@ test('E2 내려받은 그림의 도시 점 색은 그 달 저장 국가 색이�
   expect(await pixelOf(page, aPng.bytes, one.x, one.y)).toEqual(rgbOf('#000080'));
   expect(await pixelOf(page, aPng.bytes, three.x, three.y)).toEqual(rgbOf(NEUTRAL));
 
-  // P의 첫 달: 국가 2는 그 뒤 실제 출병으로 멸망했다. 그림은 첫 정산에 저장된 색이다.
+  // P는 80,100에 전술 점령으로 멸망한다. 10,000의 첫 프레임은 멸망 전 저장 색이다.
+  expect(p.ticks[0]).toBe(10_000);
   await page.goto(tabUrl(p));
   await expect(panel(page).locator(`[data-frame-tick="${p.ticks[0]}"]`)).toBeVisible();
   const pPng = await readPng(await downloadShown(page));

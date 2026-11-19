@@ -22,6 +22,7 @@ it('AC-P2-32·AC-INT-28 설정1의 5능력치 12개월 출생과 전체 상태 �
     births.push(result.effects.births.length);
   }
   expect(births).toEqual([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-  expect(hashState(world)).toMatchInlineSnapshot(`"8a8e00bbeee226f0389daabc3510cef9ced5bafb54b048505819413391a85800"`);
+  // commandFixture의 부곡 전환으로 부모의 개인 병력이 0이다. 월간 공식 계산으로 갱신한다.
+  expect(hashState(world)).toMatchInlineSnapshot(`"236014bb59e942a59f5f9be22702c6f018b1e028d322e8be78a84eb4461c137a"`);
   expect(world.lineage!.config.version).toBe(1);
 });

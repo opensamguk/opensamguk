@@ -15,6 +15,7 @@ import { recruitmentFixtureData } from './fixtures/recruitment';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
+import { settlePendingBattle } from '../apps/engine/test/tacticalSettlement';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { exportReplay, replayArchive } from '../apps/engine/src/replay';
@@ -98,6 +99,7 @@ async function advance(id: string, tick: number, fail = false) {
           }
         : {},
     ).advanceTo(tick);
+    await settlePendingBattle(db, id);
   } finally {
     await releaseLease(db, lease);
   }
@@ -127,6 +129,14 @@ async function fixture(
     seed = `cards-pg-${randomUUID()}`;
   initial.seed = seed;
   initial.statRules = { ...FIVE_STAT_RULES };
+  // 실제 세수로 도시 모집비를 마련한다.
+  for (const city of initial.cities) {
+    city.commerce = city.commerceMax = 2_000_000;
+    city.agriculture = city.agricultureMax = 2_000_000;
+    city.population = city.populationMax = 50000;
+    city.x = city.cityKey * 64;
+    city.y = 64;
+  }
   for (const general of initial.generals)
     Object.assign(general, { politics: 55, charm: 55, nextTurnTick: 1_000_000_000 });
   if (options.secondNeutral)
@@ -727,6 +737,11 @@ it.each([
       JSON.stringify({
         logs: attackLogs.map((row) => row.text),
         actor: state.generals[enemy.actorId],
+        preparation: await db.generalLog.findMany({
+          where: { worldId: f.id, generalId: enemy.actorId },
+          select: { tick: true, commandKey: true, kind: true, text: true },
+        }),
+        units: state.campaign!.units,
         diplomacy: state.diplomacies,
       }),
     ).toBe(true);
@@ -741,7 +756,7 @@ it.each([
       } else expect(state.generals[enemy.actorId]!.crew).toBe(0);
       expect(state.cities[3]!.nationId).toBe(f.nationId);
     } else {
-      // 구판 전투는 장수 로그, 휘하 전투는 BattleLog에도 기록한다.
+      // 전술 전투는 BattleLog 대신 정산된 전술 기록과 점령 결과로 검증한다.
       expect(
         battles,
         JSON.stringify({
@@ -753,7 +768,11 @@ it.each([
           attack: attackLogs.map((row) => row.text),
           afterArmy: state.campaign,
         }),
-      ).toHaveLength(campaign && !survive ? 1 : 0);
+      ).toHaveLength(0);
+      if (campaign && !survive) {
+        expect(state.campaign!.tactical!.battles).toHaveLength(1);
+        expect(state.campaign!.tactical!.battles[0]).toMatchObject({ settled: true, result: 'attack' });
+      }
       expect(
         state.cities[3]!.nationId,
         JSON.stringify({
@@ -987,6 +1006,7 @@ it.each([
       )
       .toBe(true);
     const recoveredPid = await cardProcessProbe(f.id, 'RECOVER', boundary);
+    await settlePendingBattle(db, f.id);
     expect(recoveredPid).not.toBe(crashedPid);
     const after = await snapshot(f.id),
       afterHash = hashState(after);

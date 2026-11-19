@@ -2,10 +2,9 @@ import { BALANCE } from '../balance';
 import { applyCampaignPreparation } from '../campaign/preparation';
 import type { WorldView } from '../model/world';
 import { DOMESTIC_SPECS } from './domestic/investment';
-import { recruitArgs } from './military';
-import { domesticStatScore, drillGain, recruitCost } from './statScores';
+import { applyCityPreparation, applyCityUnitRecruitment } from '../cityResources/preparation';
+import { domesticStatScore } from './statScores';
 import type { Actor } from './types';
-import { crewContext, crewTypeFailure } from '../world/crewRequirements';
 
 export interface CommandStatPreview {
   goldCost: number;
@@ -23,18 +22,26 @@ export function commandStatPreview(
   const general = view.generals[actor.generalId];
   if (!general) return null;
   if (key === 'recruit' || key === 'conscript' || key === 'train' || key === 'morale') {
-    const outcome = applyCampaignPreparation(view, actor, key, args);
+    const recruiting = key === 'recruit' || key === 'conscript';
+    const value = args && typeof args === 'object' ? args : {};
+    const city = !!view.cityResources && (recruiting || 'target' in value);
+    const outcome = city
+      ? recruiting && 'unitId' in value
+        ? applyCityUnitRecruitment(view, actor, key, args)
+        : applyCityPreparation(view, actor, key, args)
+      : applyCampaignPreparation(view, actor, key, args);
     if (!outcome.ok) return null;
-    const next = outcome.state.campaign!.units.find((unit) => unit.id === outcome.unitId)!;
-    const previous = view.campaign!.units.find((unit) => unit.id === outcome.unitId);
-    return {
-      goldCost: general.gold - outcome.state.generals[general.id]!.gold,
-      ...(key === 'train' || key === 'morale'
-        ? {
-            gain: next[key === 'morale' ? 'atmos' : 'train'] - previous![key === 'morale' ? 'atmos' : 'train'],
-          }
-        : {}),
-    };
+    const gold = (state: WorldView) =>
+      city ? state.cityResources!.cities[String(general.cityKey)]!.gold : state.generals[general.id]!.gold;
+    if (recruiting) return { goldCost: gold(view) - gold(outcome.state) };
+    const field = key === 'morale' ? 'atmos' : 'train';
+    const readiness = (state: WorldView) =>
+      city
+        ? state.cityResources!.cities[String(general.cityKey)]!.garrison.find(
+            (row) => row.crewType === (value as { crewType: number }).crewType,
+          )![field]
+        : state.campaign!.units.find((unit) => 'unitId' in outcome && unit.id === outcome.unitId)![field];
+    return { goldCost: gold(view) - gold(outcome.state), gain: readiness(outcome.state) - readiness(view) };
   }
   const spec = DOMESTIC_SPECS.find((row) => row.key === key);
   if (spec)
@@ -42,21 +49,5 @@ export function commandStatPreview(
       statScore: domesticStatScore(view, general, key, spec.stat),
       goldCost: BALANCE.DEVEL_COST * (spec.costFactor ?? 1),
     };
-  if (key === 'train' || key === 'morale')
-    return {
-      goldCost: BALANCE.DRILL_COST,
-      gain: Math.max(
-        0,
-        Math.min(100 - general[key === 'morale' ? 'atmos' : 'train'], drillGain(view, general, key === 'morale')),
-      ),
-    };
-  if (key === 'recruit' || key === 'conscript') {
-    const parsed = recruitArgs.safeParse(args);
-    if (!parsed.success) return null;
-    const unit = actor.unitSet?.crewTypes.find((row) => row.id === parsed.data.crewType && row.armType > 0);
-    if (!unit) return null;
-    if (crewTypeFailure(unit, crewContext(view, actor))) return null;
-    return { goldCost: recruitCost(view, general, parsed.data.amount, unit.cost, key === 'conscript') };
-  }
   return null;
 }

@@ -907,7 +907,7 @@ describe('T4-02 등록된 확장 명령 대조', () => {
       const valid = analyze(table(), ctx);
       expect(valid.errors).toEqual([]);
       expect(valid.summary!.legacySubset).toEqual(analyze(table(), context).summary!.legacySubset);
-      expect(valid.summary!.denominator).toBe(94);
+      expect(valid.summary!.denominator).toBe(96);
       expect(valid.summary!.unresolvedReferences).toBe(3);
       const doc = table();
       doc.commands = doc.commands.filter(({ id }) => id !== 'fire_attack');
@@ -1206,11 +1206,11 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
       [
         {
           readme: context.readme.replace(
-            '원작 비교 분모 90개, 정본 분모 94개, 전 단계 완료 2개',
+            '원작 비교 분모 90개, 정본 분모 96개, 전 단계 완료 2개',
             '원작 비교 분모 37개, 정본 분모 37개, 전 단계 완료 37개',
           ),
         },
-        'README: 명령 대응표 출력(원작/정본/전 단계 완료) 불일치 (문서 37/37/37, 원장 90/94/2)',
+        'README: 명령 대응표 출력(원작/정본/전 단계 완료) 불일치 (문서 37/37/37, 원장 90/96/2)',
       ],
       [
         { readme: context.readme.replace(readmeM1Line, readmeM1Line.replace(readmeProgress, '통과')) },
@@ -1246,12 +1246,12 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
               line.startsWith('| AC-M1-14 ')
                 ? line
                     .replace('| 🟨 |', '| ✅ |')
-                    .replace('정본 분모 94(명령 91 + 미해결 원본 3), 전 단계 완료 2', '정본 분모 37, 전 단계 완료 37')
+                    .replace('정본 분모 96(명령 93 + 미해결 원본 3), 전 단계 완료 2', '정본 분모 37, 전 단계 완료 37')
                 : line,
             )
             .join('\n'),
         },
-        '인수조건 AC-M1-14: 남은 행이 있는데 ✅다 (전 단계 완료 2/94)',
+        '인수조건 AC-M1-14: 남은 행이 있는데 ✅다 (전 단계 완료 2/96)',
       ],
       [
         {
@@ -1300,7 +1300,7 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
     const noTrade = table();
     noTrade.commands = noTrade.commands.filter((command) => command.id !== 'trade');
     expect(errorsOf(noTrade)).toContain(
-      'README: 명령 대응표 출력(원작/정본/전 단계 완료) 불일치 (문서 90/94/2, 원장 90/93/2)',
+      'README: 명령 대응표 출력(원작/정본/전 단계 완료) 불일치 (문서 90/96/2, 원장 90/95/2)',
     );
   });
 

@@ -15,6 +15,7 @@ import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { exportReplay, replayArchive } from '../apps/engine/src/replay';
 import { loadReplayState } from '../apps/engine/src/monthly';
+import { settlePendingBattle } from '../apps/engine/test/tacticalSettlement';
 import { CREATION_ERRORS, TICKS_PER_MONTH, commands, resolverForRuleFeatures } from '../packages/rules/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
 
@@ -767,6 +768,11 @@ describe('T1-11 군사 명령 API·엔진 결합', () => {
         });
         initial.cities[1]!.wall = 0;
         initial.cities[1]!.defence = 0;
+        // 전술 배치에 최소 세 칸이 필요하므로 합성 도시를 64픽셀 간격으로 둔다.
+        for (const city of initial.cities) {
+          city.x = city.cityKey * 64;
+          city.y = 64;
+        }
         if (accepted)
           Object.assign(initial.cities[0]!, {
             commerce: 2_000_000,
@@ -846,6 +852,15 @@ describe('T1-11 군사 명령 API·엔진 결합', () => {
       });
       expect(log.kind).toBe(accepted ? 'success' : 'failure');
       if (!accepted) expect(log.text).toContain(preview.data.code);
+      if (accepted && commandKey === 'attack') {
+        await settlePendingBattle(db, worldId);
+        expect(await db.battle.findFirstOrThrow({ where: { worldId } })).toMatchObject({
+          state: { settled: true, result: 'attack' },
+        });
+        expect(await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId, cityKey: 2 } } })).toMatchObject({
+          nationId: 1,
+        });
+      }
       const replay = await db.$transaction((tx) => loadReplayState(tx, worldId));
       expect(replay.state.generals[1]!.crew).toBe(0);
       if (accepted && commandKey !== 'attack')

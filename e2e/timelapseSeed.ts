@@ -517,15 +517,14 @@ export async function prepareWorlds(db: PrismaClient): Promise<PreparedWorlds> {
     await db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${p.id} FOR UPDATE`;
       const actor = await tx.general.findUniqueOrThrow({ where: { worldId_id: { worldId: p.id, id: 1 } } });
-      const turns = rules.emptyTurns();
-      turns[0] = { commandKey: 'recruit', args: { unitId: 'new', amount: 100, crewType: 1100 } };
-      turns[1] = { commandKey: 'morale', args: { unitId: 1 } };
-      turns[2] = { commandKey: 'attack', args: { cityKey: 2 } };
+      const turns = rules.emptyQueue();
+      turns[0] = { commandKey: 'recruit', args: { unitId: 'new', amount: 100, crewType: 1100 }, explicit: true };
+      turns[1] = { commandKey: 'morale', args: { unitId: 1 }, explicit: true };
+      turns[2] = { commandKey: 'attack', args: { cityKey: 2 }, explicit: true };
       await tx.generalTurn.deleteMany({ where: { worldId: p.id, generalId: 1 } });
       await tx.generalTurn.createMany({
         data: turns.map((turn, slot) => ({
           ...turn,
-          explicit: true,
           worldId: p.id,
           generalId: 1,
           slot,
@@ -537,7 +536,8 @@ export async function prepareWorlds(db: PrismaClient): Promise<PreparedWorlds> {
         data: { turnRevision: { increment: 1 } },
       });
       const sequence = await dbModule.nextActionSequence(tx, p.id);
-      await tx.inputEvent.create({
+      const { clockTick } = await tx.world.findUniqueOrThrow({ where: { id: p.id }, select: { clockTick: true } });
+      const event = await tx.inputEvent.create({
         data: {
           worldId: p.id,
           userId: actor.userId!,
@@ -547,8 +547,12 @@ export async function prepareWorlds(db: PrismaClient): Promise<PreparedWorlds> {
           status: 'APPLIED',
           sequence,
           payload: { turns, revision: actor.turnRevision } as unknown as Prisma.InputJsonValue,
-          result: { revision: actor.turnRevision + 1 },
+          result: { revision: actor.turnRevision + 1, activeTick: clockTick },
         },
+      });
+      await tx.general.update({
+        where: { worldId_id: { worldId: p.id, id: 1 } },
+        data: { lastActiveTick: Math.max(actor.lastActiveTick ?? 0, clockTick), lastActiveAt: event.createdAt },
       });
     });
     await lease.renewLease(db, held);
@@ -586,6 +590,15 @@ export async function prepareWorlds(db: PrismaClient): Promise<PreparedWorlds> {
     });
     check(alive === null, '출병 뒤에도 국가 2의 Nation 행이 남았습니다.');
     check(removed !== null, '국가 2의 RemovedNation 행이 없습니다.');
+    check(removed.removedTick === 80_100, 'P 전술 점령의 실제 정산 tick이 80,100이 아닙니다.');
+    const settlement = await db.inputEvent.findFirstOrThrow({
+      where: { worldId: p.id, kind: 'battle.step' },
+      orderBy: { sequence: 'desc' },
+    });
+    check(
+      settlement.status === 'APPLIED' && settlement.tick === removed.removedTick,
+      'P 전술 정산 기록 tick이 다릅니다.',
+    );
 
     await lease.renewLease(db, held);
     await loop.advanceTo(90_000);

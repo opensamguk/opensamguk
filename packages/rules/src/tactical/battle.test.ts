@@ -116,6 +116,7 @@ describe('AC-INT-28 전술 전투·번들 잠금', () => {
     expect(next.siege!.gate).toBeLessThan(battle.siege!.gate);
   });
   it('전술 시스템 기록도 인사 외 상태 후처리와 같은 재생 경계를 쓴다', () => {
+    expect(tacticalInputKinds.find((kind) => kind.kind === 'battle.step')).toMatchObject({ directTick: true });
     const { world, battle } = tacticalFixture();
     const payload = { battleId: battle.id, now: 100, turnTermMinutes: 60, present: false, orders: [], cancel: null };
     const computed = applyBattleStep(world, payload, testUnits),

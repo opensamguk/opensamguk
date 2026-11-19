@@ -10,6 +10,7 @@ import { saveFixtureWorld as saveInitialWorld, readWorldState } from '../e2e/wor
 import { recruitmentFixtureData } from './fixtures/recruitment';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
+import { recordTestTurns } from '../apps/engine/test/seasonFixture';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { exportReplay, replayArchive } from '../apps/engine/src/replay';
@@ -193,21 +194,26 @@ it('INT-15 12종 실행·빈칸 방침·명시적 휴식·재접속·동일 시�
     expect(farmPreview.statScore).toBe(90);
     expect(await loop.advanceTo(130100)).toEqual([{ generalId: 1, tick: 130100, commandKey: 'farm' }]);
     expect(farming.gold - (await general()).gold).toBe(farmPreview.goldCost);
-    await policy('drill', 130100);
-    await loop.advanceTo(140099);
-    const training = await general();
+    // 방침 훈련도 실제 자기 부곡을 대상으로 한다.
+    await recordTestTurns(db, worldId, 1, 'recruit', { amount: 1, crewType: 1100, unitId: 'new' });
+    await loop.advanceTo(140100);
+    await policy('drill', 140100);
+    await loop.advanceTo(150099);
+    const training = (await db.$transaction((tx) => loadReplayState(tx, worldId))).state.campaign!.units[0]!;
     const drillPreview = (await request('turns.precheck', { worldId, commandKey: 'train', args: {} })).data.preview;
-    expect(await loop.advanceTo(140100)).toEqual([{ generalId: 1, tick: 140100, commandKey: 'train' }]);
-    expect((await general()).train - training.train).toBe(drillPreview.gain);
-    await loop.advanceTo(15 * TICKS_PER_MONTH);
+    expect(await loop.advanceTo(150100)).toEqual([{ generalId: 1, tick: 150100, commandKey: 'train' }]);
+    expect(
+      (await db.$transaction((tx) => loadReplayState(tx, worldId))).state.campaign!.units[0]!.train - training.train,
+    ).toBe(drillPreview.gain);
+    await loop.advanceTo(16 * TICKS_PER_MONTH);
   } finally {
     await releaseLease(db, lease);
   }
   const reopened = createDb(url!);
   try {
     const archive = await exportReplay(reopened, worldId);
-    const first = replayArchive(archive, 15);
-    expect(replayArchive(archive, 15)).toEqual(first);
+    const first = replayArchive(archive, 16);
+    expect(replayArchive(archive, 16)).toEqual(first);
     expect(first.at(-1)!.stateHash).toBe(hashState(await reopened.$transaction((tx) => loadReplayState(tx, worldId))));
   } finally {
     await reopened.$disconnect();

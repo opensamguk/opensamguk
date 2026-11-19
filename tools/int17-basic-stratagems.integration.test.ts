@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
-import { FIVE_STAT_RULES, TICKS_PER_MONTH } from '../packages/rules/src/index';
+import {
+  FIVE_STAT_RULES,
+  TICKS_PER_MONTH,
+  providedRuleData,
+  readStratagemCardsConfig,
+} from '../packages/rules/src/index';
 import { commandInitial } from '../packages/rules/test/commandFixture';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { buildServer } from '../apps/server/src/server';
@@ -23,6 +28,7 @@ const worlds: string[] = [];
 let worldId: string, otherWorld: string, cookie: string, outsider: string;
 let generalId: number, firstTick: number;
 const initial = commandInitial();
+initial.seed = 'int17-current-4';
 initial.statRules = { ...FIVE_STAT_RULES };
 initial.nations = initial.nations.map((nation) => ({ ...nation, isNpc: false }));
 initial.generals = initial.generals.map((general) => ({
@@ -70,10 +76,17 @@ beforeAll(async () => {
     else outsider = `sid=${session.token}`;
   }
   for (let count = 0; count < 2; count++) {
+    const cards = readStratagemCardsConfig(providedRuleData(initial, 60)['stratagem-cards-v1']);
+    cards.startHand = 3;
+    cards.deck = ['fire_attack', 'sabotage', 'incite', 'plunder'].map((kind) => ({
+      kind: kind as 'fire_attack' | 'sabotage' | 'incite' | 'plunder',
+      weight: 1,
+    }));
     const saved = await saveInitialWorld(db, initial, {
       name: 'INT17 기본 계략 공존',
       turnTermMinutes: 60,
       endYear: null,
+      featureData: { 'stratagem-cards-v1': { version: 1, config: cards } },
     });
     worlds.push(saved.worldId);
   }
@@ -168,6 +181,8 @@ it('INT-17 실제 세션의 네 계략 검사·권한·중복 예약·재시작�
       const loop = new TurnLoop(db, lease);
       const tick = firstTick + index * TICKS_PER_MONTH;
       await loop.advanceTo(tick - 1);
+      const cards = (await db.$transaction((tx) => loadReplayState(tx, worldId))).state.stratagemCards!;
+      expect(cards.nations['1']!.hand).toContain(command.commandKey);
       const a = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: generalId } } });
       expect(await loop.advanceTo(tick)).toEqual([{ generalId, tick, commandKey: command.commandKey }]);
       const b = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: generalId } } });

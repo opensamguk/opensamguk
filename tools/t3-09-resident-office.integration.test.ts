@@ -16,6 +16,7 @@ import { rngFor } from '../packages/shared/src/index';
 import { defaultOfficeEffects, residentOfficeBonuses, runMonthly } from '../packages/rules/src/index';
 import { commandInitial } from '../packages/rules/test/commandFixture';
 import { recordTestTurns } from '../apps/engine/test/seasonFixture';
+import { settlePendingBattle } from '../apps/engine/test/tacticalSettlement';
 import { recruitmentFixtureData } from './fixtures/recruitment';
 
 const url = process.env.TEST_DATABASE_URL;
@@ -122,6 +123,11 @@ async function createWorld(capture = false, fogOfWar = false) {
     enabled: true,
   });
   if (capture) {
+    // 전술 전장의 배치 공간을 확보하는 합성 지도 좌표다.
+    for (const city of initial.cities) {
+      city.x = city.cityKey * 64;
+      city.y = 64;
+    }
     Object.assign(initial.cities[0]!, {
       commerce: 2_000_000,
       commerceMax: 2_000_000,
@@ -369,6 +375,10 @@ it('AC-M3-12 PostgreSQL 전투가 담당 도시를 빼앗으면 같은 장수 �
     ),
   ).toMatchObject({ status: 200, code: undefined });
   await advance(worldId, prepared.nextTurnTick);
+  await settlePendingBattle(db, worldId);
+  expect(await db.battle.findFirstOrThrow({ where: { worldId } })).toMatchObject({
+    state: { settled: true, result: 'attack' },
+  });
   expect(await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId, cityKey: 2 } } })).toMatchObject({
     nationId: 1,
   });

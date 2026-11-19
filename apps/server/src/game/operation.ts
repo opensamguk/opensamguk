@@ -136,6 +136,16 @@ async function readRecord(tx: Tx, worldId: string, id: string, actor: Actor) {
   if (!row) throw new TRPCError({ code: 'FORBIDDEN', message: '이 작전을 볼 수 없습니다.' });
   return row;
 }
+// AC-M2-15 / 결정 19: 소유 부곡의 병력과 병력 가중 준비도를 읽는다.
+export function operationReadiness(view: WorldView, generalId: number): Readiness {
+  const units = view.campaign!.units.filter((unit) => unit.ownerId === generalId);
+  const crew = units.reduce((sum, unit) => sum + unit.troops, 0);
+  return {
+    crew,
+    train: crew ? Math.floor(units.reduce((sum, unit) => sum + unit.troops * unit.train, 0) / crew) : 0,
+    atmos: crew ? Math.floor(units.reduce((sum, unit) => sum + unit.troops * unit.atmos, 0) / crew) : 0,
+  };
+}
 function forecastInput(
   world: ForecastWorld,
   general: Actor,
@@ -154,7 +164,7 @@ function forecastInput(
     nextTurnTick: general.nextTurnTick,
     deadlineTick: operationTick(operation.targetTick),
     targetCityKey: operation.targetCityKey,
-    current: { crew: general.crew, train: general.train, atmos: general.atmos },
+    current: operationReadiness(view, general.id),
     min: { crew: operation.minCrew, train: operation.minTrain, atmos: operation.minAtmos },
     turns,
     view,
@@ -412,6 +422,7 @@ export function inspectMembers(ctx: OperationContext, worldId: string) {
       include: { city: { select: { name: true } } },
       orderBy: [{ officerLevel: 'desc' }, { id: 'asc' }],
     });
+    const view = await readView(tx, worldId);
     return {
       items: await Promise.all(
         rows.map(async (general) => ({
@@ -422,9 +433,7 @@ export function inspectMembers(ctx: OperationContext, worldId: string) {
           cityKey: general.cityKey,
           cityName: general.city?.name ?? '',
           isHuman: general.userId !== null,
-          crew: general.crew,
-          train: general.train,
-          atmos: general.atmos,
+          ...operationReadiness(view, general.id),
           turns: displaySlots(await readSlots(tx, worldId, general.id)).slice(0, 5),
           nextTurnAt: nextTurnAt(world, general.nextTurnTick),
           lastActiveAt: general.lastActiveAt?.toISOString() ?? null,

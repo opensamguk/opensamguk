@@ -20,6 +20,7 @@ import { databaseNow } from './lease';
 import { persistEffects } from './persist';
 import { loadReplayState } from './monthly';
 import { engineFeatures } from './features';
+import { persistQueuedPersonnelStep } from './ruleFeatures';
 
 const json = (value: unknown) => JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 const envelope = z.object({ input: z.unknown(), receivedAt: z.number().int(), sessionId: z.string() });
@@ -263,10 +264,10 @@ export async function processTacticalStep(
   const beforeReplay = await loadReplayState(tx, world.id);
   let next;
   try {
-    next = applyBattleStep(before, payload, unitSetSchema.parse(world.unitSet));
+    next = applyBattleStep(before, payload, unitSetSchema.parse(world.unitSet), world.clockTick);
   } catch {
     Object.assign(payload, { fault: 'TACTICAL_CALCULATION_FAILED' });
-    next = applyBattleStep(before, payload, unitSetSchema.parse(world.unitSet));
+    next = applyBattleStep(before, payload, unitSetSchema.parse(world.unitSet), world.clockTick);
   }
   const sequence = await nextActionSequence(tx, world.id),
     after = next.campaign!.tactical!.battles.find((v) => v.id === b.id)!;
@@ -284,25 +285,20 @@ export async function processTacticalStep(
       result: { hash: battleStateHash(after) },
     },
   });
-  await persistEffects(
-    tx,
-    world.id,
-    next,
-    [{ kind: 'world', state: next }],
-    { tick: world.clockTick, sequence },
-    before,
-  );
+  const input = {
+    sequence,
+    tick: world.clockTick,
+    generalId: null,
+    kind: 'battle.step',
+    status: 'APPLIED' as const,
+    payload,
+    result: { hash: battleStateHash(after) },
+  };
+  // 일반 턴과 같이 국가의 직책이 cascade 삭제되기 전에 인사 패킷을 저장한다.
+  await persistQueuedPersonnelStep(tx, world, beforeReplay, input, next);
   for (const feature of engineFeatures)
-    if (feature.key !== 'campaign-v1')
-      await feature.afterQueuedInput?.(tx, world, beforeReplay, {
-        sequence,
-        tick: world.clockTick,
-        generalId: null,
-        kind: 'battle.step',
-        status: 'APPLIED',
-        payload,
-        result: { hash: battleStateHash(after) },
-      });
+    if (feature.key !== 'campaign-v1' && feature.key !== 'personnel')
+      await feature.afterQueuedInput?.(tx, world, beforeReplay, input);
   return loadWorld(tx, world.id);
 }
 export async function cancelTacticalBattles(

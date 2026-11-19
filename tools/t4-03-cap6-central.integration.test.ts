@@ -20,6 +20,7 @@ import { hashState } from '../packages/shared/src/node/hashState';
 import { commandInitial } from '../packages/rules/test/commandFixture';
 import { monthlyFixture } from '../apps/engine/test/monthlyFixture';
 import { recordTestTurns } from '../apps/engine/test/seasonFixture';
+import { settlePendingBattle } from '../apps/engine/test/tacticalSettlement';
 import { recruitmentFixtureData } from './fixtures/recruitment';
 import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { readWorldState } from '../apps/engine/src/world/persistence';
@@ -72,11 +73,15 @@ const evidence: Record<string, unknown> = { ownName, executed: false, migrations
 const clauses = [{ kind: 'peace' as const }, { kind: 'nonAggression' as const, months: 1 }];
 
 async function databases() {
-  return (
+  const rows = (
     await admin.query('SELECT datname, oid::text AS oid FROM pg_database WHERE datname <> $1 ORDER BY datname', [
       ownName,
     ])
   ).rows;
+  // CI 복구의 다른 담당자는 자기 DB를 재생성한다. 개발 DB와 자기 OID·연결 검사는 그대로 유지한다.
+  return process.env.CI_GREEN_DATABASE
+    ? rows.filter((row) => !/^opensamguk_ci_green_[a-z0-9]+_test$/.test(String(row.datname)))
+    : rows;
 }
 
 beforeAll(async () => {
@@ -1063,6 +1068,11 @@ it('P23 실제 휴식·방침·정복 턴 앞뒤의 treaties는 깊이 같고 �
   });
   initial.cities[1]!.wall = 0;
   initial.cities[1]!.defence = 0;
+  // 정복 종료는 세 칸 이상인 실제 전술 전장에서 정산한다.
+  for (const city of initial.cities) {
+    city.x = city.cityKey * 64;
+    city.y = 64;
+  }
   const f = await fixture({ initial });
   await propose(f, [{ kind: 'note', text: '정복 종료 보존' }]);
   await respond(f, String(f.initialSequence + 1));
@@ -1088,11 +1098,19 @@ it('P23 실제 휴식·방침·정복 턴 앞뒤의 treaties는 깊이 같고 �
   await recordTestTurns(db, f.worldId, 1, 'attack', { cityKey: 2 });
   const attacker = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId: f.worldId, id: 1 } } });
   await loop.advanceTo(attacker.nextTurnTick);
+  await settlePendingBattle(db, f.worldId);
+  expect(await db.battle.findFirstOrThrow({ where: { worldId: f.worldId } })).toMatchObject({
+    state: { settled: true, result: 'attack' },
+  });
+  // 통일 종료 검사는 다음 장수 턴/월간 정산에서 실행되므로 다음 예약 턴까지 진행한다.
+  await loop.advanceTo(attacker.nextTurnTick + TICKS_PER_MONTH);
   expect((await db.world.findUniqueOrThrow({ where: { id: f.worldId } })).status).toBe('ENDED');
   expect((await db.$transaction((tx) => loadWorld(tx, f.worldId))).treaties).toEqual(before);
   expect((await db.worldResult.findUniqueOrThrow({ where: { worldId: f.worldId } })).finalStateHash).toBe(
     await stateHash(f.worldId),
   );
+  const archive = await exportReplay(db, f.worldId);
+  expect(replayToEnd(archive)).toEqual(archive.end);
 });
 
 it('P24 현행 origin3의 12개월 골든과 수출 바이트를 보존한다', async () => {
