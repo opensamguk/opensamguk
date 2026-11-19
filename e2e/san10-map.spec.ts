@@ -318,8 +318,8 @@ for (const scenario of ['san10-191', 'san10-empty']) {
       renewals: { commit: 0, replay: 0 },
       timer: setTimeout(() => {
         legalStack.failed = true;
-        controller.abort(new Error('SAN10 원120초 시험의 본문110초 정착 경계'));
-      }, 110_000),
+        controller.abort(new Error('SAN10 180초 시험의 본문170초 정착 경계'));
+      }, 170_000),
     };
     current = run;
     run.body = verifyMode(legalStack, page, info, run);

@@ -298,7 +298,8 @@ jobs:
     if: github.event_name != 'workflow_dispatch' || (inputs.load_expected_sha == '' && inputs.runtime_resources_expected_sha == '')
     runs-on: ubuntu-24.04
     # Worst cold case seen in PR #219: apt download 13m28s + shard 1/4 E2E about 12 min (three 180 s test timeouts) + setup 1.5 min.
-    timeout-minutes: 30
+    # PR #674 (always-on rules): shard 4/4 setup 5 min + main 11.7 + command cards 9.6 + admin end 2.9 + SAN10 up to 6 min.
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
