@@ -158,31 +158,14 @@ scenario('T3-06 AC-M3-04 정식 두 월드 제재·403·30칸 초안·해제·6�
     await page.goto(`/w/${worldId}`);
     const editor = page.getByTestId('turn-editor');
     await expect(editor.locator('tr[data-slot]')).toHaveCount(30);
+    // 칸 누르기는 선택을 뒤집는다. 다른 시험 도우미처럼 먼저 선택을 풀고 30번 칸만 고른 것을 확인한다.
+    // CI 기록에서 '선택: 없음'으로 넣기 단추가 막혀 있었다(PR #674).
+    await editor.getByRole('button', { name: '선택 해제', exact: true }).click();
     await editor.locator('tr[data-slot="30"]').click();
+    await expect(editor.getByTestId('selection')).toContainText('30');
     await editor.getByLabel('명령 찾기').fill('농지 개간');
     await editor.getByRole('radio', { name: '농지 개간', exact: true }).check();
-    const put = editor.getByRole('button', { name: '30번 칸에 넣기', exact: true });
-    try {
-      await put.click({ timeout: 30_000 });
-    } catch (error) {
-      // CI에서만 넣기 단추가 끝내 눌리지 않은 적이 있다(PR #674). 막힌 이유를 기록에 남긴다.
-      const state = await editor.evaluate((root) => ({
-        puts: [...root.querySelectorAll('button')]
-          .filter((b) => (b.textContent ?? '').includes('넣기'))
-          .map((b) => ({ text: b.textContent, disabled: b.disabled, unavailable: b.dataset.unavailable ?? null })),
-        selection: root.querySelector('[data-testid="selection"]')?.textContent ?? null,
-        draft: root.querySelector('[data-testid="draft-state"]')?.textContent ?? null,
-        checked: [...root.querySelectorAll('input[type="radio"]:checked')].map((r) =>
-          r.getAttribute('aria-labelledby'),
-        ),
-        alerts: [...document.querySelectorAll('[role="alert"],[role="status"]')].map((a) =>
-          (a.textContent ?? '').slice(0, 120),
-        ),
-        argsScreen: Boolean(document.querySelector('[data-testid="command-args-screen"]')),
-      }));
-      console.log('SANCTION-put-state', JSON.stringify(state));
-      throw error;
-    }
+    await editor.getByRole('button', { name: '30번 칸에 넣기', exact: true }).click();
     const draft = await page.evaluate(() => Object.entries(sessionStorage));
     const before = await db.generalTurn.findMany({
       where: { worldId },
