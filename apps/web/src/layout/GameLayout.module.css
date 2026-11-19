@@ -165,7 +165,8 @@
 .window :global([role='tablist']) :global([role='tab']) {
   display: inline-flex;
   align-items: center;
-  min-height: 40px;
+  /* 누르는 대상은 모든 폭에서 44px 이상이다(T3-10, AC-M3-08). */
+  min-height: 44px;
   margin: 0;
   padding: 0 12px;
   border: 8px solid transparent;

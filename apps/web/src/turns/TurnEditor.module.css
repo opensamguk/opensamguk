@@ -419,6 +419,13 @@
   overflow-y: hidden;
   scrollbar-width: thin;
 }
+/* 좁은 화면(모바일)에서는 화면 안에 가로로 밀리는 칸을 두지 않는다(T3-10, AC-M3-08). 담장 띠도 여러 줄로 감는다. */
+@media (max-width: 767px) {
+  .categories[data-walls='true'] {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+}
 @media (max-width: 640px) {
   .categories[data-walls='true'] {
     padding-inline: 40px;
@@ -1027,6 +1034,7 @@
     min-height: 44px;
   }
 
+  .search input,
   .argLabel input,
   .argLabel select,
   .inline input {

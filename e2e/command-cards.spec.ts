@@ -7,6 +7,7 @@ import { loadPreset } from '../apps/engine/src/world/resources';
 import { commandInitial } from '../packages/rules/test/commandFixture';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { holdLease, releaseHold } from './game';
+import { bandCommand, findCommand, putFromArgsScreen } from './commandPicker';
 import { test, expect, apiQuery } from './t210-fixture';
 
 type Outputs = inferRouterOutputs<AppRouter>;
@@ -39,83 +40,78 @@ test('T4-92 명령 카드의 개인 30칸·국가 12칸 저장과 모바일·키
     await page.goto(`/w/${worldId}/turns`);
     const editor = page.getByTestId('turn-editor');
     const picker = editor.getByRole('region', { name: '명령 고르기' });
-    const listId = await picker.getByRole('searchbox').getAttribute('aria-controls');
-    const cardList = page.locator(`[id="${listId}"]`);
     await expect(editor.locator('tr[data-slot]')).toHaveCount(30);
     const listed = await apiQuery<Outputs['commands']['list']>(actor, 'commands.list', { worldId });
-    await expect(picker.getByRole('radio')).toHaveCount(listed.length);
+    // INT-29 명령 띠: 받은 명령마다 그 묶음 패의 세부 명령 단추로 닿는다. 직위 밖 묶음의 지금 쓸 수 없는 명령은 띠에 남지 않으므로
+    // 명령 찾기로 닿는다. 어느 쪽이든 지금 실행할 수 없는 명령(available false)만 흐리고 사유를 적는다(INT-26).
+    const reasonOf = (command: (typeof listed)[number]) => command.reason ?? '지금은 실행할 수 없습니다.';
     for (const command of listed) {
-      const radio = picker.getByRole('radio', { name: command.name, exact: true });
-      await expect(radio).toHaveAttribute('aria-describedby', /.+/);
-      // INT-26: 지금 실행할 수 없는 명령(available false)만 흐리고 사유를 적는다. null(인자 필요)은 흐리지 않는다.
-      const card = radio.locator('xpath=ancestor::label[1]');
-      if (command.available === false) {
-        await expect(card).toHaveAttribute('data-available', 'false');
-        await expect(card.getByTestId('command-reason')).toHaveText(command.reason ?? '지금은 실행할 수 없습니다.');
-      } else {
-        await expect(card).not.toHaveAttribute('data-available', /.*/);
-        await expect(card.getByTestId('command-reason')).toHaveCount(0);
+      const button = await bandCommand(picker, command.name);
+      if (button) {
+        await expect(button).toHaveAttribute('aria-describedby', /.+/);
+        if (command.available === false) {
+          await expect(button).toHaveAttribute('data-available', 'false');
+          await expect(button.getByTestId('command-reason')).toHaveText(reasonOf(command));
+        } else {
+          await expect(button).not.toHaveAttribute('data-available', /.*/);
+          await expect(button.getByTestId('command-reason')).toHaveCount(0);
+        }
+        continue;
       }
+      expect(command.available, `${command.name}은 띠에 없으면 지금 쓸 수 없는 명령이어야 한다`).toBe(false);
+      await picker.getByLabel('명령 찾기').fill(command.name);
+      const option = picker
+        .getByRole('radiogroup', { name: '찾은 명령' })
+        .getByRole('radio', { name: command.name, exact: true });
+      const card = option.locator('xpath=ancestor::label[1]');
+      await expect(card).toHaveAttribute('data-available', 'false');
+      await expect(card.getByTestId('command-reason')).toHaveText(reasonOf(command));
+      await picker.getByLabel('명령 찾기').fill('');
     }
     for (const colorScheme of ['light', 'dark'] as const) {
       await page.emulateMedia({ colorScheme });
       for (const width of [375, 768, 1440]) {
         await page.setViewportSize({ width, height: 900 });
-        const sizes = await picker.getByRole('radio').evaluateAll((radios) =>
-          radios.map((radio) => {
-            const card = radio.closest('label')!.getBoundingClientRect();
-            return { width: card.width, height: card.height };
-          }),
-        );
-        expect(sizes.every((card) => card.width >= 44 && card.height >= 44)).toBe(true);
-        // 분류 단추와 넣기 단추도 모든 폭에서 44px다.
+        // 첫 묶음을 펼쳐 둔다. 묶음 패, 펼친 세부 명령, 명령 찾기 칸은 모든 폭에서 누르는 대상이 44px 이상이다.
+        const first = picker.getByRole('group', { name: '명령 분류' }).first().getByRole('button').first();
+        if ((await first.getAttribute('aria-expanded')) !== 'true') await first.click();
         const controls = await picker
           .getByRole('group', { name: '명령 분류' })
+          .first()
           .getByRole('button')
-          .or(picker.getByRole('button', { name: /에 넣기/ }))
-          .evaluateAll((buttons) =>
-            buttons.map((button) => {
-              const box = button.getBoundingClientRect();
+          .or(picker.getByRole('group', { name: /세부 명령$/ }).getByRole('button'))
+          .or(picker.getByLabel('명령 찾기'))
+          .evaluateAll((nodes) =>
+            nodes.map((node) => {
+              const box = node.getBoundingClientRect();
               return { width: box.width, height: box.height };
             }),
           );
-        expect(controls.length).toBeGreaterThan(1);
+        expect(controls.length).toBeGreaterThan(2);
         expect(controls.every((box) => box.width >= 44 && box.height >= 44)).toBe(true);
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-        expect(await cardList.evaluate((list) => list.scrollWidth <= list.clientWidth)).toBe(true);
-        // 긴 이름은 CSS만 검사하는 DOM 고정물이다. 서버 응답이나 게임 명령 이름을 바꾸지 않는다.
-        const nameId = await picker.getByRole('radio').first().getAttribute('aria-labelledby');
-        const name = page.locator(`[id="${nameId}"]`);
-        const originalName = await name.textContent();
-        await name.evaluate((element) => {
-          element.textContent = '아주긴명령이름'.repeat(30);
-        });
-        expect(await cardList.evaluate((list) => list.scrollWidth <= list.clientWidth)).toBe(true);
-        await name.evaluate((element, original) => {
-          element.textContent = original;
-        }, originalName);
         await picker.screenshot({ path: info.outputPath(`command-cards-${colorScheme}-${width}.png`) });
       }
     }
+    // 키보드: 묶음 패는 Tab으로 차례로 가고, 펼친 세부 명령도 Tab으로 닿으며 Escape는 펼친 묶음을 닫고 그 패로 돌아간다.
     await page.setViewportSize({ width: 375, height: 900 });
-    await picker.getByRole('group', { name: '명령 분류' }).getByRole('button').last().focus();
-    await page.keyboard.press('Tab');
-    await expect(picker.getByRole('radio').first()).toBeFocused();
-    expect(
-      await picker
-        .getByRole('radio')
-        .first()
-        .evaluate((radio) => getComputedStyle(radio.closest('label')!).outlineWidth),
-    ).toBe('2px');
-    await page.keyboard.press('ArrowRight');
-    await expect(picker.getByRole('radio').nth(1)).toBeFocused();
-    await expect(picker.getByRole('radio').nth(1)).toBeChecked();
+    const plaque = picker.getByRole('group', { name: '명령 분류' }).first().getByRole('button').first();
+    if ((await plaque.getAttribute('aria-expanded')) !== 'true') await plaque.click();
+    const firstSub = picker
+      .getByRole('group', { name: /세부 명령$/ })
+      .getByRole('button')
+      .first();
+    await firstSub.focus();
+    await expect(firstSub).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(picker.getByRole('group', { name: /세부 명령$/ })).toHaveCount(0);
+    await expect(plaque).toBeFocused();
     await editor.getByRole('button', { name: '선택 해제', exact: true }).click();
     await editor.locator('tr[data-slot="30"]').click();
     await picker.getByRole('searchbox').fill('농지 개간');
+    // 찾기의 Enter는 첫 결과를 띠에서 누른 것과 같이 처리한다. 인자 없는 명령은 띠에서 누를 때처럼 바로 저장된다(INT-29).
     await picker.getByRole('searchbox').press('Enter');
     await expect(editor.locator('tr[data-slot="30"]')).toContainText('농지 개간');
-    await editor.getByRole('button', { name: '저장', exact: true }).click();
     await expect(editor.getByText('저장했습니다.', { exact: true })).toBeVisible();
     await page.reload();
     await expect(editor.locator('tr[data-slot="30"]')).toContainText('농지 개간');
@@ -132,11 +128,11 @@ test('T4-92 명령 카드의 개인 30칸·국가 12칸 저장과 모바일·키
       const late = other.getByTestId('turn-editor');
       await late.getByRole('button', { name: '선택 해제', exact: true }).click();
       await late.locator('tr[data-slot="1"]').click();
-      await late.getByRole('radio', { name: '상업 투자', exact: true }).check();
+      await findCommand(late.getByRole('region', { name: '명령 고르기' }), '상업 투자');
       await late.getByRole('button', { name: '1번 칸에 넣기', exact: true }).click();
       await editor.getByRole('button', { name: '선택 해제', exact: true }).click();
       await editor.locator('tr[data-slot="2"]').click();
-      await editor.getByRole('radio', { name: '농지 개간', exact: true }).check();
+      await findCommand(picker, '농지 개간');
       await editor.getByRole('button', { name: '2번 칸에 저장', exact: true }).click();
       await expect(editor.getByText('저장했습니다.', { exact: true })).toBeVisible();
       await late.getByRole('button', { name: '저장', exact: true }).click();
@@ -159,19 +155,25 @@ test('T4-92 명령 카드의 개인 30칸·국가 12칸 저장과 모바일·키
     await page.goto(`/w/${worldId}/nation/turns`);
     await expect(editor.locator('tr[data-slot]')).toHaveCount(12);
     const national = await apiQuery<Outputs['nationCommands']['list']>(actor, 'nationCommands.list', { worldId });
-    await expect(picker.getByRole('radio')).toHaveCount(national.length);
-    for (const command of national)
-      await expect(picker.getByRole('radio', { name: command.name, exact: true })).toBeVisible();
+    // 국가 명령도 띠의 세부 명령이나 명령 찾기로 모두 닿는다.
+    for (const command of national) {
+      if (await bandCommand(picker, command.name)) continue;
+      await picker.getByLabel('명령 찾기').fill(command.name);
+      await expect(
+        picker.getByRole('radiogroup', { name: '찾은 명령' }).getByRole('radio', { name: command.name, exact: true }),
+      ).toBeVisible();
+      await picker.getByLabel('명령 찾기').fill('');
+    }
     await editor.getByRole('button', { name: '선택 해제', exact: true }).click();
     await editor.locator('tr[data-slot="12"]').click();
-    await picker.getByRole('radio', { name: '천도', exact: true }).check();
+    await findCommand(picker, '천도');
     // 인자 입력 화면(INT-25)의 도시 목록에서 고른다.
     const capitalName = initial.cities.find((city) => city.cityKey === initial.nations[0]!.capitalCityKey)!.name;
     await page
       .getByRole('radiogroup', { name: '대상 도시' })
       .getByRole('radio', { name: new RegExp(`^${capitalName}`) })
       .click();
-    await editor.getByRole('button', { name: '12번 칸에 넣기', exact: true }).click();
+    await putFromArgsScreen(page, '12번 칸에 넣기');
     await editor.getByRole('button', { name: '저장', exact: true }).click();
     await expect(editor.getByText('저장했습니다.', { exact: true })).toBeVisible();
     await page.reload();
@@ -247,13 +249,16 @@ test('AC-M2-03 프리셋 월드에서 늘 켜진 화계와 대상 도시 칸을 
   await actor.page.goto(`/w/${worldId}/turns`);
   const editor = actor.page.getByTestId('turn-editor');
   const picker = editor.getByRole('region', { name: '명령 고르기' });
-  await expect(picker.getByRole('radio', { name: '농지 개간', exact: true })).toBeVisible();
-  const fire = picker.getByRole('radio', { name: '화계', exact: true });
+  // 늘 켜진 화계는 띠의 계략 묶음에 있다(INT-29). 칸을 고른 뒤 띠에서 누르면 인자 화면이 열리고, 대상 도시를 골라 넣는다.
+  await expect(editor.locator('tr[data-slot]')).toHaveCount(30);
+  expect(await bandCommand(picker, '농지 개간')).not.toBeNull();
   await editor.locator('tr[data-slot="1"]').click();
-  await fire.check();
-  const cities = picker.getByRole('radiogroup', { name: '대상 도시', exact: true });
+  const fire = await bandCommand(picker, '화계');
+  expect(fire).not.toBeNull();
+  await fire!.click();
+  const cities = actor.page.getByRole('radiogroup', { name: '대상 도시', exact: true });
   await cities.locator(`[data-value="${target.cityKey}"]`).click();
-  await picker.getByRole('button', { name: '1번 칸에 넣기', exact: true }).click();
+  await putFromArgsScreen(actor.page, '1번 칸에 넣기');
   await editor.getByRole('button', { name: '저장', exact: true }).click();
   await expect(editor.getByText('저장했습니다.', { exact: true })).toBeVisible();
   await actor.page.reload();
