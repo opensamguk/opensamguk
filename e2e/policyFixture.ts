@@ -163,10 +163,18 @@ async function createWorld(kind: WorldKind): Promise<PolicyWorld> {
   const { userId, worldId } = await withE2eDb(async (db) => {
     // 계정 행만 만든다. 세션은 화면 로그인으로 서버가 만든다.
     const user = await db.user.create({ data: { email, passwordHash: hash }, select: { id: true } });
-    const saved = await saveFixtureWorld(db, worldState(source, kind, user.id, '방침시험'), {
+    const initial = worldState(source, kind, user.id, '방침시험');
+    // 늘 켠 물류 규칙에서 수비 강화와 성벽 보수는 도시 철과 목재를 쓴다. 이 시험은 방침 선택을 보므로 물자 준비와 분리하고,
+    // 생성 기록에도 같은 비용 설정을 남긴다(tools/fixtures/recruitment.ts의 모병 비용 0과 같은 방식).
+    const { logisticsConfigSchema, providedRuleData } = await import('../packages/rules/src/index');
+    const logistics = logisticsConfigSchema.parse(providedRuleData(initial, 1440)['logistics-v1']);
+    const free = { iron: 0, wood: 0, horses: 0 };
+    logistics.build = { wall: free, defence: free };
+    const saved = await saveFixtureWorld(db, initial, {
       name,
       turnTermMinutes: 1440,
       endYear: null,
+      featureData: { 'logistics-v1': logistics },
     });
     return { userId: user.id, worldId: saved.worldId };
   });

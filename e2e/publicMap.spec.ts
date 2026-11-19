@@ -445,7 +445,7 @@ test('수도와 보급을 표시하고 장수·병력·국고 없이 읽기 전�
     expect(world.background).toBeNull();
   }
   for (const map of [raw.worlds[0]!.map!, raw.worlds[1]!.map!]) {
-    expect(Object.keys(map).sort()).toEqual(['cities', 'month', 'nations', 'takenAt', 'year']);
+    expect(Object.keys(map).sort()).toEqual(['cities', 'emperorCityKey', 'month', 'nations', 'takenAt', 'year']);
     for (const city of map.cities)
       expect(Object.keys(city).sort()).toEqual([
         'key',
