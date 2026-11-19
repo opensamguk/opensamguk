@@ -6,7 +6,6 @@ import { clockWorld, executeClock, clockHuman, clockGameRows, clockControls } fr
 import { controlClock } from '../apps/engine/src/world/clock';
 import { changeAdminRole } from '../apps/server/src/admin/roleStore';
 import { TEST_PASSWORD } from './account';
-import { Prisma } from '../packages/db/src/generated/prisma/client';
 
 const running = new Set<Promise<unknown>>(),
   jobs = new Set<Promise<void>>(),
@@ -189,29 +188,10 @@ test('T3-06 AC-M3-04 재조회로 시작이 일시정지로 바뀌면 확인을 
     await controls.getByLabel('조치할 월드', { exact: true }).selectOption(world.id);
     await confirm(controls, '   ');
     await expect(controls.getByRole('button', { name: '일시정지 요청 확정', exact: true })).toBeDisabled();
-    const original = await stack.db.world.findUniqueOrThrow({ where: { id: world.id } });
-    await stack.db.world.update({
-      where: { id: world.id },
-      data: {
-        replayFormat: 2,
-        campaignState: Prisma.DbNull,
-        operationalMap: Prisma.DbNull,
-      },
-    });
-    await page.getByRole('button', { name: '월드 조회', exact: true }).click();
-    await controls.getByLabel('조치할 월드', { exact: true }).selectOption(world.id);
-    await expect(controls).toContainText('이 월드의 재생 형식에서는');
-    await expect(controls.getByRole('button', { name: '일시정지 요청 확정', exact: true })).toBeDisabled();
+    // 늘 켠 규칙에서는 모든 월드가 재생 형식 3과 부곡 원장을 가져야 하므로(World_campaignState_rules_check)
+    // 옛 재생 형식 월드를 만들 수 없다. 형식 차단 단계는 빼고 종료 차단만 본다.
     // 조작 실행 증거가 아닌 목록 차단 자료다. 이 월드에서는 엔진을 실행하지 않는다.
-    await stack.db.world.update({
-      where: { id: world.id },
-      data: {
-        replayFormat: 3,
-        campaignState: original.campaignState ?? Prisma.DbNull,
-        operationalMap: original.operationalMap ?? Prisma.DbNull,
-        status: 'ENDED',
-      },
-    });
+    await stack.db.world.update({ where: { id: world.id }, data: { status: 'ENDED' } });
     await page.getByRole('button', { name: '월드 조회', exact: true }).click();
     await controls.getByLabel('조치할 월드', { exact: true }).selectOption(world.id);
     await expect(controls).toContainText('종료한 월드에는');

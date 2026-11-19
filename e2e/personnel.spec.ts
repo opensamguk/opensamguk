@@ -336,7 +336,8 @@ test('국가 칸 저장: 고친 뒤 해임·재임명되면 저장이 거부되�
     // 권한 오류 화면이 되고, 무효화한 재조회가 돌아와야 편집기가 돌아온다. CI에서 응답이 4초를 넘겨 15초를 기다린다.
     await expect(page.getByTestId('draft-state')).toHaveText('저장된 목록', { timeout: 15_000 });
     await page.reload();
-    await expect(page.getByTestId('draft-state')).toHaveText('저장된 목록');
+    // 새로 연 국가 예턴 화면도 탭, 직책, 감찰 자료를 다시 받아야 편집기를 그린다. 위와 같은 까닭으로 15초를 기다린다.
+    await expect(page.getByTestId('draft-state')).toHaveText('저장된 목록', { timeout: 15_000 });
     await expect(editor.locator('tr[data-slot]')).toHaveCount(12);
     const fresh = await query<{
       tabs: Array<{
