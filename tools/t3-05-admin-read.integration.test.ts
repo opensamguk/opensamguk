@@ -64,8 +64,8 @@ function track<T>(action: () => Promise<T>) {
   );
   return promise;
 }
-function it(title: string, action: () => Promise<void>) {
-  test(title, () => track(action));
+function it(title: string, action: () => Promise<void>, timeout?: number) {
+  test(title, () => track(action), timeout);
 }
 async function settle() {
   while (executions.size) await Promise.allSettled([...executions]);
@@ -617,7 +617,9 @@ it('목록 경계 전용51개 참가 행도 최대50명과 정확한 전체 수�
   expect(generals.map((row) => row.worldId)).toEqual([...ids].sort().reverse().slice(0, 50));
   expect(generals.every((row) => row.generalId === human.id && row.name === human.name)).toBe(true);
   expect(await gameSnapshot()).toBe(before);
-});
+  // 늘 켠 규칙의 World 행은 부곡, 운영 지도 원장을 담아 크다. 51행 복제와 게임 전체 지문 두 번이 바쁜 CI에서
+  // 30초를 넘긴 적이 있다(PR #674에서 다섯 번). 비교 대상은 줄이지 않고 시간만 준다.
+}, 90_000);
 
 it('없는 상세 대상은 감사1행을 확정한 뒤 NOT_FOUND이며 잘못된 UUID·추가 입력은 DB를 바꾸지 않는다', async () => {
   const actor = await user('ADMIN'),
