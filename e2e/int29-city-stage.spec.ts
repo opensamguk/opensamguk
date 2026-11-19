@@ -35,46 +35,11 @@ test('성 화면이 첫 화면이고 전체 지도와 오가며 명령 띠는 �
   // 가운데 성을 누르면 성 안 창이 뜬다(성 없는 거점이면 건너뛴다).
   const castle = page.getByTestId('city-castle');
   if (await castle.count()) {
-    await castle.click();
-    try {
-      await expect(page.getByTestId('castle-window')).toBeVisible();
-    } catch (error) {
-      // CI에서만 창이 뜨지 않은 적이 있다(PR #674). 다음 실패에서 원인을 볼 수 있게 화면 상태를 기록에 남긴다.
-      const state = await page.evaluate(() => ({
-        url: location.href,
-        view: document.querySelector('[data-testid="map-stage"]')?.getAttribute('data-view'),
-        castle: document.querySelector('[data-testid="city-castle"]')?.getAttribute('aria-label'),
-        scene: Boolean(document.querySelector('[data-testid="city-scene"]')),
-        camp: Boolean(document.querySelector('[data-testid="camp-scene"]')),
-        dialogs: [...document.querySelectorAll('[role="dialog"],[role="alertdialog"],dialog[open]')].map((el) =>
-          (el.textContent ?? '').slice(0, 120),
-        ),
-        windows: [...document.querySelectorAll('.kit-window')].map((el) => el.getAttribute('data-testid')),
-        // 성 그림 가운데를 실제로 덮은 요소와 초점. 눌림이 성에 닿았는지 본다.
-        hit: (() => {
-          const polygon = document.querySelector('[data-testid="city-castle"]');
-          if (!polygon) return null;
-          const box = polygon.getBoundingClientRect();
-          const top = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
-          return {
-            box: [box.x, box.y, box.width, box.height].map(Math.round),
-            top: top
-              ? `${top.tagName}:${top.getAttribute('data-testid') ?? ''}:${top.getAttribute('class') ?? ''}`
-              : null,
-          };
-        })(),
-        focus: `${document.activeElement?.tagName}:${document.activeElement?.getAttribute('data-testid') ?? ''}`,
-      }));
-      // 눌림을 성 요소에 바로 보내도 창이 뜨는지 본다. 뜨면 다른 요소가 가운데를 덮은 것이고, 안 뜨면 창 조건 문제다.
-      await castle.dispatchEvent('click');
-      const direct = await page
-        .getByTestId('castle-window')
-        .waitFor({ state: 'visible', timeout: 3_000 })
-        .then(() => true)
-        .catch(() => false);
-      console.log('INT29-castle-state', JSON.stringify({ ...state, directClickOpened: direct }));
-      throw error;
-    }
+    // 성 화면은 캔버스에 그린 사람을 누르면 대사를 띄우고 눌림을 가로챈다(CityScene onPickPerson). 사람이 성 그림
+    // 가운데를 지나는 순간 누르면 성 대신 사람이 눌린다(PR #674 CI). 성은 키보드로도 열리므로 초점을 두고 Enter로 연다.
+    await castle.focus();
+    await castle.press('Enter');
+    await expect(page.getByTestId('castle-window')).toBeVisible();
     await expect(page.getByRole('list', { name: '성 안에 지을 수 있는 건물' }).getByRole('listitem')).toHaveCount(16);
     await page.screenshot({ path: testInfo.outputPath('castle.png') });
     await page.getByTestId('castle-window').getByRole('button', { name: '닫기' }).click();
