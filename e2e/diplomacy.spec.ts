@@ -1,6 +1,15 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { createAccount, withE2eDb } from './account';
-import { createGeneralByApi, e2eFeatureWorld, mutate, query, stubPortraits, turns, waitTurnWindow } from './game';
+import {
+  createGeneralByApi,
+  e2eFeatureWorld,
+  mutate,
+  placeGeneral,
+  query,
+  stubPortraits,
+  turns,
+  waitTurnWindow,
+} from './game';
 
 // T2-08 · AC-M2-06, AC-M2-14 화면: 외교실 조약서와 예턴 편집의 교역 대상.
 // T2-07이 main에 병합됐으므로 실제 API·엔진으로 실행한다.
@@ -37,13 +46,10 @@ async function officer(browser: Browser, world: string, nationId: number, office
   await stubPortraits(page);
   await createAccount(page);
   const general = await createGeneralByApi(page, world);
-  await withE2eDb(async (db) => {
-    const city = await db.city.findFirstOrThrow({ where: { worldId: world, nationId }, select: { cityKey: true } });
-    await db.general.update({
-      where: { worldId_id: { worldId: world, id: general.id } },
-      data: { nationId, officerLevel, cityKey: city.cityKey },
-    });
-  });
+  const city = await withE2eDb((db) =>
+    db.city.findFirstOrThrow({ where: { worldId: world, nationId }, select: { cityKey: true } }),
+  );
+  await placeGeneral(world, general.id, { nationId, officerLevel, cityKey: city.cityKey });
   return { page, generalId: general.id, nationId };
 }
 

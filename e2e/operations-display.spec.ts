@@ -1,7 +1,7 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import type { InspectionRow, OperationDetail } from '../apps/web/src/operations/contract';
 import { createAccount, withE2eDb } from './account';
-import { createGeneralByApi, idleWorld, mutate, query, releaseIdleWorld, startEngine } from './game';
+import { createGeneralByApi, idleWorld, mutate, placeGeneral, query, releaseIdleWorld, startEngine } from './game';
 
 // T2-12 · AC-M2-15 화면 증거 보완. 준비 부족의 미흡 표시와 작전·감찰 공개 범위를 실제 API와 화면으로 본다.
 // 계약은 AppRouter의 operation·inspection 라우터다. 응답 가로채기, 가짜 응답, 초상 stub은 쓰지 않는다.
@@ -102,13 +102,10 @@ async function member(browser: Browser, world: string, nationId: number, officer
       await stop();
     }
   })();
-  await withE2eDb(async (db) => {
-    const city = await db.city.findFirstOrThrow({ where: { worldId: world, nationId }, select: { cityKey: true } });
-    await db.general.update({
-      where: { worldId_id: { worldId: world, id: general.id } },
-      data: { nationId, officerLevel, cityKey: city.cityKey, crew: 0 },
-    });
-  });
+  const city = await withE2eDb((db) =>
+    db.city.findFirstOrThrow({ where: { worldId: world, nationId }, select: { cityKey: true } }),
+  );
+  await placeGeneral(world, general.id, { nationId, officerLevel, cityKey: city.cityKey, crew: 0 });
   return { page, generalId: general.id, name: general.name };
 }
 

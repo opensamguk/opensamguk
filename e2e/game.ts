@@ -274,6 +274,29 @@ export async function mine(page: Page, world: string) {
   });
 }
 
+// 시험 고정물이 장수 하나를 한 나라의 장수나 직책자로 둔다. 늘 켠 인사 규칙은 한 나라의 한 직책에 장수 하나만 허용하므로
+// (packages/rules/src/personnel/offices.ts) 같은 직책의 기존 장수를 먼저 일반(1)으로 내린다. 그러지 않으면 감독이 띄운
+// 엔진이 PersonnelInvariantError로 반복 종료되어 공유 시험 월드 전체가 멈춘다. 엔진 턴과 겹치지 않게 월드 행 잠금 안에서 쓴다.
+export async function placeGeneral(
+  world: string,
+  generalId: number,
+  data: { nationId: number; officerLevel: number; cityKey: number; crew?: number },
+): Promise<void> {
+  const { canUseNationTurns } = await import('../packages/rules/src/index');
+  await withE2eDb((db) =>
+    db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${world} FOR UPDATE`;
+      if (canUseNationTurns(data.officerLevel))
+        await tx.general.updateMany({
+          where: { worldId: world, nationId: data.nationId, officerLevel: data.officerLevel, id: { not: generalId } },
+          data: { officerLevel: 1 },
+        });
+      const moved = await tx.general.updateMany({ where: { worldId: world, id: generalId }, data });
+      if (moved.count !== 1) throw new Error('시험 장수를 찾지 못했습니다.');
+    }),
+  );
+}
+
 export async function createGeneralByApi(page: Page, world: string, name = newGeneralName()): Promise<OwnGeneral> {
   const result = await mutate<{ status: string; general?: OwnGeneral }>(page, 'general.create', {
     worldId: world,

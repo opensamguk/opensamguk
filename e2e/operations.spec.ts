@@ -8,6 +8,7 @@ import {
   query,
   releaseIdleWorld,
   setTurns,
+  placeGeneral,
   startEngine,
   stubPortraits,
   turns,
@@ -39,13 +40,10 @@ async function member(browser: Browser, world: string, nationId: number, officer
       await stop();
     }
   })();
-  await withE2eDb(async (db) => {
-    const city = await db.city.findFirstOrThrow({ where: { worldId: world, nationId }, select: { cityKey: true } });
-    await db.general.update({
-      where: { worldId_id: { worldId: world, id: general.id } },
-      data: { nationId, officerLevel, cityKey: city.cityKey, crew: 0 },
-    });
-  });
+  const city = await withE2eDb((db) =>
+    db.city.findFirstOrThrow({ where: { worldId: world, nationId }, select: { cityKey: true } }),
+  );
+  await placeGeneral(world, general.id, { nationId, officerLevel, cityKey: city.cityKey, crew: 0 });
   return { page, generalId: general.id, name: general.name };
 }
 
