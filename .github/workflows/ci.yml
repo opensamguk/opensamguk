@@ -430,7 +430,8 @@ jobs:
         if: matrix.shard == 4
         run: pnpm e2e:san10 --reporter=line
       - name: Check campaign offer fresh reads in Chromium
-        if: matrix.shard == 4
+        # 491명 NPC commit을 기다리는 다섯 사례(약 8분)다. 4번 조각이 30분을 넘겨 가벼운 2번 조각에서 돈다.
+        if: matrix.shard == 2
         run: pnpm e2e:campaign-offer --reporter=line
       - name: Check admin world creation actions in Chromium
         if: matrix.shard == 1
