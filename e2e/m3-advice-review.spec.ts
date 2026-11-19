@@ -173,7 +173,11 @@ test('AC-M3-13 같은 예턴 판 번호에서도 계정이나 장수가 바뀌�
     isTurnEdit,
     async (route) => {
       await world.hold.db.$transaction(async (tx) => {
-        await tx.general.update({ where: { worldId_id: { worldId, id: member.generalId } }, data: { userId: null } });
+        // NPC가 된 장수에는 물리 거주 앵커가 없어야 한다(apps/engine/src/residenceState.ts).
+        await tx.general.update({
+          where: { worldId_id: { worldId, id: member.generalId } },
+          data: { userId: null, residenceTick: null },
+        });
         await tx.general.update({
           where: { worldId_id: { worldId, id: replacement.generalId } },
           data: { userId: member.userId },
