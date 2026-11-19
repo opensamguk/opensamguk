@@ -179,6 +179,16 @@ async function kill(child: ChildProcess) {
 }
 
 describe('AC-M1-10 턴 실행, 실제 PostgreSQL', () => {
+  it('AC-INT-04 다른 장수의 누락된 예턴도 첫 장수 실행 전에 거부한다', async () => {
+    const { worldId } = await create(2, true);
+    await db.generalTurn.delete({ where: { worldId_generalId_slot: { worldId, generalId: 2, slot: 29 } } });
+    const before = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+    const loop = await engine(worldId);
+    await expect(loop.advanceTo(500)).rejects.toThrow();
+    expect((await db.world.findUniqueOrThrow({ where: { id: worldId } })).actionSequence).toBe(before.actionSequence);
+    expect((await general(worldId)).nextTurnTick).toBe(500);
+  });
+
   it('시계 주입: 턴 시각에 농업·금·로그·30칸 당김·revision을 함께 저장한다', async () => {
     const { worldId, cityKey } = await create(1, true);
     await queue(worldId);
@@ -323,7 +333,9 @@ describe('AC-M1-10 턴 실행, 실제 PostgreSQL', () => {
     await db.general.updateMany({ where: { worldId }, data: { nextTurnTick: 100_000 } });
     let elapsed = 0;
     const loop = new TurnLoop(db, (await acquireLease(db, worldId))!, { elapsedNow: () => elapsed });
+    // 부곡 원장이 있는 월드는 capability 검사 직후 같은 잠금의 적재(loadWorldAfterCapabilityCheck)로 상태를 검사한다.
     const load = vi.spyOn(worldLoader, 'loadWorld');
+    const checkedLoad = vi.spyOn(worldLoader, 'loadWorldAfterCapabilityCheck');
     try {
       const before = await db.world.findUniqueOrThrow({ where: { id: worldId } });
       for (let i = 0; i < 5; i++) await loop.poll();
@@ -341,10 +353,11 @@ describe('AC-M1-10 턴 실행, 실제 PostgreSQL', () => {
       elapsed += CLOCK_CHECKPOINT_MS;
       for (let i = 0; i < 3; i++) await loop.poll();
       expect(await db.world.findUniqueOrThrow({ where: { id: worldId } })).toEqual(paused);
-      expect(load).toHaveBeenCalled();
+      expect(load.mock.calls.length + checkedLoad.mock.calls.length).toBeGreaterThan(0);
       expect(loop.state).toBeNull();
     } finally {
       load.mockRestore();
+      checkedLoad.mockRestore();
     }
   });
 
