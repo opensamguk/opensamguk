@@ -39,12 +39,14 @@ export function completePersonnelStep(
   startOffices: DeepReadonly<OfficeRevisions>,
   raw: PersonnelRawStep,
   tick: number,
+  // Only a detached result owned by this caller may be consumed without another world copy.
+  ownedAfter?: OfficeState,
 ): PersonnelStepPacket {
   assertTick(tick);
   const initial = assignments(before);
   const witness = assignments(raw.state);
   const officeBefore = officeSnapshot(before, startOffices);
-  const finished = finishPersonnelStep(before, raw, raw.offices, tick);
+  const finished = finishPersonnelStep(before, raw, raw.offices, tick, ownedAfter);
   return {
     state: finished.state,
     offices: finished.offices,

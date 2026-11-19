@@ -2,7 +2,7 @@ import { cityUpgradeFeature } from './cityUpgrade/feature';
 import { constructionFeature } from './construction/feature';
 import { COURT_RANK_FEATURE } from './personnel/nationRank';
 import { tacticalInputKinds } from './tactical/input';
-import type { JsonValue } from './model/world';
+import { toWorldState, type JsonValue, type WorldView } from './model/world';
 import type { WorldInit } from './world/bootstrap';
 import { checkInitialNpcStatLimits } from './world/initialNpcStats';
 import { assertInitialNationLifecycle, NATION_LIFECYCLE_FEATURE } from './nationLifecycle/state';
@@ -88,7 +88,7 @@ export interface RuleFeatureDefinition {
   requires: readonly string[];
   conflicts: readonly string[];
   commandBindings?: readonly { definition: CommandDef; sliceKeys: readonly string[] }[];
-  checkOrigin?(context: { initial: WorldInit; data: JsonValue | undefined }): void;
+  checkOrigin?(context: { initial: WorldInit; data: JsonValue | undefined; initialWorld?: WorldView }): void;
   checkArchive?(context: {
     origin: ReplayOriginV3;
     inputs: readonly RecordedInput[];
@@ -341,10 +341,17 @@ export function checkReplayOrigin(
       Object.keys(origin.featureData).some((key) => !features.includes(key)))
   )
     throw new Error('규칙 기능 자료의 키를 확인하세요.');
+  let initialWorld: WorldView | undefined;
   for (const key of features)
     registry.features
       .find((feature) => feature.key === key)!
-      .checkOrigin?.({ initial: origin.initial, data: origin.featureData?.[key] });
+      .checkOrigin?.({
+        initial: origin.initial,
+        data: origin.featureData?.[key],
+        get initialWorld() {
+          return (initialWorld ??= toWorldState(origin.initial));
+        },
+      });
 }
 
 // 같은 잠긴 저장 행에서 검사한 생성 기록만 읽기 경로 사이에서 재사용한다.

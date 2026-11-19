@@ -37,8 +37,9 @@ export async function assertStoredCityRuins(
   tx: Prisma.TransactionClient,
   world: StoredWorld,
   checkedOrigin?: ReturnType<typeof checkWorldReplay>,
+  loadedCities?: Prisma.CityGetPayload<Record<string, never>>[],
 ): Promise<void> {
-  const rows = await tx.city.findMany({ where: { worldId: world.id }, omit: { kind: true } });
+  const rows = loadedCities ?? (await tx.city.findMany({ where: { worldId: world.id }, omit: { kind: true } }));
   readStoredCityRuins(
     world,
     {

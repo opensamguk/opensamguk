@@ -35,10 +35,13 @@ export function syncOffices(
   before: Pick<WorldView, 'nations' | 'generals'>,
   after: OfficeView,
   offices: DeepReadonly<OfficeRevisions>,
+  ownedAfter?: OfficeState,
 ): { state: OfficeState; offices: OfficeRevisions } {
+  if (ownedAfter !== undefined && (ownedAfter !== after || ownedAfter === before))
+    throw new PersonnelInvariantError('Owned personnel state must be the detached result.');
   const previous = occupants(before);
   const current = occupants(after);
-  const next = structuredClone(after) as OfficeState;
+  const next = ownedAfter ?? (structuredClone(after) as OfficeState);
   const revisions = structuredClone(offices) as OfficeRevisions;
 
   for (const nationId of Object.keys(revisions).map(Number)) {

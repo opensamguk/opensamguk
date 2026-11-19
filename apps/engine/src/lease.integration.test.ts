@@ -3,7 +3,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { saveInitialWorld } from './world/persistence';
 import { loadInitialWorldFromDb } from './world/resources';
 import { createDb } from '@opensamguk/db';
-import { acquireLease, assertLease, LeaseLostError, releaseLease, renewLease } from './lease';
+import { acquireLease, assertLease, lockLease, LeaseLostError, releaseLease, renewLease } from './lease';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
@@ -69,8 +69,10 @@ describe('AC-M1-11 리스 해제 정밀도, 실제 PostgreSQL', () => {
       await releaseLease(db, lease);
       await expect(renewLease(db, lease)).rejects.toBeInstanceOf(LeaseLostError);
       await expect(assertLease(db, lease)).rejects.toBeInstanceOf(LeaseLostError);
+      await expect(db.$transaction((tx) => lockLease(tx, lease))).rejects.toBeInstanceOf(LeaseLostError);
       expect(await db.engineLease.findUniqueOrThrow({ where: { worldId: lease.worldId } })).toEqual(before);
       await assertLease(db, next);
+      await db.$transaction((tx) => lockLease(tx, next));
       lease = next;
     }
   });

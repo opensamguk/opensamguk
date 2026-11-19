@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import { deepFreeze } from '../personnel/testFixture';
-import { assertGovernanceFinal, reconcileGovernance } from './reconcile';
+import { assertGovernanceFinal, reconcileGovernance, reconcileOwnedGovernance } from './reconcile';
+import { cloneWorld } from '../model/clone';
 import { governanceFixture, vassal } from './testFixture';
 import type { GovernanceOffer } from './state';
 
@@ -30,6 +31,15 @@ function offer(id: number, fromNationId = 1): Extract<GovernanceOffer, { kind: '
 }
 
 describe('AC-P2-31 현재 군주·거점에 따른 황실 정리', () => {
+  it('AC-INT-04 독점 사본의 정리도 동일하게 왕좌를 정리하고 원본을 보존한다', () => {
+    const world = fixture();
+    world.cities[world.governance!.config.seatCityKey]!.nationId = null;
+    const frozen = deepFreeze(world);
+    const owned = cloneWorld(frozen);
+    expect(reconcileOwnedGovernance(owned, 1)).toBe(owned);
+    expect(owned).toEqual(reconcileGovernance(frozen, 1));
+    expect(frozen.governance!.throne.emperorNationId).toBe(1);
+  });
   it('변화가 없으면 멱등이며 원본·금·쌀을 바꾸지 않는다', () => {
     const world = deepFreeze(fixture());
     const next = reconcileGovernance(world, 1);

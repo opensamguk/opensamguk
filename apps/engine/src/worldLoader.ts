@@ -1,3 +1,4 @@
+import { loadWorldReadRows } from './worldReadRows';
 import { verifySupplyLedger } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import type { Prisma } from '@opensamguk/db';
@@ -19,7 +20,7 @@ import {
   assertNationLifecycle,
   type WorldState,
 } from '@opensamguk/rules';
-import { engineFeatures } from './features';
+import { engineFeatures, type WorldLoadContext } from './features';
 import { loadCommandState } from './commandPersistence';
 import { engineResolver, loadExt } from './extState';
 import { readStoredNationStrategy } from '@opensamguk/rules';
@@ -45,17 +46,23 @@ export async function loadWorldAfterCapabilityCheck(
   tx: Prisma.TransactionClient,
   world: Prisma.WorldGetPayload<Record<string, never>>,
   capabilities: Awaited<ReturnType<typeof assertWorldCapabilities>>,
+  context?: WorldLoadContext,
 ): Promise<WorldState> {
   const worldId = world.id;
+  if (context) context.rows ??= await loadWorldReadRows(tx, worldId);
+  if (context && capabilities.kind === 'registry') context.treaties = capabilities.treaties;
   const checkedOrigin = capabilities.kind === 'registry' ? capabilities.origin : undefined;
   const fiveStats = statRulesSchema.parse({ stat: world.statRules }).stat.count === 5;
   const armyTypes =
     (capabilities.kind === 'registry' ? capabilities.armyTypes : undefined) ?? readCampaignArmyTypes(world);
-  const { preset } = engineResolver(world);
+  const resolved = engineResolver(world);
+  if (context) context.resolver = resolved;
+  const { preset } = resolved;
   const { presetRules: rules, recruitmentLocation } = effectiveWorldOptions(preset, world.runtimeOptions);
-  if (world.replayFormat === 3) await assertPersonnelStorage(tx, worldId, true);
+  if (world.replayFormat === 3) await assertPersonnelStorage(tx, worldId, true, context?.rows?.nationTurns);
   const ext = await loadExt(tx, worldId);
-  const cities = await tx.city.findMany({ where: { worldId } });
+  const cities =
+    capabilities.kind === 'registry' ? capabilities.cities : await tx.city.findMany({ where: { worldId } });
   const operationalMap = readOperationalMap(world.operationalMap, world.replayOrigin);
   const nations = await tx.nation.findMany({
     where: { worldId },
@@ -63,8 +70,9 @@ export async function loadWorldAfterCapabilityCheck(
   });
   const generals = await tx.general.findMany({
     where: { worldId },
-    omit: { noticeSeen: true, defaultPolicy: true, lastActiveTick: true, lastActiveAt: true },
+    omit: { noticeSeen: true, lastActiveAt: true },
   });
+  if (context) context.generals = generals;
   const diplomacies = await tx.diplomacy.findMany({
     where: { worldId },
     orderBy: [{ nationA: 'asc' }, { nationB: 'asc' }],
@@ -103,29 +111,54 @@ export async function loadWorldAfterCapabilityCheck(
       }),
     ),
     generals: Object.fromEntries(
-      generals.map(({ turnRevision, battleWins, captures, residenceTick, officerCityKey, ...general }) => {
-        void turnRevision;
-        void residenceTick;
-        // 순위용 누계는 게임 규칙 입력이 아니다. 기존 재생 해시에 섞지 않는다.
-        void battleWins;
-        void captures;
-        return [
-          general.id,
-          storedGeneralStats(
-            storedGeneralRemoval(
-              storedGeneralSex(
-                { ...stripWorldId(general), ...(officerCityKey == null ? {} : { officerCityKey }) },
-                true,
-              ),
-              world.replayFormat,
-            ),
+      generals.map((row) => [
+        row.id,
+        {
+          id: row.id,
+          userId: row.userId,
+          affinity: row.affinity,
+          name: row.name,
+          portraitId: row.portraitId,
+          nationId: row.nationId,
+          cityKey: row.cityKey,
+          officerLevel: row.officerLevel,
+          birthYear: row.birthYear,
+          deathYear: row.deathYear,
+          activeFromYear: row.activeFromYear,
+          personality: row.personality,
+          special: row.special,
+          gold: row.gold,
+          rice: row.rice,
+          crew: row.crew,
+          crewType: row.crewType,
+          train: row.train,
+          atmos: row.atmos,
+          experience: row.experience,
+          dedication: row.dedication,
+          age: row.age,
+          injury: row.injury,
+          nextTurnTick: row.nextTurnTick,
+          ...storedGeneralStats(
+            {
+              leadership: row.leadership,
+              strength: row.strength,
+              intel: row.intel,
+              politics: row.politics,
+              charm: row.charm,
+            },
             fiveStats,
           ),
-        ];
-      }),
+          ...storedGeneralSex({ sex: row.sex }, true),
+          ...storedGeneralRemoval(
+            { removedAt: row.removedAt, cityAnchorKey: row.cityAnchorKey, movePath: row.movePath },
+            world.replayFormat,
+          ),
+          ...(row.officerCityKey == null ? {} : { officerCityKey: row.officerCityKey }),
+        },
+      ]),
     ),
     diplomacies: diplomacies.map(stripWorldId),
-    ...(await loadCommandState(tx, worldId, world)),
+    ...(await loadCommandState(tx, worldId, world, context?.rows?.nationTurns)),
     ...(capabilities.kind === 'caps' && 'treaty' in capabilities.selection ? await loadTreaties(tx, worldId) : {}),
   };
   const campaign = readStoredCampaign(world.campaignState, state, world.seed);
@@ -159,6 +192,6 @@ export async function loadWorldAfterCapabilityCheck(
   const cards = readStoredStratagemCards(world, state);
   if (cards) state.stratagemCards = cards;
   for (const feature of [...engineFeatures].sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)))
-    state = (await feature.loadWorld?.(tx, worldId, state)) ?? state;
+    state = (await feature.loadWorld?.(tx, worldId, state, context)) ?? state;
   return state;
 }

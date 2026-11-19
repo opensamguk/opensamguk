@@ -39,6 +39,16 @@ const cloners = [
     clone: (view: WorldView) => cloneWorldWithRegistry(view, extRegistryForRuleFeatures()),
   },
 ];
+
+it.each(cloners)('$name keeps movement paths separate and omits an undefined path', ({ clone }) => {
+  const world = commandWorld();
+  world.generals[1]!.movePath = [2, 3];
+  const copy = clone(world);
+  copy.generals[1]!.movePath!.push(4);
+  expect(world.generals[1]!.movePath).toEqual([2, 3]);
+  Object.defineProperty(world.generals[1]!, 'movePath', { value: undefined });
+  expect(Object.hasOwn(clone(world).generals[1]!, 'movePath')).toBe(false);
+});
 const shapes = ['없음', '빈 루트', '채움'] as const;
 
 function personnelWorld(): WorldState {

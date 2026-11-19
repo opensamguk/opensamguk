@@ -44,19 +44,19 @@ function fixture(status: World['status'] = 'PAUSED', caps = false, beforeCommit?
   let failFence = 0;
   const query = vi.fn(async (strings: TemplateStringsArray, ...values: unknown[]) => {
     const sql = strings.join('?').trim().replace(/\s+/g, ' ');
-    if (sql.startsWith('SELECT "worldId" FROM "EngineLease"')) {
-      trace.push('lease-lock');
-      return [];
+    if (sql.startsWith('WITH locked AS MATERIALIZED')) {
+      trace.push('lease-lock', 'fence');
+      return ++fenceChecks === failFence ? [] : [{}];
     }
     if (sql.startsWith('SELECT 1 FROM "EngineLease"')) {
       trace.push('fence');
       return ++fenceChecks === failFence ? [] : [{}];
     }
-    if (sql === 'SELECT id FROM "World" WHERE id = ? FOR UPDATE') {
+    if (sql === 'SELECT * FROM "World" WHERE id = ? FOR UPDATE') {
       expect(values).toEqual([world.id]);
       worldLocked = true;
-      trace.push('world-lock');
-      return [];
+      trace.push('world-lock', 'world-read');
+      return [world];
     }
     if (sql.includes('FROM "WorldExtSlice"')) {
       trace.push('ext-read');

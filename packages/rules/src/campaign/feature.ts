@@ -55,14 +55,14 @@ export const campaignFeature: RuleFeatureDefinition = {
   key: 'campaign-v1',
   requires: ['five-stats', 'operational-map', 'personnel', 'policy'],
   conflicts: ['ext'],
-  checkOrigin({ initial, data }) {
+  checkOrigin({ initial, data, initialWorld }) {
     if (
       data !== undefined ||
       initial.generals.some((general) => general.crew !== 0) ||
       Object.hasOwn(initial, 'campaign')
     )
       throw new Error('새 휘하 프로필은 병력이 없는 생성 기록에서 시작합니다.');
-    const state = toWorldState(initial);
+    const state = initialWorld ?? toWorldState(initial);
     emptyCampaignState(state, initial.seed, initial.scenarioKey);
     campaignArmyTypes(initial);
   },

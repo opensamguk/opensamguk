@@ -5,7 +5,7 @@ import { fail } from '../commands/support';
 import type { Actor, CommandDef, Failure } from '../commands/types';
 import type { WorldView } from '../model/world';
 import { governanceRealmIndex } from './realm';
-import { reconcileGovernance } from './reconcile';
+import { reconcileOwnedGovernance } from './reconcile';
 
 export const GOVERNANCE_HOSTILE_COMMANDS = [
   'nation_declare',
@@ -57,7 +57,7 @@ export function createGovernanceCommandResolver(base: CommandResolver): CommandR
         const denied = governanceHostilityFailure(world, actor, key, args) ?? original.check(world, actor, args);
         if (denied) throw new Error(denied.message);
         const result = original.execute(world, actor, args, rng);
-        const state = reconcileGovernance(applyEffects(world, result.effects), actor.tick ?? 0);
+        const state = reconcileOwnedGovernance(applyEffects(world, result.effects), actor.tick ?? 0);
         return { ...result, effects: [{ kind: 'world', state }] };
       },
     };

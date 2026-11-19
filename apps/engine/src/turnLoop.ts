@@ -29,7 +29,7 @@ import { persistEffects, shiftTurns, persistCityLandTurns } from './persist';
 import { persistMonthly, loadReplayState } from './monthly';
 import { hashState } from '@opensamguk/shared/node';
 import { processInputs, processPendingInput } from './inputs';
-import { checkWorldReplay } from './features';
+import { checkWorldReplay, type WorldLoadContext } from './features';
 import { loadPersonnelTurnContext, persistPersonnelPacket } from './ruleFeatures';
 import { appendLogisticsMovements } from './logisticsState';
 import { engineResolver, persistExt, verifyWorldExt } from './extState';
@@ -160,8 +160,9 @@ export class TurnLoop {
       async (tx) => {
         await lockLease(tx, this.lease);
         // 일시정지·재개와 턴 commit이 같은 월드 행에서 직렬화된다.
-        await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${worldId} FOR UPDATE`;
-        const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
+        const [world] = await tx.$queryRaw<Prisma.WorldGetPayload<Record<string, never>>[]>`
+          SELECT * FROM "World" WHERE id = ${worldId} FOR UPDATE`;
+        if (!world) throw new Error('잠글 월드가 없습니다.');
         if (world.replayFormat === 3 && !this.replayChecked) checkWorldReplay(world);
         const capabilities = await assertWorldCapabilities(tx, world);
         if (!this.extVerified) await verifyWorldExt(tx, world);
@@ -248,9 +249,10 @@ export class TurnLoop {
             status: world.status,
           };
         }
+        const loadContext: WorldLoadContext = {};
         let loadedState: WorldState | undefined;
         if (!catchUp && world.campaignState) {
-          loadedState = await loadWorldAfterCapabilityCheck(tx, world, capabilities);
+          loadedState = await loadWorldAfterCapabilityCheck(tx, world, capabilities, loadContext);
           const tactical = await processTacticalStep(tx, world, new Date(now), undefined, loadedState);
           if (tactical) {
             await persistPublicMap(
@@ -298,12 +300,14 @@ export class TurnLoop {
           next = await persistMonthly(tx, worldId, world.seed, boundary, sequence);
         } else if (due) {
           sequence = await nextActionSequence(tx, worldId);
-          await tx.$queryRaw`SELECT id FROM "General" WHERE "worldId" = ${worldId} AND id = ${due.id} FOR UPDATE`;
+          const [actor] = await tx.$queryRaw<Prisma.GeneralGetPayload<Record<string, never>>[]>`
+            SELECT * FROM "General" WHERE "worldId" = ${worldId} AND id = ${due.id} FOR UPDATE`;
+          if (!actor) throw new Error('잠글 장수가 없습니다.');
           // 예턴 편집은 actor 행 잠금 또는 turnRevision 조건을 함께 사용해야 한다.
           // 전술 처리 결과가 null이면 쓰기가 없으므로 같은 잠금의 적재 사본을 이어 쓴다.
-          const state = loadedState ?? (await loadWorldAfterCapabilityCheck(tx, world, capabilities));
-          const personnelBefore = world.replayFormat === 3 ? await loadPersonnelTurnContext(tx, worldId, state) : null;
-          const actor = await tx.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: due.id } } });
+          const state = loadedState ?? (await loadWorldAfterCapabilityCheck(tx, world, capabilities, loadContext));
+          const personnelBefore =
+            world.replayFormat === 3 ? await loadPersonnelTurnContext(tx, worldId, state, loadContext) : null;
           const slots = await tx.generalTurn.findMany({
             where: { worldId, generalId: due.id },
             orderBy: { slot: 'asc' },
@@ -332,7 +336,7 @@ export class TurnLoop {
               ...(modern ? { policy: actor.defaultPolicy as import('@opensamguk/rules').PolicyKey } : {}),
               turnRevision: actor.turnRevision,
             },
-            engineResolver(world).resolver,
+            loadContext.resolver?.resolver ?? engineResolver(world).resolver,
             ...(personnelBefore ? ([{ offices: personnelBefore.offices! }] as const) : []),
           );
           if (
@@ -353,6 +357,7 @@ export class TurnLoop {
                 personnelBefore.offices!,
                 { state: next, ...turn.personnel! },
                 due.nextTurnTick,
+                next,
               )
             : null;
           const anchors =
@@ -386,10 +391,18 @@ export class TurnLoop {
             state,
             personnelBefore && personnelPacket && anchors
               ? () =>
-                  persistPersonnelPacket(tx, worldId, personnelBefore, personnelPacket, anchors, {
-                    tick: due.nextTurnTick,
-                    sequence,
-                  })
+                  persistPersonnelPacket(
+                    tx,
+                    worldId,
+                    personnelBefore,
+                    personnelPacket,
+                    anchors,
+                    {
+                      tick: due.nextTurnTick,
+                      sequence,
+                    },
+                    loadContext,
+                  )
               : undefined,
             capabilities.kind === 'registry' ? capabilities.armyTypes : undefined,
           );
@@ -413,7 +426,9 @@ export class TurnLoop {
             const nationId = turn.nation.nationId;
             if (!('code' in national)) await persistCommandReports(tx, worldId, due.nextTurnTick, due.id, national);
             if ('code' in national || !national.history?.some((entry) => entry.nationId === nationId)) {
-              const name = engineResolver(world).resolver.get(turn.nation.commandKey)?.name ?? '국가 명령';
+              const name =
+                (loadContext.resolver?.resolver ?? engineResolver(world).resolver).get(turn.nation.commandKey)?.name ??
+                '국가 명령';
               await appendNationHistory(
                 tx,
                 worldId,

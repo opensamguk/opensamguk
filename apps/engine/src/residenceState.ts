@@ -44,9 +44,10 @@ export function assertNoResidenceAnchorsInRows(rows: readonly { residenceTick: n
 export async function loadResidenceAnchors(
   tx: Prisma.TransactionClient,
   worldId: string,
+  loadedRows?: readonly { id: number; userId: string | null; residenceTick: number | null }[],
 ): Promise<Record<number, number>> {
   const result: Record<number, number> = {};
-  for (const row of await readRows(tx, worldId)) {
+  for (const row of loadedRows ?? (await readRows(tx, worldId))) {
     if (row.userId === null) {
       if (row.residenceTick !== null) throw new Error('NPC 장수에 물리 거주 앵커가 있습니다.');
       continue;
@@ -64,10 +65,11 @@ export async function persistResidenceAnchors(
   worldId: string,
   before: Anchors,
   after: Anchors,
+  loadedRows?: readonly { id: number; userId: string | null; residenceTick: number | null }[],
 ): Promise<void> {
   const previous = anchorMap(before);
   const next = anchorMap(after);
-  const rows = await readRows(tx, worldId);
+  const rows = loadedRows ?? (await readRows(tx, worldId));
   const people = new Set(rows.filter((row) => row.userId !== null).map((row) => row.id));
   if (next.size !== people.size || [...next.keys()].some((id) => !people.has(id)))
     throw new Error('최종 사람 장수와 물리 거주 앵커가 다릅니다.');

@@ -23,8 +23,12 @@ export function readStoredLogistics(value: unknown, state: Pick<WorldView, 'citi
   return stored;
 }
 
-export async function assertStoredLogistics(tx: Prisma.TransactionClient, world: World): Promise<void> {
-  const cities = await tx.city.findMany({ where: { worldId: world.id } });
+export async function assertStoredLogistics(
+  tx: Prisma.TransactionClient,
+  world: World,
+  loadedCities?: Prisma.CityGetPayload<Record<string, never>>[],
+): Promise<void> {
+  const cities = loadedCities ?? (await tx.city.findMany({ where: { worldId: world.id } }));
   const attached = attachOperationalKinds(
     cities,
     readOperationalMap(world.operationalMap, world.replayOrigin),

@@ -1,3 +1,4 @@
+import type { PersonnelReadRow } from './worldReadRows';
 import type { Prisma } from '@opensamguk/db';
 import { processProposalRecord } from './proposalRecord';
 import {
@@ -21,7 +22,7 @@ import {
   type WorldState,
   type NationLifecycleEffects,
 } from '@opensamguk/rules';
-import type { EngineFeature, QueuedInputHandler } from './features';
+import type { EngineFeature, QueuedInputHandler, WorldLoadContext } from './features';
 import { loadReplayState } from './monthly';
 import { loadWorld } from './worldLoader';
 import { loadOfficeRevisions, loadOfficeState, persistOfficeState } from './personnelState';
@@ -50,38 +51,36 @@ import { appendReputationEvents, loadReputationLedger, persistMonthlyReview } fr
 import { persistNationLifecycleMonth } from './nationLifecycleState';
 import { processTacticalInput } from './tacticalBattle';
 
-export async function loadPersonnelTurnContext(tx: Prisma.TransactionClient, worldId: string, state: WorldState) {
+export async function loadPersonnelTurnContext(
+  tx: Prisma.TransactionClient,
+  worldId: string,
+  state: WorldState,
+  context?: WorldLoadContext,
+) {
   {
-    // 복합 PK가 칸 중복을 금지한다. 개수와 양 끝 값으로 같은 연속 범위를 검증한다.
-    const rows = await tx.$queryRaw<
-      {
-        id: number;
-        defaultPolicy: string | null;
-        userId: string | null;
-        lastActiveTick: number | null;
-        validSlots: boolean;
-      }[]
-    >`
-      WITH turn_slots AS MATERIALIZED (
-        SELECT "generalId", count(*) = 30 AND min(slot) = 0 AND max(slot) = 29 AS valid
-        FROM "GeneralTurn" WHERE "worldId" = ${worldId}
-        GROUP BY "generalId"
-      )
-      SELECT g.id, g."defaultPolicy", g."userId", g."lastActiveTick",
-        COALESCE(t.valid, false) AS "validSlots"
-      FROM "General" g
-      LEFT JOIN turn_slots t ON t."generalId" = g.id
-      WHERE g."worldId" = ${worldId}
-      ORDER BY g.id
-    `;
-    if (rows.some((row) => !row.validSlots)) assertSlotSet([]);
+    // FK·복합 PK·slot 0~29 CHECK로 장수당 최대 30칸이다. 전체 개수가 30N이면 모두 완전하다.
+    let rows: readonly Pick<PersonnelReadRow, 'defaultPolicy' | 'userId' | 'lastActiveTick'>[];
+    if (context?.rows && context.generals) {
+      const count = context.rows.slotCount;
+      if (!Number.isSafeInteger(count) || count !== 30 * context.generals.length) assertSlotSet([]);
+      rows = context.generals;
+    } else {
+      const stored = await tx.$queryRaw<PersonnelReadRow[]>`
+        SELECT g.id, g."defaultPolicy", g."userId", g."lastActiveTick",
+          (SELECT count(*) FROM "GeneralTurn" WHERE "worldId" = ${worldId}) =
+            30 * count(*) OVER () AS "validSlots"
+        FROM "General" g WHERE g."worldId" = ${worldId} ORDER BY g.id
+      `;
+      if (stored.some((row) => !row.validSlots)) assertSlotSet([]);
+      rows = stored;
+    }
     for (const row of rows) {
       if (!isPolicyKey(row.defaultPolicy)) throw new Error('저장된 기본 방침이 올바르지 않습니다.');
       if (row.userId !== null && row.lastActiveTick === null) throw new Error('사람 장수의 활동 tick이 없습니다.');
     }
   }
-  const offices = await loadOfficeRevisions(tx, worldId);
-  const residenceAnchors = await loadResidenceAnchors(tx, worldId);
+  const offices = context?.offices ?? (await loadOfficeRevisions(tx, worldId));
+  const residenceAnchors = await loadResidenceAnchors(tx, worldId, context?.generals);
   return { state, offices, residenceAnchors };
 }
 
@@ -92,10 +91,11 @@ export async function persistPersonnelPacket(
   packet: PersonnelStepPacket,
   anchors: Record<number, number>,
   at: { tick: number; sequence: number },
+  context?: WorldLoadContext,
 ): Promise<void> {
   const { tick, sequence } = at;
   await persistOfficeState(tx, worldId, packet.office.before, packet.office.next);
-  await persistAssignmentState(tx, worldId, packet.assignment);
+  await persistAssignmentState(tx, worldId, packet.assignment, context?.assignment);
   if (packet.logs.length) {
     const last = await tx.generalLog.findFirst({
       where: { worldId, sequence },
@@ -107,7 +107,12 @@ export async function persistPersonnelPacket(
     for (const log of packet.logs)
       await tx.generalLog.create({ data: { ...log, worldId, tick, sequence, ordinal: ordinal++ } });
   }
-  await persistResidenceAnchors(tx, worldId, before.residenceAnchors!, anchors);
+  const rows = context?.generals;
+  const unchangedPeople =
+    rows &&
+    rows.length === Object.keys(packet.state.generals).length &&
+    rows.every((row) => packet.state.generals[row.id]?.userId === row.userId);
+  await persistResidenceAnchors(tx, worldId, before.residenceAnchors!, anchors, unchangedPeople ? rows : undefined);
 }
 
 export async function persistQueuedPersonnelStep(
@@ -312,12 +317,17 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
   },
   {
     key: 'personnel',
-    async loadWorld(tx, worldId, state) {
-      const office = await loadOfficeState(tx, worldId);
+    async loadWorld(tx, worldId, state, context) {
+      const office = await loadOfficeState(tx, worldId, context?.rows);
+      const assignment = await loadAssignmentState(tx, worldId, context?.rows?.assignments);
+      if (context) {
+        context.offices = office.offices;
+        context.assignment = assignment;
+      }
       return {
         ...state,
         ...(office.officeTurns ? { officeTurns: office.officeTurns } : {}),
-        ...(await loadAssignmentState(tx, worldId)),
+        ...assignment,
       };
     },
     async loadReplayState(tx, worldId, replay) {
@@ -340,9 +350,9 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
   },
   {
     key: 'treaty',
-    loadWorld: async (tx, worldId, state) => ({
+    loadWorld: async (tx, worldId, state, context) => ({
       ...state,
-      ...(await loadTreaties(tx, worldId, treatyOptions())),
+      ...(await loadTreaties(tx, worldId, treatyOptions(), context?.treaties)),
     }),
     queuedInputs: {
       'treaty.propose': (tx, world, event, context) =>
@@ -366,7 +376,10 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
   },
   {
     key: 'treaty-break',
-    loadWorld: async (tx, worldId, state) => ({ ...state, ...(await loadNationTrust(tx, worldId)) }),
+    loadWorld: async (tx, worldId, state, context) => ({
+      ...state,
+      ...(await loadNationTrust(tx, worldId, context?.rows?.trust)),
+    }),
     queuedInputs: {
       'treaty.break': (tx, world, event, context) =>
         processTreatyQueuedInput(tx, world, event, {

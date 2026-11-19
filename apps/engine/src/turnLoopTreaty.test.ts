@@ -145,8 +145,10 @@ async function fixture(caps = true, modern = false) {
     }),
     $queryRaw: vi.fn(async (strings: TemplateStringsArray) => {
       const sql = strings.join('?').trim().replace(/\s+/g, ' ');
-      if (sql.startsWith('SELECT 1 FROM "EngineLease"')) return [{}];
-      if (sql.startsWith('WITH turn_slots'))
+      if (sql.startsWith('WITH locked AS MATERIALIZED') || sql.startsWith('SELECT 1 FROM "EngineLease"')) return [{}];
+      if (sql.startsWith('SELECT * FROM "World"')) return [{ ...world }];
+      if (sql.startsWith('SELECT * FROM "General"')) return [rawGeneral()];
+      if (sql.startsWith('SELECT g.id, g."defaultPolicy"'))
         return [{ id: 1, defaultPolicy: 'none', userId: 'human', lastActiveTick: 0, validSlots: true }];
       if (sql.startsWith('SELECT clock_timestamp()')) return [{ now: new Date(0) }];
       if (sql.includes('FROM "WorldExtSlice"')) return [{ key: 'intel', value: {} }];

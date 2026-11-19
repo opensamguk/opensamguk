@@ -22,9 +22,10 @@ export async function assertStoredCityResources(
     'id' | 'replayFormat' | 'replayOrigin' | 'unitSet' | 'cityResourcesState'
   >,
   armyTypes?: readonly number[],
+  loadedCities?: Prisma.CityGetPayload<Record<string, never>>[],
 ): Promise<void> {
   if (world.replayFormat !== 3) throw new Error('도시 자원은 새 판 재생 형식에서만 쓸 수 있습니다.');
-  const cities = await tx.city.findMany({ where: { worldId: world.id }, omit: { kind: true } });
+  const cities = loadedCities ?? (await tx.city.findMany({ where: { worldId: world.id }, omit: { kind: true } }));
   readStoredCityResources(
     world.cityResourcesState,
     {

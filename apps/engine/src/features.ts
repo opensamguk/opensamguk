@@ -16,9 +16,28 @@ export type QueuedInputHandler = (
   event: EngineInput,
   context: { tick: number; sequence: number; emit?: (signal: import('@opensamguk/db').RealtimeSignal) => void },
 ) => Promise<{ status: 'APPLIED' | 'REJECTED'; result: Prisma.InputJsonValue; generalId?: number }>;
+export interface WorldLoadContext {
+  resolver?: ReturnType<typeof import('./extState').engineResolver>;
+  rows?: import('./worldReadRows').WorldReadRows;
+  treaties?: readonly Omit<Prisma.TreatyGetPayload<Record<string, never>>, 'worldId'>[];
+  assignment?: Pick<WorldState, 'assignmentOffers'>;
+  generals?: readonly {
+    id: number;
+    userId: string | null;
+    residenceTick: number | null;
+    defaultPolicy: string | null;
+    lastActiveTick: number | null;
+  }[];
+  offices?: import('@opensamguk/rules').OfficeRevisions;
+}
 export interface EngineFeature {
   key: string;
-  loadWorld?(tx: Prisma.TransactionClient, worldId: string, state: WorldState): Promise<WorldState>;
+  loadWorld?(
+    tx: Prisma.TransactionClient,
+    worldId: string,
+    state: WorldState,
+    context?: WorldLoadContext,
+  ): Promise<WorldState>;
   loadReplayState?(tx: Prisma.TransactionClient, worldId: string, replay: ReplayState): Promise<ReplayState>;
   persistMonthly?(
     tx: Prisma.TransactionClient,

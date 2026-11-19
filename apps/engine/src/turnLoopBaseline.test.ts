@@ -47,9 +47,9 @@ function fixture(status: 'PAUSED' | 'RUNNING', human: boolean, modern = false) {
     $queryRaw: vi.fn(async (strings: TemplateStringsArray, ...values: unknown[]) => {
       const sql = strings.join('?').trim().replace(/\s+/g, ' ');
       if (values.length !== 1 || values[0] !== world.id) throw new Error(`예상하지 않은 원시 조회 인자: ${sql}`);
-      if (sql === 'SELECT id FROM "World" WHERE id = ? FOR UPDATE') {
+      if (sql === 'SELECT * FROM "World" WHERE id = ? FOR UPDATE') {
         locked = true;
-        return undefined;
+        return [world];
       }
       if (locked && sql === 'SELECT "key", "value" FROM "WorldExtSlice" WHERE "worldId" = ? ORDER BY "key"')
         return [{ key: 'intel', value: {} }];

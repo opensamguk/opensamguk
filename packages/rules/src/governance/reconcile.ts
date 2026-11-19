@@ -119,7 +119,12 @@ export function assertGovernanceFinal(world: WorldView, tick: number): void {
 }
 
 export function reconcileGovernance(world: WorldView, tick: number): WorldState {
-  const next = cloneWorld(world);
+  return reconcileOwnedGovernance(cloneWorld(world), tick);
+}
+
+// The caller owns this copy; all governance validation and reconciliation still run.
+export function reconcileOwnedGovernance(next: WorldState, tick: number): WorldState {
+  const world: WorldView = next;
   const state = readGovernanceState(world.governance),
     original = JSON.stringify(state);
   next.governance = state;

@@ -264,18 +264,21 @@ export function finishPersonnelStep(
   change: Readonly<{ state: OfficeView; closedOffers: readonly ClosedOffer[]; logs: readonly PersonnelLog[] }>,
   offices: DeepReadonly<OfficeRevisions>,
   tick: number,
+  ownedAfter?: OfficeState,
 ): PersonnelStepResult {
-  const synced = syncOffices(before, change.state, offices);
-  clearLostCityOffices(before, synced.state);
-  const cancelled = closeInvalidOffersInPlace(synced.state, tick);
-  const closedOffers = [...change.closedOffers, ...cancelled.closedOffers];
-  const remaining = new Set(Object.values(cancelled.state.assignmentOffers ?? {}).map((offer) => offer.id));
   // 국가 발령 뒤 개인 탈국이 실행되면 같은 턴에 새 제안이 생겼다가 취소될 수 있다.
+  // ownedAfter를 받으면 syncOffices가 change.state를 그대로 결과로 쓰고 아래 취소가 그 객체의 제안을 지우므로,
+  // 비교할 제안 id는 동기화 전에 떠 둔다.
   const pending = new Set(
     [...Object.values(before.assignmentOffers ?? {}), ...Object.values(change.state.assignmentOffers ?? {})].map(
       (offer) => offer.id,
     ),
   );
+  const synced = syncOffices(before, change.state, offices, ownedAfter);
+  clearLostCityOffices(before, synced.state);
+  const cancelled = closeInvalidOffersInPlace(synced.state, tick);
+  const closedOffers = [...change.closedOffers, ...cancelled.closedOffers];
+  const remaining = new Set(Object.values(cancelled.state.assignmentOffers ?? {}).map((offer) => offer.id));
   const removed = [...pending].filter((id) => !remaining.has(id)).sort();
   const closed = closedOffers.map((offer) => offer.id).sort();
   if (new Set(closed).size !== closed.length || JSON.stringify(removed) !== JSON.stringify(closed))

@@ -4,6 +4,7 @@ import { commandWorld } from '../../test/commandFixture';
 import { applyEffects } from '../commands/effects';
 import { createCommandResolver } from '../commands/resolve';
 import { cloneWorld } from '../model/clone';
+import { deepFreeze } from '../personnel/testFixture';
 import { initialStratagemCards } from './state';
 import { createStratagemCardResolver } from './resolver';
 import { TEST_STRATAGEM_CARDS_CONFIG } from './testFixture';
@@ -26,6 +27,18 @@ const failingRoll = () => {
   vi.spyOn(rng, 'next').mockReturnValue(0.999999);
   return rng;
 };
+
+it('AC-INT-04 패를 쓰지 않는 명령도 원본을 보존하고 독립된 결과를 낸다', () => {
+  const world = deepFreeze(setup());
+  const rest = createCommandResolver({ general: [], nation: [] });
+  const ordinary = rest.run(world, actor, 'rest', {}, createRng('rest'));
+  const result = createStratagemCardResolver(rest).run(world, actor, 'rest', {}, createRng('rest'));
+  if ('code' in ordinary || 'code' in result) throw Error('rest fixture');
+  const after = applyEffects(world, result.effects);
+  expect(after).toEqual(applyEffects(world, ordinary.effects));
+  after.generals[1]!.gold++;
+  expect(after.generals[1]!.gold).toBe(world.generals[1]!.gold + 1);
+});
 
 it.each(['fire_attack', 'sabotage', 'incite', 'plunder'])('AC-P2-23 %s는 확률 실패에도 해당 패 한 장만 쓴다', (key) => {
   const world = setup(),

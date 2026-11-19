@@ -21,8 +21,11 @@ export function cloneWorldWithRegistry(view: WorldView, registry: ExtStateRegist
   }
   for (const key in view.nations) nations[key] = { ...view.nations[key]! };
   for (const key in view.generals) {
-    const { movePath, ...general } = view.generals[key]!;
-    generals[key] = { ...general, ...(movePath ? { movePath: [...movePath] } : {}) };
+    const movePath = view.generals[key]!.movePath;
+    const general = { ...view.generals[key]! };
+    if (movePath) general.movePath = [...movePath];
+    else delete general.movePath;
+    generals[key] = general as WorldState['generals'][number];
   }
   return {
     ...(view.fogOfWar === undefined ? {} : { fogOfWar: view.fogOfWar }),

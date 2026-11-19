@@ -22,7 +22,14 @@ export async function assertWorldCapabilities(
   tx: Prisma.TransactionClient,
   world: Prisma.WorldGetPayload<Record<string, never>>,
 ): Promise<
-  WorldCapabilities | { kind: 'registry'; armyTypes?: readonly number[]; origin: ReturnType<typeof checkWorldReplay> }
+  | WorldCapabilities
+  | {
+      kind: 'registry';
+      armyTypes?: readonly number[];
+      origin: ReturnType<typeof checkWorldReplay>;
+      cities: Prisma.CityGetPayload<Record<string, never>>[];
+      treaties: readonly Omit<Prisma.TreatyGetPayload<Record<string, never>>, 'worldId'>[];
+    }
 > {
   const modern = world.replayFormat === 3;
   const origin = checkStoredReplayFormat(world);
@@ -31,10 +38,13 @@ export async function assertWorldCapabilities(
   readStoredNationResearch(world, origin);
   readStoredNationLifecycle(world, origin);
   const armyTypes = readCampaignArmyTypes(world, origin);
-  await assertStoredCityResources(tx, world, armyTypes);
-  await assertStoredCityRuins(tx, world, origin);
-  await assertStoredLogistics(tx, world);
-  const capabilities = modern ? { kind: 'registry' as const, armyTypes, origin } : selectWorldCapabilities(world);
+  const cities = await tx.city.findMany({ where: { worldId: world.id } });
+  await assertStoredCityResources(tx, world, armyTypes, cities);
+  await assertStoredCityRuins(tx, world, origin, cities);
+  await assertStoredLogistics(tx, world, cities);
+  const capabilities = modern
+    ? { kind: 'registry' as const, armyTypes, origin, cities }
+    : selectWorldCapabilities(world);
   const rows = await tx.treaty.findMany({
     where: { worldId: world.id },
     orderBy: { id: 'asc' },
@@ -70,5 +80,5 @@ export async function assertWorldCapabilities(
       );
     } else projectTreatyRows(rows, options);
   }
-  return capabilities;
+  return capabilities.kind === 'registry' ? { ...capabilities, treaties: rows } : capabilities;
 }

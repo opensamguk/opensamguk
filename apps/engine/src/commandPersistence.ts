@@ -20,10 +20,13 @@ export async function loadCommandState(
   tx: Prisma.TransactionClient,
   worldId: string,
   lockedWorld?: Pick<Prisma.WorldGetPayload<Record<string, never>>, 'commandMeta'>,
+  loadedSlots?: readonly Prisma.NationTurnGetPayload<Record<string, never>>[],
 ): Promise<Pick<WorldState, 'commandMeta' | 'nationTurns'>> {
   const world =
     lockedWorld ?? (await tx.world.findUniqueOrThrow({ where: { id: worldId }, select: { commandMeta: true } }));
-  const slots = await tx.nationTurn.findMany({ where: { worldId }, orderBy: [{ nationId: 'asc' }, { slot: 'asc' }] });
+  const slots =
+    loadedSlots ??
+    (await tx.nationTurn.findMany({ where: { worldId }, orderBy: [{ nationId: 'asc' }, { slot: 'asc' }] }));
   const nationTurns: NonNullable<WorldState['nationTurns']> = {};
   for (const slot of slots) {
     nationTurns[slot.nationId] ??= Array.from({ length: 30 }, () => ({ commandKey: 'nation_rest', args: {} }));

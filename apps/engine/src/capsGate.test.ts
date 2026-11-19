@@ -168,8 +168,9 @@ it('3a 형식·origin·정책 불일치는 저장 행 읽기 전에 실패한다
 });
 
 it('3a loadWorld는 실제 loadTreaties의 열린 fragment만 합친다 (단위 stub)', async () => {
-  const { tx, findMany, write } = transaction([row(), row('PROPOSED', 2), row('ENDED', 3)]);
+  const { tx, findMany, city, write } = transaction([row(), row('PROPOSED', 2), row('ENDED', 3)]);
   const loaded = await loadWorld(tx, 'world');
+  expect(city).toHaveBeenCalledOnce();
   expect(loaded.treaties?.map(({ id }) => id)).toEqual([1, 2]);
   expect(Object.keys(loaded.treaties![0]!).sort()).toEqual(
     keys.filter((key) => !['costFrom', 'costTo', 'closedSequence'].includes(key)).sort(),
