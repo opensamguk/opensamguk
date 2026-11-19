@@ -941,6 +941,8 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
             name: '훈련',
             args: { target: 'city', crewType: 1100 },
           },
+          // 준비된 수비병은 다음 NPC 군주 차례에 부곡으로 배속된다. 사기진작용 병력도 실제 모병으로 마련한다.
+          { key: 'recruit', name: '모병', args: { amount: 40, crewType: 1100 } },
           {
             key: 'morale',
             name: '사기진작',
