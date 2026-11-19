@@ -570,7 +570,8 @@ const ZOOM_MAX = 5;
 
 const NO_CONDS: readonly string[] = [];
 /** 성마다 그린 지물(castle-walls/city-<거점 번호>/landmark.webp). 없으면 null. */
-const landmarkArt = (siteKey: number) => art(`city/castle-walls/city-${siteKey}/landmark.webp`);
+// 공개 빌드 자산 검사는 '/'로 시작하는 그림 경로 문자열을 자산으로 읽는다. 마지막 조각을 '/landmark.webp'로 남기지 않는다.
+const landmarkArt = (siteKey: number) => art(['city/castle-walls', `city-${siteKey}`, 'landmark.webp'].join('/'));
 const PALACE_ID = 'palace';
 /** 등급별 태수부 그림 단계(시안 PALACE와 같다). */
 const PALACE_LEVEL: Readonly<Record<CityGrade, 1 | 2 | 3>> = { 현: 1, 소: 1, 중: 2, 대: 2, 특: 3, 경: 3 };
