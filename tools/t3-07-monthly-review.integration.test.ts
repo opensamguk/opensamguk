@@ -179,7 +179,8 @@ async function advance(worldId: string, tick: number, fail = false) {
 const snapshot = (worldId: string) => db.$transaction((tx) => loadReplayState(tx, worldId));
 async function fixture(players?: [Player, Player]) {
   const initial = await monthlyFixture();
-  initial.seed = 'monthly-review-integration';
+  // 실제 준비 뒤 11월에도 기존 점령·내정 문구를 고정한다.
+  initial.seed = 'monthly-review-integration-11';
   initial.generals = initial.generals.map((general) => ({ ...general, nextTurnTick: 1_000_000_000, injury: 0 }));
   if (players) {
     Object.assign(initial.generals[0]!, {
@@ -248,7 +249,8 @@ beforeAll(async () => {
 afterAll(async () => {
   await app.close();
   await db.world.deleteMany({ where: { id: { in: worldIds } } });
-  await db.user.deleteMany({ where: { id: { in: userIds } } });
+  // 종료 때 적립된 불변 유산 원장과 그 계정은 전용 DB 정리까지 보존한다.
+  await db.user.deleteMany({ where: { id: { in: userIds }, heritageAccount: { is: null } } });
   await db.$disconnect();
 });
 
@@ -276,7 +278,16 @@ it('T3-07 AC-M3-15 실제 전투·내정 사건과 월 정산은 기존 기록�
   const stored = await snapshot(modern.worldId),
     replicated = await snapshot(replica.worldId);
   expect(replicated.reputation).toEqual(stored.reputation);
-  expect(stored).toEqual(replicated);
+  // 독립 실행의 DB 시각은 다르다. 각 원본 시각을 포함한 해시는 아래에서 각자 재생한다.
+  const withoutDeadlines = (replay: typeof stored) => {
+    const copy = structuredClone(replay);
+    for (const battle of copy.state.campaign?.tactical?.battles ?? []) {
+      battle.deadlineAt = 0;
+      battle.hardDeadlineAt = 0;
+    }
+    return copy;
+  };
+  expect(withoutDeadlines(stored)).toEqual(withoutDeadlines(replicated));
   for (const { worldId } of [modern, replica]) expect((await exportReplay(db, worldId)).months).toHaveLength(11);
   const replicaRows = await db.yearbookSnapshot.findMany({
     where: { worldId: replica.worldId },
@@ -381,7 +392,7 @@ it('T3-07 AC-M3-15 사건은 최초 값을 보존하고 실패한 턴·정산은
       await tx.world.update({ where: { id: f.worldId }, data: { clockRevision: { increment: 1 } } });
       await persistMonthly(tx, f.worldId, f.initial.seed, 110000, originalWorld.actionSequence + 1);
     }),
-  ).rejects.toThrow('같은 달의 월단평이 이미 있습니다.');
+  ).rejects.toThrow('가문 월 정산이 중복되거나 달을 건너뛰었습니다.');
   expect(await db.world.findUniqueOrThrow({ where: { id: f.worldId } })).toEqual(originalWorld);
   await expect(
     db.$transaction(async (tx) => {
@@ -636,8 +647,8 @@ it('T3-07 AC-M3-15 장수 제거와 국가 멸망 뒤에도 과거 순위의 공
   const archive = await exportReplay(db, worldId);
   if (archive.version !== 3) throw Error('월단평의 재생 형식이 다릅니다.');
   expect(archive.end).not.toBeNull();
-  expect(archive.months).toHaveLength(11);
-  expect(replayArchive(archive, 11)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
+  expect(archive.months).toHaveLength(12);
+  expect(replayArchive(archive, 12)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
   expect(replayToEnd(archive)).toEqual(archive.end);
   expect(archive.end!.finalStateHash).toBe(hashState(await snapshot(worldId)));
 });

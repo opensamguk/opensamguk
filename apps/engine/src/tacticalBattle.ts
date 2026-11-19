@@ -9,6 +9,7 @@ import {
   battleParticipant,
   canCommandBattleUnit,
   battleCancellation,
+  reputationInputEvents,
   unitSetSchema,
   type WorldView,
   type BattleState,
@@ -21,6 +22,7 @@ import { persistEffects } from './persist';
 import { loadReplayState } from './monthly';
 import { engineFeatures } from './features';
 import { persistQueuedPersonnelStep } from './ruleFeatures';
+import { appendReputationEvents } from './reputationState';
 
 const json = (value: unknown) => JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 const envelope = z.object({ input: z.unknown(), receivedAt: z.number().int(), sessionId: z.string() });
@@ -296,6 +298,7 @@ export async function processTacticalStep(
   };
   // 일반 턴과 같이 국가의 직책이 cascade 삭제되기 전에 인사 패킷을 저장한다.
   await persistQueuedPersonnelStep(tx, world, beforeReplay, input, next);
+  await appendReputationEvents(tx, world.id, reputationInputEvents({ before, after: next, input }));
   for (const feature of engineFeatures)
     if (feature.key !== 'campaign-v1' && feature.key !== 'personnel')
       await feature.afterQueuedInput?.(tx, world, beforeReplay, input);

@@ -22,7 +22,10 @@ export const reputationFeature: RuleFeatureDefinition = {
     if (!after.reputation) throw Error('월단평 재생 원장이 없습니다.');
     return {
       ...after,
-      reputation: appendReputationEvents(after.reputation, reputationInputEvents({ before: before.state, input })),
+      reputation: appendReputationEvents(
+        after.reputation,
+        reputationInputEvents({ before: before.state, after: after.state, input }),
+      ),
     };
   },
   settleMonthly({ settled, tick, seed }) {

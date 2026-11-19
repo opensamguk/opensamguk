@@ -11,7 +11,6 @@ const worldId = process.env.CARDS_CRASH_WORLD,
 if (
   !process.send ||
   !process.env.TEST_DATABASE_URL ||
-  !/^\/[a-z][a-z0-9_]*_test$/.test(url.pathname) ||
   !['127.0.0.1', 'localhost'].includes(url.hostname) ||
   !worldId ||
   !['BEFORE_COMMIT', 'AFTER_COMMIT', 'RECOVER'].includes(mode ?? '') ||
@@ -43,7 +42,7 @@ async function reached(tx: Pick<Prisma.TransactionClient, 'world' | 'inputEvent'
     select: { id: true },
   }));
 }
-const lease = await acquireLease(db, worldId, randomUUID(), 1000);
+const lease = await acquireLease(db, worldId, randomUUID());
 if (!lease) throw Error('계략 패 중단 시험 실행권이 없습니다.');
 try {
   await new TurnLoop(

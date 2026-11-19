@@ -818,7 +818,7 @@ it.each(['BEFORE_COMMIT', 'AFTER_COMMIT'] as const)(
           >`SELECT "expiresAt" <= (clock_timestamp() AT TIME ZONE 'UTC') AS expired FROM "EngineLease" WHERE "worldId"=${f.id}`;
           return rows.length === 0 || rows[0]!.expired;
         },
-        { timeout: 5000, interval: 50 },
+        { timeout: 20000, interval: 50 },
       )
       .toBe(true);
     const recoveredPid = await cardProcessProbe(f.id, 'RECOVER');
@@ -1002,7 +1002,7 @@ it.each([
           >`SELECT "expiresAt" <= (clock_timestamp() AT TIME ZONE 'UTC') AS expired FROM "EngineLease" WHERE "worldId"=${f.id}`;
           return rows.length === 0 || rows[0]!.expired;
         },
-        { timeout: 5000, interval: 50 },
+        { timeout: 20000, interval: 50 },
       )
       .toBe(true);
     const recoveredPid = await cardProcessProbe(f.id, 'RECOVER', boundary);

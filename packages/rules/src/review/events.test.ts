@@ -7,10 +7,62 @@ import { applyEffects } from '../commands/effects';
 import { runCommand } from '../commands/registry';
 import type { WorldState } from '../model/world';
 import { initialReplayState, runReplayAction, settleReplayMonth, type RecordedInput } from '../replay';
-import { reputationTurnEvents, reputationInputEvents } from './events';
+import { reputationBattleEvents, reputationTurnEvents, reputationInputEvents } from './events';
+import { tacticalFixture } from '../../test/tacticalFixture';
+import { settleTacticalBattle } from '../tactical/world';
+import { applyBattleStep } from '../tactical/input';
 import { reputationFeature } from './feature';
 import { campaignAttack } from '../campaign/attack';
 import { emptyCampaignState } from '../campaign/state';
+
+it.each(['attack', 'defend'] as const)(
+  'AC-M3-15 전술 %s 승패·점령은 정산 시각과 정산 전 공개 정보를 쓴다',
+  (winner) => {
+    const { world, battle } = tacticalFixture();
+    const before = structuredClone(world);
+    battle.phase = 'ended';
+    battle.result = winner;
+    settleTacticalBattle(world, battle, 20000);
+    const events = reputationBattleEvents(before, world, 20000);
+    expect(events.map((event) => [event.generalId, event.kind])).toEqual(
+      winner === 'attack'
+        ? [
+            [1, 'victory'],
+            [2, 'defeat'],
+            [1, 'conquest'],
+          ]
+        : [
+            [2, 'victory'],
+            [1, 'defeat'],
+          ],
+    );
+    expect(events.every((event) => event.tick === 20000 && event.month === 3)).toBe(true);
+    expect(events.find((event) => event.generalId === 2)?.data.nation).toEqual({
+      id: 2,
+      name: before.nations[2]!.name,
+      color: before.nations[2]!.color,
+    });
+    expect(reputationBattleEvents(world, world, 20000)).toEqual([]);
+  },
+);
+
+it('AC-M3-15 전술 취소와 미정산에는 승패 평판이 없다', () => {
+  const { world, battle } = tacticalFixture();
+  const payload = { battleId: battle.id, now: 1, turnTermMinutes: 60, present: false, orders: [], cancel: '월드 종료' };
+  const input: RecordedInput = {
+    kind: 'battle.step',
+    status: 'APPLIED',
+    tick: 20000,
+    sequence: 1,
+    generalId: null,
+    payload,
+    result: {},
+  };
+  expect(reputationBattleEvents(world, world, 20000)).toEqual([]);
+  const after = applyBattleStep(world, payload, testUnits, 20000);
+  expect(after.campaign!.tactical!.battles[0]!.settled).toBe(true);
+  expect(reputationInputEvents({ before: world, after, input })).toEqual([]);
+});
 
 function execute(before: WorldState, commandKey: string, generalId = 1, args: unknown = {}, unitSet = testUnits) {
   const rng = rngFor('reputation-event', commandKey);

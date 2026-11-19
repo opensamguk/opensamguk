@@ -54,7 +54,7 @@ describe('작전 방침 예상', () => {
     const input = operationInput({ policy: 'drill' });
     input.turns = input.turns.map((turn, i) =>
       i === 0
-        ? directTurn('recruit', { amount: 100, crewType: 1100 })
+        ? directTurn('recruit', { unitId: 1, amount: 100, crewType: 1100 })
         : i === 2
           ? directTurn('attack', { cityKey: 2 })
           : turn,
@@ -62,13 +62,13 @@ describe('작전 방침 예상', () => {
     expect(calculateOperationForecast(input).expected).toEqual({ crew: 200, train: 62, atmos: 50 });
   });
 
-  it('빈칸 방침은 자원 실패를 실행하지 않는 예상이며 첫 출병 뒤 준비는 세지 않는다', () => {
+  it('빈칸 방침도 부곡이 없으면 훈련을 더하지 않고 첫 출병 뒤 준비는 세지 않는다', () => {
     const input = operationInput({
       current: { crew: 0, train: 95, atmos: 0 },
       policy: 'drill',
       min: { crew: 0, train: 100, atmos: 0 },
     });
     input.turns = input.turns.map((turn, i) => (i === 1 ? directTurn('attack', { cityKey: 2 }) : turn));
-    expect(calculateOperationForecast(input).expected).toEqual({ crew: 0, train: 100, atmos: 0 });
+    expect(calculateOperationForecast(input).expected).toEqual({ crew: 0, train: 95, atmos: 0 });
   });
 });

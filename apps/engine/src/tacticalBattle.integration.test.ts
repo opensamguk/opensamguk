@@ -98,6 +98,12 @@ it('AC-P2-24·AC-INT-28 마지막 도시 전술 점령은 국가 삭제 전에 �
     expect(await db.battle.findFirstOrThrow({ where: { worldId } })).toMatchObject({
       state: { settled: true, result: 'attack' },
     });
+    expect(
+      await db.reputationEvent.findMany({
+        where: { worldId, kind: 'conquest' },
+        select: { generalId: true, tick: true, cityKey: true, score: true },
+      }),
+    ).toEqual([{ generalId: 1, tick: settlementTick, cityKey: 2, score: 5 }]);
     await renewLease(db, lease);
     await loop.advanceTo(130_000);
     const archive = await exportReplay(db, worldId);

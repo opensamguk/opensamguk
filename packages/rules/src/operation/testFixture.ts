@@ -10,7 +10,9 @@ export const directTurn = (commandKey: string, args: unknown = {}): PolicySlot =
 export function operationInput(overrides: Partial<OperationSuggestionInput> = {}): OperationSuggestionInput {
   const view = commandWorld();
   const current = overrides.current ?? { crew: 100, train: 100, atmos: 100 };
-  Object.assign(view.generals[1]!, current, { userId: 'human' });
+  Object.assign(view.generals[1]!, { userId: 'human' });
+  Object.assign(view.campaign!.units[0]!, { troops: current.crew, train: current.train, atmos: current.atmos });
+  if (current.crew === 0) view.campaign!.units = view.campaign!.units.filter((unit) => unit.ownerId !== 1);
   return {
     startYear: 191,
     nextTurnTick: 0,

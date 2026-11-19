@@ -1,6 +1,6 @@
 import type { WorldView } from '../model/world';
 import { choosePolicyCommand, type PolicyKey, type PolicySlot } from '../policy';
-import { calculateOperationTimeline, prepareOperationReadiness, type OperationTimelineInput } from './timeline';
+import { calculateOperationTimeline, operationPreparation, type OperationTimelineInput } from './timeline';
 
 export interface OperationForecastInput extends Omit<OperationTimelineInput, 'turns'> {
   turns: readonly PolicySlot[];
@@ -10,10 +10,11 @@ export interface OperationForecastInput extends Omit<OperationTimelineInput, 'tu
   policyMode: boolean;
 }
 
-export function calculateOperationForecast(input: OperationForecastInput) {
+export function prepareOperationForecast(input: OperationForecastInput) {
   const stored = calculateOperationTimeline(input);
   const effective = structuredClone([...input.turns]);
   const expected = { ...input.current };
+  const preparation = operationPreparation(expected, input);
   const general = input.view.generals[input.generalId];
   for (const cell of stored.cells) {
     if (cell === stored.sortie) break;
@@ -22,7 +23,7 @@ export function calculateOperationForecast(input: OperationForecastInput) {
       turn = { commandKey: 'rest', args: {}, explicit: false };
       if (input.policyMode && general?.userId != null) {
         const view: WorldView = {
-          ...input.view,
+          ...preparation.view!,
           generals: { ...input.view.generals, [input.generalId]: { ...general, ...expected } },
         };
         const selected = choosePolicyCommand(view, input.generalId, input.policy);
@@ -30,8 +31,13 @@ export function calculateOperationForecast(input: OperationForecastInput) {
       }
       effective[cell.slot] = turn;
     }
-    prepareOperationReadiness(expected, turn, input);
+    preparation.apply(turn);
   }
+  return { stored, effective, expected, preparation };
+}
+
+export function calculateOperationForecast(input: OperationForecastInput) {
+  const { stored, effective } = prepareOperationForecast(input);
   const result = calculateOperationTimeline({ ...input, turns: effective });
   // 표시 칸은 저장된 명령을 유지한다. 방침 선택은 예상값에만 쓴다.
   return { ...result, cells: stored.cells, sortie: stored.sortie };
