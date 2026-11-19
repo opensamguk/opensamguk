@@ -178,7 +178,8 @@ test('권한: 일반 장수는 인사 칸이 잠기고 서버가 준 이유를 �
   const board = await query<{ appoint: { ok: false; reason: string } }>(page, 'personnel.officers', { worldId: world });
   expect(board.appoint).toEqual({ ok: false, reason: '군주만 임명·해임할 수 있습니다.' });
   await page.goto(`/w/${world}/nation/personnel`);
-  await expect(page.getByRole('heading', { level: 1, name: '인사부' })).toBeVisible();
+  // dev 서버는 처음 여는 화면의 모듈을 그때 변환한다. CI에서 첫 인사부 화면이 5초를 넘긴 적이 있다(PR #674).
+  await expect(page.getByRole('heading', { level: 1, name: '인사부' })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole('combobox')).toHaveCount(0);
   await page
     .getByRole('button', { name: /임명|해임/ })

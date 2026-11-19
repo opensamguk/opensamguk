@@ -283,19 +283,34 @@ for (const path of ['/', '/login']) {
 // /trpc·/sse는 여기서도 503으로 막으므로 실제 API 재연결의 증거로 쓰지 않는다.
 test('/login 화면을 새로고침해도 승인한 CDN 그림과 dist만 다시 받는다', async ({ page }) => {
   const keyart = meta.remoteImages.find((image) => image.source === KEYART_SOURCE)!.url;
-  const banner = page.locator(`img[src="${keyart}"]`);
-  const drawn = () => banner.evaluate((img: HTMLImageElement) => (img.complete ? img.naturalWidth : 0));
+  // 로그인 화면(AuthScreen)은 key art를 화면 바탕 그림(background-image)으로 깐다. 그 그림을 쓰는 요소 수와,
+  // 브라우저가 실제로 받은 같은 주소 그림의 크기를 본다.
+  const backgrounds = () =>
+    page.evaluate(
+      (url) =>
+        [...document.querySelectorAll('*')].filter((el) => getComputedStyle(el).backgroundImage.includes(url)).length,
+      keyart,
+    );
+  const drawn = () =>
+    page.evaluate(async (url) => {
+      const img = new Image();
+      img.src = url;
+      await img.decode();
+      return img.naturalWidth;
+    }, keyart);
+  const fetched = () => seen.assets.filter((asset) => asset.type === 'image' && asset.path === keyart).length;
   const seen = await watch(page);
   await page.goto(`${origin}/login`, { waitUntil: 'networkidle' });
-  await expect(banner).toHaveCount(1);
+  await expect.poll(backgrounds).toBe(1);
   await expect.poll(drawn).toBeGreaterThan(0);
   await Promise.all(seen.pending);
+  expect(fetched()).toBeGreaterThan(0);
   const documentsBefore = seen.assets.filter((asset) => asset.type === 'document').length;
 
   const reloaded = await page.reload({ waitUntil: 'networkidle' });
   expect(reloaded?.status()).toBe(200);
   await expect(page.locator('#root > *').first()).toBeAttached();
-  await expect(banner).toHaveCount(1);
+  await expect.poll(backgrounds).toBe(1);
   await expect.poll(drawn).toBeGreaterThan(0);
   await Promise.all(seen.pending);
 
