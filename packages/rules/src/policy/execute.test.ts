@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
-import { commandWorld } from '../../test/builtinCommandFixture';
+import { commandWorld } from '../../test/commandFixture';
 import { applyEffects } from '../commands/effects';
+import { resolverForRuleFeatures } from '../ruleCommands';
 import { runPolicyCommand, runPolicySlot } from './execute';
 import { normalizeSlot } from './index';
 
@@ -16,7 +17,8 @@ it.each([
   Object.assign(state.logistics!.cities['1']!, { iron: 3000, wood: 3000, horses: 3000 });
   state.generals[1]!.userId = 'human';
   state.generals[1]!.train = 0;
-  const result = runPolicyCommand(state, { generalId: 1 }, policy, 'policy');
+  state.campaign!.units[0]!.train = 0;
+  const result = runPolicyCommand(state, { generalId: 1 }, policy, 'policy', resolverForRuleFeatures(state));
   expect(result.commandKey).toBe(commandKey);
   expect(result.result.effects.length).toBeGreaterThan(0);
   expect(result.result.logs.some((log) => log.text.includes('실패'))).toBe(false);
@@ -30,7 +32,7 @@ it.each(['defend', 'drill'] as const)('AC-M2-17 방침 %s의 두 명령이 모�
   state.generals[1]!.atmos = 100;
   state.cities[1]!.defence = state.cities[1]!.defenceMax;
   state.cities[1]!.wall = state.cities[1]!.wallMax;
-  const result = runPolicyCommand(state, { generalId: 1 }, policy, 'policy');
+  const result = runPolicyCommand(state, { generalId: 1 }, policy, 'policy', resolverForRuleFeatures(state));
   expect(result.commandKey).toBe('rest');
   expect(result.result.logs[0]!.text).toBe('기본 방침 실패: 이미 최대치입니다. → 휴식');
 });
@@ -61,13 +63,49 @@ it.each([
   state.generals[1]!.userId = 'human';
   state.generals[1]!.train = 100;
   state.generals[1]!.atmos = 0;
+  state.campaign!.units[0]!.atmos = 0;
   state.cities[1]!.defence = state.cities[1]!.defenceMax;
   state.cities[1]!.wall = 0;
-  const result = runPolicyCommand(state, { generalId: 1 }, policy, 'policy');
+  const result = runPolicyCommand(state, { generalId: 1 }, policy, 'policy', resolverForRuleFeatures(state));
   expect(result.commandKey).toBe(commandKey);
   const next = applyEffects(state, result.result.effects);
   if (policy === 'defend') expect(next.cities[1]!.wall).toBeGreaterThan(0);
-  else expect(next.generals[1]!.atmos).toBeGreaterThan(0);
+  else {
+    expect(next.campaign!.units[0]!.atmos).toBeGreaterThan(0);
+    expect(next.generals[1]!.atmos).toBe(0);
+    expect(next.generals[1]!.crew).toBe(0);
+  }
+});
+
+it('AC-M2-17 훈련 방침은 부곡이 없으면 비용 없이 휴식하고 실패 사유를 남긴다', () => {
+  const state = commandWorld();
+  state.generals[1]!.userId = 'human';
+  state.campaign!.units = state.campaign!.units.filter((unit) => unit.ownerId !== 1);
+  const result = runPolicyCommand(state, { generalId: 1 }, 'drill', 'policy', resolverForRuleFeatures(state));
+  expect(result.commandKey).toBe('rest');
+  expect(result.result.logs[0]!.text).toBe('기본 방침 실패: 병력이 없습니다. → 휴식');
+  const next = applyEffects(state, result.result.effects);
+  expect(next.generals[1]!.gold).toBe(state.generals[1]!.gold);
+  expect(next.generals[1]!.injury).toBeLessThan(state.generals[1]!.injury);
+  expect(next.campaign).toEqual(state.campaign);
+});
+
+it('AC-M2-17 훈련 방침은 선택한 부곡만 훈련하고 개인 병력을 만들지 않는다', () => {
+  const state = commandWorld();
+  state.generals[1]!.userId = 'human';
+  const unit = state.campaign!.units[0]!;
+  unit.train = 0;
+  unit.troops = 100;
+  state.campaign!.units.push({ ...unit, id: 4, train: 50 });
+  state.campaign!.nextUnitId = 5;
+  state.campaign!.units.reverse();
+  const result = runPolicyCommand(state, { generalId: 1 }, 'drill', 'policy', resolverForRuleFeatures(state));
+  expect(result.commandKey).toBe('train');
+  const next = applyEffects(state, result.result.effects);
+  expect(next.campaign!.units.find((unit) => unit.id === 1)!.train).toBeGreaterThan(0);
+  expect(next.campaign!.units.find((unit) => unit.id === 4)!.train).toBe(50);
+  expect(next.generals[1]!.train).toBe(state.generals[1]!.train);
+  expect(next.generals[1]!.crew).toBe(0);
 });
 
 it('AC-M2-17 권농은 실제 명령 효과를 내고 같은 시드로 재현한다', () => {
