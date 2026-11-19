@@ -160,6 +160,26 @@ function shape(template: WorldInit, spec: WorldSpec): WorldInit {
     return { ...city, name, level, x, y, nationId, connections: links };
   });
   state.diplomacies = [];
+  // 생성 검사는 도시 행과 운영 지도 앵커(이름, 위치, 등급, 연결)가 같아야 받는다. 지도 쪽도 같은 사양으로 바꾼다.
+  const map = state.operationalMap;
+  if (map) {
+    map.sites = map.sites.map((site) => {
+      const city = site.kind === 'CITY' ? spec.cities.find((entry) => entry.key === site.anchorKey) : undefined;
+      return city ? { ...site, name: city.name, level: city.level, position: { x: city.x, y: city.y } } : site;
+    });
+    map.routes = spec.cities.flatMap((city) =>
+      city.links
+        .filter((other) => other > city.key)
+        .map((other) => ({
+          id: `route:${city.key}:${other}`,
+          from: `city:${city.key}`,
+          to: `city:${other}`,
+          mode: 'LAND' as const,
+          direction: 'BOTH' as const,
+          enabled: true,
+        })),
+    );
+  }
   return state;
 }
 

@@ -331,14 +331,15 @@ test.describe('메시지와 실시간 갱신', () => {
 
     const logs = page.locator('[data-record-kind="general"] li[data-log-kind]');
     await expect(page.locator('[data-record-kind="general"]')).toBeVisible();
-    await expect(logs).toHaveCount(0);
+    // 고정물이 사람 소유자를 general.possess 입력으로 붙여 '이 장수를 맡았습니다.' 한 줄이 먼저 있다.
+    await expect(logs).toHaveCount(1);
     type Logs = { items: Array<{ id: string; text: string }> };
     const before = (await apiQuery<Logs>(b, 'records.general', { worldId: world.id })).items[0]?.id;
     const committedAt = await advanceTurn(world, b.generalId);
     const fresh = (await apiQuery<Logs>(b, 'records.general', { worldId: world.id })).items[0];
     expect(fresh).toBeDefined();
     expect(fresh!.id).not.toBe(before);
-    await expect(logs.first()).toBeVisible({ timeout: 2_000 });
+    await expect(logs).toHaveCount(2, { timeout: 2_000 });
     await expect(
       page.locator('[data-record-kind="general"]').getByText(fresh!.text, { exact: true }).first(),
     ).toBeVisible({ timeout: 2_000 });

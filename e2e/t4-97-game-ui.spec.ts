@@ -110,14 +110,15 @@ test('T4-97 메인 HUD 계정 메뉴·예턴 상태·도시에서 명령 고르�
     await editor.getByRole('button', { name: '선택 해제', exact: true }).click();
     const cityPanel = page.getByRole('region', { name: '도시 정보', exact: true });
     await cityPanel.getByRole('button', { name: '이 도시로 명령 고르기', exact: true }).click();
-    // 고른 칸이 없으므로 칸 목록으로 간다. 칸에서 Enter를 누르면 그 칸을 고르고 명령 찾기로 간다.
+    // 고른 칸이 없으므로 칸 목록으로 간다. 칸에서 Enter를 누르면 그 칸을 고르고 명령 띠의 첫 패로 간다(INT-29).
     const rowFocused = await editor.evaluate(
       (node) => node.contains(document.activeElement) && Boolean(document.activeElement?.matches('tr[data-slot]')),
     );
     expect(rowFocused).toBe(true);
     await page.keyboard.press('Enter');
-    await expect(editor.getByRole('searchbox')).toBeFocused();
+    await expect(editor.getByRole('group', { name: '명령 분류' }).first().getByRole('button').first()).toBeFocused();
     await expect(turnShortcut).toHaveAttribute('data-turn-status', 'saved');
+    await editor.getByLabel('명령 찾기').fill(move.name);
     await editor.getByRole('radio', { name: move.name, exact: true }).check();
     await expect(
       page.getByRole('radiogroup', { name: '대상 도시' }).getByRole('radio', { name: new RegExp(`^${target.name}`) }),

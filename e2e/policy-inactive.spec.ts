@@ -306,6 +306,13 @@ for (const c of CASES) {
     const ledger = await inputLedger(world);
     evidence.ledgerBaseline = ledger;
     expect(ledger).toEqual([
+      // 고정물이 사람 소유자를 붙이는 입력이 가장 먼저 적용된다.
+      {
+        kind: 'general.possess',
+        status: 'APPLIED',
+        generalId: HUMAN_ID,
+        result: { activeTick: 0, generalId: HUMAN_ID, revision: 1, rulerNationId: null, userId: world.userId },
+      },
       { kind: 'general.active', status: 'APPLIED', generalId: HUMAN_ID, result: { activeTick: 0 } },
       ...policies.map((policy) => ({
         kind: 'general.setPolicy',
