@@ -949,7 +949,8 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
         for (const command of commands) {
           const fields: Record<string, string> =
             command.key === 'recruit' || command.key === 'conscript'
-              ? { 수량: String(command.args.amount), 병종: '1100' }
+              ? // 모병, 징병의 기본 모집 대상은 부곡(unitId)이다. 이 인수는 현재 도시 수비병 갈래를 본다.
+                { '모집 대상': 'city', 수량: String(command.args.amount), 병종: '1100' }
               : { '훈련과 사기 대상': 'city', 병종: '1100' };
           await put(actor, 1, command.name, fields);
           await save(actor);
