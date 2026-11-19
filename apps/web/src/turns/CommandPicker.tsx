@@ -164,6 +164,8 @@ export function CommandPicker({
   propose,
 }: Props) {
   const [category, setCategory] = useState<string>('all');
+  // 이름으로 명령 찾기. 명령 띠 개편(INT-29) 뒤에도 둔다: 명령이 많은 직위에서 띠를 다 펼치지 않고 바로 고른다.
+  const [query, setQuery] = useState('');
   const [chosen, setChosen] = useState<string | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
   const [preparationTarget, setPreparationTarget] = useState<PreparationTarget>('unit');
@@ -213,6 +215,13 @@ export function CommandPicker({
   const band = useMemo(() => bandGroups(commands, role, (key) => CATEGORY_LABELS[key] ?? key), [commands, role]);
   const activeCategory = band.some((group) => group.key === category) ? category : 'all';
   const activeGroup = band.find((group) => group.key === activeCategory) ?? null;
+  const found = useMemo(() => {
+    const q = query.trim();
+    if (q === '') return [];
+    // 화면 띠 순서대로 놓는다. 검색 Enter는 이 순서의 첫 명령을 고른다.
+    const order = band.flatMap((group) => group.items);
+    return order.filter((item, index) => item.name.includes(q) && order.indexOf(item) === index);
+  }, [band, query]);
   // 명령 띠 바탕: 신분별 담장 조각(왼끝, 이음, 가운데 문, 바닥)과 직위 인수 표지 (Codex walls2/, badges4/).
   const bandArt = useMemo(() => {
     const url = (source: string) => (hasPublicImage(source) ? `url(${publicImageUrl(source)})` : null);
@@ -351,6 +360,13 @@ export function CommandPicker({
       // 인자 칸이 그려진 뒤 옮긴다.
       requestAnimationFrame(() => firstArgRef.current?.focus());
     }
+  };
+
+  const onSearchKey = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    const first = found[0];
+    if (first) pick(first);
   };
 
   const onArgKey = (event: KeyboardEvent<HTMLElement>) => {
@@ -628,6 +644,55 @@ export function CommandPicker({
   return (
     <section className={styles.picker} aria-label="명령 고르기">
       {recent}
+      <label className={styles.search}>
+        <span>명령 찾기</span>
+        <input
+          type="search"
+          value={query}
+          placeholder="이름으로 찾기, Enter로 고르기"
+          aria-controls={`${listId}-found`}
+          onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={onSearchKey}
+        />
+      </label>
+      {query.trim() !== '' ? (
+        <div id={`${listId}-found`} className={styles.found} role="radiogroup" aria-label="찾은 명령">
+          {found.length === 0 ? (
+            <p className={styles.foundEmpty}>이름에 “{query.trim()}”이 든 명령이 없습니다.</p>
+          ) : (
+            found.map((item) => {
+              const availability = commandAvailability(item);
+              const cost = commandDoc(item).cost;
+              const foundId = `${listId}-found-${item.key}`;
+              return (
+                <label
+                  key={item.key}
+                  className={styles.foundOption}
+                  data-checked={chosen === item.key ? 'true' : undefined}
+                  data-available={availability.dimmed ? 'false' : undefined}
+                >
+                  <input
+                    type="radio"
+                    name={`${listId}-found`}
+                    value={item.key}
+                    checked={chosen === item.key}
+                    aria-labelledby={`${foundId}-name`}
+                    aria-describedby={availability.reason ? `${foundId}-reason` : undefined}
+                    onChange={() => choose(item.key)}
+                  />
+                  <span id={`${foundId}-name`}>{item.name}</span>
+                  {cost ? <span className={styles.foundCost}>{cost}</span> : null}
+                  {availability.reason ? (
+                    <span id={`${foundId}-reason`} className={styles.foundReason} data-testid="command-reason">
+                      {availability.reason}
+                    </span>
+                  ) : null}
+                </label>
+              );
+            })
+          )}
+        </div>
+      ) : null}
       <div className={styles.pickerHead}>
         {/* 직위별 명령 띠: 담장 바탕은 직위마다, 패 색은 세력 명령·임면·개인 명령마다 다르다 (D-099). */}
         <div className={styles.bandWrap} ref={bandWrapRef}>
@@ -811,6 +876,8 @@ export function CommandPicker({
         <div className={styles.argForm}>
           {schema ? <p className={styles.muted}>더 고를 것 없이 바로 넣는 명령입니다.</p> : null}
           {ready && precheck && ready.commandKey !== 'rest' ? <PrecheckWarning query={precheck(ready)} /> : null}
+          {/* 띠에서 누르면 바로 들어간다. 찾기로 고른 명령은 여기서 넣는다. */}
+          {query.trim() !== '' ? <div className={styles.found}>{proposeButton ?? putButton}</div> : null}
         </div>
       ) : null}
 

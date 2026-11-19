@@ -8,7 +8,7 @@ import { NationTargetPicker } from './CommandArgsScreen';
 import { CommandPicker, type CommandInfo } from './CommandPicker';
 import type { EquipmentBoard } from '../equipment/useEquipment';
 
-// 명령은 띠 위 세부 메뉴에서 고른다(띠 아래 목록과 검색 칸은 없다). 시험은 그 명령이 든 묶음 패를 차례로 눌러
+// 명령은 띠 위 세부 메뉴에서 고르거나 '명령 찾기'로 이름을 걸러 고른다. 이 도우미는 그 명령이 든 묶음 패를 차례로 눌러
 // 세부 메뉴에 띄운 뒤 그 단추를 돌려준다. 인자 없는 명령은 누르면 바로 들어가고, 인자가 있으면 인자 창이 열린다.
 function commandButton(name: string, root: HTMLElement = document.body): HTMLButtonElement {
   const scope = within(root);
@@ -166,6 +166,30 @@ function props(overrides: Partial<Omit<ComponentProps<typeof CommandPicker>, 'on
     ...overrides,
   };
 }
+
+it('명령 찾기로 이름을 걸러 라디오로 고르고, 인자 없는 명령은 칸에 넣기 단추로 넣는다', () => {
+  const input = props();
+  render(<CommandPicker {...input} />);
+  const search = screen.getByLabelText('명령 찾기');
+  fireEvent.change(search, { target: { value: '농지' } });
+  const found = screen.getByRole('radiogroup', { name: '찾은 명령' });
+  expect(
+    within(found)
+      .getAllByRole('radio')
+      .map((radio) => radio.getAttribute('value')),
+  ).toEqual(['farm']);
+  // 고르기만 해서는 넣지 않는다. 띠에서 누를 때와 달리 넣기 단추를 눌러야 들어간다.
+  fireEvent.click(within(found).getByRole('radio', { name: '농지 개간' }));
+  expect(input.onPut).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: '1번 칸에 넣기' }));
+  expect(input.onPut).toHaveBeenCalledWith({ commandKey: 'farm', args: {}, explicit: true });
+  // 없는 이름은 빈 목록 대신 이유를 적고, Enter는 첫 결과를 고른다.
+  fireEvent.change(search, { target: { value: '없는 명령' } });
+  expect(screen.getByText(/이 든 명령이 없습니다/)).toBeTruthy();
+  fireEvent.change(search, { target: { value: '휴식' } });
+  fireEvent.keyDown(search, { key: 'Enter' });
+  expect(input.onPut).toHaveBeenLastCalledWith({ commandKey: 'rest', args: {}, explicit: true });
+});
 
 it('T4-92 AC-P2-29 서버의 새 분류도 분류 패와 세부 명령에 보이며 그 분류의 명령만 띄운다', () => {
   render(<CommandPicker {...props()} />);

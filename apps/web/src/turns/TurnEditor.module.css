@@ -229,6 +229,63 @@
   align-items: flex-end;
 }
 
+/* 명령 찾기: 이름으로 걸러 고른다. 띠와 함께 둔다(INT-29 뒤에도 유지). */
+.search {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 320px;
+}
+
+.search input {
+  font: inherit;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.found {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.foundOption {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.foundOption[data-checked='true'] {
+  border-color: var(--color-accent);
+}
+
+.foundOption[data-available='false'] {
+  color: var(--color-text-muted);
+}
+
+.foundCost,
+.foundReason,
+.foundEmpty {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.foundEmpty {
+  margin: 0;
+}
+
 .argLabel input,
 .argLabel select,
 .inline input {
