@@ -156,7 +156,10 @@ let idle: { id: string; hold: LeaseHold } | undefined;
 export async function idleWorld(page: Page): Promise<string> {
   await e2eWorld(page);
   if (idle) return idle.id;
-  const id = createWorld(`e2e-idle-${Date.now()}`, 'E2E 대기 월드');
+  // 대기 월드는 시험이 입력 처리만 위해 엔진을 잠깐 돌리고, 끝나면 감독 엔진에 넘긴다. 1분 턴이면 엔진을 켤 때마다
+  // 지난 달들을 따라잡고(1030 한 달은 로컬 20초) 넘긴 뒤에도 계속 돌아 CI의 서버 연결과 CPU를 막았다(PR #674).
+  // 월 진행을 기다리는 대기 월드 시험은 없으므로 60분 턴으로 만든다.
+  const id = createWorld(`e2e-idle-${Date.now()}`, 'E2E 대기 월드', CHE_1030, 60);
   const hold = await holdLease(id);
   try {
     run(['world:start', '--world', id]);
