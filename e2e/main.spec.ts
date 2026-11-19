@@ -401,7 +401,8 @@ test.describe('장수가 있는 계정', () => {
   });
 
   test('다음 턴 0초가 되면 다시 조회해 새 시각과 엔진이 쓴 내 기록을 보여 준다', async ({ page }) => {
-    test.setTimeout(150_000);
+    // 공용 월드는 2분 턴이다. 미래 시각을 기다린 뒤 0초까지 최대 2분, 그 뒤 새 시각과 기록을 받는다.
+    test.setTimeout(300_000);
     await openMain(page);
     const nextTurn = page.getByTestId('next-turn');
     // 이미 지난 시각을 받은 직후라면 첫 재조회를 놓칠 수 있다. 미래 시각이 보일 때부터 잰다.

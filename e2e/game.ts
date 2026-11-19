@@ -8,8 +8,8 @@ import { appOrigin, e2eDatabaseUrl, withE2eDb } from './account';
 
 // 실제 서버·DB·엔진으로 게임 화면을 시험하는 도우미 (T1-15).
 // pnpm dev의 엔진 감독은 10초마다 RUNNING·PAUSED 월드를 모두 찾아 월드마다 엔진을 하나씩 띄운다 (T2-01).
-// world.list는 RUNNING 월드를 만든 순서로 주므로 그 첫 월드를 쓴다. 없으면 1분 턴 월드를 만들고 시작한다.
-// 1분 턴이라 시험 중에도 장수 턴이 실행된다 (waitTurnWindow 참고).
+// world.list는 RUNNING 월드를 만든 순서로 주므로 그 첫 월드를 쓴다. 없으면 2분 턴 월드를 만들고 시작한다.
+// 짧은 턴이라 시험 중에도 장수 턴이 실행된다 (waitTurnWindow 참고).
 // DB를 직접 쓰는 도우미는 account.ts의 e2eDatabaseUrl로 E2E 전용 DB(_test)만 쓴다.
 
 type Json = Record<string, unknown>;
@@ -88,7 +88,9 @@ export async function e2eWorld(page: Page): Promise<string> {
   const { worlds } = await query<{ worlds: Array<{ id: string }> }>(page, 'world.list');
   let id = worlds[0]?.id;
   if (!id) {
-    id = createWorld(`e2e-${Date.now()}`, 'E2E 월드');
+    // 1030 한 달 처리(491명)는 로컬 20초, CI는 더 느리고 브라우저, 서버, DB와 CPU를 나눈다. 1분 턴이면 엔진이 실시간을
+    // 따라가지 못해 다음 턴 시각이 지나 있고 입력 처리도 밀린다(PR #674). 공용 월드는 2분 턴으로 여유를 둔다.
+    id = createWorld(`e2e-${Date.now()}`, 'E2E 월드', CHE_1030, 2);
     run(['world:start', '--world', id]);
   }
   await waitEngineReady(id);
@@ -355,7 +357,7 @@ export async function waitNextTurn(page: Page, world: string, timeoutMs = 150_00
   const at = await nextTurnAt(page, world);
   if (at === null) throw new Error('월드가 멈춰 있어 턴이 실행되지 않습니다.');
   if (at - Date.now() > timeoutMs)
-    throw new Error('다음 턴이 시험 제한 시간보다 늦습니다. 1분 턴 월드에서 실행하세요.');
+    throw new Error('다음 턴이 시험 제한 시간보다 늦습니다. 2분 이하 턴 월드에서 실행하세요.');
   return at;
 }
 

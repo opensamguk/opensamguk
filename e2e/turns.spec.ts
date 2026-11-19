@@ -22,7 +22,7 @@ import {
 } from './game';
 
 // T1-15 · AC-M1-06~09 화면: 실제 서버·PostgreSQL·엔진(pnpm dev)과 Chromium으로 장수 생성과 30칸 예턴 편집을 본다.
-// 엔진은 1분 턴으로 돈다. 칸 위치를 확인하는 시험은 waitTurnWindow로 다음 턴까지 여유가 있을 때 시작한다.
+// 공용 월드 엔진은 2분 턴으로 돈다. 칸 위치를 확인하는 시험은 waitTurnWindow로 다음 턴까지 여유가 있을 때 시작한다.
 
 // 장수 생성 대기와 다음 턴까지의 창 기다림(최대 100초)이 들어가므로 기본 30초보다 넉넉히 둔다.
 test.describe.configure({ timeout: 200_000 });

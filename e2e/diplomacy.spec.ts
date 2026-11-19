@@ -315,7 +315,7 @@ test.describe('예턴 편집의 교역 대상', () => {
     await proposeByApi(a.page, world, away.nationId!, [{ kind: 'trade', months: 12 }]);
     await acceptByApi(b.page, world);
 
-    // 1분 턴이 시험 도중에 실행되면 예턴이 한 칸 당겨져 5번 칸과 저장 revision이 어긋난다. 여유가 있을 때 시작한다.
+    // 턴이 시험 도중에 실행되면 예턴이 한 칸 당겨져 5번 칸과 저장 revision이 어긋난다. 여유가 있을 때 시작한다.
     await waitTurnWindow(a.page, world, 45_000);
     const editor = a.page.getByTestId('turn-editor');
     await a.page.goto(`/w/${world}`);
