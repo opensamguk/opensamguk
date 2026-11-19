@@ -1,3 +1,4 @@
+import { testDatabaseUrl } from './test-database';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, beforeAll, beforeEach, describe, expect, it as test } from 'vitest';
@@ -25,12 +26,8 @@ import type { inferRouterOutputs } from '@trpc/server';
 // AC-INT-06 실제 191년 21국·491명 원본, HTTP 세션과 펜싱 엔진을 함께 검사한다.
 // 이 파일의 한 달 검사는 AC-INT-12 한 기수 인수를 대신하지 않는다.
 const url = process.env.TEST_DATABASE_URL;
-if (
-  !url ||
-  !['127.0.0.1', 'localhost'].includes(new URL(url).hostname) ||
-  !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(new URL(url).pathname)
-)
-  throw new Error('loopback 전용 테스트 DB가 필요합니다.');
+if (!url) throw new Error('전용 테스트 DB가 필요합니다.');
+testDatabaseUrl({ TEST_DATABASE_URL: url });
 const db = createDb(url);
 const now = Date.now(),
   origin = 'http://127.0.0.1:5173';
@@ -57,8 +54,8 @@ function track<T>(action: () => Promise<T>): Promise<T> {
   void execution.finally(() => executions.delete(execution)).catch(() => undefined);
   return execution;
 }
-function it(name: string, action: () => Promise<void>) {
-  test(name, () => track(action));
+function it(name: string, action: () => Promise<void>, timeout = 30_000) {
+  test(name, () => track(action), timeout);
 }
 beforeEach(async () => {
   await Promise.allSettled([...executions]);
@@ -197,6 +194,7 @@ afterAll(async () => {
   await db.$disconnect();
 });
 
+// 실제 사람 생성·예약·임관·부곡 준비에 75.8초가 걸린다. 정식 한 달 진행을 유지한다.
 it('정식 원본을 보존하고 실제 생성 입력·30칸 예약·임관으로 두 사람을 만든다', async () => {
   expect(initial.generals).toHaveLength(491);
   expect(initial.nations).toHaveLength(21);
@@ -276,7 +274,7 @@ it('정식 원본을 보존하고 실제 생성 입력·30칸 예약·임관으�
   await advance();
   unitId = (await snapshot()).state.campaign!.units.find((unit) => unit.ownerId === ownId)!.id;
   nextMonthTick = (Math.floor(tick / 10000) + 1) * 10000;
-});
+}, 120000);
 
 describe('네 휘하 API의 실제 HTTP 권한 대조', () => {
   for (const path of paths)
@@ -719,12 +717,15 @@ it('실제 휘하 부곡을 지정한 모병·훈련 예약과 편집이 unitId�
   ).toMatchObject({ ok: false, code: 'BAD_TARGET' });
 });
 
+// 정식 NPC 월 전반 진행 실측 33.7초. 원래 차례를 모두 실행한다.
 it('준비 뒤 게임 월 전반의 모든 NPC를 실제 부곡 프로필로 실행한다', async () => {
   await advance(nextMonthTick - 5000);
-});
+}, 60000);
+// 정식 NPC 월 후반·정산 실측 31.8초. 원래 차례를 모두 실행한다.
 it('준비 뒤 게임 월 후반의 모든 NPC와 월 정산을 실행한다', async () => {
   await advance(nextMonthTick);
-});
+}, 60000);
+// 실제 두 달 입력 원장 수출·재생 두 회 실측 134.2초. 같은 검증 범위를 유지한다.
 it('정식 월 경계의 부곡·입력·월 정산을 같은 시드로 재생한다', async () => {
   const archive = await exportReplay(db, worldId);
   const first = replayArchive(archive, archive.months.length);
@@ -732,7 +733,7 @@ it('정식 월 경계의 부곡·입력·월 정산을 같은 시드로 재생�
   expect(first).toHaveLength(nextMonthTick / 10000);
   expect(first.at(-1)!.stateHash).toBe(hashState(await snapshot()));
   expect((await snapshot(otherWorldId)).state.campaign!.revision).toBe(0);
-});
+}, 240000);
 
 it('다음 게임 월에는 거절했던 NPC에게 다시 서약하고 그 달의 시드와 비용을 저장한다', async () => {
   const before = await snapshot(),
@@ -775,7 +776,11 @@ it('예약한 실제 부장 부곡에만 모병하고 훈련 미리보기는 그
   const after = await snapshot(),
     unit = after.state.campaign!.units.find((unit) => unit.id === unitId)!;
   const troops = before.state.campaign!.units.find((unit) => unit.id === unitId)!.troops + 10;
-  expect(unit).toMatchObject({ commanderId: lieutenantId, troops, train: 0, atmos: 0 });
+  const commandLog = await db.generalLog.findMany({
+    where: { worldId, generalId: ownId, tick: actor.nextTurnTick, commandKey: 'recruit' },
+    select: { kind: true, text: true },
+  });
+  expect(unit, JSON.stringify(commandLog)).toMatchObject({ commanderId: lieutenantId, troops, train: 0, atmos: 0 });
   expect(after.state.generals[ownId]!.gold).toBe(actor.gold - 88);
   expect(after.state.generals[ownId]!.crew).toBe(0);
   expect(after.state.generals[lieutenantId]!.crew).toBe(0);

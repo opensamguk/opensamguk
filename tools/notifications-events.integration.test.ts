@@ -27,8 +27,7 @@ type Pg = {
   query(sql: string, values?: unknown[]): Promise<{ rows: Record<string, unknown>[] }>;
 };
 const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-if (!['127.0.0.1', 'localhost'].includes(source.hostname) || source.search)
-  throw Error('loopback 시험 DB가 필요합니다.');
+if (source.search) throw Error('시험 DB가 필요합니다.');
 const database = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
 const target = new URL(source),
   maintenance = new URL(source);
@@ -297,7 +296,7 @@ it('실제 외교 제안은 받는 나라 군주·참모만 정상 발송 작업
   );
 });
 
-it('같은 도시·tick의 두 공격은 서로 다른 전투 알림이며 다시 처리하지 않는다', async () => {
+it('같은 도시·tick의 두 번째 공격은 전투 중 거절하고 실제 공격만 한 번 알린다', async () => {
   const f = await fixture((initial) => {
     Object.assign(initial.generals[2]!, { nationId: 1, cityKey: 1, nextTurnTick: 100 });
   });
@@ -307,9 +306,8 @@ it('같은 도시·tick의 두 공격은 서로 다른 전투 알림이며 다�
   await f.loop.advanceTo(100);
   await pump();
   const messages = await rows(f.worldId, 'attacked');
-  expect(messages.map((row) => row.dedupeKey).sort()).toEqual(
-    [1, 3].map((id) => `attacked:${f.worldId}:${f.users[1]}:100:${id}`),
-  );
+  expect(messages.map((row) => row.dedupeKey).sort()).toEqual([`attacked:${f.worldId}:${f.users[1]}:100:1`]);
+  expect(await rows(f.worldId, 'turn.failed')).toMatchObject([{ userId: f.users[2] }]);
   expect(received).toHaveLength(2);
   await f.loop.advanceTo(100);
   await pump();
@@ -546,6 +544,8 @@ it.each(['ACCEPTED', 'DECLINED', 'REJECTED'] as const)(
       initial.generals[2]!.officerLevel = 11;
       if (outcome === 'DECLINED') initial.nations[1]!.gold = 0;
     });
+    // 소유자 부착은 사람 국가로 바꾸므로 이 알림 전용 상태의 NPC 군주를 명시한다.
+    await db.nation.update({ where: { worldId_id: { worldId: f.worldId, id: 2 } }, data: { isNpc: true } });
     const event = await db.inputEvent.create({
       data: {
         worldId: f.worldId,

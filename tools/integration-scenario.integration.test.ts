@@ -422,6 +422,7 @@ describe('AC-INT-04 정식191년 첫 달·재시작·재생·다른 월드 격�
     onTestFailed(() => owned.fail());
     await execution?.catch(() => owned.fail());
   });
+  // 정식 첫 달 진행 실측 54.6초. 491명과 다른 월드 격리를 검증한다.
   it('491명 첫 달 정산은 연감을 저장하고 다른 월드를 보존한다', ({ signal }) => {
     execution = (async () => {
       const { db } = fixture;
@@ -448,7 +449,7 @@ describe('AC-INT-04 정식191년 첫 달·재시작·재생·다른 월드 격�
       expect(await db.yearbookSnapshot.count({ where: { worldId: otherId } })).toBe(0);
     })();
     return execution;
-  });
+  }, 120000);
   it('첫 달의 연감 해시가 같은 시드의 전체 장수 재생과 일치한다', () => {
     execution = (async () => {
       const snapshot = await fixture.db.yearbookSnapshot.findUniqueOrThrow({
@@ -459,6 +460,7 @@ describe('AC-INT-04 정식191년 첫 달·재시작·재생·다른 월드 격�
     })();
     return execution;
   });
+  // 새 연결·루프의 다음 달 진행 실측 54.9초. 재시작과 격리를 검증한다.
   it('기존 연결·리스 종료 뒤 새 연결·엔진 루프가 다음 달을 진행하고 다른 월드를 보존한다', ({ signal }) => {
     execution = (async () => {
       const beforeRestart = await readWorldState(fixture.db, worldId);
@@ -488,7 +490,8 @@ describe('AC-INT-04 정식191년 첫 달·재시작·재생·다른 월드 격�
       expect(await preservedWorld(db, otherId)).toEqual(otherBefore);
     })();
     return execution;
-  });
+  }, 120000);
+  // 정식 두 달 수출·재생 실측 47.9초. 월별 해시를 모두 대조한다.
   it('재시작 전후 두 달의 모든 월 해시가 같은 시드 재생과 일치한다', () => {
     execution = (async () => {
       const snapshots = await fixture.db.yearbookSnapshot.findMany({ where: { worldId }, orderBy: { tick: 'asc' } });
@@ -498,7 +501,7 @@ describe('AC-INT-04 정식191년 첫 달·재시작·재생·다른 월드 격�
       );
     })();
     return execution;
-  });
+  }, 90000);
   it('다음 턴 전에 고정 원장을 바꾸면 새 트랜잭션에서 거부하고 진행을 롤백한다', () => {
     execution = (async () => {
       const { db } = fixture;

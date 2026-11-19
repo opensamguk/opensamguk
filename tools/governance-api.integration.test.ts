@@ -25,7 +25,7 @@ import { newSession } from '../apps/server/src/auth/session';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
-import { acquireLease, releaseLease } from '../apps/engine/src/lease';
+import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { exportReplay, replayArchive } from '../apps/engine/src/replay';
@@ -39,12 +39,11 @@ if (!url) throw new Error('전용 황실 테스트 DB가 필요합니다.');
 const target = new URL(url);
 if (
   !['postgres:', 'postgresql:'].includes(target.protocol) ||
-  !['127.0.0.1', 'localhost'].includes(target.hostname) ||
   !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(target.pathname) ||
   target.searchParams.has('host') ||
   target.searchParams.has('port')
 )
-  throw new Error('loopback 전용 테스트 DB를 확인하세요.');
+  throw new Error('전용 테스트 DB를 확인하세요.');
 const db = createDb(url),
   worldIds: string[] = [],
   userIds: string[] = [];
@@ -105,17 +104,12 @@ async function advance(worldId: string, tick: number, fail = false, connection =
   const lease = await acquireLease(connection, worldId);
   if (!lease) throw new Error('황실 시험 실행권이 없습니다.');
   try {
-    await new TurnLoop(
-      connection,
-      lease,
-      fail
-        ? {
-            beforeCommit: async () => {
-              throw new Error('governance-save-failure');
-            },
-          }
-        : {},
-    ).advanceTo(tick);
+    await new TurnLoop(connection, lease, {
+      beforeCommit: async (tx) => {
+        await renewLease(tx, lease);
+        if (fail) throw new Error('governance-save-failure');
+      },
+    }).advanceTo(tick);
   } finally {
     await releaseLease(connection, lease);
   }

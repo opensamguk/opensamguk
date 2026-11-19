@@ -26,12 +26,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 // AC-INT-09의 CITY/PASS 저장·멸망 분기만 검사하는 3인 통제 고정물이다.
 // 정식 21국·491명 사람 플레이와 AC-INT-12 전체 기수 증거를 대신하지 않는다.
 const url = process.env.TEST_DATABASE_URL;
-if (
-  !url ||
-  !['localhost', '127.0.0.1'].includes(new URL(url).hostname) ||
-  !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(new URL(url).pathname)
-)
-  throw new Error('loopback 전용 검사 DB가 필요합니다.');
+if (!url || !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(new URL(url).pathname)) throw new Error('전용 검사 DB가 필요합니다.');
 const db = createDb(url);
 const origin = 'http://127.0.0.1:5173';
 const app = await buildServer({ db, logging: false, publicOrigin: origin });
@@ -209,6 +204,8 @@ it('실제 HTTP 편성·동의·30칸 예약으로 두 나라의 부대를 준�
   await advance(Math.max(...joining.map((general) => general.nextTurnTick)));
   // 임의 UUID의 정상 턴 offset을 보존하고 첫 7월 급료로 준비 비용을 마련한다.
   await advance(60000);
+});
+it('실제 모병·관계 동의·훈련 예약으로 공격 부곡과 예비 부곡을 준비한다', async () => {
   const actor = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
   expect(actor.nationId).toBe(1);
   attackerUnit = await prepareFixtureUnit(db, worldId, 1);

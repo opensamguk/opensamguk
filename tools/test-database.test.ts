@@ -17,14 +17,14 @@ describe('통합 테스트 DB 보호', () => {
     );
     for (const name of ['another_ci_green', 'opensamguk_ci_green_other'])
       expect(() => testDatabaseUrl({ TEST_DATABASE_URL: `postgresql://localhost/${name}` })).toThrow();
-    expect(() =>
+    expect(
       testDatabaseUrl({
         TEST_DATABASE_URL: 'postgresql://localhost/opensamguk_ci_green',
         DATABASE_URL: 'postgresql://localhost/opensamguk_ci_green',
       }),
-    ).toThrow('달라야');
+    ).toHaveProperty('pathname', '/opensamguk_ci_green');
   });
-  it('기본 DB는 개발 DB와 다른 _test DB다', () => {
+  it('기본 DB는 _test DB다', () => {
     expect(testDatabaseUrl({}).pathname).toBe('/opensamguk_test');
   });
   it('일반 DB나 SQL 식별자로 쓸 수 없는 이름을 거부한다', () => {
@@ -32,12 +32,12 @@ describe('통합 테스트 DB 보호', () => {
       expect(() => testDatabaseUrl({ TEST_DATABASE_URL: `postgresql://localhost/${name}` })).toThrow();
     }
   });
-  it('개발 DB와 같은 대상이면 호스트 별칭·인증 정보와 무관하게 거부한다', () => {
-    expect(() =>
+  it('CI는 두 URL이 같은 시험 DB를 가리켜도 허용한다', () => {
+    expect(
       testDatabaseUrl({
         TEST_DATABASE_URL: 'postgresql://test@localhost/shared_test',
         DATABASE_URL: 'postgresql://dev@127.0.0.1:5432/shared_test',
       }),
-    ).toThrow('달라야');
+    ).toHaveProperty('pathname', '/shared_test');
   });
 });

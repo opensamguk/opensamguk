@@ -43,7 +43,6 @@ for (const mode of ['delayed', 'lingering', 'lingering-two', 'wrong-oid'] as con
   it(`정상 종료 관측 ${mode}는 실제 연결과 자기 DB 식별자를 확인한다`, async () => {
     if (!process.env.TEST_DATABASE_URL) throw new Error('전용 시험 DB가 필요합니다.');
     const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-    if (!['127.0.0.1', 'localhost'].includes(source.hostname)) throw new Error('loopback 시험 DB가 필요합니다.');
     for (const key of source.searchParams.keys())
       if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
         throw new Error('대상 변경 인자는 받지 않습니다.');

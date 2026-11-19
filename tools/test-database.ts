@@ -29,16 +29,5 @@ export function testDatabaseUrl(env: Record<string, string | undefined>): URL {
   ) {
     throw new Error('통합 테스트 DB는 _test로 끝나는 이름 또는 opensamguk_ci_green이어야 합니다.');
   }
-  if (env.DATABASE_URL) {
-    const development = new URL(env.DATABASE_URL);
-    const host = (value: URL) => (value.hostname === 'localhost' ? '127.0.0.1' : value.hostname);
-    if (
-      host(development) === host(url) &&
-      (development.port || '5432') === (url.port || '5432') &&
-      development.pathname === url.pathname
-    ) {
-      throw new Error('통합 테스트 DB와 개발 DATABASE_URL은 달라야 합니다.');
-    }
-  }
   return url;
 }

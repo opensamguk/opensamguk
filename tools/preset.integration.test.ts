@@ -52,10 +52,11 @@ const [actorUserId, otherUserId, newUserId, sanctionedUserId] = Array.from({ len
 const users = [actorUserId, otherUserId, newUserId, sanctionedUserId];
 const cookies = new Map<string, string>();
 let base: string;
+let existingWorldIds: string[] | undefined;
 
 beforeAll(async () => {
   await initializeSan10Resources(db);
-  await db.world.deleteMany();
+  existingWorldIds = (await db.world.findMany({ select: { id: true } })).map(({ id }) => id);
   for (const id of users) {
     await db.user.upsert({
       where: { id },
@@ -75,7 +76,7 @@ beforeAll(async () => {
 });
 afterAll(async () => {
   await app.close();
-  await db.world.deleteMany();
+  if (existingWorldIds) await db.world.deleteMany({ where: { id: { notIn: existingWorldIds } } });
   await db.user.deleteMany({ where: { id: { in: users } } });
   await db.$disconnect();
 });

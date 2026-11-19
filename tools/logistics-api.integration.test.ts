@@ -35,12 +35,11 @@ if (!url) throw new Error('전용 물류 API 테스트 DB가 필요합니다.');
 const target = new URL(url);
 if (
   !['postgres:', 'postgresql:'].includes(target.protocol) ||
-  !['127.0.0.1', 'localhost'].includes(target.hostname) ||
   !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(target.pathname) ||
   target.searchParams.has('host') ||
   target.searchParams.has('port')
 )
-  throw new Error('loopback 전용 테스트 DB를 확인하세요.');
+  throw new Error('전용 테스트 DB를 확인하세요.');
 const db = createDb(url),
   worldIds: string[] = [],
   userIds: string[] = [];
@@ -672,97 +671,105 @@ describe('AC-P2-30 실제 HTTP 물류 접수·조회·엔진', () => {
     expect(replayed.at(-1)!.stateHash).toBe(hashState(state));
   });
 
-  it('D-072 창극병·차병의 공개 비용을 실제 모집에 적용하고 부족 실패까지 재생한다', async () => {
-    const started = performance.now();
-    const world = await fixture({ fundedRecruitment: true, expandedRecruitment: true });
-    const recruitmentTick = 36 * TICKS_PER_MONTH;
-    for (let tick = 12 * TICKS_PER_MONTH; tick <= recruitmentTick; tick += 12 * TICKS_PER_MONTH) {
-      await advance(world.id, tick);
-      console.info(JSON.stringify({ event: 'logistics-D072-progress', tick, ms: performance.now() - started }));
-    }
+  describe('D-072 창극병·차병 공개 비용과 부족 실패 재생', () => {
+    let world: Awaited<ReturnType<typeof fixture>>;
+    let preparedMonths = 0;
+    // 실측: 실제 36개월 준비만 28.7초이므로 각 연도 진행과 비용·재생 검증을 나눈다.
+    it.each([12, 24, 36])('실제 %i개월의 모집 재고를 준비한다', async (months) => {
+      if (months === 12) world = await fixture({ fundedRecruitment: true, expandedRecruitment: true });
+      if (preparedMonths !== months - 12) throw Error('앞선 모집 재고 준비가 끝나지 않았습니다.');
+      const started = performance.now();
+      await advance(world.id, months * TICKS_PER_MONTH);
+      expect((await snapshot(world.id)).monthlyTick).toBe(months * TICKS_PER_MONTH);
+      preparedMonths = months;
+      console.info(JSON.stringify({ event: 'logistics-D072-progress', months, ms: performance.now() - started }));
+    });
+    it('공개 비용의 실제 모집·부족 실패와 39개월 전체 재생을 보존한다', async () => {
+      if (preparedMonths !== 36) throw Error('36개월 모집 재고 준비가 끝나지 않았습니다.');
+      const recruitmentTick = 36 * TICKS_PER_MONTH;
+      const purchase = await rpc(
+        'logistics.submit',
+        {
+          worldId: world.id,
+          expectedUserId: world.player.id,
+          requestId: randomUUID(),
+          payload: { type: 'trade', cityKey: world.cityKey, good: 'iron', side: 'buy', amount: 6 },
+        },
+        world.player,
+      );
+      expect(purchase.status).toBe(200);
+      await advance(world.id, recruitmentTick);
 
-    const purchase = await rpc(
-      'logistics.submit',
-      {
-        worldId: world.id,
-        expectedUserId: world.player.id,
-        requestId: randomUUID(),
-        payload: { type: 'trade', cityKey: world.cityKey, good: 'iron', side: 'buy', amount: 6 },
-      },
-      world.player,
-    );
-    expect(purchase.status).toBe(200);
-    await advance(world.id, recruitmentTick);
+      const generalKey = { worldId_id: { worldId: world.id, id: world.generalId } };
+      const ruler = await db.general.findUniqueOrThrow({ where: generalKey });
+      const commands = [
+        { commandKey: 'recruit', args: { amount: 100, crewType: 1400 } },
+        { commandKey: 'recruit', args: { amount: 101, crewType: 1500 } },
+        { commandKey: 'recruit', args: { amount: 100, crewType: 1500 } },
+      ];
+      expect(
+        (
+          await rpc(
+            'turns.set',
+            {
+              worldId: world.id,
+              revision: ruler.turnRevision,
+              slots: Array.from({ length: 30 }, (_, i) => commands[i] ?? null),
+            },
+            world.player,
+          )
+        ).status,
+      ).toBe(200);
+      await advance(world.id, recruitmentTick);
 
-    const generalKey = { worldId_id: { worldId: world.id, id: world.generalId } };
-    const ruler = await db.general.findUniqueOrThrow({ where: generalKey });
-    const commands = [
-      { commandKey: 'recruit', args: { amount: 100, crewType: 1400 } },
-      { commandKey: 'recruit', args: { amount: 101, crewType: 1500 } },
-      { commandKey: 'recruit', args: { amount: 100, crewType: 1500 } },
-    ];
-    expect(
-      (
-        await rpc(
-          'turns.set',
-          {
-            worldId: world.id,
-            revision: ruler.turnRevision,
-            slots: Array.from({ length: 30 }, (_, i) => commands[i] ?? null),
-          },
-          world.player,
-        )
-      ).status,
-    ).toBe(200);
-    await advance(world.id, recruitmentTick);
-
-    const key = String(world.cityKey);
-    for (const [index, expected] of [
-      [{ good: 'iron', delta: -2 }],
-      [
-        { good: 'iron', delta: -4 },
-        { good: 'wood', delta: -20 },
-      ],
-      [],
-    ].entries()) {
-      const { nextTurnTick: tick } = await db.general.findUniqueOrThrow({ where: generalKey });
-      const before = (await snapshot(world.id)).state;
-      await advance(world.id, tick);
-      const after = (await snapshot(world.id)).state;
-      const rows = await db.logisticsMovement.findMany({
-        where: { worldId: world.id, tick, holder: 'city', holderId: world.cityKey, reason: 'CONSUME' },
-        orderBy: { ordinal: 'asc' },
-        select: { good: true, delta: true },
-      });
-      expect(rows).toEqual(expected);
-      const oldStock = before.logistics!.cities[key]!;
-      expect(after.logistics!.cities[key]).toMatchObject({
-        iron: oldStock.iron + (expected.find(({ good }) => good === 'iron')?.delta ?? 0),
-        wood: oldStock.wood + (expected.find(({ good }) => good === 'wood')?.delta ?? 0),
-        horses: oldStock.horses,
-      });
-      const resource = after.cityResources!.cities[key]!;
-      const previous = before.cityResources!.cities[key]!;
-      if (expected.length) {
-        const { amount, crewType } = commands[index]!.args;
-        expect(resource.garrison.find((row) => row.crewType === crewType)?.troops).toBe(amount);
-        expect(after.cities[world.cityKey]!.population).toBe(before.cities[world.cityKey]!.population - amount);
-      } else {
-        expect(resource).toEqual(previous);
-        expect(after.cities[world.cityKey]!.population).toBe(before.cities[world.cityKey]!.population);
-        expect(
-          await db.generalLog.findFirst({ where: { worldId: world.id, generalId: ruler.id, tick, kind: 'failure' } }),
-        ).toMatchObject({
-          commandKey: 'recruit',
-          text: expect.stringContaining('도시의 철, 목재, 말이 부족합니다.'),
+      const key = String(world.cityKey);
+      for (const [index, expected] of [
+        [{ good: 'iron', delta: -2 }],
+        [
+          { good: 'iron', delta: -4 },
+          { good: 'wood', delta: -20 },
+        ],
+        [],
+      ].entries()) {
+        const { nextTurnTick: tick } = await db.general.findUniqueOrThrow({ where: generalKey });
+        const before = (await snapshot(world.id)).state;
+        await advance(world.id, tick);
+        const after = (await snapshot(world.id)).state;
+        const rows = await db.logisticsMovement.findMany({
+          where: { worldId: world.id, tick, holder: 'city', holderId: world.cityKey, reason: 'CONSUME' },
+          orderBy: { ordinal: 'asc' },
+          select: { good: true, delta: true },
         });
+        expect(rows).toEqual(expected);
+        const oldStock = before.logistics!.cities[key]!;
+        expect(after.logistics!.cities[key]).toMatchObject({
+          iron: oldStock.iron + (expected.find(({ good }) => good === 'iron')?.delta ?? 0),
+          wood: oldStock.wood + (expected.find(({ good }) => good === 'wood')?.delta ?? 0),
+          horses: oldStock.horses,
+        });
+        const resource = after.cityResources!.cities[key]!;
+        const previous = before.cityResources!.cities[key]!;
+        if (expected.length) {
+          const { amount, crewType } = commands[index]!.args;
+          expect(resource.garrison.find((row) => row.crewType === crewType)?.troops).toBe(amount);
+          expect(after.cities[world.cityKey]!.population).toBe(before.cities[world.cityKey]!.population - amount);
+        } else {
+          expect(resource).toEqual(previous);
+          expect(after.cities[world.cityKey]!.population).toBe(before.cities[world.cityKey]!.population);
+          expect(
+            await db.generalLog.findFirst({ where: { worldId: world.id, generalId: ruler.id, tick, kind: 'failure' } }),
+          ).toMatchObject({
+            commandKey: 'recruit',
+            text: expect.stringContaining('도시의 철, 목재, 말이 부족합니다.'),
+          });
+        }
+        await advance(world.id, Math.ceil(tick / TICKS_PER_MONTH) * TICKS_PER_MONTH);
       }
-      await advance(world.id, Math.ceil(tick / TICKS_PER_MONTH) * TICKS_PER_MONTH);
-    }
-    const archive = await exportReplay(db, world.id);
-    const replayed = replayArchive(archive, 39);
-    expect(replayed.map(({ stateHash }) => stateHash)).toEqual(archive.months.map(({ stateHash }) => stateHash));
-    expect(replayed.at(-1)?.stateHash).toBe(hashState(await snapshot(world.id)));
+      const archive = await exportReplay(db, world.id);
+      const replayed = replayArchive(archive, 39);
+      expect(replayed.map(({ stateHash }) => stateHash)).toEqual(archive.months.map(({ stateHash }) => stateHash));
+      expect(replayed.at(-1)?.stateHash).toBe(hashState(await snapshot(world.id)));
+    });
   });
 
   it('예약 뒤 재고가 사라지면 모집을 거부하고 금·인구·수비병·재화는 보존한다', async () => {

@@ -346,3 +346,13 @@ export function checkReplayOrigin(
       .find((feature) => feature.key === key)!
       .checkOrigin?.({ initial: origin.initial, data: origin.featureData?.[key] });
 }
+
+// 같은 잠긴 저장 행에서 검사한 생성 기록만 읽기 경로 사이에서 재사용한다.
+export function checkedReplayOrigin(value: unknown, checked?: ReplayOriginV3 | ReplayOriginV1) {
+  if (checked === undefined) {
+    checkReplayOrigin(value);
+    return value;
+  }
+  if (checked !== value) throw new Error('검증한 생성 기록이 저장 행과 다릅니다.');
+  return checked;
+}

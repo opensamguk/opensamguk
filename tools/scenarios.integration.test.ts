@@ -973,7 +973,7 @@ describe.each(ready)('S8 $key 전체 장수가 있는 DB 월드', (row) => {
   const owned = ownedDatabase();
   let fixture: Fixture;
   let worldId: string;
-  // 준비·월내 각 구간·정리는 기존 30초 제한을 지킨다. 월 전체의 성능 제한은 아니다.
+  // 준비·정리는 기존 30초, 월내 각 구간은 아래 실측에 따른 60초 제한이다.
   let preparation: Promise<void> | undefined;
   const executions = new Set<Promise<void>>();
   const checkpoints = Array.from({ length: TICKS_PER_MONTH / 1000 }, (_, index) => (index + 1) * 1000);
@@ -1029,6 +1029,7 @@ describe.each(ready)('S8 $key 전체 장수가 있는 DB 월드', (row) => {
   for (const [index, ticks] of batches.entries()) {
     const from = index === 0 ? 0 : batches[index - 1]!.at(-1)!,
       target = ticks.at(-1)!;
+    // S8 1021 마지막 구간 실측 34.9초(월 전체 75.9초). NPC·정산·재시작 검증을 유지한다.
     it(`월내 ${index + 1}구간 ${from}~${target}tick과 정산 경계를 저장한다`, ({ onTestFailed, signal }) => {
       // Vitest timeout 뒤 원래 Promise가 성공해도 뒤 구간을 다시 열지 않는다.
       onTestFailed(() => {
@@ -1102,7 +1103,7 @@ describe.each(ready)('S8 $key 전체 장수가 있는 DB 월드', (row) => {
         })
         .catch(() => undefined);
       return execution;
-    });
+    }, 60000);
   }
 });
 

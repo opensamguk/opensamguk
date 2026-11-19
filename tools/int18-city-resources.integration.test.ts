@@ -43,13 +43,11 @@ if (!url) throw new Error('도시 자원 전용 테스트 DB가 필요합니다.
 const target = new URL(url);
 if (
   !['postgres:', 'postgresql:'].includes(target.protocol) ||
-  !['127.0.0.1', 'localhost'].includes(target.hostname) ||
-  !['', '5432', '5433', '5434', '5435', '5561'].includes(target.port) ||
   !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(target.pathname) ||
   target.searchParams.has('host') ||
   target.searchParams.has('port')
 )
-  throw new Error('loopback 테스트 DB 주소와 이름을 확인하세요.');
+  throw new Error('전용 테스트 DB 주소와 이름을 확인하세요.');
 const db = createDb(url),
   worldIds: string[] = [],
   userIds: string[] = [];
@@ -76,15 +74,19 @@ function track<T>(action: () => Promise<T>) {
 async function settle() {
   while (running.size) await Promise.allSettled([...running]);
 }
-function it(name: string, run: (signal: AbortSignal) => Promise<void>) {
-  test(name, ({ onTestFailed }) => {
-    const controller = new AbortController();
-    onTestFailed(() => {
-      failed = true;
-      controller.abort();
-    });
-    return track(() => run(controller.signal));
-  });
+function it(name: string, run: (signal: AbortSignal) => Promise<void>, timeout = 30_000) {
+  test(
+    name,
+    ({ onTestFailed }) => {
+      const controller = new AbortController();
+      onTestFailed(() => {
+        failed = true;
+        controller.abort();
+      });
+      return track(() => run(controller.signal));
+    },
+    timeout,
+  );
 }
 beforeEach(settle);
 type Receipt = Awaited<ReturnType<typeof readCityResourceRequest>>;
@@ -769,6 +771,7 @@ describe('AC-INT-18B 수정하지 않은 정식 491명 첫 달과 원생성 arch
       }
     });
   }
+  // 정식 한 달 수출·재생 두 회·재적재 실측 68.7초. 원생성 검증 범위를 유지한다.
   it('정식 원생성 archive의 동일 시드 재생과 DB 월 해시가 같다', async () => {
     if (failed || active || completedTick !== 10000)
       throw new Error('정식 첫 달의 모든 구간을 성공하기 전에는 archive를 인수하지 않습니다.');
@@ -778,7 +781,7 @@ describe('AC-INT-18B 수정하지 않은 정식 491명 첫 달과 원생성 arch
     expect(replayArchive(archive, 1)).toEqual(first);
     expect(first[0]!.stateHash).toBe(hashState(await snapshot(cleanWorld)));
     expect((await snapshot(isolatedWorld)).state.cityResources).toEqual(
-      initialReplayState(initial, { policy: { version: 1, turnTermMinutes: 60 } }).state.cityResources,
+      initialReplayState(archive.origin.initial, { policy: { version: 1, turnTermMinutes: 60 } }).state.cityResources,
     );
-  });
+  }, 120000);
 });

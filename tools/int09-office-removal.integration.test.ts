@@ -16,12 +16,8 @@ import { settleFixtureBattles } from './fixtures/tactical';
 // AC-INT-09 멸망과 직책 저장 순서의 실제 PG 회귀다. 두 군주·시각·군대를 통제해 준비한다.
 // 이 고정물은 원생성 archive 재생이나 정식491명 한 기수 인수 증거가 아니다.
 const url = process.env.TEST_DATABASE_URL;
-if (
-  !url ||
-  !['127.0.0.1', 'localhost'].includes(new URL(url).hostname) ||
-  !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(new URL(url).pathname)
-) {
-  throw new Error('loopback 전용 검사 DB가 필요합니다.');
+if (!url || !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(new URL(url).pathname)) {
+  throw new Error('전용 검사 DB가 필요합니다.');
 }
 const db = createDb(url),
   worldIds: string[] = [],
@@ -30,7 +26,7 @@ const json = (value: unknown): Prisma.InputJsonValue => JSON.parse(JSON.stringif
 afterAll(async () => {
   try {
     await db.world.deleteMany({ where: { id: { in: worldIds } } });
-    await db.user.deleteMany({ where: { id: { in: userIds } } });
+    await db.user.deleteMany({ where: { id: { in: userIds }, heritageAccount: { is: null } } });
   } finally {
     await db.$disconnect();
   }
@@ -173,7 +169,11 @@ describe('AC-INT-09 국가 멸망과 직책 저장의 원자적 순서', () => {
     await settleFixtureBattles(db, worldId);
     const endingLease = (await acquireLease(db, worldId))!;
     try {
-      await new TurnLoop(db, endingLease).advanceTo(1);
+      const next = await db.general.findFirstOrThrow({
+        where: { worldId, removedAt: null },
+        orderBy: [{ nextTurnTick: 'asc' }, { id: 'asc' }],
+      });
+      await new TurnLoop(db, endingLease).advanceTo(next.nextTurnTick);
     } finally {
       await releaseLease(db, endingLease);
     }

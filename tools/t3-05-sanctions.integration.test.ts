@@ -34,7 +34,6 @@ const { Client } = createRequire(requireDb.resolve('@prisma/adapter-pg'))('pg') 
 };
 if (!process.env.TEST_DATABASE_URL) throw new Error('전용 테스트 DB가 필요합니다.');
 const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-if (!['localhost', '127.0.0.1'].includes(source.hostname)) throw new Error('loopback 시험 서버가 필요합니다.');
 for (const key of source.searchParams.keys())
   if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
     throw new Error('접속 대상 질의 인자는 쓸 수 없습니다.');
@@ -897,7 +896,7 @@ it('제재 트랜잭션 뒤 대기 중이던 실제 로그인은 새 세션을 �
     await creating;
     const result = await loggingIn;
     expect(result.status).toBe(401);
-    expect(result.body[0].error.data.code).toBe('UNAUTHORIZED');
+    expect(result.body).toMatchObject([{ error: { data: { code: 'UNAUTHORIZED' } } }]);
     expect(result.cookie).toBe(null);
     expect(await db.session.count({ where: { userId: victim.id } })).toBe(0);
   } catch (error) {

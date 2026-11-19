@@ -2,12 +2,12 @@ import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
-import { buildInitialWorld, initialReplayState, buildSupplyLedger } from '../packages/rules/src/index';
-import { hashState } from '../packages/shared/src/node/hashState';
+import { buildInitialWorld, buildSupplyLedger } from '../packages/rules/src/index';
 import { publicMapConfig } from '../packages/shared/src/publicMap';
 import { saveInitialWorld, readWorldState } from '../apps/engine/src/world/persistence';
 import { persistPublicMap } from '../apps/engine/src/publicMap';
 import { persistPublicNationEvents } from '../apps/engine/src/nationArchive';
+import { loadReplayState } from '../apps/engine/src/monthly';
 import { acquireLease, releaseLease, type Lease } from '../apps/engine/src/lease';
 import { buildServer } from '../apps/server/src/server';
 
@@ -39,6 +39,7 @@ it('AC-INT-27·28·AC-M2-20 FIELD 저장·재적재와 같은 턴 사건의 지�
     id: `int27-${randomUUID()}`,
     requiredMap: map.id,
     general: [],
+    generalStats: [],
     nation: [],
   };
   const city = map.sites.find((row: { kind: string; level: number }) => row.kind === 'CITY' && row.level >= 4);
@@ -49,8 +50,8 @@ it('AC-INT-27·28·AC-M2-20 FIELD 저장·재적재와 같은 턴 사건의 지�
     unitSet: await read('unitset/expanded.json'),
     statRules: await read('scenario/five-stats.json'),
     seed: 'int27-db',
-    mapKey: 'san10-expanded@3',
   });
+  initial.fogOfWar = false;
   ({ worldId } = await saveInitialWorld(db, initial, {
     name: 'INT-27 DB 시험',
     turnTermMinutes: 60,
@@ -70,8 +71,8 @@ it('AC-INT-27·28·AC-M2-20 FIELD 저장·재적재와 같은 턴 사건의 지�
   expect(stored.cities.filter((row) => row.kind === 'FIELD').every((row) => row.nationId === null)).toBe(true);
   expect(stored.cities.filter((city) => city.parentCityKey != null)).toHaveLength(105);
   expect(stored.cities.every((city) => city.state === 0 && city.stateTerm === 0)).toBe(true);
-  expect(hashState(stored)).toBe(hashState(initial));
-  const before = initialReplayState(initial, { policy: { version: 1, turnTermMinutes: 60 } }).state,
+  expect(stored).toEqual(initial);
+  const before = (await db.$transaction((tx) => loadReplayState(tx, worldId!))).state,
     next = structuredClone(before);
   const field = Object.values(next.cities).find((row) => row.kind === 'FIELD')!;
   field.nationId = 1;
@@ -105,7 +106,7 @@ it('AC-INT-27·28·AC-M2-20 FIELD 저장·재적재와 같은 턴 사건의 지�
   expect(headlines.items[0]).toMatchObject({ kind: 'capture', nations: [{ id: 1, name: '시험국', color: '#123456' }] });
   const maps = await request('world.publicMaps');
   const snapshot = maps.worlds.find((row: { id: string }) => row.id === worldId).map;
-  expect(snapshot.emperorCityKey).toBeNull();
+  expect(snapshot.emperorCityKey).toBe(before.governance!.config.seatCityKey);
   expect(
     snapshot.cities.every((city: { state: number; stateTerm: number }) => city.state === 0 && city.stateTerm === 0),
   ).toBe(true);

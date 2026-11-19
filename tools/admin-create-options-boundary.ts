@@ -1,3 +1,5 @@
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
+
 // 이 생성 설정 fixture만의 유한 수명과 삭제 조건이다. 전역 runner 설정은 바꾸지 않는다.
 export class CreateOptionsBoundary {
   failed = false;
@@ -145,8 +147,12 @@ export async function auditOwnedCreate(
   query: Query,
   receipt: OwnedCreateAudit,
 ) {
-  if (!/^(?:t305_create_options_[a-f0-9]{32}|opensamguk_ci_green_[a-f0-9]{20})_test$/.test(state.name))
+  if (
+    !/^(?:t305_create_options_[a-f0-9]{32}|opensamguk_ci_green_[a-f0-9]{20})_test$/.test(state.name) &&
+    state.name !== ciGreenDatabaseName('')
+  )
     throw new Error('자기 UUID 시험 DB 이름을 확인하세요.');
+  testDatabaseUrl({ TEST_DATABASE_URL: `postgresql://localhost/${state.name}` });
   if (!state.createSent) return;
   receipt.attempted = true;
   const primary = (

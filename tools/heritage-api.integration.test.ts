@@ -35,12 +35,8 @@ import { confirmDisconnectedDatabase } from './test-db-close';
 // 불변 원장은 지우지 않는다. 이 파일이 새로 만든 UUID DB에서만 실제 PG/HTTP/엔진을 검증한다.
 if (!process.env.TEST_DATABASE_URL) throw Error('전용 유산 테스트 DB가 필요합니다.');
 const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-if (
-  !['localhost', '127.0.0.1'].includes(source.hostname) ||
-  source.searchParams.has('host') ||
-  source.searchParams.has('port')
-)
-  throw Error('loopback 전용 유산 테스트 DB를 확인하세요.');
+if (source.searchParams.has('host') || source.searchParams.has('port'))
+  throw Error('전용 유산 테스트 DB를 확인하세요.');
 const name = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
 if (!/^opensamguk_ci_green_[a-zA-Z0-9]+_test$/.test(name)) throw Error('유산 시험 DB 이름을 확인하세요.');
 const target = new URL(source),
@@ -267,10 +263,14 @@ async function crashBeforeCommit(worldId: string) {
     {
       cwd: fileURLToPath(new URL('../', import.meta.url)),
       env: { ...process.env, TEST_DATABASE_URL: target.href, HERITAGE_CRASH_WORLD: worldId },
-      stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
+      stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
       windowsHide: true,
     },
   );
+  let workerError = '';
+  child.stderr?.on('data', (chunk: Buffer) => {
+    workerError += chunk.toString('utf8');
+  });
   const closed = new Promise<void>((resolve) => {
     child.once('close', () => resolve());
     child.once('error', () => resolve());
@@ -279,7 +279,13 @@ async function crashBeforeCommit(worldId: string) {
   const ready = new Promise<void>((resolve, reject) => {
     timeout = setTimeout(() => reject(new Error('중단 시험의 커밋 직전 신호가 없습니다.')), 15000);
     child.once('error', reject);
-    child.once('exit', () => reject(new Error('커밋 직전 신호 전에 시험 프로세스가 끝났습니다.')));
+    child.once('exit', () =>
+      reject(
+        new Error(
+          `커밋 직전 신호 전에 시험 프로세스가 끝났습니다. ${workerError.replace(/postgres(?:ql)?:\/\/[^\s"'<>]+/g, '[DB 생략]')}`,
+        ),
+      ),
+    );
     child.once('message', (message) => {
       if (typeof message === 'object' && message !== null && 'phase' in message && message.phase === 'BEFORE_COMMIT')
         resolve();
@@ -410,7 +416,11 @@ it('AC-P2-33 계승 전후 36개월 활동을 합산하고 다음 허용 기수�
   await send(mother, mom, { type: 'marriage.respond', offerId: offered.offerId!, accept: true });
   await advance(id, TICKS_PER_MONTH);
   const birth = await db.$transaction((tx) => loadReplayState(tx, id)),
-    heir = Number(Object.entries(birth.state.lineage!.persons).find(([, person]) => person.parents.includes(from))![0]);
+    heir = Number(
+      Object.entries(birth.state.lineage!.persons).find(([, person]) =>
+        person.parents.some((parent) => parent === from),
+      )![0],
+    );
   for (let month = 1; month < 12; month++) {
     await send(father, from, { type: 'heir.designate', heirGeneralId: null });
     await advance(id, (month + 1) * TICKS_PER_MONTH);

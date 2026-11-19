@@ -248,8 +248,10 @@ export class TurnLoop {
             status: world.status,
           };
         }
+        let loadedState: WorldState | undefined;
         if (!catchUp && world.campaignState) {
-          const tactical = await processTacticalStep(tx, world, new Date(now));
+          loadedState = await loadWorld(tx, worldId);
+          const tactical = await processTacticalStep(tx, world, new Date(now), undefined, loadedState);
           if (tactical) {
             await persistPublicMap(
               tx,
@@ -298,7 +300,8 @@ export class TurnLoop {
           sequence = await nextActionSequence(tx, worldId);
           await tx.$queryRaw`SELECT id FROM "General" WHERE "worldId" = ${worldId} AND id = ${due.id} FOR UPDATE`;
           // 예턴 편집은 actor 행 잠금 또는 turnRevision 조건을 함께 사용해야 한다.
-          const state = await loadWorldAfterCapabilityCheck(tx, world, capabilities);
+          // 전술 처리 결과가 null이면 쓰기가 없으므로 같은 잠금의 적재 사본을 이어 쓴다.
+          const state = loadedState ?? (await loadWorldAfterCapabilityCheck(tx, world, capabilities));
           const personnelBefore = world.replayFormat === 3 ? await loadPersonnelTurnContext(tx, worldId, state) : null;
           const actor = await tx.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: due.id } } });
           const slots = await tx.generalTurn.findMany({

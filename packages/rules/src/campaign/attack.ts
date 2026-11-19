@@ -17,6 +17,7 @@ import { readCampaignState, type CampaignUnitState } from './state';
 import { readCityResourcesState } from '../cityResources/state';
 import { disbandCityGarrison } from '../cityResources/ownership';
 import { battleBusy, openTacticalBattle } from '../tactical/world';
+import { reputationBattleEvents } from '../review/events';
 
 const argsSchema = z.strictObject({ cityKey: positive, ...marchSupplyArgs });
 const year = (view: WorldView, tick: number) => view.startYear + Math.floor(tick / (12 * TICKS_PER_MONTH));
@@ -173,6 +174,7 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
     return {
       ...success(`${state.cities[cityKey]!.name} 작전 회의: ${battle.id}`),
       effects: [{ kind: 'world', state }],
+      attackTarget: { cityKey, defendingNationId: defendingNation },
     };
   }
   const cityDefense = () => state.cityResources!.cities[String(cityKey)]!.garrison;
@@ -310,6 +312,49 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
     attackTarget: { cityKey, defendingNationId: defendingNation },
     ...{ battleOutcomes },
   };
+}
+
+// 엔진 저장과 재생 결과의 대조가 같은 정산 경계와 참여자를 사용한다.
+export function tacticalBattleReports(
+  before: WorldView,
+  after: WorldView,
+  battleId: string,
+  tick: number,
+  cancelled = false,
+): CommandResult {
+  const result: CommandResult = { ...success(''), effects: [], reports: [], battleAwards: [], history: [] };
+  const old = before.campaign?.tactical?.battles.find((b) => b.id === battleId);
+  const battle = after.campaign?.tactical?.battles.find((b) => b.id === battleId);
+  if (!old || old.settled || !battle?.settled || battle.fault) return result;
+  const attackerId = battle.units.find((u) => u.side === 'attack' && u.ownerId !== null)?.ownerId;
+  if (attackerId == null) return result;
+  const target = before.cities[battle.targetCityKey]!;
+  const captured =
+    battle.result === 'attack' && after.cities[target.cityKey]?.nationId === battle.sides.attack.nationId;
+  const summary = `${before.generals[attackerId]!.name} ${target.name} ${captured ? '점령' : '점령 실패'}: ${battle.reason ?? ''}`;
+  const defenders = [
+    ...new Set(battle.units.filter((u) => u.side === 'defend' && u.commanderId !== null).map((u) => u.commanderId!)),
+  ];
+  for (const generalId of defenders)
+    result.reports!.push({
+      generalId,
+      text: `${summary}; ${battle.units.map((u) => `${u.sourceId === null ? '수비병' : `부곡${u.sourceId}`} ${u.troops}명`).join('; ')}`,
+    });
+  // 재생이 기록하는 승패·점령 사건과 같은 계산을 전공 저장에도 쓴다.
+  for (const event of reputationBattleEvents(before, after, tick, cancelled ? battleId : undefined)) {
+    if (event.data.city?.cityKey !== target.cityKey) continue;
+    if (event.kind === 'victory') result.battleAwards!.push({ generalId: event.generalId, wins: 1, captures: 0 });
+    if (event.kind === 'conquest') result.battleAwards!.push({ generalId: attackerId, wins: 0, captures: 1 });
+  }
+  for (const nationId of new Set([battle.sides.attack.nationId, battle.sides.defend.nationId])) {
+    if (nationId === null) continue;
+    const destroyed = before.nations[nationId] && !after.nations[nationId];
+    result.history!.push({
+      nationId,
+      text: destroyed ? `${before.nations[nationId]!.name} 멸망, 소속 장수 재야; ${summary}` : summary,
+    });
+  }
+  return result;
 }
 
 export const campaignAttack: CommandDef = {

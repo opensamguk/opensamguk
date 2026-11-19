@@ -47,6 +47,8 @@ export async function loadWorldAfterCapabilityCheck(
   capabilities: Awaited<ReturnType<typeof assertWorldCapabilities>>,
 ): Promise<WorldState> {
   const worldId = world.id;
+  const checkedOrigin = capabilities.kind === 'registry' ? capabilities.origin : undefined;
+  const fiveStats = statRulesSchema.parse({ stat: world.statRules }).stat.count === 5;
   const armyTypes =
     (capabilities.kind === 'registry' ? capabilities.armyTypes : undefined) ?? readCampaignArmyTypes(world);
   const { preset } = engineResolver(world);
@@ -117,7 +119,7 @@ export async function loadWorldAfterCapabilityCheck(
               ),
               world.replayFormat,
             ),
-            statRulesSchema.parse({ stat: world.statRules }).stat.count === 5,
+            fiveStats,
           ),
         ];
       }),
@@ -131,17 +133,17 @@ export async function loadWorldAfterCapabilityCheck(
   if (campaign) state.campaign = campaign;
   const cityResources = readStoredCityResources(world.cityResourcesState, state, armyTypes);
   if (cityResources) state.cityResources = cityResources;
-  const cityRuins = readStoredCityRuins(world, state);
+  const cityRuins = readStoredCityRuins(world, state, checkedOrigin);
   if (cityRuins) state.cityRuins = cityRuins;
-  const nationStrategy = readStoredNationStrategy(world);
+  const nationStrategy = readStoredNationStrategy(world, checkedOrigin);
   if (nationStrategy) state.nationStrategy = nationStrategy;
-  const preparedTurns = readStoredPreparedTurns(world);
+  const preparedTurns = readStoredPreparedTurns(world, checkedOrigin);
   if (preparedTurns) state.preparedTurns = preparedTurns;
-  const nationResearch = readStoredNationResearch(world);
+  const nationResearch = readStoredNationResearch(world, checkedOrigin);
   if (nationResearch) state.nationResearch = nationResearch;
-  const relations = readStoredRelations(world, hashState);
+  const relations = readStoredRelations(world, hashState, checkedOrigin);
   if (relations) state.relations = relations;
-  const nationLifecycle = readStoredNationLifecycle(world);
+  const nationLifecycle = readStoredNationLifecycle(world, checkedOrigin);
   if (nationLifecycle) state.nationLifecycle = nationLifecycle;
   assertNationLifecycle(state);
   const logistics = readStoredLogistics(world.logisticsState, state, readLogisticsOriginConfig(world, state));

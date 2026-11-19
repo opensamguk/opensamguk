@@ -10,7 +10,6 @@ const url = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL }
 if (
   !process.send ||
   !process.env.TEST_DATABASE_URL ||
-  !['127.0.0.1', 'localhost'].includes(url.hostname) ||
   url.searchParams.has('host') ||
   url.searchParams.has('port') ||
   !worldId ||

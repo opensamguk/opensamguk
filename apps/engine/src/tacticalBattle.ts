@@ -5,6 +5,7 @@ import { z } from 'zod';
 import {
   applyBattleInput,
   applyBattleStep,
+  tacticalBattleReports,
   battleStateHash,
   battleParticipant,
   canCommandBattleUnit,
@@ -12,6 +13,7 @@ import {
   reputationInputEvents,
   unitSetSchema,
   type WorldView,
+  type WorldState,
   type BattleState,
 } from '@opensamguk/rules';
 import { battleTurnInputSchema } from '@opensamguk/shared';
@@ -23,6 +25,7 @@ import { loadReplayState } from './monthly';
 import { engineFeatures } from './features';
 import { persistQueuedPersonnelStep } from './ruleFeatures';
 import { appendReputationEvents } from './reputationState';
+import { persistCommandReports } from './commandPersistence';
 
 const json = (value: unknown) => JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 const envelope = z.object({ input: z.unknown(), receivedAt: z.number().int(), sessionId: z.string() });
@@ -165,8 +168,10 @@ export async function processTacticalStep(
   world: EngineWorld,
   now: Date,
   forceCancel?: string,
+  // 호출자가 같은 World 잠금 아래 입력 처리 뒤 읽은 사본만 넘긴다.
+  loadedState?: WorldState,
 ) {
-  const before = await loadWorld(tx, world.id);
+  const before = loadedState ?? (await loadWorld(tx, world.id));
   const candidates =
     before.campaign?.tactical?.battles.filter(
       (b) => !b.settled && (forceCancel || (!b.fault && b.pausedAt === null)),
@@ -298,6 +303,18 @@ export async function processTacticalStep(
   };
   // 일반 턴과 같이 국가의 직책이 cascade 삭제되기 전에 인사 패킷을 저장한다.
   await persistQueuedPersonnelStep(tx, world, beforeReplay, input, next);
+  for (const battle of next.campaign?.tactical?.battles ?? []) {
+    if (!battle.settled || before.campaign?.tactical?.battles.find((old) => old.id === battle.id)?.settled) continue;
+    const reports = tacticalBattleReports(
+      before,
+      next,
+      battle.id,
+      world.clockTick,
+      battle.id === b.id && cancellation !== null,
+    );
+    const attackerId = battle.units.find((u) => u.side === 'attack' && u.ownerId !== null)?.ownerId;
+    if (attackerId != null) await persistCommandReports(tx, world.id, world.clockTick, attackerId, reports);
+  }
   await appendReputationEvents(tx, world.id, reputationInputEvents({ before, after: next, input }));
   for (const feature of engineFeatures)
     if (feature.key !== 'campaign-v1' && feature.key !== 'personnel')

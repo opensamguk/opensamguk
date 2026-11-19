@@ -11,7 +11,7 @@ import {
   validateClosedTreatyRow,
   type WorldCapabilities,
 } from '@opensamguk/rules';
-import { checkStoredReplayFormat } from './features';
+import { checkStoredReplayFormat, type checkWorldReplay } from './features';
 import { assertStoredCityResources } from './cityResourcesState';
 import { assertStoredCityRuins } from './cityScaleState';
 import { assertStoredLogistics } from './logisticsState';
@@ -21,18 +21,20 @@ import { readCampaignArmyTypes } from './campaignState';
 export async function assertWorldCapabilities(
   tx: Prisma.TransactionClient,
   world: Prisma.WorldGetPayload<Record<string, never>>,
-): Promise<WorldCapabilities | { kind: 'registry'; armyTypes?: readonly number[] }> {
+): Promise<
+  WorldCapabilities | { kind: 'registry'; armyTypes?: readonly number[]; origin: ReturnType<typeof checkWorldReplay> }
+> {
   const modern = world.replayFormat === 3;
   const origin = checkStoredReplayFormat(world);
-  readStoredNationStrategy(world);
-  readStoredPreparedTurns(world);
-  readStoredNationResearch(world);
-  readStoredNationLifecycle(world);
+  readStoredNationStrategy(world, origin);
+  readStoredPreparedTurns(world, origin);
+  readStoredNationResearch(world, origin);
+  readStoredNationLifecycle(world, origin);
   const armyTypes = readCampaignArmyTypes(world, origin);
   await assertStoredCityResources(tx, world, armyTypes);
-  await assertStoredCityRuins(tx, world);
+  await assertStoredCityRuins(tx, world, origin);
   await assertStoredLogistics(tx, world);
-  const capabilities = modern ? { kind: 'registry' as const, armyTypes } : selectWorldCapabilities(world);
+  const capabilities = modern ? { kind: 'registry' as const, armyTypes, origin } : selectWorldCapabilities(world);
   const rows = await tx.treaty.findMany({
     where: { worldId: world.id },
     orderBy: { id: 'asc' },

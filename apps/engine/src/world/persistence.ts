@@ -341,6 +341,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
       const operationalMap = readOperationalMap(world.operationalMap, world.replayOrigin);
       const openingCityProfile = operationalMap ? readOpeningCityProfile(world.replayOrigin) : undefined;
       const { presetRules: rules, recruitmentLocation } = effectiveWorldOptions(preset, world.runtimeOptions);
+      const statRules = statRulesSchema.parse({ stat: world.statRules }).stat;
       const initial: WorldInit = {
         fogOfWar: world.fogOfWar,
         ...(operationalMap ? { operationalMap } : {}),
@@ -355,7 +356,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
         mapKey: world.mapKey,
         unitSetKey: world.unitSetKey,
         startYear: world.startYear,
-        statRules: statRulesSchema.parse({ stat: world.statRules }).stat,
+        statRules,
         unitSet: unitSetSchema.parse(world.unitSet),
         cities: attachOperationalKinds(cities.map(stripWorldId), operationalMap, world.campaignState),
         nations: nations.map((nation) => {
@@ -373,7 +374,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
               ),
               world.replayFormat,
             ),
-            statRulesSchema.parse({ stat: world.statRules }).stat.count === 5,
+            statRules.count === 5,
           );
         }),
         diplomacies: diplomacies.map(stripWorldId),

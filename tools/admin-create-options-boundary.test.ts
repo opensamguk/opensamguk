@@ -70,6 +70,20 @@ async function audit(
 }
 afterEach(() => vi.useRealTimers());
 describe('AC-M3-04 생성 설정 fixture 유한 수명과 불확실성', () => {
+  it('배정된 CI DB만 UUID 이름 대신 허용하고 OID·연결 감사를 유지한다', async () => {
+    const assigned = 'opensamguk_ci_green_tools7_test';
+    vi.stubEnv('CI_GREEN_DATABASE', assigned);
+    vi.stubEnv('TEST_DATABASE_URL', `postgresql://localhost/${assigned}`);
+    try {
+      const result = await audit(new CreateOptionsBoundary(), { ...initial, name: assigned });
+      expect(result.receipt).toMatchObject({ identityKnown: true, connections: 0, recoveredOid: '90' });
+      await expect(
+        audit(new CreateOptionsBoundary(), { ...initial, name: 'opensamguk_ci_green_other_test' }),
+      ).rejects.toThrow('자기 UUID');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
   it('setup 기한 뒤 원 SQL 성공을 보존하고 다음 SQL과 DROP은0이다', async () => {
     vi.useFakeTimers();
     const boundary = new CreateOptionsBoundary(),

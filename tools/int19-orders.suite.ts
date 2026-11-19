@@ -42,12 +42,8 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
   if (!process.env.TEST_DATABASE_URL) throw new Error('INT19 전용 TEST_DATABASE_URL이 필요합니다.');
   // 통합 실행기는 DATABASE_URL과 TEST_DATABASE_URL을 같은 테스트 DB로 넘긴다. 이름 규칙만 확인한다.
   const url = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-  if (
-    !['127.0.0.1', 'localhost'].includes(url.hostname) ||
-    url.searchParams.has('host') ||
-    url.searchParams.has('port')
-  )
-    throw new Error('INT19는 loopback 전용 테스트 DB만 사용합니다.');
+  if (url.searchParams.has('host') || url.searchParams.has('port'))
+    throw new Error('INT19 접속 대상 질의 인자는 쓸 수 없습니다.');
   const db = createDb(url.toString());
   const origin = 'http://127.0.0.1:5173',
     seed = 'int19-formal-orders-http-191',

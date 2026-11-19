@@ -1,4 +1,5 @@
 import { isDeepStrictEqual } from 'node:util';
+import type { checkWorldReplay } from './features';
 import type { Prisma } from '@opensamguk/db';
 import {
   campaignStateSchema,
@@ -16,20 +17,35 @@ type StoredWorld = Pick<
 export function readStoredCityRuins(
   world: StoredWorld,
   state: Pick<WorldView, 'cities'> & Partial<Pick<WorldView, 'campaign'>>,
+  checkedOrigin?: ReturnType<typeof checkWorldReplay>,
 ): CityRuinsState | undefined {
-  const origin: unknown = world.replayOrigin;
-  checkReplayOrigin(origin);
+  let origin = checkedOrigin;
+  if (origin === undefined) {
+    const stored: unknown = world.replayOrigin;
+    checkReplayOrigin(stored);
+    origin = stored;
+  } else if (origin !== (world.replayOrigin as unknown)) {
+    throw new Error('검증한 생성 기록이 저장 행과 다릅니다.');
+  }
   if (world.replayFormat !== 3 || origin.version !== 3) throw new Error('폐허의 재생 형식이나 생성 원장이 다릅니다.');
   const campaign =
     state.campaign ?? (world.campaignState == null ? undefined : campaignStateSchema.parse(world.campaignState));
   return readCityRuins(world.cityRuinsState, { ...state, ...(campaign ? { campaign } : {}) }, origin.initial.cityScale);
 }
 
-export async function assertStoredCityRuins(tx: Prisma.TransactionClient, world: StoredWorld): Promise<void> {
+export async function assertStoredCityRuins(
+  tx: Prisma.TransactionClient,
+  world: StoredWorld,
+  checkedOrigin?: ReturnType<typeof checkWorldReplay>,
+): Promise<void> {
   const rows = await tx.city.findMany({ where: { worldId: world.id }, omit: { kind: true } });
-  readStoredCityRuins(world, {
-    cities: Object.fromEntries(rows.map((city) => [city.cityKey, city])),
-  });
+  readStoredCityRuins(
+    world,
+    {
+      cities: Object.fromEntries(rows.map((city) => [city.cityKey, city])),
+    },
+    checkedOrigin,
+  );
 }
 
 // 호출자가 같은 World 행 잠금과 턴 트랜잭션을 유지한다.

@@ -209,7 +209,7 @@ export { resolverForRuleFeatures } from './ruleCommands';
 
 export * from './campaign/retinue';
 export * from './campaign/state';
-export { campaignDefenders } from './campaign/attack';
+export { campaignDefenders, tacticalBattleReports } from './campaign/attack';
 export * from './campaign/relationships';
 export * from './campaign/record';
 export * from './campaign/unitInputs';

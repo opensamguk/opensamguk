@@ -1,4 +1,4 @@
-import { checkReplayOrigin, replayResourceHashInput } from '../ruleRegistry';
+import { checkedReplayOrigin, replayResourceHashInput } from '../ruleRegistry';
 import { readRelationsData, RELATIONS_FEATURE } from './data';
 
 export function readStoredRelations(
@@ -9,9 +9,9 @@ export function readStoredRelations(
     initialStateHash: string;
   },
   hash: (value: unknown) => string,
+  checkedOrigin?: ReturnType<typeof checkedReplayOrigin>,
 ) {
-  const origin: unknown = world.replayOrigin;
-  checkReplayOrigin(origin);
+  const origin = checkedReplayOrigin(world.replayOrigin, checkedOrigin);
   if (
     world.replayFormat !== 3 ||
     origin.version !== 3 ||

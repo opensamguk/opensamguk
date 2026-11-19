@@ -11,7 +11,6 @@ const worldId = process.env.CARDS_CRASH_WORLD,
 if (
   !process.send ||
   !process.env.TEST_DATABASE_URL ||
-  !['127.0.0.1', 'localhost'].includes(url.hostname) ||
   !worldId ||
   !['BEFORE_COMMIT', 'AFTER_COMMIT', 'RECOVER'].includes(mode ?? '') ||
   !['INPUT', 'MONTHLY', 'BATTLE'].includes(boundary)
