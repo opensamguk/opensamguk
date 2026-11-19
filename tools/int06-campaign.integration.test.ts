@@ -46,7 +46,8 @@ let ownId: number,
   targetId: number,
   unitId: number,
   offerId: number,
-  tick = 0;
+  tick = 0,
+  nextMonthTick: number;
 let formRequest: string, offerRequest: string;
 let declinedNpcId: number, lieutenantId: number;
 const executions = new Set<Promise<unknown>>();
@@ -88,6 +89,7 @@ async function board(index = 0) {
   return response.data!;
 }
 async function advance(to = tick, beforeCommit?: () => Promise<void>) {
+  const started = performance.now();
   const lease = await acquireLease(db, worldId);
   if (!lease) throw new Error('검사 실행권이 없습니다.');
   const controller = new AbortController();
@@ -112,11 +114,13 @@ async function advance(to = tick, beforeCommit?: () => Promise<void>) {
   try {
     const result = await new TurnLoop(db, lease, beforeCommit ? { beforeCommit } : {}).advanceTo(to, controller.signal);
     if (renewalError) throw renewalError;
+    tick = to;
     return result;
   } finally {
     controller.abort();
     await renewal;
     await releaseLease(db, lease);
+    console.info('INT06-advance', JSON.stringify({ tick: to, elapsedMs: Math.round(performance.now() - started) }));
   }
 }
 async function submit(
@@ -217,7 +221,7 @@ it('정식 원본을 보존하고 실제 생성 입력·30칸 예약·임관으�
     );
     await expect
       .poll(() =>
-        db.inputEvent.count({ where: { worldId, userId: users[index], kind: 'general.create', status: 'PENDING' } }),
+        db.inputEvent.count({ where: { worldId, userId: users[index]!, kind: 'general.create', status: 'PENDING' } }),
       )
       .toBe(1);
     await advance(0);
@@ -271,6 +275,7 @@ it('정식 원본을 보존하고 실제 생성 입력·30칸 예약·임관으�
   tick = actor.nextTurnTick;
   await advance();
   unitId = (await snapshot()).state.campaign!.units.find((unit) => unit.ownerId === ownId)!.id;
+  nextMonthTick = (Math.floor(tick / 10000) + 1) * 10000;
 });
 
 describe('네 휘하 API의 실제 HTTP 권한 대조', () => {
@@ -568,7 +573,11 @@ it('유효한 NPC 거절도 500금을 한 번 쓰고 같은 달 재시도는 금
   const declined = await snapshot();
   expect(declined.state.generals[targetId]!.gold).toBe(actor.gold - 500);
   expect(declined.state.campaign!.links).toEqual(before.state.campaign!.links);
-  expect(declined.state.campaign!.attempts).toContainEqual({ masterId: targetId, personId: declinedNpcId, month: 0 });
+  expect(declined.state.campaign!.attempts).toContainEqual({
+    masterId: targetId,
+    personId: declinedNpcId,
+    month: Math.floor(tick / 10000),
+  });
   const retry = await submit('campaign.relationship', { ...payload, revision: declined.state.campaign!.revision }, 1);
   await advance();
   expect(await receipt(retry, 1)).toMatchObject({ status: 'rejected', result: { code: 'ALREADY_ATTEMPTED' } });
@@ -583,7 +592,13 @@ it('NPC 서약의 실제 시드·500금·월 1회와 원장 재시작을 확인�
   const before = await snapshot(),
     actor = before.state.generals[ownId]!;
   const candidate = Object.values(before.state.generals).find((general) => {
-    if (general.userId !== null || general.officerLevel === 12 || general.cityKey !== actor.cityKey) return false;
+    if (
+      general.id === declinedNpcId ||
+      general.userId !== null ||
+      general.officerLevel === 12 ||
+      general.cityKey !== actor.cityKey
+    )
+      return false;
     const outcome = applyCampaignRelationship(
       before.state,
       { type: 'offer', targetId: general.id, relation: 'LIEUTENANT', revision: before.state.campaign!.revision },
@@ -704,18 +719,18 @@ it('실제 휘하 부곡을 지정한 모병·훈련 예약과 편집이 unitId�
   ).toMatchObject({ ok: false, code: 'BAD_TARGET' });
 });
 
-it('정식 첫 달 전반의 모든 NPC를 실제 부곡 프로필로 실행한다', async () => {
-  await advance(5000);
+it('준비 뒤 게임 월 전반의 모든 NPC를 실제 부곡 프로필로 실행한다', async () => {
+  await advance(nextMonthTick - 5000);
 });
-it('정식 첫 달 후반의 모든 NPC와 월 정산을 실행한다', async () => {
-  await advance(10000);
+it('준비 뒤 게임 월 후반의 모든 NPC와 월 정산을 실행한다', async () => {
+  await advance(nextMonthTick);
 });
 it('정식 월 경계의 부곡·입력·월 정산을 같은 시드로 재생한다', async () => {
   const archive = await exportReplay(db, worldId);
-  const first = replayArchive(archive, 1);
-  expect(replayArchive(archive, 1)).toEqual(first);
-  expect(first).toHaveLength(1);
-  expect(first[0]!.stateHash).toBe(hashState(await snapshot()));
+  const first = replayArchive(archive, archive.months.length);
+  expect(replayArchive(archive, archive.months.length)).toEqual(first);
+  expect(first).toHaveLength(nextMonthTick / 10000);
+  expect(first.at(-1)!.stateHash).toBe(hashState(await snapshot()));
   expect((await snapshot(otherWorldId)).state.campaign!.revision).toBe(0);
 });
 
@@ -729,20 +744,28 @@ it('다음 게임 월에는 거절했던 NPC에게 다시 서약하고 그 달�
       revision: before.state.campaign!.revision,
     };
   const expected = applyCampaignRelationship(before.state, payload, targetId, before.state.campaign, {
-    tick: 10000,
+    tick,
     userId: users[1]!,
     userActive: true,
   });
   if (!expected.ok) throw new Error(`다음 달 서약 조건: ${expected.code}`);
   expect(actor.gold).toBeGreaterThanOrEqual(500);
   const request = await submit('campaign.relationship', payload, 1);
-  await advance(10000);
+  await advance();
   expect(await receipt(request, 1)).toMatchObject({ status: 'applied', result: expected.result });
   const after = await snapshot();
   expect(after.state.generals[targetId]!.gold).toBe(actor.gold - 500);
   expect(after.state.campaign).toEqual(expected.campaign);
-  expect(after.state.campaign!.attempts).toContainEqual({ masterId: targetId, personId: declinedNpcId, month: 1 });
-  expect(after.state.campaign!.attempts).not.toContainEqual({ masterId: targetId, personId: declinedNpcId, month: 0 });
+  expect(after.state.campaign!.attempts).toContainEqual({
+    masterId: targetId,
+    personId: declinedNpcId,
+    month: Math.floor(tick / 10000),
+  });
+  expect(after.state.campaign!.attempts).not.toContainEqual({
+    masterId: targetId,
+    personId: declinedNpcId,
+    month: Math.floor(tick / 10000) - 1,
+  });
 });
 
 it('예약한 실제 부장 부곡에만 모병하고 훈련 미리보기는 그 지휘관의 상승량을 쓴다', async () => {
@@ -751,7 +774,8 @@ it('예약한 실제 부장 부곡에만 모병하고 훈련 미리보기는 그
   await advance(actor.nextTurnTick);
   const after = await snapshot(),
     unit = after.state.campaign!.units.find((unit) => unit.id === unitId)!;
-  expect(unit).toMatchObject({ commanderId: lieutenantId, troops: 10, train: 0, atmos: 0 });
+  const troops = before.state.campaign!.units.find((unit) => unit.id === unitId)!.troops + 10;
+  expect(unit).toMatchObject({ commanderId: lieutenantId, troops, train: 0, atmos: 0 });
   expect(after.state.generals[ownId]!.gold).toBe(actor.gold - 88);
   expect(after.state.generals[ownId]!.crew).toBe(0);
   expect(after.state.generals[lieutenantId]!.crew).toBe(0);
@@ -765,7 +789,7 @@ it('예약한 실제 부장 부곡에만 모병하고 훈련 미리보기는 그
     crew: 0,
     politics: after.state.generals[lieutenantId]!.politics,
     charm: after.state.generals[lieutenantId]!.charm,
-    commandedArmy: { troops: 10, train: 0, atmos: 0 },
+    commandedArmy: { troops, train: 0, atmos: 0 },
   });
   expect(city.data!.generals.find((general) => general.id === ownId)).toMatchObject({
     commandedArmy: { troops: 0, train: 0, atmos: 0 },
@@ -794,7 +818,7 @@ it('예약한 실제 부장 부곡에만 모병하고 훈련 미리보기는 그
     crew: 0,
     politics: after.state.generals[lieutenantId]!.politics,
     charm: after.state.generals[lieutenantId]!.charm,
-    commandedArmy: { troops: 10, train: 0, atmos: 0 },
+    commandedArmy: { troops, train: 0, atmos: 0 },
   });
   expect(nation.data!.generals.find((general) => general.id === ownId)).toMatchObject({
     commandedArmy: { troops: 0, train: 0, atmos: 0 },

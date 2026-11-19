@@ -17,93 +17,100 @@ if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 �
 const db = createDb(url);
 let worldId: string | undefined;
 let lease: Lease | undefined;
-let failed = false;
+let execution: Promise<void> | undefined;
+const lifetime = new AbortController();
 let completedArchive: Awaited<ReturnType<typeof exportReplay>> | undefined;
 afterAll(async () => {
+  lifetime.abort();
+  await execution?.catch(() => undefined);
   try {
     if (lease) await releaseLease(db, lease);
-    if (worldId && !failed) await db.world.delete({ where: { id: worldId } });
+    if (worldId) await db.world.delete({ where: { id: worldId } });
   } finally {
     await db.$disconnect();
   }
 });
 
-it('AC-INT-22: 실제 프리셋 생성의45병종·155거점이12개월 DB 재적재·새 루프·순수 재생과 일치한다', async () => {
-  onTestFailed(() => {
-    failed = true;
-  });
-  await initializeSan10Resources(db);
-  const output = execFileSync(
-    process.execPath,
-    [
-      '--import',
-      'tsx',
-      'apps/engine/src/cli/createWorld.ts',
-      '--preset',
-      'regular',
-      '--published',
-      '--seed',
-      'int22-expanded-twelve-months',
-      '--name',
-      'AC-INT-22 실제 확장 병종',
-      '--end-year',
-      '300',
-    ],
-    { cwd: new URL('../', import.meta.url), env: { ...process.env, DATABASE_URL: url }, encoding: 'utf8' },
-  );
-  const result = JSON.parse(output.trim().split('\n').at(-1)!) as { worldId: string; stateHash: string };
-  worldId = result.worldId;
-  const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
-  const origin = readArchive(await exportReplay(db, worldId)).origin;
-  if (origin.version !== 3) throw new Error('확장 병종의 형식3 생성 원본이 필요합니다.');
-  const initial = origin.initial;
-  let replay = initialReplayStateWithRegistry(initial, ruleRegistry, origin.featureData);
-  let sequence = 0;
-  expect(world.unitSetKey).toBe('expanded');
-  expect(providedRuleKeys).toContain('battle-affinity-v2');
-  expect(initial.unitSet.crewTypes).toHaveLength(45);
-  expect(initial.cities).toHaveLength(155);
-  expect(initial.generals).toHaveLength(491);
-  expect(hashState(initial)).toBe(result.stateHash);
-  await controlClock(db, worldId, 'start');
-  lease = (await acquireLease(db, worldId, undefined, 120_000))!;
-  expect(lease).not.toBeNull();
-  // 정식 규모의 한 달이 길어져도 같은 토큰을 검사하며 매 트랜잭션에서 실행권을 갱신한다.
-  const ownedLoop = (owned: Lease) => new TurnLoop(db, owned, { beforeCommit: (tx) => renewLease(tx, owned) });
-  let loop = ownedLoop(lease);
-  const started = performance.now();
-  for (let month = 1; month <= 12; month++) {
-    await renewLease(db, lease);
-    await loop.advanceTo(month * 10_000);
-    expect(hashState(await loadWorld(db, worldId))).toBe(hashState(loop.state));
-    // 정산과 같은 tick의 장수 차례도 실행하므로 정산 직후 해시가 아닌 같은 입력 순번끼리 비교한다.
-    const current = await db.world.findUniqueOrThrow({ where: { id: worldId } });
-    while (sequence < current.actionSequence) {
-      replay = runReplayAction(replay, initial.seed, initial.unitSet, undefined, ruleRegistry);
-      sequence++;
-    }
-    expect(hashState(await loadReplayState(db, worldId))).toBe(hashState(replay));
-    console.info(
-      'INT22-month',
-      JSON.stringify({ month, sequence, elapsedMs: Math.round(performance.now() - started) }),
-    );
-    if (month === 6) {
-      await releaseLease(db, lease);
+it(
+  'AC-INT-22: 실제 프리셋 생성의45병종·155거점이12개월 DB 재적재·새 루프·순수 재생과 일치한다',
+  () =>
+    (execution = (async () => {
+      onTestFailed(() => {
+        lifetime.abort();
+      });
+      await initializeSan10Resources(db);
+      const output = execFileSync(
+        process.execPath,
+        [
+          '--import',
+          'tsx',
+          'apps/engine/src/cli/createWorld.ts',
+          '--preset',
+          'regular',
+          '--published',
+          '--seed',
+          'int22-expanded-twelve-months',
+          '--name',
+          'AC-INT-22 실제 확장 병종',
+          '--end-year',
+          '300',
+        ],
+        { cwd: new URL('../', import.meta.url), env: { ...process.env, DATABASE_URL: url }, encoding: 'utf8' },
+      );
+      const result = JSON.parse(output.trim().split('\n').at(-1)!) as { worldId: string; stateHash: string };
+      worldId = result.worldId;
+      const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+      const origin = readArchive(await exportReplay(db, worldId)).origin;
+      if (origin.version !== 3) throw new Error('확장 병종의 형식3 생성 원본이 필요합니다.');
+      const initial = origin.initial;
+      let replay = initialReplayStateWithRegistry(initial, ruleRegistry, origin.featureData);
+      let sequence = 0;
+      expect(world.unitSetKey).toBe('expanded');
+      expect(providedRuleKeys).toContain('battle-affinity-v2');
+      expect(initial.unitSet.crewTypes).toHaveLength(45);
+      expect(initial.cities).toHaveLength(155);
+      expect(initial.generals).toHaveLength(491);
+      expect(hashState(initial)).toBe(result.stateHash);
+      await controlClock(db, worldId, 'start');
       lease = (await acquireLease(db, worldId, undefined, 120_000))!;
-      loop = ownedLoop(lease);
-      expect(loop.state).toBeNull();
-    }
-  }
-  const archive = await exportReplay(db, worldId);
-  expect(archive.months).toHaveLength(12);
-  completedArchive = archive;
-}, 540_000);
+      expect(lease).not.toBeNull();
+      // 정식 규모의 한 달이 길어져도 같은 토큰을 검사하며 매 트랜잭션에서 실행권을 갱신한다.
+      const ownedLoop = (owned: Lease) => new TurnLoop(db, owned, { beforeCommit: (tx) => renewLease(tx, owned) });
+      let loop = ownedLoop(lease);
+      const started = performance.now();
+      for (let month = 1; month <= 12; month++) {
+        lifetime.signal.throwIfAborted();
+        await renewLease(db, lease);
+        await loop.advanceTo(month * 10_000, lifetime.signal);
+        expect(hashState(await loadWorld(db, worldId))).toBe(hashState(loop.state));
+        // 정산과 같은 tick의 장수 차례도 실행하므로 정산 직후 해시가 아닌 같은 입력 순번끼리 비교한다.
+        const current = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+        while (sequence < current.actionSequence) {
+          replay = runReplayAction(replay, initial.seed, initial.unitSet, undefined, ruleRegistry);
+          sequence++;
+        }
+        expect(hashState(await loadReplayState(db, worldId))).toBe(hashState(replay));
+        console.info(
+          'INT22-month',
+          JSON.stringify({ month, sequence, elapsedMs: Math.round(performance.now() - started) }),
+        );
+        if (month === 6) {
+          await releaseLease(db, lease);
+          lease = (await acquireLease(db, worldId, undefined, 120_000))!;
+          loop = ownedLoop(lease);
+          expect(loop.state).toBeNull();
+        }
+      }
+      const archive = await exportReplay(db, worldId);
+      lifetime.signal.throwIfAborted();
+      expect(archive.months).toHaveLength(12);
+      completedArchive = archive;
+    })()),
+  540_000,
+);
 
 // 병합 큐에서 같은 3,193개 동작을 재생하는 별도 프로세스가 120초를 넘겼다.
 it('AC-INT-22: 실제 DB의12개월 원장을 별도 DB 없는 프로세스에서 재생한다', async () => {
-  onTestFailed(() => {
-    failed = true;
-  });
   if (!completedArchive) throw new Error('실제 DB의 12개월 검증을 먼저 통과해야 합니다.');
   const archive = completedArchive;
   expect(archive.months).toHaveLength(12);

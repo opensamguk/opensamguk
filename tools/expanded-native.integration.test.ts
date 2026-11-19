@@ -149,7 +149,7 @@ describe('AC-P2-30·31·32·33 정식 491명 확장 결합', () => {
     }
   });
 
-  it('원래 NPC 차례를 진행해 첫 달 확장 상태와 연감을 함께 저장한다', () => {
+  it('원래 NPC 차례를 진행해 첫 달 확장 상태와 연감을 함께 저장한다', ({ signal }) => {
     execution = (async () => {
       await controlClock(db, worldId, 'start');
       const lease = await acquireLease(db, worldId);
@@ -158,9 +158,15 @@ describe('AC-P2-30·31·32·33 정식 491명 확장 결합', () => {
         // 일괄 진행 중에도 각 commit의 유효한 실행권을 갱신한다.
         const loop = new TurnLoop(db, lease, { beforeCommit: (tx) => renewLease(tx, lease) });
         for (let tick = 1000; tick <= TICKS_PER_MONTH; tick += 1000) {
+          const started = performance.now();
           await renewLease(db, lease);
-          await loop.advanceTo(tick);
+          await loop.advanceTo(tick, signal);
+          console.info(
+            'expanded-native-advance',
+            JSON.stringify({ tick, elapsedMs: Math.round(performance.now() - started) }),
+          );
         }
+        signal.throwIfAborted();
       } finally {
         await releaseLease(db, lease);
       }

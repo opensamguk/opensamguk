@@ -592,6 +592,7 @@ it('AC-INT-22 도시별 모집을 운영 중 바꿔도 기존 설정 원본과 �
 
 it('AC-INT-24 월말과 같은 tick의 장수 턴은 정산 체크포인트 뒤에 따로 진행한다', async () => {
   const initial = commandInitial();
+  initial.scenarioKey = 'tools-int24-fixture';
   initial.generals[0]!.nextTurnTick = 0;
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '월경계 비교',
@@ -997,6 +998,7 @@ it('AC-P2-19 HTTP 상태·첫 칸·30칸은 같은 휴전 시계를 쓰고 기�
     {},
     ordinary.cookie,
   );
+  expect(lobby.status, lobby.code).toBe(200);
   expect(lobby.data?.find((row) => row.id === worldId)?.gameDate).toEqual({ year: 191, month: 2 });
   await db.world.update({ where: { id: worldId }, data: { runtimeOptions: { truce: null } } });
   const plain = await call<{ nextTurnAt: string; turnSchedule: string[] }>('home.get', { worldId }, ordinary.cookie);

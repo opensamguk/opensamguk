@@ -147,6 +147,7 @@ async function world(lineage = true, peaceUntilTick = 300000, npcGenerations = f
   return saved.worldId;
 }
 async function advance(worldId: string, tick: number, fail = false, connection = db) {
+  const started = performance.now();
   // 운영 폴링과 달리 여러 달을 한 호출로 처리하므로 가장 긴 사례의 제한과 실행권 수명을 맞춘다.
   const lease = await acquireLease(connection, worldId, randomUUID(), 180000);
   if (!lease) throw Error('가문 시험 실행권이 없습니다.');
@@ -164,6 +165,7 @@ async function advance(worldId: string, tick: number, fail = false, connection =
     ).advanceTo(tick);
   } finally {
     await releaseLease(connection, lease);
+    console.info('lineage-advance', JSON.stringify({ tick, elapsedMs: Math.round(performance.now() - started) }));
   }
 }
 const snapshot = (worldId: string) => db.$transaction((tx) => loadReplayState(tx, worldId));

@@ -246,6 +246,7 @@ async function createRuler(worldId: string, player: User, name: string) {
   return ruler;
 }
 async function fixture(withRival = false) {
+  const started = performance.now();
   const seed = randomUUID(),
     firstId = Math.max(...initial.generals.map((general) => general.id)) + 1;
   const first = selectPlayer(seed, firstId, 0, [], 5000);
@@ -284,6 +285,10 @@ async function fixture(withRival = false) {
     },
   );
   const id = saved.worldId;
+  console.info(
+    'governance-fixture-save',
+    JSON.stringify({ withRival, elapsedMs: Math.round(performance.now() - started) }),
+  );
   worldIds.push(id);
   await controlClock(db, id, 'start');
   const emperor = await user(first.userId),
@@ -307,6 +312,10 @@ async function fixture(withRival = false) {
   const state = await snapshot(id);
   expect(state.state.governance!.legitimacy[String(ruler.nationId)]).toBe(2);
   expect(state.state.cityResources!.cities[String(lower.cityKey)]!.gold).toBeGreaterThan(100);
+  console.info(
+    'governance-fixture-ready',
+    JSON.stringify({ withRival, elapsedMs: Math.round(performance.now() - started) }),
+  );
   return { id, seed, emperor, ruler, vassal, lower, rival };
 }
 type Fixture = Awaited<ReturnType<typeof fixture>>;
@@ -742,7 +751,13 @@ describe('AC-P2-31 실제 HTTP 황실 접수·동의·경제', () => {
       count = await db.governanceMovement.count({ where: { worldId: world.id } });
     const date = monthlyDate(before.state.startYear, 70_000);
     const baseMonth = runMonthly(before.state, 70_000, rngFor(world.seed, 'monthly', date.year, date.month));
-    const expected = settleMonthlyFeatures(before, { ...before, state: baseMonth.state, monthlyTick: 70_000 }, 70_000);
+    const expected = settleMonthlyFeatures(
+      before,
+      { ...before, state: baseMonth.state, monthlyTick: 70_000 },
+      70_000,
+      undefined,
+      world.seed,
+    );
     const expectedRows = z
       .object({ movements: z.array(governanceMovementSchema) })
       .parse(expected.effects['governance-v1']).movements;

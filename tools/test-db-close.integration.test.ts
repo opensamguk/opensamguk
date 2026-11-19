@@ -236,3 +236,32 @@ it('잘못된 연결 수와 행 개수는 0으로 취급하지 않는다', async
     ),
   ).rejects.toMatchObject({ reason: 'invalid-count' });
 });
+
+it('승인된 시험 DB 이름도 OID·연결 검사를 거치고 개발 DB 이름은 거부한다', async () => {
+  for (const name of ['opensamguk_ci_green_toolsa5_test', 'opensamguk_ci_green_toolsA4_test', 'opensamguk_ci_green']) {
+    expect(
+      await observeDisconnectedDatabase(
+        name,
+        '1',
+        async () => 0,
+        async () => '1',
+      ),
+    ).toMatchObject({ connections: 0 });
+    await expect(
+      observeDisconnectedDatabase(
+        name,
+        '1',
+        async () => 0,
+        async () => '2',
+      ),
+    ).rejects.toMatchObject({ reason: 'identity-changed' });
+  }
+  await expect(
+    observeDisconnectedDatabase(
+      'opensamguk',
+      '1',
+      async () => 0,
+      async () => '1',
+    ),
+  ).rejects.toThrow();
+});

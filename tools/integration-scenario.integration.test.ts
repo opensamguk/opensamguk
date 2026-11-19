@@ -170,7 +170,7 @@ function ownedDatabase(initialize = true) {
               expect(
                 (await admin.query('SELECT oid::text AS oid FROM pg_database WHERE datname = $1', [name])).rows,
               ).toEqual([{ oid }]);
-              if (!failed && cleanupErrors.length === 0) {
+              if (!receipt.oidRecovered && cleanupErrors.length === 0) {
                 await admin.query(`DROP DATABASE "${name}"`);
                 receipt.dropped = true;
                 expect((await admin.query('SELECT 1 FROM pg_database WHERE datname = $1', [name])).rows).toEqual([]);
@@ -422,17 +422,23 @@ describe('AC-INT-04 정식191년 첫 달·재시작·재생·다른 월드 격�
     onTestFailed(() => owned.fail());
     await execution?.catch(() => owned.fail());
   });
-  it('491명 첫 달 정산은 연감을 저장하고 다른 월드를 보존한다', () => {
+  it('491명 첫 달 정산은 연감을 저장하고 다른 월드를 보존한다', ({ signal }) => {
     execution = (async () => {
       const { db } = fixture;
       await controlClock(db, worldId, 'start');
       const lease = await acquireLease(db, worldId);
       if (!lease) throw new Error('실행권 누락');
       try {
-        const loop = new TurnLoop(db, lease);
+        const loop = new TurnLoop(db, lease, { beforeCommit: (tx) => renewLease(tx, lease) });
         for (let tick = 1000; tick <= TICKS_PER_MONTH; tick += 1000) {
+          const started = performance.now();
           await renewLease(db, lease);
-          await loop.advanceTo(tick);
+          await loop.advanceTo(tick, signal);
+          signal.throwIfAborted();
+          console.info(
+            'integration-scenario-advance',
+            JSON.stringify({ tick, elapsedMs: Math.round(performance.now() - started) }),
+          );
         }
       } finally {
         await releaseLease(db, lease);
@@ -453,7 +459,7 @@ describe('AC-INT-04 정식191년 첫 달·재시작·재생·다른 월드 격�
     })();
     return execution;
   });
-  it('기존 연결·리스 종료 뒤 새 연결·엔진 루프가 다음 달을 진행하고 다른 월드를 보존한다', () => {
+  it('기존 연결·리스 종료 뒤 새 연결·엔진 루프가 다음 달을 진행하고 다른 월드를 보존한다', ({ signal }) => {
     execution = (async () => {
       const beforeRestart = await readWorldState(fixture.db, worldId);
       await fixture.db.$disconnect();
@@ -463,10 +469,16 @@ describe('AC-INT-04 정식191년 첫 달·재시작·재생·다른 월드 격�
       const lease = await acquireLease(db, worldId);
       if (!lease) throw new Error('재시작 실행권 누락');
       try {
-        const loop = new TurnLoop(db, lease);
+        const loop = new TurnLoop(db, lease, { beforeCommit: (tx) => renewLease(tx, lease) });
         for (let tick = TICKS_PER_MONTH + 1000; tick <= 2 * TICKS_PER_MONTH; tick += 1000) {
+          const started = performance.now();
           await renewLease(db, lease);
-          await loop.advanceTo(tick);
+          await loop.advanceTo(tick, signal);
+          signal.throwIfAborted();
+          console.info(
+            'integration-scenario-restart',
+            JSON.stringify({ tick, elapsedMs: Math.round(performance.now() - started) }),
+          );
         }
       } finally {
         await releaseLease(db, lease);

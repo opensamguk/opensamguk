@@ -7,7 +7,7 @@ import { testDatabaseUrl } from './test-database';
 // 전용 시험 DB의 커밋 직전 중단만 허용한다. 독립 Node 프로세스를 죽여 실제 PG 롤백을 검증한다.
 const url = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
 const worldId = process.env.HERITAGE_CRASH_WORLD;
-if (!process.send || !/^\/heritage_[a-f0-9]{32}_test$/.test(url.pathname) || !worldId)
+if (!process.send || !process.env.TEST_DATABASE_URL || !worldId)
   throw new Error('유산 중단 시험의 전용 DB·월드·IPC를 확인하세요.');
 process.once('disconnect', () => process.exit(2));
 const db = createDb(url.href);

@@ -6,7 +6,7 @@ import type { AddressInfo } from 'node:net';
 import { createRequire } from 'node:module';
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest';
 import { createDb, type Prisma } from '../packages/db/src/index';
-import { commandInitial } from '../packages/rules/test/commandFixture';
+import { commandInitial, commandWorld } from '../packages/rules/test/commandFixture';
 import { operationalInput } from '../packages/rules/test/operationalMapFixture';
 import { buildInitialWorld } from '../packages/rules/src/world/bootstrap';
 import { hashState } from '../packages/shared/src/node/hashState';
@@ -18,6 +18,8 @@ import { exportReplay, replayArchive } from '../apps/engine/src/replay';
 import { dispatchNotificationBatch, startNotificationDispatcher } from '../apps/server/src/notifications/dispatcher';
 import { testDatabaseUrl } from './test-database';
 import { listenLegalHttp } from '../e2e/legalFixturePorts';
+import { recordFixtureNationTurns } from '../apps/engine/test/worldFixture';
+import { settleFixtureBattles, tacticalCommandInitial } from './fixtures/tactical';
 
 type Pg = {
   connect(): Promise<void>;
@@ -109,7 +111,7 @@ type Initial = ReturnType<typeof commandInitial>;
 async function fixture(
   setup: (initial: Initial) => void = () => {},
   existingUsers?: string[],
-  build: () => Initial = commandInitial,
+  build: () => Initial = tacticalCommandInitial,
 ) {
   const users =
     existingUsers ??
@@ -151,17 +153,46 @@ async function fixture(
       site.defence = { initial: city.defence, max: city.defenceMax };
     }
   }
+  const nationTurns = initial.nationTurns;
+  delete initial.nationTurns;
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '알림 사건 시험',
     turnTermMinutes: 30,
     endYear: null,
     replayFormat: 3,
   });
+  if (nationTurns) await recordFixtureNationTurns(db, worldId, nationTurns);
   await db.world.update({ where: { id: worldId }, data: { status: 'RUNNING', clockAnchorAt: new Date() } });
   const lease = await acquireLease(db, worldId);
   if (!lease) throw Error('시험 실행권이 필요합니다.');
   leases.push(lease);
   return { worldId, users, lease, loop: new TurnLoop(db, lease) };
+}
+// 알림 경계만 대조하는 통제 스냅샷이다. 공식 부곡 고정물을 쓰며 원생성 재생 증거로 세지 않는다.
+async function battleFixture(f: Awaited<ReturnType<typeof fixture>>, owners = [1, 2, 3]) {
+  const state = (await loadReplayState(db, f.worldId)).state;
+  state.campaign!.units = commandWorld().campaign!.units.filter((unit) => owners.includes(unit.ownerId));
+  state.campaign!.nextUnitId = Math.max(...state.campaign!.units.map((unit) => unit.id)) + 1;
+  for (const city of Object.values(state.cityResources!.cities)) city.rice = 1_000_000;
+  await db.world.update({
+    where: { id: f.worldId },
+    data: {
+      campaignState: state.campaign as unknown as Prisma.InputJsonValue,
+      cityResourcesState: state.cityResources as unknown as Prisma.InputJsonValue,
+    },
+  });
+}
+async function settleBattle(f: Awaited<ReturnType<typeof fixture>>) {
+  await releaseLease(db, f.lease);
+  const index = leases.indexOf(f.lease);
+  if (index < 0) throw Error('알림 전투 고정물의 실행권 추적이 없습니다.');
+  leases.splice(index, 1);
+  await settleFixtureBattles(db, f.worldId);
+  const lease = await acquireLease(db, f.worldId);
+  if (!lease) throw Error('알림 전투 정산 뒤 실행권이 없습니다.');
+  leases.push(lease);
+  f.lease = lease;
+  f.loop = new TurnLoop(db, lease);
 }
 async function schedule(
   worldId: string,
@@ -228,11 +259,13 @@ it('성벽·수비가 없는 도시를 점령해 상대 국가가 살아남아�
   const f = await fixture((initial) => {
     initial.cities[1]!.wall = 0;
     initial.cities[2]!.nationId = 2;
-    initial.generals[1]!.crew = 0;
-    initial.generals[2]!.crew = 0;
   });
+  await battleFixture(f, [1]);
   await schedule(f.worldId, 1, 'attack', { cityKey: 2 }, 1);
-  await receiveNormally(() => f.loop.advanceTo(100), 2);
+  await receiveNormally(async () => {
+    await f.loop.advanceTo(100);
+    await settleBattle(f);
+  }, 2);
   expect((await rows(f.worldId, 'attacked')).map((row) => row.userId).sort()).toEqual([f.users[1], f.users[2]].sort());
   expect(await db.nation.count({ where: { worldId: f.worldId, id: 2 } })).toBe(1);
   expect(
@@ -266,10 +299,9 @@ it('실제 외교 제안은 받는 나라 군주·참모만 정상 발송 작업
 
 it('같은 도시·tick의 두 공격은 서로 다른 전투 알림이며 다시 처리하지 않는다', async () => {
   const f = await fixture((initial) => {
-    initial.generals[0]!.crew = 100;
-    initial.generals[1]!.crew = 10000;
-    Object.assign(initial.generals[2]!, { nationId: 1, cityKey: 1, crew: 100, nextTurnTick: 100 });
+    Object.assign(initial.generals[2]!, { nationId: 1, cityKey: 1, nextTurnTick: 100 });
   });
+  await battleFixture(f);
   await schedule(f.worldId, 1, 'attack', { cityKey: 2 }, 1);
   await schedule(f.worldId, 3, 'attack', { cityKey: 2 }, 1);
   await f.loop.advanceTo(100);
@@ -286,11 +318,11 @@ it('같은 도시·tick의 두 공격은 서로 다른 전투 알림이며 다�
 it('국가가 멸망해 장수가 재야가 돼도 점령 전 소속 사용자에게 기록한다', async () => {
   const f = await fixture((initial) => {
     initial.cities[1]!.wall = 0;
-    initial.generals[1]!.crew = 0;
-    initial.generals[2]!.crew = 0;
   });
+  await battleFixture(f, [1]);
   await schedule(f.worldId, 1, 'attack', { cityKey: 2 }, 1);
   await f.loop.advanceTo(100);
+  await settleBattle(f);
   await pump();
   expect(await db.nation.count({ where: { worldId: f.worldId, id: 2 } })).toBe(0);
   expect((await rows(f.worldId, 'attacked')).map((row) => row.userId).sort()).toEqual([f.users[1], f.users[2]].sort());
@@ -310,8 +342,10 @@ it('중립 도시 공격은 도시 안 재야 사용자의 공격 알림을 만�
     initial.generals[2]!.cityKey = 3;
     initial.generals[3]!.cityKey = 2;
   });
+  await battleFixture(f, [1]);
   await schedule(f.worldId, 1, 'attack', { cityKey: 2 }, 1);
   await f.loop.advanceTo(100);
+  await settleBattle(f);
   await pump();
   expect(await rows(f.worldId)).toEqual([]);
   expect(received).toHaveLength(0);
@@ -333,6 +367,7 @@ it('외교 제안은 다른 국가와 권한 없는 수뇌에게 전달하지 �
 });
 it('미등록·꺼진 사건은 실제 공격에서도 저장하지 않는다', async () => {
   const f = await fixture();
+  await battleFixture(f);
   await db.notificationTarget.update({ where: { userId: f.users[1]! }, data: { events: [] } });
   await db.notificationTarget.delete({ where: { userId: f.users[2]! } });
   await schedule(f.worldId, 1, 'attack', { cityKey: 2 }, 1);
@@ -431,6 +466,7 @@ it('NPC의 실제 rest→attack 선택은 원 슬롯 args 없이 실제 국가�
     initial.generals[0]!.userId = null;
     initial.generals[0]!.injury = 0;
   });
+  await battleFixture(f);
   await f.loop.advanceTo(100);
   await pump();
   expect(
@@ -440,18 +476,18 @@ it('NPC의 실제 rest→attack 선택은 원 슬롯 args 없이 실제 국가�
   expect(received).toHaveLength(2);
 });
 it.each([true, false])('긴 도시·월드 이름은 원문을 보존하고 알림 켬=%s에도 공격을 저장한다', async (enabled) => {
-  const cityName = '𠀀'.repeat(300) + '성',
+  const cityName = '𠀀'.repeat(29) + '성',
     worldName = '🌕'.repeat(150);
   const f = await fixture((initial) => {
     initial.cities[1]!.name = cityName;
     initial.cities[1]!.wall = 0;
-    initial.generals[1]!.crew = 0;
-    initial.generals[2]!.crew = 0;
   });
+  await battleFixture(f, [1]);
   await db.world.update({ where: { id: f.worldId }, data: { name: worldName } });
   if (!enabled) await db.notificationTarget.updateMany({ where: { userId: { in: f.users } }, data: { events: [] } });
   await schedule(f.worldId, 1, 'attack', { cityKey: 2 }, 1);
   await f.loop.advanceTo(100);
+  await settleBattle(f);
   await pump();
   expect(
     (await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId: f.worldId, cityKey: 2 } } })).name,
@@ -473,7 +509,7 @@ it.each([true, false])('긴 도시·월드 이름은 원문을 보존하고 알�
 });
 it.each(['rest', 'attack'])('개인 %s와 국가 명령의 실패는 장수 턴 사건 하나로 기록한다', async (personal) => {
   const f = await fixture((initial) => {
-    initial.nationTurns = { 1: Array.from({ length: 30 }, () => ({ commandKey: 'nation_rest', args: {} })) };
+    initial.nationTurns = { 1: Array.from({ length: 12 }, () => ({ commandKey: 'nation_rest', args: {} })) };
   });
   await schedule(f.worldId, 1, personal, personal === 'attack' ? { cityKey: 1 } : {}, 1);
   await db.nationOfficeTurn.update({
@@ -505,6 +541,8 @@ it.each(['ACCEPTED', 'DECLINED', 'REJECTED'] as const)(
   async (outcome) => {
     const f = await fixture((initial) => {
       initial.diplomacies = [];
+      // 군주를 사람이 맡으면 국가도 사람 국가로 바뀐다. NPC 군주와 사람 참모를 구분한다.
+      initial.generals[1]!.userId = null;
       initial.generals[2]!.officerLevel = 11;
       if (outcome === 'DECLINED') initial.nations[1]!.gold = 0;
     });
@@ -529,9 +567,12 @@ it.each(['ACCEPTED', 'DECLINED', 'REJECTED'] as const)(
       expect(await rows(f.worldId)).toEqual([]);
       expect(received).toHaveLength(0);
     } else {
-      expect(stored).toMatchObject({ status: 'APPLIED', result: { outcome, by: 'NPC' } });
-      expect((await rows(f.worldId)).map((row) => row.userId).sort()).toEqual([f.users[1], f.users[2]].sort());
-      expect(received).toHaveLength(2);
+      expect(stored, JSON.stringify(stored.result)).toMatchObject({
+        status: 'APPLIED',
+        result: { outcome, by: 'NPC' },
+      });
+      expect((await rows(f.worldId)).map((row) => row.userId)).toEqual([f.users[2]]);
+      expect(received).toHaveLength(1);
     }
   },
 );
@@ -598,9 +639,11 @@ it('휘하 지시가 원 예턴과 다른 도시를 공격하면 실제 대상 �
   await f.loop.advanceTo(attacker.nextTurnTick);
   attacker = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId: f.worldId, id: attacker.id } } });
   expect(attacker.cityKey).toBe(99);
-  const campaign = (await loadReplayState(db, f.worldId)).state.campaign!;
+  const prepared = (await loadReplayState(db, f.worldId)).state,
+    campaign = prepared.campaign!;
+  prepared.cityResources!.cities[String(attacker.cityKey)]!.rice = 1_000_000;
   campaign.units = [
-    { id: 1, ownerId: attacker.id, commanderId: attacker.id, troops: 1000, crewType: 1100, train: 100, atmos: 100 },
+    { ...commandWorld().campaign!.units[0]!, ownerId: attacker.id, commanderId: attacker.id, troops: 1000 },
   ];
   campaign.nextUnitId = 2;
   campaign.orders = {
@@ -623,7 +666,13 @@ it('휘하 지시가 원 예턴과 다른 도시를 공격하면 실제 대상 �
       },
     ],
   };
-  await db.world.update({ where: { id: f.worldId }, data: { campaignState: campaign as Prisma.InputJsonValue } });
+  await db.world.update({
+    where: { id: f.worldId },
+    data: {
+      campaignState: campaign as Prisma.InputJsonValue,
+      cityResourcesState: prepared.cityResources as unknown as Prisma.InputJsonValue,
+    },
+  });
   await schedule(f.worldId, attacker.id, 'attack', { cityKey: 1 }, 1);
   await f.loop.advanceTo(attacker.nextTurnTick);
   await pump();

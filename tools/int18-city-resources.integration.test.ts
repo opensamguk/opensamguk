@@ -135,6 +135,7 @@ async function withLease<T>(
     }
   })();
   const errors: unknown[] = [];
+  const started = performance.now();
   let result: { value: T } | undefined;
   try {
     signal.throwIfAborted();
@@ -154,6 +155,10 @@ async function withLease<T>(
     errors.push(error);
   }
   if (renewalFailure) errors.push(renewalFailure.error);
+  console.info(
+    'INT18-engine-work',
+    JSON.stringify({ elapsedMs: Math.round(performance.now() - started), failed: errors.length > 0 }),
+  );
   try {
     await releaseLease(db, lease);
   } catch (error) {
@@ -247,6 +252,7 @@ async function authorityFixture(fixture = initial) {
   if (!nation) throw new Error('집결 경계용 국가가 없습니다.');
   const cityKey = nation.capitalCityKey,
     otherCityKey = initial.cities.find((city) => city.nationId === nation.id && city.cityKey !== cityKey)!.cityKey;
+  if (cityKey === null) throw Error('집결 경계용 수도가 없습니다.');
   await withLease(worldId, async (lease) =>
     db.$transaction(async (tx) => {
       await lockLease(tx, lease);
@@ -335,15 +341,18 @@ beforeAll(() =>
 afterAll(async () => {
   await settle();
   const errors: unknown[] = [...executionErrors];
-  let deletedWorldRows = false;
+  let deletedWorldRows = false,
+    serverClosed = app === undefined;
   for (const close of [
-    async () => app?.close(),
     async () => {
-      if (failed || errors.length) return;
+      await app?.close();
+      serverClosed = true;
+    },
+    async () => {
       await db.sanction.deleteMany({ where: { OR: [{ worldId: { in: worldIds } }, { userId: { in: userIds } }] } });
     },
     async () => {
-      if (failed || errors.length) return;
+      if (!serverClosed) return;
       await db.world.deleteMany({ where: { id: { in: worldIds } } });
       deletedWorldRows = true;
     },

@@ -1,7 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, expect, it as test } from 'vitest';
 import { createDb } from '../packages/db/src/index';
-import { buildInitialWorld, type WorldInit } from '../packages/rules/src/index';
+import {
+  applyRecordedInput,
+  buildInitialWorld,
+  ruleRegistry,
+  type RecordedInput,
+  type WorldInit,
+} from '../packages/rules/src/index';
 import { operationalInput } from '../packages/rules/test/operationalMapFixture';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { buildServer } from '../apps/server/src/server';
@@ -9,6 +15,7 @@ import { newSession } from '../apps/server/src/auth/session';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { prepareFixtureUnit, recruitmentFixtureData } from './fixtures/recruitment';
+import { settleFixtureBattles } from './fixtures/tactical';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease, renewLease, LEASE_TTL_MS } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -141,7 +148,7 @@ afterAll(async () => {
   try {
     await app.close();
     if (worldId) await db.world.delete({ where: { id: worldId } });
-    await db.user.deleteMany({ where: { id: { in: users } } });
+    await db.user.deleteMany({ where: { id: { in: users }, heritageAccount: { is: null } } });
   } finally {
     await db.$disconnect();
   }
@@ -269,16 +276,21 @@ it('실제 HTTP 편성·동의·30칸 예약으로 두 나라의 부대를 준�
 it('PASS 점령은 군량을 한 번 차감하고 경제 CITY가 남은 적국을 보존한다', async () => {
   const before = await snapshot();
   await advance(passTick);
+  await settleFixtureBattles(db, worldId);
   const after = await snapshot();
   expect(after.state.cities[99]).toMatchObject({ kind: 'PASS', nationId: 1 });
   expect(after.state.nations[2]).toMatchObject({ capitalCityKey: 2 });
-  expect(after.state.generals[1]!.rice).toBe(before.state.generals[1]!.rice - 5);
+  expect(after.state.generals[1]!.rice).toBe(before.state.generals[1]!.rice);
+  expect(after.state.cityResources!.cities['1']!.rice).toBeLessThan(before.state.cityResources!.cities['1']!.rice);
   expect(after.state.generals[1]!.crew).toBe(0);
   expect((await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId, cityKey: 99 } } })).nationId).toBe(1);
   expect(
     (await db.generalLog.findFirstOrThrow({ where: { worldId, generalId: 1, tick: passTick, commandKey: 'attack' } }))
       .text,
-  ).toContain('점령');
+  ).toContain('작전 회의');
+  expect(after.state.campaign!.tactical!.battles).toContainEqual(
+    expect.objectContaining({ targetCityKey: 99, settled: true, result: 'attack' }),
+  );
   const stable = hashState(after);
   await advance(passTick);
   expect(hashState(await snapshot())).toBe(stable);
@@ -288,6 +300,30 @@ it('마지막 CITY 상실의 멸망·소속 해제·개인 관계/부곡/타인 
   const before = await snapshot();
   const otherTurns = await db.generalTurn.findMany({ where: { worldId, generalId: 3 }, orderBy: { slot: 'asc' } });
   await advance(cityTick);
+  let tacticalReplay = await snapshot();
+  const openedSequence = (await db.world.findUniqueOrThrow({ where: { id: worldId } })).actionSequence;
+  await settleFixtureBattles(db, worldId);
+  const steps = await db.inputEvent.findMany({
+    where: { worldId, kind: 'battle.step', sequence: { gt: openedSequence } },
+    orderBy: { sequence: 'asc' },
+  });
+  expect(steps.length).toBeGreaterThan(0);
+  for (const step of steps)
+    tacticalReplay = applyRecordedInput(
+      tacticalReplay,
+      {
+        sequence: step.sequence!,
+        tick: step.tick,
+        generalId: step.generalId,
+        kind: step.kind,
+        status: step.status,
+        payload: step.payload,
+        result: step.result,
+      } as RecordedInput,
+      ruleRegistry,
+      { unitSet: initial.unitSet },
+    );
+  await advance(cityTick);
   const after = await snapshot();
   expect(after.state.cities[2]).toMatchObject({ kind: 'CITY', nationId: 1 });
   expect(after.state.nations[2]).toBeUndefined();
@@ -295,43 +331,51 @@ it('마지막 CITY 상실의 멸망·소속 해제·개인 관계/부곡/타인 
   for (const id of [2, 3]) expect(after.state.generals[id]).toMatchObject({ nationId: null, officerLevel: 0, crew: 0 });
   expect(after.state.campaign!.links).toEqual(before.state.campaign!.links);
   expect(after.state.campaign!.units.map((unit) => unit.id)).toEqual(
-    before.state.campaign!.units.map((unit) => unit.id),
+    before.state.campaign!.units.filter((unit) => unit.id !== defenderUnit).map((unit) => unit.id),
   );
-  expect(after.state.campaign!.units.find((unit) => unit.id === defenderUnit)).toMatchObject({
-    ownerId: 2,
-    commanderId: 2,
-    troops: 0,
-  });
+  expect(after.state.campaign!.units.find((unit) => unit.id === defenderUnit)).toBeUndefined();
   expect(after.state.campaign!.units.find((unit) => unit.id === reserveUnit)).toEqual(
     before.state.campaign!.units.find((unit) => unit.id === reserveUnit),
   );
   expect(after.state.campaign!.units.find((unit) => unit.id === reserveUnit)!.troops).toBe(7);
   expect(after.state.campaign!.units.find((unit) => unit.id === attackerUnit)!.troops).toBeGreaterThan(400);
-  expect(after.state.generals[1]!.rice).toBe(before.state.generals[1]!.rice - 10);
-  expect(after.state.generals[2]!.rice).toBe(before.state.generals[2]!.rice - 1);
+  // 전술은 여러 차례의 군량을 쓰므로 실제 기록을 공식 계산으로 재생한 소비량과 대조한다.
+  for (const id of [1, 2, 3]) expect(after.state.generals[id]!.rice).toBe(tacticalReplay.state.generals[id]!.rice);
   expect(after.state.generals[3]!.rice).toBe(before.state.generals[3]!.rice);
   const storedCampaign = (await db.world.findUniqueOrThrow({ where: { id: worldId } })).campaignState;
   expect(storedCampaign).toEqual(after.state.campaign);
   expect(await db.generalTurn.findMany({ where: { worldId, generalId: 3 }, orderBy: { slot: 'asc' } })).toEqual(
     otherTurns,
   );
-  expect(await db.battleLog.count({ where: { worldId, tick: cityTick, attackerId: 1, generalId: 2 } })).toBe(1);
-  expect(await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } })).toMatchObject({
+  expect.soft(await db.battleLog.count({ where: { worldId, tick: cityTick, attackerId: 1, generalId: 2 } })).toBe(1);
+  expect.soft(await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } })).toMatchObject({
     captures: 2,
     battleWins: 1,
   });
-  const history = await db.nationHistory.findUniqueOrThrow({
+  const history = await db.nationHistory.findUnique({
     where: { worldId_tick_nationId: { worldId, tick: cityTick, nationId: 2 } },
   });
-  expect(JSON.stringify(history.data)).toContain('멸망');
+  expect.soft(JSON.stringify(history?.data) ?? '').toContain('멸망');
+  // 점령 직후의 예약 보존과 현재 엔진이 다음 동작에서 확정하는 종료 상태를 따로 대조한다.
+  if ((await db.world.findUniqueOrThrow({ where: { id: worldId } })).status !== 'ENDED') {
+    const nextGeneral = await db.general.findFirstOrThrow({
+      where: { worldId, removedAt: null, activeFromYear: { lte: initial.startYear + Math.floor(cityTick / 120000) } },
+      orderBy: [{ nextTurnTick: 'asc' }, { id: 'asc' }],
+    });
+    await advance(nextGeneral.nextTurnTick);
+  }
+  const endedWorld = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+  expect(endedWorld.status).toBe('ENDED');
+  const final = await snapshot();
   const archive = await exportReplay(db, worldId);
   const first = replayArchive(archive, archive.months.length);
-  expect(first).toHaveLength(Math.floor(cityTick / 10000));
+  expect(first).toHaveLength(endedWorld.monthlyTick / 10000);
+  expect(first.length).toBeGreaterThanOrEqual(Math.floor(cityTick / 10000));
   expect(replayArchive(archive, archive.months.length)).toEqual(first);
   const end = replayToEnd(archive);
   expect(replayToEnd(archive)).toEqual(end);
   const result = await db.worldResult.findUniqueOrThrow({ where: { worldId } });
   expect(result.reason).toBe('UNIFIED');
   expect(result.finalStateHash).toBe(end.finalStateHash);
-  expect(result.finalStateHash).toBe(hashState(after));
+  expect(result.finalStateHash).toBe(hashState(final));
 });

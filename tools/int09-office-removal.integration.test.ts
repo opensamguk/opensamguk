@@ -11,6 +11,7 @@ import { acquireLease, assertLease, lockLease, releaseLease } from '../apps/engi
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { persistEffects } from '../apps/engine/src/persist';
 import { persistOfficeState } from '../apps/engine/src/personnelState';
+import { settleFixtureBattles } from './fixtures/tactical';
 
 // AC-INT-09 멸망과 직책 저장 순서의 실제 PG 회귀다. 두 군주·시각·군대를 통제해 준비한다.
 // 이 고정물은 원생성 archive 재생이나 정식491명 한 기수 인수 증거가 아니다.
@@ -169,6 +170,13 @@ describe('AC-INT-09 국가 멸망과 직책 저장의 원자적 순서', () => {
     } finally {
       await releaseLease(db, lease);
     }
+    await settleFixtureBattles(db, worldId);
+    const endingLease = (await acquireLease(db, worldId))!;
+    try {
+      await new TurnLoop(db, endingLease).advanceTo(1);
+    } finally {
+      await releaseLease(db, endingLease);
+    }
     expect(await db.nation.count({ where: { worldId, id: 2 } })).toBe(0);
     expect(await db.nationOffice.count({ where: { worldId, nationId: 2 } })).toBe(0);
     expect(
@@ -179,7 +187,7 @@ describe('AC-INT-09 국가 멸망과 직책 저장의 원자적 순서', () => {
     expect(await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId, cityKey: 2 } } })).toMatchObject({
       nationId: 1,
     });
-    expect(await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } })).toMatchObject({
+    expect.soft(await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } })).toMatchObject({
       captures: 1,
       crew: 0,
       cityKey: 2,

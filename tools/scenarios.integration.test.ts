@@ -5,7 +5,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, type TestContext } from 'vitest';
 import { createDb, type PrismaClient } from '../packages/db/src/index';
 import {
   applySexLedger,
@@ -172,7 +172,20 @@ function ownedDatabase(initialize = true) {
   };
 }
 
-async function withDatabase(action: (value: Fixture) => Promise<void>, initialize = true): Promise<void> {
+const databaseWork = new Set<Promise<void>>();
+afterEach(async () => {
+  while (databaseWork.size) await Promise.allSettled([...databaseWork]);
+});
+function withDatabase(action: (value: Fixture) => Promise<void>, initialize = true): Promise<void> {
+  const execution = runWithDatabase(action, initialize);
+  databaseWork.add(execution);
+  void execution.then(
+    () => databaseWork.delete(execution),
+    () => databaseWork.delete(execution),
+  );
+  return execution;
+}
+async function runWithDatabase(action: (value: Fixture) => Promise<void>, initialize: boolean): Promise<void> {
   const owned = ownedDatabase(initialize);
   let failure: unknown;
   try {
@@ -809,9 +822,10 @@ it.each([
   });
 });
 
-it.each(['2060', '2070'])(
+it.for(['2060', '2070'])(
   'E2 %s 로비에서 장수를 만들고 건국한 뒤 임관한다',
-  async (key) => {
+  { timeout: 90000 },
+  async (key: string, { signal }: TestContext) => {
     await withDatabase(async ({ db, url }) => {
       await initializeScenarios(db, sql);
       const output = execFileSync(
@@ -847,7 +861,7 @@ it.each(['2060', '2070'])(
         const lease = await acquireLease(db, worldId, undefined, 120_000);
         if (!lease) throw new Error('공백지 월드의 실행권을 얻지 못했습니다.');
         try {
-          await new TurnLoop(db, lease, { beforeCommit: (tx) => renewLease(tx, lease) }).advanceTo(tick);
+          await new TurnLoop(db, lease, { beforeCommit: (tx) => renewLease(tx, lease) }).advanceTo(tick, signal);
         } finally {
           await releaseLease(db, lease);
         }
@@ -923,7 +937,6 @@ it.each(['2060', '2070'])(
       }
     });
   },
-  90000,
 );
 
 async function expectReplayMatchesReloadedState(db: PrismaClient, url: URL, worldId: string) {
@@ -1016,7 +1029,7 @@ describe.each(ready)('S8 $key 전체 장수가 있는 DB 월드', (row) => {
   for (const [index, ticks] of batches.entries()) {
     const from = index === 0 ? 0 : batches[index - 1]!.at(-1)!,
       target = ticks.at(-1)!;
-    it(`월내 ${index + 1}구간 ${from}~${target}tick과 정산 경계를 저장한다`, ({ onTestFailed }) => {
+    it(`월내 ${index + 1}구간 ${from}~${target}tick과 정산 경계를 저장한다`, ({ onTestFailed, signal }) => {
       // Vitest timeout 뒤 원래 Promise가 성공해도 뒤 구간을 다시 열지 않는다.
       onTestFailed(() => {
         failed = true;
@@ -1035,10 +1048,10 @@ describe.each(ready)('S8 $key 전체 장수가 있는 DB 월드', (row) => {
           if (index === 0) await controlClock(db, worldId, 'start');
           lease = await acquireLease(db, worldId);
           if (!lease) throw new Error('시나리오 월드의 실행권을 얻지 못했습니다.');
-          const loop = new TurnLoop(db, lease);
+          const loop = new TurnLoop(db, lease, { beforeCommit: (tx) => renewLease(tx, lease!) });
           for (const tick of ticks) {
             await renewLease(db, lease);
-            await loop.advanceTo(tick);
+            await loop.advanceTo(tick, signal);
             executedTicks.push(tick);
           }
           const saved = await db.world.findUniqueOrThrow({ where: { id: worldId } });
@@ -1078,6 +1091,7 @@ describe.each(ready)('S8 $key 전체 장수가 있는 DB 월드', (row) => {
           failed = true;
           throw new AggregateError(errors, '시나리오 구간 실행과 실행권 해제 실패');
         }
+        signal.throwIfAborted();
         completedTick = target;
       })();
       executions.add(execution);

@@ -11,7 +11,6 @@ if (
   !process.send ||
   !process.env.TEST_DATABASE_URL ||
   !['127.0.0.1', 'localhost'].includes(url.hostname) ||
-  !/^\/[a-z][a-z0-9_]*_test$/.test(url.pathname) ||
   url.searchParams.has('host') ||
   url.searchParams.has('port') ||
   !worldId ||

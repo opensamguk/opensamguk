@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createDb } from '../packages/db/src/index';
+import { createDb, type Prisma } from '../packages/db/src/index';
 import {
   initialReplayState,
   enableReplayPolicy,
@@ -21,9 +21,8 @@ import {
 import { rngFor } from '../packages/shared/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { buildServer } from '../apps/server/src/server';
-import { appRouter } from '../apps/server/src/router';
 import { newSession } from '../apps/server/src/auth/session';
-import { commandInitial } from '../packages/rules/test/commandFixture';
+import { commandInitial, commandWorld } from '../packages/rules/test/commandFixture';
 import { loadPreset, resourceRoot } from '../apps/engine/src/world/resources';
 import { saveFixtureWorld as saveInitialWorld, readWorldState } from '../e2e/worldFixture';
 import { loadReplayState } from '../apps/engine/src/monthly';
@@ -32,6 +31,10 @@ import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { exportReplay, replayArchive, replayToEnd } from '../apps/engine/src/replay';
 import { initializeSan10Resources } from './san10-resources';
+import { recordFixtureNationTurns } from '../apps/engine/test/worldFixture';
+import { prepareFixtureUnit, recruitmentFixtureData } from './fixtures/recruitment';
+import { recordTestTurns } from '../apps/engine/test/seasonFixture';
+import { tacticalCommandInitial } from './fixtures/tactical';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !/\/[a-z][a-zA-Z0-9_]*_test$/.test(new URL(url).pathname))
@@ -77,11 +80,11 @@ afterAll(async () => {
   await db.$disconnect();
 });
 async function request<T = unknown>(
-  path: keyof typeof appRouter._def.procedures,
+  path: 'commands.list' | 'turns.get' | 'turns.set' | 'turns.precheck' | 'general.create',
   data: unknown,
   user: string | null = actorUserId,
 ) {
-  const mutation = appRouter._def.procedures[path]._def.type === 'mutation';
+  const mutation = path === 'turns.set' || path === 'general.create';
   const encoded = JSON.stringify({ 0: data });
   const result = await fetch(`${base}/trpc/${path}?batch=1${mutation ? '' : `&input=${encodeURIComponent(encoded)}`}`, {
     method: mutation ? 'POST' : 'GET',
@@ -92,22 +95,27 @@ async function request<T = unknown>(
     },
     ...(mutation ? { body: encoded } : {}),
   });
-  const body = (await result.json())[0] as { result?: { data: T }; error?: { data: { code: string } } };
+  const [body] = JSON.parse(await result.text()) as Array<{ result?: { data: T }; error?: { data: { code: string } } }>;
+  if (!body) throw Error('프리셋 HTTP 응답이 없습니다.');
   return { status: result.status, data: body.result?.data, code: body.error?.data.code };
 }
 async function fixture(preset: WorldPreset, edit: (initial: WorldInit) => void = () => {}) {
-  const initial = commandInitial();
+  const initial = tacticalCommandInitial();
   initial.generals.forEach((g, i) => {
     g.userId = i === 0 ? users[0]! : i === 3 ? users[1]! : null;
     g.nextTurnTick = i === 0 ? 100 : 9000;
   });
   edit(initial);
+  const nationTurns = initial.nationTurns;
+  delete initial.nationTurns;
   const result = await saveInitialWorld(db, initial, {
     name: '프리셋 시험',
     turnTermMinutes: preset.turnTermMinutes,
     endYear: null,
     preset: { key: 'fixture', value: preset },
+    featureData: recruitmentFixtureData(initial),
   });
+  if (nationTurns) await recordFixtureNationTurns(db, result.worldId, nationTurns);
   await controlClock(db, result.worldId, 'start');
   return { ...result, initial: await readWorldState(db, result.worldId) };
 }
@@ -120,12 +128,14 @@ async function queue(worldId: string, commandKey: string, args: unknown = {}, us
   expect(result.data).toMatchObject({ ok: true });
 }
 async function advance(worldId: string, tick: number) {
+  const started = performance.now();
   const lease = await acquireLease(db, worldId, undefined, 120_000);
   if (!lease) throw new Error('시험 월드 실행권이 없습니다.');
   try {
     return await new TurnLoop(db, lease, { beforeCommit: (tx) => renewLease(tx, lease) }).advanceTo(tick);
   } finally {
     await releaseLease(db, lease);
+    console.info('preset-advance', JSON.stringify({ tick, elapsedMs: Math.round(performance.now() - started) }));
   }
 }
 function worker(worldId: string, tick?: number) {
@@ -410,7 +420,7 @@ describe('T2-02 HTTP·엔진·재시작', () => {
     const tick = (found ? 12 : 24) * 10000;
     const { worldId } = await fixture(preset, (initial) => {
       initial.generals = [initial.generals[0]!];
-      initial.generals[0]!.nextTurnTick = tick;
+      initial.generals[0]!.nextTurnTick = tick + 1;
       if (found) {
         initial.generals[0]!.nationId = null;
         initial.generals[0]!.officerLevel = 0;
@@ -419,20 +429,37 @@ describe('T2-02 HTTP·엔진·재시작', () => {
     });
     const args = found ? { name: '새나라', color: '#123456' } : { cityKey: 2 };
     // 보호 경계의 사전 검사와 실행을 직접 대조한다. 이 월드는 재생 증거에 쓰지 않는다.
-    await db.world.update({ where: { id: worldId }, data: { monthlyTick: tick, clockTick: tick } });
-    expect((await request('turns.precheck', { worldId, commandKey, args })).data).toEqual({ ok: true });
-    await queue(worldId, commandKey, args);
     await advance(worldId, tick);
-    expect(await db.generalLog.findFirstOrThrow({ where: { worldId, generalId: 1 } })).toMatchObject({
+    if (!found) {
+      const unitId = await prepareFixtureUnit(db, worldId, 1);
+      await recordTestTurns(db, worldId, 1, 'morale', { unitId });
+      const next = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
+      await advance(worldId, next.nextTurnTick);
+    }
+    expect((await request('turns.precheck', { worldId, commandKey, args })).data).toMatchObject({ ok: true });
+    await queue(worldId, commandKey, args);
+    const next = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
+    await advance(worldId, next.nextTurnTick);
+    expect(
+      await db.generalLog.findFirstOrThrow({
+        where: { worldId, generalId: 1, commandKey },
+        orderBy: { sequence: 'desc' },
+      }),
+    ).toMatchObject({
       kind: 'success',
       commandKey,
     });
   });
   it('국가 선포는 엔진에서 보호되며 현재 일반 명령 전용 HTTP 입력은 거부한다', async () => {
     const { worldId } = await fixture(await loadPreset('beginner'), (initial) => {
-      initial.generals[0]!.userId = null;
       initial.diplomacies = [];
-      initial.nationTurns = { 1: [{ commandKey: 'nation_declare', args: { nationId: 2 } }] };
+      initial.nationTurns = {
+        1: Array.from({ length: 12 }, (_, slot) =>
+          slot === 0
+            ? { commandKey: 'nation_declare', args: { nationId: 2 } }
+            : { commandKey: 'nation_rest', args: {} },
+        ),
+      };
     });
     // HTTP는 국가 명령을 받는 경로가 아직 없다(T4-03). BAD_REQUEST를 보호 성공으로 세지 않는다.
     expect(
@@ -448,12 +475,17 @@ describe('T2-02 HTTP·엔진·재시작', () => {
     const tick = 24 * 10000;
     const { worldId } = await fixture(await loadPreset('beginner'), (initial) => {
       initial.generals = [initial.generals[0]!];
-      initial.generals[0]!.userId = null;
       initial.generals[0]!.nextTurnTick = tick;
       initial.diplomacies = [];
-      initial.nationTurns = { 1: [{ commandKey: 'nation_declare', args: { nationId: 2 } }] };
+      initial.nationTurns = {
+        1: Array.from({ length: 12 }, (_, slot) =>
+          slot === 0
+            ? { commandKey: 'nation_declare', args: { nationId: 2 } }
+            : { commandKey: 'nation_rest', args: {} },
+        ),
+      };
     });
-    await db.world.update({ where: { id: worldId }, data: { monthlyTick: tick, clockTick: tick } });
+    await advance(worldId, tick - 1);
     await advance(worldId, tick);
     expect(await db.diplomacy.findFirstOrThrow({ where: { worldId } })).toMatchObject({
       nationA: 1,
@@ -470,7 +502,20 @@ describe('T2-02 HTTP·엔진·재시작', () => {
       const { worldId } = await fixture(await loadPreset(key!), (initial) => {
         initial.generals = [initial.generals[0]!];
         initial.generals[0]!.userId = null;
-        initial.generals[0]!.train = 59;
+        Object.assign(initial.generals[0]!, { leadership: 60, strength: 60 });
+      });
+      // NPC 선택만 비교하는 통제 스냅샷이다. 공식 부곡 고정물을 명시하며 원생성 재생 증거로 쓰지 않는다.
+      const state = (await db.$transaction((tx) => loadReplayState(tx, worldId))).state;
+      const army = commandWorld().campaign!;
+      state.campaign!.units = [{ ...army.units[0]!, train: 59, troops: 2000 }];
+      state.campaign!.nextUnitId = 2;
+      state.cityResources!.cities['1']!.rice = 100000;
+      await db.world.update({
+        where: { id: worldId },
+        data: {
+          campaignState: state.campaign as unknown as Prisma.InputJsonValue,
+          cityResourcesState: state.cityResources as unknown as Prisma.InputJsonValue,
+        },
       });
       await advance(worldId, 100);
       expect(await db.generalLog.findFirstOrThrow({ where: { worldId, generalId: 1 } })).toMatchObject({
