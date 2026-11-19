@@ -268,7 +268,7 @@ export async function processTacticalStep(
     cancel: cancellation,
     receipts,
   };
-  const beforeReplay = await loadReplayState(tx, world.id);
+  const beforeReplay = await loadReplayState(tx, world.id, before);
   let next;
   try {
     next = applyBattleStep(before, payload, unitSetSchema.parse(world.unitSet), world.clockTick);
@@ -316,9 +316,11 @@ export async function processTacticalStep(
     if (attackerId != null) await persistCommandReports(tx, world.id, world.clockTick, attackerId, reports);
   }
   await appendReputationEvents(tx, world.id, reputationInputEvents({ before, after: next, input }));
+  let reconciled: WorldState | undefined;
   for (const feature of engineFeatures)
-    if (feature.key !== 'campaign-v1' && feature.key !== 'personnel')
-      await feature.afterQueuedInput?.(tx, world, beforeReplay, input);
+    if (feature.key !== 'campaign-v1' && feature.key !== 'personnel' && feature.afterQueuedInput)
+      // 사본을 반환하지 않는 처리기 뒤에는 DB를 다시 읽어 후속 쓰기를 반영한다.
+      reconciled = (await feature.afterQueuedInput(tx, world, beforeReplay, input, reconciled)) ?? undefined;
   return loadWorld(tx, world.id);
 }
 export async function cancelTacticalBattles(

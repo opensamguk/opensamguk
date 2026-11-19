@@ -96,6 +96,22 @@ async function fixture(count?: number) {
 }
 type Fixture = Awaited<ReturnType<typeof fixture>>;
 
+it('AC-INT-22 전술의 쓰기 전 사본을 재사용해도 현재 슬롯 검증과 독립 재적재를 유지한다', async () => {
+  const f = await fixture();
+  const expected = await f.read();
+  vi.mocked(loadWorld).mockClear();
+  expect(await loadReplayState(f.tx as unknown as Prisma.TransactionClient, 'fixture-world', f.state)).toEqual(
+    expected,
+  );
+  expect(loadWorld).not.toHaveBeenCalled();
+  f.slots.pop();
+  await expect(
+    loadReplayState(f.tx as unknown as Prisma.TransactionClient, 'fixture-world', f.state),
+  ).rejects.toThrow();
+  await expect(f.read()).rejects.toThrow();
+  expect(loadWorld).toHaveBeenCalledOnce();
+});
+
 // Frozen pre-change filter algorithm is the behavioral oracle, not the new grouping algorithm.
 function previousProjection(f: Fixture): ReplayState {
   const { state, world, generals, slots } = f,

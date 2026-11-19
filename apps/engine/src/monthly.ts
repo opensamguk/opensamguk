@@ -38,8 +38,13 @@ import { persistLineageState } from './lineage/repository';
 import { persistStratagemCardsState } from './stratagemCards/state';
 import { persistEquipmentState } from './equipmentState';
 
-export async function loadReplayState(tx: Prisma.TransactionClient, worldId: string): Promise<ReplayState> {
-  const state = await loadWorld(tx, worldId);
+export async function loadReplayState(
+  tx: Prisma.TransactionClient,
+  worldId: string,
+  // 같은 World 잠금 아래 쓰기 전에 검증·적재한 사본만 재사용한다.
+  loadedState?: WorldState,
+): Promise<ReplayState> {
+  const state = loadedState ?? (await loadWorld(tx, worldId));
   const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
   const generals = await tx.general.findMany({ where: { worldId } });
   const slots = await tx.generalTurn.findMany({ where: { worldId }, orderBy: { slot: 'asc' } });

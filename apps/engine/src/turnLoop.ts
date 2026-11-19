@@ -250,7 +250,7 @@ export class TurnLoop {
         }
         let loadedState: WorldState | undefined;
         if (!catchUp && world.campaignState) {
-          loadedState = await loadWorld(tx, worldId);
+          loadedState = await loadWorldAfterCapabilityCheck(tx, world, capabilities);
           const tactical = await processTacticalStep(tx, world, new Date(now), undefined, loadedState);
           if (tactical) {
             await persistPublicMap(

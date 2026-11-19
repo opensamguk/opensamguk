@@ -326,6 +326,7 @@ async function tables() {
   ).rows.map((row) => String(row.tablename));
 }
 async function fullFootprint(exclude: readonly string[] = []) {
+  const started = performance.now();
   const hash = createHash('sha256');
   for (const table of await tables()) {
     if (exclude.includes(table)) continue;
@@ -333,13 +334,15 @@ async function fullFootprint(exclude: readonly string[] = []) {
     const quoted = '"' + table.replaceAll('"', '""') + '"';
     const rows = await checked(() =>
       gate.query(
-        "SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text),'[]'::jsonb)::text AS body FROM " +
+        // 모든 행·필드를 해시하되 큰 JSON 대신 고정 길이 지문을 정렬한다. 중복 행도 각각 포함한다.
+        "WITH row_hashes AS MATERIALIZED (SELECT encode(sha256(convert_to(to_jsonb(t)::text, 'UTF8')), 'hex') AS value FROM " +
           quoted +
-          ' t',
+          " t) SELECT encode(sha256(convert_to(COALESCE(string_agg(value, '' ORDER BY value), ''), 'UTF8')), 'hex') AS body FROM row_hashes",
       ),
     );
     hash.update(table + '\n' + String(rows.rows[0]!.body) + '\n');
   }
+  console.info('admin-reset-footprint', JSON.stringify({ elapsedMs: Math.round(performance.now() - started) }));
   return hash.digest('hex');
 }
 beforeAll(
@@ -1620,7 +1623,9 @@ async function cityReset(owner: Actor, source: CityResetWorld, signal: AbortSign
 let cityOwner: Actor | undefined,
   cliCitySource: CityResetWorld | undefined,
   peerCityWorld: CityResetWorld | undefined,
-  lastCityTarget: CityResetWorld | undefined;
+  lastCityTarget: CityResetWorld | undefined,
+  cityResetArchive: Awaited<ReturnType<typeof exportReplay>> | undefined,
+  cityResetPayload: ReturnType<typeof input> | undefined;
 it('AC-INT-18D AC-M3-04 실제 게시 CLI의 도시 판과 두 월드 사람30칸·첫 세수를 준비한다', async (signal) => {
   cityOwner = await actor();
   const result = await hook(
@@ -1707,7 +1712,7 @@ it('AC-INT-18D AC-M3-04 실제 게시 CLI의 도시 판과 두 월드 사람30�
     expect(await checked(() => db.generalTurn.count({ where: { worldId: row.id, generalId: person.id } }))).toBe(30);
   }
 }, 120000);
-// 수출·재생 두 회까지 실측 36.5초. 뒤의 중복 요청 검증도 유지하며 60초를 둔다.
+// 수출과 독립 재생 두 회의 합이 62.4초였다. 같은 실제 원장을 이어 검증하되 CPU 단계를 나눈다.
 it('AC-INT-18D AC-M3-04 도시 초기화는 원본 세수·사람·30칸과 타월드를 보존하고 빈61원장만 만든다', async (signal) => {
   if (!cityOwner || !cliCitySource || !peerCityWorld) throw new Error('앞선 도시 정식 두 월드가 필요합니다.');
   const started = performance.now(),
@@ -1733,18 +1738,24 @@ it('AC-INT-18D AC-M3-04 도시 초기화는 원본 세수·사람·30칸과 타�
   expect(ended.cityResourcesState).toEqual(ledger);
   expect(await existingRows([cliCitySource.id, peerCityWorld.id], cliCitySource.id, event.id)).toBe(before);
   phase('after-snapshot');
-  const sourceArchive = await checked(() => exportReplay(db, cliCitySource!.id)),
+  cityResetArchive = await checked(() => exportReplay(db, cliCitySource!.id));
+  cityResetPayload = payload;
+  phase('exported');
+}, 60000);
+it('AC-INT-18D AC-M3-04 도시 초기화의 실제 원장은 두 번 재생하고 중복 요청도 같은 월드를 읽는다', async (signal) => {
+  if (!cityOwner || !cliCitySource || !lastCityTarget || !cityResetArchive || !cityResetPayload)
+    throw new Error('앞선 실제 도시 초기화와 수출 원장이 필요합니다.');
+  const sourceArchive = cityResetArchive,
+    payload = cityResetPayload,
     replayed = replayToEnd(sourceArchive);
   expect(replayed).toMatchObject({ reason: 'ADMIN_RESET', winnerNationId: null });
   expect(replayToEnd(JSON.parse(JSON.stringify(sourceArchive)))).toEqual(replayed);
-  phase('replayed');
   const count = await checked(() => db.world.count()),
     same = await call('admin.world.resetRequest', query(payload), signal, cityOwner);
   expect(same.data).toMatchObject({ status: 'APPLIED', plannedNewWorldId: lastCityTarget.id });
   expect(await request(cityOwner, payload, signal)).toEqual(same);
   await apply(cliCitySource.id, signal);
   expect(await checked(() => db.world.count())).toBe(count);
-  phase('idempotency-verified');
 }, 60000);
 it('AC-INT-18D AC-M3-04 실제 생성 DONE과 초기화 APPLIED 출처는 같은 도시 기능·게시 자료로 다시 초기화한다', async (signal) => {
   if (!cityOwner) throw new Error('도시 초기화 관리자가 필요합니다.');

@@ -145,6 +145,7 @@ export async function persistQueuedPersonnelStep(
         tick: input.tick!,
         sequence: input.sequence,
       }),
+    before.campaignArmyTypes,
   );
 }
 const processPolicyInput: QueuedInputHandler = async (tx, world, event, { tick }) => {
@@ -262,11 +263,13 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
   {
     key: 'governance-v1',
     queuedInputs: { 'governance.act': processGovernanceInput },
-    afterQueuedInput: (tx, world, _before, input) =>
-      reconcileGovernanceOrder(new PgGovernanceRepository(tx), world.id, {
-        tick: input.tick!,
-        sequence: input.sequence,
-      }),
+    afterQueuedInput: (tx, world, _before, input, loadedState) =>
+      reconcileGovernanceOrder(
+        new PgGovernanceRepository(tx),
+        world.id,
+        { tick: input.tick!, sequence: input.sequence },
+        loadedState,
+      ),
     async persistMonthly(tx, worldId, _before, _next, effects, context) {
       const rows = z.object({ movements: z.array(governanceMovementSchema) }).parse(effects).movements;
       await appendGovernanceMovements(tx, worldId, rows, context);
@@ -287,14 +290,21 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
   {
     key: 'lineage-v1',
     queuedInputs: { 'lineage.act': processLineageInput },
-    afterQueuedInput: (tx, world, _before, input) =>
-      reconcileLineageOrder(new PgLineageRepository(tx), world.id, { tick: input.tick!, sequence: input.sequence }),
+    afterQueuedInput: (tx, world, _before, input, loadedState) =>
+      reconcileLineageOrder(
+        new PgLineageRepository(tx),
+        world.id,
+        { tick: input.tick!, sequence: input.sequence },
+        loadedState,
+      ),
     persistMonthly: (tx, worldId, before, next, effects, context) =>
       persistLineageMonth(tx, worldId, before, next, effects as LineageMonthEffects, context),
   },
   {
     key: 'nation-lifecycle-v1',
-    async afterQueuedInput(tx, world) {
+    async afterQueuedInput(tx, world, _before, _input, loadedState) {
+      // 전술 호출자는 모든 후처리 뒤 DB 재적재에서 같은 검사를 한다.
+      if (loadedState) return loadedState;
       await loadWorld(tx, world.id);
     },
     persistMonthly: (tx, worldId, _before, _next, effects, at) =>

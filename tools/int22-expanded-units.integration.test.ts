@@ -6,7 +6,7 @@ import {
   initialReplayStateWithRegistry,
   applyRecordedInput,
   ruleRegistry,
-  runReplayAction,
+  runArchiveReplayAction,
   type RecordedInput,
   type WorldInit,
 } from '../packages/rules/src/index';
@@ -142,9 +142,10 @@ for (let month = 1; month <= 12; month++) {
           // 원생성 재생 대조가 길어져도 자기 토큰의 유효성을 검사하며 갱신한다.
           if (sequence % 64 === 0) await renewLease(db, lease!);
           const input = inputs.get(++sequence);
+          // 이 루프만 소유한 재생 상태는 보관 재생과 같이 비실행 장수의 예턴을 재사용한다.
           replay = input
             ? applyRecordedInput(replay, input, ruleRegistry, { unitSet: initial.unitSet })
-            : runReplayAction(replay, initial.seed, initial.unitSet, undefined, ruleRegistry);
+            : runArchiveReplayAction(replay, initial.seed, initial.unitSet, ruleRegistry);
         }
         expect(hashState(await loadReplayState(db, worldId!))).toBe(hashState(replay));
         console.info(

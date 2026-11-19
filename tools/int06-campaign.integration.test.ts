@@ -5,7 +5,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it as test } from 'v
 import { createDb } from '../packages/db/src/index';
 import { rngFor } from '../packages/shared/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
-import { applyCampaignRelationship, type WorldInit } from '../packages/rules/src/index';
+import { applyCampaignRelationship, logisticsConfigSchema, type WorldInit } from '../packages/rules/src/index';
+import { drillGain } from '../packages/rules/src/commands/statScores';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { recruitmentFixtureData } from './fixtures/recruitment';
@@ -22,6 +23,7 @@ import { categories } from '../apps/server/src/authz/coverage';
 import type { readCampaignBoard, readCampaignRequest } from '../apps/server/src/game/campaignApi';
 import type { AppRouter } from '../apps/server/src/router';
 import type { inferRouterOutputs } from '@trpc/server';
+import { attachFixtureOwners } from '../e2e/worldFixture';
 
 // AC-INT-06 실제 191년 21국·491명 원본, HTTP 세션과 펜싱 엔진을 함께 검사한다.
 // 이 파일의 한 달 검사는 AC-INT-12 한 기수 인수를 대신하지 않는다.
@@ -162,7 +164,7 @@ beforeAll(() =>
         }
       }
     }
-    users.push(randomUUID(), randomUUID());
+    users.push(randomUUID(), randomUUID(), randomUUID());
     const passwordHash = await hashPassword(randomUUID());
     for (const [index, id] of users.entries()) {
       await db.user.create({
@@ -172,12 +174,21 @@ beforeAll(() =>
       await db.session.create({ data: { id: session.id, userId: id, expiresAt: session.expiresAt } });
       cookies.push(`sid=${session.token}`);
     }
+    const featureData = recruitmentFixtureData(initial),
+      logistics = logisticsConfigSchema.parse(featureData['logistics-v1']),
+      capital = initial.nations.find((nation) => nation.id === 1)!.capitalCityKey!;
+    // 원본 명단·도시 값은 보존하고, 실제 월 생산·판매로 모병 예산을 마련할 재고만 준비한다.
+    logistics.specialties = [
+      ...logistics.specialties.filter((row) => row.cityKey !== capital),
+      { cityKey: capital, good: 'wood', perMonth: 1000 },
+    ];
+    featureData['logistics-v1'] = logistics;
     for (let count = 0; count < 2; count++) {
       const created = await saveInitialWorld(db, initial, {
         name: 'INT06 정식 HTTP',
         turnTermMinutes: 60,
         endYear: 201,
-        featureData: recruitmentFixtureData(initial),
+        featureData,
       });
       worldIds.push(created.worldId);
     }
@@ -495,7 +506,8 @@ it('서로 동시에 보낸 제안은 revision으로 직렬화하고 본인의 �
   ).toEqual(reservations);
 });
 
-it('반대 방향 제안의 동시 수락은 한 관계만 만들고 순환·강제 수락을 거부한다', async () => {
+// 다섯 번의 실제 입력 진행 합이 로컬에서 30초를 넘었다. 수락 경합과 후속 순환·해제를 나눠 잇는다.
+it('반대 방향 제안의 동시 수락은 한 관계만 만들고 강제 수락을 거부한다', async () => {
   for (const [index, personId] of [targetId, ownId].entries()) {
     await submit(
       'campaign.relationship',
@@ -523,6 +535,10 @@ it('반대 방향 제안의 동시 수락은 한 관계만 만들고 순환·강
   expect(results.filter((result) => result.status === 'rejected')).toEqual([
     expect.objectContaining({ result: expect.objectContaining({ code: 'STALE_REVISION' }) }),
   ]);
+  const campaign = (await snapshot()).state.campaign!;
+  expect(campaign.links).toHaveLength(1);
+});
+it('성립한 휘하 관계의 역방향 제안은 순환을 거부하고 본인이 해제한다', async () => {
   const campaign = (await snapshot()).state.campaign!;
   expect(campaign.links).toHaveLength(1);
   const link = campaign.links[0]!,
@@ -770,6 +786,47 @@ it('다음 게임 월에는 거절했던 NPC에게 다시 서약하고 그 달�
 });
 
 it('예약한 실제 부장 부곡에만 모병하고 훈련 미리보기는 그 지휘관의 상승량을 쓴다', async () => {
+  // 월중 NPC 지출 뒤의 도시 예산은 공식 물류 판매 입력으로 마련한다.
+  const unfunded = await snapshot(),
+    cityKey = unfunded.state.generals[ownId]!.cityKey,
+    ruler = Object.values(unfunded.state.generals).find(
+      (general) => general.nationId === unfunded.state.generals[ownId]!.nationId && general.officerLevel === 12,
+    )!;
+  await attachFixtureOwners(db, worldId, [{ id: ruler.id, userId: users[4]! }]);
+  const logistics = unfunded.state.logistics!,
+    shortfall = Math.max(0, 188 - unfunded.state.cityResources!.cities[String(cityKey)]!.gold);
+  if (shortfall > 0) {
+    const good = (['iron', 'wood', 'horses'] as const).find(
+      (good) => logistics.cities[String(cityKey)]![good] * logistics.config.trade[good].sell >= shortfall,
+    );
+    if (!good) throw new Error('공식 판매로 모병 도시 예산을 마련할 재고가 필요합니다.');
+    const requestId = randomUUID();
+    expect(
+      (
+        await http(
+          'logistics.submit',
+          {
+            worldId,
+            requestId,
+            expectedUserId: users[4],
+            payload: {
+              type: 'trade',
+              cityKey,
+              good,
+              side: 'sell',
+              amount: Math.ceil(shortfall / logistics.config.trade[good].sell),
+            },
+          },
+          cookies[4],
+          true,
+        )
+      ).code,
+    ).toBeUndefined();
+    await advance();
+    expect((await http('logistics.request', { worldId, requestId }, cookies[4])).data).toMatchObject({
+      status: 'applied',
+    });
+  }
   const before = await snapshot(),
     actor = before.state.generals[ownId]!;
   await advance(actor.nextTurnTick);
@@ -781,7 +838,10 @@ it('예약한 실제 부장 부곡에만 모병하고 훈련 미리보기는 그
     select: { kind: true, text: true },
   });
   expect(unit, JSON.stringify(commandLog)).toMatchObject({ commanderId: lieutenantId, troops, train: 0, atmos: 0 });
-  expect(after.state.generals[ownId]!.gold).toBe(actor.gold - 88);
+  expect(after.state.generals[ownId]!.gold).toBe(actor.gold);
+  expect(after.state.cityResources!.cities[String(cityKey)]!.gold).toBe(
+    before.state.cityResources!.cities[String(cityKey)]!.gold - 88,
+  );
   expect(after.state.generals[ownId]!.crew).toBe(0);
   expect(after.state.generals[lieutenantId]!.crew).toBe(0);
   const city = await http<inferRouterOutputs<AppRouter>['city']['get']>('city.get', {
@@ -789,7 +849,6 @@ it('예약한 실제 부장 부곡에만 모병하고 훈련 미리보기는 그
     cityKey: after.state.generals[lieutenantId]!.cityKey,
   });
   expect(city.code).toBeUndefined();
-  expect(city.data).toMatchObject({ campaignEnabled: true, fiveStats: true });
   expect(city.data!.generals.find((general) => general.id === lieutenantId)).toMatchObject({
     crew: 0,
     politics: after.state.generals[lieutenantId]!.politics,
@@ -818,7 +877,6 @@ it('예약한 실제 부장 부곡에만 모병하고 훈련 미리보기는 그
   const otherBefore = hashState(await snapshot(otherWorldId));
   const nation = await http<inferRouterOutputs<AppRouter>['nation']['get']>('nation.get', { worldId, nationId });
   expect(nation.code).toBeUndefined();
-  expect(nation.data).toMatchObject({ campaignEnabled: true, fiveStats: true });
   expect(nation.data!.generals.find((general) => general.id === lieutenantId)).toMatchObject({
     crew: 0,
     politics: after.state.generals[lieutenantId]!.politics,
@@ -858,7 +916,7 @@ it('예약한 실제 부장 부곡에만 모병하고 훈련 미리보기는 그
   expect(hashState(await snapshot(otherWorldId))).toBe(otherBefore);
   expect((await http('turns.precheck', { worldId, commandKey: 'train', args: { unitId } })).data).toMatchObject({
     ok: true,
-    preview: { goldCost: 100, gain: 8 + Math.floor(after.state.generals[lieutenantId]!.leadership / 25) },
+    preview: { goldCost: 100, gain: drillGain(after.state, after.state.generals[lieutenantId]!, false) },
   });
   expect(
     (

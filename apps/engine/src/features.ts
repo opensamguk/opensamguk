@@ -33,7 +33,9 @@ export interface EngineFeature {
     world: EngineWorld,
     before: ReplayState,
     input: import('@opensamguk/rules').RecordedInput,
-  ): Promise<void>;
+    // 전술 입력의 같은 잠금 사본이다. 후처리에서 바꾼 사본을 반환해 다음 기능에 잇는다.
+    loadedState?: WorldState,
+  ): Promise<WorldState | void>;
   queuedInputs?: Record<string, QueuedInputHandler>;
 }
 export const engineFeatures: readonly EngineFeature[] = builtInEngineFeatures;

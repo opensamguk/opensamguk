@@ -40,7 +40,7 @@ export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): 
 }
 
 // 호출자는 같은 트랜잭션의 World 행을 잠그고 바로 앞에서 capability 검사를 마쳐야 한다.
-// 입력을 처리하지 않은 일반 턴에서만 같은 사본을 재사용하며 다음 턴에는 다시 DB에서 검사한다.
+// 그 뒤 입력 쓰기가 없을 때만 같은 사본을 재사용하며 다음 트랜잭션에서는 다시 DB에서 검사한다.
 export async function loadWorldAfterCapabilityCheck(
   tx: Prisma.TransactionClient,
   world: Prisma.WorldGetPayload<Record<string, never>>,
