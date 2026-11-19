@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createDb } from '@opensamguk/db';
+import { saveTestWorld } from '../../test/saveTestWorld';
 import { buildServer } from '../server';
 import { hashPassword } from '../auth/password';
 import { hashToken, newSession } from '../auth/session';
@@ -26,24 +27,7 @@ async function createUser(email: string, passwordHash: string) {
 }
 
 async function createWorld(status: 'PREOPEN' | 'RUNNING' | 'PAUSED' | 'ENDED', createdAt: Date, id = randomUUID()) {
-  return db.world.create({
-    data: {
-      id,
-      name: `월드 ${status}`,
-      scenarioKey: 'scenario_191',
-      mapKey: 'map_che',
-      unitSetKey: 'default',
-      seed: 'world-list-test',
-      startYear: 191,
-      turnTermMinutes: 1,
-      status,
-      initialStateHash: 'world-list-test',
-      statRules: {},
-      unitSet: {},
-      createdAt,
-    },
-    select: { id: true, name: true, status: true },
-  });
+  return saveTestWorld(db, { name: `월드 ${status}`, status, createdAt, id });
 }
 
 async function list(cookie?: string, input?: unknown) {
@@ -62,7 +46,7 @@ async function list(cookie?: string, input?: unknown) {
 
 beforeAll(async () => {
   await db.world.deleteMany();
-  await db.user.deleteMany();
+
   const passwordHash = await hashPassword(randomBytes(24).toString('base64url'));
   alice = await createUser('world-alice@example.com', passwordHash);
   bob = await createUser('world-bob@example.com', passwordHash);
@@ -74,7 +58,7 @@ beforeEach(async () => {
 afterAll(async () => {
   await app.close();
   await db.world.deleteMany();
-  await db.user.deleteMany();
+  await db.user.deleteMany({ where: { id: { in: [alice?.id, bob?.id].filter((id): id is string => Boolean(id)) } } });
   await db.$disconnect();
 });
 

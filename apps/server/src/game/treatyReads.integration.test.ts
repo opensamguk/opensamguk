@@ -742,7 +742,7 @@ describe('T2-07 / AC-M2-06 새 조회 leaf 보조 단위', () => {
     f.nationQuery.mockResolvedValue(nation(2));
     expect(
       await quoteTreaty(f.db, { ...identity, payload: { toNationId: 2, clauses: [{ kind: 'trade', months: 12 }] } }),
-    ).toMatchObject({ cost: null, problem: { code: 'CLAUSE_NOT_CONNECTED' } });
+    ).toMatchObject({ cost: { mine: 100, theirs: 100 }, problem: null });
     expect(
       await quoteTreaty(f.db, { ...identity, payload: { toNationId: 2, clauses: [{ kind: 'peace' }] } }),
     ).toMatchObject({ cost: { mine: 0, theirs: 0 }, problem: { code: 'TREATY_RELATION' } });
