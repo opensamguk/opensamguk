@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '../trpc';
 import { retryUnlessClientError } from '../game/errors';
+import { useWorldEnded } from '../game/queries';
 import { serverMessage } from '../turns/apiError';
 import type { CityChoices } from '../turns/CommandPicker';
 import { TRADE_COMMAND_KEY } from './contract';
@@ -15,11 +16,13 @@ export const TRADE_UNSUPPORTED: CityChoices = {
 // 후보와 거부 이유는 서버가 계산한다. 목록에 교역이 있을 때만 조회한다.
 export function useTradeCityChoices(worldId: string, hasTrade: boolean) {
   const trpc = useTRPC();
+  const ended = useWorldEnded(worldId);
   const targets = useQuery({
     ...trpc.treaty.tradeTargets.queryOptions({ worldId }),
     enabled: hasTrade,
     retry: retryUnlessClientError,
-    refetchInterval: 10_000,
+    // 끝난 판에서는 주기 조회를 멈춘다(AC-M1-26 종료 뒤 조용함).
+    refetchInterval: ended ? false : 10_000,
   });
   return useCallback(
     (commandKey: string): CityChoices | null =>

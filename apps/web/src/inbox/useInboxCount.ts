@@ -2,6 +2,7 @@ import { useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-que
 import { useCallback, useSyncExternalStore } from 'react';
 import type { TreatyListPage } from '../diplomacy/contract';
 import { personnelKeys, type AssignmentOfferView } from '../personnel/contract';
+import { useWorldEnded } from '../game/queries';
 import { useTRPC } from '../trpc';
 import { countInbox, type CampaignBoard } from './count';
 
@@ -9,10 +10,11 @@ import { countInbox, type CampaignBoard } from './count';
 export function useInboxCount(worldId: string): number {
   const client = useQueryClient();
   const trpc = useTRPC();
+  const ended = useWorldEnded(worldId);
   const proposals = useQuery(
     trpc.proposals.list.queryOptions(
       { worldId, box: 'received', status: 'PENDING' },
-      { retry: false, refetchInterval: 30_000 },
+      { retry: false, refetchInterval: ended ? false : 30_000 },
     ),
   );
   const subscribe = useCallback((onChange: () => void) => client.getQueryCache().subscribe(onChange), [client]);

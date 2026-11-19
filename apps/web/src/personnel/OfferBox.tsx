@@ -4,6 +4,7 @@ import { personnelKeys, usePersonnelApi, type AssignmentOfferView } from './cont
 import styles from './Personnel.module.css';
 import { euro, iGa, type Notice } from './request';
 import { usePersonnelAction } from './usePersonnelAction';
+import { useWorldEnded } from '../game/queries';
 
 const KINDS = ['offer.respond'] as const;
 
@@ -13,12 +14,14 @@ export function OfferBox({ worldId }: { worldId: string }) {
   const api = usePersonnelApi();
   const queryClient = useQueryClient();
   const action = usePersonnelAction({ worldId, kinds: KINDS });
+  const ended = useWorldEnded(worldId);
   const offers = useQuery({
     queryKey: personnelKeys.offers(worldId),
     queryFn: () => api.offers({ worldId }),
     retry: false,
     // 발령은 엔진이 턴에 만든다. 서버가 거부하면 다시 묻지 않는다.
-    refetchInterval: (query) => (query.state.status === 'error' ? false : 15_000),
+    // 끝난 판에서는 발령이 생기지 않으므로 다시 묻지 않는다.
+    refetchInterval: (query) => (ended || query.state.status === 'error' ? false : 15_000),
   });
   const offer = offers.data?.[0];
   // 보내기 직전 제안 목록을 다시 받아 이 제안이 지금 장수에게 아직 열려 있을 때만 보낸다.

@@ -15,6 +15,7 @@ import {
   type VisibleCityResources,
 } from './cityResourceRequest';
 import styles from './CityResourcesPanel.module.css';
+import { useWorldEnded } from '../game/queries';
 
 type View = { userId: string; board: CityResourceBoard; pending: AllocationRequest | null };
 const number = (value: number) => value.toLocaleString('ko-KR');
@@ -35,6 +36,7 @@ function ResourceBoard({ worldId, cityKey }: { worldId: string; cityKey: number 
   const api = useTRPCClient(),
     trpc = useTRPC(),
     queries = useQueryClient();
+  const ended = useWorldEnded(worldId);
   const [view, setView] = useState<View | null>(null);
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
@@ -179,7 +181,7 @@ function ResourceBoard({ worldId, cityKey }: { worldId: string; cityKey: number 
 
   // 원장은 공용 캐시에 넣지 않고 같은 신원/세대에서 새로 읽는다. 입력 중인 폼은 다시 만들지 않는다.
   useEffect(() => {
-    if (!view || view.pending || busy || (view.board.visible && view.board.status !== 'RUNNING')) return;
+    if (ended || !view || view.pending || busy || (view.board.visible && view.board.status !== 'RUNNING')) return;
     const timer = setInterval(() => {
       if (sending.current || document.hidden) return;
       const signal = controller.current?.signal,
@@ -196,7 +198,7 @@ function ResourceBoard({ worldId, cityKey }: { worldId: string; cityKey: number 
         });
     }, 15_000);
     return () => clearInterval(timer);
-  }, [view, busy, snapshot]);
+  }, [ended, view, busy, snapshot]);
 
   // actorId: 새 배속이면 양식을 그린 화면의 장수. 다시 읽은 장수가 다르면(계승) 보내지 않는다.
   async function act(request: AllocationRequest, submit: boolean, actorId?: number) {

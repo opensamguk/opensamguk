@@ -39,6 +39,8 @@ let client: QueryClient;
 beforeEach(() => {
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   wire.handlers.clear();
+  // 끝난 판이면 관계 주기 조회를 멈추므로 월드 요약을 함께 읽는다.
+  wire.handlers.set('world.summary', () => ({ status: 'RUNNING' }));
 });
 afterEach(cleanup);
 
