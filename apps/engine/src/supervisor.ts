@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
-import type { PrismaClient } from '@opensamguk/db';
+import type { Prisma, PrismaClient } from '@opensamguk/db';
 import { errorDiagnostic } from '@opensamguk/shared/node';
 import { ADMIN_CLOCK_KINDS, POSSESSION_KIND } from '@opensamguk/rules';
 import { stopOwnedChild } from './process-lifecycle';
@@ -69,6 +69,8 @@ export async function runSupervisor(
     signal: AbortSignal;
     onEvent?: (event: SupervisorEvent) => void;
     spawnChild?: (worldId: string) => ChildProcess;
+    // 같은 DB를 함께 쓰는 시험이 다른 시험의 월드를 띄우지 않게 발견 범위를 좁힌다. 운영 감독은 쓰지 않는다.
+    worldScope?: Prisma.WorldWhereInput;
   },
 ): Promise<void> {
   const worlds = new Map<string, ManagedWorld>();
@@ -193,6 +195,7 @@ export async function runSupervisor(
         try {
           const active = await db.world.findMany({
             where: {
+              ...(options.worldScope ? { AND: [options.worldScope] } : {}),
               OR: [
                 { status: { in: ['RUNNING', 'PAUSED'] } },
                 {

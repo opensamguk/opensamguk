@@ -117,6 +117,21 @@ async function waitEngineReady(world: string) {
         },
       )
       .toBe(true);
+  } catch (error) {
+    // CI 기록에는 감독과 엔진의 stderr가 남지 않는다. 엔진이 마지막으로 쓴 heartbeat와 오류를 붙여 원인을 남긴다.
+    const heartbeat = await db.engineHeartbeat
+      .findUnique({ where: { worldId: world }, select: { at: true, lastTick: true, lagMs: true, lastError: true } })
+      .catch((reason: unknown) => ({ readFailed: String(reason) }));
+    const state = await db.world
+      .findUnique({ where: { id: world }, select: { status: true, clockTick: true } })
+      .catch((reason: unknown) => ({ readFailed: String(reason) }));
+    throw new Error(
+      `${error instanceof Error ? error.message : String(error)}
+` +
+        `월드 ${world}: ${JSON.stringify(state)}
+EngineHeartbeat: ${JSON.stringify(heartbeat)}`,
+      { cause: error },
+    );
   } finally {
     await db.$disconnect();
   }

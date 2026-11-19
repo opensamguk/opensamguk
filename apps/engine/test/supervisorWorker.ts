@@ -3,6 +3,7 @@ import { createDb } from '@opensamguk/db';
 import { engineFailureMessage } from '../src/main';
 import { runSupervisor } from '../src/supervisor';
 import { onShutdownRequest } from '../src/process-lifecycle';
+import { SUPERVISOR_TEST_WORLD_PREFIX } from './supervisorScope';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
@@ -14,6 +15,8 @@ try {
   await runSupervisor(db, {
     signal: controller.signal,
     onEvent: (event) => process.send?.(event),
+    // 같은 CI 조각에서 앞 시험이 남긴 RUNNING 월드를 이 감독이 띄우지 않게 이 시험의 월드만 본다.
+    worldScope: { name: { startsWith: SUPERVISOR_TEST_WORLD_PREFIX } },
   });
 } catch (error) {
   console.error(engineFailureMessage(error));
