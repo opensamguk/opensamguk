@@ -1,3 +1,4 @@
+import { readTransactionOptions } from '../readTransaction';
 import { TRPCError } from '@trpc/server';
 import { nowTick, toGameDate, LINEAGE_EXITED_YEAR } from '@opensamguk/rules';
 import { z } from 'zod';
@@ -56,7 +57,7 @@ export const messageRouter = router({
             next: rows.length > 20 ? encodeMessageCursor(page.at(-1)!) : null,
           };
         },
-        { isolationLevel: 'RepeatableRead' },
+        { ...readTransactionOptions },
       ),
     ),
   send: worldVerifiedProcedure
@@ -168,7 +169,7 @@ export const messageRouter = router({
     .query(({ ctx, input }) =>
       ctx.db.$transaction(
         async (tx) => unreadMessages(tx, input.worldId, await messagingActor(tx, ctx, input.worldId)),
-        { isolationLevel: 'RepeatableRead' },
+        readTransactionOptions,
       ),
     ),
   markRead: worldVerifiedProcedure
@@ -218,7 +219,7 @@ export const messageRouter = router({
         });
         return { generals, nations };
       },
-      { isolationLevel: 'RepeatableRead' },
+      { ...readTransactionOptions },
     ),
   ),
 });

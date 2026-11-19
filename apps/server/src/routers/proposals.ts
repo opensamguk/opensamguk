@@ -1,3 +1,4 @@
+import { readTransactionOptions } from '../readTransaction';
 import { z } from 'zod';
 import { activeSanctionWhere } from '../auth/sanction';
 import { protectedProcedure, router, worldVerifiedProcedure } from '../trpc';
@@ -61,7 +62,7 @@ export const proposalsRouter = router({
           await requirePersonnelSession(tx, personnelIdentity(ctx, started));
           return listProposals(tx, ctx.user.id, input);
         },
-        { isolationLevel: 'RepeatableRead' },
+        { ...readTransactionOptions },
       );
     }),
   respond: worldVerifiedProcedure

@@ -1,3 +1,4 @@
+import { readTransactionOptions } from '../readTransaction';
 import { readStoredRelations, toGameDate } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { requireWorld } from '../game/queries';
@@ -35,7 +36,7 @@ export const relationsRouter = router({
         });
         return { items };
       },
-      { isolationLevel: 'RepeatableRead' },
+      { ...readTransactionOptions },
     ),
   ),
 });

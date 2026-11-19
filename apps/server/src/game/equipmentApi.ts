@@ -1,3 +1,4 @@
+import { readTransactionOptions } from '../readTransaction';
 import { TRPCError } from '@trpc/server';
 import { equipmentSlotSchema, equipmentBonus, generalStats, withEquipmentBonus } from '@opensamguk/rules';
 import { requirePersonnelSession } from './personnelAdmission';
@@ -50,6 +51,6 @@ export function readEquipmentBoard(ctx: PersonnelActorContext, worldId: string, 
         }),
       };
     },
-    { isolationLevel: 'RepeatableRead' },
+    { ...readTransactionOptions },
   );
 }

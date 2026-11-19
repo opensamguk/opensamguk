@@ -1,3 +1,4 @@
+import { readTransactionOptions } from '../readTransaction';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { TRPCError } from '@trpc/server';
@@ -76,7 +77,7 @@ export const generalRouter = router({
         const general = await requireGeneral(tx, input.worldId, ctx.user.id);
         return readPolicy(tx, input.worldId, ctx.user.id, general.id);
       },
-      { isolationLevel: 'RepeatableRead' },
+      { ...readTransactionOptions },
     ),
   ),
   setPolicy: worldVerifiedProcedure
@@ -281,7 +282,7 @@ export const generalRouter = router({
               : null;
         return { general: null, creation, creationRules };
       },
-      { isolationLevel: 'RepeatableRead' },
+      { ...readTransactionOptions },
     ),
   ),
 });

@@ -11,6 +11,7 @@ import {
   type Clock,
 } from '@opensamguk/rules';
 import { z } from 'zod';
+import { readTransactionOptions } from './readTransaction';
 
 export const worldInput = z.object({ worldId: z.uuid() }).strict();
 export const entityKey = z.number().int().min(1).max(2_147_483_647);
@@ -78,7 +79,7 @@ export async function readWorld<T>(
       if (!world) throw new TRPCError({ code: 'NOT_FOUND', message: '월드를 찾을 수 없습니다.' });
       return read(tx, world);
     },
-    { isolationLevel: 'RepeatableRead' },
+    { ...readTransactionOptions },
   );
 }
 

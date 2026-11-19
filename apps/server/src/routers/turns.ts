@@ -1,3 +1,4 @@
+import { readTransactionOptions } from '../readTransaction';
 import { previewMarchSupply, marchForce, campaignAttackingUnits } from '@opensamguk/rules';
 import { randomUUID } from 'node:crypto';
 import { TRPCError } from '@trpc/server';
@@ -165,7 +166,7 @@ export const turnsRouter = router({
           ),
         };
       },
-      { isolationLevel: 'RepeatableRead' },
+      { ...readTransactionOptions },
     ),
   ),
   set: worldVerifiedProcedure
@@ -248,7 +249,7 @@ export const turnsRouter = router({
           ? { ok: false as const, ...failure, supply, ...(preview ? { preview } : {}) }
           : { ok: true as const, supply, ...(preview ? { preview } : {}) };
       },
-      { isolationLevel: 'RepeatableRead' },
+      { ...readTransactionOptions },
     );
   }),
 });

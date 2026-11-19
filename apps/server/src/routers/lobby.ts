@@ -1,3 +1,4 @@
+import { readTransactionOptions } from '../readTransaction';
 import { providedRuleKeys } from '@opensamguk/rules';
 import { readPublishedResources, type Prisma } from '@opensamguk/db';
 import { TRPCError } from '@trpc/server';
@@ -47,7 +48,7 @@ export const lobbyRouter = router({
     .input(worldInput.extend({ limit: z.number().int().min(1).max(50).default(20) }).strict())
     .query(({ ctx, input }) =>
       ctx.db.$transaction((tx) => publicHeadlines(tx, input, ctx.now, ctx.publicMapConfig.delayMinutes), {
-        isolationLevel: 'RepeatableRead',
+        ...readTransactionOptions,
       }),
     ),
   worlds: publicProcedure
@@ -223,7 +224,7 @@ export const lobbyRouter = router({
             };
           });
         },
-        { isolationLevel: 'RepeatableRead' },
+        { ...readTransactionOptions },
       ),
     ),
   notices: publicProcedure.input(z.undefined()).query(async ({ ctx }) => {

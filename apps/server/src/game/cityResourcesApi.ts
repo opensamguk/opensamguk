@@ -1,3 +1,4 @@
+import { readTransactionOptions } from '../readTransaction';
 import { isDeepStrictEqual } from 'node:util';
 import type { Prisma } from '@opensamguk/db';
 import {
@@ -75,7 +76,7 @@ export async function readCityResourceRequest(ctx: ActorContext, worldId: string
         throw new TRPCError({ code: 'NOT_FOUND', message: '도시 자원 요청이 없습니다.' });
       return { userId: ctx.user.id, ...requestDto(event) };
     },
-    { isolationLevel: 'RepeatableRead' },
+    { ...readTransactionOptions },
   );
 }
 export async function submitCityResourceRequest(
@@ -221,6 +222,6 @@ export async function readCityResourceBoard(ctx: ActorContext, worldId: string, 
         ...recruitmentAvailability(initial.unitSet, view, { generalId: actor.id, tick: world.clockTick }),
       };
     },
-    { isolationLevel: 'RepeatableRead' },
+    { ...readTransactionOptions },
   );
 }

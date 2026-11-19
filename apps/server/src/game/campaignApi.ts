@@ -1,3 +1,4 @@
+import { readTransactionOptions } from '../readTransaction';
 import { isDeepStrictEqual } from 'node:util';
 import type { Prisma } from '@opensamguk/db';
 import {
@@ -106,7 +107,7 @@ export async function readCampaignRequest(ctx: ActorContext, worldId: string, re
       }
       return requestDto(event);
     },
-    { isolationLevel: 'RepeatableRead' },
+    { ...readTransactionOptions },
   );
 }
 
@@ -308,6 +309,6 @@ export async function readCampaignBoard(ctx: ActorContext, worldId: string) {
           })),
       };
     },
-    { isolationLevel: 'RepeatableRead' },
+    { ...readTransactionOptions },
   );
 }

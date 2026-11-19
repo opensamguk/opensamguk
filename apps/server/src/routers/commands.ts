@@ -1,3 +1,4 @@
+import { readTransactionOptions } from '../readTransaction';
 import {
   commandMoveTargets,
   commandAttackTargets,
@@ -37,7 +38,7 @@ export const commandsRouter = router({
         if (world.status === 'ENDED' || general.removedAt !== null) return [];
         return commandMoveTargets(await readView(tx, world.id), general.id, general.nextTurnTick);
       },
-      { isolationLevel: 'RepeatableRead' },
+      { ...readTransactionOptions },
     ),
   ),
   attackTargets: protectedProcedure.input(strictWorldInput).query(({ ctx, input }) =>
@@ -48,7 +49,7 @@ export const commandsRouter = router({
         if (world.status === 'ENDED' || general.removedAt !== null) return [];
         return commandAttackTargets(await readView(tx, world.id), general.id);
       },
-      { isolationLevel: 'RepeatableRead' },
+      { ...readTransactionOptions },
     ),
   ),
   recruitCandidates: protectedProcedure.input(strictWorldInput).query(({ ctx, input }) =>
@@ -74,7 +75,7 @@ export const commandsRouter = router({
             cityName: view.cities[cityKey]?.name ?? null,
           }));
       },
-      { isolationLevel: 'RepeatableRead' },
+      { ...readTransactionOptions },
     ),
   ),
   list: protectedProcedure.input(worldInput).query(({ ctx, input }) =>
@@ -99,7 +100,7 @@ export const commandsRouter = router({
             ...commandAvailability(def, view, actor, ended),
           }));
       },
-      { isolationLevel: 'RepeatableRead' },
+      { ...readTransactionOptions },
     ),
   ),
 });

@@ -132,7 +132,11 @@ describe('T2-07 / AC-M2-14 교역 후보 API leaf', () => {
     expect(f.tx.general.findUnique).toHaveBeenCalledWith({
       where: { worldId_userId: { worldId: 'world', userId: 'owner' } },
     });
-    expect(f.context.db.$transaction).toHaveBeenCalledWith(expect.any(Function), { isolationLevel: 'RepeatableRead' });
+    expect(f.context.db.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: 'RepeatableRead',
+      maxWait: 10_000,
+      timeout: 10_000,
+    });
   });
   it('무인증 요청을 막는다', async () => {
     const f = fixture();

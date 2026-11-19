@@ -1,3 +1,4 @@
+import { readTransactionOptions } from '../readTransaction';
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { isDeepStrictEqual } from 'node:util';
@@ -140,7 +141,7 @@ export async function readTactical(
         nextCursor: replay ? (battle.frames.at(-1)?.turn ?? null) : null,
       };
     },
-    { isolationLevel: 'RepeatableRead' },
+    { ...readTransactionOptions },
   );
 }
 export async function submitTactical(
