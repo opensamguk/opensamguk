@@ -36,7 +36,24 @@ test('성 화면이 첫 화면이고 전체 지도와 오가며 명령 띠는 �
   const castle = page.getByTestId('city-castle');
   if (await castle.count()) {
     await castle.click();
-    await expect(page.getByTestId('castle-window')).toBeVisible();
+    try {
+      await expect(page.getByTestId('castle-window')).toBeVisible();
+    } catch (error) {
+      // CI에서만 창이 뜨지 않은 적이 있다(PR #674). 다음 실패에서 원인을 볼 수 있게 화면 상태를 기록에 남긴다.
+      const state = await page.evaluate(() => ({
+        url: location.href,
+        view: document.querySelector('[data-testid="map-stage"]')?.getAttribute('data-view'),
+        castle: document.querySelector('[data-testid="city-castle"]')?.getAttribute('aria-label'),
+        scene: Boolean(document.querySelector('[data-testid="city-scene"]')),
+        camp: Boolean(document.querySelector('[data-testid="camp-scene"]')),
+        dialogs: [...document.querySelectorAll('[role="dialog"],[role="alertdialog"],dialog[open]')].map((el) =>
+          (el.textContent ?? '').slice(0, 120),
+        ),
+        windows: [...document.querySelectorAll('.kit-window')].map((el) => el.getAttribute('data-testid')),
+      }));
+      console.log('INT29-castle-state', JSON.stringify(state));
+      throw error;
+    }
     await expect(page.getByRole('list', { name: '성 안에 지을 수 있는 건물' }).getByRole('listitem')).toHaveCount(16);
     await page.screenshot({ path: testInfo.outputPath('castle.png') });
     await page.getByTestId('castle-window').getByRole('button', { name: '닫기' }).click();

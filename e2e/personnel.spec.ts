@@ -158,6 +158,8 @@ const offerBox = (page: Page) => page.getByRole('region', { name: '발령 제안
 const notice = (page: Page) => page.getByTestId('personnel-notice');
 
 test.beforeAll(async ({ browser }) => {
+  // 1030 491명 월드 생성과 두 계정, 장수 준비가 바쁜 CI에서 30초를 넘긴 적이 있다(PR #674).
+  test.setTimeout(120_000);
   const first = await seat(browser);
   world = await personnelWorld();
   const second = await seat(browser);
