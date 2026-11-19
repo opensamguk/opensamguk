@@ -176,8 +176,8 @@
   },
   "fixtures": {
     "monthlyFixture": {
-      "initialStateHash": "46d8a339d6f66c176b60a764bcc362d60db1176a810207ab39ed1a8f014ab677",
-      "resourceHash": "cd13d86a06e8ed57b9f700a5fd0b9bcb0c5cfbd9ffa8853edad2cbb555441782",
+      "initialStateHash": "1c33cb7a861357eb1e409c6da8298b78992324ea4f7333e124193ab4565e038d",
+      "resourceHash": "eabee5ebfa561af464356fb952689ecf5b6a38f97bee4afa287908e9232b986a",
       "cities": 4,
       "nations": 2,
       "generals": 3,
@@ -185,8 +185,8 @@
       "portraits": 0
     },
     "warFixture": {
-      "initialStateHash": "063110222aa63eb412e1f9a480f7948f19d681f32c8960125f7d1032a51ad768",
-      "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
+      "initialStateHash": "c7cc180c57ab4238df0716812a49062be2bab45db164a24368c99170f434f084",
+      "resourceHash": "6cbbbcade762502db983092d8ce5fff70268e551da55b9eaa4ca8b7ea262ffc5",
       "cities": 4,
       "nations": 2,
       "generals": 4,

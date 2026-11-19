@@ -176,10 +176,13 @@ async function fixture(key: keyof typeof fixed.cases = 'successWithInjury') {
   const cards = readStratagemCardsConfig(providedRuleData(initial, 60)['stratagem-cards-v1']);
   cards.startHand = 1;
   cards.deck = [{ kind: 'fire_attack', weight: 1 }];
+  // 생성 기록과 DB 적재에 같은 프리셋을 쓴다. 구형 명령 선택은 상시 규칙에 없다.
+  const preset = { ...fixed.preset, commands: null };
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '화계 통합 시험',
     turnTermMinutes: 60,
     endYear: null,
+    preset: { key: 't4-17-ext-fixture', value: preset },
     featureData: { 'stratagem-cards-v1': { version: 1, config: cards } },
   });
   await db.world.update({ where: { id: worldId }, data: { status: 'RUNNING', clockAnchorAt: new Date(now) } });
@@ -487,11 +490,13 @@ it('N1 실제 12개월 수출과 재생의 해시·월단평이 일치하고 같
   const legacy = JSON.parse(
     await readFile(new URL('../apps/engine/test/fixtures/replay-v1-b8f5074.json', import.meta.url), 'utf8'),
   ) as ReplayArchiveV3;
+  if (!legacy.origin.featureData) throw new Error('현행 골든의 생성 기능 원장이 필요합니다.');
   const off = await saveInitialWorld(db, legacy.origin.initial, {
     name: '기존 골든',
     turnTermMinutes: 60,
     endYear: null,
     replayFormat: 3,
+    featureData: legacy.origin.featureData,
   });
   await db.world.update({ where: { id: off.worldId }, data: { status: 'RUNNING', clockAnchorAt: new Date(now) } });
   const offLoop = await loopFor(off.worldId);

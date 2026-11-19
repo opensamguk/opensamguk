@@ -1,5 +1,7 @@
 import { hashState } from '../packages/shared/src/node/hashState';
 import { randomUUID } from 'node:crypto';
+import { readdir, readFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createDb, type Prisma } from '../packages/db/src/index';
@@ -7,18 +9,48 @@ import { buildServer } from '../apps/server/src/server';
 import { newSession } from '../apps/server/src/auth/session';
 import { authzCase } from '../apps/server/src/authz/case';
 import { monthlyFixture } from '../apps/engine/test/monthlyFixture';
-import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
+import { saveFixtureWorld as saveInitialWorld, attachFixtureOwners } from '../e2e/worldFixture';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { CREATION_ERRORS, nationRank, officerTitle, toGameDate } from '../packages/rules/src/index';
 import { loadPreset } from '../apps/engine/src/world/resources';
 import { prepareSeasonWorld, finishSeasonWorld } from '../apps/engine/test/seasonFixture';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
+import { confirmDisconnectedDatabase } from './test-db-close';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
-const db = createDb(url);
-const app = await buildServer({ db, logging: false });
+const sourceUrl = testDatabaseUrl({ TEST_DATABASE_URL: url });
+if (!['localhost', '127.0.0.1'].includes(sourceUrl.hostname)) throw new Error('loopback test server required');
+for (const key of sourceUrl.searchParams.keys())
+  if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
+    throw new Error('connection target overrides are forbidden');
+const databaseName = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
+const targetUrl = new URL(sourceUrl);
+targetUrl.pathname = '/' + databaseName;
+testDatabaseUrl({
+  TEST_DATABASE_URL: targetUrl.href,
+  ...(!process.env.CI_GREEN_DATABASE ? { DATABASE_URL: process.env.DATABASE_URL } : {}),
+});
+const adminUrl = new URL(sourceUrl);
+adminUrl.pathname = '/postgres';
+type Pg = {
+  connect(): Promise<void>;
+  end(): Promise<void>;
+  query(sql: string, values?: unknown[]): Promise<{ rows: Record<string, unknown>[] }>;
+};
+const requireDb = createRequire(new URL('../packages/db/package.json', import.meta.url));
+const { Client } = createRequire(requireDb.resolve('@prisma/adapter-pg'))('pg') as {
+  Client: new (options: { connectionString: string }) => Pg;
+};
+const admin = new Client({ connectionString: adminUrl.href });
+const migrationClient = new Client({ connectionString: targetUrl.href });
+const db = createDb(targetUrl.href);
+let app: Awaited<ReturnType<typeof buildServer>> | undefined;
+let created = false;
+let databaseOid: string | undefined;
 const worlds: string[] = [];
+const fixturePreparations = new Set<ReturnType<typeof saveInitialWorld>>();
 const users: string[] = [];
 const notices: string[] = [];
 const payload = {
@@ -117,6 +149,18 @@ async function untilPending(worldId: string, count = 1) {
   }
 }
 beforeAll(async () => {
+  await admin.connect();
+  expect((await admin.query('SELECT oid FROM pg_database WHERE datname=$1', [databaseName])).rows).toHaveLength(0);
+  await admin.query(`CREATE DATABASE "${databaseName}"`);
+  created = true;
+  const identity = await admin.query('SELECT oid::text AS oid FROM pg_database WHERE datname=$1', [databaseName]);
+  expect(identity.rows).toHaveLength(1);
+  databaseOid = String(identity.rows[0]!.oid);
+  await migrationClient.connect();
+  const root = new URL('../packages/db/prisma/migrations/', import.meta.url);
+  for (const migration of (await readdir(root)).filter((value) => /^\d{14}_/.test(value)).sort())
+    await migrationClient.query(await readFile(new URL(migration + '/migration.sql', root), 'utf8'));
+  await migrationClient.end();
   const content = { id: 'engine-monthly-fixture', title: '월간 합성 시험' };
   const season = { id: 'engine-season-fixture', title: '종료 합성 시험' };
   for (const value of [content, season])
@@ -134,16 +178,51 @@ beforeAll(async () => {
       },
       update: {},
     });
+  app = await buildServer({ db, logging: false });
   address = await app.listen({ host: '127.0.0.1', port: 0 });
 });
 afterEach(async () => {
+  await Promise.allSettled(fixturePreparations);
   await db.notice.deleteMany({ where: { id: { in: notices.splice(0) } } });
   await db.world.deleteMany({ where: { id: { in: worlds.splice(0) } } });
   await db.user.deleteMany({ where: { id: { in: users.splice(0) } } });
 });
 afterAll(async () => {
-  await app.close();
-  await db.$disconnect();
+  const errors: unknown[] = [];
+  await Promise.allSettled(fixturePreparations);
+  for (const close of [() => app?.close(), () => migrationClient.end(), () => db.$disconnect()]) {
+    try {
+      await close();
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  let connections: number | undefined;
+  let dropped = false;
+  try {
+    if (created) {
+      if (!databaseOid) throw new Error('missing owned database identity');
+      ({ connections } = await confirmDisconnectedDatabase(admin, databaseName, databaseOid));
+      if (!errors.length) {
+        await admin.query(`DROP DATABASE "${databaseName}"`);
+        dropped = true;
+        expect((await admin.query('SELECT oid FROM pg_database WHERE datname=$1', [databaseName])).rows).toHaveLength(
+          0,
+        );
+      }
+    }
+  } catch (error) {
+    errors.push(error);
+  }
+  try {
+    await admin.end();
+  } catch (error) {
+    errors.push(error);
+  }
+  console.info(
+    JSON.stringify({ event: 't203-cleanup', databaseName, databaseOid, connections, dropped, errors: errors.length }),
+  );
+  if (errors.length) throw new AggregateError(errors, 'T2-03 database cleanup failed');
 });
 
 describe('T2-03 실제 로비 HTTP·PostgreSQL', () => {
@@ -275,19 +354,45 @@ describe('T2-03 실제 로비 HTTP·PostgreSQL', () => {
     expect(result.data![0]!.myGeneral!.nationName).toBeNull();
   });
 
-  it('월드 10개·사람 장수 600명에서 목록 응답이 50ms 미만이다', async () => {
+  it('월드 10개·사람 장수 600명에서 목록 응답이 50ms 미만이다', async ({ signal }) => {
+    const preparationStart = performance.now();
     const accounts = await Promise.all(Array.from({ length: 60 }, () => identity()));
+    console.info(`T2-03 accounts preparation: ${(performance.now() - preparationStart).toFixed(2)}ms`);
+    const source = await monthlyFixture();
     for (let index = 0; index < 10; index++) {
-      const initial = await monthlyFixture();
+      signal.throwIfAborted();
+      const worldStart = performance.now();
+      const initial = structuredClone(source);
       const template = initial.generals[0]!;
-      initial.generals = accounts.map((user, i) => ({ ...template, id: i + 1, userId: user.id, name: `장수${i}` }));
-      const { worldId } = await saveInitialWorld(db, initial, {
-        name: `성능 월드${index}`,
-        turnTermMinutes: 60,
-        endYear: null,
-      });
-      worlds.push(worldId);
+      initial.generals = accounts.map((_, i) => ({ ...template, id: i + 1, userId: null, name: `장수${i}` }));
+      const preparing = (async () => {
+        const saved = await saveInitialWorld(db, initial, {
+          name: `성능 월드${index}`,
+          turnTermMinutes: 60,
+          endYear: null,
+        });
+        worlds.push(saved.worldId);
+        // 600개의 실제 입력은 유지하되 한 준비 트랜잭션에 20개씩만 넣는다.
+        for (let first = 0; first < accounts.length; first += 20) {
+          signal.throwIfAborted();
+          await attachFixtureOwners(
+            db,
+            saved.worldId,
+            accounts.slice(first, first + 20).map((user, offset) => ({ id: first + offset + 1, userId: user.id })),
+          );
+        }
+        return saved;
+      })();
+      fixturePreparations.add(preparing);
+      const settled = () => fixturePreparations.delete(preparing);
+      void preparing.then(settled, settled);
+      await preparing;
+      console.info(
+        `T2-03 world ${index} preparation (60 owner inputs): ${(performance.now() - worldStart).toFixed(2)}ms`,
+      );
     }
+    signal.throwIfAborted();
+    console.info(`T2-03 total preparation: ${(performance.now() - preparationStart).toFixed(2)}ms`);
     // 배포 리소스 캐시를 채운 뒤 실제 HTTP 왕복 시간을 잰다.
     expect((await call<Row[]>('lobby.worlds', {}, accounts[0]!.cookie)).data).toHaveLength(10);
     const measurements: number[] = [];

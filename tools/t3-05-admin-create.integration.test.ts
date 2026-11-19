@@ -7,7 +7,7 @@ import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, beforeAll, beforeEach, expect, it as test } from 'vitest';
-import { createDb, type Prisma } from '../packages/db/src/index';
+import { createDb, PrismaClient, type Prisma } from '../packages/db/src/index';
 import { buildServer } from '../apps/server/src/server';
 import { appRouter } from '../apps/server/src/router';
 import type { Context } from '../apps/server/src/context';
@@ -67,13 +67,21 @@ const pending = new Set<Promise<unknown>>(),
 const apps = new Set<Awaited<ReturnType<typeof buildServer>>>(),
   children: OwnedChild[] = [],
   oldWorlds: string[] = [];
+const crashSchema = 'admin_create_crash_' + randomBytes(8).toString('hex');
 const crashUrl = new URL(target);
-const crashName = ciGreenDatabaseName('opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test');
-crashUrl.pathname = '/' + crashName;
+crashUrl.searchParams.set('options', '-c search_path=' + crashSchema);
+const { PrismaPg } = requireDb('@prisma/adapter-pg') as {
+  PrismaPg: new (
+    config: { connectionString: string },
+    options: { schema: string },
+  ) => NonNullable<NonNullable<ConstructorParameters<typeof PrismaClient>[0]>['adapter']>;
+};
 const crash = {
-  name: crashName,
+  name,
+  schema: crashSchema,
+  schemaOid: undefined as string | undefined,
   url: crashUrl,
-  db: createDb(crashUrl.href),
+  db: new PrismaClient({ adapter: new PrismaPg({ connectionString: crashUrl.href }, { schema: crashSchema }) }),
   gate: new Client({ connectionString: crashUrl.href }),
   created: false,
   oid: undefined as string | undefined,
@@ -84,6 +92,7 @@ const crash = {
   requestId: '',
   plannedWorldId: '',
   key: '',
+  worker: new URL('../.tmp-ci-green/admin-create-' + randomUUID() + '.mjs', import.meta.url),
 };
 secrets.add(crashUrl.href);
 let oid: string | undefined,
@@ -488,6 +497,14 @@ afterAll(
       );
       if (children.some((child) => !child.closedAt || !child.stdoutEnded || !child.stderrEnded))
         suite.fail(new Error('자기 child close/stream 미확인: DB 보존'));
+      if (crash.created)
+        await cleanupAttempt(async () => {
+          const identity = await gate.query('SELECT oid::text AS oid FROM pg_namespace WHERE nspname=$1', [
+            crash.schema,
+          ]);
+          if (!crash.schemaOid || identity.rows[0]?.oid !== crash.schemaOid)
+            throw new Error('자기 crash schema OID가 달라 DB를 보존합니다.');
+        });
       const closers: Array<() => Promise<unknown>> = [...apps].map((app) => () => app.close());
       closers.push(
         () => gate.end(),
@@ -528,40 +545,8 @@ afterAll(
               (await checked(() => admin.query('SELECT oid FROM pg_database WHERE datname=$1', [name]), signal)).rows,
             ).toHaveLength(0);
             dropped = true;
-          }
-        }
-      } catch (error) {
-        suite.fail(error);
-      }
-
-      try {
-        if (crash.created) {
-          signal.throwIfAborted();
-          const identity = await checked(
-            () => admin.query('SELECT oid::text AS oid FROM pg_database WHERE datname=$1', [crash.name]),
-            signal,
-          );
-          if (!crash.oid) {
-            suite.fail(new Error('자기 crash DB 최초 OID가 불명하여 보존합니다.'));
-            const count = await checked(
-              () => admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=$1', [crash.name]),
-              signal,
-            );
-            crash.connections = Number(count.rows[0]?.count);
-          } else {
-            expect(identity.rows).toEqual([{ oid: crash.oid }]);
-            ({ connections: crash.connections } = await checked(
-              () => confirmDisconnectedDatabase(admin, crash.name, crash.oid!),
-              signal,
-            ));
-            if (mayDrop()) {
-              await dropDatabase(crash.name);
-              expect(
-                (await checked(() => admin.query('SELECT oid FROM pg_database WHERE datname=$1', [crash.name]), signal))
-                  .rows,
-              ).toHaveLength(0);
-              crash.dropped = true;
-            }
+            crash.connections = connections;
+            crash.dropped = crash.created;
           }
         }
       } catch (error) {
@@ -581,7 +566,9 @@ afterAll(
           hookAborted: signal.aborted,
           pendingOperations: pending.size,
 
-          crashDatabase: {
+          crashSchema: {
+            schema: crash.schema,
+            schemaOid: crash.schemaOid,
             name: crash.name,
             created: crash.created,
             oid: crash.oid,
@@ -1531,7 +1518,9 @@ function spawnEngine(
     [
       '--import',
       'tsx',
-      fileURLToPath(new URL('../apps/engine/src/index.ts', import.meta.url)),
+      purpose.startsWith('crash-')
+        ? fileURLToPath(crash.worker)
+        : fileURLToPath(new URL('../apps/engine/src/index.ts', import.meta.url)),
       ...(worldId ? ['--world', worldId] : []),
     ],
     {
@@ -1718,26 +1707,59 @@ it('AC-M3-04·AC-INT-22 프리셋만 지정해도 확장 병종과 계산식을 
   expect(readArchive(await exportReplay(db, target.id)).origin.initial.unitSet.crewTypes).toHaveLength(45);
 });
 
-it('AC-M3-04 crash 전용 UUID DB에 전체 migration·게시 자원·PENDING을 준비한다', async (signal) => {
+it('AC-M3-04 같은 DB의 crash 전용 schema에 전체 migration·게시 자원·PENDING을 준비한다', async (signal) => {
   signal.throwIfAborted();
-  expect(
-    (await checked(async () => admin.query('SELECT oid FROM pg_database WHERE datname=$1', [crash.name]))).rows,
-  ).toHaveLength(0);
-  await checked(async () => admin.query('CREATE DATABASE "' + crash.name + '"'));
+  expect((await gate.query('SELECT oid FROM pg_namespace WHERE nspname=$1', [crash.schema])).rows).toHaveLength(0);
+  await checked(() => gate.query('CREATE SCHEMA "' + crash.schema + '"'));
   crash.created = true;
-  crash.oid = String(
-    (await checked(async () => admin.query('SELECT oid::text AS oid FROM pg_database WHERE datname=$1', [crash.name])))
-      .rows[0]!.oid,
+  crash.oid = oid;
+  crash.schemaOid = String(
+    (await gate.query('SELECT oid::text AS oid FROM pg_namespace WHERE nspname=$1', [crash.schema])).rows[0]!.oid,
   );
-  await checked(async () => admin.query('ALTER DATABASE "' + crash.name + '" SET statement_timeout=10000'));
-  await checked(async () => crash.gate.connect());
+  await checked(() => crash.gate.connect());
+  expect((await crash.gate.query('SELECT current_schema() AS schema')).rows).toEqual([{ schema: crash.schema }]);
+  await mkdir(new URL('../.tmp-ci-green/', import.meta.url), { recursive: true });
+  // 실제 감독을 실행한다. DB 어댑터의 schema 설정과 raw SQL search_path만 격리한다.
+  await writeFile(
+    crash.worker,
+    `
+    import { createRequire } from 'node:module';
+    import { PrismaClient } from ${JSON.stringify(new URL('../packages/db/src/index.ts', import.meta.url).href)};
+    import { runSupervisor } from ${JSON.stringify(new URL('../apps/engine/src/supervisor.ts', import.meta.url).href)};
+    import { engineFailureMessage } from ${JSON.stringify(new URL('../apps/engine/src/main.ts', import.meta.url).href)};
+    import { onShutdownRequest } from ${JSON.stringify(new URL('../apps/engine/src/process-lifecycle.ts', import.meta.url).href)};
+    const require = createRequire(${JSON.stringify(new URL('../packages/db/package.json', import.meta.url).href)});
+    const { PrismaPg } = require('@prisma/adapter-pg');
+    const url = new URL(process.env.DATABASE_URL);
+    const schema = url.searchParams.get('options')?.replace('-c search_path=', '');
+    if (schema !== ${JSON.stringify(crash.schema)} || url.pathname !== ${JSON.stringify(target.pathname)})
+      throw Error('자기 crash schema 연결이 필요합니다.');
+    const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: url.href }, { schema }) });
+    const controller = new AbortController();
+    const remove = onShutdownRequest(() => controller.abort());
+    try {
+      await runSupervisor(db, { signal: controller.signal });
+    } catch (error) {
+      console.error(engineFailureMessage(error));
+      process.exitCode = 1;
+    } finally {
+      await db.$disconnect();
+      remove();
+    }
+  `,
+  );
   const migrations = new URL('../packages/db/prisma/migrations/', import.meta.url);
   for (const migration of (await checked(async () => readdir(migrations)))
     .filter((value) => /^\d{14}_/.test(value))
     .sort()) {
     signal.throwIfAborted();
     await checked(async () =>
-      crash.gate.query(await checked(async () => readFile(new URL(migration + '/migration.sql', migrations), 'utf8'))),
+      crash.gate.query(
+        (await checked(async () => readFile(new URL(migration + '/migration.sql', migrations), 'utf8'))).replace(
+          /\bpublic\b/g,
+          crash.schema,
+        ),
+      ),
     );
   }
   await checked(async () =>
@@ -1795,7 +1817,7 @@ it('AC-M3-04 실제 감독을 INSERT 대기 중 SIGKILL하면 PENDING·월드0·
         { timeout: 5000 },
       )
       .toBe(1);
-    // 이 DB에는 World가 없어 감독의 --world 자식이 없다. 자기 실제 감독만 강제 종료한다.
+    // 이 schema에는 World가 없어 감독의 --world 자식이 없다. 자기 실제 감독만 강제 종료한다.
     expect(await crash.db.world.count()).toBe(0);
     expect(child.child.kill('SIGKILL'), '자기 supervisor SIGKILL 전송').toBe(true);
     await stopChild(child);

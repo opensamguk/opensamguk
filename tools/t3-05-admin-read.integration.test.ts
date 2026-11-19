@@ -71,8 +71,17 @@ function it(title: string, action: () => Promise<void>) {
 async function settle() {
   while (executions.size) await Promise.allSettled([...executions]);
 }
-const catalog = async () =>
-  (await admin.query('SELECT datname,oid::text AS oid FROM pg_database ORDER BY datname')).rows;
+const catalog = async () => {
+  const rows = (await admin.query('SELECT datname,oid::text AS oid FROM pg_database ORDER BY datname')).rows;
+  // CI의 다른 담당 DB만 비교에서 빼고 자기 DB·개발 DB의 식별자는 계속 확인한다.
+  return process.env.CI_GREEN_DATABASE
+    ? rows.filter(
+        (row) =>
+          row.datname === process.env.CI_GREEN_DATABASE ||
+          !/^opensamguk_ci_green_[a-z0-9]+_test$/.test(String(row.datname)),
+      )
+    : rows;
+};
 beforeEach(settle);
 async function user(
   role: 'USER' | 'ADMIN' = 'USER',

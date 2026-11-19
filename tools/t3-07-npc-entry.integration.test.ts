@@ -185,7 +185,7 @@ async function expectReplayed(worldId: string) {
   expect(hashState(replay)).toBe(hashState(await db.$transaction((tx) => loadReplayState(tx, worldId))));
 }
 function supervisor() {
-  const child = spawn(process.execPath, ['--import', 'tsx', 'apps/engine/test/supervisorWorker.ts'], {
+  const child = spawn(process.execPath, ['--import', 'tsx', 'apps/engine/src/index.ts'], {
     cwd: new URL('../', import.meta.url),
     env: { ...process.env, DATABASE_URL: target.href, TEST_DATABASE_URL: target.href },
     windowsHide: true,
@@ -286,7 +286,10 @@ it('AC-M3-14 정식491명 확장 판에서5능력치 후보를 맡고 장비·�
     endYear: 231,
     replayFormat: 3,
 
-    featureData: { ...profile.featureData, 'equipment-v1': STANDARD_EQUIPMENT_CONFIG },
+    featureData: {
+      ...Object.fromEntries(Object.entries(profile.featureData).filter(([, data]) => data !== undefined)),
+      'equipment-v1': STANDARD_EQUIPMENT_CONFIG,
+    },
   });
   await enable(worldId);
   const before = await db.$transaction((tx) => loadReplayState(tx, worldId));
