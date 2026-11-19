@@ -138,6 +138,8 @@ it('AC-INT-03: 두 정식 원생성의155거점 전체 경로와382방향 이동
         .sort((a, b) => a.cityKey - b.cityKey),
     ).toEqual(graph.map(({ cityKey, kind, connections }) => ({ cityKey, kind, connections })));
     const state = toWorldState(initial);
+    // 이 검사는 지리 연결만 다룬다. 재야 장수의 타국 진입 권한은 별도 시험에서 검사한다.
+    for (const city of Object.values(state.cities)) city.nationId = null;
     // 정본 재야 장수의 위치만 메모리에서 바꿔 지리를 검사한다. 소속 장수의 적국 진입 권한은 별도 규칙이다.
     const probe = Object.values(state.generals).find((general) => general.nationId === null);
     expect(probe).toBeDefined();
@@ -255,16 +257,16 @@ it('SAN10 파일·게시·생성·재생 추론은 같은 기본 자원 선택�
     map: 'san10',
     scenario: 'san10-191',
     unitSet: 'basic',
-    statRules: 'five-stats',
+    statRules: 'default',
     portraitMap: '191-map',
   });
-  expect(resolveWorldResourceSelection({ map: 'san10', scenario: 'san10-empty' }).statRules).toBe('five-stats');
+  expect(resolveWorldResourceSelection({ map: 'san10', scenario: 'san10-empty' }).statRules).toBe('default');
   expect(resolveWorldResourceSelection({ map: 'che', scenario: '1030' })).toEqual({
     map: 'che',
     scenario: '1030',
     unitSet: 'basic',
     statRules: 'default',
-    portraitMap: 'rtk14-map',
+    portraitMap: '191-map',
   });
   expect(
     resolveWorldResourceSelection({

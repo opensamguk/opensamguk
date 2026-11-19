@@ -1,3 +1,4 @@
+import { saveFixtureWorld as saveInitialWorld } from '../test/worldFixture';
 import { randomUUID } from 'node:crypto';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createDb, nextActionSequence, type Prisma } from '@opensamguk/db';
@@ -5,8 +6,8 @@ import { settleDiplomacy, settleTreaties, type TreatyInput, type WorldState } fr
 import { monthlyFixture } from '../test/monthlyFixture';
 import { loadWorld } from './worldLoader';
 import { loadTreaties, persistTreatyClosures } from './treatyState';
-import { processTreatyInput } from './treatyInput';
-import { saveInitialWorld } from './world/persistence';
+import { processTreatyQueuedInput } from './treatyInput';
+
 import { controlClock } from './world/clock';
 
 const url = process.env.TEST_DATABASE_URL;
@@ -27,8 +28,12 @@ afterAll(async () => {
 });
 
 // 실제 factory로 만든 저장 경계 fixture다. CLI·리스·loop 검증은 별도다.
-async function fixture(npc = false) {
+async function fixture(npc = false, extraNation = false) {
   const initial = await monthlyFixture();
+  if (extraNation) {
+    initial.nations.push({ ...initial.nations[0]!, id: 3, name: 'Preserved nation', capitalCityKey: 3 });
+    initial.cities[2]!.nationId = 3;
+  }
   const userIds = [randomUUID(), randomUUID(), randomUUID()];
   userIds.forEach((id) => users.add(id));
   initial.nations = initial.nations.map((nation) => ({ ...nation, gold: 1000, isNpc: npc && nation.id === 2 }));
@@ -36,6 +41,8 @@ async function fixture(npc = false) {
     ...general,
     userId: npc && index === 1 ? null : userIds[index]!,
     officerLevel: index < 2 ? 12 : 1,
+    activeFromYear: initial.startYear,
+    deathYear: initial.startYear + 100,
   }));
   await db.user.createMany({
     data: userIds
@@ -46,8 +53,7 @@ async function fixture(npc = false) {
     name: '조약 저장 경계',
     turnTermMinutes: 60,
     endYear: null,
-    replayFormat: 'legacy',
-    treatyFormat: 1,
+    replayFormat: 3,
   });
   worlds.add(worldId);
   await controlClock(db, worldId, 'start', 0);
@@ -66,12 +72,32 @@ async function enqueue(worldId: string, userId: string, generalId: number, input
     },
   });
 }
+async function processFixtureTreaty(
+  tx: Prisma.TransactionClient,
+  world: Prisma.WorldGetPayload<Record<string, never>>,
+  event: Event,
+  tick: number,
+) {
+  const sequence = await nextActionSequence(tx, world.id);
+  const outcome = await processTreatyQueuedInput(tx, world, event, {
+    tick,
+    sequence,
+    treatyBreakEnabled: true,
+    treatyTradeEnabled: true,
+    treatyExpandedEnabled: true,
+  });
+  const updated = await tx.inputEvent.updateMany({
+    where: { id: event.id, status: 'PENDING' },
+    data: { ...outcome, sequence, tick },
+  });
+  if (updated.count !== 1) throw Error('대기 입력이 변경됐습니다.');
+}
+
 async function run(event: Event, tick = 1500, after?: (tx: Prisma.TransactionClient) => Promise<void>) {
   await db.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${event.worldId} FOR UPDATE`;
     const world = await tx.world.findUniqueOrThrow({ where: { id: event.worldId } });
-    const selected = await tx.inputEvent.findUniqueOrThrow({ where: { id: event.id } });
-    await processTreatyInput(tx, world, selected, tick);
+    await processFixtureTreaty(tx, world, await tx.inputEvent.findUniqueOrThrow({ where: { id: event.id } }), tick);
     await after?.(tx);
   });
   return db.inputEvent.findUniqueOrThrow({ where: { id: event.id } });
@@ -101,19 +127,15 @@ async function snapshot(worldId: string) {
 
 describe('T2-07 / AC-M2-06 실제 PostgreSQL 조약 저장 component', () => {
   it('사람 제안·수락 때 비용을 다시 계산하고 상태와 완료 입력을 함께 저장한다', async () => {
-    const { worldId, userIds } = await fixture();
-    const nation = await db.nation.findUniqueOrThrow({
-      where: { worldId_id: { worldId, id: 1 } },
-      omit: { noticeDirective: true },
-    });
-    const otherNation = await db.nation.create({ data: { ...nation, id: 3, name: '보존 국가' } });
+    const { worldId, userIds } = await fixture(false, true);
+    const otherNation = await db.nation.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 3 } } });
     const otherPair = await db.diplomacy.create({
       data: { worldId, nationA: 1, nationB: 3, state: 'NON_AGGRESSION', untilTick: 90000 },
     });
     const otherTreaty = await db.treaty.create({
       data: {
         worldId,
-        id: 100,
+        id: 1,
         fromNationId: 1,
         toNationId: 3,
         clauses: [{ kind: 'note', text: '보존' }],
@@ -135,7 +157,7 @@ describe('T2-07 / AC-M2-06 실제 PostgreSQL 조약 저장 component', () => {
     const accepted = await run(await response(worldId, userIds[1]!, id), 1501);
     expect(accepted).toMatchObject({
       status: 'APPLIED',
-      sequence: 2,
+      sequence: 5,
       result: { outcome: 'ACCEPTED', by: 'HUMAN', tick: 1501, cost: { from: 9, to: 25 }, endTick: 11501 },
     });
     expect(
@@ -149,7 +171,7 @@ describe('T2-07 / AC-M2-06 실제 PostgreSQL 조약 저장 component', () => {
       await db.diplomacy.findMany({ where: { worldId }, orderBy: [{ nationA: 'asc' }, { nationB: 'asc' }] }),
     ).toEqual([{ worldId, nationA: 1, nationB: 2, state: 'NON_AGGRESSION', untilTick: 11501 }, otherPair]);
     expect(await db.nation.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 3 } } })).toEqual(otherNation);
-    expect(await db.treaty.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 100 } } })).toEqual(otherTreaty);
+    expect(await db.treaty.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } })).toEqual(otherTreaty);
     expect(await db.general.findMany({ where: { worldId }, orderBy: { id: 'asc' } })).toEqual(generals);
     expect(await db.treaty.findUniqueOrThrow({ where: { worldId_id: { worldId, id: Number(id) } } })).toMatchObject({
       status: 'ACTIVE',
@@ -159,7 +181,7 @@ describe('T2-07 / AC-M2-06 실제 PostgreSQL 조약 저장 component', () => {
       endTick: 11501,
       closedSequence: null,
     });
-    expect((await db.world.findUniqueOrThrow({ where: { id: worldId } })).actionSequence).toBe(2);
+    expect((await db.world.findUniqueOrThrow({ where: { id: worldId } })).actionSequence).toBe(5);
   });
 
   it('원시 저장 세계를 enabled-world나 origin6 생성 증거로 삼지 않는다', async () => {
@@ -167,7 +189,7 @@ describe('T2-07 / AC-M2-06 실제 PostgreSQL 조약 저장 component', () => {
     // 이 음성 사례만 실제 생성 뒤 origin을 지워 파손 행을 만든다.
     await db.$executeRaw`UPDATE "World" SET "replayOrigin" = NULL WHERE id = ${worldId}`;
     const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
-    expect(world.treatyFormat).toBe(1);
+    expect(world.treatyFormat).toBeNull();
     expect(world.replayOrigin).toBeNull();
     expect(await db.$transaction((tx) => loadTreaties(tx, worldId))).toEqual({});
   });
@@ -186,19 +208,19 @@ describe('T2-07 / AC-M2-06 실제 PostgreSQL 조약 저장 component', () => {
         userId: userIds[0],
         generalId: 1,
         status: 'APPLIED',
-        sequence: 1,
-        result: { outcome: insufficient ? 'DECLINED' : 'ACCEPTED', by: 'NPC', treatyId: '1' },
+        sequence: 3,
+        result: { outcome: insufficient ? 'DECLINED' : 'ACCEPTED', by: 'NPC', treatyId: '3' },
       });
-      const row = await db.treaty.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
+      const row = await db.treaty.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 3 } } });
       expect(row).toMatchObject({
         status: insufficient ? 'REJECTED' : 'ACTIVE',
         proposedTick: 1500,
         respondByTick: 61500,
-        closedSequence: insufficient ? 1 : null,
+        closedSequence: insufficient ? 3 : null,
         costFrom: insufficient ? null : 17,
         costTo: insufficient ? null : 17,
       });
-      expect(await db.inputEvent.count({ where: { worldId } })).toBe(1);
+      expect(await db.inputEvent.count({ where: { worldId, kind: { startsWith: 'treaty.' } } })).toBe(1);
       expect(
         await db.general.findMany({ where: { worldId }, orderBy: { id: 'asc' }, select: { userId: true } }),
       ).toEqual(userIds.map((userId, index) => ({ userId: index === 1 ? null : userId })));
@@ -262,7 +284,7 @@ describe('T2-07 / AC-M2-06 실제 PostgreSQL 조약 저장 component', () => {
       data: { clauses: [{ kind: 'note', text: '기록' }, { kind: 'peace' }] },
     });
     await expect(db.$transaction((tx) => loadTreaties(tx, worldId))).rejects.toThrow();
-    await db.treaty.update({ where: { worldId_id: { worldId, id } }, data: { clauses, closedSequence: 1 } });
+    await db.treaty.update({ where: { worldId_id: { worldId, id } }, data: { clauses, closedSequence: 4 } });
     await expect(db.$transaction((tx) => loadTreaties(tx, worldId))).rejects.toThrow();
     await db.treaty.update({ where: { worldId_id: { worldId, id } }, data: { closedSequence: null, costFrom: 0 } });
     await expect(db.$transaction((tx) => loadTreaties(tx, worldId))).rejects.toThrow();
@@ -304,7 +326,7 @@ describe('T2-07 / AC-M2-06 실제 PostgreSQL 조약 저장 component', () => {
     });
     expect(await db.treaty.findUniqueOrThrow({ where: { worldId_id: { worldId, id: Number(id) } } })).toMatchObject({
       status: 'EXPIRED',
-      closedSequence: 3,
+      closedSequence: 6,
       costFrom: null,
       costTo: null,
     });
@@ -326,22 +348,22 @@ describe('T2-07 / AC-M2-06 실제 PostgreSQL 조약 저장 component', () => {
     });
     expect(await db.treaty.findUniqueOrThrow({ where: { worldId_id: { worldId, id } } })).toMatchObject({
       status: 'EXPIRED',
-      closedSequence: 2,
+      closedSequence: 5,
     });
   });
 
-  it('연결하지 않은 조항은 이벤트만 거절한다', async () => {
+  it('상시 제공 교역 조항의 제안은 비용·관계를 바꾸지 않고 저장한다', async () => {
     const { worldId, userIds } = await fixture();
     const event = await enqueue(worldId, userIds[0]!, 1, {
       kind: 'treaty.propose',
       payload: { toNationId: 2, clauses: [{ kind: 'trade', months: 1 }] },
     });
     const before = await snapshot(worldId);
-    expect(await run(event)).toMatchObject({ status: 'REJECTED', result: { code: 'CLAUSE_NOT_CONNECTED' } });
+    expect(await run(event)).toMatchObject({ status: 'APPLIED', result: { outcome: 'PROPOSED' } });
     const next = await snapshot(worldId);
     expect(next.nations).toEqual(before.nations);
     expect(next.relations).toEqual(before.relations);
-    expect(next.treaties).toEqual(before.treaties);
+    expect(next.treaties).toMatchObject([{ status: 'PROPOSED', clauses: [{ kind: 'trade', months: 1 }] }]);
   });
 
   it('수락 국고 부족이면 이벤트만 거절하고 열린 제안과 양국 값을 보존한다', async () => {
@@ -352,7 +374,7 @@ describe('T2-07 / AC-M2-06 실제 PostgreSQL 조약 저장 component', () => {
     const before = await snapshot(worldId);
     expect(await run(event)).toMatchObject({
       status: 'REJECTED',
-      sequence: 2,
+      sequence: 5,
       result: { code: 'INSUFFICIENT_GOLD', tick: 1500 },
     });
     const next = await snapshot(worldId);
@@ -377,7 +399,7 @@ describe('T2-07 / AC-M2-06 실제 PostgreSQL 조약 저장 component', () => {
       const saved = await run(event);
       expect(saved).toMatchObject({
         status: 'REJECTED',
-        sequence: 1,
+        sequence: 4,
         result: {
           code: condition === 'permission' ? 'NO_PERMISSION' : condition === 'owner' ? 'NO_GENERAL' : 'ACTOR_INACTIVE',
         },
@@ -386,7 +408,7 @@ describe('T2-07 / AC-M2-06 실제 PostgreSQL 조약 저장 component', () => {
     },
   );
 
-  it('파손 payload와 off 월드는 sequence도 증가시키지 않고 롤백한다', async () => {
+  it('파손 payload는 롤백하고 옛 flag가 NULL인 형식 3도 조약을 처리한다', async () => {
     const { worldId, userIds } = await fixture();
     const event = await enqueue(worldId, userIds[0]!, 1, {
       kind: 'treaty.propose',
@@ -408,9 +430,7 @@ describe('T2-07 / AC-M2-06 실제 PostgreSQL 조약 저장 component', () => {
     expect(await snapshot(worldId)).toEqual(wrongKey);
     await db.inputEvent.update({ where: { id: event.id }, data: { idempotencyKey: `treaty.propose:${randomUUID()}` } });
     await db.world.update({ where: { id: worldId }, data: { treatyFormat: null } });
-    const off = await snapshot(worldId);
-    await expect(run(event)).rejects.toThrow();
-    expect(await snapshot(worldId)).toEqual(off);
+    expect(await run(event)).toMatchObject({ status: 'APPLIED' });
   });
 
   it('PAUSED·ENDED는 WORLD_CLOSED이고 종료 기록 시각을 지킨다', async () => {
@@ -420,7 +440,7 @@ describe('T2-07 / AC-M2-06 실제 PostgreSQL 조약 저장 component', () => {
       kind: 'treaty.propose',
       payload: { toNationId: 2, clauses },
     });
-    expect(await run(paused)).toMatchObject({ status: 'REJECTED', sequence: 1, result: { code: 'WORLD_CLOSED' } });
+    expect(await run(paused)).toMatchObject({ status: 'REJECTED', sequence: 4, result: { code: 'WORLD_CLOSED' } });
     await db.world.update({ where: { id: worldId }, data: { status: 'ENDED', clockTick: 20000 } });
     await db.worldResult.create({
       data: {
@@ -444,7 +464,7 @@ describe('T2-07 / AC-M2-06 실제 PostgreSQL 조약 저장 component', () => {
     expect(await snapshot(worldId)).toEqual(before);
     expect(await run(ended, 20000)).toMatchObject({
       status: 'REJECTED',
-      sequence: 2,
+      sequence: 5,
       result: { code: 'WORLD_CLOSED', tick: 20000 },
     });
   });
@@ -460,7 +480,7 @@ describe('T2-07 / AC-M2-06 실제 PostgreSQL 조약 저장 component', () => {
       }),
     ).rejects.toThrow('저장 취소');
     expect(await snapshot(worldId)).toEqual(before);
-    expect(await run(event, 1501)).toMatchObject({ status: 'APPLIED', sequence: 2 });
+    expect(await run(event, 1501)).toMatchObject({ status: 'APPLIED', sequence: 5 });
   });
 
   it('InputEvent count 0이면 이미 쓴 게임 상태와 sequence도 롤백한다', async () => {
@@ -472,9 +492,8 @@ describe('T2-07 / AC-M2-06 실제 PostgreSQL 조약 저장 component', () => {
       db.$transaction(async (tx) => {
         await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${worldId} FOR UPDATE`;
         const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
-        const selected = await tx.inputEvent.findUniqueOrThrow({ where: { id: event.id } });
         await tx.inputEvent.delete({ where: { id: event.id } });
-        await processTreatyInput(tx, world, selected, 1501);
+        await processFixtureTreaty(tx, world, event, 1501);
       }),
     ).rejects.toThrow('대기 입력이 변경');
     expect(await snapshot(worldId)).toEqual(before);
@@ -493,7 +512,7 @@ describe('T2-07 / AC-M2-06 실제 PostgreSQL 조약 저장 component', () => {
       { gold: 983 },
       { gold: 983 },
     ]);
-    expect((await db.world.findUniqueOrThrow({ where: { id: worldId } })).actionSequence).toBe(3);
+    expect((await db.world.findUniqueOrThrow({ where: { id: worldId } })).actionSequence).toBe(6);
   });
 
   it('월간 caller의 sequence로 닫고 비용을 보존하며 count 0은 롤백한다', async () => {
@@ -510,7 +529,7 @@ describe('T2-07 / AC-M2-06 실제 PostgreSQL 조약 저장 component', () => {
     });
     expect(await db.treaty.findUniqueOrThrow({ where: { worldId_id: { worldId, id: Number(id) } } })).toMatchObject({
       status: 'ENDED',
-      closedSequence: 3,
+      closedSequence: 6,
       costFrom: 17,
       costTo: 17,
     });

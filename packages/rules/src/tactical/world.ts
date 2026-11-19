@@ -2,6 +2,7 @@ import { rngFor, battleStructureSchema, type BattleSide } from '@opensamguk/shar
 import { BALANCE } from '../balance';
 import { captureCounties } from '../cityAffiliation';
 import { removeNation } from '../commands/support';
+import { applyLastNationRecruitmentLock } from '../commands/recruitmentLock';
 import { refreshSupply } from '../supply';
 import type { WorldState, WorldView, DeepReadonly } from '../model/world';
 import type { CampaignUnitState } from '../campaign/state';
@@ -400,7 +401,7 @@ export function battleCancellation(view: WorldView, b: DeepReadonly<BattleState>
     return '참가 장수 사망·하야·소속 변경';
   return null;
 }
-export function settleTacticalBattle(state: WorldState, b: BattleState) {
+export function settleTacticalBattle(state: WorldState, b: BattleState, tick = b.tick) {
   if (b.settled) return;
   if (b.phase !== 'ended') throw Error('끝나지 않은 전투입니다.');
   const injuries = new Map<number, number>();
@@ -473,11 +474,12 @@ export function settleTacticalBattle(state: WorldState, b: BattleState) {
           other.result = 'defend';
           other.reason = '참가 국가 멸망';
           recordBattleFrame(other, [{ kind: 'end', text: other.reason }]);
-          settleTacticalBattle(state, other);
+          settleTacticalBattle(state, other, tick);
         }
         for (const owned of Object.values(state.cities).filter((c) => c.nationId === defendingNation))
           disband(owned.cityKey);
         removeNation(state, defendingNation);
+        applyLastNationRecruitmentLock(state, defendingNation, tick);
       } else if (state.nations[defendingNation]!.capitalCityKey === city.cityKey)
         state.nations[defendingNation]!.capitalCityKey = left[0]!.cityKey;
     }

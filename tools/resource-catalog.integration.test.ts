@@ -1,3 +1,4 @@
+import { ciGreenDatabaseName } from './test-database';
 import { createHash, randomUUID } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { readFile, readdir, rm } from 'node:fs/promises';
@@ -6,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { createDb, readPublishedResources, type GameResourceRef, type PrismaClient } from '../packages/db/src/index';
 import { buildInitialWorld, TICKS_PER_MONTH, type WorldInit } from '../packages/rules/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
@@ -92,7 +93,7 @@ async function createFixture(
 ): Promise<Fixture> {
   if (!process.env.TEST_DATABASE_URL) throw new Error('전용 TEST_DATABASE_URL이 필요합니다.');
   const reference = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-  const name = `opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`;
+  const name = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
   const url = new URL(reference);
   url.pathname = `/${name}`;
   testDatabaseUrl({ TEST_DATABASE_URL: url.href, DATABASE_URL: process.env.DATABASE_URL });
@@ -241,18 +242,19 @@ async function withDatabase(
   if (failure) throw failure;
 }
 
-let shared: Fixture | undefined;
-beforeAll(async () => {
+beforeAll(() => {
   expect(Object.keys(baseline.seeds)).toHaveLength(13);
-  shared = await createFixture({ initialize: true });
-});
-afterAll(async () => {
-  await shared?.dispose();
 });
 
-function sharedDb() {
-  if (!shared) throw new Error('공유 시험 DB가 준비되지 않았습니다.');
-  return shared.db;
+async function publishedFixtureResources() {
+  let resources: Awaited<ReturnType<typeof readInitialResources>> | undefined;
+  await withDatabase(
+    async ({ db }) => {
+      resources = await readInitialResources(db, options);
+    },
+    { initialize: true },
+  );
+  return resources!;
 }
 
 function resourceReads(start: number) {
@@ -323,7 +325,7 @@ it('P13 빈 표는 첫 시나리오 누락 키와 초기화 안내로 실패하�
 it('P14 없는 DB 접속 실패 뒤에도 파일을 읽지 않는다', async () => {
   if (!process.env.TEST_DATABASE_URL) throw new Error('전용 TEST_DATABASE_URL이 필요합니다.');
   const reference = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-  const name = `opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`;
+  const name = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
   const url = new URL(reference);
   url.pathname = `/${name}`;
   testDatabaseUrl({ TEST_DATABASE_URL: url.href, DATABASE_URL: process.env.DATABASE_URL });
@@ -356,8 +358,11 @@ it('P14 자원 migration 전 DB는 실패하고 파일을 읽지 않는다', asy
 });
 
 it('P15 없는 2판은 키를 적어 거부한다', async () => {
-  await expect(readPublishedResources(sharedDb(), [{ kind: 'MAP', name: 'che', version: 2 }])).rejects.toThrow(
-    'MAP/che/2',
+  await withDatabase(
+    async ({ db }) => {
+      await expect(readPublishedResources(db, [{ kind: 'MAP', name: 'che', version: 2 }])).rejects.toThrow('MAP/che/2');
+    },
+    { initialize: true },
   );
 });
 
@@ -512,17 +517,22 @@ it.each([false, true])('AC-P2-27 게시 2판 CLI 생성·출처·초기화·재�
 });
 
 it('P15 다른 kind를 넣은 칸은 build 전에 키를 적어 거부한다', async () => {
-  const resources = await readInitialResources(sharedDb(), options);
-  await noFileFallback(async () => {
-    expect(() => composeInitialWorld({ ...resources, map: resources.scenario }, options.seed)).toThrow(
-      'SCENARIO/1030/1',
-    );
-  });
+  await withDatabase(
+    async ({ db }) => {
+      const resources = await readInitialResources(db, options);
+      await noFileFallback(async () => {
+        expect(() => composeInitialWorld({ ...resources, map: resources.scenario }, options.seed)).toThrow(
+          'SCENARIO/1030/1',
+        );
+      });
+    },
+    { initialize: true },
+  );
 });
 
 it('P16 DRAFT만 있는 키는 게시 자원 없음으로 거부한다', async () => {
+  const resources = await publishedFixtureResources();
   await withDatabase(async (fixture) => {
-    const resources = await readInitialResources(sharedDb(), options);
     await insertResource(fixture, refs[0]!, resources.map.content, { draft: true });
     await expect(readPublishedResources(fixture.db, [refs[0]!])).rejects.toThrow('MAP/che/1');
   });
@@ -584,15 +594,25 @@ it.each([
   ['map', '/che', 1],
   ['unitSet', '', 1],
 ] as const)('P20 잘못된 %s 이름은 선택된 자원을 읽기 전에 거부한다', async (slot, value, reads) => {
-  const counter = countingDb(sharedDb());
-  await expect(readInitialResources(counter.db, { ...options, [slot]: value })).rejects.toThrow();
-  expect(counter.count()).toBe(reads);
+  await withDatabase(
+    async ({ db }) => {
+      const counter = countingDb(db);
+      await expect(readInitialResources(counter.db, { ...options, [slot]: value })).rejects.toThrow();
+      expect(counter.count()).toBe(reads);
+    },
+    { initialize: true },
+  );
 });
 
 it.each([0, -1, 1.5])('P20 판 번호 %s는 조회 전에 거부한다', async (version) => {
-  const counter = countingDb(sharedDb());
-  await expect(readPublishedResources(counter.db, [{ kind: 'MAP', name: 'che', version }])).rejects.toThrow();
-  expect(counter.count()).toBe(0);
+  await withDatabase(
+    async ({ db }) => {
+      const counter = countingDb(db);
+      await expect(readPublishedResources(counter.db, [{ kind: 'MAP', name: 'che', version }])).rejects.toThrow();
+      expect(counter.count()).toBe(0);
+    },
+    { initialize: true },
+  );
 });
 
 function resourceCli(fixture: Fixture, script: string, args: string[] = []) {
@@ -729,7 +749,7 @@ it('T4-77 S5 초상 도구는 게시 대응표와 비교하고 원본·게시 �
 });
 
 it('T4-77 S5 초상 도구는 다른 게시 대응표를 수정하지 않고 실패한다', async () => {
-  const resources = await readInitialResources(sharedDb(), options);
+  const resources = await publishedFixtureResources();
   await withDatabase(async (fixture) => {
     await insertResource(fixture, { kind: 'SCENARIO', name: '1030', version: 1 }, resources.scenario.content);
     await insertResource(
@@ -761,24 +781,29 @@ it('T4-77 S5 초상 도구는 게시 자원이 없으면 원본 파일로 대체
 });
 
 it('T4-77 S6 시뮬레이션 열 시드의 DB·파일 초기 상태가 같다', async () => {
-  const resources = await readInitialResources(sharedDb(), options);
-  for (const [index, { slot }] of RESOURCE_INPUTS.entries())
-    expect(hashState(resources[slot].content)).toBe(Object.values(baseline.resources)[index]!.contentHash);
-  for (let index = 1; index <= 10; index++) {
-    const seed = String(index);
-    const fromDb = composeInitialWorld(resources, seed);
-    const fromSource = buildInitialWorld({
-      map: resources.map.content,
-      scenario: resources.scenario.content,
-      unitSet: resources.unitSet.content,
-      statRules: resources.statRules.content,
-      portraitMap: resources.portraitMap.content,
-      seed,
-    });
-    expect(fromDb).toEqual(fromSource);
-    expect(hashState(fromDb)).toBe(hashState(fromSource));
-    if (seed === '1') expect(hashState(fromDb)).toBe(baseline.seeds['1'].initialStateHash);
-  }
+  await withDatabase(
+    async ({ db }) => {
+      const resources = await readInitialResources(db, options);
+      for (const [index, { slot }] of RESOURCE_INPUTS.entries())
+        expect(hashState(resources[slot].content)).toBe(Object.values(baseline.resources)[index]!.contentHash);
+      for (let index = 1; index <= 10; index++) {
+        const seed = String(index);
+        const fromDb = composeInitialWorld(resources, seed);
+        const fromSource = buildInitialWorld({
+          map: resources.map.content,
+          scenario: resources.scenario.content,
+          unitSet: resources.unitSet.content,
+          statRules: resources.statRules.content,
+          portraitMap: resources.portraitMap.content,
+          seed,
+        });
+        expect(fromDb).toEqual(fromSource);
+        expect(hashState(fromDb)).toBe(hashState(fromSource));
+        if (seed === '1') expect(hashState(fromDb)).toBe(baseline.seeds['1'].initialStateHash);
+      }
+    },
+    { initialize: true },
+  );
 });
 
 it('T4-77 S6 실제 sim CLI의 다중·반복 시드는 파일 공급자의 짧은 실행과 같다', async () => {
@@ -881,25 +906,30 @@ it('T4-77 S6 sim은 게시 자원이 없으면 출력 파일과 DB 행을 만들
 
 for (const [seed, expected] of Object.entries(baseline.seeds)) {
   it(`P21 S0 시드 ${seed}의 DB·파일 합성과 두 해시가 같다`, async () => {
-    const resources = await readInitialResources(sharedDb(), options);
-    for (const [index, { slot }] of RESOURCE_INPUTS.entries())
-      expect(hashState(resources[slot].content)).toBe(Object.values(baseline.resources)[index]!.contentHash);
-    let fromDb: WorldInit | undefined;
-    if (expected.inputResourceCount === 5) {
-      await noFileFallback(async () => {
-        fromDb = composeInitialWorld(resources, seed);
-      }, 1);
-    } else {
-      fromDb = buildInitialWorld({
-        map: resources.map.content,
-        scenario: resources.scenario.content,
-        unitSet: resources.unitSet.content,
-        statRules: resources.statRules.content,
-        seed,
-      });
-    }
-    expect(hashState(fromDb)).toBe(expected.initialStateHash);
-    expect(resourceHash(fromDb!)).toBe(expected.resourceHash);
+    await withDatabase(
+      async ({ db }) => {
+        const resources = await readInitialResources(db, options);
+        for (const [index, { slot }] of RESOURCE_INPUTS.entries())
+          expect(hashState(resources[slot].content)).toBe(Object.values(baseline.resources)[index]!.contentHash);
+        let fromDb: WorldInit | undefined;
+        if (expected.inputResourceCount === 5) {
+          await noFileFallback(async () => {
+            fromDb = composeInitialWorld(resources, seed);
+          }, 1);
+        } else {
+          fromDb = buildInitialWorld({
+            map: resources.map.content,
+            scenario: resources.scenario.content,
+            unitSet: resources.unitSet.content,
+            statRules: resources.statRules.content,
+            seed,
+          });
+        }
+        expect(hashState(fromDb)).toBe(expected.initialStateHash);
+        expect(resourceHash(fromDb!)).toBe(expected.resourceHash);
+      },
+      { initialize: true },
+    );
   });
 }
 
@@ -948,27 +978,37 @@ it('P22 자원 초기화와 추가 게시 뒤에도 기존 월드·도시·생�
 });
 
 it('C9 DB와 원본 다섯 내용의 검증 보고가 같고 pass다', async () => {
-  const resources = await readInitialResources(sharedDb(), options);
-  for (const [index, { slot }] of RESOURCE_INPUTS.entries())
-    expect(hashState(resources[slot].content)).toBe(Object.values(baseline.resources)[index]!.contentHash);
-  const input = {
-    map: resources.map.content,
-    scenario: resources.scenario.content,
-    unitSet: resources.unitSet.content,
-    statRules: resources.statRules.content,
-    portraitMap: resources.portraitMap.content,
-  };
-  const report = validateWorldResources(input);
-  expect(report.status).toBe('pass');
+  await withDatabase(
+    async ({ db }) => {
+      const resources = await readInitialResources(db, options);
+      for (const [index, { slot }] of RESOURCE_INPUTS.entries())
+        expect(hashState(resources[slot].content)).toBe(Object.values(baseline.resources)[index]!.contentHash);
+      const input = {
+        map: resources.map.content,
+        scenario: resources.scenario.content,
+        unitSet: resources.unitSet.content,
+        statRules: resources.statRules.content,
+        portraitMap: resources.portraitMap.content,
+      };
+      const report = validateWorldResources(input);
+      expect(report.status).toBe('pass');
+    },
+    { initialize: true },
+  );
 });
 
 it('C5 한 번 조회해 refs 순서로 돌려주고 transaction client도 받는다', async () => {
-  const shuffled = [refs[4]!, refs[1]!, refs[3]!, refs[0]!, refs[2]!];
-  const counter = countingDb(sharedDb());
-  const rows = await readPublishedResources(counter.db, shuffled);
-  expect(counter.count()).toBe(1);
-  expect(rows.map(({ kind, name, version }) => ({ kind, name, version }))).toEqual(shuffled);
-  expect(await sharedDb().$transaction((tx) => readPublishedResources(tx, shuffled))).toEqual(rows);
+  await withDatabase(
+    async ({ db }) => {
+      const shuffled = [refs[4]!, refs[1]!, refs[3]!, refs[0]!, refs[2]!];
+      const counter = countingDb(db);
+      const rows = await readPublishedResources(counter.db, shuffled);
+      expect(counter.count()).toBe(1);
+      expect(rows.map(({ kind, name, version }) => ({ kind, name, version }))).toEqual(shuffled);
+      expect(await db.$transaction((tx) => readPublishedResources(tx, shuffled))).toEqual(rows);
+    },
+    { initialize: true },
+  );
 });
 
 async function createDraft(db: PrismaClient) {
@@ -1610,11 +1650,17 @@ it('A3 조회는 거대한 메타데이터와 JSON 이스케이프·잘못된 �
 
 describe('T4-77 S2a 초기화 SQL', () => {
   async function converted() {
-    const resources = await readInitialResources(sharedDb(), options);
+    let resources: Awaited<ReturnType<typeof readInitialResources>> | undefined;
+    await withDatabase(
+      async ({ db }) => {
+        resources = await readInitialResources(db, options);
+      },
+      { initialize: true },
+    );
     const expected = Object.values(baseline.resources);
     const input = Object.fromEntries(
       RESOURCE_INPUTS.map(({ slot }, index) => {
-        const resource = resources[slot];
+        const resource = resources![slot];
         expect(hashState(resource.content)).toBe(expected[index]!.contentHash);
         expect(resource.contentHash).toBe(expected[index]!.contentHash);
         return [slot, JSON.stringify(resource.content, null, 2)];

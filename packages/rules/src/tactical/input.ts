@@ -176,7 +176,12 @@ export const battleStepSchema = z.strictObject({
     .array(z.object({ id: z.string(), status: z.enum(['APPLIED', 'REJECTED']), reason: z.string().nullable() }))
     .optional(),
 });
-export function applyBattleStep(view: WorldView, payload: unknown, unitSet: DeepReadonly<UnitSetResource>): WorldState {
+export function applyBattleStep(
+  view: WorldView,
+  payload: unknown,
+  unitSet: DeepReadonly<UnitSetResource>,
+  tick?: number,
+): WorldState {
   const input = battleStepSchema.parse(payload),
     state = cloneWorld(view);
   const b = state.campaign?.tactical?.battles.find((b) => b.id === input.battleId);
@@ -193,7 +198,7 @@ export function applyBattleStep(view: WorldView, payload: unknown, unitSet: Deep
     b.result = 'defend';
     b.reason = cancel;
     recordBattleFrame(b, [{ kind: 'end', text: cancel }]);
-    settleTacticalBattle(state, b);
+    settleTacticalBattle(state, b, tick);
     return state;
   }
   if (b.unitSetHash !== battleHash(unitSet)) throw Error('전투 병종 자원 해시가 다릅니다.');
@@ -233,14 +238,14 @@ export function applyBattleStep(view: WorldView, payload: unknown, unitSet: Deep
     b.result = 'defend';
     b.reason = '직접 지휘 총 시간 상한: 공격 철수';
     recordBattleFrame(b, [{ kind: 'end', text: b.reason }]);
-    settleTacticalBattle(state, b);
+    settleTacticalBattle(state, b, tick);
     return state;
   }
   const next = resolveBattleTurn(b, input.orders as BattleOrder[], unitSet);
   next.mode = input.present && next.turnMs > 0 ? 'LIVE' : 'RESERVED';
   next.deadlineAt = Math.min(next.hardDeadlineAt, input.now + (next.mode === 'LIVE' ? next.turnMs : 0));
   state.campaign!.tactical!.battles[state.campaign!.tactical!.battles.findIndex((v) => v.id === b.id)] = next;
-  if (next.phase === 'ended') settleTacticalBattle(state, next);
+  if (next.phase === 'ended') settleTacticalBattle(state, next, tick);
   return state;
 }
 export const tacticalInputKinds: readonly InputKindDefinition[] = [
@@ -266,7 +271,7 @@ export const tacticalInputKinds: readonly InputKindDefinition[] = [
     route: 'direct',
     apply(replay, input) {
       if (!replay.campaignUnitSet) throw Error('전술 병종 자원이 없습니다.');
-      const state = applyBattleStep(replay.state, input.payload, replay.campaignUnitSet);
+      const state = applyBattleStep(replay.state, input.payload, replay.campaignUnitSet, input.tick ?? undefined);
       const b = state.campaign!.tactical!.battles.find((b) => b.id === battleStepSchema.parse(input.payload).battleId)!;
       if (battleHash(input.result) !== battleHash({ hash: battleStateHash(b) }))
         throw Error('전술 턴 재생 결과가 다릅니다.');

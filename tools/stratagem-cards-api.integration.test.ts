@@ -11,6 +11,7 @@ import { operationalFixture } from '../packages/rules/test/operationalMapFixture
 import { governanceTestConfig } from '../packages/rules/src/governance/testFixture';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { recruitmentFixtureData } from './fixtures/recruitment';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
@@ -131,7 +132,7 @@ async function fixture(
   if (options.secondNeutral)
     Object.assign(initial.cities[3]!, { nationId: null, wall: 0, wallMax: 0, defence: 0, defenceMax: 0 });
   if (options.emptyDefence) Object.assign(initial.cities[2]!, { wall: 0, wallMax: 0, defence: 0, defenceMax: 0 });
-  const campaign = options.campaign || options.governance;
+  const campaign = true;
   if (campaign) {
     for (const general of initial.generals) general.crew = 0;
     for (const city of initial.cities) city.kind = 'CITY';
@@ -224,6 +225,7 @@ async function fixture(
     replayFormat: 3,
 
     featureData: {
+      ...recruitmentFixtureData(initial),
       ...(enabled ? { 'stratagem-cards-v1': { version: 1, config } } : {}),
       ...(options.governance ? { 'governance-v1': governanceTestConfig } : {}),
     },
@@ -279,6 +281,9 @@ async function reserve(
   f: Awaited<ReturnType<typeof fixture>>,
   commands: Array<{ commandKey: string; args: Record<string, unknown> }>,
 ) {
+  commands = commands.map((command) =>
+    command.commandKey === 'recruit' ? { ...command, args: { ...command.args, unitId: 'new' } } : command,
+  );
   const actor = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId: f.id, id: f.actorId } } });
   const result = await rpc(
     'turns.set',
@@ -496,17 +501,15 @@ it('AC-P2-23 월 보충은 설치 함정을 포함한 3장 상한을 지키며 �
   await replay(f.id);
 });
 
-it('AC-P2-23 끈 월드는 SQL NULL·비활성 DTO·기존 재생을 유지한다', async () => {
+it('AC-P2-23 설정을 생략한 월드도 카드 원장·조회·명령을 제공한다', async () => {
   const f = await fixture('trap', false);
-  expect((await db.world.findUniqueOrThrow({ where: { id: f.id } })).stratagemCardsState).toBeNull();
-  expect(Object.hasOwn((await snapshot(f.id)).state, 'stratagemCards')).toBe(false);
+  expect((await db.world.findUniqueOrThrow({ where: { id: f.id } })).stratagemCardsState).not.toBeNull();
+  expect(Object.hasOwn((await snapshot(f.id)).state, 'stratagemCards')).toBe(true);
   expect((await rpc('stratagemCards.mine', { worldId: f.id }, f.player)).data).toMatchObject({
-    enabled: false,
-    hand: [],
     traps: [],
-    canSubmit: false,
+    canSubmit: true,
   });
-  expect((await rpc('stratagemCards.setTrap', request(f), f.player)).status).toBe(412);
+  expect((await rpc('stratagemCards.setTrap', request(f), f.player)).status).not.toBe(412);
   await replay(f.id);
 });
 
@@ -539,7 +542,7 @@ it('AC-P2-23 SQL과 저장 어댑터는 비활성·누락·설정·시드·시�
   await expect(
     db.$executeRaw`UPDATE "World" SET "ruleFeatures"=array_remove("ruleFeatures",'stratagem-cards-v1') WHERE id=${f.id}`,
   ).rejects.toThrow();
-  for (const part of ['missing', 'feature', 'config', 'seed', 'tick', 'revision']) {
+  for (const part of ['missing', 'config', 'seed', 'tick', 'revision']) {
     const next = structuredClone(before.state);
     if (part === 'missing') delete next.stratagemCards;
 

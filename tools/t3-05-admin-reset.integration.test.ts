@@ -1,4 +1,3 @@
-import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
@@ -17,7 +16,7 @@ import { saveInitialWorld, prepareInitialWorld, savePreparedInitialWorld } from 
 import { controlClock } from '../apps/engine/src/world/clock';
 import { initializeResources } from './init-resources';
 import { initializeIntegrationResources } from './integration-resources';
-import { testDatabaseUrl } from './test-database';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
 import { confirmDisconnectedDatabase } from './test-db-close';
 import { acquireLease, releaseLease, renewLease, type Lease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -57,7 +56,7 @@ if (!['localhost', '127.0.0.1'].includes(source.hostname)) throw new Error('loop
 for (const key of source.searchParams.keys())
   if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
     throw new Error('접속 대상 질의 인자는 쓸 수 없습니다.');
-const name = 'opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test',
+const name = ciGreenDatabaseName('opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test'),
   target = new URL(source),
   adminUrl = new URL(source);
 target.pathname = '/' + name;
@@ -213,7 +212,10 @@ async function cleanupWithReservedClose(
   return closed;
 }
 async function dropExactOwnedDatabase(client: Pg, expectedName: string, expectedOid: string, signal: AbortSignal) {
-  if (!/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(expectedName) || !/^[1-9]\d*$/.test(expectedOid))
+  if (
+    !(/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(expectedName) || expectedName === ciGreenDatabaseName('')) ||
+    !/^[1-9]\d*$/.test(expectedOid)
+  )
     throw new Error('자기 시험 DB 식별자를 확인하세요.');
   const identity = (
     await checked(
@@ -227,7 +229,8 @@ async function dropExactOwnedDatabase(client: Pg, expectedName: string, expected
   await checked(() => client.query('DROP DATABASE "' + expectedName + '"'), signal);
 }
 async function createOwnedDatabase(client: Pg, expectedName: string, marker: DatabaseOwnership, signal: AbortSignal) {
-  if (!/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(expectedName)) throw new Error('자기 시험 DB 이름을 확인하세요.');
+  if (!(/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(expectedName) || expectedName === ciGreenDatabaseName('')))
+    throw new Error('자기 시험 DB 이름을 확인하세요.');
   const baseline = (
     await checked(() => client.query('SELECT oid FROM pg_database WHERE datname=$1', [expectedName]), signal)
   ).rows;
@@ -260,7 +263,7 @@ async function auditCreatedDatabase(
   if (
     !marker.baselineAbsent ||
     !marker.creationAttempted ||
-    !/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(expectedName)
+    (!/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(expectedName) && expectedName !== ciGreenDatabaseName(''))
   )
     throw new Error('자기 CREATE 시도 근거 미확인: DB 보존');
   const rows = (
@@ -459,12 +462,10 @@ async function world() {
       seed: randomUUID(),
     }),
   );
-  const selected = providedRuleKeys === undefined ? {} : {};
-  const featureState = { ...state, ...selected };
   expect(state.nations).toHaveLength(21);
   expect(state.generals).toHaveLength(491);
   const saved = await checked(() =>
-    saveInitialWorld(db, featureState, { name: '초기화 접수 보존', turnTermMinutes: 30, endYear: 200, ...selected }),
+    saveInitialWorld(db, state, { name: '초기화 접수 보존', turnTermMinutes: 30, endYear: 200, replayFormat: 3 }),
   );
   await checked(() => controlClock(db, saved.worldId, 'start'));
   await checked(() => controlClock(db, saved.worldId, 'pause'));
@@ -953,7 +954,7 @@ let resetOwner: Actor | undefined,
 it('AC-M3-04 D2 정식21국491명 두 월드에 실제 사람·30예약·기록을 준비한다', async (signal) => {
   resetOwner = await actor();
   for (const index of [0, 1]) {
-    const source = await world({});
+    const source = await world();
     preservedWorlds.push(source.id);
     await human(source.id, resetOwner, signal, index);
     expect(await checked(() => db.nation.count({ where: { worldId: source.id } }))).toBe(21);
@@ -1059,9 +1060,9 @@ for (const mode of ['role', 'status', 'sanction', 'logout', 'revision', 'name', 
   });
 for (const table of ['World', 'Nation', 'General', 'GeneralTurn', 'AuditLog'] as const)
   it('AC-M3-04 D2 ' + table + ' 실제 INSERT 거부는 원본·mapping·새 월드 전체를 롤백한다', async (signal) => {
-    // 초기 GeneralTurn 쓰기는 정책 기능을 고른 월드에서만 발생한다.
+    // 현재 모든 월드는 초기 GeneralTurn 원장을 준비한다.
     const owner = await actor(),
-      source = await world(table === 'GeneralTurn' ? {} : {}),
+      source = await world(),
       payload = input(owner, source);
     await accepted(owner, payload, signal);
     const event = await eventFor(payload),
@@ -1527,15 +1528,6 @@ it('AC-M3-04 D3 접수된 일반 입력은 초기화 뒤 WORLD_CLOSED만 기록�
 });
 
 // AC-INT-18D/AC-M3-04: dedicated formal-world contract tests, not full-season acceptance.
-const cityResetFeatures = [
-  'campaign-assignment-v2',
-  'campaign-v1',
-  'city-resources-v1',
-  'five-stats',
-  'operational-map',
-  'personnel',
-  'policy',
-];
 type CityResetWorld = Awaited<ReturnType<typeof world>>;
 type CreateReceipt = {
   userId: string;
@@ -1551,10 +1543,9 @@ async function assertFreshCityResetWorld(id: string) {
   checkReplayOrigin(origin);
   if (origin.version !== 3) throw new Error('도시 초기화의 형식3 원생성이 필요합니다.');
   expect(row).toMatchObject({ status: 'PREOPEN', clockTick: 0, clockRevision: 0, startedAt: null, endedAt: null });
-  const expectedFeatures =
-    row.officeEffects == null ? cityResetFeatures : [...cityResetFeatures, 'office-effects'].sort();
-  expect(providedRuleKeys).toEqual(expectedFeatures);
-  expect(providedRuleKeys).toEqual(expectedFeatures);
+  expect(Object.keys(origin.featureData ?? {})).toEqual(
+    expect.arrayContaining(['policy', 'logistics-v1', 'lineage-v1', 'office-effects']),
+  );
   expect(row.initialStateHash).toBe(hashState(origin.initial));
   expect(origin.resourceHash).toBe(resourceHashV3(origin));
   expect(Object.hasOwn(origin.initial, 'cityResources')).toBe(false);
@@ -1610,7 +1601,9 @@ async function cityReset(owner: Actor, source: CityResetWorld, signal: AbortSign
       charm: general.charm,
     }));
   expect(identities(nextOrigin.initial)).toEqual(identities(oldOrigin.initial));
-  expect(providedRuleKeys).toEqual(providedRuleKeys);
+  expect(next.cityResourcesState).not.toBeNull();
+  expect(next.campaignState).not.toBeNull();
+  expect(next.nationResearchState).not.toBeNull();
   expect(next.seed).toBe(adminResetPayloadSchema.parse(event.payload).effectiveSeed);
   const oldArchive = await checked(() => exportReplay(db, source.id));
   expect(replayToEnd(oldArchive)).toMatchObject({ reason: 'ADMIN_RESET', winnerNationId: null });
@@ -1797,7 +1790,7 @@ it('AC-INT-18D AC-M3-04 실제 생성 DONE과 초기화 APPLIED 출처는 같은
   expect(first.applied.resources).toEqual(createRefs);
   lastCityTarget = second.next;
 });
-it('AC-INT-18D AC-M3-04 새 도시 원장 NULL은 초기화 전체를 롤백하고 구판은 SQLNULL을 유지한다', async (signal) => {
+it('AC-INT-18D AC-M3-04 새 도시 원장 NULL은 초기화 전체를 롤백하고 기본 생성의 초기화도 원장을 준비한다', async (signal) => {
   if (!cityOwner || !lastCityTarget) throw new Error('실제 도시 초기화 대상이 필요합니다.');
   const source = await pauseFreshCityWorld(lastCityTarget.id),
     payload = input(cityOwner, source),
@@ -1819,19 +1812,18 @@ it('AC-INT-18D AC-M3-04 새 도시 원장 NULL은 초기화 전체를 롤백하�
     );
   });
   await assertNoLiveLease(source.id);
-  const old = await world({}),
+  const old = await world(),
     oldPayload = input(cityOwner, old),
     oldReceipt = await accepted(cityOwner, oldPayload, signal);
   expect(await apply(old.id, signal)).toMatchObject({ status: 'ENDED' });
   const legacy = await checked(() => db.world.findUniqueOrThrow({ where: { id: oldReceipt.plannedNewWorldId } }));
-  expect(providedRuleKeys).not.toContain('city-resources-v1');
-  expect(legacy.cityResourcesState).toBeNull();
+  expect(legacy.cityResourcesState).not.toBeNull();
   expect(
     Object.hasOwn(
       (await checked(() => db.$transaction((tx) => loadReplayState(tx, legacy.id)))).state,
       'cityResources',
     ),
-  ).toBe(false);
+  ).toBe(true);
 });
 
 afterAll(async () => {

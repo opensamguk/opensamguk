@@ -1,3 +1,6 @@
+// Integration fixture uses the approved engine persistence path.
+// eslint-disable-next-line opensamguk/no-cross-package-relative
+import { saveFixtureWorld as saveInitialWorld } from '../../../engine/test/worldFixture';
 import { randomUUID } from 'node:crypto';
 import { arch, cpus, platform, release } from 'node:os';
 import { performance } from 'node:perf_hooks';
@@ -81,40 +84,21 @@ const routeInput = (route: keyof Results, id = worldId) => ({
 });
 
 async function fixtureWorld(label: string) {
-  const world = await db.world.create({
+  const initial = structuredClone(state);
+  initial.generals = initial.generals.map((general, index) => ({
+    ...general,
+    userId: index === 0 ? users[0]!.id : index === 2 ? users[1]!.id : index === 3 ? users[2]!.id : null,
+  }));
+  const { worldId: id } = await saveInitialWorld(db, initial, { name: label, turnTermMinutes: 1, endYear: null });
+  await db.world.update({
+    where: { id },
     data: {
-      name: label,
-      scenarioKey: state.scenarioKey,
-      mapKey: state.mapKey,
-      unitSetKey: state.unitSetKey,
-      seed: state.seed,
-      startYear: state.startYear,
-      turnTermMinutes: 1,
       status: 'RUNNING',
       clockTick: 100,
       clockAnchorAt: new Date(anchor),
-      initialStateHash: 'private-hash',
-      statRules: {},
-      unitSet: {},
     },
   });
-  const id = world.id;
-  await db.nation.createMany({
-    data: state.nations.map((nation) => ({ ...nation, worldId: id, capitalCityKey: null })),
-  });
-  await db.city.createMany({ data: state.cities.map((city) => ({ ...city, worldId: id })) });
-  for (const nation of state.nations)
-    await db.nation.update({
-      where: { worldId_id: { worldId: id, id: nation.id } },
-      data: { capitalCityKey: nation.capitalCityKey },
-    });
-  await db.general.createMany({
-    data: state.generals.map((general, index) => ({
-      ...general,
-      worldId: id,
-      userId: index === 0 ? users[0]!.id : index === 2 ? users[1]!.id : index === 3 ? users[2]!.id : null,
-    })),
-  });
+  await db.generalTurn.deleteMany({ where: { worldId: id, generalId: 1 } });
   await db.generalTurn.createMany({
     data: Array.from({ length: 30 }, (_, slot) => ({
       worldId: id,
@@ -192,7 +176,6 @@ beforeAll(async () => {
   await db.user.deleteMany();
   state = await readFixture();
   // 조회 공개 범위 검사는 생성 기록과 별도로 병력이 있는 상태를 직접 저장한다.
-  state.generals = state.generals.map((general, index) => ({ ...general, crew: 13001 + index }));
   for (let index = 0; index < 4; index++) {
     const session = newSession(now);
     const user = await db.user.create({
@@ -329,7 +312,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       isHuman: true,
     });
     expect(open.data.generals[1]).toHaveProperty('isHuman', false);
-    await db.world.update({ where: { id: world }, data: {} });
+    await db.world.update({ where: { id: world }, data: { fogOfWar: true } });
     const foreign = await query('world.map', input, users[3]!.cookie);
     expect(foreign.status).toBe(200);
     expect(foreign.data.generals).toEqual([]);
@@ -371,6 +354,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       status: 200,
       error: undefined,
       data: {
+        fogOfWar: false,
         name: 'primary',
         status: 'RUNNING',
         startYear: state.startYear,
@@ -384,7 +368,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
         truce: null,
         quota: { humans: 3, max: 500 },
         npcCount: 1,
-        scenarioType: 'historical',
+        scenarioType: null,
         serverTime: new Date(now).toISOString(),
         engine: null,
         engineStale: true,
@@ -474,7 +458,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
         truce: null,
         quota: { humans: 3, max: 500 },
         npcCount: 1,
-        scenarioType: 'historical',
+        scenarioType: null,
         serverTime: new Date(now).toISOString(),
         engine: null,
         engineStale: null,
@@ -496,6 +480,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     const result = await query('world.map', { worldId });
     expect(result.status).toBe(200);
     expect(result.data).toEqual({
+      emperorCityKey: state.cities.find((city) => city.name === '낙양')?.cityKey ?? state.cities[0]!.cityKey,
       background: null,
       cities: state.cities.map((city) => ({
         key: city.cityKey,
@@ -503,6 +488,11 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
         region: city.region,
         regionName: cityRegionName(city.region, 'che'),
         level: city.level,
+        state: 0,
+        stateTerm: 0,
+        parentCityKey: null,
+        detached: false,
+        ruin: null,
         x: city.x,
         y: city.y,
         nationId: city.nationId,
@@ -534,13 +524,14 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     expect(Object.keys(data).sort()).toEqual([
       'city',
       'general',
+      'land',
       'nation',
       'nextTurnAt',
       'recentLogs',
       'turnSchedule',
       'turnsPreview',
     ]);
-    expect(data.general).toMatchObject({ id: 1, gold: 11001, rice: 12001, crew: 13001, train: 41, atmos: 51 });
+    expect(data.general).toMatchObject({ id: 1, gold: 11001, rice: 12001, crew: 0, train: 41, atmos: 51 });
     expect(data.city).toMatchObject({ population: state.cities[0]!.population });
     expect(data.nation).toMatchObject({
       id: 1,
@@ -578,15 +569,12 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     expect(ally.defense).toEqual({
       minimumTraining: 20,
       minimumMorale: 20,
-      troops: 26003,
-      generals: [
-        { generalId: 1, troops: 13001 },
-        { generalId: 2, troops: 13002 },
-      ],
+      troops: 0,
+      generals: [],
     });
     expect((await query('home.get', { worldId })).data.general.defense).toMatchObject({
-      participating: true,
-      troops: 13001,
+      participating: false,
+      troops: 0,
     });
     expect(ally.generals.slice(0, 2)).toMatchObject([
       { id: 1, gold: 11001 },
@@ -652,6 +640,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       'population',
       'populationMax',
       'rank',
+      'wandering',
     ]);
     expect(enemy).toMatchObject({
       philosophy: state.nations[1]!.philosophy,
@@ -693,8 +682,8 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     expect(own).toMatchObject({ gold: state.nations[0]!.gold, rice: state.nations[0]!.rice, taxRate: 0.2 });
     expect(own).toHaveProperty('financeEstimate.gold.month', 1);
     expect(own).toHaveProperty('financeEstimate.rice.month', 4);
-    expect(own).toHaveProperty('financeEstimate.destination', 'nation');
-    expect(own.generals[1]).toMatchObject({ id: 2, gold: 11002, crew: 13002 });
+    expect(own).toHaveProperty('financeEstimate.destination', 'city');
+    expect(own.generals[1]).toMatchObject({ id: 2, gold: 11002, crew: 0 });
     expect(own.cities[0]).toHaveProperty('population', state.cities[0]!.population);
     expect(own.cities[0]).toHaveProperty('populationMax', state.cities[0]!.populationMax);
     expect(own).toHaveProperty('salaryRate', 0.5);
@@ -790,13 +779,22 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
         expect(Buffer.from(first.nextCursor!, 'base64url').toString('utf8')).toMatch(/^\[60000,"[1-9]\d*"\]$/);
       else expect(first.nextCursor).toBe('60000');
       const second = (await query(route, { worldId, cursor: first.nextCursor })).data;
-      expect(second.items.map((row) => row.tick)).toEqual([50000, 40000, 30000, 20000, 10000]);
+      expect(second.items.map((row) => row.tick)).toEqual(
+        route === 'records.general' ? [50000, 40000, 30000, 20000, 10000, 0] : [50000, 40000, 30000, 20000, 10000],
+      );
       expect(second.nextCursor).toBeNull();
-      expect((await query(route, { worldId, cursor: '10000' })).data).toEqual({ items: [], nextCursor: null });
-      expect(new Set([...first.items, ...second.items].map((row) => row.tick)).size).toBe(35);
+      expect((await query(route, { worldId, cursor: '0' })).data).toEqual({ items: [], nextCursor: null });
+      expect(new Set([...first.items, ...second.items].map((row) => row.tick)).size).toBe(
+        route === 'records.general' ? 36 : 35,
+      );
       const exactPage = (await query(route, { worldId, cursor: '310000' })).data;
       expect(exactPage.items).toHaveLength(30);
-      expect(exactPage.nextCursor).toBeNull();
+      if (route === 'records.general') {
+        expect(exactPage.nextCursor).not.toBeNull();
+        expect(
+          (await query(route, { worldId, cursor: exactPage.nextCursor })).data.items.map((row) => row.tick),
+        ).toEqual([0]);
+      } else expect(exactPage.nextCursor).toBeNull();
     },
   );
 
@@ -962,7 +960,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       });
       expect(
         (await query('records.general', { worldId, cursor: first.nextCursor })).data.items.map((row) => row.tick),
-      ).toEqual([50000, 40000, 30000, 20000, 10000]);
+      ).toEqual([50000, 40000, 30000, 20000, 10000, 0]);
       expect((await query('records.general', { worldId, cursor: '0' })).data).toEqual({ items: [], nextCursor: null });
     } finally {
       await db.generalLog.deleteMany({ where: { worldId, generalId: 1, tick: 999999 } });

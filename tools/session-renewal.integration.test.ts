@@ -1,5 +1,7 @@
+import { ciGreenDatabaseName } from './test-database';
 import { spawnSync } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { Writable } from 'node:stream';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDb } from '../packages/db/src/index';
@@ -10,12 +12,13 @@ import { displaySlots } from '../apps/server/src/game/slots';
 import { readFixture } from '../apps/server/test/readFixture';
 import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { pnpmCli } from './node-cli';
+import { initializeResources } from './init-resources';
 
 const sourceUrl = process.env.TEST_DATABASE_URL;
-if (!sourceUrl || !/^[a-z][a-z0-9_]*_test$/.test(new URL(sourceUrl).pathname.slice(1)))
+if (!sourceUrl || !/^[a-z][a-zA-Z0-9_]*_test$/.test(new URL(sourceUrl).pathname.slice(1)))
   throw new Error('전용 테스트 DB가 필요합니다.');
 // 장애 주입은 이 파일이 새로 만든 DB에만 적용한다. 원래 시험 DB의 테이블은 건드리지 않는다.
-const databaseName = `opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`;
+const databaseName = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
 const databaseUrl = new URL(sourceUrl);
 databaseUrl.pathname = `/${databaseName}`;
 const adminUrl = new URL(sourceUrl);
@@ -166,12 +169,17 @@ beforeAll(async () => {
     timeout: 60_000,
   });
   if (result.error || result.status !== 0) throw new Error('세션 갱신 시험 DB migration에 실패했습니다.');
+  await initializeResources(
+    db,
+    await readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8'),
+  );
   passwordHash = await hashPassword(randomUUID());
   console.log(
     'SESSION_RENEWAL_FAULT_SCOPE isolated file-owned PostgreSQL DB; real loopback HTTP; no mock/syscall fault',
   );
 }, 90_000);
 beforeEach(async () => {
+  vi.stubEnv('DATABASE_URL', databaseUrl.href);
   vi.stubEnv('EMAIL_VERIFICATION_REQUIRED', undefined);
   logText = '';
   user = await db.user.create({

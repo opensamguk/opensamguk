@@ -9,7 +9,7 @@ import { createDb } from '../packages/db/src/index';
 
 const run = promisify(execFile);
 const url = process.env.TEST_DATABASE_URL;
-if (!url || !/^\/[a-z][a-z0-9_]*_test$/.test(new URL(url).pathname))
+if (!url || !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(new URL(url).pathname))
   throw new Error('T2-02 전용 테스트 DB가 필요합니다.');
 const root = fileURLToPath(new URL('../', import.meta.url));
 const dbRoot = join(root, 'packages/db');

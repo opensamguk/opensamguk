@@ -1,9 +1,8 @@
-import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { readFile, readdir } from 'node:fs/promises';
-import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { createDb, type Prisma } from '@opensamguk/db';
+import { monthlyFixture } from '../test/monthlyFixture';
+import { saveInitialWorld } from './world/persistence';
 import type { OfficeTurns } from '@opensamguk/rules';
 import { assertNoOfficeRows, assertPersonnelStorage, loadOfficeState, persistOfficeState } from './personnelState';
 
@@ -12,7 +11,6 @@ type PgClient = {
   query(sql: string, values?: unknown[]): Promise<{ rows: Record<string, unknown>[] }>;
   end(): Promise<void>;
 };
-type Catalog = { datname: string; oid: string }[];
 type Snapshot = Awaited<ReturnType<typeof loadOfficeState>>;
 type Queue = OfficeTurns[number][number];
 const dbRequire = createRequire(new URL('../../../packages/db/package.json', import.meta.url));
@@ -30,97 +28,13 @@ if (
   source.searchParams.has('port')
 )
   throw new Error('loopback 5432 또는 5433 시험 서버를 명시하세요.');
-const name = `opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`;
-if (!/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(name)) throw new Error('자체 시험 DB 이름을 확인하세요.');
-const adminUrl = new URL(source),
-  target = new URL(source);
-adminUrl.pathname = '/postgres';
-target.pathname = `/${name}`;
-const admin = new Client({ connectionString: adminUrl.href });
-const client = new Client({ connectionString: target.href });
-const db = createDb(target.href);
-let adminConnected = false;
-let created = false;
-let createdOid: string | null = null;
-let before: Catalog = [];
-const requiredMigrations = [
-  '20261020000000_initial_world',
-  '20261020010000_world_clock',
-  '20261020020000_accounts',
-  '20261020030000_engine_turns',
-  '20261020040000_monthly_replay',
-  '20261021030000_commands_war',
-  '20261021040000_rankings',
-  '20261021080000_engine_heartbeat',
-  '20261023000000_world_outcome',
-  '20261023010000_public_map_snapshot',
-  '20261023020000_nation_display_archive',
-  '20261023030000_messaging_realtime',
-  '20261023040000_world_presets',
-  '20261023050000_default_policy',
-  '20261023060000_operation_plans',
-  '20261023071000_nation_offices',
-  '20261023072000_world_ext_slices',
-  '20261023073000_treaties',
-  '20261023074000_assignment_storage',
-];
-
-async function catalog(): Promise<Catalog> {
-  return (await admin.query('SELECT datname,oid::text AS oid FROM pg_database ORDER BY datname')).rows.map((row) => {
-    if (typeof row.datname !== 'string' || typeof row.oid !== 'string') throw new Error('DB 목록을 확인하세요.');
-    return { datname: row.datname, oid: row.oid };
-  });
-}
-
-beforeAll(async () => {
-  await admin.connect();
-  adminConnected = true;
-  before = await catalog();
-  if (before.some((row) => row.datname === name)) throw new Error('자체 시험 DB가 이미 있습니다.');
-  await admin.query(`CREATE DATABASE "${name}"`);
-  created = true;
-  createdOid = (await catalog()).find((row) => row.datname === name)?.oid ?? null;
-  expect(createdOid).not.toBeNull();
-  console.info('T2-05 직책 DB 생성', JSON.stringify({ name, createdOid }));
-  await client.connect();
-  const migrations = new URL('../../../packages/db/prisma/migrations/', import.meta.url);
-  const directories = (await readdir(migrations)).filter((entry) => /^\d{14}_/.test(entry)).sort();
-  expect(directories.filter((directory) => requiredMigrations.includes(directory))).toEqual(requiredMigrations);
-  for (const directory of directories)
-    await client.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));
-});
-
+const db = createDb(source.href);
+const ids: string[] = [];
+const client = new Client({ connectionString: source.href });
+beforeAll(() => client.connect());
 afterAll(async () => {
-  try {
-    const disconnected = await Promise.allSettled([client.end(), db.$disconnect()]);
-    expect(
-      disconnected.every((result) => result.status === 'fulfilled'),
-      '자체 연결 종료',
-    ).toBe(true);
-    if (!adminConnected) return;
-    if (created) {
-      const readConnections = async () =>
-        (await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=$1', [name])).rows;
-      let connections = await readConnections();
-      // 클라이언트가 닫힌 뒤 PostgreSQL이 연결 종료를 반영할 때까지 기다린다.
-      for (let attempt = 0; connections[0]?.count !== 0 && attempt < 30; attempt++) {
-        await delay(100);
-        connections = await readConnections();
-      }
-      expect(connections).toEqual([{ count: 0 }]);
-      expect((await catalog()).find((row) => row.datname === name)).toEqual({ datname: name, oid: createdOid });
-      // 이 실행이 만든 같은 OID의 DB만 연결 0개일 때 정상 삭제한다.
-      await admin.query(`DROP DATABASE "${name}"`);
-      const after = await catalog();
-      expect(after).toEqual(before);
-      console.info(
-        'T2-05 직책 DB 정리',
-        JSON.stringify({ name, createdOid, created, connectionsBeforeDrop: 0, dropped: true, before, after }),
-      );
-    }
-  } finally {
-    await admin.end();
-  }
+  await db.world.deleteMany({ where: { id: { in: ids } } });
+  await Promise.all([client.end(), db.$disconnect()]);
 });
 
 function queue(): Queue {
@@ -143,23 +57,19 @@ function nation(worldId: string, id: number) {
 }
 
 async function fixture(label: string): Promise<string> {
-  const worldId = `${label}-${randomUUID()}`;
-  await db.world.create({
-    data: {
-      id: worldId,
-      name: label,
-      scenarioKey: 'office-test',
-      mapKey: 'office-test',
-      unitSetKey: 'office-test',
-      seed: 'office-test',
-      startYear: 191,
-      turnTermMinutes: 1,
-      initialStateHash: 'office-test',
-      statRules: {},
-      unitSet: {},
-    },
+  const source = await monthlyFixture();
+  source.nations = [nation('', 1), nation('', 2)].map((row) => {
+    const { worldId, ...value } = row;
+    void worldId;
+    return { ...value, capitalCityKey: null, isNpc: false };
   });
-  await db.nation.createMany({ data: [nation(worldId, 1), nation(worldId, 2)] });
+  source.cities.forEach((city) => {
+    city.nationId = null;
+  });
+  source.generals = [];
+  source.diplomacies = [];
+  const { worldId } = await saveInitialWorld(db, source, { name: label, turnTermMinutes: 1, endYear: null });
+  ids.push(worldId);
   return worldId;
 }
 

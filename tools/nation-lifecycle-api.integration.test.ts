@@ -155,7 +155,19 @@ async function fixture() {
   initial.diplomacies = [];
   initial.cities[0]!.connections.push(3);
   initial.cities[2]!.connections.push(1);
+  for (const city of initial.cities) city.connections.sort((a, b) => a - b);
+  initial.operationalMap!.routes.push({
+    id: 'route:1:3',
+    from: 'city:1',
+    to: 'city:3',
+    mode: 'LAND',
+    direction: 'BOTH',
+    enabled: true,
+  });
   initial.cities[2]!.level = 5;
+  const third = initial.operationalMap!.sites.find((site) => site.id === 'city:3')!;
+  if (third.kind !== 'CITY') throw new Error('검사 도시가 없습니다.');
+  third.level = 5;
   initial.generals[0]!.experience = 101;
   Object.assign(initial.generals[2]!, { nationId: 1, cityKey: 4, officerLevel: 11 });
   for (const general of initial.generals) general.nextTurnTick = general.id === 1 ? 100 : 1000000000;
@@ -166,6 +178,8 @@ async function fixture() {
     replayFormat: 3,
   });
   worldIds.push(worldId);
+  await controlClock(db, worldId, 'start');
+  await controlClock(db, worldId, 'pause');
   const operator = await user(true),
     ruler = await user(),
     successor = await user();
@@ -186,13 +200,13 @@ async function fixture() {
     ).status,
   ).toBe(200);
   await advance(worldId);
+  await controlClock(db, worldId, 'resume');
   for (const [generalId, actor] of [
     [1, ruler],
     [3, successor],
   ] as const) {
     await possess(worldId, generalId, actor);
   }
-  await controlClock(db, worldId, 'start');
   return { worldId, ruler, successor };
 }
 async function reserve(
@@ -248,12 +262,11 @@ it('기능·세션·권한·엄격한 인자와 기존 월드의 NULL·조회 �
   expect((await rpc('commands.list', { worldId: f.worldId }, f.ruler)).data!.map((row) => row.key)).toEqual(
     expect.arrayContaining(['abdicate', 'wander', 'resettle', 'disband']),
   );
-  expect((await reserve(f, f.ruler, [{ commandKey: 'return_border', args: {} }])).status).toBe(400);
-  expect((await rpc('general.mine', { worldId: f.worldId }, f.ruler)).data!.creationRules).toMatchObject({
-    nationLifecycleEnabled: true,
-  });
+  expect((await reserve(f, f.ruler, [{ commandKey: 'return_border', args: {} }])).status).toBe(200);
+  expect((await rpc('general.mine', { worldId: f.worldId }, f.ruler)).data!.creationRules).not.toHaveProperty(
+    'nationLifecycleEnabled',
+  );
   expect((await rpc('nation.get', { worldId: f.worldId, nationId: 1 }, f.ruler)).data).toMatchObject({
-    nationLifecycleEnabled: true,
     wandering: null,
   });
   expect(
@@ -268,22 +281,22 @@ it('기능·세션·권한·엄격한 인자와 기존 월드의 NULL·조회 �
       )
     ).status,
   ).toBe(400);
-  const old = await fixture(false);
-  expect((await rpc('commands.list', { worldId: old.worldId }, old.ruler)).data!.map((row) => row.key)).not.toContain(
+  const old = await fixture();
+  expect((await rpc('commands.list', { worldId: old.worldId }, old.ruler)).data!.map((row) => row.key)).toContain(
     'wander',
   );
-  expect((await reserve(old, old.ruler, [{ commandKey: 'wander', args: {} }])).status).toBe(400);
-  expect((await db.world.findUniqueOrThrow({ where: { id: old.worldId } })).nationLifecycleState).toBeNull();
+  expect((await reserve(old, old.ruler, [{ commandKey: 'wander', args: {} }])).status).toBe(200);
+  expect((await db.world.findUniqueOrThrow({ where: { id: old.worldId } })).nationLifecycleState).not.toBeNull();
   expect((await rpc('general.mine', { worldId: old.worldId }, old.ruler)).data!.creationRules).not.toHaveProperty(
     'nationLifecycleEnabled',
   );
-  expect((await rpc('nation.get', { worldId: old.worldId, nationId: 1 }, old.ruler)).data).not.toHaveProperty(
-    'wandering',
-  );
+  expect((await rpc('nation.get', { worldId: old.worldId, nationId: 1 }, old.ruler)).data).toMatchObject({
+    wandering: null,
+  });
 });
 
 it('AC-M1-14 접경귀환은 실제 HTTP 예턴을 저장하고 턴 재시도와 재생에서 같은 도시를 고른다', async () => {
-  const f = await fixture(true, true);
+  const f = await fixture();
   const input = { worldId: f.worldId, commandKey: 'return_border', args: {} };
   expect((await rpc('turns.precheck', input)).status).toBe(401);
   expect((await rpc('commands.list', { worldId: f.worldId }, f.ruler)).data).toEqual(

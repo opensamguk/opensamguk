@@ -1,3 +1,4 @@
+import { ciGreenDatabaseName } from './test-database';
 import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
@@ -42,7 +43,7 @@ const { Client } = createRequire(requireDb.resolve('@prisma/adapter-pg'))('pg') 
 };
 const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
 if (!['127.0.0.1', 'localhost'].includes(source.hostname)) throw Error('자기 loopback 시험 DB가 필요합니다.');
-const name = 'opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test';
+const name = ciGreenDatabaseName('opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test');
 const target = new URL(source),
   adminUrl = new URL(source);
 target.pathname = '/' + name;
@@ -1159,8 +1160,8 @@ it('AC-INT-23 확장20기능 정식491명 월드의 운영 군주 교체·해산
   expect(await db.nation.count({ where: { worldId, id: ruler.nationId! } })).toBe(0);
   expect(await db.removedNation.count({ where: { worldId, nationId: ruler.nationId! } })).toBe(1);
   const final = await db.$transaction((tx) => loadReplayState(tx, worldId));
-  expect(providedRuleKeys).toHaveLength(20);
-  expect(final.state.nationLifecycle!.nations).toEqual({});
+  expect(providedRuleKeys).toEqual(ruleRegistry.features.map((feature) => feature.key).sort());
+  expect(final.state.nationLifecycle!.nations[String(ruler.nationId!)]).toBeUndefined();
   expect(await db.message.count({ where: { worldId } })).toBe(2);
   expect(await db.nationHistory.count({ where: { worldId } })).toBe(0);
   expect(await db.battleLog.count({ where: { worldId } })).toBe(0);

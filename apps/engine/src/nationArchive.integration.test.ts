@@ -1,14 +1,23 @@
+import { recordTestTurns } from '../test/seasonFixture';
+import { loadReplayState } from './monthly';
+import { saveFixtureWorld as saveInitialWorld } from '../test/worldFixture';
 import { spawn, execFile } from 'node:child_process';
 import { once } from 'node:events';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import { afterAll, describe, expect, it } from 'vitest';
-import { createDb, nextActionSequence, type Prisma } from '@opensamguk/db';
-import { emptyTurns, runGeneralTurn, toWorldState, type WorldInit } from '@opensamguk/rules';
+import { createDb, type Prisma } from '@opensamguk/db';
+import {
+  applyRecordedInput,
+  nextGameAction,
+  runReplayAction,
+  type RecordedInput,
+  type WorldInit,
+} from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { warFixture } from '../test/warFixture';
 import { monthlyFixture } from '../test/monthlyFixture';
-import { saveInitialWorld, readWorldState } from './world/persistence';
+import { readWorldState } from './world/persistence';
 import { controlClock } from './world/clock';
 import { acquireLease, releaseLease, renewLease, LeaseLostError } from './lease';
 import { TurnLoop } from './turnLoop';
@@ -19,16 +28,22 @@ const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
 const db = createDb(url);
 const execute = promisify(execFile);
-const userPrefix = `archive-human-${randomUUID()}-`;
+const users: string[] = [];
 const worldIds: string[] = [];
 afterAll(async () => {
   await db.world.deleteMany({ where: { id: { in: worldIds } } });
-  await db.user.deleteMany({ where: { id: { startsWith: userPrefix } } });
+  await db.user.deleteMany({ where: { id: { in: users } } });
   await db.$disconnect();
 });
 
 async function create(initial?: WorldInit) {
   initial ??= await warFixture();
+  // This suite covers nation-history storage. Combat is exercised in war.integration.test.ts.
+  delete initial.nationTurns;
+  delete initial.operationalMap;
+  initial.cities.forEach((city) => {
+    delete city.kind;
+  });
   // 조기 통일을 막고 명시한 예턴만 실행해 저장 경계를 검증한다.
   initial.cities.push({
     ...initial.cities[0]!,
@@ -39,15 +54,23 @@ async function create(initial?: WorldInit) {
     supplied: false,
   });
   for (const general of initial.generals) {
-    general.userId = `${userPrefix}${general.id}`;
+    general.userId = randomUUID();
+    users.push(general.userId);
+    general.activeFromYear = initial.startYear;
+    general.deathYear = initial.startYear + 100;
     await db.user.upsert({
       where: { id: general.userId },
       update: {},
-      create: { id: general.userId, email: `${general.userId}@example.test`, passwordHash: 'fixture-only' },
+      create: {
+        id: general.userId,
+        email: `${general.userId}@example.test`,
+        passwordHash: 'fixture-only',
+        role: 'ADMIN',
+      },
     });
   }
   const { worldId } = await saveInitialWorld(db, initial, {
-    replayFormat: 'legacy',
+    replayFormat: 3,
     name: '국가 표시값 보존',
     turnTermMinutes: 60,
     endYear: null,
@@ -58,42 +81,25 @@ async function create(initial?: WorldInit) {
   return { initial, worldId, lease, loop: new TurnLoop(db, lease) };
 }
 async function queue(worldId: string, generalId: number, commandKey: string, args: Prisma.InputJsonValue) {
-  await db.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${worldId} FOR UPDATE`;
-    const actor = await tx.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: generalId } } });
-    const turns = emptyTurns();
-    turns[0] = { commandKey, args };
-    await tx.generalTurn.deleteMany({ where: { worldId, generalId } });
-    await tx.generalTurn.createMany({
-      data: turns.map((turn, slot) => ({
-        ...turn,
-        explicit: true,
-        worldId,
-        generalId,
-        slot,
-        args: turn.args as Prisma.InputJsonValue,
-      })),
-    });
-    await tx.general.update({
-      where: { worldId_id: { worldId, id: generalId } },
-      data: { turnRevision: { increment: 1 } },
-    });
-    const sequence = await nextActionSequence(tx, worldId);
-    await tx.inputEvent.create({
-      data: {
-        worldId,
-        userId: actor.userId!,
-        generalId,
-        kind: 'turns.set',
-        idempotencyKey: `archive-${sequence}`,
-        status: 'APPLIED',
-        sequence,
-        payload: { turns, revision: actor.turnRevision } as unknown as Prisma.InputJsonValue,
-        result: { revision: actor.turnRevision + 1 },
-      },
-    });
+  await recordTestTurns(db, worldId, generalId, commandKey, args);
+}
+
+// Explicit administrative dissolution reaches the same nation-history persistence boundary without legacy crew.
+async function dissolve(worldId: string, nationId: number) {
+  const actor = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
+  const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+  await db.world.update({ where: { id: worldId }, data: { clockTick: Math.max(world.clockTick, actor.nextTurnTick) } });
+  return db.inputEvent.create({
+    data: {
+      worldId,
+      userId: actor.userId!,
+      kind: 'admin.nation.disband',
+      idempotencyKey: randomUUID(),
+      payload: { version: 1, reason: 'Nation archive fixture', action: { kind: 'admin.nation.disband', nationId } },
+    },
   });
 }
+
 async function archived(worldId: string) {
   return db.yearbookNation.findMany({ where: { worldId }, orderBy: [{ tick: 'asc' }, { nationId: 'asc' }] });
 }
@@ -126,9 +132,9 @@ async function birthAndRemove(frameFirst: boolean) {
   const item = await create(await birthFixture(frameFirst ? 10100 : 100));
   await queue(item.worldId, 4, 'found', { name: '짧은 나라', color: '#123456' });
   await item.loop.advanceTo(50);
-  await db.diplomacy.create({ data: { worldId: item.worldId, nationA: 1, nationB: 3, state: 'WAR', untilTick: 0 } });
+
   if (frameFirst) await item.loop.advanceTo(10000);
-  await queue(item.worldId, 1, 'attack', { cityKey: 3 });
+  await dissolve(item.worldId, 3);
   await item.loop.advanceTo(frameFirst ? 10100 : 100);
   expect(await db.nation.findUnique({ where: { worldId_id: { worldId: item.worldId, id: 3 } } })).toBeNull();
   return item;
@@ -159,23 +165,24 @@ describe('T4-56 / AC-P2-17 실제 PostgreSQL 국가 표시값 저장', () => {
     const { worldId, loop } = await create(initial);
     await loop.advanceTo(10000);
     const before = await archived(worldId);
-    await queue(worldId, 1, 'attack', { cityKey: 2 });
+    await dissolve(worldId, 2);
     await loop.advanceTo(10100);
     const row = await db.removedNation.findUniqueOrThrow({ where: { worldId_nationId: { worldId, nationId: 2 } } });
-    const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
     expect(row).toEqual({
       worldId,
       nationId: 2,
       name: initial.nations[1]!.name,
       color: initial.nations[1]!.color,
-      removedSequence: world.actionSequence,
+      removedSequence: (
+        await db.inputEvent.findFirstOrThrow({ where: { worldId, kind: 'admin.nation.disband', status: 'APPLIED' } })
+      ).sequence,
       removedTick: 10100,
     });
     expect(
-      await db.generalLog.findFirstOrThrow({
-        where: { worldId, generalId: 1, tick: row.removedTick, sequence: row.removedSequence },
+      await db.inputEvent.findFirstOrThrow({
+        where: { worldId, kind: 'admin.nation.disband', tick: row.removedTick, sequence: row.removedSequence },
       }),
-    ).toMatchObject({ kind: 'success' });
+    ).toMatchObject({ status: 'APPLIED' });
     expect(await archived(worldId)).toEqual(before);
     await loop.advanceTo(20000);
     expect((await archived(worldId)).filter(({ tick }) => tick === 20000).map(({ nationId }) => nationId)).toEqual([1]);
@@ -183,7 +190,7 @@ describe('T4-56 / AC-P2-17 실제 PostgreSQL 국가 표시값 저장', () => {
 
   it('R2 첫 정산 전 멸망도 프레임 없이 보존한다', async () => {
     const { worldId, loop, initial } = await create();
-    await queue(worldId, 1, 'attack', { cityKey: 2 });
+    await dissolve(worldId, 2);
     await loop.advanceTo(100);
     expect(await archived(worldId)).toEqual([]);
     expect(await db.removedNation.findMany({ where: { worldId } })).toMatchObject([
@@ -197,8 +204,8 @@ describe('T4-56 / AC-P2-17 실제 PostgreSQL 국가 표시값 저장', () => {
     const { worldId, loop } = await create(initial);
     await queue(worldId, 4, 'found', { name: '짧은 나라', color: '#123456' });
     await loop.advanceTo(50);
-    await db.diplomacy.create({ data: { worldId, nationA: 1, nationB: 3, state: 'WAR', untilTick: 0 } });
-    await queue(worldId, 1, 'attack', { cityKey: 3 });
+
+    await dissolve(worldId, 3);
     await loop.advanceTo(100);
     expect(await archived(worldId)).toEqual([]);
     expect(
@@ -218,7 +225,7 @@ describe('T4-56 / AC-P2-17 실제 PostgreSQL 국가 표시값 저장', () => {
     'R5 멸망 턴 %s는 보존·국가·로그·예턴·행동 번호를 함께 롤백한다',
     async (failure) => {
       const { worldId, lease } = await create();
-      await queue(worldId, 1, 'attack', { cityKey: 2 });
+      await dissolve(worldId, 2);
       const before = await snapshot(worldId);
       const loop = new TurnLoop(db, lease, {
         beforeCommit: async (tx) => {
@@ -241,19 +248,17 @@ describe('T4-56 / AC-P2-17 실제 PostgreSQL 국가 표시값 저장', () => {
     'R6 실제 SIGKILL %s 뒤 보존은 한 번이고 재적재 상태가 일치한다',
     async (phase) => {
       const { worldId, lease, initial } = await create();
-      await queue(worldId, 1, 'attack', { cityKey: 2 });
-      const expected = runGeneralTurn(
-        toWorldState(initial),
-        { generalId: 1, tick: 100, unitSet: initial.unitSet },
-        { commandKey: 'attack', args: { cityKey: 2 } },
-        initial.seed,
-      ).state;
-      expected.generals[1]!.nextTurnTick = 10100;
+      await dissolve(worldId, 2);
+      const before = await db.$transaction((tx) => loadReplayState(tx, worldId));
       await releaseLease(db, lease);
-      const child = spawn(process.execPath, ['--import', 'tsx', 'apps/engine/test/turnWorker.ts', worldId, phase], {
-        env: { ...process.env, TEST_DATABASE_URL: url },
-        stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
-      });
+      const child = spawn(
+        process.execPath,
+        ['--import', 'tsx', 'apps/engine/test/turnWorker.ts', worldId, phase, '500'],
+        {
+          env: { ...process.env, TEST_DATABASE_URL: url },
+          stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+        },
+      );
       const exited = once(child, 'exit');
       try {
         const message = await Promise.race([
@@ -271,7 +276,23 @@ describe('T4-56 / AC-P2-17 실제 PostgreSQL 국가 표시값 저장', () => {
         await loop.advanceTo(500);
         await loop.advanceTo(500);
         expect(await db.removedNation.count({ where: { worldId } })).toBe(1);
-        expect(hashState(toWorldState(await readWorldState(db, worldId)))).toBe(hashState(expected));
+        const event = await db.inputEvent.findFirstOrThrow({
+          where: { worldId, kind: 'admin.nation.disband', status: 'APPLIED' },
+        });
+        let expected = applyRecordedInput(before, {
+          sequence: event.sequence!,
+          tick: event.tick!,
+          generalId: event.generalId,
+          kind: event.kind,
+          status: 'APPLIED',
+          payload: event.payload,
+          result: event.result,
+        } as RecordedInput);
+        while (nextGameAction(expected).tick <= 500)
+          expected = runReplayAction(expected, initial.seed, initial.unitSet);
+        expect(hashState((await db.$transaction((tx) => loadReplayState(tx, worldId))).state)).toBe(
+          hashState(expected.state),
+        );
       } finally {
         if (child.exitCode === null && child.signalCode === null) {
           child.kill('SIGKILL');
@@ -284,7 +305,7 @@ describe('T4-56 / AC-P2-17 실제 PostgreSQL 국가 표시값 저장', () => {
 
   it('R7 삭제 보존 키 중복은 턴 전체를 롤백한다', async () => {
     const { worldId, loop, initial } = await create();
-    await queue(worldId, 1, 'attack', { cityKey: 2 });
+    await dissolve(worldId, 2);
     await db.removedNation.create({
       data: {
         worldId,
@@ -370,7 +391,7 @@ describe('T4-56 / AC-P2-17 실제 PostgreSQL 국가 표시값 저장', () => {
       data: { name: '바뀐 국호', color: '#112233' },
     });
     await loop.advanceTo(20000);
-    await queue(worldId, 1, 'attack', { cityKey: 2 });
+    await dissolve(worldId, 2);
     await loop.advanceTo(20100);
     expect((await archived(worldId)).filter(({ nationId }) => nationId === 2)).toMatchObject([
       { tick: 10000, name: initial.nations[1]!.name, color: initial.nations[1]!.color },
@@ -442,7 +463,7 @@ describe('T4-56 / AC-P2-17 실제 PostgreSQL 국가 표시값 저장', () => {
   });
   it('M1 프레임 외래 키를 강제하고 월드 삭제는 두 보존 표에 전파된다', async () => {
     const { worldId, loop } = await create();
-    await queue(worldId, 1, 'attack', { cityKey: 2 });
+    await dissolve(worldId, 2);
     await loop.advanceTo(10000);
     await expect(
       db.yearbookNation.create({ data: { worldId, tick: 99999, nationId: 1, name: '시험', color: '#112233' } }),

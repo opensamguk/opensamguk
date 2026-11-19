@@ -1,50 +1,21 @@
 {
-  "stateHash": "4177102adac3e845abcfb95dc1f9cf327ff553ac415ece2180a428d030a3eff0",
+  "stateHash": "7d3a7cd0378de405d8db754e8d7ab954b9a59b5442945b3e8a1bac70d83169db",
   "replay": {
     "state": {
       "fogOfWar": false,
-      "relations": {
-        "version": 1,
-        "pairs": []
-      },
+      "relations": { "version": 1, "pairs": [] },
       "officeEffects": {
         "version": 1,
         "minimumAbility": 65,
-        "tax": {
-          "3": 10,
-          "4": 10,
-          "11": 5
-        },
-        "supplyLoss": {
-          "5": 10,
-          "6": 10,
-          "7": 10,
-          "8": 10,
-          "9": 10,
-          "10": 10
-        },
+        "tax": { "3": 10, "4": 10, "11": 5 },
+        "supplyLoss": { "5": 10, "6": 10, "7": 10, "8": 10, "9": 10, "10": 10 },
         "secretary": true
       },
-      "preparedTurns": {
-        "version": 1,
-        "nations": {}
-      },
-      "nationResearch": {
-        "version": 1,
-        "nations": {}
-      },
-      "nationLifecycle": {
-        "version": 1,
-        "nations": {}
-      },
-      "nationStrategy": {
-        "version": 1,
-        "nations": {}
-      },
-      "cityRuins": {
-        "version": 1,
-        "cities": []
-      },
+      "preparedTurns": { "version": 1, "nations": {} },
+      "nationResearch": { "version": 1, "nations": {} },
+      "nationLifecycle": { "version": 1, "nations": {} },
+      "nationStrategy": { "version": 1, "nations": {} },
+      "cityRuins": { "version": 1, "cities": [] },
       "equipment": {
         "version": 1,
         "config": {
@@ -59,11 +30,7 @@
               "requiredSecurity": 1000,
               "stat": "leadership",
               "bonus": 1,
-              "goods": {
-                "iron": 0,
-                "wood": 0,
-                "horses": 5
-              }
+              "goods": { "iron": 0, "wood": 0, "horses": 5 }
             },
             {
               "key": "horse_02",
@@ -74,11 +41,7 @@
               "requiredSecurity": 2000,
               "stat": "leadership",
               "bonus": 2,
-              "goods": {
-                "iron": 0,
-                "wood": 0,
-                "horses": 10
-              }
+              "goods": { "iron": 0, "wood": 0, "horses": 10 }
             },
             {
               "key": "horse_03",
@@ -89,11 +52,7 @@
               "requiredSecurity": 3000,
               "stat": "leadership",
               "bonus": 3,
-              "goods": {
-                "iron": 0,
-                "wood": 0,
-                "horses": 15
-              }
+              "goods": { "iron": 0, "wood": 0, "horses": 15 }
             },
             {
               "key": "horse_04",
@@ -104,11 +63,7 @@
               "requiredSecurity": 4000,
               "stat": "leadership",
               "bonus": 4,
-              "goods": {
-                "iron": 0,
-                "wood": 0,
-                "horses": 20
-              }
+              "goods": { "iron": 0, "wood": 0, "horses": 20 }
             },
             {
               "key": "horse_05",
@@ -119,11 +74,7 @@
               "requiredSecurity": 5000,
               "stat": "leadership",
               "bonus": 5,
-              "goods": {
-                "iron": 0,
-                "wood": 0,
-                "horses": 25
-              }
+              "goods": { "iron": 0, "wood": 0, "horses": 25 }
             },
             {
               "key": "horse_06",
@@ -134,11 +85,7 @@
               "requiredSecurity": 6000,
               "stat": "leadership",
               "bonus": 6,
-              "goods": {
-                "iron": 0,
-                "wood": 0,
-                "horses": 30
-              }
+              "goods": { "iron": 0, "wood": 0, "horses": 30 }
             },
             {
               "key": "weapon_01",
@@ -149,11 +96,7 @@
               "requiredSecurity": 1000,
               "stat": "strength",
               "bonus": 1,
-              "goods": {
-                "iron": 5,
-                "wood": 0,
-                "horses": 0
-              }
+              "goods": { "iron": 5, "wood": 0, "horses": 0 }
             },
             {
               "key": "weapon_02",
@@ -164,11 +107,7 @@
               "requiredSecurity": 2000,
               "stat": "strength",
               "bonus": 2,
-              "goods": {
-                "iron": 10,
-                "wood": 0,
-                "horses": 0
-              }
+              "goods": { "iron": 10, "wood": 0, "horses": 0 }
             },
             {
               "key": "weapon_03",
@@ -179,11 +118,7 @@
               "requiredSecurity": 3000,
               "stat": "strength",
               "bonus": 3,
-              "goods": {
-                "iron": 15,
-                "wood": 0,
-                "horses": 0
-              }
+              "goods": { "iron": 15, "wood": 0, "horses": 0 }
             },
             {
               "key": "weapon_04",
@@ -194,11 +129,7 @@
               "requiredSecurity": 4000,
               "stat": "strength",
               "bonus": 4,
-              "goods": {
-                "iron": 20,
-                "wood": 0,
-                "horses": 0
-              }
+              "goods": { "iron": 20, "wood": 0, "horses": 0 }
             },
             {
               "key": "weapon_05",
@@ -209,11 +140,7 @@
               "requiredSecurity": 5000,
               "stat": "strength",
               "bonus": 5,
-              "goods": {
-                "iron": 25,
-                "wood": 0,
-                "horses": 0
-              }
+              "goods": { "iron": 25, "wood": 0, "horses": 0 }
             },
             {
               "key": "weapon_06",
@@ -224,11 +151,7 @@
               "requiredSecurity": 6000,
               "stat": "strength",
               "bonus": 6,
-              "goods": {
-                "iron": 30,
-                "wood": 0,
-                "horses": 0
-              }
+              "goods": { "iron": 30, "wood": 0, "horses": 0 }
             },
             {
               "key": "book_01",
@@ -239,11 +162,7 @@
               "requiredSecurity": 1000,
               "stat": "intel",
               "bonus": 1,
-              "goods": {
-                "iron": 0,
-                "wood": 0,
-                "horses": 0
-              }
+              "goods": { "iron": 0, "wood": 0, "horses": 0 }
             },
             {
               "key": "book_02",
@@ -254,11 +173,7 @@
               "requiredSecurity": 2000,
               "stat": "intel",
               "bonus": 2,
-              "goods": {
-                "iron": 0,
-                "wood": 0,
-                "horses": 0
-              }
+              "goods": { "iron": 0, "wood": 0, "horses": 0 }
             },
             {
               "key": "book_03",
@@ -269,11 +184,7 @@
               "requiredSecurity": 3000,
               "stat": "intel",
               "bonus": 3,
-              "goods": {
-                "iron": 0,
-                "wood": 0,
-                "horses": 0
-              }
+              "goods": { "iron": 0, "wood": 0, "horses": 0 }
             },
             {
               "key": "book_04",
@@ -284,11 +195,7 @@
               "requiredSecurity": 4000,
               "stat": "intel",
               "bonus": 4,
-              "goods": {
-                "iron": 0,
-                "wood": 0,
-                "horses": 0
-              }
+              "goods": { "iron": 0, "wood": 0, "horses": 0 }
             },
             {
               "key": "book_05",
@@ -299,11 +206,7 @@
               "requiredSecurity": 5000,
               "stat": "intel",
               "bonus": 5,
-              "goods": {
-                "iron": 0,
-                "wood": 0,
-                "horses": 0
-              }
+              "goods": { "iron": 0, "wood": 0, "horses": 0 }
             },
             {
               "key": "book_06",
@@ -314,11 +217,7 @@
               "requiredSecurity": 6000,
               "stat": "intel",
               "bonus": 6,
-              "goods": {
-                "iron": 0,
-                "wood": 0,
-                "horses": 0
-              }
+              "goods": { "iron": 0, "wood": 0, "horses": 0 }
             }
           ],
           "sellRateBp": 5000,
@@ -333,44 +232,17 @@
           "version": 1,
           "capacity": 3,
           "deck": [
-            {
-              "kind": "fire_attack",
-              "weight": 1
-            },
-            {
-              "kind": "sabotage",
-              "weight": 1
-            },
-            {
-              "kind": "incite",
-              "weight": 1
-            },
-            {
-              "kind": "plunder",
-              "weight": 1
-            },
-            {
-              "kind": "nation_mobilize",
-              "weight": 1
-            },
-            {
-              "kind": "nation_rivalry",
-              "weight": 1
-            },
-            {
-              "kind": "nation_raid",
-              "weight": 1
-            },
-            {
-              "kind": "trap",
-              "weight": 1
-            }
+            { "kind": "fire_attack", "weight": 1 },
+            { "kind": "sabotage", "weight": 1 },
+            { "kind": "incite", "weight": 1 },
+            { "kind": "plunder", "weight": 1 },
+            { "kind": "nation_mobilize", "weight": 1 },
+            { "kind": "nation_rivalry", "weight": 1 },
+            { "kind": "nation_raid", "weight": 1 },
+            { "kind": "trap", "weight": 1 }
           ],
           "trapCountsInCapacity": true,
-          "trap": {
-            "lossBp": 1000,
-            "atmosLoss": 10
-          },
+          "trap": { "lossBp": 1000, "atmosLoss": 10 },
           "campaignLoss": "eligibleAll",
           "consumeOnRollFailure": true,
           "checkOnReserve": false,
@@ -381,16 +253,7 @@
         },
         "monthlyTick": 10000,
         "revision": 1,
-        "nations": {
-          "1": {
-            "hand": ["plunder"],
-            "traps": []
-          },
-          "2": {
-            "hand": ["incite"],
-            "traps": []
-          }
-        }
+        "nations": { "1": { "hand": ["plunder"], "traps": [] }, "2": { "hand": ["incite"], "traps": [] } }
       },
       "lineage": {
         "version": 1,
@@ -402,11 +265,7 @@
             "maxSpouses": 1,
             "kinDepth": 3,
             "offerMonths": 6,
-            "npc": {
-              "perMonth": 10,
-              "affinityGap": 30,
-              "chanceBp": 3000
-            }
+            "npc": { "perMonth": 10, "affinityGap": 30, "chanceBp": 3000 }
           },
           "birth": {
             "minParentAge": 16,
@@ -415,10 +274,7 @@
             "comingOfAgeYears": 15,
             "femaleBp": 5000,
             "statSpread": 10,
-            "lifespan": {
-              "min": 50,
-              "max": 75
-            },
+            "lifespan": { "min": 50, "max": 75 },
             "givenNames": [
               "가",
               "각",
@@ -637,9 +493,7 @@
             ],
             "compoundSurnames": ["공손", "사마", "제갈", "하후", "황보", "태사"]
           },
-          "heir": {
-            "depth": 3
-          },
+          "heir": { "depth": 3 },
           "limits": {
             "maxGenerals": 10000,
             "maxBirthsPerYear": 30,
@@ -657,11 +511,7 @@
           "1": {
             "parents": [],
             "bornTick": null,
-            "exit": {
-              "tick": 10000,
-              "cause": "DIED",
-              "activeFromYear": 191
-            },
+            "exit": { "tick": 10000, "cause": "DIED", "activeFromYear": 191 },
             "successorId": null,
             "heirId": null
           }
@@ -684,49 +534,22 @@
             "censureLoss": 5,
             "renounceLoss": 10
           },
-          "tribute": {
-            "maxBp": 2000,
-            "maxAmount": 100000
-          },
-          "stipendGold": {
-            "chancellor": 100,
-            "grandMarshal": 100,
-            "minister": 100
-          },
+          "tribute": { "maxBp": 2000, "maxAmount": 100000 },
+          "stipendGold": { "chancellor": 100, "grandMarshal": 100, "minister": 100 },
           "offerMonths": 6,
           "maxDepth": 3,
           "maxRemitMonths": 12,
           "censureCooldownMonths": 6,
-          "npc": {
-            "cityRatio": 2,
-            "acceptMaxBp": 1000,
-            "offerBp": 500,
-            "cooldownMonths": 12
-          },
-          "limits": {
-            "sentOffers": 3,
-            "receivedOffers": 5,
-            "worldOffers": 200
-          }
+          "npc": { "cityRatio": 2, "acceptMaxBp": 1000, "offerBp": 500, "cooldownMonths": 12 },
+          "limits": { "sentOffers": 3, "receivedOffers": 5, "worldOffers": 200 }
         },
         "monthlyTick": 10000,
         "revision": 1,
         "nextOfferId": 1,
         "nextVassalId": 1,
-        "throne": {
-          "emperorGeneralId": null,
-          "emperorNationId": null,
-          "sinceTick": 0
-        },
-        "court": {
-          "chancellor": null,
-          "grandMarshal": null,
-          "minister": null
-        },
-        "legitimacy": {
-          "1": 2,
-          "2": 0
-        },
+        "throne": { "emperorGeneralId": null, "emperorNationId": null, "sinceTick": 0 },
+        "court": { "chancellor": null, "grandMarshal": null, "minister": null },
+        "legitimacy": { "1": 2, "2": 0 },
         "vassals": [],
         "offers": [],
         "pendingRenounce": [],
@@ -738,15 +561,8 @@
         "config": {
           "version": 1,
           "specialties": [],
-          "capacity": {
-            "base": 10000,
-            "perLevel": 10000,
-            "maxLevel": 5
-          },
-          "upgrade": {
-            "gold": 1000,
-            "wood": 500
-          },
+          "capacity": { "base": 10000, "perLevel": 10000, "maxLevel": 5 },
+          "upgrade": { "gold": 1000, "wood": 500 },
           "transport": {
             "maxHops": 8,
             "hopsPerMonth": 2,
@@ -755,122 +571,46 @@
             "maxActivePerNation": 20
           },
           "recruitPer100": {
-            "1": {
-              "iron": 2,
-              "wood": 0,
-              "horses": 0
-            },
-            "2": {
-              "iron": 2,
-              "wood": 0,
-              "horses": 0
-            },
-            "3": {
-              "iron": 2,
-              "wood": 0,
-              "horses": 10
-            }
+            "1": { "iron": 2, "wood": 0, "horses": 0 },
+            "2": { "iron": 2, "wood": 0, "horses": 0 },
+            "3": { "iron": 2, "wood": 0, "horses": 10 }
           },
           "build": {
-            "wall": {
-              "iron": 0,
-              "wood": 50,
-              "horses": 0
-            },
-            "defence": {
-              "iron": 20,
-              "wood": 20,
-              "horses": 0
-            }
+            "wall": { "iron": 0, "wood": 50, "horses": 0 },
+            "defence": { "iron": 20, "wood": 20, "horses": 0 }
           },
           "trade": {
-            "iron": {
-              "buy": 3,
-              "sell": 1
-            },
-            "wood": {
-              "buy": 3,
-              "sell": 1
-            },
-            "horses": {
-              "buy": 3,
-              "sell": 1
-            }
+            "iron": { "buy": 3, "sell": 1 },
+            "wood": { "buy": 3, "sell": 1 },
+            "horses": { "buy": 3, "sell": 1 }
           },
-          "npc": {
-            "recruitTarget": 1000,
-            "budgetBp": 1000,
-            "maxActions": 3,
-            "stockCapBp": 5000,
-            "upgradeAtBp": 8000
-          }
+          "npc": { "recruitTarget": 1000, "budgetBp": 1000, "maxActions": 3, "stockCapBp": 5000, "upgradeAtBp": 8000 }
         },
         "revision": 1,
         "monthlyTick": 10000,
         "nextConvoyId": 1,
         "cities": {
-          "1": {
-            "iron": 0,
-            "wood": 0,
-            "horses": 0,
-            "level": 0
-          },
-          "2": {
-            "iron": 0,
-            "wood": 0,
-            "horses": 0,
-            "level": 0
-          },
-          "3": {
-            "iron": 0,
-            "wood": 0,
-            "horses": 0,
-            "level": 0
-          },
-          "4": {
-            "iron": 0,
-            "wood": 0,
-            "horses": 0,
-            "level": 0
-          }
+          "1": { "iron": 0, "wood": 0, "horses": 0, "level": 0 },
+          "2": { "iron": 0, "wood": 0, "horses": 0, "level": 0 },
+          "3": { "iron": 0, "wood": 0, "horses": 0, "level": 0 },
+          "4": { "iron": 0, "wood": 0, "horses": 0, "level": 0 }
         },
         "convoys": []
       },
       "cityResources": {
         "version": 1,
         "cities": {
-          "1": {
-            "gold": 10,
-            "rice": 0,
-            "garrison": []
-          },
-          "2": {
-            "gold": 10,
-            "rice": 0,
-            "garrison": []
-          },
-          "3": {
-            "gold": 10,
-            "rice": 0,
-            "garrison": []
-          },
-          "4": {
-            "gold": 10,
-            "rice": 0,
-            "garrison": []
-          }
+          "1": { "gold": 10, "rice": 0, "garrison": [] },
+          "2": { "gold": 10, "rice": 0, "garrison": [] },
+          "3": { "gold": 10, "rice": 0, "garrison": [] },
+          "4": { "gold": 10, "rice": 0, "garrison": [] }
         }
       },
       "campaign": {
         "cityUpgrade": {
           "version": 1,
           "enabled": true,
-          "originalLevels": {
-            "1": 8,
-            "2": 8,
-            "3": 8,
-            "4": 8
-          },
+          "originalLevels": { "1": 8, "2": 8, "3": 8, "4": 8 },
           "completed": {}
         },
         "version": 1,
@@ -879,9 +619,9 @@
         "nextUnitId": 1,
         "nextOfferId": 1,
         "sources": {
-          "1": "scenario:1030#general:1",
-          "2": "scenario:1030#general:2",
-          "3": "scenario:1030#general:3"
+          "1": "scenario:engine-monthly-fixture#general:1",
+          "2": "scenario:engine-monthly-fixture#general:2",
+          "3": "scenario:engine-monthly-fixture#general:3"
         },
         "links": [],
         "offers": [],
@@ -1404,9 +1144,7 @@
           ]
         }
       },
-      "ext": {
-        "intel": {}
-      },
+      "ext": { "intel": {} },
       "startYear": 191,
       "cities": {
         "1": {
@@ -1636,543 +1374,132 @@
           "sex": "UNKNOWN"
         }
       },
-      "diplomacies": [
-        {
-          "nationA": 1,
-          "nationB": 2,
-          "state": "WAR",
-          "untilTick": 10000
-        }
-      ],
+      "diplomacies": [{ "nationA": 1, "nationB": 2, "state": "WAR", "untilTick": 10000 }],
       "officeTurns": {
         "2": {
           "12": [
-            {
-              "commandKey": "nation_rest",
-              "args": {}
-            },
-            {
-              "commandKey": "nation_rest",
-              "args": {}
-            },
-            {
-              "commandKey": "nation_rest",
-              "args": {}
-            },
-            {
-              "commandKey": "nation_rest",
-              "args": {}
-            },
-            {
-              "commandKey": "nation_rest",
-              "args": {}
-            },
-            {
-              "commandKey": "nation_rest",
-              "args": {}
-            },
-            {
-              "commandKey": "nation_rest",
-              "args": {}
-            },
-            {
-              "commandKey": "nation_rest",
-              "args": {}
-            },
-            {
-              "commandKey": "nation_rest",
-              "args": {}
-            },
-            {
-              "commandKey": "nation_rest",
-              "args": {}
-            },
-            {
-              "commandKey": "nation_rest",
-              "args": {}
-            },
-            {
-              "commandKey": "nation_rest",
-              "args": {}
-            }
+            { "commandKey": "nation_rest", "args": {} },
+            { "commandKey": "nation_rest", "args": {} },
+            { "commandKey": "nation_rest", "args": {} },
+            { "commandKey": "nation_rest", "args": {} },
+            { "commandKey": "nation_rest", "args": {} },
+            { "commandKey": "nation_rest", "args": {} },
+            { "commandKey": "nation_rest", "args": {} },
+            { "commandKey": "nation_rest", "args": {} },
+            { "commandKey": "nation_rest", "args": {} },
+            { "commandKey": "nation_rest", "args": {} },
+            { "commandKey": "nation_rest", "args": {} },
+            { "commandKey": "nation_rest", "args": {} }
           ]
         }
       }
     },
     "turns": {
       "1": [
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        }
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false }
       ],
       "2": [
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        }
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false }
       ],
       "3": [
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        },
-        {
-          "commandKey": "rest",
-          "args": {},
-          "explicit": false
-        }
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false }
       ]
     },
-    "revisions": {
-      "1": 0,
-      "2": 0,
-      "3": 0
-    },
+    "revisions": { "1": 0, "2": 0, "3": 0 },
     "monthlyTick": 10000,
     "campaignArmyTypes": [1100, 1200, 1300],
     "campaignUnitSet": {
       "id": "basic",
       "name": "basic",
       "defaultCrewTypeId": 1100,
-      "armTypes": {
-        "1": "보병",
-        "2": "궁병",
-        "3": "기병"
-      },
+      "armTypes": { "1": "보병", "2": "궁병", "3": "기병" },
       "crewTypes": [
         {
           "id": 1000,
@@ -2186,9 +1513,7 @@
           "cost": 99,
           "rice": 9,
           "attackCoef": [],
-          "defenceCoef": {
-            "1": 1.2
-          }
+          "defenceCoef": { "1": 1.2 }
         },
         {
           "id": 1100,
@@ -2201,14 +1526,8 @@
           "magicCoef": 0,
           "cost": 9,
           "rice": 9,
-          "attackCoef": {
-            "2": 1.2,
-            "3": 0.8
-          },
-          "defenceCoef": {
-            "2": 0.8,
-            "3": 1.2
-          }
+          "attackCoef": { "2": 1.2, "3": 0.8 },
+          "defenceCoef": { "2": 0.8, "3": 1.2 }
         },
         {
           "id": 1200,
@@ -2221,14 +1540,8 @@
           "magicCoef": 0,
           "cost": 10,
           "rice": 10,
-          "attackCoef": {
-            "1": 0.8,
-            "3": 1.2
-          },
-          "defenceCoef": {
-            "1": 1.2,
-            "3": 0.8
-          }
+          "attackCoef": { "1": 0.8, "3": 1.2 },
+          "defenceCoef": { "1": 1.2, "3": 0.8 }
         },
         {
           "id": 1300,
@@ -2241,57 +1554,21 @@
           "magicCoef": 0,
           "cost": 11,
           "rice": 11,
-          "attackCoef": {
-            "1": 1.2,
-            "2": 0.8
-          },
-          "defenceCoef": {
-            "1": 0.8,
-            "2": 1.2
-          }
+          "attackCoef": { "1": 1.2, "2": 0.8 },
+          "defenceCoef": { "1": 0.8, "2": 1.2 }
         }
       ]
     },
     "lineageResources": {
-      "statRules": {
-        "count": 5,
-        "total": 275,
-        "min": 15,
-        "max": 90
-      },
-      "unitSet": {
-        "defaultCrewTypeId": 1100
-      }
+      "statRules": { "count": 5, "total": 275, "min": 15, "max": 90 },
+      "unitSet": { "defaultCrewTypeId": 1100 }
     },
-    "offices": {
-      "2": {
-        "12": {
-          "revision": 1,
-          "tenure": 1
-        }
-      }
-    },
+    "offices": { "2": { "12": { "revision": 1, "tenure": 1 } } },
     "residenceAnchors": {},
-    "policy": {
-      "turnTermMinutes": 60,
-      "policies": {
-        "1": "none",
-        "2": "none",
-        "3": "none"
-      },
-      "lastActiveTicks": {}
-    },
+    "policy": { "turnTermMinutes": 60, "policies": { "1": "none", "2": "none", "3": "none" }, "lastActiveTicks": {} },
     "reputation": {
       "events": [],
-      "reviews": [
-        {
-          "year": 191,
-          "month": 1,
-          "tick": 10000,
-          "entries": [],
-          "headline": null
-        }
-      ]
+      "reviews": [{ "year": 191, "month": 1, "tick": 10000, "entries": [], "headline": null }]
     }
   }
 }

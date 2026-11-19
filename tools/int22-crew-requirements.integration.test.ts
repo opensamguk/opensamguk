@@ -14,6 +14,7 @@ import { exportReplay, replayArchive } from '../apps/engine/src/replay';
 import { buildServer } from '../apps/server/src/server';
 import { newSession } from '../apps/server/src/auth/session';
 import { testDatabaseUrl } from './test-database';
+import { recruitmentFixtureData } from './fixtures/recruitment';
 
 const url = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
 const db = createDb(url.href),
@@ -93,6 +94,7 @@ beforeAll(async () => {
     turnTermMinutes: 60,
     endYear: null,
     replayFormat: 3,
+    featureData: recruitmentFixtureData(initial),
   });
   worldId = saved.worldId;
   worlds.push(worldId);
@@ -152,7 +154,26 @@ it('실제 생성 입력과 임관으로 장수를 준비하고 원본 NPC 소�
   expect(await db.general.count({ where: { worldId, id: { in: [1, 2] }, userId: null } })).toBe(2);
 });
 
-it('저장한 모집 조건을 사전 검사와 실제 편성 큐에서 같은 이유로 거부한다', async () => {
+async function reserveRecruit(crewType: number) {
+  const actor = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: generalId } } });
+  expect(
+    await rpc(
+      'turns.set',
+      {
+        worldId,
+        revision: actor.turnRevision,
+        slots: [
+          { commandKey: 'recruit', args: { amount: 1, crewType, unitId: 'new' } },
+          ...Array.from({ length: 29 }, () => null),
+        ],
+      },
+      true,
+    ),
+  ).toMatchObject({ ok: true });
+  return actor.nextTurnTick;
+}
+
+it('저장한 모집 조건을 사전 검사와 실제 모병 예턴에서 같은 이유로 거부한다', async () => {
   const before = await snapshot();
   expect(before.campaignUnitSet!.crewTypes.find((row) => row.id === 1500)?.requirements).toEqual([
     { kind: 'research', name: 'greatsword' },
@@ -161,45 +182,22 @@ it('저장한 모집 조건을 사전 검사와 실제 편성 큐에서 같은 �
     await rpc('turns.precheck', { worldId, commandKey: 'recruit', args: { amount: 1, crewType: 1500 } }),
   ).toMatchObject({ ok: false, code: 'BAD_STATE', message: reason });
   expect(hashState(await snapshot())).toBe(hashState(before));
-  const requestId = randomUUID();
+  const tick = await reserveRecruit(1500);
+  await advance(tick);
   expect(
-    await rpc(
-      'campaign.unit',
-      {
-        worldId,
-        requestId,
-        payload: { type: 'form', commanderId: generalId, crewType: 1500, revision: before.state.campaign!.revision },
-      },
-      true,
-    ),
-  ).toMatchObject({ status: 'pending' });
-  await advance(actorTick);
-  expect(await rpc('campaign.request', { worldId, requestId })).toMatchObject({
-    status: 'rejected',
-    result: { code: 'BAD_STATE', message: reason },
-  });
-  expect((await snapshot()).state).toEqual(before.state);
+    await db.generalLog.findFirstOrThrow({ where: { worldId, generalId, tick, commandKey: 'recruit' } }),
+  ).toMatchObject({ kind: 'failure', text: expect.stringContaining('대검병 연구') });
+  expect((await snapshot()).state.campaign!.units).toEqual(before.state.campaign!.units);
 });
 
 it('경계에서 허용한 편성의 rollback·한 번 적용·12개월 DB 재적재·순수 재생을 보존한다', async () => {
-  const before = await snapshot(),
-    requestId = randomUUID();
-  await rpc(
-    'campaign.unit',
-    {
-      worldId,
-      requestId,
-      payload: { type: 'form', commanderId: generalId, crewType: 1501, revision: before.state.campaign!.revision },
-    },
-    true,
-  );
-  await expect(advance(actorTick, true)).rejects.toThrow('int22 rollback');
-  expect(await rpc('campaign.request', { worldId, requestId })).toMatchObject({ status: 'pending' });
+  const tick = await reserveRecruit(1501),
+    before = await snapshot();
+  await expect(advance(tick, true)).rejects.toThrow('int22 rollback');
   expect(hashState(await snapshot())).toBe(hashState(before));
-  await advance(actorTick);
-  expect(await rpc('campaign.request', { worldId, requestId })).toMatchObject({ status: 'applied' });
+  await advance(tick);
   expect((await snapshot()).state.campaign!.units).toEqual([
-    { id: 1, ownerId: generalId, commanderId: generalId, crewType: 1501, troops: 0, train: 0, atmos: 0 },
+    { id: 1, ownerId: generalId, commanderId: generalId, crewType: 1501, troops: 1, train: 0, atmos: 0 },
   ]);
   await advance(12 * TICKS_PER_MONTH);
   const after = await snapshot(),

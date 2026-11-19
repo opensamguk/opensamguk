@@ -10,10 +10,9 @@ import { hashState } from '../packages/shared/src/node/hashState';
 import { saveFixtureWorld, attachFixtureOwners } from '../e2e/worldFixture';
 import { commandInitial } from '../packages/rules/test/commandFixture';
 import { loadReplayState } from '../apps/engine/src/monthly';
-import { assertInt27Database } from '../e2e/int27Database';
+import { testDatabaseUrl } from './test-database';
 
-const url = process.env.TEST_DATABASE_URL!;
-assertInt27Database(new URL(url));
+const url = testDatabaseUrl(process.env).href;
 const db = createDb(url);
 afterAll(() => db.$disconnect());
 

@@ -1,3 +1,4 @@
+import { ciGreenDatabaseName } from './test-database';
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { readdir, readFile } from 'node:fs/promises';
@@ -24,6 +25,7 @@ import {
   type RecordedInput,
 } from '../packages/rules/src/index';
 import { commandInitial } from '../packages/rules/test/commandFixture';
+import { operationalInput } from '../packages/rules/test/operationalMapFixture';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { testDatabaseUrl } from './test-database';
 import { confirmDisconnectedDatabase } from './test-db-close';
@@ -39,7 +41,7 @@ const { Client } = createRequire(requireDb.resolve('@prisma/adapter-pg'))('pg') 
 };
 const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
 if (!['127.0.0.1', 'localhost'].includes(source.hostname)) throw Error('자기 loopback 시험 DB가 필요합니다.');
-const name = 'opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test';
+const name = ciGreenDatabaseName('opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test');
 const target = new URL(source),
   adminUrl = new URL(source);
 target.pathname = '/' + name;
@@ -107,7 +109,7 @@ async function world(withPreset = true, published = false) {
         seed: randomUUID(),
       })
     : commandInitial();
-  if (!published) initial.scenarioKey = 'integration191';
+  if (!published) initial.scenarioKey = 'tools-int24-fixture';
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '생성 이름',
     turnTermMinutes: 60,
@@ -175,6 +177,19 @@ beforeAll(async () => {
     await readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8'),
   );
   await initializeIntegrationResources(db);
+  const content = { ...operationalInput().scenario, id: 'tools-int24-fixture', title: '설정 검증 고정물' };
+  await db.gameResource.create({
+    data: {
+      kind: 'SCENARIO',
+      name: content.id,
+      version: 1,
+      content,
+      contentHash: hashState(content),
+      status: 'PUBLISHED',
+      publishedAt: new Date(now),
+      source: '합성 설정 시험',
+    },
+  });
   actor = await user('ADMIN');
   ordinary = await user('USER');
   app = await buildServer({

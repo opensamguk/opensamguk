@@ -1,3 +1,4 @@
+import { ciGreenDatabaseName } from './test-database';
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { readFile, readdir } from 'node:fs/promises';
@@ -29,8 +30,9 @@ async function insert(client: PgClient, table: string, row: Record<string, unkno
 
 async function withDatabase(run: (client: PgClient, db: ReturnType<typeof createDb>) => Promise<void>) {
   const url = process.env.TEST_DATABASE_URL;
-  if (!url || !/^\/[a-z][a-z0-9_]*_test$/.test(new URL(url).pathname)) throw new Error('전용 테스트 DB가 필요합니다.');
-  const name = `opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`;
+  if (!url || !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(new URL(url).pathname))
+    throw new Error('전용 테스트 DB가 필요합니다.');
+  const name = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
   const target = new URL(url),
     adminUrl = new URL(url);
   target.pathname = `/${name}`;

@@ -1,3 +1,4 @@
+import { ciGreenDatabaseName } from './test-database';
 import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { setTimeout as delay } from 'node:timers/promises';
 import { execFileSync, spawn } from 'node:child_process';
@@ -6,14 +7,20 @@ import { readFile, readdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb, type PrismaClient } from '../packages/db/src/index';
-import { buildInitialWorld, scenarioSchema, TICKS_PER_MONTH } from '../packages/rules/src/index';
+import {
+  applySexLedger,
+  buildInitialWorld,
+  ruleRegistry,
+  scenarioSchema,
+  TICKS_PER_MONTH,
+} from '../packages/rules/src/index';
 import { validateWorldResources } from '../packages/rules/src/world/validate';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { saveInitialWorld, readWorldState, type InitialWorldOptions } from '../apps/engine/src/world/persistence';
-import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb, loadSexLedger } from '../apps/engine/src/world/resources';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { exportReplay } from '../apps/engine/src/replay';
 import { buildServer } from '../apps/server/src/server';
@@ -43,6 +50,13 @@ import { testDatabaseUrl } from './test-database';
 
 const root = new URL('../', import.meta.url);
 const ready = fixture.scenarios.filter((row) => row.support === 'ready');
+function savedInitial(initial: ReturnType<typeof buildInitialWorld>) {
+  return {
+    ...initial,
+    fogOfWar: initial.fogOfWar ?? false,
+    generals: applySexLedger(initial, loadSexLedger(initial.scenarioKey)),
+  };
+}
 function worldCreationFeatures(row: { bundle: string; unitSet?: string }) {
   if (row.unitSet === 'che') return ['battle-affinity-v2'];
   return row.bundle === 'B' ? ['nation-lifecycle-v1', 'personnel'] : undefined;
@@ -77,7 +91,7 @@ interface Fixture {
 function ownedDatabase(initialize = true) {
   if (!process.env.TEST_DATABASE_URL) throw new Error('전용 TEST_DATABASE_URL이 필요합니다.');
   const reference = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-  const name = `opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`;
+  const name = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
   const url = new URL(reference);
   url.pathname = `/${name}`;
   testDatabaseUrl({ TEST_DATABASE_URL: url.href, DATABASE_URL: process.env.DATABASE_URL });
@@ -349,10 +363,14 @@ it('S5 능력치 판을 시나리오와 함께 게시하고 누락과 충돌 때
     });
     expect(await initializeScenarios(db, withoutStatRules, rows)).toEqual({ inserted: 0, existing: 1 });
     const options = { scenario: '1010', map: 'che', seed: 't4-46-stat-rules' };
-    await expect(loadInitialWorldFromDb(db, options)).rejects.toThrow(
+    await expect(loadInitialWorldFromDb(db, { portraitMap: 'rtk14-map', ...options })).rejects.toThrow(
       '시나리오와 장수 생성 능력치 판이 맞지 않습니다.',
     );
-    const world = await loadInitialWorldFromDb(db, { ...options, statRules: publication.name });
+    const world = await loadInitialWorldFromDb(db, {
+      portraitMap: 'rtk14-map',
+      ...options,
+      statRules: publication.name,
+    });
     expect(world.statRules).toEqual(publication.content.stat);
   });
 });
@@ -442,6 +460,8 @@ it('S5 miniche 지도·병종의 게시, 롤백과 월드 재생', async () => {
           '--import',
           'tsx',
           'apps/engine/src/cli/createWorld.ts',
+          '--portrait-map',
+          'rtk14-map',
           '--scenario',
           scenario.id,
           '--map',
@@ -529,8 +549,10 @@ it.each([
     expect(await initializeScenarios(db, generated, rows)).toEqual({ inserted: 1, existing: 0 });
     const options = { scenario: scenario.id, seed: 't4-46-alternate-legacy-map' };
     const wrongMap = map === 'che' ? 'cr' : 'che';
-    await expect(loadInitialWorldFromDb(db, { ...options, map: wrongMap, unitSet })).rejects.toThrow('지도');
-    const initial = await loadInitialWorldFromDb(db, { ...options, map, unitSet });
+    await expect(
+      loadInitialWorldFromDb(db, { portraitMap: 'rtk14-map', ...options, map: wrongMap, unitSet }),
+    ).rejects.toThrow('지도');
+    const initial = await loadInitialWorldFromDb(db, { portraitMap: 'rtk14-map', ...options, map, unitSet });
     const { worldId } = await saveInitialWorld(db, initial, {
       name: map,
       turnTermMinutes: 60,
@@ -626,6 +648,7 @@ it.each([
       expect(await initializeScenarios(db, generated, rows)).toEqual({ inserted: 0, existing: 1 });
 
       const initialWorld = await loadInitialWorldFromDb(db, {
+        portraitMap: 'rtk14-map',
         scenario: key,
         map: 'miniche',
         unitSet,
@@ -663,14 +686,16 @@ it.each(ready)('S6 $key 두 DB 월드의 행 수와 재적재 해시는 파일 �
     };
     const ruleFeatures = worldCreationFeatures(row);
     if (row.unitSet === 'che')
-      await expect(loadInitialWorldFromDb(db, { ...options, unitSet: 'basic' })).rejects.toThrow('che 병종 판');
+      await expect(
+        loadInitialWorldFromDb(db, { portraitMap: 'rtk14-map', ...options, unitSet: 'basic' }),
+      ).rejects.toThrow('che 병종 판');
     const fromFile = buildInitialWorld({
       ...scenarioMaterialsForRow(await readScenarioMaterials(db), row),
       scenario: JSON.parse(input[row.key]!),
       seed: options.seed,
     });
     for (let index = 0; index < 2; index++) {
-      const initial = await loadInitialWorldFromDb(db, options);
+      const initial = await loadInitialWorldFromDb(db, { portraitMap: 'rtk14-map', ...options });
       expect(hashState(initial)).toBe(hashState(fromFile));
       expect(hashState(initial)).toBe(row.initialHashes!['t4-46-a']);
       const { worldId } = await saveInitialWorld(db, initial, {
@@ -682,7 +707,7 @@ it.each(ready)('S6 $key 두 DB 월드의 행 수와 재적재 해시는 파일 �
       expect(await db.city.count({ where: { worldId } })).toBe(row.expected!.cities);
       expect(await db.nation.count({ where: { worldId } })).toBe(row.expected!.nations);
       expect(await db.general.count({ where: { worldId } })).toBe(row.expected!.generals);
-      expect(hashState(await readWorldState(db, worldId))).toBe(hashState(ruleFeatures ? { ...initial } : initial));
+      expect(hashState(await readWorldState(db, worldId))).toBe(hashState(savedInitial(initial)));
     }
   });
 });
@@ -693,19 +718,24 @@ it.each([
 ])('B2 $key 명시적 CLI 생성·시작 방랑·구형 거부와 손상 적재를 검증한다', async (row) => {
   await withDatabase(async ({ db, url }) => {
     await initializeScenarios(db, sql);
-    const initial = await loadInitialWorldFromDb(db, { scenario: row.key, map: 'che', seed: 't4-46-a' });
+    const initial = await loadInitialWorldFromDb(db, {
+      portraitMap: 'rtk14-map',
+      scenario: row.key,
+      map: 'che',
+      seed: 't4-46-a',
+    });
     const options = { name: `시작 방랑 ${row.key}`, turnTermMinutes: 60, endYear: 300 };
     const invalid: Array<Partial<InitialWorldOptions>> = [
-      {},
       { replayFormat: 'legacy' },
       { replayFormat: 'policy' },
       { treatyFormat: 1 },
       { extFormat: 1 },
-      {},
       { replayFormat: 1 },
     ];
     for (const disabled of invalid) {
-      await expect(saveInitialWorld(db, initial, { ...options, ...disabled })).rejects.toThrow('시작 방랑');
+      await expect(saveInitialWorld(db, initial, { ...options, ...disabled })).rejects.toThrow(
+        disabled.extFormat || disabled.treatyFormat ? '별도 기능 생성 옵션' : '재생 형식 3',
+      );
       expect(await db.world.count()).toBe(0);
       expect(await db.nation.count()).toBe(0);
     }
@@ -715,6 +745,8 @@ it.each([
         '--import',
         'tsx',
         'apps/engine/src/cli/createWorld.ts',
+        '--portrait-map',
+        'rtk14-map',
         '--scenario',
         row.key,
         '--map',
@@ -733,9 +765,9 @@ it.each([
     const result = JSON.parse(output) as { worldId: string; stateHash: string };
     const { worldId } = result;
     const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
-    expect(providedRuleKeys).toEqual(['nation-lifecycle-v1', 'personnel']);
+    expect(providedRuleKeys).toEqual(ruleRegistry.features.map(({ key }) => key).sort());
     expect(world.nationLifecycleState).toEqual({ version: 1, nations: { [row.nationId]: { sinceTick: 0 } } });
-    expect(result.stateHash).toBe(hashState({ ...initial }));
+    expect(result.stateHash).toBe(hashState(savedInitial(initial)));
     expect(await db.nation.findUniqueOrThrow({ where: { worldId_id: { worldId, id: row.nationId } } })).toMatchObject({
       capitalCityKey: null,
     });
@@ -788,6 +820,8 @@ it.each(['2060', '2070'])(
           '--import',
           'tsx',
           'apps/engine/src/cli/createWorld.ts',
+          '--portrait-map',
+          'rtk14-map',
           '--scenario',
           key,
           '--map',
@@ -810,10 +844,10 @@ it.each(['2060', '2070'])(
       const app = await buildServer({ db, logging: false });
       const currentWorld = () => db.world.findUniqueOrThrow({ where: { id: worldId } });
       const advance = async (tick: number) => {
-        const lease = await acquireLease(db, worldId);
+        const lease = await acquireLease(db, worldId, undefined, 120_000);
         if (!lease) throw new Error('공백지 월드의 실행권을 얻지 못했습니다.');
         try {
-          await new TurnLoop(db, lease).advanceTo(tick);
+          await new TurnLoop(db, lease, { beforeCommit: (tx) => renewLease(tx, lease) }).advanceTo(tick);
         } finally {
           await releaseLease(db, lease);
         }
@@ -844,8 +878,6 @@ it.each(['2060', '2070'])(
           strength: 55,
           intel: 55,
           sex: 'MALE' as const,
-          politics: 55,
-          charm: 55,
           portraitId: null,
         });
         try {
@@ -945,6 +977,7 @@ describe.each(ready)('S8 $key 전체 장수가 있는 DB 월드', (row) => {
       const { db } = fixture;
       await initializeScenarios(db, sql);
       const initial = await loadInitialWorldFromDb(db, {
+        portraitMap: 'rtk14-map',
         scenario: row.key,
         map: 'che',
         seed: 't4-46-a',
@@ -1076,12 +1109,14 @@ describe('T4-46 / AC-P2-24 A9·B2 출처와 합성', () => {
   const cases = fixture.scenarios.filter((row) => row.support === 'ready') as unknown as ScenarioCase[];
   let materials: ScenarioMaterials;
   beforeAll(async () => {
-    const db = createDb(testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL }).href);
+    const owned = ownedDatabase();
     try {
+      const { db } = await owned.setup();
+      await initializeLegacyMaps(db);
       materials = await readScenarioMaterials(db);
       sql = convert();
     } finally {
-      await db.$disconnect();
+      await owned.close();
     }
   });
   const convert = (texts = input, rows: readonly ScenarioRow[] = scenarioRows, sourceNotice = notice) =>

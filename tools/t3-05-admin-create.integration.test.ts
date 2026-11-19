@@ -33,7 +33,7 @@ import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { processWorldCreateRequest } from '../apps/engine/src/admin/createRequests';
 import { prepareWorldReset } from '../apps/engine/src/admin/resetPreparation';
 import { stopOwnedChild } from '../apps/engine/src/process-lifecycle';
-import { testDatabaseUrl } from './test-database';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
 import { confirmDisconnectedDatabase } from './test-db-close';
 
 type Pg = {
@@ -51,7 +51,7 @@ if (!['127.0.0.1', 'localhost'].includes(source.hostname)) throw new Error('loop
 for (const key of source.searchParams.keys())
   if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
     throw new Error('접속 대상 질의 인자는 쓸 수 없습니다.');
-const name = 'opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test';
+const name = ciGreenDatabaseName('opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test');
 const target = new URL(source),
   adminUrl = new URL(source);
 target.pathname = '/' + name;
@@ -68,7 +68,7 @@ const apps = new Set<Awaited<ReturnType<typeof buildServer>>>(),
   children: OwnedChild[] = [],
   oldWorlds: string[] = [];
 const crashUrl = new URL(target);
-const crashName = 'opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test';
+const crashName = ciGreenDatabaseName('opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test');
 crashUrl.pathname = '/' + crashName;
 const crash = {
   name: crashName,
@@ -755,7 +755,7 @@ for (const profileKey of [
     );
     if (!selected?.available) throw new Error('실제 확장 선택지가 필요합니다.');
     const profile = await loadFeatureProfile(profileKey);
-    const createdFeatures = [...new Set([...providedRuleKeys, 'office-effects'])].sort();
+    const createdFeatures = ruleRegistry.features.map(({ key }) => key).sort();
     if (selected.featureProfileKey === profileKey) expect(selected.featureProfileHash).toBe(profile.contentHash);
     const pair = await accepted(actor, signal, {
       ...selected.selection,
@@ -794,14 +794,9 @@ for (const profileKey of [
       if (providedRuleKeys.includes('nation-lifecycle-v1'))
         expect(world.nationLifecycleState).toEqual({ version: 1, nations: {} });
       else expect(world.nationLifecycleState).toBeNull();
-      if (profileKey === 'expanded-191-v6' || profileKey === 'expanded-191-v7') {
-        expect(providedRuleKeys).toHaveLength(profileKey === 'expanded-191-v7' ? 24 : 23);
-        expect(world.preparedTurnsState).toEqual({ version: 1, nations: {} });
-        expect(world.nationResearchState).toEqual({ version: 1, nations: {} });
-      } else {
-        expect(world.preparedTurnsState).toBeNull();
-        expect(world.nationResearchState).toBeNull();
-      }
+      expect(providedRuleKeys).toEqual(expect.arrayContaining(['prepared-turns-v1', 'nation-research-v1']));
+      expect(world.preparedTurnsState).toEqual({ version: 1, nations: {} });
+      expect(world.nationResearchState).toEqual({ version: 1, nations: {} });
       const resolution = stored.resolution as {
         resources: Array<{ kind: string; version: number; contentHash: string }>;
       };
@@ -820,14 +815,12 @@ for (const profileKey of [
     if (archive.version !== 3) throw new Error('확장 생성의 실제 V3 보관 파일이 필요합니다.');
     const reloaded = await loadWorld(db, world.id);
     const borderReturn = resolverForRuleFeatures(reloaded)?.get('return_border');
-    if (profileKey === 'expanded-191-v7') {
-      expect(borderReturn).toMatchObject({
-        key: 'return_border',
-        name: '접경귀환',
-        target: 'general',
-        category: 'military',
-      });
-    } else expect(borderReturn).toBeUndefined();
+    expect(borderReturn).toMatchObject({
+      key: 'return_border',
+      name: '접경귀환',
+      target: 'general',
+      category: 'military',
+    });
     expect(hashState(archive.origin.initial)).toBe(world.initialStateHash);
     expect(
       hashState(initialReplayStateWithRegistry(archive.origin.initial, ruleRegistry, archive.origin.featureData).state),
@@ -869,7 +862,9 @@ for (const profileKey of [
     });
     const target = await db.world.findUniqueOrThrow({ where: { id: reset.data.plannedNewWorldId } });
     expect(target.status).toBe('PREOPEN');
-    expect(providedRuleKeys).toEqual(providedRuleKeys);
+    expect(target.cityResourcesState).not.toBeNull();
+    expect(target.campaignState).not.toBeNull();
+    expect(target.nationResearchState).not.toBeNull();
     expect(target.replayOrigin).toMatchObject({ featureData: profile.value.featureData });
     expect(
       await db.general.findMany({
@@ -972,16 +967,22 @@ it('AC-P2-30·31·32·33 설정 파일 누락·손상은 기존 HTTP 목록과 r
     });
 });
 
-it('AC-P2-30·31·32·33 입력 목록 누락을 시나리오 기능으로 채우지 않고 미지 키를 확정 거부한다', async (signal) => {
+it('AC-P2-30·31·32·33 미지 프로필과 자원 불일치를 거부하고 일치하는 현재 생성은 허용한다', async (signal) => {
   const { value } = await loadFeatureProfile('expanded-191-v3');
   for (const [extra, expected] of [
     [{ featureProfileKey: 'missing-expanded-profile' }, 'RESOURCE_INVALID'],
-    [{ featureProfileKey: value.key }, 'INPUT_INVALID'],
+    [{ featureProfileKey: value.key }, null],
     [{ featureProfileKey: value.key, mapKey: 'san10' }, 'INPUT_INVALID'],
   ] as const) {
     const pair = await accepted(actor, signal, extra);
     await processOne(signal);
     const stored = await row(pair.receipt.requestId);
+    if (expected === null) {
+      expect(stored).toMatchObject({ status: 'DONE', errorCode: null });
+      const created = await db.world.findUniqueOrThrow({ where: { id: stored.plannedWorldId } });
+      expect(created.replayOrigin).toMatchObject({ version: 3, featureData: value.featureData });
+      continue;
+    }
     expect(stored).toMatchObject({ status: 'FAILED', errorCode: expected });
     expect(await db.world.count({ where: { id: stored.plannedWorldId } })).toBe(0);
   }
@@ -1361,7 +1362,6 @@ for (const [field, value, code] of [
   ['scenarioKey', 'missing', 'RESOURCE_INVALID'],
   ['presetKey', 'missing', 'RESOURCE_INVALID'],
   ['endYear', 1, 'INPUT_INVALID'],
-  ['ruleFeatures', ['campaign-assignment-v2'], 'INPUT_INVALID'],
 ] as const)
   it('AC-M3-04 확정 불가 ' + field + '는 고정 FAILED이며 같은 키는 재생성하지 않는다', async (signal) => {
     const acceptedRequest = await accepted(actor, signal, { [field]: value }),
@@ -1379,6 +1379,12 @@ for (const [field, value, code] of [
     expect(await db.world.count({ where: { id: current.plannedWorldId } })).toBe(0);
     expect(await oldFootprints()).toEqual(old);
   });
+it('AC-INT-28 없어진 월드별 규칙 선택 입력은 HTTP 경계에서 접수하지 않는다', async (signal) => {
+  const before = await db.worldCreateRequest.count();
+  const response = await create(actor, input(actor, { ruleFeatures: ['campaign-assignment-v2'] }), signal);
+  expect(response.status).toBe(400);
+  expect(await db.worldCreateRequest.count()).toBe(before);
+});
 it('AC-M3-04 프리셋 위에 명시한 정식 자원·간격·긴 이름을 유지한다', async (signal) => {
   const long = '긴 이름'.repeat(100),
     request = await accepted(actor, signal, {
@@ -1430,7 +1436,7 @@ it('AC-P2-27 실제 HTTP의 1판 별칭은 멱등하고 게시 2판은 엔진·�
       return {
         kind,
         name,
-        content: selected,
+        content: selected as Prisma.InputJsonValue,
         contentHash: hashState(selected),
         source,
         version: 2,

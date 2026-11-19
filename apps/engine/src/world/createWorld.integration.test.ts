@@ -3,7 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeEach, describe, expect, it, onTestFailed } from 'vitest';
 import { createDb } from '@opensamguk/db';
 import { hashState } from '@opensamguk/shared/node';
-import { loadInitialWorldFromDb } from './resources';
+import { applySexLedger, type WorldInit } from '@opensamguk/rules';
+import { loadInitialWorldFromDb, loadSexLedger } from './resources';
 import {
   prepareInitialWorld,
   readWorldState,
@@ -16,7 +17,12 @@ if (!url || !/\/[a-z][a-z0-9_]*_test$/.test(new URL(url).pathname))
   throw new Error('pnpm test:int로 전용 테스트 DB를 준비하세요.');
 const db = createDb(url);
 const options = { name: 'AC-M1-03 integration', turnTermMinutes: 10, endYear: null };
-const input = { scenario: '1030', map: 'che', seed: 'integration-seed' };
+const input = { portraitMap: 'rtk14-map', scenario: '1030', map: 'che', seed: 'integration-seed' };
+const storedInitial = (initial: WorldInit): WorldInit => ({
+  ...initial,
+  fogOfWar: false,
+  generals: applySexLedger(initial, loadSexLedger(initial.scenarioKey)),
+});
 
 const ownedWorldIds = new Set<string>();
 const ownedCliAuditIds: bigint[] = [];
@@ -95,14 +101,14 @@ describe('AC-M1-03 실제 DB 월드 생성', () => {
       expect([read.cities.length, read.nations.length, read.generals.length, read.diplomacies.length]).toEqual([
         94, 21, 491, 7,
       ]);
-      expect(read).toEqual(state);
+      expect(read).toEqual(storedInitial(state));
       const withPortraits = read.generals.filter((general) => general.portraitId !== null);
       expect(withPortraits.length).toBe(429);
       expect(withPortraits.length / read.generals.length).toBeGreaterThanOrEqual(0.8);
       expect(read.generals.find((general) => general.name === '조조')?.portraitId).toBe(10405);
       expect(read.generals.find((general) => general.name === '고승')?.portraitId).toBeNull();
       expect(hashState(read)).toBe(result.stateHash);
-      expect(result.stateHash).toBe(hashState(state));
+      expect(result.stateHash).toBe(hashState(storedInitial(state)));
       const world = await db.world.findUniqueOrThrow({ where: { id: result.worldId } });
       expect(world).toMatchObject({
         status: 'PREOPEN',
@@ -205,8 +211,8 @@ describe('AC-M1-03 실제 DB 월드 생성', () => {
     const firstId = randomUUID();
     const saved = await db.$transaction((tx) => savePreparedInitialWorld(tx, prepared, firstId), { timeout: 30000 });
     ownedWorldIds.add(saved.worldId);
-    expect(saved).toEqual({ worldId: firstId, stateHash: hashState(initial) });
-    expect(await readWorldState(db, firstId)).toEqual(initial);
+    expect(saved).toEqual({ worldId: firstId, stateHash: hashState(storedInitial(initial)) });
+    expect(await readWorldState(db, firstId)).toEqual(storedInitial(initial));
     const rolledBackId = randomUUID();
     await expect(
       db.$transaction(

@@ -12,6 +12,7 @@ import {
 import { hashState } from '../packages/shared/src/node/hashState';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { readWorldState, saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { prepareFixtureUnit, recruitmentFixtureData } from './fixtures/recruitment';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import {
@@ -44,7 +45,7 @@ if (
   !['postgres:', 'postgresql:'].includes(target.protocol) ||
   !['127.0.0.1', 'localhost'].includes(target.hostname) ||
   !['', '5432', '5433', '5434', '5435', '5561'].includes(target.port) ||
-  !/^\/[a-z][a-z0-9_]*_test$/.test(target.pathname) ||
+  !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(target.pathname) ||
   target.searchParams.has('host') ||
   target.searchParams.has('port')
 )
@@ -187,6 +188,7 @@ async function createWorld(enabled = true, fixture = initial) {
     name: enabled ? 'INT18 정식 원생성' : 'INT18 기존 판',
     turnTermMinutes: 60,
     endYear: 201,
+    featureData: recruitmentFixtureData(source),
   });
   worldIds.push(worldId);
   return worldId;
@@ -233,7 +235,10 @@ async function createActor(worldId: string, index: number): Promise<Actor> {
 
 // 부여한 직책·집결·도시 자원은 권한 경계 시험에만 쓴다. 생성 인물·출처는 실제 입력으로 만든다.
 async function authorityFixture(fixture = initial) {
-  const worldId = await createWorld(true, fixture);
+  const source = structuredClone(fixture);
+  // 권한 경계는 새 사람 둘의 실제 차례로 준비한다. 배경 NPC 차례는 이 고정물 밖에 둔다.
+  for (const general of source.generals) general.nextTurnTick = 1_000_000;
+  const worldId = await createWorld(true, source);
   await controlClock(db, worldId, 'start');
   const actors = [await createActor(worldId, 0), await createActor(worldId, 1)] as [Actor, Actor];
   const nation = initial.nations.find(
@@ -267,23 +272,17 @@ async function authorityFixture(fixture = initial) {
       await assertLease(tx, lease);
     }),
   );
-  for (const actor of actors) {
-    const revision = (await snapshot(worldId)).state.campaign!.revision,
-      requestId = randomUUID();
-    expect(
-      (
-        await api(
-          'campaign.unit',
-          { worldId, requestId, payload: { type: 'form', commanderId: actor.generalId, crewType: 1100, revision } },
-          actor.cookie,
-          true,
-        )
-      ).data,
-    ).toMatchObject({ status: 'pending' });
-    await drain(worldId);
-    const state = await snapshot(worldId);
-    actor.unitId = state.state.campaign!.units.find((unit) => unit.ownerId === actor.generalId)!.id;
-  }
+  for (const actor of actors) actor.unitId = await prepareFixtureUnit(db, worldId, actor.generalId);
+  await db.$transaction(async (tx) => {
+    const before = await loadReplayState(tx, worldId),
+      next = structuredClone(before.state);
+    next.cityResources!.cities[String(cityKey)] = {
+      gold: 10000,
+      rice: 10000,
+      garrison: [{ crewType: 1100, troops: 300, train: 40, atmos: 60 }],
+    };
+    await persistCityResourcesState(tx, worldId, before.state, next, before.campaignArmyTypes!);
+  });
   return { worldId, actors, cityKey, otherCityKey, nationId: nation.id };
 }
 async function submit(
@@ -387,8 +386,8 @@ describe('AC-INT-18B 정식 원생성·기존 판과 실제 PG', () => {
         (city) => city.gold === 0 && city.rice === 0 && city.garrison.length === 0,
       ),
     ).toBe(true);
-    expect((await db.world.findUniqueOrThrow({ where: { id: oldWorld } })).cityResourcesState).toBeNull();
-    expect(Object.hasOwn((await snapshot(oldWorld)).state, 'cityResources')).toBe(false);
+    expect((await db.world.findUniqueOrThrow({ where: { id: oldWorld } })).cityResourcesState).not.toBeNull();
+    expect(Object.hasOwn((await snapshot(oldWorld)).state, 'cityResources')).toBe(true);
   });
 });
 describe('AC-INT-18B 정식 자료 기반 권한·잔량 통제 고정물', () => {
@@ -399,7 +398,7 @@ describe('AC-INT-18B 정식 자료 기반 권한·잔량 통제 고정물', () =
     const { worldId, actors, cityKey } = await authorityFixture(opening);
     const staff = actors[1];
     const recruitType = initial.unitSet.crewTypes.find(({ armType, id }) => armType > 0 && id !== 1100)!;
-    const form = { commandKey: 'form_unit', args: { crewType: recruitType.id } };
+    const form = { commandKey: 'recruit', args: { crewType: recruitType.id, unitId: 'new', amount: 1 } };
     const allocate = {
       commandKey: 'nation_city_allocate',
       args: { cityKey, unitId: staff.unitId, crewType: 1100, amount: 200 },
@@ -466,9 +465,13 @@ describe('AC-INT-18B 정식 자료 기반 권한·잔량 통제 고정물', () =
     const after = await snapshot(worldId);
     const units = after.state.campaign!.units.filter(({ ownerId }) => ownerId === staff.generalId);
     expect(units).toHaveLength(2);
-    expect(units.find(({ id }) => id === staff.unitId)).toMatchObject({ troops: 200, train: 40, atmos: 60 });
+    expect(units.find(({ id }) => id === staff.unitId)).toMatchObject({
+      troops: 201,
+      train: Math.floor((200 * 40) / 201),
+      atmos: Math.floor((200 * 60) / 201),
+    });
     expect(units.find(({ crewType }) => crewType === recruitType.id)).toMatchObject({
-      troops: 0,
+      troops: 1,
       commanderId: staff.generalId,
     });
     expect(after.state.cityResources!.cities[String(cityKey)]!.garrison).toContainEqual({
@@ -523,8 +526,11 @@ describe('AC-INT-18B 정식 자료 기반 권한·잔량 통제 고정물', () =
     expect(city.garrison[0]!.troops).toBe(100);
     expect(city.gold).toBe(before.state.cityResources!.cities[String(f.cityKey)]!.gold);
     expect(city.rice).toBe(before.state.cityResources!.cities[String(f.cityKey)]!.rice);
-    expect(after.state.campaign!.units.reduce((sum, row) => sum + row.troops, 0)).toBe(200);
-    expect(after.state.campaign!.units.find((unit) => unit.troops === 200)).toMatchObject({ train: 40, atmos: 60 });
+    expect(after.state.campaign!.units.reduce((sum, row) => sum + row.troops, 0)).toBe(202);
+    expect(after.state.campaign!.units.find((unit) => unit.troops === 201)).toMatchObject({
+      train: Math.floor((200 * 40) / 201),
+      atmos: Math.floor((200 * 60) / 201),
+    });
     expect(after.state.nations).toEqual(before.state.nations);
     for (const actor of f.actors) {
       expect(after.state.generals[actor.generalId]!.crew).toBe(0);

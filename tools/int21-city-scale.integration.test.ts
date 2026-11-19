@@ -20,7 +20,7 @@ import { newSession } from '../apps/server/src/auth/session';
 const url = process.env.TEST_DATABASE_URL;
 if (!url) throw new Error('도시 규모 전용 테스트 DB가 필요합니다.');
 const target = new URL(url);
-if (!['127.0.0.1', 'localhost'].includes(target.hostname) || !/^\/[a-z][a-z0-9_]*_test$/.test(target.pathname))
+if (!['127.0.0.1', 'localhost'].includes(target.hostname) || !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(target.pathname))
   throw new Error('loopback 전용 테스트 DB를 확인하세요.');
 const db = createDb(url);
 const worldIds: string[] = [],
@@ -124,7 +124,11 @@ function initialWorld(expanded = true) {
         : {}),
     },
   });
-  for (const general of initial.generals) general.userId = userIds[general.id - 1]!;
+  initial.fogOfWar = true;
+  for (const general of initial.generals) {
+    general.userId = userIds[general.id - 1]!;
+    general.sex = 'UNKNOWN';
+  }
   return initial;
 }
 async function world(expanded = true) {
@@ -142,7 +146,9 @@ const snapshot = (worldId: string) =>
 
 it('무·경·폐허의 최초 저장과 실제 TCP 조회는 원래 규모·공개 표식·비공개 수치 경계를 지킨다', async () => {
   const { worldId, initial } = await world();
-  expect(hashState(await snapshot(worldId))).toBe(hashState(initialReplayState(initial)));
+  expect((await db.world.findUniqueOrThrow({ where: { id: worldId } })).initialStateHash).toBe(
+    hashState({ ...initial, generals: initial.generals.map((general) => ({ ...general, userId: null, crew: 0 })) }),
+  );
   expect((await db.world.findUniqueOrThrow({ where: { id: worldId } })).cityRuinsState).toEqual(
     initialReplayState(initial).state.cityRuins,
   );
@@ -176,10 +182,12 @@ it('실제 월 정산·재적재와 DB 없는 별도 재생이 일치하고 공�
   const loop = new TurnLoop(db, lease, { publicMapNow: () => now });
   await loop.advanceTo(TICKS_PER_MONTH);
   const stored = await snapshot(worldId);
-  let replay = initialReplayState(initial);
-  const row = await db.world.findUniqueOrThrow({ where: { id: worldId } });
-  for (let sequence = 0; sequence < row.actionSequence; sequence++)
-    replay = runReplayAction(replay, initial.seed, initial.unitSet);
+  let replay = first;
+  while (replay.monthlyTick < TICKS_PER_MONTH) {
+    const next = runReplayAction(replay, initial.seed, initial.unitSet);
+    expect(next).not.toBe(replay);
+    replay = next;
+  }
   expect(hashState(stored)).toBe(hashState(replay));
   expect(stored.state.cityRuins!.cities.find((city) => city.cityKey === 1)!.stage).toBe(1);
   expect(stored.state.cityRuins!.cities.find((city) => city.cityKey === 3)!.stage).toBe(0);
@@ -255,13 +263,14 @@ it('누락·위조한 저장 원장과 실패한 CAS를 거부하고 트랜잭�
   });
 });
 
-it('기존 월드의 저장값은 NULL이고 도시·지도·홈 응답에는 새 키가 없다', async () => {
+it('규모를 생략한 월드도 빈 폐허 원장을 저장하고 도시·지도·홈은 정상 도시를 표시한다', async () => {
   const { worldId, initial } = await world(false);
-  expect((await db.world.findUniqueOrThrow({ where: { id: worldId } })).cityRuinsState).toBeNull();
-  expect(hashState(await snapshot(worldId))).toBe(hashState(initialReplayState(initial)));
+  expect((await db.world.findUniqueOrThrow({ where: { id: worldId } })).cityRuinsState).toEqual(
+    initialReplayState(initial).state.cityRuins,
+  );
   const session = await cookie();
-  expect((await api<CityInfo>('city.get', { worldId, cityKey: 1 }, session)).data).not.toHaveProperty('ruin');
-  expect((await api<{ city: CityInfo }>('home.get', { worldId }, session)).data!.city).not.toHaveProperty('ruin');
+  expect((await api<CityInfo>('city.get', { worldId, cityKey: 1 }, session)).data?.ruin).toBeNull();
+  expect((await api<{ city: CityInfo }>('home.get', { worldId }, session)).data!.city.ruin).toBeNull();
   const map = (await api<{ cities: CityInfo[] }>('world.map', { worldId }, session)).data!;
-  expect(map.cities.every((city) => !Object.hasOwn(city, 'ruin'))).toBe(true);
+  expect(map.cities.every((city) => city.ruin === null)).toBe(true);
 });

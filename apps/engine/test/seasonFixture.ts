@@ -53,7 +53,7 @@ export async function recordTestTurns(
     });
     const sequence = await nextActionSequence(tx, worldId);
     const world = await tx.world.findUniqueOrThrow({ where: { id: worldId }, select: { clockTick: true } });
-    await tx.inputEvent.create({
+    const event = await tx.inputEvent.create({
       data: {
         worldId,
         userId: general.userId ?? 'season-fixture',
@@ -66,6 +66,11 @@ export async function recordTestTurns(
         result: { revision: general.turnRevision + 1, activeTick: world.clockTick },
       },
     });
+    if (general.userId !== null)
+      await tx.general.update({
+        where: { worldId_id: { worldId, id: generalId } },
+        data: { lastActiveTick: Math.max(general.lastActiveTick ?? 0, world.clockTick), lastActiveAt: event.createdAt },
+      });
   });
 }
 

@@ -16,7 +16,7 @@ const url = process.env.TEST_DATABASE_URL;
 if (
   !url ||
   !['127.0.0.1', 'localhost'].includes(new URL(url).hostname) ||
-  !/^\/[a-z][a-z0-9_]*_test$/.test(new URL(url).pathname)
+  !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(new URL(url).pathname)
 )
   throw new Error('loopback 전용 테스트 DB가 필요합니다.');
 const db = createDb(url);
@@ -54,14 +54,18 @@ beforeAll(
       const state = await db.$transaction((tx) => loadWorld(tx, worldId!));
       const from = Object.values(state.cities).find(
         (city) =>
+          city.kind !== 'FIELD' &&
           city.nationId !== null &&
           city.connections.some(
-            (id) => state.cities[id]!.nationId !== null && state.cities[id]!.nationId !== city.nationId,
+            (id) =>
+              state.cities[id]!.kind !== 'FIELD' &&
+              state.cities[id]!.nationId !== null &&
+              state.cities[id]!.nationId !== city.nationId,
           ),
       )!;
       const target = from.connections
         .map((id) => state.cities[id]!)
-        .find((city) => city.nationId !== null && city.nationId !== from.nationId)!;
+        .find((city) => city.kind !== 'FIELD' && city.nationId !== null && city.nationId !== from.nationId)!;
       const friendly = Object.values(state.generals)
         .filter((general) => general.nationId === from.nationId && general.activeFromYear <= 191)
         .sort((a, b) => b.leadership - a.leadership || a.id - b.id);

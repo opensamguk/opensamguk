@@ -14,6 +14,7 @@ import { cityNpcAllocations } from '../packages/rules/src/cityResources/npc';
 import { operationalInput } from '../packages/rules/test/operationalMapFixture';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { recruitmentFixtureData } from './fixtures/recruitment';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { acquireLease, assertLease, lockLease, releaseLease, renewLease, LEASE_TTL_MS } from '../apps/engine/src/lease';
@@ -285,6 +286,7 @@ beforeAll(() => {
       name: 'INT19 NPC 자기부곡 통제 검사',
       turnTermMinutes: 60,
       endYear: 201,
+      featureData: recruitmentFixtureData(initial),
     }));
     await controlClock(db, worldId, 'start');
     app = await buildServer({ db, logging: false, publicOrigin: origin, now: () => now });
@@ -396,10 +398,10 @@ it('NPC자기부곡 지시는 정상 도시 준비와 NPC군주 배속으로 병
     const crewType = initial.unitSet.crewTypes
       .filter((row) => row.armType > 0 && row.id !== ruler.crewType)
       .sort((x, y) => x.cost - y.cost || x.id - y.id)[0]!;
-    await executeOrder(await issued('form_unit', { crewType: crewType.id }));
+    await executeOrder(await issued('recruit', { crewType: crewType.id, unitId: 'new', amount: 1 }));
     const formed = (await snapshot()).state.campaign!.units;
     expect(formed).toHaveLength(1);
-    expect(formed[0]).toMatchObject({ ownerId: npcId, commanderId: npcId, crewType: crewType.id, troops: 0 });
+    expect(formed[0]).toMatchObject({ ownerId: npcId, commanderId: npcId, crewType: crewType.id, troops: 1 });
     const unitId = formed[0]!.id;
 
     // 도시 금으로 그 병종 수비병만 모병·사기·훈련하게 지시하고, NPC군주의 실제 국가 차례 배속을 기다린다.

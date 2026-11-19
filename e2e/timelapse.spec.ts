@@ -251,7 +251,7 @@ test('E3 첫 화면은 가장 오래된 달이고 재생하면 날짜가 오름�
   await expect(dateLine(page)).toHaveText(`${await dateOf(a, a.ticks[33]!)} (34/35)`);
 });
 
-test('E4 실제 출병으로 멸망한 국가 2는 첫 달에 저장된 이름·색으로 그려지고 둘째 달에는 지도·범례에 없다', async ({
+test('E4 실제 출병으로 멸망한 국가 2는 첫 달에 저장된 이름·색으로 그려지고 마지막 달에는 지도·범례에 없다', async ({
   page,
   timelapseStack,
 }) => {
@@ -267,15 +267,15 @@ test('E4 실제 출병으로 멸망한 국가 2는 첫 달에 저장된 이름·
 
   await login(page);
   await page.goto(tabUrl(p));
-  await expect(panel(page).locator('[data-frame-tick="10000"]')).toBeVisible();
+  await expect(panel(page).locator(`[data-frame-tick="${p.ticks[0]}"]`)).toBeVisible();
   await expect(dateLine(page)).not.toContainText('국가 기록 없음');
   await expect(city(page, 2)).toHaveAttribute('data-nation-id', '2');
   await expect(city(page, 2).locator('title')).toHaveText(`도시2, ${pSaved.removed.name}`);
   expect(await fillOf(page, 2)).toBe(await cssColor(page, pSaved.removed.color));
   await expect(legend(page).locator('[data-nation-id="2"]')).toContainText(pSaved.removed.name);
 
-  await button(page, '다음').click();
-  await expect(panel(page).locator('[data-frame-tick="20000"]')).toBeVisible();
+  for (let frame = 1; frame < p.ticks.length; frame++) await button(page, '다음').click();
+  await expect(panel(page).locator(`[data-frame-tick="${p.ticks.at(-1)}"]`)).toBeVisible();
   await expect(dateLine(page)).not.toContainText('국가 기록 없음');
   await expect(panel(page).getByTestId('timelapse-map')).toBeVisible();
   await expect(city(page, 2)).toHaveAttribute('data-nation-id', '1');
@@ -283,7 +283,7 @@ test('E4 실제 출병으로 멸망한 국가 2는 첫 달에 저장된 이름·
   await expect(legend(page).locator('[data-nation-id="2"]')).toHaveCount(0);
 });
 
-test('E5 국가 1의 지금 이름·색을 바꾸면 응답의 currentNations만 바뀌고 화면은 두 달 모두 저장값이다', async ({
+test('E5 국가 1의 지금 이름·색을 바꾸면 응답의 currentNations만 바뀌고 화면은 모든 달에 저장값이다', async ({
   page,
   timelapseStack,
 }) => {
@@ -300,7 +300,9 @@ test('E5 국가 1의 지금 이름·색을 바꾸면 응답의 currentNations만
     await page.goto(tabUrl(p));
     const body = (await framesEntry(await response))?.result?.data;
     expect(body?.currentNations.find(({ id }) => id === 1)).toEqual({ id: 1, ...now });
-    expect(body?.items.map(({ nations }) => nations.find(({ id }) => id === 1))).toEqual([pSaved.first, pSaved.first]);
+    expect(body?.items.map(({ nations }) => nations.find(({ id }) => id === 1))).toEqual(
+      p.ticks.map(() => pSaved.first),
+    );
 
     await page.reload();
     const savedColor = await cssColor(page, pSaved.first.color);

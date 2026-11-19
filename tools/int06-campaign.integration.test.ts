@@ -7,6 +7,7 @@ import { hashState } from '../packages/shared/src/node/hashState';
 import { applyCampaignRelationship, type WorldInit } from '../packages/rules/src/index';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { recruitmentFixtureData } from './fixtures/recruitment';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { acquireLease, releaseLease, renewLease, LEASE_TTL_MS } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -27,7 +28,7 @@ const url = process.env.TEST_DATABASE_URL;
 if (
   !url ||
   !['127.0.0.1', 'localhost'].includes(new URL(url).hostname) ||
-  !/^\/[a-z][a-z0-9_]*_test$/.test(new URL(url).pathname)
+  !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(new URL(url).pathname)
 )
   throw new Error('loopback 전용 테스트 DB가 필요합니다.');
 const db = createDb(url);
@@ -175,6 +176,7 @@ beforeAll(() =>
         name: 'INT06 정식 HTTP',
         turnTermMinutes: 60,
         endYear: 201,
+        featureData: recruitmentFixtureData(initial),
       });
       worldIds.push(created.worldId);
     }
@@ -247,6 +249,28 @@ it('정식 원본을 보존하고 실제 생성 입력·30칸 예약·임관으�
   expect(joined.every((general) => general.nationId === 1 && general.crew === 0)).toBe(true);
   expect(new Set(joined.map((general) => general.cityKey)).size).toBe(1);
   expect((await snapshot()).state.campaign!.sources[String(ownId)]).toMatch(/^input:\d+#general:492$/);
+  const actor = (await snapshot()).state.generals[ownId]!;
+  const turns = await http<{ revision: number }>('turns.get', { worldId });
+  expect(
+    (
+      await http(
+        'turns.set',
+        {
+          worldId,
+          revision: turns.data!.revision,
+          slots: [
+            { commandKey: 'recruit', args: { amount: 1, crewType: 1100, unitId: 'new' } },
+            ...Array.from({ length: 29 }, () => null),
+          ],
+        },
+        cookies[0],
+        true,
+      )
+    ).data,
+  ).toMatchObject({ ok: true });
+  tick = actor.nextTurnTick;
+  await advance();
+  unitId = (await snapshot()).state.campaign!.units.find((unit) => unit.ownerId === ownId)!.id;
 });
 
 describe('네 휘하 API의 실제 HTTP 권한 대조', () => {
@@ -266,7 +290,7 @@ describe('네 휘하 API의 실제 HTTP 권한 대조', () => {
                     requestId: randomUUID(),
                     payload:
                       path === 'campaign.unit'
-                        ? { type: 'form', commanderId: ownId, crewType: 1100, revision: current.revision }
+                        ? { type: 'command', unitId, commanderId: ownId, revision: current.revision }
                         : { type: 'offer', targetId, relation: 'STAFF', revision: current.revision },
                   };
           const mutation = path === 'campaign.unit' || path === 'campaign.relationship';
@@ -306,7 +330,7 @@ describe('네 휘하 API의 실제 HTTP 권한 대조', () => {
           } else {
             const otherInput =
               path === 'campaign.unit'
-                ? { ...input, payload: { type: 'disband', unitId, revision: current.revision } }
+                ? { ...input, payload: { type: 'command', unitId, commanderId: ownId, revision: current.revision } }
                 : path === 'campaign.relationship'
                   ? { ...input, payload: { type: 'respond', offerId, accept: true, revision: current.revision } }
                   : input;
@@ -600,9 +624,9 @@ it('NPC 서약의 실제 시드·500금·월 1회와 원장 재시작을 확인�
 it('후반 트랜잭션 실패는 편성과 입력 원장을 함께 롤백하며 재시도가 한 번 적용된다', async () => {
   const before = await snapshot();
   const requestId = await submit('campaign.unit', {
-    type: 'form',
+    type: 'command',
+    unitId,
     commanderId: ownId,
-    crewType: 1200,
     revision: before.state.campaign!.revision,
   });
   await expect(
@@ -614,13 +638,8 @@ it('후반 트랜잭션 실패는 편성과 입력 원장을 함께 롤백하며
   expect(await receipt(requestId)).toMatchObject({ status: 'pending' });
   await advance();
   expect(await receipt(requestId)).toMatchObject({ status: 'applied' });
-  expect((await board()).units).toHaveLength(2);
+  expect((await board()).units).toHaveLength(1);
   expect((await snapshot(otherWorldId)).state.campaign!.units).toEqual([]);
-  const current = await board(),
-    empty = current.units.find((unit) => unit.id !== unitId)!;
-  const disband = await submit('campaign.unit', { type: 'disband', unitId: empty.id, revision: current.revision });
-  await advance();
-  expect(await receipt(disband)).toMatchObject({ status: 'applied' });
   expect((await board()).units.map((unit) => unit.id)).toEqual([unitId]);
 });
 
@@ -812,12 +831,23 @@ it('예약한 실제 부장 부곡에만 모병하고 훈련 미리보기는 그
     ok: true,
     preview: { goldCost: 100, gain: 8 + Math.floor(after.state.generals[lieutenantId]!.leadership / 25) },
   });
-  const forbidden = await submit('campaign.unit', {
-    type: 'disband',
-    unitId,
-    revision: after.state.campaign!.revision,
-  });
-  await advance(actor.nextTurnTick);
-  expect(await receipt(forbidden)).toMatchObject({ status: 'rejected', result: { code: 'TROOPS_PRESENT' } });
+  expect(
+    (
+      await http(
+        'campaign.unit',
+        {
+          worldId,
+          requestId: randomUUID(),
+          payload: {
+            type: 'disband',
+            unitId,
+            revision: after.state.campaign!.revision,
+          },
+        },
+        cookies[0],
+        true,
+      )
+    ).code,
+  ).toBe('BAD_REQUEST');
   expect((await snapshot()).state.campaign!.units.find((row) => row.id === unitId)).toEqual(unit);
 });

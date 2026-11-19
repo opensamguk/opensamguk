@@ -4,7 +4,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { expect, it } from 'vitest';
 import { createDb, readWorldExtRows, writeWorldExtChanges } from '../packages/db/src/index';
 import type { ReplayArchive } from '../apps/engine/src/replay';
-import { testDatabaseUrl } from './test-database';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
 import { confirmDisconnectedDatabase } from './test-db-close';
 
 type PgClient = {
@@ -33,8 +33,8 @@ async function withDatabase(mode: string, run: (client: PgClient, db: Db) => Pro
   if (!process.env.TEST_DATABASE_URL) throw new Error('전용 테스트 DB가 필요합니다.');
   // run-integration이 두 URL을 시험 DB로 맞춘 뒤이므로 시험 DB 이름만 다시 검사한다.
   const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-  const name = `opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_${mode}_test`;
-  if (!/^opensamguk_ci_green_[a-f0-9]{20}_(empty|legacy)_test$/.test(name))
+  const name = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_${mode}_test`);
+  if (!(/^opensamguk_ci_green_[a-f0-9]{20}_(empty|legacy)_test$/.test(name) || name === ciGreenDatabaseName('')))
     throw new Error('시험 DB 이름이 올바르지 않습니다.');
   const target = new URL(source),
     adminUrl = new URL(source);

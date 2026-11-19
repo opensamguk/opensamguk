@@ -1,11 +1,14 @@
+import { CONTENT_TAG, RESOURCE_INPUTS } from './resources-sql/convert';
+import { hashState } from '../packages/shared/src/node/hashState';
+import { integrationResourceRows } from './integration-resources';
 import { createHash, randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, beforeEach, expect, it as test } from 'vitest';
 import { createDb } from '../packages/db/src/index';
-import { testDatabaseUrl } from './test-database';
-import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
+import { composeInitialWorld } from '../apps/engine/src/world/resources';
 import { insertHistoricalWorld } from './historical-world-fixture';
 
 type Pg = {
@@ -73,8 +76,9 @@ it('T3-05 관리자 migration은 두 정식 월드·기존 계정과 모든 기�
   for (const key of source.searchParams.keys())
     if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
       throw new Error('접속 대상 질의 인자는 쓸 수 없습니다.');
-  const name = `opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`;
-  if (!/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(name)) throw new Error('자체 DB 이름을 확인하세요.');
+  const name = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
+  if (!(/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(name) || name === ciGreenDatabaseName('')))
+    throw new Error('자체 DB 이름을 확인하세요.');
   const adminUrl = new URL(source),
     target = new URL(source);
   adminUrl.pathname = '/postgres';
@@ -106,19 +110,7 @@ it('T3-05 관리자 migration은 두 정식 월드·기존 계정과 모든 기�
     expect(index).toBeGreaterThan(0);
     for (const migration of migrations.slice(0, index))
       await client.query(await readFile(new URL(`${migration}/migration.sql`, root), 'utf8'));
-    const resourceDb = createDb(source.href);
-    let initial: Awaited<ReturnType<typeof loadInitialWorldFromDb>>;
-    try {
-      initial = await loadInitialWorldFromDb(resourceDb, {
-        scenario: 'integration191',
-        map: 'integration',
-        statRules: 'five-stats',
-        portraitMap: '191-map',
-        seed: 't305-preservation',
-      });
-    } finally {
-      await resourceDb.$disconnect();
-    }
+    const initial = await historicalInitial('t305-preservation');
     expect(initial.nations).toHaveLength(21);
     expect(initial.generals).toHaveLength(491);
     db = createDb(target.href);
@@ -234,3 +226,31 @@ it('T3-05 관리자 migration은 두 정식 월드·기존 계정과 모든 기�
   const errors = [...(bodyError ? [bodyError] : []), ...cleanupErrors];
   if (errors.length) throw new AggregateError([...new Set(errors)], '관리자 migration 본문·정리 실패');
 });
+
+// 옛 schema에는 현 Prisma의 GameResource 열이 없다. 정식 파일을 공식 합성기로 읽는다.
+async function historicalInitial(seed: string) {
+  const rows = await integrationResourceRows();
+  const sql = await readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8');
+  const parts = sql.split(CONTENT_TAG);
+  const index = parts.findIndex((part) => part.includes("'UNIT_SET', 'basic', 1, 'PUBLISHED', resource_content"));
+  const unitSet: unknown = JSON.parse(parts[index - 1] ?? 'null');
+  if (hashState(unitSet) !== RESOURCE_INPUTS.find((row) => row.kind === 'UNIT_SET')!.contentHash)
+    throw Error('옛 schema 고정물의 내장 병종 해시가 다릅니다.');
+  return composeInitialWorld(
+    {
+      map: rows.find((row) => row.kind === 'MAP')!,
+      scenario: rows.find((row) => row.kind === 'SCENARIO')!,
+      statRules: rows.find((row) => row.kind === 'STAT_RULES')!,
+      portraitMap: rows.find((row) => row.kind === 'PORTRAIT_MAP')!,
+      unitSet: {
+        kind: 'UNIT_SET',
+        name: 'basic',
+        version: 1,
+        content: unitSet,
+        contentHash: hashState(unitSet),
+        source: 'core2026 df6c926 MIT; resources/NOTICE.md',
+      },
+    },
+    seed,
+  );
+}

@@ -1,3 +1,4 @@
+import { ciGreenDatabaseName } from './test-database';
 import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { setTimeout as delay } from 'node:timers/promises';
 import { spawn } from 'node:child_process';
@@ -6,13 +7,13 @@ import { readFile, readdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { beforeAll, beforeEach, afterAll, describe, expect, it, onTestFailed } from 'vitest';
 import { createDb, type PrismaClient } from '../packages/db/src/index';
-import { TICKS_PER_MONTH } from '../packages/rules/src/index';
+import { applySexLedger, ruleRegistry, TICKS_PER_MONTH } from '../packages/rules/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { saveInitialWorld, readWorldState } from '../apps/engine/src/world/persistence';
-import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb, loadSexLedger } from '../apps/engine/src/world/resources';
 import { exportReplay, replayArchive } from '../apps/engine/src/replay';
 import { initializeResources } from './init-resources';
 import { initializeIntegrationResources, integrationResourceRows } from './integration-resources';
@@ -47,7 +48,7 @@ interface Fixture {
 function ownedDatabase(initialize = true) {
   if (!process.env.TEST_DATABASE_URL) throw new Error('전용 TEST_DATABASE_URL이 필요합니다.');
   const reference = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-  const name = `opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`;
+  const name = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
   const url = new URL(reference);
   url.pathname = `/${name}`;
   testDatabaseUrl({ TEST_DATABASE_URL: url.href, DATABASE_URL: process.env.DATABASE_URL });
@@ -253,12 +254,17 @@ async function catalog(db: PrismaClient) {
 
 it('AC-INT-04 정식 게시를 재실행해도 원래 게시 자원과 구형191년 월드는 그대로다', async () => {
   await withDatabase(async ({ db }) => {
-    const old = await loadInitialWorldFromDb(db, { scenario: '1030', map: 'che', seed: 'old-191-preserved' });
+    const old = await loadInitialWorldFromDb(db, {
+      scenario: '1030',
+      map: 'che',
+      portraitMap: 'rtk14-map',
+      seed: 'old-191-preserved',
+    });
     const { worldId } = await saveInitialWorld(db, old, {
       name: '기존191년',
       turnTermMinutes: 60,
       endYear: null,
-      replayFormat: 'legacy',
+      replayFormat: 3,
     });
     const beforeWorld = await preservedWorld(db, worldId);
     const before = await catalog(db);
@@ -270,7 +276,7 @@ it('AC-INT-04 정식 게시를 재실행해도 원래 게시 자원과 구형191
     expect(await preservedWorld(db, worldId)).toEqual(beforeWorld);
     const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
     expect(world.operationalMap).toBeNull();
-    expect(providedRuleKeys).toEqual([]);
+    expect(providedRuleKeys).toEqual(ruleRegistry.features.map(({ key }) => key).sort());
   });
 });
 
@@ -356,13 +362,16 @@ it('AC-INT-04 실제CLI는 게시된 191년61거점·21국·491명·초상·5능
       await db.nation.count({ where: { worldId: world.id } }),
       await db.general.count({ where: { worldId: world.id } }),
     ]).toEqual([61, 21, 491]);
-    expect(providedRuleKeys).toEqual(['five-stats', 'operational-map']);
+    expect(providedRuleKeys).toEqual(ruleRegistry.features.map(({ key }) => key).sort());
     expect(
       await db.general.count({
         where: { worldId: world.id, OR: [{ portraitId: null }, { politics: null }, { charm: null }] },
       }),
     ).toBe(0);
-    expect(hashState(await readWorldState(db, world.id))).toBe(hashState(await loadInitialWorldFromDb(db, selection)));
+    const expected = await loadInitialWorldFromDb(db, selection);
+    expected.fogOfWar = false;
+    expected.generals = applySexLedger(expected, loadSexLedger(expected.scenarioKey));
+    expect(hashState(await readWorldState(db, world.id))).toBe(hashState(expected));
   });
 });
 

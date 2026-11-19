@@ -5,7 +5,7 @@ import { buildServer } from '../apps/server/src/server';
 import { appRouter } from '../apps/server/src/router';
 import { newSession } from '../apps/server/src/auth/session';
 import { loadWorld } from '../apps/engine/src/worldLoader';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { controlClock } from '../apps/engine/src/world/clock';
@@ -15,6 +15,8 @@ import { exportReplay, replayArchive } from '../apps/engine/src/replay';
 import { rngFor } from '../packages/shared/src/index';
 import { defaultOfficeEffects, residentOfficeBonuses, runMonthly } from '../packages/rules/src/index';
 import { commandInitial } from '../packages/rules/test/commandFixture';
+import { recordTestTurns } from '../apps/engine/test/seasonFixture';
+import { recruitmentFixtureData } from './fixtures/recruitment';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw Error('전용 테스트 DB가 필요합니다.');
@@ -99,7 +101,7 @@ async function claim(worldId: string, generalId: number, actor: Actor) {
     userId: actor.id,
   });
 }
-async function createWorld(capture = false) {
+async function createWorld(capture = false, fogOfWar = false) {
   const initial = commandInitial();
   const base = initial.generals[2]!;
   Object.assign(base, { nationId: 1, cityKey: 1, strength: 65, intel: 65 });
@@ -120,14 +122,29 @@ async function createWorld(capture = false) {
     enabled: true,
   });
   if (capture) {
+    Object.assign(initial.cities[0]!, {
+      commerce: 2_000_000,
+      commerceMax: 2_000_000,
+      agriculture: 2_000_000,
+      agricultureMax: 2_000_000,
+    });
+    Object.assign(initial.cities[1]!, { wall: 0, defence: 0 });
+    for (const general of initial.generals) general.nextTurnTick = 1_000_000_000;
     Object.assign(initial.cities[3]!, { nationId: 2 });
     Object.assign(initial.generals[0]!, { nextTurnTick: 100 });
     Object.assign(initial.generals[1]!, { cityKey: 4 });
-    Object.assign(base, { cityKey: 4, nationId: 2, nextTurnTick: 10000 });
+    Object.assign(base, { cityKey: 4, nationId: 2, nextTurnTick: 1_000_000_000 });
   } else {
     initial.diplomacies = [];
   }
-  const { worldId } = await saveInitialWorld(db, initial, { name: '주재 검증', turnTermMinutes: 60, endYear: 230 });
+  syncFixtureMap(initial);
+  const { worldId } = await saveInitialWorld(db, initial, {
+    name: '주재 검증',
+    turnTermMinutes: 60,
+    endYear: 230,
+    fogOfWar,
+    featureData: recruitmentFixtureData(initial),
+  });
   worlds.push(worldId);
   await controlClock(db, worldId, 'start');
   return worldId;
@@ -199,7 +216,6 @@ it('AC-M3-12 실제 HTTP 임명·교체·이동·해임과 12개월 정산 해�
   });
   expect(await call('personnel.officers', { worldId }, ruler)).toMatchObject({
     data: {
-      officeEffectsEnabled: true,
       officeCities: expect.arrayContaining([{ cityKey: 1, name: '도시1' }]),
       members: expect.arrayContaining([expect.objectContaining({ generalId: 3, officerCityKey: 1, resident: true })]),
     },
@@ -323,19 +339,36 @@ it('AC-M3-12 PostgreSQL 전투가 담당 도시를 빼앗으면 같은 장수 �
   expect(await applyQueued(worldId, 'personnel.appoint', pending)).toMatchObject({ data: { status: 'applied' } });
   const current = () => db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 3 } } });
   expect(await current()).toMatchObject({ officerCityKey: 2, officerLevel: 4, cityKey: 4, nationId: 2 });
+  await advance(worldId, 10_000);
   const ruler = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
+  await recordTestTurns(db, worldId, 1, 'recruit', { amount: 1000, crewType: 1100, unitId: 'new' });
+  await advance(worldId, ruler.nextTurnTick);
+  expect(
+    await db.generalLog.findFirstOrThrow({ where: { worldId, generalId: 1, commandKey: 'recruit' } }),
+  ).toMatchObject({ kind: 'success' });
+  for (const commandKey of ['train', 'train', 'train', 'train', 'morale', 'morale', 'morale', 'morale']) {
+    const current = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId: worldId, id: 1 } } });
+    await recordTestTurns(db, worldId, 1, commandKey, {});
+    await advance(worldId, current.nextTurnTick);
+    expect(
+      await db.generalLog.findFirstOrThrow({
+        where: { worldId: worldId, generalId: 1, tick: current.nextTurnTick, commandKey },
+      }),
+    ).toMatchObject({ kind: 'success' });
+  }
+  const prepared = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
   expect(
     await call(
       'turns.edit',
       {
         worldId,
-        revision: ruler.turnRevision,
+        revision: prepared.turnRevision,
         op: { put: { from: 0, to: 0, commandKey: 'attack', args: { cityKey: 2 } } },
       },
       attacker,
     ),
   ).toMatchObject({ status: 200, code: undefined });
-  await advance(worldId, 100);
+  await advance(worldId, prepared.nextTurnTick);
   expect(await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId, cityKey: 2 } } })).toMatchObject({
     nationId: 1,
   });
@@ -378,7 +411,7 @@ it('AC-M3-12 첩보 안개가 가린 도시의 관직과 주재 위치를 공개
   const operator = await identity('ADMIN'),
     ruler = await identity(),
     viewer = await identity();
-  const worldId = await createWorld(false);
+  const worldId = await createWorld(false, true);
   await enableClaims(worldId, operator);
   await claim(worldId, 1, ruler);
   const appoint = call(
@@ -391,6 +424,38 @@ it('AC-M3-12 첩보 안개가 가린 도시의 관직과 주재 위치를 공개
     data: { officers: [{ generalId: 3, officerLevel: 11, resident: true }], fog: { garrisonHidden: false } },
   });
   const hidden = await call('city.get', { worldId, cityKey: 1 }, viewer);
-  expect(hidden).toMatchObject({ data: { officeEffectsEnabled: true, generals: [], fog: { garrisonHidden: true } } });
+  expect(hidden).toMatchObject({ data: { generals: [], fog: { garrisonHidden: true } } });
   expect(hidden.data).not.toHaveProperty('officers');
 });
+
+// 합성 지도의 생성 원본에도 변경한 도시 값과 연결을 기록한다.
+function syncFixtureMap(initial: Parameters<typeof saveInitialWorld>[1]) {
+  const map = initial.operationalMap;
+  if (!map) return;
+  for (const city of initial.cities) city.connections.sort((a, b) => a - b);
+  for (const site of map.sites) {
+    if (site.kind !== 'CITY') continue;
+    const city = initial.cities.find((row) => row.cityKey === site.anchorKey);
+    if (!city) continue;
+    site.name = city.name;
+    site.level = city.level;
+    site.region = city.region;
+    site.position = { x: city.x, y: city.y };
+    for (const field of ['population', 'agriculture', 'commerce', 'security', 'defence', 'wall'] as const) {
+      site.initial![field] = city[field];
+      site.max![field] = city[`${field}Max`];
+    }
+  }
+  map.routes = initial.cities.flatMap((city) =>
+    city.connections
+      .filter((key) => city.cityKey < key)
+      .map((key) => ({
+        id: `route:${city.cityKey}:${key}`,
+        from: `city:${city.cityKey}`,
+        to: `city:${key}`,
+        mode: 'LAND' as const,
+        direction: 'BOTH' as const,
+        enabled: true,
+      })),
+  );
+}

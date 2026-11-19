@@ -5,7 +5,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import { commandInitial } from '../packages/rules/test/commandFixture';
-import { testDatabaseUrl } from './test-database';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
 
 type Row = Record<string, unknown>;
 type PgClient = {
@@ -70,8 +70,13 @@ async function ownDatabase(
   for (const key of source.searchParams.keys())
     if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
       throw new Error('접속 대상 질의 인자는 쓸 수 없습니다.');
-  const name = `opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_${mode}_test`;
-  if (!/^opensamguk_ci_green_[a-f0-9]{20}_(empty|upgrade|values)_test$/.test(name) || name.length > 63)
+  const name = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_${mode}_test`);
+  if (
+    !(
+      /^opensamguk_ci_green_[a-f0-9]{20}_(empty|upgrade|values)_test$/.test(name) || name === ciGreenDatabaseName('')
+    ) ||
+    name.length > 63
+  )
     throw new Error('자체 시험 DB 이름을 확인하세요.');
   const adminUrl = new URL(source),
     target = new URL(source);

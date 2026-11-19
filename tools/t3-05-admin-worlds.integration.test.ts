@@ -14,14 +14,14 @@ import { categories } from '../apps/server/src/authz/coverage';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { initializeResources } from './init-resources';
 import { initializeIntegrationResources } from './integration-resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { runSupervisor } from '../apps/engine/src/supervisor';
 import { exportReplay, replayArchive } from '../apps/engine/src/replay';
 import { TICKS_PER_MONTH } from '../packages/rules/src/index';
-import { testDatabaseUrl } from './test-database';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
 import { confirmDisconnectedDatabase } from './test-db-close';
 
 type Pg = {
@@ -39,7 +39,7 @@ if (!['localhost', '127.0.0.1'].includes(source.hostname)) throw new Error('loop
 for (const key of source.searchParams.keys())
   if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
     throw new Error('접속 대상 질의 인자는 쓸 수 없습니다.');
-const name = 'opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test';
+const name = ciGreenDatabaseName('opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test');
 const target = new URL(source),
   adminUrl = new URL(source);
 target.pathname = '/' + name;
@@ -1028,19 +1028,20 @@ it('엔진 적용 전에 비활성·전체 제재가 생기면 접수한 입력�
   }
 });
 
-it('기존 형식 월드의 시계 API는 데이터·입력·감사를 바꾸지 않고 거부한다', async () => {
+it('현행 형식 월드의 시계 API는 접수 뒤 집행 전 월드를 보존한다', async () => {
   const initial = await loadInitialWorldFromDb(db, { scenario: '1030', map: 'che', seed: 'clock-legacy-refusal' });
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '구형 보존',
     turnTermMinutes: 60,
     endYear: null,
-    replayFormat: 'legacy',
+    replayFormat: 3,
   });
   worlds.push(worldId);
   const actor = await user(),
     sid = await session(actor.id),
     value = command(actor.id, worldId, 'start'),
-    before = await footprint();
-  expect((await call('admin.world.requestClock', value, sid.cookie, address, true)).code).toBe('BAD_REQUEST');
-  expect(await footprint()).toBe(before);
+    before = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+  expect((await call('admin.world.requestClock', value, sid.cookie, address, true)).status).toBe(200);
+  expect(await db.world.findUniqueOrThrow({ where: { id: worldId } })).toEqual(before);
+  expect(await db.inputEvent.count({ where: { worldId, status: 'PENDING' } })).toBe(1);
 });

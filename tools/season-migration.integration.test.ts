@@ -1,3 +1,4 @@
+import { ciGreenDatabaseName } from './test-database';
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { readFile, readdir } from 'node:fs/promises';
@@ -10,7 +11,7 @@ it('T1-26 이전 실제 DB 행을 migration해도 초기·월간 해시·origin�
   if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
   const target = new URL(url),
     adminUrl = new URL(url);
-  const name = `opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`;
+  const name = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
   target.pathname = `/${name}`;
   adminUrl.pathname = '/postgres';
   const admin = createDb(adminUrl.href),

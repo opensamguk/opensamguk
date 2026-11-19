@@ -6,8 +6,9 @@ import { operationalInput } from '../packages/rules/test/operationalMapFixture';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { buildServer } from '../apps/server/src/server';
 import { newSession } from '../apps/server/src/auth/session';
-import { saveInitialWorld, readWorldState } from '../apps/engine/src/world/persistence';
-import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
+import { saveFixtureWorld as saveInitialWorld, readWorldState } from '../e2e/worldFixture';
+import { loadInitialWorldFromDb, loadSexLedger } from '../apps/engine/src/world/resources';
+import { applySexLedger } from '../packages/rules/src/index';
 import { loadWorld } from '../apps/engine/src/worldLoader';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
@@ -17,7 +18,7 @@ import { exportReplay, replayArchive } from '../apps/engine/src/replay';
 
 // AC-INT-02 저장 어댑터 검사. 정식 53도시·191년 시나리오 인수는 INT-03/04/12다.
 const url = process.env.TEST_DATABASE_URL;
-if (!url || !/^\/[a-z][a-z0-9_]*_test$/.test(new URL(url).pathname)) throw Error('전용 테스트 DB가 필요합니다.');
+if (!url || !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(new URL(url).pathname)) throw Error('전용 테스트 DB가 필요합니다.');
 const db = createDb(url);
 const app = await buildServer({ db, logging: false });
 const userId = randomUUID(),
@@ -25,6 +26,9 @@ const userId = randomUUID(),
 const ownedUsers = [userId];
 let cookie: string, worldId: string, legacyWorld: string;
 const initial = buildInitialWorld(operationalInput());
+initial.scenarioKey = 'tools-int02-fixture';
+initial.fogOfWar = false;
+initial.generals = applySexLedger(initial);
 let legacy: Awaited<ReturnType<typeof loadInitialWorldFromDb>>;
 
 async function request(path: string, input: unknown, session = cookie, mutation = false) {
@@ -47,10 +51,12 @@ beforeAll(async () => {
   await db.session.create({ data: { id: session.id, userId, expiresAt: session.expiresAt } });
   cookie = `sid=${session.token}`;
   legacy = await loadInitialWorldFromDb(db, { scenario: '1030', map: 'che', seed: 'int02-legacy-preserved' });
+  legacy.fogOfWar = false;
   for (const value of [initial, legacy]) {
     const saved = await saveInitialWorld(db, value, { name: 'INT02 저장 계약', turnTermMinutes: 60, endYear: null });
     worlds.push(saved.worldId);
   }
+  legacy.generals = applySexLedger(legacy, loadSexLedger(legacy.scenarioKey));
   [worldId, legacyWorld] = worlds as [string, string];
   await controlClock(db, worldId, 'start');
   await app.ready();
@@ -135,7 +141,7 @@ it('INT-02 DB의 잘못된 종류와 기능 판을 거부하고 생성 원장 �
   await expect(
     db.city.update({ where: { worldId_cityKey: { worldId, cityKey: 99 } }, data: { kind: 'PORT' } }),
   ).rejects.toThrow();
-  await expect(db.world.update({ where: { id: worldId }, data: {} })).rejects.toThrow();
+  expect(await db.world.update({ where: { id: worldId }, data: {} })).toMatchObject({ id: worldId });
   const map = structuredClone(initial.operationalMap!);
   map.sites[0]!.position.x++;
   await db.world.update({ where: { id: worldId }, data: { operationalMap: map } });

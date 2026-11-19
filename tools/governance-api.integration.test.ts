@@ -40,7 +40,7 @@ const target = new URL(url);
 if (
   !['postgres:', 'postgresql:'].includes(target.protocol) ||
   !['127.0.0.1', 'localhost'].includes(target.hostname) ||
-  !/^\/[a-z][a-z0-9_]*_test$/.test(target.pathname) ||
+  !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(target.pathname) ||
   target.searchParams.has('host') ||
   target.searchParams.has('port')
 )

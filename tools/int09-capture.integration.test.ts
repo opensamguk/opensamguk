@@ -8,6 +8,7 @@ import { buildServer } from '../apps/server/src/server';
 import { newSession } from '../apps/server/src/auth/session';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { prepareFixtureUnit, recruitmentFixtureData } from './fixtures/recruitment';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease, renewLease, LEASE_TTL_MS } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -21,7 +22,7 @@ const url = process.env.TEST_DATABASE_URL;
 if (
   !url ||
   !['localhost', '127.0.0.1'].includes(new URL(url).hostname) ||
-  !/^\/[a-z][a-z0-9_]*_test$/.test(new URL(url).pathname)
+  !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(new URL(url).pathname)
 )
   throw new Error('loopback 전용 검사 DB가 필요합니다.');
 const db = createDb(url);
@@ -127,6 +128,7 @@ beforeAll(
       ({ worldId } = await saveInitialWorld(db, initial, {
         name: 'INT09 통제 점령 저장',
         turnTermMinutes: 60,
+        featureData: recruitmentFixtureData(initial),
         endYear: 201,
       }));
       await controlClock(db, worldId, 'start');
@@ -202,11 +204,12 @@ it('실제 HTTP 편성·동의·30칸 예약으로 두 나라의 부대를 준�
   await advance(60000);
   const actor = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
   expect(actor.nationId).toBe(1);
-  passTick = actor.nextTurnTick + 21 * 10000;
+  attackerUnit = await prepareFixtureUnit(db, worldId, 1);
+  defenderUnit = await prepareFixtureUnit(db, worldId, 2);
+  reserveUnit = await prepareFixtureUnit(db, worldId, 3);
+  passTick =
+    (await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } })).nextTurnTick + 21 * 10000;
   cityTick = passTick + 10000;
-  attackerUnit = (await input('campaign.unit', { type: 'form', commanderId: 1, crewType: 1100 }, 0)).unitId;
-  defenderUnit = (await input('campaign.unit', { type: 'form', commanderId: 2, crewType: 1100 }, 1)).unitId;
-  reserveUnit = (await input('campaign.unit', { type: 'form', commanderId: 3, crewType: 1100 }, 2)).unitId;
   const offer = await input('campaign.relationship', { type: 'offer', targetId: 3, relation: 'STAFF' }, 1);
   await input('campaign.relationship', { type: 'respond', offerId: offer.offerId, accept: true }, 2);
   for (let index = 0; index < 3; index++) {
@@ -214,11 +217,11 @@ it('실제 HTTP 편성·동의·30칸 예약으로 두 나라의 부대를 준�
     const planned =
       index === 2
         ? [
-            { commandKey: 'recruit', args: { unitId: reserveUnit, amount: 7, crewType: 1100 } },
+            { commandKey: 'recruit', args: { unitId: reserveUnit, amount: 6, crewType: 1100 } },
             { commandKey: 'move', args: { cityKey: 99 } },
           ]
         : [
-            { commandKey: 'recruit', args: { unitId, amount: index === 0 ? 500 : 10, crewType: 1100 } },
+            { commandKey: 'recruit', args: { unitId, amount: index === 0 ? 499 : 9, crewType: 1100 } },
             ...Array.from({ length: 10 }, () => ({ commandKey: 'train', args: { unitId } })),
             ...Array.from({ length: 10 }, () => ({ commandKey: 'morale', args: { unitId } })),
             ...(index === 0

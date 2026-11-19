@@ -1,3 +1,4 @@
+import { ciGreenDatabaseName } from './test-database';
 import { randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
@@ -9,7 +10,7 @@ import { commandInitial } from '../packages/rules/test/commandFixture';
 import { operationalInput } from '../packages/rules/test/operationalMapFixture';
 import { buildInitialWorld } from '../packages/rules/src/world/bootstrap';
 import { hashState } from '../packages/shared/src/node/hashState';
-import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
+import { saveFixtureWorld as saveInitialWorld } from '../apps/engine/test/worldFixture';
 import { acquireLease, releaseLease, type Lease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { loadReplayState } from '../apps/engine/src/monthly';
@@ -26,7 +27,7 @@ type Pg = {
 const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
 if (!['127.0.0.1', 'localhost'].includes(source.hostname) || source.search)
   throw Error('loopback 시험 DB가 필요합니다.');
-const database = `opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`;
+const database = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
 const target = new URL(source),
   maintenance = new URL(source);
 target.pathname = '/' + database;
@@ -135,6 +136,21 @@ async function fixture(
     general.nextTurnTick = index === 0 ? 100 : 5000;
   });
   setup(initial);
+  for (const site of initial.operationalMap?.sites ?? []) {
+    if (site.kind !== 'CITY' && site.kind !== 'PASS') continue;
+    const city = initial.cities.find((city) => city.cityKey === site.anchorKey)!;
+    site.name = city.name;
+    if (site.kind === 'CITY') {
+      site.level = city.level;
+      for (const field of ['population', 'agriculture', 'commerce', 'security', 'defence', 'wall'] as const) {
+        site.initial[field] = city[field];
+        site.max[field] = city[`${field}Max`];
+      }
+    } else {
+      site.wall = { initial: city.wall, max: city.wallMax };
+      site.defence = { initial: city.defence, max: city.defenceMax };
+    }
+  }
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '알림 사건 시험',
     turnTermMinutes: 30,
@@ -198,9 +214,11 @@ it('실제 예턴 실패가 정상 발송 작업을 거쳐 1분 안에 도착한
 it('실제 explicit 4→3 경계만 1분 안에 알리고 3→2는 다시 알리지 않는다', async () => {
   const f = await fixture();
   await schedule(f.worldId, 1, 'rest', {}, 4);
+  const revision = (await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId: f.worldId, id: 1 } } }))
+    .turnRevision;
   await receiveNormally(() => f.loop.advanceTo(100), 1);
   expect(await rows(f.worldId)).toMatchObject([
-    { event: 'turns.low', dedupeKey: `turns-low:${f.worldId}:1:1`, status: 'SENT' },
+    { event: 'turns.low', dedupeKey: `turns-low:${f.worldId}:1:${revision + 1}`, status: 'SENT' },
   ]);
   await f.loop.advanceTo(10100);
   await pump();
@@ -458,8 +476,8 @@ it.each(['rest', 'attack'])('개인 %s와 국가 명령의 실패는 장수 턴 
     initial.nationTurns = { 1: Array.from({ length: 30 }, () => ({ commandKey: 'nation_rest', args: {} })) };
   });
   await schedule(f.worldId, 1, personal, personal === 'attack' ? { cityKey: 1 } : {}, 1);
-  await db.nationTurn.update({
-    where: { worldId_nationId_slot: { worldId: f.worldId, nationId: 1, slot: 0 } },
+  await db.nationOfficeTurn.update({
+    where: { worldId_nationId_officerLevel_slot: { worldId: f.worldId, nationId: 1, officerLevel: 12, slot: 0 } },
     data: { commandKey: 'nation_capital', args: { cityKey: 999999 } },
   });
   await f.loop.advanceTo(100);

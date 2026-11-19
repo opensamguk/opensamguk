@@ -24,6 +24,9 @@ import { loadInitialWorldFromDb } from './world/resources';
 import { saveInitialWorld } from './world/persistence';
 import { controlClock } from './world/clock';
 import { loadReplayState } from './monthly';
+import { persistGovernanceState } from './governance/repository';
+import { persistLineageState } from './lineage/repository';
+import { persistStratagemCardsState } from './stratagemCards/state';
 import { acquireLease, releaseLease } from './lease';
 import { TurnLoop } from './turnLoop';
 import { exportReplay, replayArchive } from './replay';
@@ -120,6 +123,15 @@ async function saveMonth(id: string, before: WorldState, fail = false) {
     await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${id} FOR UPDATE`;
     await persistLogisticsState(tx, id, before, next.state);
     await appendLogisticsMovements(tx, id, next.movements, { tick: 10_000, sequence: 1 });
+    const coupled = {
+      ...next.state,
+      governance: { ...before.governance!, monthlyTick: 10_000 },
+      lineage: { ...before.lineage!, monthlyTick: 10_000 },
+      stratagemCards: { ...before.stratagemCards!, monthlyTick: 10_000 },
+    };
+    await persistGovernanceState(tx, id, before, coupled);
+    await persistLineageState(tx, id, before, coupled);
+    await persistStratagemCardsState(tx, id, before, coupled, 10_000);
     await tx.world.update({ where: { id }, data: { monthlyTick: 10_000 } });
     if (fail) throw new Error('after-logistics-save');
   });
@@ -177,6 +189,7 @@ async function queuedFixture() {
 async function npcFixture(mode: 'buy' | 'transport', treasuryBudgetBp?: number) {
   const source = structuredClone(initial),
     byCity = new Map(source.cities.map((city) => [city.cityKey, city]));
+  source.scenarioKey = 'engine-logistics-npc-fixture';
   const rulers = source.generals.filter(
     (general) => general.userId === null && general.officerLevel === 12 && general.activeFromYear <= source.startYear,
   );
@@ -521,7 +534,7 @@ describe('AC-P2-30 실제 PostgreSQL 물류', () => {
     await expect(
       db.world.update({
         where: { id: world.id },
-        data: {},
+        data: { logisticsState: {} },
       }),
     ).rejects.toThrow();
     const corrupted = structuredClone(world.before.logistics!);
@@ -556,7 +569,13 @@ describe('AC-P2-30 실제 PostgreSQL 물류', () => {
     const before = await db.$transaction((tx) => loadReplayState(tx, world.id));
     const date = monthlyDate(before.state.startYear, 10_000);
     const base = runMonthly(before.state, 10_000, rngFor(world.seed, 'monthly', date.year, date.month));
-    const expected = settleMonthlyFeatures(before, { ...before, state: base.state, monthlyTick: 10_000 }, 10_000);
+    const expected = settleMonthlyFeatures(
+      before,
+      { ...before, state: base.state, monthlyTick: 10_000 },
+      10_000,
+      undefined,
+      world.seed,
+    );
     const expectedRows = z
       .strictObject({ movements: z.array(logisticsMovementSchema) })
       .parse(expected.effects['logistics-v1']).movements;

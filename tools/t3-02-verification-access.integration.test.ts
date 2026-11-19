@@ -9,7 +9,7 @@ import type { MailMessage } from '../apps/server/src/mail/transport';
 import { newSession } from '../apps/server/src/auth/session';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -18,7 +18,7 @@ const url = process.env.TEST_DATABASE_URL;
 if (
   !url ||
   !['localhost', '127.0.0.1'].includes(new URL(url).hostname) ||
-  !/^\/[a-z][a-z0-9_]*_test$/.test(new URL(url).pathname)
+  !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(new URL(url).pathname)
 )
   throw new Error('loopback 전용 테스트 DB가 필요합니다.');
 const db = createDb(url);

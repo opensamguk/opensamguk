@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { hashState } from '../packages/shared/src/node/hashState';
-import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb, loadSexLedger } from '../apps/engine/src/world/resources';
+import { applySexLedger } from '../packages/rules/src/index';
 import {
   applyCampaignOrder,
   applyRecordedInput,
@@ -32,6 +33,7 @@ it('AC-INT-19B 정식191년21국491명에서 사람 생성·정상출사·NPC지
   });
   expect(initial.generals).toHaveLength(491);
   expect(initial.nations).toHaveLength(21);
+  initial.generals = applySexLedger(initial, loadSexLedger(initial.scenarioKey));
   const original = structuredClone(initial),
     originHash = hashState(initial);
   const replay = initialReplayState(initial, { policy: { version: 1, turnTermMinutes: 60 } });

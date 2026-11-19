@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb, type Prisma } from '@opensamguk/db';
-import { emptyCampaignState, toWorldState, type WorldState } from '@opensamguk/rules';
+import { type WorldState } from '@opensamguk/rules';
 import { monthlyFixture } from '../test/monthlyFixture';
+import { saveInitialWorld } from './world/persistence';
+import { loadReplayState } from './monthly';
 import { loadInitialWorldFromDb } from './world/resources';
 import { persistCampaignState, readStoredCampaign } from './campaignState';
 
@@ -22,7 +24,6 @@ if (
 const db = createDb(url);
 const ids: string[] = [];
 let initial: Awaited<ReturnType<typeof monthlyFixture>>;
-let legacy: Awaited<ReturnType<typeof monthlyFixture>>;
 beforeAll(async () => {
   initial = await loadInitialWorldFromDb(db, {
     scenario: 'integration191',
@@ -31,7 +32,6 @@ beforeAll(async () => {
     portraitMap: '191-map',
     seed: 'campaign-storage-source',
   });
-  legacy = await monthlyFixture();
 });
 afterAll(async () => {
   await db.world.deleteMany({ where: { id: { in: ids } } });
@@ -39,33 +39,20 @@ afterAll(async () => {
 });
 const json = (value: unknown): Prisma.InputJsonValue => JSON.parse(JSON.stringify(value));
 
-async function fixture(enabled = true) {
-  const source = enabled ? initial : legacy;
-  const world = toWorldState(source);
-  const seed = `campaign-storage-${randomUUID()}`;
-  if (enabled) {
-    world.campaign = emptyCampaignState(world, seed, 'storage-fixture');
-  }
-  const row = await db.world.create({
-    data: {
-      name: 'AC-INT-06 저장 계약',
-      scenarioKey: source.scenarioKey,
-      mapKey: source.mapKey,
-      unitSetKey: source.unitSetKey,
-      seed,
-      startYear: world.startYear,
-      initialStateHash: 'storage-contract-only',
-      statRules: json(source.statRules),
-      unitSet: json(source.unitSet),
-      turnTermMinutes: 60,
-      replayFormat: enabled ? 3 : 1,
-
-      ...(enabled ? { campaignState: json(world.campaign), operationalMap: json(source.operationalMap) } : {}),
-    },
+async function fixture() {
+  const init = structuredClone(initial);
+  init.seed = `storage-${randomUUID()}`;
+  const { worldId } = await saveInitialWorld(db, init, {
+    name: '휘하 저장 계약',
+    turnTermMinutes: 60,
+    endYear: null,
   });
-  ids.push(row.id);
+  ids.push(worldId);
+  const row = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+  const { state: world } = await db.$transaction((tx) => loadReplayState(tx, worldId));
   return { row, world };
 }
+
 function changed(before: WorldState): WorldState {
   const next = structuredClone(before);
   const owner = Object.values(next.generals)[0]!;
@@ -78,15 +65,17 @@ function changed(before: WorldState): WorldState {
 }
 
 describe('AC-INT-06 실제 PostgreSQL 휘하 스냅샷', () => {
-  it('기존 월드는 NULL을 유지하고 신규 상태는 연결을 다시 열어도 그대로 읽는다', async () => {
-    const old = await fixture(false),
+  it('필수 휘하 상태는 연결을 다시 열어도 그대로 읽는다', async () => {
+    const old = await fixture(),
       current = await fixture();
-    expect(old.row.campaignState).toBeNull();
+    expect(old.row.campaignState).toEqual(old.world.campaign);
     const reopened = createDb(url);
     try {
       const row = await reopened.world.findUniqueOrThrow({ where: { id: current.row.id } });
       expect(readStoredCampaign(row.campaignState, current.world, row.seed)).toEqual(current.world.campaign);
-      expect((await reopened.world.findUniqueOrThrow({ where: { id: old.row.id } })).campaignState).toBeNull();
+      expect((await reopened.world.findUniqueOrThrow({ where: { id: old.row.id } })).campaignState).toEqual(
+        old.world.campaign,
+      );
     } finally {
       await reopened.$disconnect();
     }
@@ -123,14 +112,12 @@ describe('AC-INT-06 실제 PostgreSQL 휘하 스냅샷', () => {
     const row = await db.world.findUniqueOrThrow({ where: { id: f.row.id } });
     expect(readStoredCampaign(row.campaignState, next, row.seed)).toEqual(next.campaign);
   });
-  it('DB는 끈 기능의 JSON·의존 누락·다른 시드·다른 판·빈 상태를 거부한다', async () => {
+  it('DB는 필수 상태 누락·다른 시드·다른 판·빈 상태를 거부한다', async () => {
     const f = await fixture(),
-      old = await fixture(false);
-    await expect(
-      db.world.update({ where: { id: old.row.id }, data: { campaignState: json(f.world.campaign) } }),
-    ).rejects.toThrow();
+      old = await fixture();
+    await expect(db.world.update({ where: { id: old.row.id }, data: { campaignState: json(null) } })).rejects.toThrow();
     for (const patch of [
-      {},
+      { campaignState: json(null) },
       { campaignState: json({ ...f.world.campaign, seed: 'other-seed' }) },
       { campaignState: json({ ...f.world.campaign, version: 2 }) },
       { campaignState: {} },

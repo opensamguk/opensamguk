@@ -34,6 +34,9 @@ export async function readFixture() {
   state.generals = state.generals.slice(0, 4).map((general, index) => ({
     ...general,
     id: index + 1,
+    birthYear: 170,
+    deathYear: 290,
+    activeFromYear: state.startYear,
     nationId: index < 2 ? 1 : index === 2 ? 2 : null,
     cityKey: state.cities[0]!.cityKey,
     nextTurnTick: 500,

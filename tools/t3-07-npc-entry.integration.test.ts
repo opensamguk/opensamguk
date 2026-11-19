@@ -10,7 +10,7 @@ import { buildServer } from '../apps/server/src/server';
 import { newSession } from '../apps/server/src/auth/session';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { authzCase } from '../apps/server/src/authz/case';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { loadFeatureProfile, loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { initializeIntegrationResources } from './integration-resources';
 import { initializeResources } from './init-resources';
@@ -34,7 +34,7 @@ import {
   type ReplayOriginV3,
 } from '../packages/rules/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
-import { testDatabaseUrl } from './test-database';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
 import { confirmDisconnectedDatabase } from './test-db-close';
 
 type Pg = {
@@ -48,7 +48,7 @@ const { Client } = createRequire(requireDb.resolve('@prisma/adapter-pg'))('pg') 
 };
 const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
 if (!['127.0.0.1', 'localhost'].includes(source.hostname)) throw Error('자기 loopback 시험 DB가 필요합니다.');
-const name = 'opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test';
+const name = ciGreenDatabaseName('opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test');
 const target = new URL(source),
   adminUrl = new URL(source);
 target.pathname = '/' + name;

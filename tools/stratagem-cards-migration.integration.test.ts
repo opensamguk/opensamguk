@@ -1,3 +1,4 @@
+import { ciGreenDatabaseName } from './test-database';
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { readFile, readdir } from 'node:fs/promises';
@@ -29,8 +30,8 @@ async function ownDatabase(run: (client: PgClient) => Promise<void>) {
     target.searchParams.has('port')
   )
     throw Error('loopback 전용 DB를 확인하세요.');
-  const name = `opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`;
-  if (!/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(name)) throw Error('생성할 DB 이름을 확인하세요.');
+  const name = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
+  if (!/^opensamguk_ci_green_[a-zA-Z0-9]+_test$/.test(name)) throw Error('생성할 DB 이름을 확인하세요.');
   target.pathname = `/${name}`;
   adminUrl.pathname = '/postgres';
   const admin = new Client({ connectionString: adminUrl.href }),

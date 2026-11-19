@@ -35,7 +35,7 @@ const target = new URL(url);
 if (
   !['postgres:', 'postgresql:'].includes(target.protocol) ||
   !['127.0.0.1', 'localhost'].includes(target.hostname) ||
-  !/^\/[a-z][a-z0-9_]*_test$/.test(target.pathname) ||
+  !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(target.pathname) ||
   target.searchParams.has('host') ||
   target.searchParams.has('port')
 )
@@ -280,6 +280,7 @@ beforeAll(async () => {
     portraitMap: '191-map',
     seed: 'logistics-api',
   });
+  initial.scenarioKey = 'tools-logistics-fixture';
   initial.generals = initial.generals.map((general) => ({ ...general, crew: 0, nextTurnTick: 1_000_000 }));
   base = await app.listen({ host: '127.0.0.1', port: 0 });
 });

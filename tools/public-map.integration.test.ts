@@ -1,18 +1,18 @@
-import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
 import { createDb, type Prisma } from '../packages/db/src/index';
 import { buildServer } from '../apps/server/src/server';
 import { newSession } from '../apps/server/src/auth/session';
 import { monthlyFixture } from '../apps/engine/test/monthlyFixture';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
+import { prepareInitialWorld, savePreparedInitialWorld } from '../apps/engine/src/world/persistence';
 import { createWorldFromCli } from '../apps/engine/src/admin/creation';
 import { acquireLease, LeaseLostError } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { exportReplay, replayArchive, replayToEnd } from '../apps/engine/src/replay';
 import { hashState } from '../packages/shared/src/node/hashState';
-import { initialReplayState, runReplayAction } from '../packages/rules/src/replay';
+import { runReplayAction } from '../packages/rules/src/replay';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
@@ -48,14 +48,20 @@ afterAll(async () => {
 async function world() {
   const initial = structuredClone(template);
   const { worldId } = await saveInitialWorld(db, initial, {
-    replayFormat: 'legacy',
+    replayFormat: 3,
     name: '공개 지도 시험',
     turnTermMinutes: 60,
     endYear: null,
   });
   await db.world.update({ where: { id: worldId }, data: { status: 'RUNNING', clockAnchorAt: new Date(epoch) } });
   const lease = (await acquireLease(db, worldId, randomUUID(), 120_000))!;
-  return { worldId, initial, lease, loop: new TurnLoop(db, lease, { publicMapNow: () => now }) };
+  return {
+    worldId,
+    initial,
+    replay: await db.$transaction((tx) => loadReplayState(tx, worldId)),
+    lease,
+    loop: new TurnLoop(db, lease, { publicMapNow: () => now }),
+  };
 }
 async function rows(worldId: string) {
   return db.publicMapSnapshot.findMany({ where: { worldId }, orderBy: { takenAt: 'asc' } });
@@ -66,26 +72,28 @@ async function replayHash(worldId: string) {
 async function maps(input?: unknown, cookie?: string) {
   const query = input === undefined ? '' : `&input=${encodeURIComponent(JSON.stringify({ 0: input }))}`;
   const response = await fetch(`${base}/trpc/world.publicMaps?batch=1${query}`, { headers: cookie ? { cookie } : {} });
-  const body = (await response.json())[0] as {
-    result?: {
-      data: {
-        delayMinutes: number;
-        worlds: Array<{
-          id: string;
-          name: string;
-          status: string;
-          map: null | {
-            takenAt: string;
-            year: number;
-            month: number;
-            cities: Array<{ key: string; nationId: number | null; supplied?: boolean }>;
-            nations: Array<{ id: number; name: string; color: string; capitalCityKey?: number | null }>;
-          };
-        }>;
+  const [body] = (await response.json()) as [
+    {
+      result?: {
+        data: {
+          delayMinutes: number;
+          worlds: Array<{
+            id: string;
+            name: string;
+            status: string;
+            map: null | {
+              takenAt: string;
+              year: number;
+              month: number;
+              cities: Array<{ key: string; nationId: number | null; supplied?: boolean }>;
+              nations: Array<{ id: number; name: string; color: string; capitalCityKey?: number | null }>;
+            };
+          }>;
+        };
       };
-    };
-    error?: { data: { code: string } };
-  };
+      error?: { data: { code: string } };
+    },
+  ];
   return { status: response.status, data: body.result?.data, code: body.error?.data.code };
 }
 async function cookie(index: number) {
@@ -96,6 +104,7 @@ async function cookie(index: number) {
 
 it('AC-M2-20 월드 생성과 함께 시작 전 지도를 공개하고 진행 중 사본에는 지연을 적용한다', async () => {
   const initial = structuredClone(template);
+  initial.generals = initial.generals.map((general) => ({ ...general, userId: null }));
   const { worldId } = await createWorldFromCli(db, initial, {
     name: '시작 전 공개 지도',
     turnTermMinutes: 60,
@@ -172,73 +181,23 @@ it('실제 엔진 사본 A/B는 10분 경계를 포함해 늦게 공개되고 �
 
 it('RUNNING·PAUSED만 createdAt/id 순서로 나열하고 사본 없는 월드는 null이다', async () => {
   const { worldId } = await world();
-  const source = await db.world.findUniqueOrThrow({ where: { id: worldId } });
-  const {
-    preset,
-    commandMeta,
-    replayOrigin,
-    operationalMap,
-    campaignState,
-    cityResourcesState,
-    logisticsState,
-    governanceState,
-    lineageState,
-    stratagemCardsState,
-    equipmentState,
-    cityRuinsState,
-    nationStrategyState,
-    nationLifecycleState,
-    preparedTurnsState,
-    nationResearchState,
-    runtimeOptions,
-    ...sourceScalars
-  } = source;
-  // These legacy list fixtures intentionally omit runtime map/campaign/city ledgers.
-  void [operationalMap, campaignState];
-  expect(providedRuleKeys).not.toContain('city-resources-v1');
-  expect(cityResourcesState).toBeNull();
-  expect(providedRuleKeys).not.toContain('logistics-v1');
-  expect(logisticsState).toBeNull();
-  expect(providedRuleKeys).not.toContain('governance-v1');
-  expect(governanceState).toBeNull();
-  expect(providedRuleKeys).not.toContain('lineage-v1');
-  expect(lineageState).toBeNull();
-  expect(providedRuleKeys).not.toContain('stratagem-cards-v1');
-  expect(stratagemCardsState).toBeNull();
-  expect(providedRuleKeys).not.toContain('equipment-v1');
-  expect(equipmentState).toBeNull();
-  expect(providedRuleKeys).not.toContain('city-scale-v1');
-  expect(cityRuinsState).toBeNull();
-  expect(providedRuleKeys).not.toContain('nation-strategy-v1');
-  expect(nationStrategyState).toBeNull();
-  expect(providedRuleKeys).not.toContain('nation-lifecycle-v1');
-  expect(nationLifecycleState).toBeNull();
-  expect(providedRuleKeys).not.toContain('prepared-turns-v1');
-  expect(preparedTurnsState).toBeNull();
-  expect(providedRuleKeys).not.toContain('nation-research-v1');
-  expect(nationResearchState).toBeNull();
-  expect(runtimeOptions).toBeNull();
-  if (source.statRules === null || source.unitSet === null) throw new Error('정식 능력치·병종 JSON이 필요합니다.');
   await db.world.update({ where: { id: worldId }, data: { createdAt: new Date(epoch + minute) } });
   for (const [id, status, createdAt] of [
     ['00000000-0000-4000-8000-000000000002', 'RUNNING', epoch],
     ['00000000-0000-4000-8000-000000000001', 'PAUSED', epoch],
     ['00000000-0000-4000-8000-000000000003', 'PREOPEN', epoch - minute],
     ['00000000-0000-4000-8000-000000000004', 'ENDED', epoch - minute],
-  ] as const)
-    await db.world.create({
-      data: {
-        ...sourceScalars,
-        statRules: source.statRules,
-        unitSet: source.unitSet,
-        ...(preset === null ? {} : { preset }),
-        ...(commandMeta === null ? {} : { commandMeta }),
-        ...(replayOrigin === null ? {} : { replayOrigin }),
-        id,
-        status,
-        createdAt: new Date(createdAt),
-      },
+  ] as const) {
+    const initial = structuredClone(template);
+    initial.generals = initial.generals.map((general) => ({ ...general, userId: null }));
+    const prepared = prepareInitialWorld(initial, {
+      name: 'public-map-list',
+      turnTermMinutes: 60,
+      endYear: null,
     });
+    await db.$transaction((tx) => savePreparedInitialWorld(tx, prepared, id, false));
+    await db.world.update({ where: { id }, data: { status, createdAt: new Date(createdAt) } });
+  }
   const ledgers = await db.$queryRaw<
     Array<{
       isNull: boolean;
@@ -250,12 +209,12 @@ it('RUNNING·PAUSED만 createdAt/id 순서로 나열하고 사본 없는 월드�
     }>
   >`SELECT "cityResourcesState" IS NULL AS "isNull", "logisticsState" IS NULL AS "logisticsNull", "runtimeOptions" IS NULL AS "optionsNull", "cityRuinsState" IS NULL AS "ruinsNull", "nationStrategyState" IS NULL AS "strategyNull", "nationLifecycleState" IS NULL AS "lifecycleNull" FROM "World"`;
   expect(ledgers).toHaveLength(5);
-  expect(ledgers.every((row) => row.isNull)).toBe(true);
-  expect(ledgers.every((row) => row.logisticsNull)).toBe(true);
+  expect(ledgers.every((row) => !row.isNull)).toBe(true);
+  expect(ledgers.every((row) => !row.logisticsNull)).toBe(true);
   expect(ledgers.every((row) => row.optionsNull)).toBe(true);
-  expect(ledgers.every((row) => row.ruinsNull)).toBe(true);
-  expect(ledgers.every((row) => row.strategyNull)).toBe(true);
-  expect(ledgers.every((row) => row.lifecycleNull)).toBe(true);
+  expect(ledgers.every((row) => !row.ruinsNull)).toBe(true);
+  expect(ledgers.every((row) => !row.strategyNull)).toBe(true);
+  expect(ledgers.every((row) => !row.lifecycleNull)).toBe(true);
   const response = await maps();
   expect(response.data?.worlds.map((entry) => entry.id)).toEqual([
     '00000000-0000-4000-8000-000000000001',
@@ -272,8 +231,7 @@ it('무인증·다른 계정·제재 세션은 같고 입력 ID 주입은 거부
   const snapshot = (await rows(worldId))[0]!;
   const data = snapshot.data as Prisma.JsonObject;
   const polluted = structuredClone(data);
-  delete polluted.capitalAndSupply;
-  (polluted.cities as Prisma.JsonObject[])[0]!.supplied = true;
+  (polluted.cities as Prisma.JsonObject[])[0]!.supplied = 'private-canary';
   (polluted.nations as Prisma.JsonObject[])[0]!.capitalCityKey = 99999;
   (polluted.cities as Prisma.JsonObject[])[0]!.crew = 123456;
   (polluted.nations as Prisma.JsonObject[])[0]!.gold = 654321;
@@ -292,8 +250,30 @@ it('무인증·다른 계정·제재 세션은 같고 입력 ID 주입은 거부
   const entry = anonymous.data!.worlds[0]!;
   expect(Object.keys(entry).sort()).toEqual(['background', 'id', 'map', 'name', 'status']);
   expect(entry).toHaveProperty('background', null);
-  expect(Object.keys(entry.map!).sort()).toEqual(['cities', 'month', 'nations', 'takenAt', 'year']);
-  expect(Object.keys(entry.map!.cities[0]!).sort()).toEqual(['key', 'level', 'links', 'name', 'nationId', 'x', 'y']);
+  expect(Object.keys(entry.map!).sort()).toEqual([
+    'cities',
+    'emperorCityKey',
+    'month',
+    'nations',
+    'operationalMap',
+    'takenAt',
+    'year',
+  ]);
+  expect(Object.keys(entry.map!.cities[0]!).sort()).toEqual([
+    'detached',
+    'key',
+    'kind',
+    'level',
+    'links',
+    'name',
+    'nationId',
+    'parentCityKey',
+    'ruin',
+    'state',
+    'stateTerm',
+    'x',
+    'y',
+  ]);
   expect(Object.keys(entry.map!.nations[0]!).sort()).toEqual(['color', 'id', 'name']);
   for (const input of [{ worldId }, { userId: userIds[0] }, { generalId: 1 }, null, []])
     expect((await maps(input)).code).toBe('BAD_REQUEST');
@@ -384,7 +364,7 @@ it('실행권 재획득·재시작은 저장 간격을 DB에서 복원하고 이
 });
 
 it('밀린 월드는 사본의 실제 반영 tick을 쓰고 12개월 stateHash·v2 재생은 사본 유무와 같다', async () => {
-  const { worldId, initial, lease } = await world();
+  const { worldId, initial, replay, lease } = await world();
   let calls = 0;
   const captured: Array<{ tick: number; year: number; month: number }> = [];
   const loop = new TurnLoop(db, lease, {
@@ -409,10 +389,14 @@ it('밀린 월드는 사본의 실제 반영 tick을 쓰고 12개월 stateHash·
     expect(snapshot.month).toBe((Math.floor(snapshot.tick / 10_000) % 12) + 1);
   }
   const archive = await exportReplay(db, worldId);
-  expect(archive.version).toBe(2);
+  expect(archive.version).toBe(3);
   expect(replayArchive(archive, 12)).toHaveLength(12);
-  let pure = initialReplayState(initial);
-  while (pure.monthlyTick < 120_000) pure = runReplayAction(pure, initial.seed, initial.unitSet);
+  let pure = replay;
+  while (pure.monthlyTick < 120_000) {
+    const next = runReplayAction(pure, initial.seed, initial.unitSet);
+    expect(next).not.toBe(pure);
+    pure = next;
+  }
   const finalMonthly = archive.months[11]!;
   expect(finalMonthly.stateHash).toBe(hashState(pure));
   const before = await replayHash(worldId);

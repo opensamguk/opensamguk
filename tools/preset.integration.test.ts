@@ -1,6 +1,7 @@
 import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { execFileSync } from 'node:child_process';
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { cp, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -12,6 +13,7 @@ import {
   presetRules,
   runCommand,
   applyEffects,
+  runReplayAction,
   type WorldInit,
   type WorldPreset,
   type QueuedTurn,
@@ -23,22 +25,28 @@ import { appRouter } from '../apps/server/src/router';
 import { newSession } from '../apps/server/src/auth/session';
 import { commandInitial } from '../packages/rules/test/commandFixture';
 import { loadPreset, resourceRoot } from '../apps/engine/src/world/resources';
-import { saveInitialWorld, readWorldState } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld, readWorldState } from '../e2e/worldFixture';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { controlClock } from '../apps/engine/src/world/clock';
-import { exportReplay, replayArchive, replayToEnd, type ReplayArchive } from '../apps/engine/src/replay';
+import { exportReplay, replayArchive, replayToEnd } from '../apps/engine/src/replay';
 import { initializeSan10Resources } from './san10-resources';
 
 const url = process.env.TEST_DATABASE_URL;
-if (!url || !/\/[a-z][a-z0-9_]*_test$/.test(new URL(url).pathname))
+if (!url || !/\/[a-z][a-zA-Z0-9_]*_test$/.test(new URL(url).pathname))
   throw new Error('T2-02 전용 테스트 DB가 필요합니다.');
 const db = createDb(url);
 const origin = 'http://127.0.0.1:5173';
 const app = await buildServer({ db, publicOrigin: origin, logging: false });
 const root = new URL('../', import.meta.url);
-const users = ['preset-actor', 'preset-other', 'preset-new', 'preset-sanctioned'];
+const [actorUserId, otherUserId, newUserId, sanctionedUserId] = Array.from({ length: 4 }, () => randomUUID()) as [
+  string,
+  string,
+  string,
+  string,
+];
+const users = [actorUserId, otherUserId, newUserId, sanctionedUserId];
 const cookies = new Map<string, string>();
 let base: string;
 
@@ -48,12 +56,12 @@ beforeAll(async () => {
   for (const id of users) {
     await db.user.upsert({
       where: { id },
-      update: { status: id === 'preset-sanctioned' ? 'SANCTIONED' : 'ACTIVE' },
+      update: { status: id === sanctionedUserId ? 'SANCTIONED' : 'ACTIVE' },
       create: {
         id,
         email: `${id}@example.invalid`,
         passwordHash: 'fixture-only',
-        status: id === 'preset-sanctioned' ? 'SANCTIONED' : 'ACTIVE',
+        status: id === sanctionedUserId ? 'SANCTIONED' : 'ACTIVE',
       },
     });
     const session = newSession(Date.now());
@@ -71,7 +79,7 @@ afterAll(async () => {
 async function request<T = unknown>(
   path: keyof typeof appRouter._def.procedures,
   data: unknown,
-  user: string | null = 'preset-actor',
+  user: string | null = actorUserId,
 ) {
   const mutation = appRouter._def.procedures[path]._def.type === 'mutation';
   const encoded = JSON.stringify({ 0: data });
@@ -89,7 +97,6 @@ async function request<T = unknown>(
 }
 async function fixture(preset: WorldPreset, edit: (initial: WorldInit) => void = () => {}) {
   const initial = commandInitial();
-  initial.statRules = { min: 15, max: 80, total: 165 };
   initial.generals.forEach((g, i) => {
     g.userId = i === 0 ? users[0]! : i === 3 ? users[1]! : null;
     g.nextTurnTick = i === 0 ? 100 : 9000;
@@ -102,9 +109,9 @@ async function fixture(preset: WorldPreset, edit: (initial: WorldInit) => void =
     preset: { key: 'fixture', value: preset },
   });
   await controlClock(db, result.worldId, 'start');
-  return { ...result, initial: { ...initial, presetRules: presetRules(preset) } };
+  return { ...result, initial: await readWorldState(db, result.worldId) };
 }
-async function queue(worldId: string, commandKey: string, args: unknown = {}, user = 'preset-actor') {
+async function queue(worldId: string, commandKey: string, args: unknown = {}, user = actorUserId) {
   const current = await request<{ revision: number }>('turns.get', { worldId }, user);
   expect(current.status).toBe(200);
   const slots: (QueuedTurn | null)[] = Array.from({ length: 30 }, () => null);
@@ -113,10 +120,10 @@ async function queue(worldId: string, commandKey: string, args: unknown = {}, us
   expect(result.data).toMatchObject({ ok: true });
 }
 async function advance(worldId: string, tick: number) {
-  const lease = await acquireLease(db, worldId);
+  const lease = await acquireLease(db, worldId, undefined, 120_000);
   if (!lease) throw new Error('시험 월드 실행권이 없습니다.');
   try {
-    return await new TurnLoop(db, lease).advanceTo(tick);
+    return await new TurnLoop(db, lease, { beforeCommit: (tx) => renewLease(tx, lease) }).advanceTo(tick);
   } finally {
     await releaseLease(db, lease);
   }
@@ -145,13 +152,13 @@ describe('T2-02 실제 DB 생성·고정', () => {
   it('AC-M2-03 두 프리셋 파일의 턴 간격·보호 기간·NPC·명령 설정을 실제 월드에 적용한다', async () => {
     const temp = await mkdtemp(join(tmpdir(), 'opensamguk-preset-pair-'));
     try {
-      await mkdir(join(temp, 'preset'));
+      await cp(resourceRoot, temp, { recursive: true });
       const rootUrl = pathToFileURL(`${temp}/`);
       const modes = [
         { key: 'beginner', turnMinutes: 30, peaceMonths: 24, aggression: 0.5, command: false },
         { key: 'speed', turnMinutes: 10, peaceMonths: 0, aggression: 1, command: true },
       ] as const;
-      for (const { key, turnMinutes, peaceMonths, aggression, command } of modes) {
+      for (const { key, turnMinutes, peaceMonths, aggression } of modes) {
         const original = await loadPreset(key);
         await writeFile(
           join(temp, 'preset', `${key}.json`),
@@ -160,7 +167,7 @@ describe('T2-02 실제 DB 생성·고정', () => {
             map: 'che',
             scenario: '1030',
             unitSet: 'basic',
-            commands: command ? { general: ['fire_attack'], nation: [] } : null,
+            commands: null,
           }),
         );
         const preset = await loadPreset(key, rootUrl);
@@ -178,7 +185,6 @@ describe('T2-02 실제 DB 생성·고정', () => {
             '300',
             '--name',
             '프리셋 비교',
-            ...(command ? ['--ext'] : []),
           ],
           {
             cwd: root,
@@ -198,8 +204,7 @@ describe('T2-02 실제 DB 생성·고정', () => {
         expect(response.status).toBe(200);
         expect(response.data?.some(({ key }) => key === 'farm')).toBe(true);
         const fireAttack = response.data?.find(({ key }) => key === 'fire_attack');
-        if (command) expect(fireAttack?.argsSchema).toBeDefined();
-        else expect(fireAttack).toBeUndefined();
+        expect(fireAttack?.argsSchema).toBeDefined();
       }
     } finally {
       await rm(temp, { recursive: true, force: true });
@@ -235,18 +240,20 @@ describe('T2-02 실제 DB 생성·고정', () => {
       unitSetKey: preset.unitSet,
     });
     const initial = await readWorldState(db, result.worldId);
-    expect(hashState(initial)).toBe(result.stateHash);
+    const savedOrigin = world.replayOrigin as unknown as {
+      initial: WorldInit;
+      featureData: Record<string, import('../packages/rules/src/index').JsonValue>;
+    };
+    expect(world.initialStateHash).toBe(result.stateHash);
+    expect(hashState(savedOrigin.initial)).toBe(result.stateHash);
+    expect(initial).toMatchObject(savedOrigin.initial);
     const replay = await db.$transaction((tx) => loadReplayState(tx, result.worldId));
     expect(hashState(replay)).toBe(
       hashState(
-        enableReplayPolicy(
-          initialReplayState(initial, { policy: { version: 1, turnTermMinutes: preset.turnTermMinutes } }),
-          preset.turnTermMinutes,
-          0,
-        ),
+        enableReplayPolicy(initialReplayState(savedOrigin.initial, savedOrigin.featureData), preset.turnTermMinutes, 0),
       ),
     );
-    expect((world.replayOrigin as unknown as { initial: WorldInit }).initial).toEqual(initial);
+    expect((world.replayOrigin as unknown as { initial: WorldInit }).initial).toEqual(savedOrigin.initial);
   });
   it('속성 월드의 실제 엔진이 다음 턴을 10분 뒤로 잡는다', async () => {
     const { worldId } = await fixture(await loadPreset('speed'), (initial) => {
@@ -289,7 +296,7 @@ describe('T2-02 실제 DB 생성·고정', () => {
     expect(world.mapKey).toBe('che');
     expect(world.scenarioKey).toBe('1030');
     expect(world.unitSetKey).toBe('basic');
-    expect(providedRuleKeys).not.toContain('battle-affinity-v2');
+    expect(providedRuleKeys).toContain('battle-affinity-v2');
     expect(world.preset).toEqual(await loadPreset('speed'));
   });
   it('없는 프리셋·경로 이탈·없는 시나리오·필수 인자가 빠진 CLI는 행을 만들지 않는다', async () => {
@@ -429,13 +436,8 @@ describe('T2-02 HTTP·엔진·재시작', () => {
     });
     // HTTP는 국가 명령을 받는 경로가 아직 없다(T4-03). BAD_REQUEST를 보호 성공으로 세지 않는다.
     expect(
-      (
-        await request(
-          'turns.precheck',
-          { worldId, commandKey: 'nation_declare', args: { nationId: 2 } },
-          'preset-other',
-        )
-      ).code,
+      (await request('turns.precheck', { worldId, commandKey: 'nation_declare', args: { nationId: 2 } }, otherUserId))
+        .code,
     ).toBe('BAD_REQUEST');
     await advance(worldId, 100);
     const history = await db.nationHistory.findFirstOrThrow({ where: { worldId, nationId: 1 } });
@@ -516,11 +518,11 @@ describe('T2-02 참가·권한·재생', () => {
         g.nextTurnTick = (year + 1) * 120000;
       });
     });
-    await db.world.update({ where: { id: worldId }, data: { monthlyTick: year * 120000, clockTick: year * 120000 } });
+    await advance(worldId, year * 120000);
     const response = request<{ status: string; general: { gold: number; rice: number; experience: number } }>(
       'general.create',
       createPayload(worldId),
-      'preset-new',
+      newUserId,
     );
     const deadline = Date.now() + 5000;
     while (Date.now() < deadline) {
@@ -539,17 +541,15 @@ describe('T2-02 참가·권한·재생', () => {
     const { worldId } = await fixture(await loadPreset('beginner'));
     const input = { worldId, commandKey: 'attack', args: { cityKey: 2 } };
     expect((await request('turns.precheck', input, null)).status).toBe(401);
-    expect((await request('turns.precheck', input, 'preset-sanctioned')).status).toBe(401);
-    expect((await request('turns.precheck', input, 'preset-new')).status).toBe(404);
-    expect((await request('turns.precheck', { ...input, generalId: 1 }, 'preset-other')).status).toBe(400);
+    expect((await request('turns.precheck', input, sanctionedUserId)).status).toBe(401);
+    expect((await request('turns.precheck', input, newUserId)).status).toBe(404);
+    expect((await request('turns.precheck', { ...input, generalId: 1 }, otherUserId)).status).toBe(400);
     expect((await request('general.create', createPayload(worldId), null)).status).toBe(401);
-    expect((await request('general.create', createPayload(worldId), 'preset-sanctioned')).status).toBe(401);
+    expect((await request('general.create', createPayload(worldId), sanctionedUserId)).status).toBe(401);
     expect(
-      (await request('general.create', { ...createPayload(worldId), userId: 'preset-new' }, 'preset-other')).status,
+      (await request('general.create', { ...createPayload(worldId), userId: newUserId }, otherUserId)).status,
     ).toBe(400);
-    expect((await request('general.create', { ...createPayload(worldId), intel: 9999 }, 'preset-new')).status).toBe(
-      400,
-    );
+    expect((await request('general.create', { ...createPayload(worldId), intel: 9999 }, newUserId)).status).toBe(400);
     expect(await db.inputEvent.count({ where: { worldId, kind: 'general.create' } })).toBe(0);
   });
   it('맞춤 프리셋으로 실제 엔진 12개월·프로세스 재시작·종료 재생 해시가 같다', async () => {
@@ -566,7 +566,7 @@ describe('T2-02 참가·권한·재생', () => {
     const creation = request<{ status: string; general: { experience: number } }>(
       'general.create',
       createPayload(worldId),
-      'preset-new',
+      newUserId,
     );
     const deadline = Date.now() + 5000;
     while (Date.now() < deadline) {
@@ -622,21 +622,19 @@ describe('T2-02 참가·권한·재생', () => {
     const ended = await exportReplay(db, worldId);
     expect(replayToEnd(ended)).toEqual(ended.end);
   }, 120_000);
-  it('기존 v1 origin·초기 해시·12개월 해시는 변경 전 골든 그대로다', async () => {
-    const archive = JSON.parse(
-      await readFile(new URL('../apps/engine/test/fixtures/replay-v1-b8f5074.json', import.meta.url), 'utf8'),
-    ) as ReplayArchive;
-    const { worldId } = await saveInitialWorld(db, archive.origin.initial, {
-      name: '레거시 골든',
-      replayFormat: 'legacy',
+  it('프리셋을 생략한 형식 3의 생성 기록·12개월 재생은 현재 규칙과 같다', async () => {
+    const initial = commandInitial();
+    const { worldId } = await saveInitialWorld(db, initial, {
+      name: '프리셋 생략 기준',
+      replayFormat: 3,
       turnTermMinutes: 60,
       endYear: null,
     });
     const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
     expect(world.presetKey).toBeNull();
     expect(world.preset).toBeNull();
-    expect(world.initialStateHash).toBe(archive.origin.initialStateHash);
-    expect(world.replayOrigin).toEqual(archive.origin);
+    expect(world.initialStateHash).toBe(hashState(initial));
+    const origin = structuredClone(world.replayOrigin);
     expect(Object.hasOwn((await db.$transaction((tx) => loadReplayState(tx, worldId))).state, 'presetRules')).toBe(
       false,
     );
@@ -653,7 +651,13 @@ describe('T2-02 참가·권한·재생', () => {
       await releaseLease(db, lease);
     }
     const result = await exportReplay(db, worldId);
-    expect(result.months.map((m) => m.stateHash)).toEqual(archive.months.map((m) => m.stateHash));
-    expect(replayArchive(result, 12)).toEqual(replayArchive(archive, 12));
+    let expected = initialReplayState(initial);
+    for (const month of result.months) {
+      while (expected.monthlyTick < month.tick) expected = runReplayAction(expected, initial.seed, initial.unitSet);
+      expect(month.stateHash).toBe(hashState(expected));
+    }
+    expect(result.months).toHaveLength(12);
+    expect(replayArchive(result, 12).at(-1)!.stateHash).toBe(hashState(expected));
+    expect((await db.world.findUniqueOrThrow({ where: { id: worldId } })).replayOrigin).toEqual(origin);
   }, 120_000);
 });

@@ -6,6 +6,7 @@ import { afterAll, beforeAll, expect, it as test } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import {
   applyCampaignRelationship,
+  applySexLedger,
   checkReplayOrigin,
   TICKS_PER_MONTH,
   type CampaignOrder,
@@ -13,7 +14,7 @@ import {
   type WorldInit,
 } from '../packages/rules/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
-import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb, loadSexLedger } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { loadReplayState } from '../apps/engine/src/monthly';
@@ -29,6 +30,7 @@ import { categories } from '../apps/server/src/authz/coverage';
 import type { readCampaignOrders } from '../apps/server/src/game/campaignOrders';
 import type { readCampaignRequest } from '../apps/server/src/game/campaignApi';
 import { testDatabaseUrl } from './test-database';
+import { prepareFixtureUnit, recruitmentFixtureData } from './fixtures/recruitment';
 
 // AC-INT-19B: 같은 정식 준비를 공유하고 권한 사례(API 묶음)와 긴 실제 차례 시나리오(엔진 묶음)를 나눠 실행한다.
 export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
@@ -357,6 +359,7 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
         {
           worldId,
           name: `지시검사${index}`,
+          sex: 'MALE',
           portraitId: null,
           leadership: 55,
           strength: 55,
@@ -425,6 +428,7 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
               name: 'INT19 정식 HTTP 검사',
               turnTermMinutes: 60,
               endYear: 201,
+              featureData: recruitmentFixtureData(initial),
             });
             worldIds.push(created.worldId);
             signal();
@@ -503,7 +507,7 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
     if (errors.length) throw new AggregateError(errors, 'INT19 자기 서버·데이터·연결 정리에 실패했습니다.');
   }, 120_000);
 
-  it('AC-INT-19B 정식53도시8관문·21국491명/9features와 생성출처·두 사람30칸·다른 월드를 보존한다', async () => {
+  it('AC-INT-19B 정식53도시8관문·21국491명·제공 규칙과 생성출처·두 사람30칸·다른 월드를 보존한다', async () => {
     expect(initial.generals).toHaveLength(491);
     expect(initial.nations).toHaveLength(21);
     expect(initial.cities.filter((city) => city.kind === 'CITY')).toHaveLength(53);
@@ -517,7 +521,9 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
     expect(state.turns[b.generalId]).toHaveLength(30);
     const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
     checkReplayOrigin(world.replayOrigin);
-    expect(world.replayOrigin).toMatchObject({ initial: { generals: initial.generals } });
+    expect(world.replayOrigin).toMatchObject({
+      initial: { generals: applySexLedger(initial, loadSexLedger(initial.scenarioKey)) },
+    });
     expect(hashState(await snapshot(otherWorldId))).toBe(otherHash);
     await linkHumans();
   });
@@ -701,12 +707,12 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
       await executeOrder(await issue(npcId, 'farm'));
     }, 120_000);
 
-    it('NPC 명시 편성 지시는 NPC자기 소유 부곡만 정상 생성하고 병력을 중복 저장하지 않는다', async () => {
+    it('NPC 명시 모병 지시는 NPC자기 소유 부곡만 정상 생성하고 병력을 중복 저장하지 않는다', async () => {
       const before = await snapshot();
       const existing = before.state.campaign!.units.find((unit) => unit.ownerId === npcId);
       if (!existing) {
         const type = initial.unitSet.crewTypes.find((type) => type.armType > 0)!.id;
-        await executeOrder(await issue(npcId, 'form_unit', { crewType: type }));
+        await executeOrder(await issue(npcId, 'recruit', { crewType: type, amount: 1 }));
       }
       const after = await snapshot(),
         owned = after.state.campaign!.units.filter((unit) => unit.ownerId === npcId);
@@ -880,14 +886,12 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
       await executeOrder(await issue(npcId, 'return'));
       const returned = await snapshot();
       expect(returned.state.generals[npcId]!.cityKey).toBe(returned.state.nations[nationId]!.capitalCityKey);
-      const formed = await applyInput('campaign.unit', {
-        type: 'form',
-        commanderId: a.generalId,
-        crewType: initial.unitSet.crewTypes.find((type) => type.armType > 0)!.id,
-        revision: (await board()).revision,
-      });
-      expect(formed.status).toBe('applied');
-      foreignUnitId = (await snapshot()).state.campaign!.units.find((unit) => unit.ownerId === a.generalId)!.id;
+      foreignUnitId = await prepareFixtureUnit(
+        db,
+        worldId,
+        a.generalId,
+        initial.unitSet.crewTypes.find((type) => type.armType > 0)!.id,
+      );
       const before = hashState(await snapshot()),
         count = await db.inputEvent.count({ where: { worldId } });
       expect(

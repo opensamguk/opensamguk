@@ -4,7 +4,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, afterEach, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import { commandInitial } from '../packages/rules/test/commandFixture';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { processInputs } from '../apps/engine/src/inputs';
 import { hashPassword, verifyPassword } from '../apps/server/src/auth/password';
 import { issueAccountToken, resetPasswordToken } from '../apps/server/src/auth/accountTokenStore';

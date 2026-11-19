@@ -834,7 +834,7 @@ describe('T2-15 B1 실제 복구 리허설', () => {
             name: '백업 복구 시험',
             turnTermMinutes: 60,
             endYear: null,
-            replayFormat: 'legacy',
+            replayFormat: 3,
           })
         ).worldId;
         controller.signal.throwIfAborted();

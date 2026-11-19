@@ -15,7 +15,7 @@ const url = process.env.TEST_DATABASE_URL;
 if (
   !url ||
   !['localhost', '127.0.0.1'].includes(new URL(url).hostname) ||
-  !/^\/[a-z][a-z0-9_]*_test$/.test(new URL(url).pathname)
+  !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(new URL(url).pathname)
 )
   throw new Error('loopback 전용 검사 DB가 필요합니다.');
 const db = createDb(url);
@@ -101,22 +101,28 @@ async function fixture() {
       cityKey: 2,
       status: 'PENDING',
       createdTick: 0,
-      expiresTick: 20000,
+      expiresTick: 10000,
     },
   });
   return { worldId, initial, origin: saved.replayOrigin };
 }
 
 describe('AC-INT-09 실제 PostgreSQL 월간 발령 동행 저장', () => {
-  it.each([false, true])('원생성의 보완판 선택=%s: 원자적 저장·롤백·재접속·월 해시 일치', async (corrected) => {
-    const f = await fixture(corrected),
-      other = await fixture(corrected);
+  it('현재 규칙의 원자적 저장·롤백·재접속·월 해시 일치', async () => {
+    const f = await fixture(),
+      other = await fixture();
     const before = await db.$transaction((tx) => loadReplayState(tx, f.worldId), { isolationLevel: 'RepeatableRead' });
     const isolated = hashState(await db.$transaction((tx) => loadReplayState(tx, other.worldId)));
-    const tick = 20000,
+    const tick = 10000,
       date = monthlyDate(before.state.startYear, tick);
     const monthly = runMonthly(before.state, tick, rngFor(f.initial.seed, 'monthly', date.year, date.month));
-    const expected = settleMonthlyFeatures(before, { ...before, state: monthly.state, monthlyTick: tick }, tick).replay;
+    const expected = settleMonthlyFeatures(
+      before,
+      { ...before, state: monthly.state, monthlyTick: tick },
+      tick,
+      undefined,
+      f.initial.seed,
+    ).replay;
     const lease = await acquireLease(db, f.worldId);
     if (!lease) throw new Error('검사 실행권이 없습니다.');
     try {
@@ -145,7 +151,7 @@ describe('AC-INT-09 실제 PostgreSQL 월간 발령 동행 저장', () => {
         isolationLevel: 'RepeatableRead',
       });
       expect(after).toEqual(expected);
-      expect([1, 2, 3].map((id) => after.state.generals[id]!.cityKey)).toEqual([2, corrected ? 2 : 1, 1]);
+      expect([1, 2, 3].map((id) => after.state.generals[id]!.cityKey)).toEqual([2, 2, 1]);
       expect(after.residenceAnchors).toEqual({ 1: tick, 3: 0 });
       expect(after.turns).toEqual(before.turns);
       expect(after.state.campaign).toEqual(before.state.campaign);

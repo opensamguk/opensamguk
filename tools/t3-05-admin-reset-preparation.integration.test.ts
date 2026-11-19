@@ -20,7 +20,7 @@ import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { exportReplay, replayArchive } from '../apps/engine/src/replay';
-import { testDatabaseUrl } from './test-database';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
 import { confirmDisconnectedDatabase } from './test-db-close';
 import { OwnedChildScope } from './test-support/owned-child-scope';
 import { stopOwnedChild } from '../apps/engine/src/process-lifecycle';
@@ -41,7 +41,7 @@ if (!['localhost', '127.0.0.1'].includes(source.hostname)) throw new Error('loop
 for (const key of source.searchParams.keys())
   if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
     throw new Error('접속 대상 질의 인자는 쓸 수 없습니다.');
-const name = 'opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test',
+const name = ciGreenDatabaseName('opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test'),
   target = new URL(source),
   adminUrl = new URL(source);
 target.pathname = '/' + name;
@@ -156,7 +156,10 @@ async function cleanupWithReservedClose(
   return closed;
 }
 async function dropExactOwnedDatabase(client: Pg, expectedName: string, expectedOid: string, signal: AbortSignal) {
-  if (!/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(expectedName) || !/^[1-9]\d*$/.test(expectedOid))
+  if (
+    !(/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(expectedName) || expectedName === ciGreenDatabaseName('')) ||
+    !/^[1-9]\d*$/.test(expectedOid)
+  )
     throw new Error('자기 시험 DB 식별자를 확인하세요.');
   const identity = (
     await checked(

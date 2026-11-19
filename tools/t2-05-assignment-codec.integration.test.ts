@@ -11,7 +11,7 @@ import {
   type AssignmentSnapshot,
 } from '../apps/engine/src/assignmentState';
 import { loadOfficeState, persistOfficeState } from '../apps/engine/src/personnelState';
-import { testDatabaseUrl } from './test-database';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
 import { confirmDisconnectedDatabase } from './test-db-close';
 
 type PgClient = {
@@ -60,7 +60,7 @@ const requiredMigrations = [
 ] as const;
 
 function identifier(value: string): string {
-  if (!/^[a-z][a-z0-9_]*$/.test(value) || value.length > 63) throw new Error('시험 DB 식별자를 확인하세요.');
+  if (!/^[a-z][a-zA-Z0-9_]*$/.test(value) || value.length > 63) throw new Error('시험 DB 식별자를 확인하세요.');
   return `"${value}"`;
 }
 
@@ -78,9 +78,12 @@ type Context = { sql: PgClient; db: Db; initial: WorldInit; openSql(): Promise<P
 async function withDatabase(caseId: CaseId, run: (context: Context) => Promise<void>) {
   if (!process.env.TEST_DATABASE_URL) throw new Error('TEST_DATABASE_URL이 필요합니다.');
   const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-  const name = `opensamguk_ci_green_${caseId}_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`;
+  const name = ciGreenDatabaseName(
+    `opensamguk_ci_green_${caseId}_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`,
+  );
   identifier(name);
-  if (name === source.pathname.slice(1)) throw new Error('원본 URL의 DB 이름은 사용할 수 없습니다.');
+  if (!process.env.CI_GREEN_DATABASE && name === source.pathname.slice(1))
+    throw new Error('원본 URL의 DB 이름은 사용할 수 없습니다.');
   const adminUrl = new URL(source),
     target = new URL(source);
   adminUrl.pathname = '/postgres';

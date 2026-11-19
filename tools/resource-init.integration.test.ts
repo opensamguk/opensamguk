@@ -1,3 +1,4 @@
+import { ciGreenDatabaseName } from './test-database';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createHash, randomUUID } from 'node:crypto';
@@ -64,7 +65,7 @@ async function withDatabase(action: (fixture: Fixture) => Promise<void>, beforeC
   const { files, target } = await migrationFiles();
   if (!process.env.TEST_DATABASE_URL) throw new Error('전용 TEST_DATABASE_URL이 필요합니다.');
   const reference = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-  const name = `opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`;
+  const name = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
   const url = new URL(reference);
   url.pathname = `/${name}`;
   testDatabaseUrl({ TEST_DATABASE_URL: url.href, DATABASE_URL: process.env.DATABASE_URL });

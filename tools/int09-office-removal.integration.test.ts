@@ -18,7 +18,7 @@ const url = process.env.TEST_DATABASE_URL;
 if (
   !url ||
   !['127.0.0.1', 'localhost'].includes(new URL(url).hostname) ||
-  !/^\/[a-z][a-z0-9_]*_test$/.test(new URL(url).pathname)
+  !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(new URL(url).pathname)
 ) {
   throw new Error('loopback 전용 검사 DB가 필요합니다.');
 }
@@ -57,17 +57,22 @@ async function fixture() {
   userIds.push(user.id);
   await db.general.update({
     where: { worldId_id: { worldId, id: 1 } },
-    data: { userId: user.id, rice: 10000, lastActiveTick: 240000, residenceTick: 0, nextTurnTick: 240001 },
+    data: { userId: user.id, rice: 10000, lastActiveTick: 0, residenceTick: 0, nextTurnTick: 1 },
   });
-  await db.general.update({ where: { worldId_id: { worldId, id: 2 } }, data: { nextTurnTick: 250000 } });
+  await db.general.update({ where: { worldId_id: { worldId, id: 2 } }, data: { nextTurnTick: 10000 } });
   const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+  const resources = structuredClone(world.cityResourcesState) as unknown as {
+    cities: Record<string, { rice: number }>;
+  };
+  resources.cities['99']!.rice = 10000;
   await db.world.update({
     where: { id: worldId },
     data: {
       status: 'RUNNING',
       clockMode: 'ACCELERATED',
-      clockTick: 240000,
-      monthlyTick: 240000,
+      clockTick: 0,
+      monthlyTick: 0,
+      cityResourcesState: json(resources),
       campaignState: json({
         ...(world.campaignState as object),
         nextUnitId: 2,
@@ -113,7 +118,7 @@ describe('AC-INT-09 국가 멸망과 직책 저장의 원자적 순서', () => {
           worldId,
           after,
           [{ kind: 'world', state: after }],
-          { tick: 240001, sequence: 1 },
+          { tick: 1, sequence: 1 },
           before.state,
           async () => {
             expect(await tx.nation.count({ where: { worldId, id: { in: [2, 3] } } })).toBe(2);
@@ -160,7 +165,7 @@ describe('AC-INT-09 국가 멸망과 직책 저장의 원자적 순서', () => {
     const lease = await acquireLease(db, worldId);
     if (!lease) throw new Error('검사 실행권이 없습니다.');
     try {
-      await new TurnLoop(db, lease).advanceTo(240001);
+      await new TurnLoop(db, lease).advanceTo(1);
     } finally {
       await releaseLease(db, lease);
     }
@@ -182,7 +187,7 @@ describe('AC-INT-09 국가 멸망과 직책 저장의 원자적 순서', () => {
     expect(await db.removedNation.count({ where: { worldId, nationId: 2 } })).toBe(1);
     expect(
       await db.generalLog.count({
-        where: { worldId, generalId: 1, tick: 240001, commandKey: 'attack', kind: 'success' },
+        where: { worldId, generalId: 1, tick: 1, commandKey: 'attack', kind: 'success' },
       }),
     ).toBe(1);
     const result = await db.worldResult.findUniqueOrThrow({ where: { worldId } });
@@ -204,7 +209,7 @@ describe('AC-INT-09 국가 멸망과 직책 저장의 원자적 순서', () => {
           beforeCommit: async () => {
             throw new Error('office-removal-late-rollback');
           },
-        }).advanceTo(240001),
+        }).advanceTo(1),
       ).rejects.toThrow('office-removal-late-rollback');
     } finally {
       await releaseLease(db, lease);

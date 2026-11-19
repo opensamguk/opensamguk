@@ -15,7 +15,7 @@ import { exportReplay, replayArchive } from '../apps/engine/src/replay';
 
 // AC-INT-17 명령 어댑터 검사. 정식 시나리오·지도·한 기수 인수를 대신하지 않는다.
 const url = process.env.TEST_DATABASE_URL;
-if (!url || !/^\/[a-z][a-z0-9_]*_test$/.test(new URL(url).pathname)) throw Error('전용 테스트 DB가 필요합니다.');
+if (!url || !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(new URL(url).pathname)) throw Error('전용 테스트 DB가 필요합니다.');
 const db = createDb(url);
 const app = await buildServer({ db, logging: false });
 const users = Array.from({ length: 5 }, () => randomUUID());
@@ -173,7 +173,11 @@ it('INT-17 실제 세션의 네 계략 검사·권한·중복 예약·재시작�
       const b = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: generalId } } });
       // 탈취 성공의 몫은 별도 효과다. 다른 세 계략은 확정 비용만 차감한다.
       if (command.commandKey !== 'plunder') {
-        expect(a.gold - b.gold).toBe(100);
+        const logs = await db.generalLog.findMany({
+          where: { worldId, generalId, tick, commandKey: command.commandKey },
+          select: { text: true },
+        });
+        expect(a.gold - b.gold, JSON.stringify(logs)).toBe(100);
         expect(a.rice - b.rice).toBe(100);
       }
       expect(b.turnRevision).toBe(a.turnRevision + 1);

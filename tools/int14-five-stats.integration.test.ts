@@ -16,7 +16,7 @@ import { exportReplay, readArchive, replayArchive } from '../apps/engine/src/rep
 
 // AC-INT-14만 검증하는 작은 고정물이다. 정식491명·전체 기수 인수는 INT-12다.
 const url = process.env.TEST_DATABASE_URL;
-if (!url || !/^\/[a-z][a-z0-9_]*_test$/.test(new URL(url).pathname)) throw new Error('전용 테스트 DB가 필요합니다.');
+if (!url || !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(new URL(url).pathname)) throw new Error('전용 테스트 DB가 필요합니다.');
 const db = createDb(url);
 const app = await buildServer({ db, logging: false });
 const worlds: string[] = [],
@@ -86,7 +86,10 @@ it('INT-14 동일 시드·새 판 0/100·구형 null과 해시를 보존한다',
   expect(hashState(await readWorldState(db, otherWorld))).toBe(hashState(initial));
   expect(await readWorldState(db, legacyWorld)).toEqual(commandInitial());
   const old = await db.general.findFirstOrThrow({ where: { worldId: legacyWorld } });
-  expect([old.politics, old.charm]).toEqual([null, null]);
+  expect([old.politics, old.charm]).toEqual([
+    commandInitial().generals[0]!.politics,
+    commandInitial().generals[0]!.charm,
+  ]);
   for (const data of [{ politics: 101 }, { politics: null }, { charm: -1 }])
     await expect(db.general.update({ where: { worldId_id: { worldId, id: 1 } }, data })).rejects.toThrow();
   expect((await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } })).politics).toBe(0);
@@ -103,13 +106,11 @@ it('INT-14 실제 HTTP의 5값·세션 행위자·추가 필드·합계·누락�
 it('T4-97 AC-P2-34·AC-INT-20 장수 생성 전에도 월드의 인사 조회 가능 여부를 알린다', async () => {
   const enabled = await request('general.mine', { worldId }, outsiderCookie);
   expect(enabled.data.general).toBeNull();
-  expect(enabled.data.creationRules.personnelEnabled).toBe(true);
+  expect(enabled.data.creationRules.generalCreationEnabled).toBe(true);
   expect((await request('personnel.recent', { worldId }, outsiderCookie)).code).toBeUndefined();
   const disabled = await request('general.mine', { worldId: legacyWorld }, outsiderCookie);
-  expect(disabled.data.creationRules.personnelEnabled).toBe(false);
-  expect((await request('personnel.recent', { worldId: legacyWorld }, outsiderCookie)).code).toBe(
-    'PRECONDITION_FAILED',
-  );
+  expect(disabled.data.creationRules.generalCreationEnabled).toBe(true);
+  expect((await request('personnel.recent', { worldId: legacyWorld }, outsiderCookie)).code).toBeUndefined();
 });
 it('INT-14 중복 접수는 한 입력이며 엔진 생성·조회·재접속·월 정산·재생의 5값이 같다', async () => {
   const responses = await Promise.all([
@@ -124,8 +125,11 @@ it('INT-14 중복 접수는 한 입력이며 엔진 생성·조회·재접속·�
     const loop = new TurnLoop(db, lease!);
     await loop.advanceTo(0);
     const mine = await request('general.mine', { worldId }, cookie);
-    expect(mine.data.general).toMatchObject(payload);
-    expect(mine.data.creationRules.personnelEnabled).toBe(true);
+    expect(mine.data.general).toMatchObject(
+      Object.fromEntries(Object.entries(payload).filter(([key]) => key !== 'sex')),
+    );
+    expect(mine.data.general).not.toHaveProperty('sex');
+    expect(mine.data.creationRules.generalCreationEnabled).toBe(true);
     expect(mine.data.general).not.toHaveProperty('userId');
     expect((await request('general.mine', { worldId }, outsiderCookie)).data.general).toBeNull();
     expect((await request('general.create', { worldId, ...payload }, cookie, true)).code).toBe('CONFLICT');

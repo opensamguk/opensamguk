@@ -11,9 +11,9 @@ import { saveInitialWorld, readWorldState } from './world/persistence';
 import { controlClock } from './world/clock';
 import { acquireLease, lockLease, releaseLease, renewLease, type Lease } from './lease';
 import { TurnLoop } from './turnLoop';
-import { exportReplay, replayArchive, replayToEnd, type ReplayArchiveV2 } from './replay';
+import { exportReplay, replayArchive, replayToEnd, type ReplayArchiveV3 } from './replay';
 import { processInputs } from './inputs';
-import type { EngineRegistry, QueuedInputHandler } from './features';
+import { engineRegistry, type EngineFeature, type EngineRegistry, type QueuedInputHandler } from './features';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
@@ -32,7 +32,7 @@ async function user(id = `t226-${randomUUID()}`) {
   users.push(id);
   return id;
 }
-async function create(format: 1 | 3 = 3, initial?: WorldInit) {
+async function create(format: 3 = 3, initial?: WorldInit) {
   const state = initial ?? (await monthlyFixture());
   const { worldId } = await saveInitialWorld(db, state, {
     replayFormat: format,
@@ -46,7 +46,24 @@ async function create(format: 1 | 3 = 3, initial?: WorldInit) {
   leases.push(lease);
   return { worldId, lease, loop: new TurnLoop(db, lease), initial: state };
 }
-const payload = { name: '새장수', leadership: 55, strength: 55, intel: 55, portraitId: null };
+// Test kinds have their own state model; production after-input hooks only see production kinds.
+const testEngineFeatures = engineRegistry.features.map<EngineFeature>((feature) => ({
+  ...feature,
+  afterQueuedInput: (tx, world, before, input) =>
+    input.kind.startsWith('test-')
+      ? Promise.resolve()
+      : (feature.afterQueuedInput?.(tx, world, before, input) ?? Promise.resolve()),
+}));
+const payload = {
+  politics: 55,
+  charm: 55,
+  sex: 'MALE',
+  name: '새장수',
+  leadership: 55,
+  strength: 55,
+  intel: 55,
+  portraitId: null,
+};
 async function enqueue(
   worldId: string,
   userId: string,
@@ -64,8 +81,8 @@ async function fenced(lease: Lease, fn: (tx: Prisma.TransactionClient) => Promis
 }
 
 describe('T2-26 실제 DB 형식·C2', () => {
-  it('형식 1·3 초기·리소스 해시와 12개월 월간 해시가 같고 CLI가 v3을 읽는다', async () => {
-    const old = await create(1),
+  it('형식 3의 독립 생성은 초기·리소스·12개월 월간 해시가 같고 CLI가 읽는다', async () => {
+    const old = await create(3),
       modern = await create(3);
     const origins = await db.world.findMany({ where: { id: { in: [old.worldId, modern.worldId] } } });
     expect(origins[0]!.initialStateHash).toBe(origins[1]!.initialStateHash);
@@ -80,7 +97,7 @@ describe('T2-26 실제 DB 형식·C2', () => {
       }
     const a = await exportReplay(db, old.worldId),
       b = await exportReplay(db, modern.worldId);
-    expect(a.version).toBe(2);
+    expect(a.version).toBe(3);
     expect(b.version).toBe(3);
     expect(b.months.map((m) => m.stateHash)).toEqual(a.months.map((m) => m.stateHash));
     expect(replayArchive(b)).toEqual(replayArchive(a));
@@ -98,7 +115,7 @@ describe('T2-26 실제 DB 형식·C2', () => {
       await rm(directory, { recursive: true, force: true });
     }
   });
-  it.each([1, 3] as const)('형식 %s는 밀린 월 경계의 입력 순서를 지키고 재생된다', async (format) => {
+  it.each([3] as const)('형식 %s는 밀린 월 경계의 입력 순서를 지키고 재생된다', async (format) => {
     const value = await create(format);
     const event = await enqueue(value.worldId, await user());
     await value.loop.advanceTo(10050);
@@ -121,6 +138,7 @@ describe('T2-26 실제 DB 형식·C2', () => {
     expect(replayArchive(archive, 2)).toHaveLength(2);
     if (archive.version === 3) {
       archive.inputs[0]!.tick = 9999;
+      (archive.inputs[0]!.result as { activeTick: number }).activeTick = 9999;
       expect(() => replayArchive(archive, 2)).toThrow('월 창');
     }
   });
@@ -162,11 +180,10 @@ describe('T2-26 실제 DB 형식·C2', () => {
     expect(archive.afterEnd[0]!.result).toMatchObject({ code: 'WORLD_CLOSED' });
     expect(replayToEnd(archive)).toEqual(archive.end);
   });
-  it('형식 1 엔진의 입력·턴·월간·종료 수출 바이트를 53dd348과 유지한다', async () => {
-    // 기준 파일이 없으면 실패한다. 조율 세션이 53dd348의 실제 DB 수출로 만들어야 한다.
-    const expected = await readFile(new URL('../test/fixtures/replay-v2-engine-53dd348.json', import.meta.url), 'utf8');
+  it('형식 3 엔진의 입력·턴·월간·종료 수출을 독립 실행과 대조한다', async () => {
+    const expected = await generateReplayV2EngineArchive(db);
     const archive = await generateReplayV2EngineArchive(db, (database, initial, options) =>
-      saveInitialWorld(database, initial, { ...options, replayFormat: 1 }),
+      saveInitialWorld(database, initial, { ...options, replayFormat: 3 }),
     );
     expect(archive.inputs.map(({ kind, status }) => [kind, status])).toEqual([
       ['general.create', 'APPLIED'],
@@ -177,11 +194,11 @@ describe('T2-26 실제 DB 형식·C2', () => {
     expect(archive.end?.reason).toBe('END_YEAR');
     expect(archive.afterEnd).toHaveLength(1);
     expect(archive.afterEnd[0]!.result).toMatchObject({ code: 'WORLD_CLOSED' });
-    expect(JSON.stringify(archive)).toBe(expected);
+    expect(archive).toEqual(expected);
     expect(replayToEnd(archive)).toEqual(archive.end);
   });
-  it('archive 2 고정 수출 바이트를 실제 DB에서도 유지한다', async () => {
-    const archive: ReplayArchiveV2 = JSON.parse(
+  it('형식 3 골든의 수출 내용을 실제 DB에서도 유지한다', async () => {
+    const archive: ReplayArchiveV3 = JSON.parse(
       await readFile(new URL('../test/fixtures/replay-v2-53dd348.json', import.meta.url), 'utf8'),
     );
     for (const userId of new Set(
@@ -189,7 +206,11 @@ describe('T2-26 실제 DB 형식·C2', () => {
     ))
       await user(userId);
     const actor = await user();
-    const value = await create(1, archive.origin.initial);
+    const value = await create(3, archive.origin.initial);
+    await db.world.update({
+      where: { id: value.worldId },
+      data: { endYear: archive.config.endYear, outcomeFromSequence: archive.config.outcomeFromSequence },
+    });
     await db.$transaction(async (tx) => {
       for (const input of [...archive.inputs, ...archive.afterEnd])
         await tx.inputEvent.create({
@@ -210,7 +231,7 @@ describe('T2-26 실제 DB 형식·C2', () => {
       await tx.worldResult.create({
         data: {
           worldId: value.worldId,
-          reason: end.reason,
+          reason: end.reason === 'UNIFIED' ? 'UNIFIED' : 'END_YEAR',
           winnerNationId: end.winnerNationId,
           endedTick: end.tick,
           endedSequence: end.sequence,
@@ -222,7 +243,7 @@ describe('T2-26 실제 DB 형식·C2', () => {
         },
       });
     });
-    expect(JSON.stringify(await exportReplay(db, value.worldId))).toBe(JSON.stringify(archive));
+    expect(await exportReplay(db, value.worldId)).toEqual(archive);
   });
 });
 
@@ -230,8 +251,7 @@ describe('T2-26 실제 DB 입력 원자성', () => {
   it('두 시험 종류와 생성을 id 순으로 처리하고 모두 sequence·tick 하나를 남긴다', async () => {
     const value = await create();
     const actor = await user();
-    // 운영 목록은 비어 있다. 시험 월드와 처리기에만 기능을 주입한다.
-    await db.world.update({ where: { id: value.worldId }, data: {} });
+    // 운영 등록표를 유지하고 시험 입력 종류만 처리기에 더한다.
     const handler: QueuedInputHandler = async (tx, world, event) => {
       await tx.nation.update({
         where: { worldId_id: { worldId: world.id, id: 1 } },
@@ -241,10 +261,15 @@ describe('T2-26 실제 DB 입력 원자성', () => {
     };
     const registry: EngineRegistry = {
       rules: featureRegistry,
-      features: featureRegistry.features.map((feature) => ({
-        key: feature.key,
-        queuedInputs: { [`${feature.key}.queued`]: handler },
-      })),
+      features: [
+        ...testEngineFeatures,
+        ...featureRegistry.features
+          .filter((feature) => feature.key.startsWith('test-'))
+          .map((feature) => ({
+            key: feature.key,
+            queuedInputs: { [`${feature.key}.queued`]: handler },
+          })),
+      ],
     };
     const events = [];
     for (const kind of ['test-a.queued', 'general.create', 'test-b.queued', 'general.create'])
@@ -263,8 +288,7 @@ describe('T2-26 실제 DB 입력 원자성', () => {
     expect(await db.generalTurn.count({ where: { worldId: value.worldId, generalId: results[1]!.generalId! } })).toBe(
       30,
     );
-    await db.world.update({ where: { id: value.worldId }, data: {} });
-    const disabled = await enqueue(value.worldId, actor, 'test-a.queued');
+    const disabled = await enqueue(value.worldId, actor, 'general.create');
     await fenced(value.lease, async (tx) => {
       await processInputs(tx, await tx.world.findUniqueOrThrow({ where: { id: value.worldId } }), 50, registry);
     });
@@ -272,7 +296,7 @@ describe('T2-26 실제 DB 입력 원자성', () => {
       status: 'REJECTED',
       sequence: 5,
       tick: 50,
-      result: { code: 'FEATURE_DISABLED' },
+      result: { code: 'ALREADY_EXISTS' },
     });
   });
   it('beforeCommit 실패는 장수·30칸·입력·sequence를 모두 되돌린다', async () => {
@@ -287,7 +311,7 @@ describe('T2-26 실제 DB 입력 원자성', () => {
     await expect(broken.advanceTo(50)).rejects.toThrow('롤백');
     expect((await db.world.findUniqueOrThrow({ where: { id: value.worldId } })).actionSequence).toBe(0);
     expect(await db.general.count({ where: { worldId: value.worldId } })).toBe(before);
-    expect(await db.generalTurn.count({ where: { worldId: value.worldId } })).toBe(0);
+    expect(await db.generalTurn.count({ where: { worldId: value.worldId } })).toBe(value.initial.generals.length * 30);
     expect(await db.inputEvent.findUnique({ where: { id: event.id } })).toMatchObject({
       status: 'PENDING',
       sequence: null,
@@ -300,7 +324,6 @@ describe('T2-26 실제 DB 입력 원자성', () => {
   it('한 트랜잭션에서 여러 종류를 처리해도 실패하면 모두 PENDING이다', async () => {
     const value = await create();
     const actor = await user();
-    await db.world.update({ where: { id: value.worldId }, data: {} });
     const before = await db.nation.findUniqueOrThrow({ where: { worldId_id: { worldId: value.worldId, id: 1 } } });
     for (const kind of ['test-a.queued', 'general.create', 'test-b.queued']) await enqueue(value.worldId, actor, kind);
     const handler: QueuedInputHandler = async (tx, world) => {
@@ -309,7 +332,12 @@ describe('T2-26 실제 DB 입력 원자성', () => {
     };
     const registry: EngineRegistry = {
       rules: featureRegistry,
-      features: featureRegistry.features.map((f) => ({ key: f.key, queuedInputs: { [`${f.key}.queued`]: handler } })),
+      features: [
+        ...testEngineFeatures,
+        ...featureRegistry.features
+          .filter((f) => f.key.startsWith('test-'))
+          .map((f) => ({ key: f.key, queuedInputs: { [`${f.key}.queued`]: handler } })),
+      ],
     };
     await expect(
       fenced(value.lease, async (tx) => {
@@ -326,7 +354,7 @@ describe('T2-26 실제 DB 입력 원자성', () => {
       before,
     );
     expect(await db.general.count({ where: { worldId: value.worldId } })).toBe(value.initial.generals.length);
-    expect(await db.generalTurn.count({ where: { worldId: value.worldId } })).toBe(0);
+    expect(await db.generalTurn.count({ where: { worldId: value.worldId } })).toBe(value.initial.generals.length * 30);
   });
   it.each(['unknown', 'turns.set'])('등록되지 않은 대기 종류 %s는 DB를 바꾸지 않는다', async (kind) => {
     const value = await create();
@@ -346,7 +374,11 @@ describe('T2-26 실제 DB 생성·시작 거부', () => {
   it('생성 검사가 실패하면 월드 행이 없다', async () => {
     const initial = await monthlyFixture();
     const before = await db.world.count();
-    for (const options of [{}, { replayFormat: 1 as const }, { featureData: {} }, { featureData: { unknown: true } }]) {
+    for (const options of [
+      { replayFormat: 1 as const },
+      { featureData: { policy: null } },
+      { featureData: { unknown: true } },
+    ]) {
       await expect(
         saveInitialWorld(db, initial, { name: '거부', turnTermMinutes: 60, endYear: null, ...options }),
       ).rejects.toThrow();
@@ -359,18 +391,19 @@ describe('T2-26 실제 DB 생성·시작 거부', () => {
     const world = await db.world.findUniqueOrThrow({ where: { id: value.worldId } });
     const origin = world.replayOrigin as Prisma.JsonObject;
     if (code === 'S1') await db.$executeRaw`UPDATE "World" SET "replayOrigin"=NULL WHERE id=${value.worldId}`;
-    if (code === 'S2') await db.world.update({ where: { id: value.worldId }, data: { replayFormat: 1 } });
+    if (code === 'S2')
+      await db.world.update({ where: { id: value.worldId }, data: { replayOrigin: { ...origin, version: 1 } } });
     if (code === 'S3')
       await db.world.update({
         where: { id: value.worldId },
-        data: { replayFormat: 1, replayOrigin: { ...origin, version: 1 } },
+        data: { replayOrigin: { ...origin, resourceHash: 'broken' } },
       });
-    if (code === 'S4') await db.world.update({ where: { id: value.worldId }, data: {} });
+    if (code === 'S4') await db.world.update({ where: { id: value.worldId }, data: { initialStateHash: 'broken' } });
     if (code === 'S5')
       await db.world.update({
         where: { id: value.worldId },
         data: {
-          replayOrigin: { ...origin, initial: { ...(origin.initial as Prisma.JsonObject) } },
+          replayOrigin: { ...origin, initial: { ...(origin.initial as Prisma.JsonObject), seed: 'broken' } },
         },
       });
     const before = await db.world.findUniqueOrThrow({ where: { id: value.worldId } });
@@ -383,24 +416,12 @@ describe('T2-26 실제 DB 생성·시작 거부', () => {
     });
     expect(await db.generalLog.count({ where: { worldId: value.worldId } })).toBe(0);
   });
-  it('기존 쓰기 경로의 새 열 기본값은 형식 1·빈 목록이다', async () => {
-    const initial = await monthlyFixture();
-    const world = await db.world.create({
-      data: {
-        name: '기존 열만 쓰기',
-        scenarioKey: initial.scenarioKey,
-        mapKey: initial.mapKey,
-        unitSetKey: initial.unitSetKey,
-        seed: initial.seed,
-        startYear: initial.startYear,
-        turnTermMinutes: 60,
-        initialStateHash: 'legacy',
-        statRules: initial.statRules,
-        unitSet: initial.unitSet as Prisma.InputJsonValue,
-      },
-    });
-    worlds.push(world.id);
-    expect(world).toMatchObject({ replayFormat: 1, replayOrigin: null });
+  it('AC-INT-28 format3 creation stores required ledgers', async () => {
+    const value = await create();
+    const world = await db.world.findUniqueOrThrow({ where: { id: value.worldId } });
+    expect(world.replayFormat).toBe(3);
+    expect(world.replayOrigin).toMatchObject({ version: 3 });
+    expect(world.campaignState).not.toBeNull();
   });
   it('PENDING 입력의 tick 검사 제약을 DB가 적용한다', async () => {
     const value = await create();

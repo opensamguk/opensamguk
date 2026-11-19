@@ -195,12 +195,16 @@ export async function generateReplayV2EngineArchive(
   saveWorld: typeof saveInitialWorld = saveInitialWorld,
 ): Promise<ReplayArchiveV3> {
   const userId = 't226-engine-v2-actor';
+  const lateUserId = 't226-engine-v2-late-actor';
   let ownsUser = false;
   let worldId: string | undefined;
   let lease: Lease | null = null;
   try {
     await db.user.create({ data: { id: userId, email: userId + '@example.invalid', passwordHash: 'test-only' } });
     ownsUser = true;
+    await db.user.create({
+      data: { id: lateUserId, email: lateUserId + '@example.invalid', passwordHash: 'test-only' },
+    });
     const initial = await monthlyFixture();
     initial.seed = 't2-26-engine-v2';
     initial.generals = [];
@@ -217,7 +221,7 @@ export async function generateReplayV2EngineArchive(
       db.inputEvent.create({
         data: {
           worldId: worldId!,
-          userId,
+          userId: key === 'after-end' ? lateUserId : userId,
           kind: 'general.create',
           idempotencyKey: key,
           payload: {
@@ -236,7 +240,7 @@ export async function generateReplayV2EngineArchive(
     await loop.advanceTo(0);
     await recordTestTurns(db, worldId, 1, 'rest');
     await enqueue('duplicate');
-    // 밀린 월 경계에서도 형식 1은 입력을 먼저 처리한다.
+    // 형식 3은 밀린 월 경계를 정산한 뒤 입력을 처리한다.
     await loop.advanceTo(10050);
     for (let month = 2; month <= 12; month++) {
       await renewLease(db, lease);
@@ -254,7 +258,7 @@ export async function generateReplayV2EngineArchive(
       try {
         if (worldId) await db.world.delete({ where: { id: worldId } });
       } finally {
-        if (ownsUser) await db.user.delete({ where: { id: userId } });
+        if (ownsUser) await db.user.deleteMany({ where: { id: { in: [userId, lateUserId] } } });
       }
     }
   }

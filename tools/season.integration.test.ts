@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import { buildServer } from '../apps/server/src/server';
 import { newSession } from '../apps/server/src/auth/session';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { acquireLease, releaseLease, type Lease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { controlClock } from '../apps/engine/src/world/clock';
@@ -26,7 +26,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await app.close();
   await db.world.deleteMany({ where: { id: { in: worlds } } });
-  await db.user.deleteMany({ where: { id: { in: users } } });
+  await db.user.deleteMany({ where: { id: { in: users }, heritageAccount: { is: null } } });
   await db.$disconnect();
 });
 async function identity() {
@@ -146,16 +146,36 @@ it('같은 사람 판에서 realtime 턴·가속·예턴 편집·충돌·정지�
   const queue = turns();
   queue[0] = { commandKey: 'farm', args: {} };
   queue[1] = { commandKey: 'commerce', args: {} };
-  expect((await request('turns.set', { worldId, revision: 0, slots: queue }, a.cookie)).data.ok).toBe(true);
+  expect(
+    (
+      await request(
+        'turns.set',
+        {
+          worldId,
+          revision: (await db.general.findUniqueOrThrow({ where: { worldId_userId: { worldId, userId: a.id } } }))
+            .turnRevision,
+          slots: queue,
+        },
+        a.cookie,
+      )
+    ).data.ok,
+  ).toBe(true);
   const lease = (await acquireLease(db, worldId))!;
   try {
     const loop = new TurnLoop(db, lease);
     await loop.advanceTo(100);
-    expect((await db.generalLog.findFirstOrThrow({ where: { worldId } })).commandKey).toBe('farm');
+    expect(
+      (await db.generalLog.findFirstOrThrow({ where: { worldId, commandKey: { not: 'general.possess' } } })).commandKey,
+    ).toBe('farm');
     await loop.advanceTo(10100);
     await loop.advanceTo(20100);
     expect(
-      (await db.generalLog.findMany({ where: { worldId }, orderBy: { tick: 'asc' } })).map((log) => log.commandKey),
+      (
+        await db.generalLog.findMany({
+          where: { worldId, commandKey: { not: 'general.possess' } },
+          orderBy: { tick: 'asc' },
+        })
+      ).map((log) => log.commandKey),
     ).toEqual(['farm', 'commerce', 'rest']);
     await controlClock(db, worldId, 'accelerate');
     expect((await request('home.get', { worldId }, a.cookie)).data.nextTurnAt).toBeNull();
@@ -199,7 +219,20 @@ it('가속 턴 commit과 겹친 API edit는 STALE이며 재시도한 편집은 �
   await controlClock(db, worldId, 'accelerate');
   const slots = turns();
   slots[0] = { commandKey: 'farm', args: {} };
-  expect((await request('turns.set', { worldId, revision: 0, slots }, a.cookie)).data.ok).toBe(true);
+  expect(
+    (
+      await request(
+        'turns.set',
+        {
+          worldId,
+          revision: (await db.general.findUniqueOrThrow({ where: { worldId_userId: { worldId, userId: a.id } } }))
+            .turnRevision,
+          slots,
+        },
+        a.cookie,
+      )
+    ).data.ok,
+  ).toBe(true);
   const lease = (await acquireLease(db, worldId))!;
   let reached!: () => void, release!: () => void;
   const barrier = new Promise<void>((resolve) => {
@@ -264,7 +297,7 @@ it('가속 턴 commit과 겹친 API edit는 STALE이며 재시도한 편집은 �
     expect((await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } })).turnRevision).toBe(
       saved.data.revision + 1,
     );
-    expect(await db.inputEvent.count({ where: { worldId } })).toBe(2);
+    expect(await db.inputEvent.count({ where: { worldId, kind: { not: 'general.possess' } } })).toBe(2);
   } finally {
     release();
     await releaseLease(db, lease);

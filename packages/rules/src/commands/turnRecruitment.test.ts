@@ -22,7 +22,14 @@ function fixture() {
   return world;
 }
 
-function run(state: WorldState, tick: number, generalId: number, commandKey: string, args: unknown = {}) {
+function run(
+  state: WorldState,
+  tick: number,
+  generalId: number,
+  commandKey: string,
+  args: unknown = {},
+  settlementTick = tick,
+) {
   const outcome = runGeneralTurn(
     state,
     { generalId, tick, unitSet: testUnits },
@@ -48,6 +55,7 @@ function run(state: WorldState, tick: number, generalId: number, commandKey: str
           cancel: null,
         },
         testUnits,
+        settlementTick,
       );
     }
     expect(next.campaign!.tactical!.battles[0]).toMatchObject({ settled: true, result: 'attack' });
@@ -103,4 +111,9 @@ it('AC-P2-24 방랑국 자진 해산으로 한 나라가 남아도 임관을 허
   expect(state.commandMeta?.lastNationRecruitmentLock).toEqual({ fromYear: 195 });
   const { state: joined } = run(state, firstMonthOf195 + 2, 4, 'join', { nationId: 1 });
   expect(joined.generals[4]!.nationId).toBe(1);
+});
+
+it('AC-P2-24 195년 전 출병해도 경계일에 전술 정산하면 모집을 잠근다', () => {
+  const { state } = run(fixture(), firstMonthOf195 - 1, 1, 'attack', { cityKey: 2 }, firstMonthOf195);
+  expect(state.commandMeta?.lastNationRecruitmentLock).toEqual({ fromYear: 195, blockedNationId: 1 });
 });

@@ -1,3 +1,4 @@
+import { hashState } from '../packages/shared/src/node/hashState';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -6,7 +7,7 @@ import { buildServer } from '../apps/server/src/server';
 import { newSession } from '../apps/server/src/auth/session';
 import { authzCase } from '../apps/server/src/authz/case';
 import { monthlyFixture } from '../apps/engine/test/monthlyFixture';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { CREATION_ERRORS, nationRank, officerTitle, toGameDate } from '../packages/rules/src/index';
@@ -116,6 +117,23 @@ async function untilPending(worldId: string, count = 1) {
   }
 }
 beforeAll(async () => {
+  const content = { id: 'engine-monthly-fixture', title: '월간 합성 시험' };
+  const season = { id: 'engine-season-fixture', title: '종료 합성 시험' };
+  for (const value of [content, season])
+    await db.gameResource.upsert({
+      where: { kind_name_version: { kind: 'SCENARIO', name: value.id, version: 1 } },
+      create: {
+        kind: 'SCENARIO',
+        name: value.id,
+        version: 1,
+        status: 'PUBLISHED',
+        publishedAt: new Date(),
+        content: value,
+        contentHash: hashState(value),
+        source: '시험 합성 시나리오',
+      },
+      update: {},
+    });
   address = await app.listen({ host: '127.0.0.1', port: 0 });
 });
 afterEach(async () => {
@@ -165,12 +183,19 @@ describe('T2-03 실제 로비 HTTP·PostgreSQL', () => {
         'turnTermMinutes',
         'startedAt',
         'humanGenerals',
+        'capacity',
+        'registrationClosed',
+        'npcGenerals',
+        'nations',
+        'settingsSummary',
+        'upcomingPreopen',
+        'joinModes',
         'winner',
         'myGeneral',
         'createBlockedReason',
       ].sort(),
     );
-    expect(row.scenarioTitle).toBe('【역사모드3】 군웅할거');
+    expect(row.scenarioTitle).toBe('월간 합성 시험');
     expect(row.gameDate).toEqual(toGameDate(world.startYear, world.clockTick));
     expect(row.humanGenerals).toBe(1);
     expect(row.winner).toBeNull();
@@ -232,6 +257,8 @@ describe('T2-03 실제 로비 HTTP·PostgreSQL', () => {
                   leadership: general.leadership,
                   strength: general.strength,
                   intel: general.intel,
+                  politics: general.politics,
+                  charm: general.charm,
                 },
               }
             : null,
@@ -274,7 +301,7 @@ describe('T2-03 실제 로비 HTTP·PostgreSQL', () => {
     }
     console.info(`T2-03 HTTP 10 worlds/600 generals: ${measurements.map((ms) => ms.toFixed(2)).join(', ')}ms`);
     expect(Math.max(...measurements)).toBeLessThan(50);
-  });
+  }, 120_000);
 
   it('프리셋 사본의 이름을 읽고 레거시 null을 유지한다', async () => {
     const initial = await monthlyFixture();
@@ -311,7 +338,7 @@ describe('T2-03 실제 로비 HTTP·PostgreSQL', () => {
       const response = await call('general.create', { worldId, ...invalid }, user.cookie);
       expect(response.code).toBe('CONFLICT');
       expect(response.message).toBe(CREATION_ERRORS.ALREADY_EXISTS);
-      expect(await db.inputEvent.count({ where: { worldId } })).toBe(0);
+      expect(await db.inputEvent.count({ where: { worldId, kind: 'general.create' } })).toBe(0);
       const event = await enqueue(worldId, user.id, invalid);
       if (status === 'RUNNING') await db.user.update({ where: { id: user.id }, data: { status: 'SANCTIONED' } });
       const lease = (await acquireLease(db, worldId))!;

@@ -1,4 +1,3 @@
-import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -13,11 +12,11 @@ import { authenticate, newSession } from '../apps/server/src/auth/session';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { createSanction, liftSanction } from '../apps/server/src/admin/sanctionStore';
 import { changeAdminRole } from '../apps/server/src/admin/roleStore';
-import { testDatabaseUrl } from './test-database';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
 import { initializeResources } from './init-resources';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { initializeIntegrationResources } from './integration-resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -39,7 +38,7 @@ if (!['localhost', '127.0.0.1'].includes(source.hostname)) throw new Error('loop
 for (const key of source.searchParams.keys())
   if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
     throw new Error('접속 대상 질의 인자는 쓸 수 없습니다.');
-const name = `opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`;
+const name = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
 const adminUrl = new URL(source),
   target = new URL(source);
 adminUrl.pathname = '/postgres';
@@ -1047,7 +1046,45 @@ it('정식 두191년 월드에서21개 변경 차단·본인 조회·같은 월�
   const guarded = Object.entries(procedures)
     .filter(([, procedure]) => procedure._def.meta?.worldSanction)
     .map(([path]) => path);
-  expect(guarded).toHaveLength(30);
+  expect([...guarded].sort()).toEqual([
+    'battle.council.set',
+    'battle.plan.set',
+    'battle.presence.heartbeat',
+    'battle.turn.submit',
+    'campaign.order',
+    'campaign.relationship',
+    'campaign.unit',
+    'cityResources.allocate',
+    'entry.possess',
+    'general.create',
+    'general.setPolicy',
+    'governance.submit',
+    'intel.records',
+    'lineage.submit',
+    'logistics.submit',
+    'message.markRead',
+    'message.send',
+    'nationTurns.edit',
+    'nationTurns.set',
+    'notice.nation.markSeen',
+    'notice.nation.set',
+    'offers.respond',
+    'operation.close',
+    'operation.create',
+    'personnel.appoint',
+    'personnel.dismiss',
+    'proposals.cancel',
+    'proposals.create',
+    'proposals.respond',
+    'records.season',
+    'relations.list',
+    'stratagemCards.setTrap',
+    'treaty.break',
+    'treaty.propose',
+    'treaty.respond',
+    'turns.edit',
+    'turns.set',
+  ]);
   expect(guarded).toContain('relations.list');
   expect(guarded).toContain('records.season');
   expect(guarded).toContain('intel.records');
@@ -1059,7 +1096,7 @@ it('정식 두191년 월드에서21개 변경 차단·본인 조회·같은 월�
   expect(guarded).toContain('cityResources.allocate');
   // AC-INT-19B: 장수 지시 접수도 월드 제재 대상이다.
   expect(guarded).toContain('campaign.order');
-  expect(providedRuleKeys).not.toContain('city-resources-v1');
+  expect((await db.world.findUniqueOrThrow({ where: { id: worldId } })).cityResourcesState).not.toBeNull();
   const cityInput = {
     worldId,
     requestId: randomUUID(),

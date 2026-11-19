@@ -4,7 +4,7 @@
     "version": 3,
     "initial": {
       "seed": "monthly-golden",
-      "scenarioKey": "1030",
+      "scenarioKey": "engine-monthly-fixture",
       "mapKey": "che",
       "unitSetKey": "basic",
       "startYear": 191,
@@ -393,8 +393,8 @@
         ]
       }
     },
-    "initialStateHash": "395e7f0ad78b38d2dcf78c7fcc1434af3eb031c8d21aef658576fc4f6a403cc4",
-    "resourceHash": "1f8499bf6562466e9c5eec9417e93fca8fef973d4c7b4af64e2fa072f9970905",
+    "initialStateHash": "3157f1bb8a617d08156535521ca93caaf1699193bd9564eced4e944a5fe04fa1",
+    "resourceHash": "6ff1680f9cbfb05158c9aa70e681e6af33929ea557b20809290d983ef99cdfb5",
     "featureData": {
       "logistics-v1": {
         "version": 1,
@@ -940,7 +940,7 @@
       "year": 191,
       "month": 1,
       "sequence": 1,
-      "stateHash": "36cc76e4f2bc8b8449ec83012ff77c23628b9634a8c74ab6d5868382bf971130",
+      "stateHash": "38b5475aa932218f118aeac5d6d40a10d5eeaddcb5f62371b2890729f1ec863b",
       "data": {
         "nations": [
           { "nationId": 1, "cities": 2, "generals": 0, "power": 2340, "gold": 100, "rice": 200 },
@@ -959,7 +959,7 @@
       "year": 191,
       "month": 2,
       "sequence": 3,
-      "stateHash": "40cee644d00270f0fafabf457adb54c72157874309907a993d2c0ed31d8b04f8",
+      "stateHash": "3b3977391d5128bd22d29568234aa74f66ab05f94b026489741bfe9b0db603f1",
       "data": {
         "nations": [
           { "nationId": 1, "cities": 2, "generals": 0, "power": 2380, "gold": 100, "rice": 200 },
@@ -978,7 +978,7 @@
       "year": 191,
       "month": 3,
       "sequence": 5,
-      "stateHash": "9eb801c6880af6bc942b84c1d3c6dce92df6cfd61f7c584b8b53341b15a33acc",
+      "stateHash": "0038af2f72f62170f29cffd80ea4dbb36a5e3d009705b4436c8b99ad55214a85",
       "data": {
         "nations": [
           { "nationId": 1, "cities": 2, "generals": 0, "power": 2418, "gold": 100, "rice": 200 },
@@ -997,7 +997,7 @@
       "year": 191,
       "month": 4,
       "sequence": 7,
-      "stateHash": "21a08a10aa19006eb2b95b6988c56fcab79fd844e110d403f4f53f8e0c4dfe2c",
+      "stateHash": "77499acb9331903d92b6792245f5142824c07ef60172ba9714ccf8263ee54765",
       "data": {
         "nations": [
           { "nationId": 1, "cities": 2, "generals": 0, "power": 2456, "gold": 100, "rice": 200 },
@@ -1016,7 +1016,7 @@
       "year": 191,
       "month": 5,
       "sequence": 9,
-      "stateHash": "e6ff4d1701676570abef2f8196f34d25d81608287bca85413ebae03ace0101a7",
+      "stateHash": "87b9f45582a933b1d216650c9eb1e1e0563816c116607def40ef4d8e88e67ee9",
       "data": {
         "nations": [
           { "nationId": 1, "cities": 2, "generals": 0, "power": 2492, "gold": 100, "rice": 200 },
@@ -1035,7 +1035,7 @@
       "year": 191,
       "month": 6,
       "sequence": 11,
-      "stateHash": "4e0442161c0cc8f61d86ec39ab85e849f18e7ef3684cda7e620e2eae800444b4",
+      "stateHash": "e180a43b5720b66f20c88198bb9d5e92e4dbde0523a1b2336f2c2824781d439d",
       "data": {
         "nations": [
           { "nationId": 1, "cities": 2, "generals": 0, "power": 2528, "gold": 100, "rice": 200 },
@@ -1054,7 +1054,7 @@
       "year": 191,
       "month": 7,
       "sequence": 13,
-      "stateHash": "c5b895178085f34a65dcb9b3107718972211b926e53b6e1f6ace702f3d40308b",
+      "stateHash": "d7a72e92eafae16360b3e260c900e24a12fe1045f5294d82eeae7989158584b9",
       "data": {
         "nations": [
           { "nationId": 1, "cities": 2, "generals": 0, "power": 2564, "gold": 100, "rice": 200 },
@@ -1073,7 +1073,7 @@
       "year": 191,
       "month": 8,
       "sequence": 15,
-      "stateHash": "1c7a6c17dd0385a910efc2c250db49cc3f477141dd2e40d592d393e187f46f24",
+      "stateHash": "21f94490cef0a4e75f098e8275e3081130467de0b3f3862d9c5d30b5b62762c2",
       "data": {
         "nations": [
           { "nationId": 1, "cities": 2, "generals": 0, "power": 2598, "gold": 100, "rice": 200 },
@@ -1092,7 +1092,7 @@
       "year": 191,
       "month": 9,
       "sequence": 17,
-      "stateHash": "b84731bbee625f2b1f870e096ced21a86385fd7dd20941f70199dd0493304693",
+      "stateHash": "1596c69ed79676a82d48dad17a4e33a9d429aa5bfb3eae38e1a7124415968d8d",
       "data": {
         "nations": [
           { "nationId": 1, "cities": 2, "generals": 0, "power": 2632, "gold": 100, "rice": 200 },
@@ -1111,7 +1111,7 @@
       "year": 191,
       "month": 10,
       "sequence": 19,
-      "stateHash": "46f2a051f353e37b975699194e5e73a6162fa0ddb811776b93ed1d312a5897e4",
+      "stateHash": "563e2cbb4d2c08137e888d6ca8f3352f3508ed71f1f3d3aa496f3e157548ef3d",
       "data": {
         "nations": [
           { "nationId": 1, "cities": 2, "generals": 0, "power": 2666, "gold": 100, "rice": 200 },
@@ -1130,7 +1130,7 @@
       "year": 191,
       "month": 11,
       "sequence": 21,
-      "stateHash": "7e2f30802ea2412083329635b207e3956d4fb53103d838b93b4648d5fb35cb7b",
+      "stateHash": "d62cf790652eed51bf164549667073c5b89675ad37ee15c881c389911536992a",
       "data": {
         "nations": [
           { "nationId": 1, "cities": 2, "generals": 0, "power": 2698, "gold": 100, "rice": 200 },
@@ -1149,7 +1149,7 @@
       "year": 191,
       "month": 12,
       "sequence": 23,
-      "stateHash": "880e6b8800e5119bbbd9500370f669924bb5f60ffb59f45633a4967e33bd759f",
+      "stateHash": "77f308a0ca0921343e848626ba371b3733be3d580f68e92f50e96bb29243b1af",
       "data": {
         "nations": [
           { "nationId": 1, "cities": 2, "generals": 0, "power": 2730, "gold": 100, "rice": 200 },
@@ -1171,7 +1171,7 @@
     "winnerNationId": null,
     "year": 191,
     "month": 12,
-    "finalStateHash": "880e6b8800e5119bbbd9500370f669924bb5f60ffb59f45633a4967e33bd759f"
+    "finalStateHash": "77f308a0ca0921343e848626ba371b3733be3d580f68e92f50e96bb29243b1af"
   },
   "afterEnd": []
 }

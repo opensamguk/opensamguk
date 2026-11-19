@@ -1,9 +1,12 @@
+import { loadReplayState } from './monthly';
+import { randomUUID } from 'node:crypto';
+import { saveFixtureWorld as saveInitialWorld } from '../test/worldFixture';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createDb } from '@opensamguk/db';
-import { runGeneralTurn, toWorldState } from '@opensamguk/rules';
+import { runGeneralTurn, resolverForRuleFeatures } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { warFixture } from '../test/warFixture';
-import { saveInitialWorld, readWorldState } from './world/persistence';
+import { readWorldState } from './world/persistence';
 import { controlClock } from './world/clock';
 import { acquireLease, LeaseLostError, renewLease } from './lease';
 import { TurnLoop } from './turnLoop';
@@ -12,23 +15,24 @@ import { exportReplay, replayArchive } from './replay';
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
 const db = createDb(url);
+const humanId = randomUUID();
 afterAll(async () => {
   await db.world.deleteMany();
-  await db.user.deleteMany({ where: { id: 'npc-test-human' } });
+  await db.user.deleteMany({ where: { id: humanId } });
   await db.$disconnect();
 });
 
-async function create() {
+async function create(human = true) {
   const initial = await warFixture();
   delete initial.nationTurns;
   await db.user.upsert({
-    where: { id: 'npc-test-human' },
+    where: { id: humanId },
     update: {},
-    create: { id: 'npc-test-human', email: 'npc-test-human@example.invalid', passwordHash: 'test-only' },
+    create: { id: humanId, email: 'npc-test-human@example.invalid', passwordHash: 'test-only' },
   });
-  initial.generals[0]!.userId = 'npc-test-human';
+  initial.generals[0]!.userId = human ? humanId : null;
   const { worldId } = await saveInitialWorld(db, initial, {
-    replayFormat: 'legacy',
+    replayFormat: 3,
     name: 'NPC 통합',
     turnTermMinutes: 60,
     endYear: null,
@@ -46,7 +50,7 @@ describe('AC-M1-17 실제 PostgreSQL NPC 턴', () => {
       await renewLease(db, lease);
       await loop.advanceTo(month * 10000);
     }
-    const human = await db.generalLog.findMany({ where: { worldId, generalId: 1 } });
+    const human = await db.generalLog.findMany({ where: { worldId, generalId: 1, commandKey: 'rest' } });
     expect(human).toHaveLength(12);
     expect(human.every((log) => log.commandKey === 'rest')).toBe(true);
     const npc = await db.generalLog.findMany({ where: { worldId, generalId: { not: 1 } } });
@@ -56,15 +60,13 @@ describe('AC-M1-17 실제 PostgreSQL NPC 턴', () => {
     expect(replayArchive(archive).map((entry) => entry.stateHash)).toEqual(
       archive.months.map((month) => month.stateHash),
     );
-    expect(await db.inputEvent.count({ where: { worldId } })).toBe(0);
+    expect(await db.inputEvent.count({ where: { worldId } })).toBe(1);
   });
   it.each(['error', 'fencing'])(
     'NPC 선택 뒤 %s이면 상태·로그·메모리를 롤백하고 같은 명령을 재실행한다',
     async (failure) => {
-      const { initial, worldId, lease } = await create();
+      const { initial, worldId, lease } = await create(false);
       // 첫 턴부터 실제 NPC 선택을 검사한다.
-      initial.generals[0]!.userId = null;
-      await db.general.update({ where: { worldId_id: { worldId, id: 1 } }, data: { userId: null } });
       const before = await readWorldState(db, worldId);
       const failing = new TurnLoop(db, lease, {
         beforeCommit: async (tx) => {
@@ -76,17 +78,23 @@ describe('AC-M1-17 실제 PostgreSQL NPC 턴', () => {
       else await expect(failing.advanceTo(100)).rejects.toBeInstanceOf(LeaseLostError);
       expect(failing.state).toBeNull();
       expect(await readWorldState(db, worldId)).toEqual(before);
-      expect(await db.generalLog.count({ where: { worldId } })).toBe(0);
+      expect(await db.generalLog.count({ where: { worldId, commandKey: { not: 'general.possess' } } })).toBe(0);
+      const replay = await db.$transaction((tx) => loadReplayState(tx, worldId));
       const expected = runGeneralTurn(
-        toWorldState(initial),
+        replay.state,
         { generalId: 1, tick: 100, unitSet: initial.unitSet },
-        { commandKey: 'rest', args: {} },
+        { commandKey: 'rest', args: {}, explicit: false },
         initial.seed,
+        {},
+        resolverForRuleFeatures(replay.state),
+        { offices: replay.offices ?? {} },
       );
       expected.state.generals[1]!.nextTurnTick = 10100;
       const loop = new TurnLoop(db, lease);
       expect(await loop.advanceTo(100)).toEqual([{ generalId: 1, tick: 100, commandKey: expected.commandKey }]);
-      expect(hashState(toWorldState(await readWorldState(db, worldId)))).toBe(hashState(expected.state));
+      expect(hashState((await db.$transaction((tx) => loadReplayState(tx, worldId))).state)).toBe(
+        hashState(expected.state),
+      );
       expect(await loop.advanceTo(100)).toEqual([]);
     },
   );

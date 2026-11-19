@@ -4,7 +4,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { expect, it } from 'vitest';
 import { hashState } from '../packages/shared/src/node/hashState';
 import legacy from './fixtures/migration-replay-v1.json';
-import { testDatabaseUrl } from './test-database';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
 
 type PgClient = {
   connect(): Promise<void>;
@@ -125,8 +125,9 @@ it('PG-B8-1 인사 표지 migration은 과거 SQL 행·원본을 보존하고 �
     if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
       throw new Error('접속 대상 질의 인자는 쓸 수 없습니다.');
   source.port ||= '5432';
-  const name = `opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`;
-  if (!/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(name)) throw new Error('자체 DB 이름을 확인하세요.');
+  const name = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
+  if (!(/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(name) || name === ciGreenDatabaseName('')))
+    throw new Error('자체 DB 이름을 확인하세요.');
   const adminUrl = new URL(source),
     target = new URL(source);
   adminUrl.pathname = '/postgres';

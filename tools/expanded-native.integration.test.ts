@@ -3,7 +3,13 @@ import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
-import { TICKS_PER_MONTH, type LogisticsConfig, type ReplayState, type WorldInit } from '../packages/rules/src/index';
+import {
+  ruleRegistry,
+  TICKS_PER_MONTH,
+  type LogisticsConfig,
+  type ReplayState,
+  type WorldInit,
+} from '../packages/rules/src/index';
 import { governanceTestConfig } from '../packages/rules/src/governance/testFixture';
 import { lineageTestConfig } from '../packages/rules/src/lineage/testFixture';
 import { commandInitial } from '../packages/rules/test/commandFixture';
@@ -26,28 +32,13 @@ const target = new URL(url);
 if (
   !['postgres:', 'postgresql:'].includes(target.protocol) ||
   !['127.0.0.1', 'localhost'].includes(target.hostname) ||
-  !/^\/[a-z][a-z0-9_]*_test$/.test(target.pathname) ||
+  !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(target.pathname) ||
   target.searchParams.has('host') ||
   target.searchParams.has('port')
 )
   throw new Error('loopback 전용 테스트 DB를 확인하세요.');
 let db = createDb(url);
 const ids: string[] = [];
-const features = [
-  'campaign-assignment-v2',
-  'campaign-v1',
-  'city-resources-v1',
-  'five-stats',
-  'governance-v1',
-  'heritage-v1',
-  'lineage-v1',
-  'logistics-v1',
-  'operational-map',
-  'personnel',
-  'policy',
-  'stratagem-basic',
-  'treaty',
-];
 
 describe('AC-P2-30·31·32·33 정식 491명 확장 결합', () => {
   let worldId: string;
@@ -71,6 +62,7 @@ describe('AC-P2-30·31·32·33 정식 491명 확장 결합', () => {
       expect(initial.generals).toHaveLength(491);
       expect(initial.nations).toHaveLength(21);
       expect(initial.cities).toHaveLength(61);
+      initial.fogOfWar = false;
       const native = structuredClone(initial);
       const supplied = structuredClone(initial);
       const city = initial.cities.find(
@@ -131,7 +123,7 @@ describe('AC-P2-30·31·32·33 정식 491명 확장 결합', () => {
       ).toEqual(native.generals);
       expect(stored.initialStateHash).toBe(hashState(origin.initial));
       expect(origin.featureData['heritage-v1']).toEqual({ version: 1 });
-      expect(providedRuleKeys).toEqual(features);
+      expect(providedRuleKeys).toEqual(ruleRegistry.features.map(({ key }) => key).sort());
       before = await db.$transaction((tx) => loadReplayState(tx, worldId));
       expect(Object.keys(before.state.generals)).toHaveLength(491);
       expect(Object.values(before.state.generals).filter((general) => general.sex === 'UNKNOWN')).toHaveLength(468);
@@ -212,7 +204,7 @@ describe('AC-P2-30·31·32·33 정식 491명 확장 결합', () => {
     return execution;
   });
 
-  it('13기능을 원생성부터 실제 재생해 첫 달의 정확한 tick·sequence·해시를 대조한다', () => {
+  it('제공 규칙을 원생성부터 실제 재생해 첫 달의 정확한 tick·sequence·해시를 대조한다', () => {
     execution = (async () => {
       const month = await db.yearbookSnapshot.findUniqueOrThrow({
         where: { worldId_tick: { worldId, tick: TICKS_PER_MONTH } },
