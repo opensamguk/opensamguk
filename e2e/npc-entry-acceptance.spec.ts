@@ -112,6 +112,9 @@ test('AC-M3-14 네 역할에서 NPC를 맡고 이미 맡긴 무장을 제외하�
     await page.getByLabel('통솔', { exact: true }).fill('70');
     await page.getByLabel('무력', { exact: true }).fill('70');
     await page.getByLabel('지력', { exact: true }).fill('60');
+    // 시험 고정물(commandInitial)은 다섯 능력치, 합 275다. 정치와 매력까지 채워야 만들기 단추가 열린다.
+    await page.getByLabel('정치', { exact: true }).fill('40');
+    await page.getByLabel('매력', { exact: true }).fill('35');
     // 성별은 늘 필수다(가문 규칙 상시, D-104).
     await page.getByRole('radio', { name: '남', exact: true }).check();
     await page.getByRole('button', { name: '장수 만들기', exact: true }).click();

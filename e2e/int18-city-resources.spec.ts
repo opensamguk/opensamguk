@@ -19,6 +19,7 @@ import { BALANCE } from '../packages/rules/src/balance';
 import { test as legalTest, expect, type LegalStack } from './legalFixture';
 import { e2eDatabaseUrl, TEST_PASSWORD } from './account';
 import { holdLease, type LeaseHold } from './game';
+import { argsScreen, putPicked, toFieldStep } from './commandPicker';
 import { trpcCalls } from './t210-fixture';
 
 // AC-INT-18C: 실제 공개 dist·PG·API·Chromium의 도시 모집/준비/배속 경계다.
@@ -684,6 +685,8 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
         .getByRole('combobox', { name: label, exact: true })
         .or(editor.getByRole('spinbutton', { name: label, exact: true }))
         .or(editor.getByRole('textbox', { name: label, exact: true }));
+      // 인자 화면은 단계가 여럿이다(INT-29). 그 칸이 있는 단계로 간 뒤 고른다.
+      if (await argsScreen(actor.page).isVisible()) await toFieldStep(actor.page, group.or(control).first());
       await group.or(control).first().waitFor();
       if ((await group.count()) > 0) {
         await group.locator(`[data-value="${value}"], input[value="${value}"]`).first().click();
@@ -693,7 +696,8 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
       else await control.fill(value);
     }
     if (beforePut) await beforePut(editor);
-    await editor.getByRole('button', { name: `${slot}번 칸에 넣기`, exact: true }).click();
+    // 넣기 단추는 인자 화면의 끝 단계에만 있다. 인자 없는 명령은 편집기의 넣기 단추를 누른다.
+    await putPicked(actor.page, editor, `${slot}번 칸에 넣기`);
     await expect(editor.locator(`tr[data-slot="${slot}"]`)).toContainText(name);
   }
   async function save(actor: Actor) {
