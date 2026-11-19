@@ -86,8 +86,9 @@ test('AC-M3-13 공지 지시를 우선 표시하고 조언을 누르면 첫 예�
 
   await editor.getByRole('button', { name: '선택 해제', exact: true }).click();
   await editor.locator('tr[data-slot="2"]').click();
-  await editor.getByLabel('명령 찾기').fill('훈련');
-  await editor.getByRole('radio', { name: '훈련', exact: true }).check();
+  // 저장하지 않은 편집 하나를 만든다. 훈련은 부곡을 고르는 인자가 있어(결정 19) 인자 없는 농지 개간을 넣는다.
+  await editor.getByLabel('명령 찾기').fill('농지 개간');
+  await editor.getByRole('radio', { name: '농지 개간', exact: true }).check();
   await editor.getByRole('button', { name: '2번 칸에 넣기', exact: true }).click();
   await expect(editor.getByTestId('draft-state')).toHaveText('저장하지 않은 편집 1건');
   await noticeRow.getByRole('button', { name: '1칸에 넣기 (사용 불가)', exact: true }).click();
@@ -201,6 +202,9 @@ test('AC-M3-15 실제 월간 정산이 기록 화면에 순위와 한 줄 평을
   const player = initial.generals[2]!;
   const city = initial.cities.find((row) => row.cityKey === 3)!;
   city.agriculture = city.agricultureMax - 1;
+  // 생성 검사는 도시 값과 운영 지도의 초깃값이 같아야 받는다(packages/rules/src/world/map/profile.ts).
+  const site = initial.operationalMap?.sites.find((row) => row.kind === 'CITY' && row.anchorKey === city.cityKey);
+  if (site && 'initial' in site && site.initial) site.initial.agriculture = city.agriculture;
   Object.assign(player, {
     userId: user.id,
     cityKey: city.cityKey,

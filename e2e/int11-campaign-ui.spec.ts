@@ -317,6 +317,8 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
     await expect(panel(owner)).toBeVisible();
     await owner.page.setViewportSize({ width: 1440, height: 900 });
     await expect(panel(owner).getByRole('button', { name: '빈 부곡 편성', exact: true })).toBeHidden();
+    // 패널 틀은 자료보다 먼저 그려진다. 휘하 자료가 들어와 조작 칸이 생긴 뒤에 잰다.
+    await expect(panel(owner).getByLabel('제안할 관계')).toBeVisible();
     const controls = panel(owner).locator('button, select');
     const desktopFonts = await controls.evaluateAll((elements) =>
       elements.map((element) => getComputedStyle(element).fontSize),

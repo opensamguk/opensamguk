@@ -94,9 +94,12 @@ async function createGeneral(page: Page, worldId: string, world: Awaited<ReturnT
     worldId,
     name: newGeneralName(),
     sex: 'MALE',
+    // 월 정산 고정물은 5능력치 규칙(합계 275)이다(apps/engine/test/fixtures/monthly-initial.json의 statRules).
     leadership: 55,
     strength: 55,
     intel: 55,
+    politics: 55,
+    charm: 55,
     portraitId: null,
   });
   const stored = await world.hold.db.world.findUniqueOrThrow({ where: { id: worldId }, select: { clockTick: true } });
