@@ -10,7 +10,7 @@ import {
 } from './campaign-offer-fixture';
 
 // INT-11 AC-INT-11. 전용 공개 dist 구성에서만 열거하고 실행한다.
-test.describe.configure({ timeout: 120_000, retries: 0 });
+test.describe.configure({ timeout: 240_000, retries: 0 });
 // C는 두 사람의 가입 차례가 월 마지막 tick인 경계를 매번 실제로 거친다.
 const lateOnboardingTest = test.extend({ offerLateOnboarding: true });
 
