@@ -364,6 +364,9 @@ test('로그인 뒤 /lobby의 월드 목록 위에 같은 탭과 지도가 있�
   await expect(page).toHaveURL('/lobby');
 
   await expect(tabs(page)).toHaveText([ga.name, `${na.name}멈춤`, da.name]);
+  // 로비는 고른 월드와 지도 탭을 맞춘다(INT-29). 고른 것이 없으면 목록의 첫 월드(가장 최근에 시작한 진행 중 월드)다.
+  // 이 시험은 가 월드의 지도를 보므로 가 탭을 눌러 고른다.
+  await tabs(page).first().click();
   await expect(tabs(page).first()).toHaveAttribute('aria-selected', 'true');
   expect(await drawn(page)).toEqual(DRAWN_GA);
   const card = page.getByRole('article', { name: ga.name, exact: true });
@@ -448,11 +451,16 @@ test('수도와 보급을 표시하고 장수·병력·국고 없이 읽기 전�
     expect(Object.keys(map).sort()).toEqual(['cities', 'emperorCityKey', 'month', 'nations', 'takenAt', 'year']);
     for (const city of map.cities)
       expect(Object.keys(city).sort()).toEqual([
+        'detached',
         'key',
         'level',
         'links',
         'name',
         'nationId',
+        'parentCityKey',
+        'ruin',
+        'state',
+        'stateTerm',
         ...(city.nationId === null ? [] : ['supplied']),
         'x',
         'y',
@@ -586,6 +594,7 @@ test('지연 시간이 지난 사본 B를 다시 받으면 그 사본의 도시 
       takenAt: iso(eligible),
       year: 191,
       month: 2,
+      emperorCityKey: RAW_GA.emperorCityKey,
       cities: RAW_GA.cities.map((city) => (city.key === '3' ? { ...city, nationId: 2 } : city)),
       nations: RAW_GA.nations.map((nation) => (nation.id === B_NATION.id ? B_NATION : nation)),
     });
