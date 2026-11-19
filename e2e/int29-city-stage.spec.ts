@@ -50,8 +50,29 @@ test('성 화면이 첫 화면이고 전체 지도와 오가며 명령 띠는 �
           (el.textContent ?? '').slice(0, 120),
         ),
         windows: [...document.querySelectorAll('.kit-window')].map((el) => el.getAttribute('data-testid')),
+        // 성 그림 가운데를 실제로 덮은 요소와 초점. 눌림이 성에 닿았는지 본다.
+        hit: (() => {
+          const polygon = document.querySelector('[data-testid="city-castle"]');
+          if (!polygon) return null;
+          const box = polygon.getBoundingClientRect();
+          const top = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+          return {
+            box: [box.x, box.y, box.width, box.height].map(Math.round),
+            top: top
+              ? `${top.tagName}:${top.getAttribute('data-testid') ?? ''}:${top.getAttribute('class') ?? ''}`
+              : null,
+          };
+        })(),
+        focus: `${document.activeElement?.tagName}:${document.activeElement?.getAttribute('data-testid') ?? ''}`,
       }));
-      console.log('INT29-castle-state', JSON.stringify(state));
+      // 눌림을 성 요소에 바로 보내도 창이 뜨는지 본다. 뜨면 다른 요소가 가운데를 덮은 것이고, 안 뜨면 창 조건 문제다.
+      await castle.dispatchEvent('click');
+      const direct = await page
+        .getByTestId('castle-window')
+        .waitFor({ state: 'visible', timeout: 3_000 })
+        .then(() => true)
+        .catch(() => false);
+      console.log('INT29-castle-state', JSON.stringify({ ...state, directClickOpened: direct }));
       throw error;
     }
     await expect(page.getByRole('list', { name: '성 안에 지을 수 있는 건물' }).getByRole('listitem')).toHaveCount(16);
