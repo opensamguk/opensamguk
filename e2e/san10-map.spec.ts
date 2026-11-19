@@ -11,7 +11,8 @@ import { saveFixtureWorld, readWorldState } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { loadReplayState } from '../apps/engine/src/monthly';
-import { exportReplay, replayArchive } from '../apps/engine/src/replay';
+import { replaySan10World } from './san10Replay';
+import { e2eDatabaseUrl } from './account';
 import { hashState } from '../packages/shared/src/node/hashState';
 import type { WorldMap } from '../apps/web/src/game/types';
 
@@ -26,6 +27,8 @@ type Run = {
   worlds: string[];
   passed: boolean;
   scenario: string;
+  phase: string;
+  renewals: { commit: number; replay: number };
   timer: ReturnType<typeof setTimeout>;
 };
 let current: Run | undefined;
@@ -112,6 +115,9 @@ test.afterEach(async ({ legalStack, page }, info) => {
           pendingRequests: run.requests.size,
           leaseConnectionsClosed: errors.length === 0,
           errorCount: errors.length,
+          phase: run.phase,
+          renewals: run.renewals,
+          errors: errors.map((error) => (error instanceof Error ? `${error.name}: ${error.message}` : String(error))),
           failed: legalStack.failed,
           worldRowsPreservedUntilOwnedDatabaseCleanup: true,
         },
@@ -218,7 +224,13 @@ async function verifyMode(stack: LegalStack, page: Page, info: TestInfo, run: Ru
       .toBe(1),
   );
   // 턴 트랜잭션이 실행권 행을 잠그므로 외부 타이머 대신 각 커밋 안에서도 갱신한다.
-  const loop = new TurnLoop(hold.db, hold.lease, { beforeCommit: (tx) => renewLease(tx, hold.lease) });
+  const loop = new TurnLoop(hold.db, hold.lease, {
+    beforeCommit: async (tx) => {
+      await renewLease(tx, hold.lease);
+      run.renewals.commit++;
+    },
+  });
+  run.phase = 'general.create';
   await step(run, () => loop.advanceTo(0, signal));
   expect((await step(run, () => creating)).status).toBe('created');
   const human = await step(run, () =>
@@ -227,6 +239,7 @@ async function verifyMode(stack: LegalStack, page: Page, info: TestInfo, run: Ru
   expect(await step(run, () => db.generalTurn.count({ where: { worldId, generalId: human.id } }))).toBe(30);
   expect(await step(run, () => db.general.count({ where: { worldId, userId: null } }))).toBe(491);
   // 실제 전체 NPC와 새 도시 원장으로 한 달을 정산하고 저장한 원본 입력을 재생한다.
+  run.phase = 'monthly';
   await step(run, () => loop.advanceTo(10_000, signal));
   if (hold.lost) throw hold.lost;
   const stored = await step(run, () => db.world.findUniqueOrThrow({ where: { id: worldId } }));
@@ -235,13 +248,19 @@ async function verifyMode(stack: LegalStack, page: Page, info: TestInfo, run: Ru
   expect(Object.keys(live.state.cityResources!.cities).sort()).toEqual(
     Object.keys(before.state.cityResources!.cities).sort(),
   );
-  const archive = await step(run, () => exportReplay(db, worldId));
-  expect(archive.version).toBe(3);
-  const months = replayArchive(archive, 1);
+  run.phase = 'replay';
+  await step(run, () => renewLease(hold.db, hold.lease));
+  run.renewals.replay++;
+  const replay = await step(run, () => replaySan10World(worldId, e2eDatabaseUrl(), (phase) => (run.phase = phase)));
+  expect(replay.version).toBe(3);
+  await step(run, () => renewLease(hold.db, hold.lease));
+  run.renewals.replay++;
+  if (hold.lost) throw hold.lost;
   const snapshot = await step(run, () =>
     db.yearbookSnapshot.findUniqueOrThrow({ where: { worldId_tick: { worldId, tick: 10_000 } } }),
   );
-  expect(months).toEqual([{ tick: 10_000, stateHash: snapshot.stateHash }]);
+  expect(replay.months).toEqual([{ tick: 10_000, stateHash: snapshot.stateHash }]);
+  run.phase = 'map';
   const data = await step(run, () => api<WorldMap>(run, page, stack, 'world.map', { worldId }));
   expect(data.cities).toHaveLength(155);
   expect(data.operationalMap!.sites).toHaveLength(155);
@@ -295,6 +314,8 @@ for (const scenario of ['san10-191', 'san10-empty']) {
       worlds: [],
       passed: false,
       scenario,
+      phase: 'setup',
+      renewals: { commit: 0, replay: 0 },
       timer: setTimeout(() => {
         legalStack.failed = true;
         controller.abort(new Error('SAN10 원120초 시험의 본문110초 정착 경계'));

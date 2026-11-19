@@ -5,6 +5,7 @@ import { monthlyFixture } from '../apps/engine/test/monthlyFixture';
 import { saveFixtureWorld } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
+import { renewLease } from '../apps/engine/src/lease';
 import { createAccount, withE2eDb } from './account';
 import { holdLease, query, releaseHold } from './game';
 import { apiMutate, apiQuery, expect, test } from './t210-fixture';
@@ -19,6 +20,28 @@ test('AC-M3-13 공지 지시를 우선 표시하고 조언을 누르면 첫 예�
   const ruler = await world.user('ruler');
   const member = await world.user('member');
   const { id: worldId } = world;
+  // 생성 시 비어 있는 도시 원장은 실제 7월 세수와 물자 구입으로 준비한다.
+  // 이 동안 사람 예턴은 실행하지 않아 아래 저장·충돌 검사의 판 번호를 보존한다.
+  const db = world.hold.db;
+  await db.general.updateMany({ where: { worldId }, data: { nextTurnTick: { increment: 60_000 } } });
+  const loop = new TurnLoop(db, world.hold.lease, { beforeCommit: (tx) => renewLease(tx, world.hold.lease) });
+  await loop.advanceTo(60_000);
+  const memberGeneral = await db.general.findUniqueOrThrow({
+    where: { worldId_id: { worldId, id: member.generalId } },
+  });
+  const goods = await db.inputEvent.create({
+    data: {
+      worldId,
+      userId: ruler.userId,
+      generalId: ruler.generalId,
+      kind: 'logistics.order',
+      idempotencyKey: 'advice-review-iron',
+      status: 'PENDING',
+      payload: { type: 'trade', cityKey: memberGeneral.cityKey, good: 'iron', side: 'buy', amount: 20 },
+    },
+  });
+  await loop.advanceTo(60_000);
+  expect((await db.inputEvent.findUniqueOrThrow({ where: { id: goods.id } })).status).toBe('APPLIED');
   const reason = '도시 농업을 보강합니다';
   await apiMutate(world, ruler, 'notice.nation.set', {
     worldId,
@@ -108,14 +131,24 @@ test('AC-M3-13 공지 지시를 우선 표시하고 조언을 누르면 첫 예�
     where: { worldId_id: { worldId, id: member.generalId } },
   });
   const storedWorld = await world.hold.db.world.findUniqueOrThrow({ where: { id: worldId } });
+  const target = await db.city.findFirstOrThrow({ where: { worldId, nationId: { not: actor.nationId! } } });
   await apiMutate(world, ruler, 'operation.create', {
     worldId,
-    targetCityKey: actor.cityKey,
+    targetCityKey: target.cityKey,
     targetYear: storedWorld.startYear,
-    targetMonth: 6,
-    min: { crew: 1000, train: 70, atmos: 60 },
+    targetMonth: 9,
+    // 모병 한 칸과 출병 한 칸을 목표 전에 넣어 첫 조언이 실제 부곡 모병이 되게 한다.
+    min: { crew: 1000, train: 0, atmos: 0 },
     memberIds: [member.generalId],
   });
+  const operationAdvice = await apiQuery<Output['advice']['get']>(member, 'advice.get', { worldId });
+  expect(operationAdvice.skipped).toEqual([]);
+  expect(operationAdvice.items[0]).toMatchObject({
+    source: 'operation',
+    commandKey: 'recruit',
+    args: { unitId: 'new', amount: 1000 },
+  });
+  expect(operationAdvice.items[1]).toMatchObject({ source: 'notice', commandKey: 'farm' });
   await advice.getByRole('button', { name: '접기', exact: true }).click();
   await advice.getByRole('button', { name: '펼치기', exact: true }).click();
   await expect(rows.nth(0)).toHaveAttribute('data-advice-source', 'operation');
