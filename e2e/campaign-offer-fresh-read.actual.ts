@@ -10,11 +10,12 @@ import {
 } from './campaign-offer-fixture';
 
 // INT-11 AC-INT-11. 전용 공개 dist 구성에서만 열거하고 실행한다.
-test.describe.configure({ timeout: 240_000, retries: 0 });
+test.describe.configure({ timeout: 420_000, retries: 0 });
+const npcCommitTest = test.extend({ offerNpcObservation: true });
 // C는 두 사람의 가입 차례가 월 마지막 tick인 경계를 매번 실제로 거친다.
-const lateOnboardingTest = test.extend({ offerLateOnboarding: true });
+const lateOnboardingTest = npcCommitTest.extend({ offerLateOnboarding: true });
 
-test('AC-INT-11 A 이전 표시→실제 NPC commit→명시적 최신 조회→POST 한 번', async ({ offer }) =>
+npcCommitTest('AC-INT-11 A 이전 표시→실제 NPC commit→명시적 최신 조회→POST 한 번', async ({ offer }) =>
   offer.run(async () => {
     const [main, control] = offer.worlds;
     const page = offer.users[0]!.page;
@@ -66,9 +67,10 @@ test('AC-INT-11 A 이전 표시→실제 NPC commit→명시적 최신 조회→
       result: event.result,
       baselineHash: hashState(await offer.snapshot(control!)),
     });
-  }));
+  }),
+);
 
-test('AC-INT-11 B 최신 실제 조회 후 NPC commit은409·접수0·비용0', async ({ offer }) =>
+npcCommitTest('AC-INT-11 B 최신 실제 조회 후 NPC commit은409·접수0·비용0', async ({ offer }) =>
   offer.run(async () => {
     const main = offer.worlds[0]!;
     const before = await offer.board();
@@ -90,7 +92,8 @@ test('AC-INT-11 B 최신 실제 조회 후 NPC commit은409·접수0·비용0', 
     expect(posts).toHaveLength(1);
     await checkDraft();
     offer.journal.push({ case: 'B', snapshotRevision: fresh.revision, submitted: posts[0]!.input, status: 409 });
-  }));
+  }),
+);
 
 lateOnboardingTest('AC-INT-11 C 선행 정상 입력 뒤 engine STALE은 비용·시도·후속 RNG에 영향0', async ({ offer }) =>
   offer.run(async () => {

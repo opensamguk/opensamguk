@@ -17,6 +17,9 @@ import { saveFixtureWorld } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
+import { engineResolver } from '../apps/engine/src/extState';
+import { chooseNationTurn } from '../packages/rules/src/npc';
+import { rngFor } from '../packages/shared/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { e2eDatabaseUrl, appOrigin, TEST_PASSWORD } from './account';
 import { createDb, type PrismaClient } from '../packages/db/src/index';
@@ -307,7 +310,7 @@ export class OfferFixture {
       },
     });
   }
-  async prepare(browser: Browser, lateOnboarding = false) {
+  async prepare(browser: Browser, lateOnboarding = false, observeNpc = false) {
     if (!this.runtime && process.env.CAMPAIGN_OFFER_PUBLIC_DIST !== '1')
       throw new Error('공개 dist 전용 실행기가 필요합니다.');
     this.progress('public-metadata');
@@ -447,7 +450,7 @@ export class OfferFixture {
       this.worlds.map((world) => () => this.prepareConsent(world)),
       () => this.scope.cancel(),
     );
-    await this.prepareNpcObservationMonth();
+    if (observeNpc) await this.prepareNpcObservationMonth();
     this.progress('world-snapshot');
     expect(hashState(await this.snapshot(this.worlds[0]!))).toBe(hashState(await this.snapshot(this.worlds[1]!)));
     const page = this.users[0]!.page;
@@ -472,31 +475,51 @@ export class OfferFixture {
   private async prepareNpcObservationMonth() {
     const [main, control] = this.worlds as [World, World];
     expect(main.tick).toBe(control.tick);
-    const due = await control.hold.db.general.findFirstOrThrow({
-      where: { worldId: control.id, activeFromYear: { lte: 191 } },
-      orderBy: [{ nextTurnTick: 'asc' }, { id: 'asc' }],
-    });
-    const currentMonth = Math.floor(control.tick / 10000),
-      dueMonth = Math.floor(due.nextTurnTick / 10000);
-    expect(dueMonth).toBeGreaterThanOrEqual(currentMonth);
-    if (dueMonth === currentMonth) return;
-    expect(dueMonth).toBe(currentMonth + 1);
-    const human = await control.hold.db.general.aggregate({
-      where: { worldId: control.id, userId: { not: null } },
-      _min: { nextTurnTick: true },
-    });
-    expect(due.nextTurnTick).toBeLessThan(human._min.nextTurnTick!);
     for (const world of [main, control])
       expect(await world.hold.db.inputEvent.count({ where: { worldId: world.id, status: 'PENDING' } })).toBe(0);
-    // 가입 처리 중 그달의 NPC 차례를 모두 진행했다면, 최종 판을 읽기 전에 다음 정상 월을 준비한다.
-    const fromTick = control.tick,
-      tick = dueMonth * 10000;
+    // 고정 시드의 1월 세수와 두 달의 실제 NPC 모집·도시 훈련을 최종 표시 전에 진행한다.
+    // 도시 수비병 준비는 campaign 개정을 올리지 않는다. 준비된 병사의 실제 NPC 배속을 기다린다.
+    const fromTick = control.tick;
     this.progress('npc-observation-month');
+    await settleIndependentJoins(
+      [main, control].map((world) => () => this.advance(world, 25000)),
+      () => this.scope.cancel(),
+    );
+    const stored = await control.hold.db.world.findUniqueOrThrow({ where: { id: control.id } });
+    const resolver = engineResolver(stored).resolver;
+    const ready = (replay: Awaited<ReturnType<OfferFixture['snapshot']>>, id: number, tick: number) =>
+      chooseNationTurn(
+        replay.state,
+        replay.state.generals[id]!,
+        rngFor(stored.seed, 'npc-nation', tick, replay.state.generals[id]!.nationId!),
+        {
+          tick,
+          unitSet: replay.campaignUnitSet,
+          resolver,
+        },
+      ).chosen?.key === 'nation_city_allocate';
+    const replay = await this.snapshot(control);
+    const actorCity = (await this.board(main)).cityKey;
+    const rulers = await control.hold.db.general.findMany({
+      where: {
+        worldId: control.id,
+        userId: null,
+        officerLevel: 12,
+        activeFromYear: { lte: 191 },
+        cityKey: { not: actorCity },
+      },
+      orderBy: [{ nextTurnTick: 'asc' }, { id: 'asc' }],
+    });
+    const due = rulers.find((general) => ready(replay, general.id, general.nextTurnTick));
+    expect(due).toBeDefined();
+    const tick = due!.nextTurnTick - 1;
+    // 사람의 정상 차례도 이 준비 구간에서 끝내고, 선택한 NPC commit 직전의 실제 판을 표시한다.
     await settleIndependentJoins(
       [main, control].map((world) => () => this.advance(world, tick)),
       () => this.scope.cancel(),
     );
-    const prepared = { fromTick, tick, firstDueTick: due.nextTurnTick };
+    expect(ready(await this.snapshot(control), due!.id, due!.nextTurnTick)).toBe(true);
+    const prepared = { fromTick, tick, firstDueTick: due!.nextTurnTick, npc: due!.id };
     this.journal.push({ npcObservationMonth: prepared });
     console.log('[campaign-offer-month]', JSON.stringify(prepared));
   }
@@ -586,34 +609,40 @@ export class OfferFixture {
       });
       expect(due.nextTurnTick).toBeLessThan(human._min.nextTurnTick!);
       expect(Math.floor(due.nextTurnTick / 10000)).toBe(Math.floor(control.tick / 10000));
-      const before = (await this.snapshot(control)).state.campaign!.revision;
+      const prior = await this.snapshot(control);
+      const before = prior.state.campaign!.revision;
       const tick = due.nextTurnTick;
       await settleIndependentJoins(
         [control, main].map((world) => () => this.advance(world, tick)),
         () => this.scope.cancel(),
       );
-      const logs = await control.hold.db.generalLog.findMany({
-        where: { worldId: control.id, tick, kind: 'success', commandKey: { in: ['recruit', 'train', 'morale'] } },
-      });
-      const ids = logs.map((log) => log.generalId);
-      const others = await control.hold.db.general.findMany({
-        where: { worldId: control.id, id: { in: ids }, userId: null, cityKey: { not: actorCity } },
-      });
-      const after = (await this.snapshot(control)).state.campaign!.revision;
+      const next = await this.snapshot(control);
+      const after = next.state.campaign!.revision;
       expect(hashState(await this.snapshot(main))).toBe(hashState(await this.snapshot(control)));
-      if (others.length && after > before) {
-        const matching = await main.hold.db.generalLog.findMany({
-          where: {
-            worldId: main.id,
-            tick,
-            kind: 'success',
-            generalId: { in: others.map((g) => g.id) },
-            commandKey: { in: ['recruit', 'train', 'morale'] },
-          },
+      const added = next.state.campaign!.units.filter(
+        (unit) => !prior.state.campaign!.units.some((old) => old.id === unit.id),
+      );
+      const history =
+        due.nationId === null
+          ? null
+          : await control.hold.db.nationHistory.findUnique({
+              where: { worldId_tick_nationId: { worldId: control.id, tick, nationId: due.nationId } },
+            });
+      const events = (history?.data as { events?: string[] } | undefined)?.events ?? [];
+      if (
+        due.userId === null &&
+        due.cityKey !== actorCity &&
+        added.length &&
+        after > before &&
+        events.some((event) => event.startsWith('도시 병력 배속: 부곡'))
+      ) {
+        expect(added.every((unit) => next.state.generals[unit.ownerId]!.cityKey !== actorCity)).toBe(true);
+        const matching = await main.hold.db.nationHistory.findUniqueOrThrow({
+          where: { worldId_tick_nationId: { worldId: main.id, tick, nationId: due.nationId! } },
         });
-        expect(matching.length).toBeGreaterThan(0);
+        expect(matching.data).toEqual(history!.data);
         this.journal.push({
-          npcCommit: { tick, before, after, logs: matching.map((l) => ({ id: l.generalId, command: l.commandKey })) },
+          npcCommit: { tick, before, after, logs: [{ id: due.id, command: 'nation_city_allocate' }], units: added },
         });
         return;
       }
@@ -974,9 +1003,10 @@ export function assertCleanupPassed(cleanup: Awaited<ReturnType<OfferFixture['cl
     throw new Error('시험 실패 또는 불확실한 정리: controlled-cleanup-v3.json을 확인하세요.');
 }
 
-export const test = base.extend<{ offer: OfferFixture; offerLateOnboarding: boolean }>({
+export const test = base.extend<{ offer: OfferFixture; offerLateOnboarding: boolean; offerNpcObservation: boolean }>({
   offerLateOnboarding: [false, { option: true }],
-  offer: async ({ browser, offerRuntime, offerLateOnboarding }, use, info) => {
+  offerNpcObservation: [false, { option: true }],
+  offer: async ({ browser, offerRuntime, offerLateOnboarding, offerNpcObservation }, use, info) => {
     const offer = new OfferFixture(undefined, offerRuntime);
     const timer = setTimeout(() => {
       offer.progressPending('timeout');
@@ -984,7 +1014,9 @@ export const test = base.extend<{ offer: OfferFixture; offerLateOnboarding: bool
     }, info.timeout);
     let fixtureFailed = false;
     try {
-      await offer.scope.cancellable(offer.scope.work('prepare', () => offer.prepare(browser, offerLateOnboarding)));
+      await offer.scope.cancellable(
+        offer.scope.work('prepare', () => offer.prepare(browser, offerLateOnboarding, offerNpcObservation)),
+      );
       await use(offer);
     } catch {
       fixtureFailed = true;

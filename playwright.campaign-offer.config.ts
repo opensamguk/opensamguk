@@ -8,8 +8,8 @@ export default defineConfig({
   forbidOnly: true,
   workers: 1,
   retries: 0,
-  // 491명 NPC commit을 실제로 기다린다. CI에서 한 사례가 120초를 넘겨 감시가 취소했다(PR #674).
-  timeout: 240_000,
+  // A, B, C는 실제 세수와 NPC 배속(nation_city_allocate)까지 월을 진행한다. 로컬 준비만 160초대다(PR #674).
+  timeout: 420_000,
   expect: { timeout: 10_000 },
   use: { trace: 'off', video: 'off', screenshot: 'off' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
