@@ -140,7 +140,9 @@ async function prepare(world: T210World) {
 }
 
 scenario('T3-06 AC-M3-04 정식 두 월드 제재·403·30칸 초안·해제·6개 폭·조회 실패·만료', async ({ world }, info) => {
-  test.setTimeout(120_000);
+  // 정식 491명 월드 둘을 준비하는 데 늘 켠 규칙에서 시간이 더 든다. CI에서 120초 안에 30칸 초안 단계에 닿지
+  // 못해 넣기 눌림이 시험 종료로 끊겼다(PR #674, 네 번).
+  test.setTimeout(300_000);
   const fixture = await prepare(world);
   const {
     db,
