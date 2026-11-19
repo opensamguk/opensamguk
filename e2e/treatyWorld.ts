@@ -322,6 +322,12 @@ export class TreatyFixture {
     const capital = nation.capitalCityKey;
     await this.db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${worldId} FOR UPDATE`;
+      // 한 나라의 한 직책에는 장수 하나만 둘 수 있다(인사 불변식). 같은 직책의 기존 장수를 먼저 일반으로 내린다.
+      if (officerLevel > 1)
+        await tx.general.updateMany({
+          where: { worldId, nationId, officerLevel, id: { not: generalId } },
+          data: { officerLevel: 1 },
+        });
       await tx.general.update({
         where: { worldId_id: { worldId, id: generalId } },
         data: { nationId, officerLevel, cityKey: capital, nextTurnTick: FIRST_DUE_TICK },
