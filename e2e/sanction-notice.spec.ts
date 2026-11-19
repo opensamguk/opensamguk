@@ -161,7 +161,28 @@ scenario('T3-06 AC-M3-04 정식 두 월드 제재·403·30칸 초안·해제·6�
     await editor.locator('tr[data-slot="30"]').click();
     await editor.getByLabel('명령 찾기').fill('농지 개간');
     await editor.getByRole('radio', { name: '농지 개간', exact: true }).check();
-    await editor.getByRole('button', { name: '30번 칸에 넣기', exact: true }).click();
+    const put = editor.getByRole('button', { name: '30번 칸에 넣기', exact: true });
+    try {
+      await put.click({ timeout: 30_000 });
+    } catch (error) {
+      // CI에서만 넣기 단추가 끝내 눌리지 않은 적이 있다(PR #674). 막힌 이유를 기록에 남긴다.
+      const state = await editor.evaluate((root) => ({
+        puts: [...root.querySelectorAll('button')]
+          .filter((b) => (b.textContent ?? '').includes('넣기'))
+          .map((b) => ({ text: b.textContent, disabled: b.disabled, unavailable: b.dataset.unavailable ?? null })),
+        selection: root.querySelector('[data-testid="selection"]')?.textContent ?? null,
+        draft: root.querySelector('[data-testid="draft-state"]')?.textContent ?? null,
+        checked: [...root.querySelectorAll('input[type="radio"]:checked')].map((r) =>
+          r.getAttribute('aria-labelledby'),
+        ),
+        alerts: [...document.querySelectorAll('[role="alert"],[role="status"]')].map((a) =>
+          (a.textContent ?? '').slice(0, 120),
+        ),
+        argsScreen: Boolean(document.querySelector('[data-testid="command-args-screen"]')),
+      }));
+      console.log('SANCTION-put-state', JSON.stringify(state));
+      throw error;
+    }
     const draft = await page.evaluate(() => Object.entries(sessionStorage));
     const before = await db.generalTurn.findMany({
       where: { worldId },
