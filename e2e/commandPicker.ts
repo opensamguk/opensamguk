@@ -68,3 +68,9 @@ export async function putPicked(page: Page, scope: Locator, label: string) {
   if (await argsScreen(page).isVisible()) await putFromArgsScreen(page, label);
   else await scope.getByRole('button', { name: label, exact: true }).click();
 }
+
+// 단계 순서를 가정하지 않고 그 칸이 있는 단계로 간다. 맨 앞 단계로 돌아가 앞으로 찾는다.
+export async function toFieldStep(page: Page, target: Locator) {
+  await toFirstStep(page);
+  await toStepWith(page, target);
+}

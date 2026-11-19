@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { appOrigin, createAccount } from './account';
 import { e2eWorld, setTurns, turns, waitNextTurn, waitTurnWindow } from './game';
+import { putPicked } from './commandPicker';
 import { bindGeneral, query } from './world';
 
 // T1-16 · AC-M1-19: 실제 PostgreSQL·서버·엔진·Chromium으로 메인 작업 화면을 검증한다.
@@ -258,7 +259,7 @@ test.describe('장수가 있는 계정', () => {
       page.getByRole('radiogroup', { name: '대상 도시' }).getByRole('radio', { name: new RegExp(`^${enemy.name}`) }),
     ).toHaveAttribute('aria-checked', 'true');
     await expect(row(page, 4)).toContainText('휴식');
-    await editor(page).getByRole('button', { name: '4번 칸에 넣기', exact: true }).click();
+    await putPicked(page, editor(page), '4번 칸에 넣기');
     await expect(row(page, 4)).toContainText(enemy.name);
     await expect(draftState(page)).toHaveText('저장하지 않은 편집 2건');
     await shot(page, '10-main-turn-draft.png');

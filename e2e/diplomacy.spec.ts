@@ -20,7 +20,9 @@ test.describe.configure({ timeout: 180_000 });
 
 const ownedWorlds = new Set<string>();
 async function diplomacyWorld() {
-  const id = await e2eFeatureWorld({ npcNations: false });
+  // 외교 입력(제안, 수락, 파기)은 엔진이 바로 처리하고 이 시험들은 월 진행을 기다리지 않는다. 1030 한 달 처리는
+  // 36~43초(실측)라 1분 턴 월드가 여럿 돌면 CI의 공용 월드 엔진까지 밀린다. 60분 턴으로 만든다.
+  const id = await e2eFeatureWorld({ npcNations: false, turnTermMinutes: 60 });
   ownedWorlds.add(id);
   return id;
 }
@@ -344,7 +346,7 @@ test.describe('예턴 편집의 교역 대상', () => {
     const city = target.locator(`[data-value="${away.key}"]`);
     await city.click();
     await expect(city).toHaveAttribute('aria-checked', 'true');
-    await editor.getByRole('button', { name: '5번 칸에 넣기', exact: true }).click();
+    await putPicked(a.page, editor, '5번 칸에 넣기');
     await expect(editor.locator('tr[data-slot="5"]')).toContainText('교역');
     await expect(editor.locator('tr[data-slot="5"]')).toContainText(away.name);
     const before = await turns(a.page, world);
