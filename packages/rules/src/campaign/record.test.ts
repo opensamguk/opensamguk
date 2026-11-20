@@ -14,6 +14,7 @@ function fixture() {
   Object.assign(world.generals[1]!, { userId: 'owner', gold: 1000 });
   Object.assign(world.generals[2]!, { nationId: 1, officerLevel: 1 });
   const campaign = emptyCampaignState(world, 'ledger-test-seed', 'source-scenario');
+  world.campaign = campaign;
   const payload = { type: 'offer', targetId: 2, relation: 'LIEUTENANT', revision: 0 };
   const result = applyCampaignRelationship(world, payload, 1, campaign, {
     tick: 10000,

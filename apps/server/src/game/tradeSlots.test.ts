@@ -1,13 +1,12 @@
 import { expect, it } from 'vitest';
-import { trade } from '@opensamguk/rules';
 import { worldResolver } from './resolver';
 import { assertEnabledSlots, parseSlot } from './slots';
 
-it('API 명령 목록과 개인 칸은 같은 교역 feature 선택을 따른다', () => {
-  const world = { preset: null, replayFormat: 3, ruleFeatures: ['treaty', 'treaty-trade'] };
-  expect(worldResolver(world).resolver.get('trade')).toBe(trade);
+it('AC-INT-28 API 명령 목록과 개인 칸은 상시 제공 교역을 쓴다', () => {
+  const world = { preset: null, replayFormat: 3 };
+  expect(worldResolver(world).resolver.get('trade')).toMatchObject({ key: 'trade', target: 'general' });
   const turn = parseSlot({ commandKey: 'trade', args: { cityKey: 2 } }, true);
   expect(() => assertEnabledSlots(world, [turn])).not.toThrow();
-  expect(() => assertEnabledSlots({ ...world, ruleFeatures: ['treaty'] }, [turn])).toThrow('명령과 인자');
-  expect(() => assertEnabledSlots({ ...world, replayFormat: 1, ruleFeatures: [] }, [turn])).toThrow('명령과 인자');
+  expect(() => assertEnabledSlots({ ...world }, [turn])).not.toThrow();
+  expect(() => assertEnabledSlots({ ...world, replayFormat: 1 }, [turn])).toThrow('명령과 인자');
 });

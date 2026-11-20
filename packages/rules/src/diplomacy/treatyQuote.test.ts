@@ -61,21 +61,30 @@ describe('T2-07 / AC-M2-06 첫 세 조항 견적', () => {
       [{ kind: 'note', text: '' }],
       [{ kind: 'note', text: '가'.repeat(301) }],
       [{ kind: 'passage', cityKeys: [1] }],
-      [{ kind: 'tribute', payerNationId: 1, gold: 0, rice: 0, months: 1 }],
-      [{ kind: 'trade', months: 1 }],
-      [{ kind: 'cityTransfer', cityKey: 1, giverNationId: 1 }],
+      [{ kind: 'tribute', payerNationId: 1, gold: 0, rice: 0, months: 0 }],
+      [{ kind: 'trade', months: 0 }],
+      [{ kind: 'cityTransfer', cityKey: 0, giverNationId: 1 }],
     ];
     for (const clauses of bad) {
       const engine = execute(clauses);
       expect(engine.ok).toBe(false);
       if (engine.ok) throw new Error('거절 fixture 실패');
-      expect(quoteTreatyProposal(preview(clauses))).toEqual({
+      expect(quoteTreatyProposal(preview(clauses), { tradeEnabled: true, expandedEnabled: true })).toEqual({
         cost: null,
         problem: { code: engine.result.code, message: engine.result.message },
       });
     }
     expect(quoteTreatyProposal(preview([])).problem?.code).toBe('BAD_INPUT');
     expect(quoteTreatyProposal(preview([{ kind: 'trade', months: 1 }])).problem?.code).toBe('CLAUSE_NOT_CONNECTED');
+  });
+
+  it('수도 이양 대상은 실제 월드에서 거부하고 요약 견적은 소유권을 추측하지 않는다', () => {
+    const clauses: TreatyClause[] = [{ kind: 'cityTransfer', cityKey: 1, giverNationId: 1 }];
+    expect(execute(clauses, 'NONE')).toMatchObject({ ok: false, result: { code: 'BAD_TARGET' } });
+    expect(quoteTreatyProposal(preview(clauses, 'NONE'), { tradeEnabled: true, expandedEnabled: true })).toEqual({
+      cost: { from: 0, to: 0 },
+      problem: null,
+    });
   });
 
   it('Q2 자기 국가·없는 상대는 BAD_TARGET이며 조항 검사가 먼저다', () => {
@@ -127,7 +136,7 @@ describe('T2-07 / AC-M2-06 첫 세 조항 견적', () => {
   it('Q4 양국 비용은 실제 수락과 같고 공개값이 같으면 국고·NPC와 무관하다', () => {
     for (const months of [1, 12, 120]) {
       const clauses: TreatyClause[] = [{ kind: 'peace' }, { kind: 'nonAggression', months }];
-      const result = quoteTreatyProposal(preview(clauses));
+      const result = quoteTreatyProposal(preview(clauses), { tradeEnabled: true, expandedEnabled: true });
       expect(result).toEqual({
         cost: { from: calculateTreatyFee(2, months), to: calculateTreatyFee(1, months) },
         problem: null,

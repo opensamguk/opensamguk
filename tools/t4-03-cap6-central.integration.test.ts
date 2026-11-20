@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
@@ -8,12 +9,9 @@ import { afterAll, beforeAll, expect, it } from 'vitest';
 import { createDb, type Prisma } from '../packages/db/src/index';
 import {
   calculateTreatyFee,
-  capsResourceHashInput,
+  replayResourceHashInput,
   checkReplayOrigin,
-  emptyQueue,
-  parseCapsOrigin,
   parsePreset,
-  selectWorldCapabilities,
   TICKS_PER_MONTH,
   type TreatyInput,
   type WorldInit,
@@ -21,19 +19,23 @@ import {
 import { hashState } from '../packages/shared/src/node/hashState';
 import { commandInitial } from '../packages/rules/test/commandFixture';
 import { monthlyFixture } from '../apps/engine/test/monthlyFixture';
-import { readWorldState, saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { recordTestTurns } from '../apps/engine/test/seasonFixture';
+import { settlePendingBattle } from '../apps/engine/test/tacticalSettlement';
+import { recruitmentFixtureData } from './fixtures/recruitment';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
+import { readWorldState } from '../apps/engine/src/world/persistence';
 import { loadWorld } from '../apps/engine/src/worldLoader';
 import { loadReplayState } from '../apps/engine/src/monthly';
-import { acquireLease, LeaseLostError, lockLease, releaseLease, type Lease } from '../apps/engine/src/lease';
+import { acquireLease, LeaseLostError, releaseLease, type Lease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
-import { processPendingInput } from '../apps/engine/src/inputs';
 import { requestShutdown, stopOwnedChild } from '../apps/engine/src/process-lifecycle';
 import { runSupervisor } from '../apps/engine/src/supervisor';
-import { exportReplay, replayArchive, type ReplayArchive } from '../apps/engine/src/replay';
-import { replayCapsArchive, replayCapsToEnd } from '../apps/engine/src/replayCaps';
+import { exportReplay, replayArchive, replayToEnd, type ReplayArchiveV3 } from '../apps/engine/src/replay';
+
 import { readView } from '../apps/server/src/game/queries';
-import { testDatabaseUrl } from './test-database';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
 import { confirmDisconnectedDatabase } from './test-db-close';
+import { initializeIntegrationResources } from './integration-resources';
 import { initializeResources } from './init-resources';
 
 type PgClient = {
@@ -46,8 +48,11 @@ const pgRequire = createRequire(dbRequire.resolve('@prisma/adapter-pg'));
 const { Client } = pgRequire('pg') as { Client: new (config: { connectionString: string }) => PgClient };
 if (!process.env.TEST_DATABASE_URL) throw new Error('전용 테스트 DB가 필요합니다.');
 const sourceUrl = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-const ownName = process.env.T403_CENTRAL_DB_NAME ?? `t403_caps_${randomUUID().replaceAll('-', '')}_test`;
-if (!/^t403_caps_[a-f0-9]{32}_test$/.test(ownName)) throw new Error('시험 DB 이름을 확인하세요.');
+const ownName =
+  process.env.T403_CENTRAL_DB_NAME ??
+  ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
+if (!(/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(ownName) || ownName === ciGreenDatabaseName('')))
+  throw new Error('시험 DB 이름을 확인하세요.');
 const ownUrl = new URL(sourceUrl);
 const adminUrl = new URL(sourceUrl);
 ownUrl.pathname = `/${ownName}`;
@@ -68,11 +73,15 @@ const evidence: Record<string, unknown> = { ownName, executed: false, migrations
 const clauses = [{ kind: 'peace' as const }, { kind: 'nonAggression' as const, months: 1 }];
 
 async function databases() {
-  return (
+  const rows = (
     await admin.query('SELECT datname, oid::text AS oid FROM pg_database WHERE datname <> $1 ORDER BY datname', [
       ownName,
     ])
   ).rows;
+  // CI 복구의 다른 담당자는 자기 DB를 재생성한다. 개발 DB와 자기 OID·연결 검사는 그대로 유지한다.
+  return process.env.CI_GREEN_DATABASE
+    ? rows.filter((row) => !/^opensamguk_ci_green_[a-z0-9]+_test$/.test(String(row.datname)))
+    : rows;
 }
 
 beforeAll(async () => {
@@ -116,6 +125,7 @@ beforeAll(async () => {
     db,
     await readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8'),
   );
+  await initializeIntegrationResources(db);
   // 실제 CLI가 읽는 시험 소유 자원이다. 기존 자원은 바꾸지 않는다.
   const values = { population: 1000, agriculture: 100, commerce: 100, security: 100, defence: 50, wall: 50 };
   const map = {
@@ -145,6 +155,14 @@ beforeAll(async () => {
     id: resourceKey,
     title: '중앙 PG 시험',
     startYear: 191,
+    requiredStatRules: { count: 5, total: 275, min: 15, max: 90 },
+    generalStats: [1, 2].map((generalId) => ({
+      generalId,
+      stats: { leadership: 70, strength: 70, intel: 60, politics: 50, charm: 50 },
+      sourceId: 'central-fixture',
+      sourceRevision: '1',
+      officerId: generalId,
+    })),
     nation: [1, 2].map((id) => [
       `시험국가${id}`,
       id === 1 ? '#ff0000' : '#0000ff',
@@ -223,51 +241,49 @@ async function user() {
   return db.user.create({ data: { email: `t403-${randomUUID()}@example.invalid`, passwordHash: 'test-only' } });
 }
 type FixtureOptions = {
-  format?: 'legacy' | 'f0' | 'positive';
   human?: boolean;
   npcTarget?: boolean;
   gold?: number;
   targetGold?: number;
-  separated?: boolean;
+  dormant?: boolean;
   status?: 'PREOPEN' | 'PAUSED' | 'RUNNING';
-  treaty?: boolean;
   end?: boolean;
   initial?: WorldInit;
 };
 async function fixture(options: FixtureOptions = {}) {
   const users = await Promise.all([user(), user()]);
   const initial = options.initial ?? (await monthlyFixture());
-  if (options.separated) initial.cities = initial.cities.map((city) => ({ ...city, connections: [] }));
   initial.generals = initial.generals.slice(0, 2).map((general, i) => ({
     ...general,
     userId: options.human === false || (options.npcTarget && i === 1) ? null : users[i]!.id,
     officerLevel: 12,
     activeFromYear: initial.startYear,
-    nextTurnTick: options.initial ? general.nextTurnTick : 1000 + i,
+    nextTurnTick: options.dormant ? 1_000_000_000 : options.initial ? general.nextTurnTick : 1000 + i,
   }));
   initial.nations = initial.nations.map((nation, i) => ({
     ...nation,
     gold: (i === 1 ? options.targetGold : undefined) ?? options.gold ?? 1000,
     isNpc: !!options.npcTarget && i === 1,
   }));
-  const format = options.format ?? 'legacy';
+
+  syncFixtureMap(initial);
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '중앙 조약 시험',
     turnTermMinutes: 60,
     endYear: options.end ? initial.startYear : null,
-    ...(format === 'f0' ? {} : { replayFormat: 'legacy' as const }),
-    ...(options.treaty === false ? {} : { treatyFormat: 1 as const }),
+    replayFormat: 3,
+    featureData: recruitmentFixtureData(initial),
   });
   await db.world.update({
     where: { id: worldId },
     data: { status: options.status ?? 'RUNNING', clockAnchorAt: new Date() },
   });
-  const f = { worldId, users, initial };
-  if (format === 'positive') {
-    await db.world.update({ where: { id: worldId }, data: { clockTick: 600 } });
-    await marker(f);
-    await (await loopFor(worldId)).advanceTo(600);
-  }
+  const f = {
+    worldId,
+    users,
+    initial,
+    initialSequence: (await db.world.findUniqueOrThrow({ where: { id: worldId } })).actionSequence,
+  };
   return f;
 }
 type Fixture = Awaited<ReturnType<typeof fixture>>;
@@ -280,23 +296,6 @@ async function loopFor(worldId: string, hooks?: ConstructorParameters<typeof Tur
   const loop = new TurnLoop(db, lease, hooks);
   if (!hooks) loops.set(worldId, loop);
   return loop;
-}
-async function marker(f: Fixture) {
-  const generals = await db.general.findMany({ where: { worldId: f.worldId }, orderBy: { id: 'asc' } });
-  await db.generalTurn.createMany({
-    data: generals.flatMap((general) =>
-      emptyQueue().map((turn, slot) => ({ ...turn, args: {}, worldId: f.worldId, generalId: general.id, slot })),
-    ),
-  });
-  return db.inputEvent.create({
-    data: {
-      worldId: f.worldId,
-      userId: 'system:policy',
-      kind: 'system.policy.enable',
-      idempotencyKey: 'system.policy.enable:5',
-      payload: { version: 5, emptySlots: generals.map((general) => general.id) },
-    },
-  });
 }
 async function enqueue(f: Fixture, input: TreatyInput, actor = 0) {
   return db.inputEvent.create({
@@ -354,7 +353,7 @@ async function corruptTreaty(worldId: string) {
       id: 999,
       fromNationId: 1,
       toNationId: 2,
-      clauses: [{ kind: 'note', text: '손상 fixture' }],
+      clauses: [{ kind: 'note', text: '' }],
       status: 'PROPOSED',
       proposedTick: 0,
       respondByTick: 6 * TICKS_PER_MONTH,
@@ -385,7 +384,7 @@ function trackChild(child: ChildProcess, kind: 'cli' | 'engine', worldId?: strin
   children.set(child, exited);
   return exited;
 }
-async function cliWorld(treaty: boolean) {
+async function cliWorld() {
   const child = spawn(
     process.execPath,
     [
@@ -396,6 +395,8 @@ async function cliWorld(treaty: boolean) {
       resourceKey,
       '--map',
       resourceKey,
+      '--stat-rules',
+      'five-stats',
       '--seed',
       'central-cli',
       '--turn-term',
@@ -404,7 +405,6 @@ async function cliWorld(treaty: boolean) {
       '191',
       '--name',
       '중앙 CLI',
-      ...(treaty ? ['--treaty'] : []),
     ],
     {
       cwd: root,
@@ -450,30 +450,44 @@ async function stopEngine(child: ChildProcess) {
   children.delete(child);
 }
 
-it('P1 실제 CLI와 factory는 origin6·형식1·초기 행을 함께 만들고 후속 행 실패를 롤백한다', async () => {
-  const cli = await cliWorld(true);
+it('P1 실제 CLI와 factory는 origin3·형식3·초기 행을 함께 만들고 후속 행 실패를 롤백한다', async () => {
+  const cli = await cliWorld();
   const worldIds = [cli.worldId];
-  for (const format of ['legacy', 'f0', 'positive'] as const) worldIds.push((await fixture({ format })).worldId);
+  for (const options of [{ human: true }, { human: false }, { npcTarget: true }])
+    worldIds.push((await fixture(options)).worldId);
   for (const worldId of worldIds) {
     const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
-    expect(world.treatyFormat).toBe(1);
-    const origin = parseCapsOrigin(world.replayOrigin);
-    expect(origin.version).toBe(6);
-    expect(origin.capabilities).toEqual({ version: 1, treaty: { version: 1 } });
+    expect(world.treatyFormat).toBeNull();
+    const origin: unknown = world.replayOrigin;
+    checkReplayOrigin(origin);
+    if (origin.version !== 3) throw Error('형식3 생성 기록이 필요합니다.');
+    expect(origin.version).toBe(3);
+    expect((await db.$transaction((tx) => loadReplayState(tx, worldId))).state.treaties).toBeUndefined();
     expect(Object.hasOwn(origin.initial, 'treaties')).toBe(false);
     expect(origin.initialStateHash).toBe(hashState(origin.initial));
     expect(world.initialStateHash).toBe(origin.initialStateHash);
-    expect(origin.resourceHash).toBe(hashState(capsResourceHashInput(origin)));
-    expect(selectWorldCapabilities(world).kind).toBe('caps');
+    expect(origin.resourceHash).toBe(hashState(replayResourceHashInput(origin.initial, origin.featureData)));
+    expect(world.replayFormat).toBe(3);
     expect(await db.treaty.count({ where: { worldId } })).toBe(0);
   }
   const initial = await monthlyFixture();
-  initial.generals[0]!.userId = `missing-${randomUUID()}`;
   const count = await db.world.count();
-  await expect(
-    saveInitialWorld(db, initial, { name: '외래키 롤백', turnTermMinutes: 60, endYear: null, treatyFormat: 1 }),
-  ).rejects.toThrow();
-  expect(await db.world.count()).toBe(count);
+  // 소유자 부착은 별도 입력이다. 생성 원장의 후속 INSERT 실패로 생성 트랜잭션 자체를 검증한다.
+  await db.$executeRawUnsafe(
+    `CREATE FUNCTION t403_reject_generation_slice() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 't403-generation-followup'; END $$`,
+  );
+  await db.$executeRawUnsafe(
+    `CREATE TRIGGER t403_reject_generation_slice BEFORE INSERT ON "WorldExtSlice" FOR EACH ROW EXECUTE FUNCTION t403_reject_generation_slice()`,
+  );
+  try {
+    await expect(
+      saveInitialWorld(db, initial, { name: '후속 원장 롤백', turnTermMinutes: 60, endYear: null, replayFormat: 3 }),
+    ).rejects.toThrow('t403-generation-followup');
+    expect(await db.world.count()).toBe(count);
+  } finally {
+    await db.$executeRawUnsafe(`DROP TRIGGER t403_reject_generation_slice ON "WorldExtSlice"`);
+    await db.$executeRawUnsafe(`DROP FUNCTION t403_reject_generation_slice()`);
+  }
 });
 
 it('P2 non-null commands preset은 생성 전에 거부하고 World 행을 남기지 않는다', async () => {
@@ -486,21 +500,21 @@ it('P2 non-null commands preset은 생성 전에 거부하고 World 행을 남�
       name: '명령 거부',
       turnTermMinutes: 60,
       endYear: null,
-      treatyFormat: 1,
+
       preset: { key: 'blocked', value: { ...preset, commands: { general: ['fire_attack'], nation: [] } } },
     }),
-  ).rejects.toThrow('확장 명령을 켠 월드는 아직 지원하지 않습니다.');
+  ).rejects.toThrow('월드별 명령 선택은 지원하지 않습니다.');
   expect(await db.world.count()).toBe(count);
 });
 
-it('P3 기능 없는 새 CLI는 origin3과 빈 기능 목록, 조약 꺼짐을 기록한다', async () => {
-  const result = await cliWorld(false);
+it('P3 새 CLI는 origin3과 전체 제공 규칙·조약 원장을 기록한다', async () => {
+  const result = await cliWorld();
   const world = await db.world.findUniqueOrThrow({ where: { id: result.worldId } });
   const origin = world.replayOrigin;
   checkReplayOrigin(origin);
   expect(origin).toMatchObject({ version: 3, initialStateHash: result.stateHash });
   expect(world.replayFormat).toBe(3);
-  expect(world.ruleFeatures).toEqual([]);
+  expect(providedRuleKeys).toContain('treaty');
   expect(world.policyFromSequence).toBeNull();
   expect(world.treatyFormat).toBeNull();
   expect(await db.treaty.count({ where: { worldId: world.id } })).toBe(0);
@@ -508,59 +522,59 @@ it('P3 기능 없는 새 CLI는 origin3과 빈 기능 목록, 조약 꺼짐을 �
   expect(hashState(origin.initial)).toBe(result.stateHash);
   expect(hashState(await readWorldState(db, world.id))).toBe(result.stateHash);
   expect(origin.resourceHash).toBe(
-    hashState({
-      scenarioKey: origin.initial.scenarioKey,
-      mapKey: origin.initial.mapKey,
-      unitSetKey: origin.initial.unitSetKey,
-      statRules: origin.initial.statRules,
-      unitSet: origin.initial.unitSet,
-    }),
+    hashState(replayResourceHashInput(origin.initial, origin.version === 3 ? origin.featureData : undefined)),
   );
 });
 
-it('P3 명시 방침 factory는 origin1과 방침 표지 0, 조약 꺼짐을 보존한다', async () => {
+it('P3 명시 형식3 factory는 전체 제공 규칙과 조약 원장을 보존한다', async () => {
   const initial = await monthlyFixture();
   const result = await saveInitialWorld(db, initial, {
     name: '명시 방침 형식',
     turnTermMinutes: 60,
     endYear: null,
-    replayFormat: 'policy',
+    replayFormat: 3,
   });
   const world = await db.world.findUniqueOrThrow({ where: { id: result.worldId } });
   const origin = world.replayOrigin;
   checkReplayOrigin(origin);
-  expect(origin).toMatchObject({ version: 1, initialStateHash: result.stateHash });
-  expect(world.replayFormat).toBe(1);
-  expect(world.ruleFeatures).toEqual([]);
-  expect(world.policyFromSequence).toBe(0);
+  expect(origin).toMatchObject({ version: 3, initialStateHash: result.stateHash });
+  expect(world.replayFormat).toBe(3);
+  expect((await db.$transaction((tx) => loadReplayState(tx, world.id))).state.treaties).toBeUndefined();
+  expect(world.policyFromSequence).toBeNull();
   expect(world.treatyFormat).toBeNull();
   expect(await db.treaty.count({ where: { worldId: world.id } })).toBe(0);
   expect(world.initialStateHash).toBe(result.stateHash);
-  expect(result.stateHash).toBe(hashState(initial));
+  expect(result.stateHash).toBe(hashState(origin.initial));
   expect(hashState(origin.initial)).toBe(result.stateHash);
-  expect(selectWorldCapabilities(world).kind).toBe('legacy');
+  expect(origin.version).toBe(3);
 });
 
 it('P4 사람 제안·수락은 비용을 한 번 내고 거절은 국고를 보존한다', async () => {
   for (const accept of [true, false]) {
     const f = await fixture();
     const proposed = await propose(f);
-    expect(proposed).toMatchObject({ status: 'APPLIED', sequence: 1, result: { outcome: 'PROPOSED', treatyId: '1' } });
+    expect(proposed).toMatchObject({
+      status: 'APPLIED',
+      sequence: f.initialSequence + 1,
+      result: { outcome: 'PROPOSED', treatyId: String(f.initialSequence + 1) },
+    });
     const before = await db.nation.findMany({ where: { worldId: f.worldId }, orderBy: { id: 'asc' } });
     expect(before.map((nation) => nation.gold)).toEqual([1000, 1000]);
-    const result = await respond(f, '1', accept);
+    const result = await respond(f, String(f.initialSequence + 1), accept);
     expect(result).toMatchObject({
       status: 'APPLIED',
-      sequence: 2,
+      sequence: f.initialSequence + 2,
       result: { outcome: accept ? 'ACCEPTED' : 'DECLINED', by: 'HUMAN' },
     });
-    const row = await db.treaty.findUniqueOrThrow({ where: { worldId_id: { worldId: f.worldId, id: 1 } } });
+    const row = await db.treaty.findUniqueOrThrow({
+      where: { worldId_id: { worldId: f.worldId, id: f.initialSequence + 1 } },
+    });
     const costs = before.map((nation) =>
       calculateTreatyFee(f.initial.cities.filter((city) => city.nationId === nation.id).length, 1),
     );
     expect(row.status).toBe(accept ? 'ACTIVE' : 'REJECTED');
     expect([row.costFrom, row.costTo]).toEqual(accept ? costs : [null, null]);
-    expect(row.closedSequence).toBe(accept ? null : 2);
+    expect(row.closedSequence).toBe(accept ? null : f.initialSequence + 2);
     expect(
       (await db.nation.findMany({ where: { worldId: f.worldId }, orderBy: { id: 'asc' } })).map(
         (nation) => nation.gold,
@@ -575,14 +589,15 @@ it('P5 NPC 수락·거절은 제안 이벤트 하나 안에서 끝난다', async
     const result = await propose(f);
     expect(result).toMatchObject({
       status: 'APPLIED',
-      sequence: 1,
+      sequence: f.initialSequence + 1,
       result: { outcome: insufficient ? 'DECLINED' : 'ACCEPTED', by: 'NPC' },
     });
-    expect(await db.inputEvent.count({ where: { worldId: f.worldId } })).toBe(1);
-    expect((await db.treaty.findUniqueOrThrow({ where: { worldId_id: { worldId: f.worldId, id: 1 } } })).status).toBe(
-      insufficient ? 'REJECTED' : 'ACTIVE',
-    );
-    expect((await db.world.findUniqueOrThrow({ where: { id: f.worldId } })).actionSequence).toBe(1);
+    expect(await db.inputEvent.count({ where: { worldId: f.worldId, kind: { not: 'general.possess' } } })).toBe(1);
+    expect(
+      (await db.treaty.findUniqueOrThrow({ where: { worldId_id: { worldId: f.worldId, id: f.initialSequence + 1 } } }))
+        .status,
+    ).toBe(insufficient ? 'REJECTED' : 'ACTIVE');
+    expect((await db.world.findUniqueOrThrow({ where: { id: f.worldId } })).actionSequence).toBe(f.initialSequence + 1);
   }
 });
 
@@ -590,58 +605,73 @@ it('P6 사람 수락의 금 부족은 REJECTED이며 양쪽 국고가 그대로�
   const f = await fixture({ gold: 0 });
   await propose(f);
   const before = await db.nation.findMany({ where: { worldId: f.worldId }, orderBy: { id: 'asc' } });
-  expect(await respond(f, '1')).toMatchObject({
+  expect(await respond(f, String(f.initialSequence + 1))).toMatchObject({
     status: 'REJECTED',
-    sequence: 2,
+    sequence: f.initialSequence + 2,
     result: { code: 'INSUFFICIENT_GOLD' },
   });
   expect(await db.nation.findMany({ where: { worldId: f.worldId }, orderBy: { id: 'asc' } })).toEqual(before);
-  expect((await db.treaty.findUniqueOrThrow({ where: { worldId_id: { worldId: f.worldId, id: 1 } } })).status).toBe(
-    'PROPOSED',
-  );
+  expect(
+    (await db.treaty.findUniqueOrThrow({ where: { worldId_id: { worldId: f.worldId, id: f.initialSequence + 1 } } }))
+      .status,
+  ).toBe('PROPOSED');
 });
 
 it('P7 손상된 열린 조약은 대기 입력과 턴보다 먼저 거부한다', async () => {
   const f = await fixture();
   await propose(f);
-  await db.treaty.update({ where: { worldId_id: { worldId: f.worldId, id: 1 } }, data: { costFrom: 1 } });
-  await enqueue(f, { kind: 'treaty.respond', payload: { treatyId: '1', accept: true } }, 1);
+  await db.treaty.update({
+    where: { worldId_id: { worldId: f.worldId, id: f.initialSequence + 1 } },
+    data: { costFrom: 1 },
+  });
+  await enqueue(f, { kind: 'treaty.respond', payload: { treatyId: String(f.initialSequence + 1), accept: true } }, 1);
   const before = await snapshot(f.worldId);
   await expect((await loopFor(f.worldId)).advanceTo(TICKS_PER_MONTH)).rejects.toThrow();
   expect(await snapshot(f.worldId)).toEqual(before);
 });
 
-it('P8 off 월드의 손상 조약 행은 PREOPEN·PAUSED·ENDED에서도 행동 전에 막는다', async () => {
+it('P8 현행 월드의 손상 조약 행은 PREOPEN·PAUSED·ENDED에서도 행동 전에 막는다', async () => {
   for (const status of ['PREOPEN', 'PAUSED', 'ENDED'] as const) {
-    const f = await fixture({ treaty: false });
+    const f = await fixture();
     await db.world.update({ where: { id: f.worldId }, data: { status } });
     await corruptTreaty(f.worldId);
     const before = await snapshot(f.worldId);
-    await expect((await loopFor(f.worldId)).advanceTo(TICKS_PER_MONTH)).rejects.toThrow(
-      '조약을 끈 월드에 조약 저장 행이 있습니다.',
-    );
+    await expect((await loopFor(f.worldId)).advanceTo(TICKS_PER_MONTH)).rejects.toMatchObject({
+      name: 'RangeError',
+      message: '저장된 조약의 조항을 확인하세요.',
+    });
     expect(await snapshot(f.worldId)).toEqual(before);
   }
 });
 
-it('P9 명시적으로 손상시킨 format·origin 불일치는 쓰기 전에 거부한다', async () => {
+it('P9 형식3은 옛 조약 표지 없이 적재하며 origin 불일치는 쓰기 전에 거부한다', async () => {
   for (const damage of ['null-format', 'origin1'] as const) {
     const f = await fixture();
     const world = await db.world.findUniqueOrThrow({ where: { id: f.worldId } });
-    const origin = parseCapsOrigin(world.replayOrigin);
+    const origin: unknown = world.replayOrigin;
+    checkReplayOrigin(origin);
+    if (origin.version !== 3) throw Error('형식3 생성 기록이 필요합니다.');
+    const loop = await loopFor(f.worldId);
+    if (damage === 'null-format') {
+      const before = await snapshot(f.worldId);
+      await db.world.update({ where: { id: f.worldId }, data: { treatyFormat: null } });
+      await loop.advanceTo(0);
+      expect(await snapshot(f.worldId)).toEqual({
+        ...before,
+        world: { ...before.world, clockRevision: before.world.clockRevision + 1, clockAnchorAt: expect.any(Date) },
+      });
+      continue;
+    }
     await db.world.update({
       where: { id: f.worldId },
-      data:
-        damage === 'null-format'
-          ? { treatyFormat: null }
-          : {
-              replayOrigin: {
-                version: 1,
-                initial: origin.initial,
-                initialStateHash: origin.initialStateHash,
-                resourceHash: origin.resourceHash,
-              } as unknown as Prisma.InputJsonValue,
-            },
+      data: {
+        replayOrigin: {
+          version: 1,
+          initial: origin.initial,
+          initialStateHash: origin.initialStateHash,
+          resourceHash: origin.resourceHash,
+        } as unknown as Prisma.InputJsonValue,
+      },
     });
     const before = await snapshot(f.worldId);
     await expect((await loopFor(f.worldId)).advanceTo(TICKS_PER_MONTH)).rejects.toThrow();
@@ -649,7 +679,7 @@ it('P9 명시적으로 손상시킨 format·origin 불일치는 쓰기 전에 �
   }
 });
 
-it('P10 최소 id의 모르는 kind는 뒤 조약·턴·월간을 가리고 쓰기를 남기지 않는다', async () => {
+it('P10 정산 밀림이 없는 시점의 모르는 kind는 뒤 조약·턴을 가리고 쓰기를 남기지 않는다', async () => {
   const f = await fixture();
   const first = await db.inputEvent.create({
     data: { worldId: f.worldId, userId: f.users[0]!.id, kind: 'unknown', idempotencyKey: 'unknown:first', payload: {} },
@@ -657,48 +687,21 @@ it('P10 최소 id의 모르는 kind는 뒤 조약·턴·월간을 가리고 쓰�
   const next = await enqueue(f, { kind: 'treaty.propose', payload: { toNationId: 2, clauses } });
   expect(first.id < next.id).toBe(true);
   const before = await snapshot(f.worldId);
-  await expect((await loopFor(f.worldId)).advanceTo(TICKS_PER_MONTH)).rejects.toThrow(
-    '처리할 수 없는 대기 입력입니다.',
+  await expect((await loopFor(f.worldId)).advanceTo(TICKS_PER_MONTH - 1)).rejects.toThrow(
+    '등록되지 않은 대기 입력 종류입니다.',
   );
   expect(await snapshot(f.worldId)).toEqual(before);
 });
 
-it('P11 off 월드의 두 조약 kind는 sequence 배정 전에 거부한다', async () => {
-  for (const input of [
-    { kind: 'treaty.propose' as const, payload: { toNationId: 2, clauses } },
-    { kind: 'treaty.respond' as const, payload: { treatyId: '1', accept: true } },
-  ]) {
-    const f = await fixture({ treaty: false });
-    await enqueue(f, input);
-    const before = await snapshot(f.worldId);
-    await expect(drain(f)).rejects.toThrow('조약을 끈 월드의 조약 입력입니다.');
-    expect(await snapshot(f.worldId)).toEqual(before);
-  }
+it('P11 별도 조약 선택 없이 제안·응답 입력을 처리한다', async () => {
+  const f = await fixture();
+  const proposed = await propose(f);
+  expect(proposed).toMatchObject({ status: 'APPLIED', sequence: 3 });
+  const response = await respond(f, '3');
+  expect(response).toMatchObject({ status: 'APPLIED', sequence: 4 });
 });
 
-it('P12 null 표지 barrier는 뒤 입력을 건너뛰지 않으며 턴·월간도 쓰지 않는다', async () => {
-  const preopen = await fixture({ status: 'PREOPEN' });
-  await marker(preopen);
-  await enqueue(preopen, { kind: 'treaty.propose', payload: { toNationId: 2, clauses } });
-  const before = await snapshot(preopen.worldId);
-  await (await loopFor(preopen.worldId)).advanceTo(TICKS_PER_MONTH);
-  expect(await snapshot(preopen.worldId)).toEqual(before);
-  // PAUSED의 정상 loop는 기준 T를 준다. 이 변형은 직접 호출에서 그 인자가 없는 null 계약만 본다.
-  const paused = await fixture({ status: 'PAUSED' });
-  await marker(paused);
-  await enqueue(paused, { kind: 'treaty.propose', payload: { toNationId: 2, clauses } });
-  const pausedBefore = await snapshot(paused.worldId);
-  const loop = await loopFor(paused.worldId);
-  await db.$transaction(async (tx) => {
-    await lockLease(tx, loop.lease);
-    await tx.$queryRaw`SELECT id FROM "World" WHERE id=${paused.worldId} FOR UPDATE`;
-    const world = await tx.world.findUniqueOrThrow({ where: { id: paused.worldId } });
-    expect(await processPendingInput(tx, world, world.clockTick)).toBeNull();
-  });
-  expect(await snapshot(paused.worldId)).toEqual(pausedBefore);
-});
-
-it('P13 생성·표지·정책·조약 입력을 실제 최소 id 순서로 처리한다', async () => {
+it('P13 생성·활동·정책·조약 입력을 실제 최소 id 순서로 처리한다', async () => {
   const f = await fixture();
   const first = await db.inputEvent.create({
     data: {
@@ -710,7 +713,16 @@ it('P13 생성·표지·정책·조약 입력을 실제 최소 id 순서로 처�
     },
   });
   // 기존 장수가 있는 생성 요청은 ALREADY_EXISTS로 끝나며 뒤 입력을 계속 처리한다.
-  const second = await marker(f);
+  const second = await db.inputEvent.create({
+    data: {
+      worldId: f.worldId,
+      userId: f.users[0]!.id,
+      generalId: 1,
+      kind: 'general.active',
+      idempotencyKey: 'activity:current',
+      payload: {},
+    },
+  });
   const third = await db.inputEvent.create({
     data: {
       worldId: f.worldId,
@@ -729,41 +741,49 @@ it('P13 생성·표지·정책·조약 입력을 실제 최소 id 순서로 처�
     },
   });
   await loop.advanceTo(0);
-  const events = await db.inputEvent.findMany({ where: { worldId: f.worldId }, orderBy: { id: 'asc' } });
+  const events = await db.inputEvent.findMany({
+    where: { worldId: f.worldId, kind: { not: 'general.possess' } },
+    orderBy: { id: 'asc' },
+  });
   expect(events.map((event) => event.id)).toEqual([first.id, second.id, third.id, fourth.id]);
-  expect(events.map((event) => event.sequence)).toEqual([1, 2, 3, 4]);
+  expect(events.map((event) => event.sequence)).toEqual([1, 2, 3, 4].map((step) => f.initialSequence + step));
   expect(events.map((event) => event.status)).toEqual(['REJECTED', 'APPLIED', 'APPLIED', 'APPLIED']);
-  expect(committed).toEqual([1, 2, 3, 4]);
+  expect(committed).toEqual([1, 2, 3, 4].map((step) => f.initialSequence + step));
 });
 
 it('P14 조약 이벤트마다 actionSequence는 정확히 한 번만 늘어난다', async () => {
   const f = await fixture();
   await propose(f);
-  await respond(f, '1');
+  await respond(f, String(f.initialSequence + 1));
   await propose(f, [{ kind: 'note', text: '거절 확인' }]);
-  await respond(f, '3', false);
+  await respond(f, String(f.initialSequence + 3), false);
   expect(
-    (await db.inputEvent.findMany({ where: { worldId: f.worldId }, orderBy: { id: 'asc' } })).map(
-      (event) => event.sequence,
-    ),
-  ).toEqual([1, 2, 3, 4]);
-  expect((await db.world.findUniqueOrThrow({ where: { id: f.worldId } })).actionSequence).toBe(4);
+    (
+      await db.inputEvent.findMany({
+        where: { worldId: f.worldId, kind: { startsWith: 'treaty.' } },
+        orderBy: { id: 'asc' },
+      })
+    ).map((event) => event.sequence),
+  ).toEqual([1, 2, 3, 4].map((step) => f.initialSequence + step));
+  expect((await db.world.findUniqueOrThrow({ where: { id: f.worldId } })).actionSequence).toBe(f.initialSequence + 4);
   await drain(f);
-  expect((await db.world.findUniqueOrThrow({ where: { id: f.worldId } })).actionSequence).toBe(4);
+  expect((await db.world.findUniqueOrThrow({ where: { id: f.worldId } })).actionSequence).toBe(f.initialSequence + 4);
 });
 
 it('P15 월간 EXPIRED·ENDED 저장은 월간 해시보다 앞서며 commit 뒤 해시도 같다', async () => {
   for (const accept of [false, true]) {
     const f = await fixture();
     await propose(f);
-    if (accept) await respond(f, '1');
+    if (accept) await respond(f, String(f.initialSequence + 1));
     const tick = (accept ? 1 : 6) * TICKS_PER_MONTH;
     let observed = false;
     const loop = await loopFor(f.worldId, {
       beforeCommit: async (tx) => {
         const month = await tx.yearbookSnapshot.findUnique({ where: { worldId_tick: { worldId: f.worldId, tick } } });
         if (!month) return;
-        const row = await tx.treaty.findUniqueOrThrow({ where: { worldId_id: { worldId: f.worldId, id: 1 } } });
+        const row = await tx.treaty.findUniqueOrThrow({
+          where: { worldId_id: { worldId: f.worldId, id: f.initialSequence + 1 } },
+        });
         expect(row.status).toBe(accept ? 'ENDED' : 'EXPIRED');
         expect(row.closedSequence).toBe(month.sequence);
         expect(month.stateHash).toBe(hashState(await loadReplayState(tx, f.worldId)));
@@ -783,7 +803,11 @@ it('P15 월간 EXPIRED·ENDED 저장은 월간 해시보다 앞서며 commit 뒤
 it('P16 lease·World 잠금을 확인하고 beforeCommit 실패의 전체 쓰기를 롤백한 뒤 한 번 적용한다', async () => {
   const f = await fixture();
   await propose(f);
-  const event = await enqueue(f, { kind: 'treaty.respond', payload: { treatyId: '1', accept: true } }, 1);
+  const event = await enqueue(
+    f,
+    { kind: 'treaty.respond', payload: { treatyId: String(f.initialSequence + 1), accept: true } },
+    1,
+  );
   const before = await snapshot(f.worldId);
   const probe = new Client({ connectionString: ownUrl.href });
   await probe.connect();
@@ -819,12 +843,13 @@ it('P16 lease·World 잠금을 확인하고 beforeCommit 실패의 전체 쓰기
     await loop.advanceTo(0);
     expect(await db.inputEvent.findUniqueOrThrow({ where: { id: event.id } })).toMatchObject({
       status: 'APPLIED',
-      sequence: 2,
+      sequence: f.initialSequence + 2,
     });
-    expect((await db.world.findUniqueOrThrow({ where: { id: f.worldId } })).actionSequence).toBe(2);
-    expect((await db.treaty.findUniqueOrThrow({ where: { worldId_id: { worldId: f.worldId, id: 1 } } })).status).toBe(
-      'ACTIVE',
-    );
+    expect((await db.world.findUniqueOrThrow({ where: { id: f.worldId } })).actionSequence).toBe(f.initialSequence + 2);
+    expect(
+      (await db.treaty.findUniqueOrThrow({ where: { worldId_id: { worldId: f.worldId, id: f.initialSequence + 1 } } }))
+        .status,
+    ).toBe('ACTIVE');
   } finally {
     await probe.end();
   }
@@ -888,7 +913,7 @@ it('P18 새 엔진 프로세스가 이어 처리하고 새 TurnLoop에서도 해
     await stopEngine(second);
   }
   expect(await db.inputEvent.findUniqueOrThrow({ where: { id: next.id } })).toMatchObject({
-    sequence: 2,
+    sequence: f.initialSequence + 2,
     result: { outcome: 'PROPOSED' },
   });
   const savedHash = await stateHash(f.worldId);
@@ -959,7 +984,7 @@ it('P20 세 runtime 적재의 treaties는 같고 WorldInit 읽기에는 키가 �
   const f = await fixture();
   for (const active of [false, true]) {
     if (!active) await propose(f);
-    else await respond(f, '1');
+    else await respond(f, String(f.initialSequence + 1));
     const world = await db.$transaction((tx) => loadWorld(tx, f.worldId));
     const replay = await db.$transaction((tx) => loadReplayState(tx, f.worldId));
     const view = await db.$transaction((tx) => readView(tx, f.worldId));
@@ -971,10 +996,10 @@ it('P20 세 runtime 적재의 treaties는 같고 WorldInit 읽기에는 키가 �
 
 it('P21 W1~W4의 12개월 DB 해시·수출 바이트·종료 재생을 대조한다', async () => {
   const w1 = await fixture({ end: true });
-  const cli = await cliWorld(true);
+  const cli = await cliWorld();
   await db.world.update({ where: { id: cli.worldId }, data: { status: 'RUNNING', clockAnchorAt: new Date() } });
-  const w3 = await fixture({ format: 'positive', end: true });
-  const w4 = await fixture({ format: 'positive', human: false, end: true, separated: true });
+  const w3 = await fixture({ end: true });
+  const w4 = await fixture({ human: false, end: true, dormant: true });
   for (const f of [w1, w3]) {
     const event = await propose(f);
     await respond(f, String(event.sequence));
@@ -991,40 +1016,23 @@ it('P21 W1~W4의 12개월 DB 해시·수출 바이트·종료 재생을 대조�
     leases.push(lease);
     await new TurnLoop(db, lease).advanceTo(12 * TICKS_PER_MONTH);
     const archive = await exportReplay(db, worldId!);
-    expect(archive.version, name).toBe(6);
-    if (archive.version !== 6) throw new Error('형식 6 수출이 아닙니다.');
+    expect(archive.version, name).toBe(3);
+    if (archive.version !== 3) throw new Error('형식 3 수출이 아닙니다.');
     expect(archive.months, name).toHaveLength(12);
     expect(JSON.stringify(await exportReplay(db, worldId!)), name).toBe(JSON.stringify(archive));
-    expect(replayCapsArchive(archive, 12), name).toEqual(
+    expect(replayArchive(archive, 12), name).toEqual(
       archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })),
     );
-    expect(replayCapsToEnd(archive), name).toEqual(archive.end);
+    expect(replayToEnd(archive), name).toEqual(archive.end);
     expect(archive.end?.finalStateHash, name).toBe(await stateHash(worldId!));
-  }
-});
-
-it('P22 F 양수의 사람 기준 T와 NPC-only null은 marker와 재적재에 남는다', async () => {
-  for (const human of [true, false]) {
-    const f = await fixture({ format: 'positive', human });
-    const world = await db.world.findUniqueOrThrow({ where: { id: f.worldId } });
-    expect(world.policyFromSequence).toBe(1);
-    const event = await db.inputEvent.findFirstOrThrow({ where: { worldId: f.worldId, kind: 'system.policy.enable' } });
-    expect(event.result).toMatchObject({ fromSequence: 1, clockTick: 600, baselineActiveTick: human ? 600 : null });
-    const replay = await db.$transaction((tx) => loadReplayState(tx, f.worldId));
-    expect(replay.policy?.lastActiveTicks).toEqual(human ? { 1: 600, 2: 600 } : {});
-    expect(
-      (await db.general.findMany({ where: { worldId: f.worldId }, orderBy: { id: 'asc' } })).map(
-        (general) => general.lastActiveTick,
-      ),
-    ).toEqual(human ? [600, 600] : [null, null]);
   }
 });
 
 it('P23 실제 휴식·방침·정복 턴 앞뒤의 treaties는 깊이 같고 종료 해시도 같다', async () => {
   for (const modern of [false, true]) {
-    const f = await fixture({ format: modern ? 'f0' : 'legacy' });
+    const f = await fixture();
     await propose(f, [{ kind: 'note', text: '턴 불변 확인' }]);
-    await respond(f, '1');
+    await respond(f, String(f.initialSequence + 1));
     if (modern) {
       await db.inputEvent.create({
         data: {
@@ -1062,65 +1070,123 @@ it('P23 실제 휴식·방침·정복 턴 앞뒤의 treaties는 깊이 같고 �
   }
   const initial = commandInitial();
   // 도시 2 점령이 통일 조건을 채우도록 P23 사본의 중립 도시를 생성 전에 배정한다.
-  initial.cities[2]!.nationId = 1;
+  for (const city of initial.cities) if (city.cityKey !== 2) city.nationId = 1;
   initial.generals[1]!.crew = 0;
+  initial.generals[0]!.gold = 100_000;
+  initial.generals[0]!.rice = 100_000;
+  Object.assign(initial.cities[0]!, {
+    commerce: 2_000_000,
+    commerceMax: 2_000_000,
+    agriculture: 2_000_000,
+    agricultureMax: 2_000_000,
+  });
   initial.cities[1]!.wall = 0;
   initial.cities[1]!.defence = 0;
+  // 정복 종료는 세 칸 이상인 실제 전술 전장에서 정산한다.
+  for (const city of initial.cities) {
+    city.x = city.cityKey * 64;
+    city.y = 64;
+  }
   const f = await fixture({ initial });
   await propose(f, [{ kind: 'note', text: '정복 종료 보존' }]);
-  await respond(f, '1');
+  await respond(f, String(f.initialSequence + 1));
   const before = (await db.$transaction((tx) => loadWorld(tx, f.worldId))).treaties;
-  await db.generalTurn.create({
-    data: { worldId: f.worldId, generalId: 1, slot: 0, commandKey: 'attack', args: { cityKey: 2 }, explicit: true },
+  const loop = await loopFor(f.worldId);
+  await loop.advanceTo(TICKS_PER_MONTH);
+  const recruiting = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId: f.worldId, id: 1 } } });
+  await recordTestTurns(db, f.worldId, 1, 'recruit', { amount: 1000, crewType: 1100, unitId: 'new' });
+  await loop.advanceTo(recruiting.nextTurnTick);
+  expect(
+    await db.generalLog.findFirstOrThrow({ where: { worldId: f.worldId, generalId: 1, commandKey: 'recruit' } }),
+  ).toMatchObject({ kind: 'success' });
+  for (const commandKey of ['train', 'train', 'train', 'train', 'morale', 'morale', 'morale', 'morale']) {
+    const current = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId: f.worldId, id: 1 } } });
+    await recordTestTurns(db, f.worldId, 1, commandKey, {});
+    await loop.advanceTo(current.nextTurnTick);
+    expect(
+      await db.generalLog.findFirstOrThrow({
+        where: { worldId: f.worldId, generalId: 1, tick: current.nextTurnTick, commandKey },
+      }),
+    ).toMatchObject({ kind: 'success' });
+  }
+  await recordTestTurns(db, f.worldId, 1, 'attack', { cityKey: 2 });
+  const attacker = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId: f.worldId, id: 1 } } });
+  await loop.advanceTo(attacker.nextTurnTick);
+  await settlePendingBattle(db, f.worldId);
+  expect(await db.battle.findFirstOrThrow({ where: { worldId: f.worldId } })).toMatchObject({
+    state: { settled: true, result: 'attack' },
   });
-  await (await loopFor(f.worldId)).advanceTo(100);
+  // 통일 종료 검사는 다음 장수 턴/월간 정산에서 실행되므로 다음 예약 턴까지 진행한다.
+  await loop.advanceTo(attacker.nextTurnTick + TICKS_PER_MONTH);
   expect((await db.world.findUniqueOrThrow({ where: { id: f.worldId } })).status).toBe('ENDED');
   expect((await db.$transaction((tx) => loadWorld(tx, f.worldId))).treaties).toEqual(before);
   expect((await db.worldResult.findUniqueOrThrow({ where: { worldId: f.worldId } })).finalStateHash).toBe(
     await stateHash(f.worldId),
   );
+  const archive = await exportReplay(db, f.worldId);
+  expect(replayToEnd(archive)).toEqual(archive.end);
 });
 
-it('P24 기존 origin1의 12개월 골든과 archive2 바이트를 보존한다', async () => {
+it('P24 현행 origin3의 12개월 골든과 수출 바이트를 보존한다', async () => {
   const original = JSON.parse(
     await readFile(new URL('../apps/engine/test/fixtures/replay-v1-b8f5074.json', import.meta.url), 'utf8'),
-  ) as ReplayArchive;
+  ) as ReplayArchiveV3;
   const { worldId } = await saveInitialWorld(db, original.origin.initial, {
     name: '기존 골든',
     turnTermMinutes: 60,
     endYear: null,
-    replayFormat: 'legacy',
+    replayFormat: 3,
   });
   await db.world.update({ where: { id: worldId }, data: { status: 'RUNNING', clockAnchorAt: new Date() } });
   await (await loopFor(worldId)).advanceTo(12 * TICKS_PER_MONTH);
   const archive = await exportReplay(db, worldId);
-  expect(archive.version).toBe(2);
-  expect(replayArchive(archive, 12).at(-1)?.stateHash).toBe(
-    'd60ad5f09185a889fc64926efe4e367e1b909710b227e76e3005698e71d80a0b',
-  );
+  expect(archive.version).toBe(3);
+  expect(replayArchive(archive, 12).at(-1)?.stateHash).toBe(original.months.at(-1)!.stateHash);
   await readWorldState(db, worldId);
   await db.$transaction((tx) => readView(tx, worldId));
   expect(JSON.stringify(await exportReplay(db, worldId))).toBe(JSON.stringify(archive));
 });
 
-it('P25 origin null인 옛 월드는 세 상태에서 돌고 수출을 거부하며 잔여 조약은 막는다', async () => {
+it('P25 생성 기록 손상은 모든 상태에서 행동 전에 거부한다', async () => {
   for (const status of ['PREOPEN', 'RUNNING', 'ENDED'] as const) {
-    const f = await fixture({ treaty: false });
-    // 생성 기록이 없던 과거 저장 형식의 회귀 fixture다. 활성화 증거로 쓰지 않는다.
+    const f = await fixture();
     await client.query('UPDATE "World" SET "replayOrigin"=NULL WHERE id=$1', [f.worldId]);
     await db.world.update({ where: { id: f.worldId }, data: { status } });
-    await (await loopFor(f.worldId)).advanceTo(status === 'RUNNING' ? TICKS_PER_MONTH : 0);
-    if (status === 'RUNNING') {
-      expect(await db.generalLog.count({ where: { worldId: f.worldId } })).toBeGreaterThan(0);
-      expect(await db.yearbookSnapshot.count({ where: { worldId: f.worldId } })).toBe(1);
-    }
-    expect((await db.world.findUniqueOrThrow({ where: { id: f.worldId } })).treatyFormat).toBeNull();
-    await expect(exportReplay(db, f.worldId)).rejects.toThrow('생성 기록이 없는 월드는 재생할 수 없습니다.');
-    await corruptTreaty(f.worldId);
     const before = await snapshot(f.worldId);
-    await expect((await loopFor(f.worldId)).advanceTo(TICKS_PER_MONTH)).rejects.toThrow(
-      '조약을 끈 월드에 조약 저장 행이 있습니다.',
-    );
+    await expect((await loopFor(f.worldId)).advanceTo(TICKS_PER_MONTH)).rejects.toThrow();
     expect(await snapshot(f.worldId)).toEqual(before);
+    await expect(exportReplay(db, f.worldId)).rejects.toThrow();
   }
 });
+
+// 합성 지도의 생성 원본에도 변경한 도시 값과 연결을 기록한다.
+function syncFixtureMap(initial: Parameters<typeof saveInitialWorld>[1]) {
+  const map = initial.operationalMap;
+  if (!map) return;
+  for (const city of initial.cities) city.connections.sort((a, b) => a - b);
+  for (const site of map.sites) {
+    if (site.kind !== 'CITY') continue;
+    const city = initial.cities.find((row) => row.cityKey === site.anchorKey);
+    if (!city) continue;
+    site.name = city.name;
+    site.level = city.level;
+    site.region = city.region;
+    site.position = { x: city.x, y: city.y };
+    for (const field of ['population', 'agriculture', 'commerce', 'security', 'defence', 'wall'] as const) {
+      site.initial![field] = city[field];
+      site.max![field] = city[`${field}Max`];
+    }
+  }
+  map.routes = initial.cities.flatMap((city) =>
+    city.connections
+      .filter((key) => city.cityKey < key)
+      .map((key) => ({
+        id: `route:${city.cityKey}:${key}`,
+        from: `city:${city.cityKey}`,
+        to: `city:${key}`,
+        mode: 'LAND' as const,
+        direction: 'BOTH' as const,
+        enabled: true,
+      })),
+  );
+}

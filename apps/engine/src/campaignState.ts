@@ -1,4 +1,5 @@
 import { isDeepStrictEqual } from 'node:util';
+import { persistTacticalTables } from './tacticalBattle';
 import type { Prisma } from '@opensamguk/db';
 import type { checkWorldReplay } from './features';
 import {
@@ -22,18 +23,13 @@ export function readCampaignArmyTypes(
   } else if (origin !== (world.replayOrigin as unknown)) {
     throw new Error('검증한 생성 기록이 잠근 월드와 다릅니다.');
   }
-  if (origin.version !== 3 || !origin.initial.ruleFeatures?.includes('campaign-v1'))
-    throw new Error('휘하 프로필의 생성 기록이 없습니다.');
+  if (origin.version !== 3) throw new Error('휘하 프로필의 생성 기록이 없습니다.');
   if (!isDeepStrictEqual(world.unitSet, origin.initial.unitSet)) throw new Error('운영 병종이 생성 기록과 다릅니다.');
   return campaignArmyTypes(origin.initial);
 }
 
 // 같은 World 행 잠금 아래 호출한다. General.crew와 부곡에 병력을 중복 저장하지 않는다.
 export function readStoredCampaign(value: unknown, world: WorldView, seed: string): CampaignState | undefined {
-  if (!world.ruleFeatures?.includes('campaign-v1')) {
-    if (value !== null && value !== undefined) throw new Error('휘하 기능을 끈 월드에 부곡 저장 상태가 있습니다.');
-    return undefined;
-  }
   if (Object.values(world.generals).some((general) => general.crew !== 0))
     throw new Error('부곡 월드의 General.crew에 병력을 중복 저장할 수 없습니다.');
   return readCampaignState(value, world, seed);
@@ -50,17 +46,27 @@ export async function persistCampaignState(
   const original = before.campaign,
     final = next.campaign;
   if (!original && !final) {
-    if (before.ruleFeatures?.includes('campaign-v1') || next.ruleFeatures?.includes('campaign-v1'))
-      throw new Error('휘하 기능을 켠 월드의 저장 상태가 없습니다.');
+    throw new Error('휘하 기능을 켠 월드의 저장 상태가 없습니다.');
     return;
   }
   if (!original || !final) throw new Error('진행 중인 월드의 휘하 기능을 추가하거나 지울 수 없습니다.');
   const originalState = readStoredCampaign(original, before, original.seed);
   const finalState = readStoredCampaign(final, next, original.seed);
+  if (
+    !isDeepStrictEqual(originalState?.cityUpgrade?.originalLevels, finalState?.cityUpgrade?.originalLevels) ||
+    originalState?.cityUpgrade?.enabled !== finalState?.cityUpgrade?.enabled
+  )
+    throw new Error('증축·감축의 원래 규모와 설정을 변경할 수 없습니다.');
+  if (!isDeepStrictEqual(originalState?.supplyLedger, finalState?.supplyLedger))
+    throw new Error('불변 행군 원장을 변경할 수 없습니다.');
   if (isDeepStrictEqual(originalState, finalState)) return;
   const changed = await tx.$executeRaw`
     UPDATE "World" SET "campaignState" = ${JSON.stringify(finalState)}::jsonb
     WHERE id = ${worldId} AND "campaignState" = ${JSON.stringify(originalState)}::jsonb
   `;
   if (changed !== 1) throw new Error('저장할 휘하 상태가 바뀌었습니다.');
+  if (!isDeepStrictEqual(originalState?.tactical, finalState?.tactical)) {
+    const world = await tx.world.findUniqueOrThrow({ where: { id: worldId }, select: { actionSequence: true } });
+    await persistTacticalTables(tx, worldId, before, next, world.actionSequence);
+  }
 }

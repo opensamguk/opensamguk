@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { readFile, readdir } from 'node:fs/promises';
 import { expect, it } from 'vitest';
-import { testDatabaseUrl } from './test-database';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
 import { confirmDisconnectedDatabase } from './test-db-close';
 
 type Row = Record<string, unknown>;
@@ -49,8 +49,14 @@ const catalog = async (client: PgClient) =>
 async function ownDatabase(mode: 'empty' | 'upgrade' | 'constraints', run: (client: PgClient) => Promise<void>) {
   if (!process.env.TEST_DATABASE_URL) throw new Error('파기 저장 시험 전용 DB가 필요합니다.');
   const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-  const name = `t207_bt_${randomUUID().replaceAll('-', '')}_${mode}_test`;
-  if (!/^t207_bt_[a-f0-9]{32}_(empty|upgrade|constraints)_test$/.test(name) || name.length > 63)
+  const name = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_${mode}_test`);
+  if (
+    !(
+      /^opensamguk_ci_green_[a-f0-9]{20}_(empty|upgrade|constraints)_test$/.test(name) ||
+      name === ciGreenDatabaseName('')
+    ) ||
+    name.length > 63
+  )
     throw new Error('파기 저장 시험 DB 이름을 확인하세요.');
   const target = new URL(source),
     adminUrl = new URL(source);

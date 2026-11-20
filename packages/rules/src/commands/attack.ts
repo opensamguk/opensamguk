@@ -1,6 +1,8 @@
 import { logPartsToText, type LogPart } from '@opensamguk/shared';
 import { logSentence, nationPart, generalPart, cityPart, numPart, textPart } from './logging';
 import { commandLog } from './support';
+import { commandAttackTargets } from '../commandPaths';
+import { captureCounties } from '../cityAffiliation';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import { z } from 'zod';
 import { BALANCE } from '../balance';
@@ -40,7 +42,10 @@ function makeAttack(collect: typeof collectModifiers) {
         return fail('BAD_TARGET', '자기 국가 도시에는 출병할 수 없습니다.');
       if (from?.nationId !== g.nationId) return fail('NOT_OWN_CITY', '자기 국가 도시에서 출병해야 합니다.');
       if (!from.supplied) return fail('NO_SUPPLY', '보급이 끊긴 도시입니다.');
-      if (!from.connections.includes(target.cityKey)) return fail('NOT_ADJACENT', '연결된 도시가 아닙니다.');
+      const path = commandAttackTargets(view, g.id).find((row) => row.cityKey === target.cityKey);
+      if (!path) return fail('NOT_ADJACENT', '연결된 도시가 아닙니다.');
+      if (path.blockedBy !== null)
+        return fail('BLOCKED_BY_COUNTY', `${view.cities[path.blockedBy]!.name}: 수비 있는 현이 길을 막습니다.`);
       if (target.nationId !== null && relation(view, g.nationId, target.nationId)?.state !== 'WAR')
         return fail('NOT_WAR', '교전 중인 국가가 아닙니다.');
       if (g.crew <= 0 || g.atmos <= 0) return fail('NO_CREW', '출병할 병력이나 사기가 부족합니다.');
@@ -58,6 +63,10 @@ function makeAttack(collect: typeof collectModifiers) {
     change(state, actor, args, rng) {
       const g = state.generals[actor.generalId]!,
         city = state.cities[args.cityKey]!;
+      if (city.state != null) {
+        city.state = 43;
+        city.stateTerm = 3;
+      }
       const attackingNation = g.nationId!,
         defendingNation = city.nationId;
       const aTech = state.nations[attackingNation]!.tech,
@@ -75,7 +84,6 @@ function makeAttack(collect: typeof collectModifiers) {
       const reports: NonNullable<CommandResult['reports']> = [];
       const battleAwards: NonNullable<CommandResult['battleAwards']> = [];
       const battleOutcomes: NonNullable<CommandResult['battleOutcomes']> = [];
-      const reputation = state.ruleFeatures?.includes('reputation-v1');
       const rounds: LogPart[][] = [];
       let attackerFirstVolleyUsed = false;
       const wallFirst =
@@ -96,7 +104,7 @@ function makeAttack(collect: typeof collectModifiers) {
             siege: !openingSkirmish,
             attackerFirstVolleyUsed,
             unitSet: actor.unitSet!,
-            coefMode: state.ruleFeatures?.includes('battle-affinity-v2') ? 'multiply' : 'divide',
+            coefMode: 'multiply',
             attackerModifiers: {
               dealt: collect(state, g.id, { stage: 'battle.dealt', commandKey: 'attack' }),
               taken: collect(state, g.id, { stage: 'battle.taken', commandKey: 'attack' }),
@@ -123,7 +131,7 @@ function makeAttack(collect: typeof collectModifiers) {
             defenderTech: bTech,
             attackerFirstVolleyUsed,
             unitSet: actor.unitSet!,
-            coefMode: state.ruleFeatures?.includes('battle-affinity-v2') ? 'multiply' : 'divide',
+            coefMode: 'multiply',
             attackerModifiers: {
               dealt: collect(state, g.id, { stage: 'battle.dealt', commandKey: 'attack' }),
               taken: collect(state, g.id, { stage: 'battle.taken', commandKey: 'attack' }),
@@ -142,10 +150,10 @@ function makeAttack(collect: typeof collectModifiers) {
         const defenderSurvives = defender.crew > 0 && defender.atmos > 0;
         if (attackerSurvives && !defenderSurvives) {
           battleAwards.push({ generalId: g.id, wins: 1, captures: 0 });
-          if (reputation) battleOutcomes.push({ winnerId: g.id, loserId: defender.id });
+          battleOutcomes.push({ winnerId: g.id, loserId: defender.id });
         } else if (!attackerSurvives && defenderSurvives) {
           battleAwards.push({ generalId: defender.id, wins: 1, captures: 0 });
-          if (reputation) battleOutcomes.push({ winnerId: defender.id, loserId: g.id });
+          battleOutcomes.push({ winnerId: defender.id, loserId: g.id });
         }
         const parts: LogPart[] = [
           generalPart(g),
@@ -176,6 +184,7 @@ function makeAttack(collect: typeof collectModifiers) {
       if (captured) {
         battleAwards.push({ generalId: g.id, wins: 0, captures: 1 });
         city.nationId = attackingNation;
+        captureCounties(state, city.cityKey);
         city.defence = 0;
         city.security = Math.round(city.security * BALANCE.CAPTURE_SECURITY_FACTOR);
         city.trust = Math.max(0, city.trust - BALANCE.CAPTURE_TRUST_LOSS);
@@ -184,7 +193,7 @@ function makeAttack(collect: typeof collectModifiers) {
         if (defendingNation !== null) {
           const nation = state.nations[defendingNation]!;
           const remaining = Object.values(state.cities)
-            .filter((c) => c.nationId === defendingNation && c.kind !== 'PASS')
+            .filter((c) => c.nationId === defendingNation && c.kind !== 'PASS' && c.kind !== 'FIELD')
             .sort((a, b) => b.population - a.population || a.cityKey - b.cityKey);
           if (!remaining.length) {
             removeNation(state, defendingNation);
@@ -227,7 +236,7 @@ function makeAttack(collect: typeof collectModifiers) {
         reports,
         history,
         battleAwards,
-        ...(reputation ? { battleOutcomes } : {}),
+        ...{ battleOutcomes },
         attackTarget: { cityKey: args.cityKey, defendingNationId: defendingNation },
       };
     },

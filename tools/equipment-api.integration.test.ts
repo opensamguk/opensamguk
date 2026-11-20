@@ -120,7 +120,7 @@ async function fixture(enabled = true, lineage = false, specialty: 'iron' | 'hor
     ...(lineage ? { sex: 'UNKNOWN' as const } : {}),
   }));
   initial.diplomacies = [{ nationA: 1, nationB: 2, state: 'NON_AGGRESSION', untilTick: 1_000_000 }];
-  const features = [
+  [
     'campaign-assignment-v2',
     'campaign-v1',
     'city-resources-v1',
@@ -132,7 +132,6 @@ async function fixture(enabled = true, lineage = false, specialty: 'iron' | 'hor
     ...(enabled ? ['equipment-v1'] : []),
     ...(lineage ? ['lineage-v1'] : []),
   ].sort();
-  initial.ruleFeatures = features;
   const logistics = structuredClone(TEST_EQUIPMENT_LOGISTICS_CONFIG);
   logistics.capacity.base = 10000;
   logistics.specialties = [{ cityKey: 3, good: specialty, perMonth: specialty === 'iron' ? 500 : 100 }];
@@ -145,7 +144,7 @@ async function fixture(enabled = true, lineage = false, specialty: 'iron' | 'hor
     turnTermMinutes: 60,
     endYear: null,
     replayFormat: 3,
-    ruleFeatures: features,
+
     featureData: {
       'logistics-v1': logistics,
       ...(enabled ? { 'equipment-v1': STANDARD_EQUIPMENT_CONFIG } : {}),
@@ -160,6 +159,7 @@ async function fixture(enabled = true, lineage = false, specialty: 'iron' | 'hor
     intel: 55,
     politics: 55,
     charm: 55,
+    sex: 'MALE' as const,
     portraitId: null,
     ...(lineage ? { sex: 'MALE' as const } : {}),
   };
@@ -427,11 +427,11 @@ for (const category of categories) {
   );
 }
 
-it('AC-P2-12: 장비 비활성 월드는 저장값이 없고 조회·장비 명령을 열지 않는다', async () => {
+it('AC-P2-12: 별도 장비 설정을 생략해도 원장·조회·명령이 제공되고 NULL 저장은 거부한다', async () => {
   const f = await fixture(false);
-  expect((await db.world.findUniqueOrThrow({ where: { id: f.id } })).equipmentState).toBeNull();
-  expect((await snapshot(f.id)).state.equipment).toBeUndefined();
-  expect((await rpc('equipment.mine', { worldId: f.id }, f.player)).status).toBe(412);
+  expect((await db.world.findUniqueOrThrow({ where: { id: f.id } })).equipmentState).toMatchObject({ version: 1 });
+  expect((await snapshot(f.id)).state.equipment).toBeDefined();
+  expect((await rpc('equipment.mine', { worldId: f.id }, f.player)).status).toBe(200);
   const actor = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId: f.id, id: f.actorId } } });
   expect(
     (
@@ -447,19 +447,8 @@ it('AC-P2-12: 장비 비활성 월드는 저장값이 없고 조회·장비 명�
         f.player,
       )
     ).status,
-  ).toBe(400);
-  await expect(
-    db.world.update({
-      where: { id: f.id },
-      data: {
-        equipmentState: {
-          version: 1,
-          config: STANDARD_EQUIPMENT_CONFIG,
-          generals: {},
-        },
-      },
-    }),
-  ).rejects.toThrow();
+  ).toBe(200);
+  await expect(db.$executeRaw`UPDATE "World" SET "equipmentState"=NULL WHERE id=${f.id}`).rejects.toThrow();
 });
 
 async function equippedFamily() {
@@ -481,7 +470,7 @@ async function equippedFamily() {
   await advance(f.id, 240000);
   const grown = (await snapshot(f.id)).state;
   const heir = Number(
-    Object.entries(grown.lineage!.persons).find(([, person]) => person.parents.includes(f.actorId))?.[0],
+    Object.entries(grown.lineage!.persons).find(([, person]) => person.parents.some((id) => id === f.actorId))?.[0],
   );
   expect(grown.generals[heir], JSON.stringify(grown.lineage)).toBeDefined();
   await lineageAction(f, f.player, f.actorId, { type: 'heir.designate', heirGeneralId: heir });

@@ -1,8 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { operationIdle, operationMonths, operationTargetAt, operationTick } from './operation';
+import { operationIdle, operationMonths, operationReadiness, operationTargetAt, operationTick } from './operation';
+import type { WorldView } from '@opensamguk/rules';
 import type { nextTurnAt } from '../queries';
 
 describe('작전 응답 경계', () => {
+  it('AC-M2-15: 개인 준비도와 다른 여러 소유 부곡을 병력 가중해 읽고 타인 부곡은 제외한다', () => {
+    const view = {
+      generals: { 1: { crew: 0, train: 99, atmos: 99 } },
+      campaign: {
+        units: [
+          { id: 1, ownerId: 1, commanderId: 1, troops: 100, crewType: 1100, train: 20, atmos: 40 },
+          { id: 2, ownerId: 1, commanderId: 4, troops: 300, crewType: 1100, train: 80, atmos: 100 },
+          { id: 3, ownerId: 2, commanderId: 2, troops: 1000, crewType: 1100, train: 100, atmos: 100 },
+        ],
+      },
+    } as unknown as WorldView;
+    expect(operationReadiness(view, 1)).toEqual({ crew: 400, train: 65, atmos: 85 });
+    expect(operationReadiness(view, 4)).toEqual({ crew: 0, train: 0, atmos: 0 });
+  });
   it('BigInt 목표를 Int32 제한 없이 정확한 number로 읽는다', () => {
     expect(operationTick(2147490000n)).toBe(2147490000);
     expect(operationTick(BigInt(Number.MAX_SAFE_INTEGER))).toBe(Number.MAX_SAFE_INTEGER);

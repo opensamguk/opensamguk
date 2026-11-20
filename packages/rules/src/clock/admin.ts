@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { RecordedInput, ReplayState } from '../replay';
+import { tacticalClock } from '../tactical/clock';
 
 export const ADMIN_CLOCK_KINDS = ['admin.world.start', 'admin.world.pause', 'admin.world.resume'] as const;
 export const adminClockActionSchema = z.enum(['start', 'pause', 'resume']);
@@ -74,5 +75,16 @@ export function validateAdminClockRecord(input: RecordedInput): void {
 // 시계 조치는 게임 상태·난수·예턴을 바꾸지 않는다. 외부 시계 기록 자체는 엄격히 검증한다.
 export function applyAdminClockRecord(replay: ReplayState, input: RecordedInput): ReplayState {
   validateAdminClockRecord(input);
+  if (input.status === 'APPLIED' && replay.state.campaign?.tactical) {
+    const result = adminClockAppliedSchema.parse(input.result);
+    return {
+      ...replay,
+      state: tacticalClock(
+        replay.state,
+        input.kind.slice('admin.world.'.length) as AdminClockAction,
+        Date.parse(result.at),
+      ),
+    };
+  }
   return replay;
 }

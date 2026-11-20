@@ -2,6 +2,8 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import { operationalInput } from '../../../test/operationalMapFixture';
 import { buildInitialWorld } from '../bootstrap';
 import { checkReplayOrigin } from '../../ruleRegistry';
+import { checkInitialNpcStatLimits } from '../initialNpcStats';
+import { providedRuleData } from '../../providedRuleData';
 import { checkOperationalProfile } from '../map/profile';
 import { validateMap } from './map';
 import { validateWorldResources } from './world';
@@ -31,7 +33,8 @@ describe('T4-76 자원 묶음 판정', () => {
     const initial = buildInitialWorld(input);
     expect(initial.generals[0]).toMatchObject({ userId: null, leadership: limit, strength: limit, intel: limit });
     const current = { version: 3, initial, initialStateHash: '', resourceHash: '' };
-    expect(() => checkReplayOrigin(current)).not.toThrow();
+    expect(() => checkInitialNpcStatLimits(initial, 'current')).not.toThrow();
+    expect(() => checkReplayOrigin(current)).toThrow('FIVE_STATS_REQUIRED');
     const legacy = () => checkReplayOrigin({ version: 1, initial });
     if (['2121', '2200', '2210', '2300'].includes(id)) expect(legacy).not.toThrow();
     else expect(legacy).toThrow('시작 장수의 기본 능력치');
@@ -164,12 +167,17 @@ describe('T4-76 자원 묶음 판정', () => {
     expect(initial.cities[0]).toMatchObject({ nationId: 1, population: 1400, defence: 70, wall: 70, trust: 80 });
     expect(initial.cities[2]).toMatchObject({ nationId: null, population: 1400, defence: 100, wall: 100, trust: 80 });
     expect(initial.cities[3]).toEqual(base.cities[3]);
+    for (const general of initial.generals) {
+      general.sex = 'UNKNOWN';
+      general.crew = 0;
+    }
     expect(() =>
       checkReplayOrigin({
         version: 3,
         initial,
         initialStateHash: 'b'.repeat(64),
         resourceHash: 'a'.repeat(64),
+        featureData: providedRuleData(initial, 60),
       }),
     ).not.toThrow();
     const { openingCityProfile, ...withoutProfile } = initial;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { rngFor } from '@opensamguk/shared';
-import { commandWorld, testUnits } from '../../test/commandFixture';
+import { commandWorld, testUnits } from '../../test/builtinCommandFixture';
 import { applyEffects } from './effects';
 import { commands, runCommand } from './registry';
 import { runGeneralTurn } from './turn';
@@ -89,6 +89,8 @@ describe('AC-M1-16 점령과 보급', () => {
     state.cities[3]!.population = populations[0]!;
     state.cities[4]!.population = populations[1]!;
     state.cities[5] = { ...state.cities[4]!, cityKey: 5, name: '고립 도시', population: 10000, connections: [] };
+    state.cityResources!.cities['5'] = { gold: 0, rice: 0, garrison: [] };
+    state.logistics!.cities['5'] = structuredClone(state.logistics!.cities['4']!);
     state.generals[1]!.crew = 1000;
     state.generals[2]!.cityKey = 3;
     state.generals[2]!.crew = 10000;
@@ -137,6 +139,9 @@ describe('AC-M1-16 점령과 보급', () => {
     state.generals[2]!.crew = 10000;
     state.generals[3]!.nationId = 1;
     state.generals[3]!.cityKey = 3;
+    state.campaign!.units = [{ id: 1, ownerId: 3, commanderId: 3, troops: 10, crewType: 1100, train: 100, atmos: 100 }];
+    state.campaign!.nextUnitId = 2;
+    state.generals[3]!.crew = 0;
     const supplied = settleSupply(state);
     expect(supplied.cities[3]!.supplied).toBe(true);
     const cut = execute(supplied, 2, 'attack', { cityKey: 2 }).state;
@@ -145,13 +150,13 @@ describe('AC-M1-16 점령과 보급', () => {
     expect(cut.cities[3]!.agriculture).toBe(100);
     const damaged = runMonthly(cut, 10000, rngFor('month')).state;
     expect(damaged.cities[3]!.agriculture).toBe(90);
-    expect(damaged.generals[3]!.train).toBe(90);
+    expect(damaged.campaign!.units[0]!.train).toBe(90);
     const withdrawn = execute(damaged, 2, 'move', { cityKey: 4 }).state;
     const restored = execute(withdrawn, 1, 'attack', { cityKey: 2 }).state;
     expect(restored.cities[3]!.supplied).toBe(true);
     const nextMonth = runMonthly(restored, 20000, rngFor('month2')).state;
     expect(nextMonth.cities[3]!.agriculture).toBe(90);
-    expect(nextMonth.generals[3]!.train).toBe(90);
+    expect(nextMonth.campaign!.units[0]!.train).toBe(90);
   });
 });
 describe('명령 경계와 국가 예턴', () => {

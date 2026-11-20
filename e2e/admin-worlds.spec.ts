@@ -6,7 +6,7 @@ import { TEST_PASSWORD } from './account';
 import { holdLease, type LeaseHold } from './game';
 import { cleanupHeldWorld } from './heldWorldCleanup';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 
@@ -89,19 +89,9 @@ test('T3-06 AC-M3-04 실제 정식 두 월드·수동 조회·게임 불변·엔
             portraitMap: '191-map',
             seed: 'world-ui-' + tag + suffix,
           });
-          initial.ruleFeatures = [
-            'campaign-assignment-v2',
-            'campaign-v1',
-            'five-stats',
-            'operational-map',
-            'personnel',
-            'policy',
-            'stratagem-basic',
-            'treaty',
-          ];
           expect(initial.nations).toHaveLength(21);
           expect(initial.generals).toHaveLength(491);
-          const { worldId } = await saveInitialWorld(db, initial, {
+          const { worldId } = await saveFixtureWorld(db, initial, {
             name: suffix === 'a' ? '조회 정식191 ' + tag : '<img src=x onerror="window.worldInjected=1">' + tag,
             turnTermMinutes: suffix === 'a' ? 60 : 120,
             endYear: 201,
@@ -115,6 +105,7 @@ test('T3-06 AC-M3-04 실제 정식 두 월드·수동 조회·게임 불변·엔
             worldId,
             name: '조회장수',
             portraitId: null,
+            sex: 'MALE',
             leadership: 55,
             strength: 55,
             intel: 55,
@@ -126,9 +117,7 @@ test('T3-06 AC-M3-04 실제 정식 두 월드·수동 조회·게임 불변·엔
           expect(await db.general.count({ where: { worldId, userId: null } })).toBe(491);
           expect(await db.general.count({ where: { worldId, userId: { not: null } } })).toBe(1);
           expect(await db.generalTurn.count({ where: { worldId } })).toBe(492 * 30);
-          expect((await db.world.findUniqueOrThrow({ where: { id: worldId } })).ruleFeatures).toEqual(
-            initial.ruleFeatures,
-          );
+          expect((await db.world.findUniqueOrThrow({ where: { id: worldId } })).fogOfWar).toBe(false);
           ids.push(worldId);
         }
         const [first, second] = ids as [string, string];

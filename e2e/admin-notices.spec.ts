@@ -5,8 +5,9 @@ import { adminRole } from './adminSetup';
 import { TEST_PASSWORD } from './account';
 import { holdLease, type LeaseHold } from './game';
 import { cleanupHeldWorld } from './heldWorldCleanup';
+import { openLobbyNotice } from './lobbyNotices';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
-import { saveInitialWorld, readWorldState } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld, readWorldState } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { hashState } from '../packages/shared/src/node/hashState';
@@ -101,19 +102,9 @@ test('T3-06 AC-M3-04 실제 정식 두 월드·로비 공지 발행 수정 숨�
           portraitMap: '191-map',
           seed: 'notice-' + tag + suffix,
         });
-        initial.ruleFeatures = [
-          'campaign-assignment-v2',
-          'campaign-v1',
-          'five-stats',
-          'operational-map',
-          'personnel',
-          'policy',
-          'stratagem-basic',
-          'treaty',
-        ];
         expect(initial.nations).toHaveLength(21);
         expect(initial.generals).toHaveLength(491);
-        const saved = await saveInitialWorld(db, initial, {
+        const saved = await saveFixtureWorld(db, initial, {
           name: '공지 정식191 ' + tag + suffix,
           turnTermMinutes: 60,
           endYear: 201,
@@ -127,6 +118,7 @@ test('T3-06 AC-M3-04 실제 정식 두 월드·로비 공지 발행 수정 숨�
           worldId: saved.worldId,
           name: '공지장수',
           portraitId: null,
+          sex: 'MALE',
           leadership: 55,
           strength: 55,
           intel: 55,
@@ -232,17 +224,19 @@ test('T3-06 AC-M3-04 실제 정식 두 월드·로비 공지 발행 수정 숨�
       expect(await row.locator('img,script').count()).toBe(0);
       expect(await page.evaluate(() => 'noticeInjected' in window)).toBe(false);
       await actor.page.goto('/lobby');
+      await openLobbyNotice(actor.page, title);
       await expect(actor.page.getByText(body, { exact: true })).toBeVisible();
-      await row.getByRole('button', { name: '수정·숨김 선택', exact: true }).click();
+      await row.getByRole('button', { name: '수정 또는 숨김', exact: true }).click();
       await fillNotice(page, title + ' 수정', body + ' 수정');
       await page.getByRole('button', { name: '수정 저장', exact: true }).click();
       await expect(page.getByText('공지를 수정했습니다.', { exact: true })).toBeVisible();
       await actor.page.reload();
+      await openLobbyNotice(actor.page, title + ' 수정');
       await expect(actor.page.getByText(body + ' 수정', { exact: true })).toBeVisible();
       await page
         .getByRole('listitem')
         .filter({ has: page.getByRole('heading', { name: title + ' 수정', exact: true }) })
-        .getByRole('button', { name: '수정·숨김 선택', exact: true })
+        .getByRole('button', { name: '수정 또는 숨김', exact: true })
         .click();
       await page.getByLabel('숨김 사유', { exact: true }).fill('시험 종료 ' + tag);
       await page.getByLabel('일반 화면에서 숨기고 이력을 보존합니다.', { exact: true }).check();
@@ -464,7 +458,7 @@ test('T3-06 AC-M3-04 신원 조회 응답 대기 중 계정 전환 뒤 이전 �
       );
       await page.evaluate(() => window.dispatchEvent(new Event('focus')));
       await checked;
-      await expect(page.getByText('공지 범위를 조회한 뒤 작성할 수 있습니다.', { exact: true })).toBeVisible();
+      await expect(page.getByText('공지 범위를 먼저 조회하세요.', { exact: true })).toBeVisible();
       release();
       await Promise.allSettled([...pending]);
       await frames(page);

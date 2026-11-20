@@ -522,7 +522,7 @@ describe('T2-07 / AC-M2-06 제안 기한의 표현 가능성', () => {
       applyTreatyInput(state, freezeDeep(value), { tick: lastEngineTick, sequence: 10 });
     expect(run({ ...input, payload: { ...input.payload, clauses: [{ kind: 'trade', months: 1 }] } })).toMatchObject({
       ok: false,
-      result: { code: 'CLAUSE_NOT_CONNECTED' },
+      result: { code: 'BAD_INPUT' },
     });
     expect(run({ ...input, generalId: 99 })).toMatchObject({ ok: false, result: { code: 'NO_GENERAL' } });
     expect(run({ ...input, generalId: 3 })).toMatchObject({ ok: false, result: { code: 'NO_PERMISSION' } });
@@ -636,8 +636,8 @@ describe('T2-07 / AC-M2-06 구조 검사와 게임 거절', () => {
     { kind: 'tribute', payerNationId: -1, gold: -1, rice: 0, months: 0 },
     { kind: 'trade', months: 0 },
     { kind: 'cityTransfer', cityKey: -1, giverNationId: -1 },
-  ])('뒤 조항의 모양만 확인하고 CLAUSE_NOT_CONNECTED로 돌려준다 (%j)', (clause) => {
-    expect(propose(humanWorld(), [clause])).toMatchObject({ ok: false, result: { code: 'CLAUSE_NOT_CONNECTED' } });
+  ])('상시 제공 조항의 잘못된 범위를 BAD_INPUT으로 거부한다 (%j)', (clause) => {
+    expect(propose(humanWorld(), [clause])).toMatchObject({ ok: false, result: { code: 'BAD_INPUT' } });
   });
 
   it('NFC 뒤 코드 포인트로 기록 길이를 센다', () => {

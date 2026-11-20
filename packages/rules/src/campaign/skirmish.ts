@@ -1,8 +1,7 @@
 import type { Rng } from '@opensamguk/shared';
 import { BALANCE } from '../balance';
 import { simulateBattle, type BattleForce, type BattleInput } from '../battle/simulate';
-import { FIVE_STAT_KEYS, fiveStatsSchema } from '../general/fiveStats';
-import { fiveStatsBattleModifiers } from '../general/fiveStatsBattle';
+import { commanderBattleModifiers } from '../general/fiveStatsBattle';
 import { collectModifiers, type BattleModifiers } from '../modifiers';
 import { cloneWorld } from '../model/clone';
 import type { DeepReadonly, WorldState, WorldView } from '../model/world';
@@ -35,11 +34,10 @@ function feed(state: WorldState, row: CampaignUnitState) {
 }
 function modifiers(state: WorldState, row: CampaignUnitState): BattleModifiers {
   const commander = state.generals[row.commanderId]!;
-  const stats = fiveStatsSchema.parse(Object.fromEntries(FIVE_STAT_KEYS.map((key) => [key, commander[key]])));
-  const equipment = state.ruleFeatures?.includes('equipment-v1') ? equipmentBonus(state, commander.id) : undefined;
-  const base = fiveStatsBattleModifiers(
-    stats,
-    equipment ? { leadership: equipment.leadership, strength: equipment.strength } : undefined,
+  const equipment = equipmentBonus(state, commander.id);
+  const base = commanderBattleModifiers(
+    { leadership: commander.leadership, strength: commander.strength },
+    { leadership: equipment.leadership, strength: equipment.strength },
   );
   return {
     dealt: [...collectModifiers(state, commander.id, { stage: 'battle.dealt', commandKey: 'attack' }), ...base.dealt],
@@ -82,7 +80,7 @@ export function fightCampaignUnits(
       defenderTech: state.nations[bNation]!.tech,
       unitSet,
       attackerFirstVolleyUsed,
-      coefMode: state.ruleFeatures?.includes('battle-affinity-v2') ? 'multiply' : 'divide',
+      coefMode: 'multiply',
       attackerModifiers: modifiers(state, attacker),
       defenderModifiers: modifiers(state, defender),
     },
@@ -125,7 +123,7 @@ export function fightCampaignWall(
       siege: !openingSkirmish,
       attackerFirstVolleyUsed,
       unitSet,
-      coefMode: state.ruleFeatures?.includes('battle-affinity-v2') ? 'multiply' : 'divide',
+      coefMode: 'multiply',
       attackerModifiers: modifiers(state, attacker),
     },
     rng,
@@ -145,7 +143,6 @@ export function fightCampaignCityGarrison(
   rng: Rng,
   attackerFirstVolleyUsed = false,
 ) {
-  if (!view.ruleFeatures?.includes('city-resources-v1')) throw new Error('도시 수비 규칙이 없는 판입니다.');
   const state = start(view),
     attacker = unit(state, attackerId),
     city = state.cities[cityKey];
@@ -184,7 +181,7 @@ export function fightCampaignCityGarrison(
       defence: city.defence,
       unitSet,
       attackerFirstVolleyUsed,
-      coefMode: state.ruleFeatures?.includes('battle-affinity-v2') ? 'multiply' : 'divide',
+      coefMode: 'multiply',
       attackerModifiers: modifiers(state, attacker),
     },
     rng,

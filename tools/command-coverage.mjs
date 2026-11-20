@@ -89,8 +89,28 @@ export function readExtensionRegistryKeys(root) {
     'enum',
     'literal',
     'array',
+    'record',
+    'discriminatedUnion',
+    'union',
+    'tuple',
+    'never',
+    'null',
+    'lazy',
   ]);
-  const zodMethods = new Set(['int', 'positive', 'nonnegative', 'min', 'max', 'length', 'optional', 'nullable']);
+  const zodMethods = new Set([
+    'int',
+    'positive',
+    'nonnegative',
+    'min',
+    'max',
+    'length',
+    'optional',
+    'nullable',
+    'regex',
+    'extend',
+    'finite',
+    'strict',
+  ]);
   const numericLiteral = (node) =>
     ts.isNumericLiteral(node) ||
     (ts.isPrefixUnaryExpression(node) &&
@@ -100,6 +120,8 @@ export function readExtensionRegistryKeys(root) {
     throw new Error(`확장 registry ${relative(root, file)}: ${message}`);
   };
   const importFile = (file, specifier) => {
+    if (ts.isStringLiteral(specifier) && specifier.text === '@opensamguk/shared')
+      return resolve(root, 'packages/shared/src/index.ts');
     if (!ts.isStringLiteral(specifier) || !specifier.text.startsWith('.'))
       fail(file, '상대 경로 import만 읽을 수 있다');
     const base = resolve(dirname(file), specifier.text);
@@ -138,18 +160,25 @@ export function readExtensionRegistryKeys(root) {
               : [];
         const sharedLogImport =
           ts.isStringLiteral(statement.moduleSpecifier) && statement.moduleSpecifier.text === '@opensamguk/shared';
+        // shared의 로그 함수(INT-29)는 support와 logging에서만 읽는다. 그 밖의 shared 값(성 등급, 영지 칸 등)은
+        // main의 규칙대로 shared 소스를 따라가 분석한다.
+        const LOG_HELPERS = ['koreanParticle', 'logDisplayName', 'logPartsToText'];
         if (sharedLogImport) {
           const named = clause.namedBindings;
+          if (clause.name || !named || !ts.isNamedImports(named))
+            fail(file, '허용된 로그 순수 함수만 shared에서 읽을 수 있다');
+          const helpers = named.elements.filter(
+            (item) => !item.isTypeOnly && LOG_HELPERS.includes((item.propertyName ?? item.name).text),
+          );
+          const values = named.elements.filter((item) => !item.isTypeOnly);
+          // support와 logging은 정해 둔 로그 함수만 읽는다. 다른 파일은 로그 함수를 직접 읽지 못한다.
           if (
-            logHelpers.length === 0 ||
-            clause.name ||
-            !named ||
-            !ts.isNamedImports(named) ||
-            !named.elements.every(
-              (item) => item.isTypeOnly || logHelpers.includes((item.propertyName ?? item.name).text),
-            )
+            logHelpers.length > 0
+              ? values.some((item) => !logHelpers.includes((item.propertyName ?? item.name).text))
+              : helpers.length > 0
           )
             fail(file, '허용된 로그 순수 함수만 shared에서 읽을 수 있다');
+          if (logHelpers.length === 0 && values.length > 0) imports.push(statement.moduleSpecifier);
         } else imports.push(statement.moduleSpecifier);
         if (clause.name) put(bindings, clause.name.text, fromModule(statement.moduleSpecifier, 'default'));
         const named = clause.namedBindings;
@@ -177,6 +206,15 @@ export function readExtensionRegistryKeys(root) {
         }
       } else if (ts.isExportDeclaration(statement)) {
         if (statement.isTypeOnly) continue;
+        // shared의 기록 조각 모듈(INT-29)은 support와 logging만 읽는 순수 함수 묶음이다. 그 함수의 호출은 위의 로그 함수
+        // 허용 목록이 막으므로, shared를 따라갈 때 이 모듈은 분석하지 않는다.
+        if (
+          file === resolve(root, 'packages/shared/src/index.ts') &&
+          statement.moduleSpecifier &&
+          ts.isStringLiteral(statement.moduleSpecifier) &&
+          statement.moduleSpecifier.text === './logParts'
+        )
+          continue;
         if (statement.moduleSpecifier) imports.push(statement.moduleSpecifier);
         if (statement.exportClause && ts.isNamedExports(statement.exportClause))
           for (const item of statement.exportClause.elements)
@@ -192,7 +230,11 @@ export function readExtensionRegistryKeys(root) {
         put(exports, 'default', { node: statement.expression, constant: true });
         initializers.push(statement.expression);
       } else if (ts.isFunctionDeclaration(statement)) {
-        if (statement.name) put(bindings, statement.name.text, { node: statement, constant: false });
+        if (statement.name) {
+          put(bindings, statement.name.text, { node: statement, constant: false });
+          if (statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword))
+            put(exports, statement.name.text, { file, name: statement.name.text });
+        }
       } else if (ts.isClassDeclaration(statement)) {
         const heritage = statement.heritageClauses;
         const base = heritage?.[0]?.types[0];
@@ -254,6 +296,14 @@ export function readExtensionRegistryKeys(root) {
     }
   };
   const zodValue = (file, node) => {
+    if (
+      ts.isElementAccessExpression(node) &&
+      ts.isNumericLiteral(node.argumentExpression) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      node.expression.name.text === 'options' &&
+      zodValue(file, node.expression.expression)?.zodSchema
+    )
+      return { zodSchema: true };
     if (ts.isIdentifier(node)) {
       const found = binding(file, node.text);
       return found?.zodRoot || found?.zodSchema ? found : null;
@@ -261,7 +311,9 @@ export function readExtensionRegistryKeys(root) {
     if (!ts.isCallExpression(node) || !ts.isPropertyAccessExpression(node.expression)) return null;
     const receiver = zodValue(file, node.expression.expression);
     const methods = receiver?.zodRoot ? zodConstructors : receiver?.zodSchema ? zodMethods : null;
-    const refinement = receiver?.zodSchema && node.expression.name.text === 'refine';
+    const refinement =
+      (receiver?.zodSchema && ['refine', 'superRefine', 'transform'].includes(node.expression.name.text)) ||
+      (receiver?.zodRoot && node.expression.name.text === 'lazy');
     if (
       (!refinement && !methods?.has(node.expression.name.text)) ||
       node.questionDotToken ||
@@ -299,11 +351,31 @@ export function readExtensionRegistryKeys(root) {
   };
   // zod는 생성 중 인자를 형 변환할 수 있다. 별칭 안의 함수 값도 이 경계에서는 허용하지 않는다.
   const zodArgument = (file, node) => {
+    if (ts.isPrefixUnaryExpression(node) && node.operator === ts.SyntaxKind.MinusToken) {
+      const operand = closed(file, node.operand, new Map(), new WeakSet());
+      if (typeof operand !== 'number') fail(file, 'zod 음수 인자는 숫자여야 한다');
+      return;
+    }
+    if (
+      ts.isPropertyAccessExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === 'Number' &&
+      ['MAX_SAFE_INTEGER', 'MIN_SAFE_INTEGER'].includes(node.name.text) &&
+      !moduleAt(file).bindings.has('Number')
+    )
+      return;
+    if (
+      ts.isPropertyAccessExpression(node) &&
+      ['shape', 'options'].includes(node.name.text) &&
+      zodValue(file, node.expression)
+    )
+      return;
     if (ts.isIdentifier(node)) return argumentBinding(file, node.text);
     if (
       ts.isStringLiteral(node) ||
       numericLiteral(node) ||
       ts.isBigIntLiteral(node) ||
+      ts.isRegularExpressionLiteral(node) ||
       ts.isNoSubstitutionTemplateLiteral(node) ||
       [ts.SyntaxKind.TrueKeyword, ts.SyntaxKind.FalseKeyword, ts.SyntaxKind.NullKeyword].includes(node.kind)
     )
@@ -323,6 +395,13 @@ export function readExtensionRegistryKeys(root) {
     }
     if (ts.isObjectLiteralExpression(node)) {
       for (const property of node.properties) {
+        if (
+          ts.isSpreadAssignment(property) &&
+          ts.isPropertyAccessExpression(property.expression) &&
+          property.expression.name.text === 'shape' &&
+          zodValue(file, property.expression.expression)
+        )
+          continue;
         if (!property.name || ts.isComputedPropertyName(property.name))
           fail(file, 'zod 인자의 spread·계산 속성은 읽을 수 없다');
         if (ts.isPropertyAssignment(property)) zodArgument(file, property.initializer);
@@ -331,8 +410,12 @@ export function readExtensionRegistryKeys(root) {
       }
       return;
     }
+    if (closedRoot(file, node)) {
+      closedInitializer(file, node);
+      return;
+    }
     if (ts.isCallExpression(node) && zodValue(file, node)) return;
-    fail(file, `지원하지 않는 zod 인자 ${ts.SyntaxKind[node.kind]}`);
+    fail(file, `지원하지 않는 zod 인자 ${ts.SyntaxKind[node.kind]}: ${node.getText()}`);
   };
   // 대상 모듈을 실행하지 않고 리터럴·const로 닫힌 자료 계산만 따라간다.
   const closedMethods = new Set(['map', 'filter', 'flatMap', 'some']);
@@ -340,10 +423,11 @@ export function readExtensionRegistryKeys(root) {
   const intrinsic = (file, node, name, scope) =>
     ts.isIdentifier(node) && node.text === name && !scope.has(name) && !moduleAt(file).bindings.has(name);
   const closedRoot = (file, node) =>
-    (ts.isNewExpression(node) && intrinsic(file, node.expression, 'Set', new Map())) ||
+    (ts.isNewExpression(node) && ['Set', 'Map'].some((name) => intrinsic(file, node.expression, name, new Map()))) ||
     (ts.isCallExpression(node) &&
       ts.isPropertyAccessExpression(node.expression) &&
       (closedMethods.has(node.expression.name.text) ||
+        (node.expression.name.text === 'max' && intrinsic(file, node.expression.expression, 'Math', new Map())) ||
         (['freeze', 'fromEntries'].includes(node.expression.name.text) &&
           intrinsic(file, node.expression.expression, 'Object', new Map()))));
   const closedActive = new Set();
@@ -390,6 +474,19 @@ export function readExtensionRegistryKeys(root) {
       }
       return items;
     }
+    if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+      if (node.expression.name.text === 'values' && node.arguments.length === 0) {
+        const owner = read(node.expression.expression);
+        if (owner instanceof Map) return [...owner.values()];
+      }
+      if (node.expression.name.text === 'max' && intrinsic(file, node.expression.expression, 'Math', scope)) {
+        const args = node.arguments.flatMap((argument) =>
+          ts.isSpreadElement(argument) ? read(argument.expression) : [read(argument)],
+        );
+        if (!args.every((item) => typeof item === 'number')) fail(file, '닫힌 자료 Math.max는 숫자만 받는다');
+        return Math.max(...args);
+      }
+    }
     if (ts.isObjectLiteralExpression(node)) {
       const entries = node.properties.map((property) => {
         if (
@@ -412,6 +509,10 @@ export function readExtensionRegistryKeys(root) {
         return read(node.right);
       }
       const right = read(node.right);
+      if (typeof left === 'number' && typeof right === 'number') {
+        if (node.operatorToken.kind === ts.SyntaxKind.PlusToken) return left + right;
+        if (node.operatorToken.kind === ts.SyntaxKind.AsteriskToken) return left * right;
+      }
       if (node.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken && primitive(left) && primitive(right))
         return left === right;
       if (
@@ -434,6 +535,15 @@ export function readExtensionRegistryKeys(root) {
       )
         return owner[node.name.text];
       fail(file, '닫힌 자료의 상속 속성·배열 메서드 값은 읽지 않는다');
+    }
+    if (ts.isNewExpression(node) && intrinsic(file, node.expression, 'Map', scope) && node.arguments?.length === 1) {
+      const entries = read(node.arguments[0]);
+      if (
+        !Array.isArray(entries) ||
+        !entries.every((entry) => Array.isArray(entry) && entry.length === 2 && entry.every(primitive))
+      )
+        fail(file, '닫힌 자료 Map은 원시값 쌍 배열이어야 한다');
+      return new Map(entries);
     }
     if (
       ts.isNewExpression(node) &&
@@ -480,7 +590,7 @@ export function readExtensionRegistryKeys(root) {
           callback.typeParameters ||
           callback.parameters.length !== 1 ||
           !param ||
-          !ts.isIdentifier(param.name) ||
+          (!ts.isIdentifier(param.name) && !ts.isArrayBindingPattern(param.name)) ||
           param.initializer ||
           param.dotDotDotToken ||
           ts.isBlock(callback.body)
@@ -489,7 +599,23 @@ export function readExtensionRegistryKeys(root) {
         return owner[method]((item) => {
           // 빈 배열에서 호출되지 않은 본문을 검사했다고 표시하지 않는다.
           visited.add(callback);
-          return closed(file, callback.body, new Map(scope).set(param.name.text, item), visited);
+          const local = new Map(scope);
+          if (ts.isIdentifier(param.name)) local.set(param.name.text, item);
+          else {
+            if (!Array.isArray(item)) fail(file, '닫힌 자료 구조 분해 대상은 배열이어야 한다');
+            param.name.elements.forEach((element, index) => {
+              if (
+                !ts.isBindingElement(element) ||
+                !ts.isIdentifier(element.name) ||
+                element.initializer ||
+                element.dotDotDotToken ||
+                element.propertyName
+              )
+                fail(file, '닫힌 자료 구조 분해는 기본값 없는 이름이어야 한다');
+              local.set(element.name.text, item[index]);
+            });
+          }
+          return closed(file, callback.body, local, visited);
         });
       }
     }

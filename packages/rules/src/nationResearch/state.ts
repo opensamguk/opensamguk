@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import type { WorldView } from '../model/world';
 import { crewResearchNames } from '../world/resources';
 
 export const NATION_RESEARCH_FEATURE = 'nation-research-v1';
@@ -21,10 +20,6 @@ export const nationResearchSchema = z.strictObject({
 export type ResearchName = z.infer<typeof crewResearchNames>;
 export type NationResearchState = z.infer<typeof nationResearchSchema>;
 export const initialNationResearch = (): NationResearchState => ({ version: 1, nations: {} });
-export function readNationResearch(value: unknown, world: Pick<WorldView, 'ruleFeatures'>) {
-  if (!world.ruleFeatures?.includes(NATION_RESEARCH_FEATURE)) {
-    if (value != null) throw new Error('연구 기능을 끈 월드에 완료 기록이 있습니다.');
-    return undefined;
-  }
+export function readNationResearch(value: unknown) {
   return nationResearchSchema.parse(value);
 }

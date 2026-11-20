@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import type { AppRouter } from '@opensamguk/server/router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { TRPCClientError, type TRPCLink } from '@trpc/client';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -57,6 +57,9 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
 const { TRPCProvider, trpcClient } = await import('../trpc');
 const { InboxPage } = await import('./InboxPage');
 const { countInbox } = await import('./count');
+const { useInboxCount } = await import('./useInboxCount');
+const { boardKeys } = await import('../layout/boardKeys');
+const { createTRPCOptionsProxy } = await import('@trpc/tanstack-react-query');
 
 const ok = { ok: true } as const;
 const offer: AssignmentOfferView = {
@@ -117,9 +120,12 @@ beforeEach(() => {
   wire.handlers.clear();
   on('auth.me', () => ({ user: { id: 'u1' } }));
   on('home.get', () => ({ nation: null }));
-  on('general.mine', () => ({ general: null, creationRules: { campaignEnabled: false } }));
+  on('general.mine', () => ({ general: null, creationRules: {} }));
   on('offers.mine', () => []);
   on('personnel.recent', () => []);
+  on('proposals.list', () => []);
+  on('world.summary', () => ({ status: 'RUNNING', nowTick: 100, msPerTick: 6, turnTermMinutes: 1 }));
+  on('world.map', () => ({ cities: [{ key: 3, name: '북평' }], nations: [{ id: 2, name: '원소' }] }));
 });
 afterEach(cleanup);
 
@@ -135,7 +141,7 @@ describe('받은 제안함', () => {
     on('home.get', () => ({ nation: { id: 1 } }));
     on('general.mine', () => ({
       general: { id: 1 },
-      creationRules: { campaignEnabled: true, personnelEnabled: true },
+      creationRules: {},
     }));
     on('offers.mine', () => [offer]);
     on('campaign.get', () => board);
@@ -161,19 +167,159 @@ describe('받은 제안함', () => {
     expect(screen.queryByText('받은 제안이 없습니다')).toBeNull();
   });
 
-  // 서버 general.mine의 personnelEnabled가 정본이다. false이거나 키가 없으면(구형 서버) 인사 조회를 부르지 않는다 (PR377).
-  it.each([{ personnelEnabled: false }, {}])(
-    '인사 기능이 없는 월드는 발령·인사 조회 없이 빈 상태를 보인다 %o',
-    async (rules) => {
-      on('general.mine', () => ({ general: { id: 1 }, creationRules: { campaignEnabled: false, ...rules } }));
-      on('offers.mine', () => {
-        throw serverError('PRECONDITION_FAILED', '인사 기능이 없는 월드입니다.');
-      });
+  it('D-100 받은 명령 제안은 국가 예턴 칸을 정해 승인하고, 보낸 제안은 답한 장수와 사유를 보인다', async () => {
+    on('home.get', () => ({ nation: { id: 1 } }));
+    on('general.mine', () => ({ general: { id: 1 }, creationRules: {} }));
+    on('campaign.get', () => board);
+    on('treaty.list', () => listPage([]));
+    const row = (over: object) => ({
+      id: 'p1',
+      proposer: { id: 3, name: '관우', portraitId: null, officerTitle: '장군' },
+      commandKey: 'nation_declare',
+      commandName: '선전포고',
+      args: { nationId: 2 },
+      argsSummary: '{"nationId":2}',
+      slot: 2,
+      note: '먼저 쳐야 합니다.',
+      status: 'PENDING',
+      createdTick: 100,
+      expiresTick: 120_100,
+      precheck: { ok: true, message: null },
+      response: null,
+      ...over,
+    });
+    on('proposals.list', (input) =>
+      (input as { box: string }).box === 'received'
+        ? [row({})]
+        : [row({ id: 'p2', status: 'REJECTED', response: { by: 2, at: 150, reason: '아직 이르다' } })],
+    );
+    on('proposals.respond', () => ({ ok: true, status: 'APPROVED' }));
+    renderPage();
+
+    const received = await screen.findByRole('region', { name: '받은 명령 제안' });
+    expect(within(received).getByText('원소')).toBeTruthy();
+    // 서버 칸 번호 2(0부터)는 화면에서 3번 칸이다.
+    expect((within(received).getByRole('spinbutton', { name: '국가 예턴 칸' }) as HTMLInputElement).value).toBe('3');
+    fireEvent.change(within(received).getByRole('spinbutton', { name: '국가 예턴 칸' }), { target: { value: '12' } });
+    fireEvent.click(within(received).getByRole('button', { name: '12번 칸에 승인' }));
+    await waitFor(() =>
+      expect(wire.calls).toContainEqual({
+        path: 'proposals.respond',
+        input: { proposalId: 'p1', decision: 'approve', slot: 11 },
+      }),
+    );
+
+    const sent = await screen.findByRole('region', { name: '보낸 명령 제안' });
+    expect(within(sent).getByText('거절됨, 하후돈')).toBeTruthy();
+    expect(within(sent).getByText('“아직 이르다”')).toBeTruthy();
+    expect(screen.queryByText('받은 제안이 없습니다')).toBeNull();
+  });
+
+  it('D-100 보낸 명령 제안은 화면을 열어 둔 채 승인되면 다시 받아 승인 결과를 보인다', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      on('home.get', () => ({ nation: { id: 1 } }));
+      on('treaty.list', () => listPage([]));
+      let status = 'PENDING';
+      on('proposals.list', (input) =>
+        (input as { box: string }).box === 'received'
+          ? []
+          : [
+              {
+                id: 'p3',
+                proposer: { id: 1, name: '유비', portraitId: null, officerTitle: null },
+                commandKey: 'nation_capital',
+                commandName: '천도',
+                args: { cityKey: 3 },
+                slot: status === 'APPROVED' ? 4 : null,
+                note: null,
+                status,
+                createdTick: 100,
+                expiresTick: 120_100,
+                precheck: null,
+                response: status === 'APPROVED' ? { by: 2, at: 200, reason: null } : null,
+              },
+            ],
+      );
       renderPage();
-      expect(await screen.findByText('받은 제안이 없습니다')).toBeTruthy();
-      expect(wire.calls.some((call) => call.path === 'offers.mine' || call.path === 'personnel.recent')).toBe(false);
-    },
-  );
+      const sent = await screen.findByRole('region', { name: '보낸 명령 제안' });
+      expect(within(sent).getByRole('button', { name: '제안 거두기' })).toBeTruthy();
+      status = 'APPROVED';
+      await vi.advanceTimersByTimeAsync(31_000);
+      await waitFor(() => expect(within(sent).getByText('승인됨, 장수 2, 5번 칸')).toBeTruthy());
+      expect(within(sent).queryByRole('button', { name: '제안 거두기' })).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('D-100 월드 상태가 바뀌면 레이아웃의 전환 갱신(boardKeys)이 제안 목록을 다시 받아 끝나며 만료된 제안을 닫는다', async () => {
+    on('home.get', () => ({ nation: { id: 1 } }));
+    on('treaty.list', () => listPage([]));
+    let ended = false;
+    on('world.summary', () => ({
+      status: ended ? 'ENDED' : 'RUNNING',
+      nowTick: 100,
+      msPerTick: 6,
+      turnTermMinutes: 1,
+    }));
+    on('proposals.list', (input) =>
+      (input as { box: string }).box === 'received'
+        ? []
+        : [
+            {
+              id: 'p4',
+              proposer: { id: 1, name: '유비', portraitId: null, officerTitle: null },
+              commandKey: 'nation_capital',
+              commandName: '천도',
+              args: { cityKey: 3 },
+              slot: null,
+              note: null,
+              status: ended ? 'EXPIRED' : 'PENDING',
+              createdTick: 100,
+              expiresTick: 120_100,
+              precheck: null,
+              response: null,
+            },
+          ],
+    );
+    renderPage();
+    const sent = await screen.findByRole('region', { name: '보낸 명령 제안' });
+    expect(within(sent).getByRole('button', { name: '제안 거두기' })).toBeTruthy();
+    ended = true;
+    // 게임 레이아웃이 요약에서 종료 전환을 보고 부르는 것과 같다. 목록 주기(30초)를 기다리지 않는다.
+    const trpc = createTRPCOptionsProxy<AppRouter>({ client: trpcClient, queryClient: client });
+    for (const queryKey of boardKeys(trpc, 'w1')) await client.invalidateQueries({ queryKey });
+    await waitFor(() => expect(within(sent).getByText('만료')).toBeTruthy());
+    expect(within(sent).queryByRole('button', { name: '제안 거두기' })).toBeNull();
+  });
+
+  it('D-100 끝난 월드에서 늦게 온 대기 제안은 만료로 보이고 답하기와 거두기를 열지 않는다', async () => {
+    on('home.get', () => ({ nation: { id: 1 } }));
+    on('treaty.list', () => listPage([]));
+    on('world.summary', () => ({ status: 'ENDED', nowTick: 100, msPerTick: 6, turnTermMinutes: 1 }));
+    const pending = {
+      id: 'p5',
+      proposer: { id: 1, name: '유비', portraitId: null, officerTitle: null },
+      commandKey: 'nation_capital',
+      commandName: '천도',
+      args: { cityKey: 3 },
+      slot: null,
+      note: null,
+      status: 'PENDING',
+      createdTick: 100,
+      expiresTick: 120_100,
+      precheck: null,
+      response: null,
+    };
+    on('proposals.list', () => [pending]);
+    renderPage();
+    const sent = await screen.findByRole('region', { name: '보낸 명령 제안' });
+    await waitFor(() => expect(within(sent).getByText('만료')).toBeTruthy());
+    expect(within(sent).queryByRole('button', { name: '제안 거두기' })).toBeNull();
+    const received = screen.getByRole('region', { name: '받은 명령 제안' });
+    expect(within(received).queryByRole('button', { name: /승인$/ })).toBeNull();
+  });
 
   it('조약을 볼 수 없는 월드는 오류 없이 빈 상태로 둔다', async () => {
     on('home.get', () => ({ nation: { id: 1 } }));
@@ -195,6 +341,59 @@ describe('받은 제안함', () => {
 });
 
 describe('메뉴의 제안함 수', () => {
+  function Count() {
+    return <span>제안 수 {useInboxCount('w1')}</span>;
+  }
+  it('권한자가 받은 열린 상신을 조회해 메뉴 수에 더한다', async () => {
+    on('general.mine', () => ({ general: { id: 1 }, creationRules: {} }));
+    on('proposals.list', () => [{ id: 'proposal-1' }, { id: 'proposal-2' }]);
+    render(
+      <QueryClientProvider client={client}>
+        <TRPCProvider trpcClient={trpcClient} queryClient={client}>
+          <Count />
+        </TRPCProvider>
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByText('제안 수 2')).toBeTruthy();
+    expect(wire.calls).toContainEqual({
+      path: 'proposals.list',
+      input: { worldId: 'w1', box: 'received', status: 'PENDING' },
+    });
+  });
+  it('D-100 제안함을 열지 않은 화면에서도 월드 상태 전환 갱신(boardKeys) 뒤 끝나며 만료된 상신이 메뉴 수에서 빠진다', async () => {
+    on('general.mine', () => ({ general: { id: 1 }, creationRules: {} }));
+    let open = [{ id: 'proposal-1' }];
+    on('proposals.list', () => open);
+    render(
+      <QueryClientProvider client={client}>
+        <TRPCProvider trpcClient={trpcClient} queryClient={client}>
+          <Count />
+        </TRPCProvider>
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByText('제안 수 1')).toBeTruthy();
+    open = [];
+    const trpc = createTRPCOptionsProxy<AppRouter>({ client: trpcClient, queryClient: client });
+    for (const queryKey of boardKeys(trpc, 'w1')) await client.invalidateQueries({ queryKey });
+    expect(await screen.findByText('제안 수 0')).toBeTruthy();
+  });
+  it('D-100 끝난 월드에서는 종료와 겹쳐 늦게 온 대기 상신을 메뉴 수에 세지 않는다', async () => {
+    on('general.mine', () => ({ general: { id: 1 }, creationRules: {} }));
+    on('world.summary', () => ({ status: 'ENDED', nowTick: 100, msPerTick: 6, turnTermMinutes: 1 }));
+    on('proposals.list', () => [{ id: 'proposal-1' }]);
+    render(
+      <QueryClientProvider client={client}>
+        <TRPCProvider trpcClient={trpcClient} queryClient={client}>
+          <Count />
+        </TRPCProvider>
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(wire.calls.some((call) => call.path === 'world.summary')).toBe(true));
+    await waitFor(() =>
+      expect(client.getQueryData([['world', 'summary'], { input: { worldId: 'w1' }, type: 'query' }])).toBeTruthy(),
+    );
+    expect(await screen.findByText('제안 수 0')).toBeTruthy();
+  });
   it('받은 대기 제안만 센다', () => {
     expect(countInbox({ offers: undefined, board: undefined, treaties: undefined })).toBe(0);
     expect(

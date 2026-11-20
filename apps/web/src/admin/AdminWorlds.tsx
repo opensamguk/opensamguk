@@ -92,7 +92,7 @@ export function AdminWorlds() {
   return (
     <section>
       <h2>월드 목록</h2>
-      <p>조회 버튼을 누르면 현재 월드와 엔진 기록을 확인합니다. 자동으로 갱신하지 않습니다.</p>
+      <p>월드와 엔진 기록은 자동으로 갱신하지 않습니다.</p>
       <button
         type="button"
         disabled={query.pending || owner !== null}

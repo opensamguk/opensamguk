@@ -1,3 +1,4 @@
+import { readTransactionOptions } from '../readTransaction';
 import { isDeepStrictEqual } from 'node:util';
 import type { Prisma } from '@opensamguk/db';
 import {
@@ -7,8 +8,8 @@ import {
   campaignUnitResultSchema,
   campaignOrderResultSchema,
   validateCampaignRecord,
-  FIVE_STAT_KEYS,
-  fiveStatsSchema,
+  generalStats,
+  pledgeChance,
   checkReplayOrigin,
   campaignArmyTypes,
   TICKS_PER_MONTH,
@@ -20,9 +21,11 @@ import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import type { Context } from '../context';
 import { requirePersonnelSession } from './personnelAdmission';
-import { readView, requireGeneral, requireRuleFeature, requireWorld } from './queries';
+import { readView, requireGeneral, requireWorld } from './queries';
 import { requireCampaignOrderAccess } from './campaignOrders';
 import { recruitmentAvailability } from './recruitment';
+import { withPersonnel } from './personnelApi';
+import { activeSanctionWhere } from '../auth/sanction';
 
 type ActorContext = Pick<
   Context,
@@ -35,7 +38,6 @@ function identity(ctx: ActorContext, started: number) {
   return { userId: ctx.user.id, sessionId: ctx.sessionId ?? '', at: new Date(ctx.now + performance.now() - started) };
 }
 function ready(world: Awaited<ReturnType<typeof requireWorld>>) {
-  requireRuleFeature(world, 'campaign-v1');
   if (world.replayFormat !== 3)
     throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '휘하 기능을 사용할 수 없습니다.' });
   const origin: unknown = world.replayOrigin;
@@ -107,7 +109,7 @@ export async function readCampaignRequest(ctx: ActorContext, worldId: string, re
       }
       return requestDto(event);
     },
-    { isolationLevel: 'RepeatableRead' },
+    { ...readTransactionOptions },
   );
 }
 
@@ -197,6 +199,43 @@ export async function submitCampaignRequest(
   return readCampaignRequest(ctx, input.worldId, input.requestId);
 }
 
+export async function readNationUnits(ctx: ActorContext, worldId: string) {
+  return withPersonnel(ctx, worldId, async (tx) => {
+    if (
+      await tx.sanction.findFirst({
+        where: { userId: ctx.user.id, worldId, ...activeSanctionWhere(ctx.now) },
+        select: { id: true },
+      })
+    )
+      throw new TRPCError({ code: 'FORBIDDEN', message: '이 월드의 이용이 제한됐습니다.' });
+    const actor = await requireGeneral(tx, worldId, ctx.user.id);
+    if (actor.nationId === null || actor.removedAt !== null)
+      throw new TRPCError({ code: 'FORBIDDEN', message: '국가에 소속된 장수만 이용할 수 있습니다.' });
+    const view = await readView(tx, worldId);
+    return view.campaign!.units.flatMap((unit) => {
+      const owner = view.generals[unit.ownerId]!,
+        commander = view.generals[unit.commanderId]!;
+      if (owner.nationId !== actor.nationId || commander.nationId !== actor.nationId) return [];
+      return [
+        {
+          id: unit.id,
+          crewType: unit.crewType,
+          troops: unit.troops,
+          train: unit.train,
+          atmos: unit.atmos,
+          ownerId: owner.id,
+          ownerName: owner.name,
+          ownerCityKey: owner.cityKey,
+          commanderId: commander.id,
+          commanderName: commander.name,
+          commanderCityKey: commander.cityKey,
+          supply: unit.supply !== undefined,
+        },
+      ];
+    });
+  });
+}
+
 export async function readCampaignBoard(ctx: ActorContext, worldId: string) {
   const started = performance.now();
   return ctx.db.$transaction(
@@ -235,7 +274,7 @@ export async function readCampaignBoard(ctx: ActorContext, worldId: string) {
       const people = campaignPeople(view, campaign);
       const person = (id: number) => {
         const general = view.generals[id]!,
-          stats = fiveStatsSchema.parse(Object.fromEntries(FIVE_STAT_KEYS.map((key) => [key, general[key]])));
+          stats = generalStats(general);
         return {
           id,
           name: general.name,
@@ -266,7 +305,7 @@ export async function readCampaignBoard(ctx: ActorContext, worldId: string) {
           ),
         npcPledge: {
           cost: 500,
-          chance: 25 + Math.floor(view.generals[actor.id]!.charm! / 2),
+          chance: pledgeChance(view.generals[actor.id]!),
           month: Math.floor(world.clockTick / TICKS_PER_MONTH),
           attempts: campaign.attempts.filter((attempt) => attempt.masterId === actor.id),
         },
@@ -276,7 +315,18 @@ export async function readCampaignBoard(ctx: ActorContext, worldId: string) {
         offers,
         units: campaign.units
           .filter((unit) => unit.ownerId === actor.id)
-          .map((unit) => ({ ...unit, cityKey: view.generals[unit.commanderId]!.cityKey })),
+          .map((unit) => ({
+            ...unit,
+            supply: unit.supply
+              ? {
+                  feature: unit.supply.feature,
+                  unit: unit.supply.unit,
+                  loaded: unit.supply.loaded,
+                  remaining: unit.supply.remaining,
+                }
+              : null,
+            cityKey: view.generals[unit.commanderId]!.cityKey,
+          })),
         commanders: [
           actor.id,
           ...campaign.links
@@ -298,6 +348,6 @@ export async function readCampaignBoard(ctx: ActorContext, worldId: string) {
           })),
       };
     },
-    { isolationLevel: 'RepeatableRead' },
+    { ...readTransactionOptions },
   );
 }

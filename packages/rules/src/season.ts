@@ -3,7 +3,17 @@ import { isWandering } from './nationLifecycle/state';
 
 export function unifiedNation(state: WorldState): number | null {
   const nations = Object.values(state.nations).filter((nation) => !isWandering(state, nation.id));
-  const cities = Object.values(state.cities).filter((city) => city.kind !== 'PASS');
+  const cities = Object.values(state.cities).filter(
+    (city) => city.kind !== 'PASS' && city.kind !== 'FIELD' && (city.state == null || city.level >= 5),
+  );
+  if (Object.values(state.cities).some((city) => city.state != null)) {
+    const owner = cities[0]?.nationId;
+    return owner != null &&
+      nations.some((nation) => nation.id === owner) &&
+      cities.every((city) => city.nationId === owner)
+      ? owner
+      : null;
+  }
   return nations.length === 1 && cities.length > 0 && cities.every((city) => city.nationId === nations[0]!.id)
     ? nations[0]!.id
     : null;

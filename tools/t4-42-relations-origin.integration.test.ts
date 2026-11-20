@@ -1,7 +1,8 @@
+import { readRelationsData } from '../packages/rules/src/relations/data';
 import { execFileSync } from 'node:child_process';
 import { afterAll, expect, it } from 'vitest';
 import { createDb, type Prisma } from '../packages/db/src/index';
-import { createRelationsData, initialReplayState, RELATIONS_FEATURE } from '../packages/rules/src/index';
+import { createRelationsData, RELATIONS_FEATURE } from '../packages/rules/src/index';
 import { cloneWorld } from '../packages/rules/src/model/clone';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
@@ -27,22 +28,16 @@ it('AC-P2-20 게시 1030 관계는 생성 원본에서 재적재·재생하고 �
   const resources = await readInitialResources(db, { scenario: '1030', map: 'che' });
   const initial = composeInitialWorld(resources, 'relations-origin-1030');
   expect(initial.generals).toHaveLength(491);
-  expect(initialReplayState(initial).state).not.toHaveProperty('relations');
   const options = { name: '인물 관계 원본 검증', turnTermMinutes: 60, endYear: null, replayFormat: 3 } as const;
   const relations = createRelationsData(initial);
   expect(relations.pairs).toHaveLength(18);
   expect(relations.pairs.map(({ ref }) => ref)).not.toContain('J3');
   expect(relations.pairs.map(({ ref }) => ref)).not.toContain('J5');
-  expect(() => createRelationsData({ ...initial, scenarioKey: '1030@2' })).toThrow('게시 시나리오 판');
+  expect(createRelationsData({ ...initial, scenarioKey: '1030@2' })).toEqual(relations);
   const changed = structuredClone(initial);
   changed.generals.find(({ id }) => id === relations.pairs[0]!.a.id)!.name = '다른 장수';
-  expect(() => createRelationsData(changed)).toThrow('생성 장수');
-  const { worldId } = await createWorldFromCli(
-    db,
-    initial,
-    { ...options, ruleFeatures: [RELATIONS_FEATURE] },
-    resources,
-  );
+  expect(() => readRelationsData(changed, relations)).toThrow('생성 장수');
+  const { worldId } = await createWorldFromCli(db, initial, { ...options }, resources);
   try {
     const origin = readArchive(await exportReplay(db, worldId)).origin;
     const state = await loadWorld(db, worldId);
@@ -50,7 +45,7 @@ it('AC-P2-20 게시 1030 관계는 생성 원본에서 재적재·재생하고 �
     expect(cloneWorld(state).relations).toEqual(relations);
     expect(cloneWorld(state).relations).not.toBe(state.relations);
     expect((await db.$transaction((tx) => readView(tx, worldId))).relations).toEqual(relations);
-    expect(await db.worldExtSlice.count({ where: { worldId } })).toBe(0);
+    expect(await db.worldExtSlice.count({ where: { worldId } })).toBe(1);
 
     if (origin.version !== 3) throw new Error('형식 3 생성 기록이 필요합니다.');
     const tampered = structuredClone(origin);
@@ -61,19 +56,28 @@ it('AC-P2-20 게시 1030 관계는 생성 원본에서 재적재·재생하고 �
         pairs: [{ ...relations.pairs[0]!, kind: 'lord' }, ...relations.pairs.slice(1)],
       },
     };
-    await db.world.update({ where: { id: worldId }, data: { replayOrigin: tampered as Prisma.InputJsonValue } });
+    await db.world.update({
+      where: { id: worldId },
+      data: { replayOrigin: tampered as unknown as Prisma.InputJsonValue },
+    });
     await expect(loadWorld(db, worldId)).rejects.toThrow('생성 기록과 해시');
     await expect(db.$transaction((tx) => readView(tx, worldId))).rejects.toThrow('생성 기록과 해시');
 
     const alteredInitial = structuredClone(origin);
     alteredInitial.initial.generals.find(({ id }) => id === relations.pairs[0]!.a.id)!.gold += 1;
-    await db.world.update({ where: { id: worldId }, data: { replayOrigin: alteredInitial as Prisma.InputJsonValue } });
+    await db.world.update({
+      where: { id: worldId },
+      data: { replayOrigin: alteredInitial as unknown as Prisma.InputJsonValue },
+    });
     await expect(loadWorld(db, worldId)).rejects.toThrow('생성 기록과 해시');
     await expect(db.$transaction((tx) => readView(tx, worldId))).rejects.toThrow('생성 기록과 해시');
 
     await db.world.update({
       where: { id: worldId },
-      data: { replayOrigin: origin as Prisma.InputJsonValue, initialStateHash: hashState(alteredInitial.initial) },
+      data: {
+        replayOrigin: origin as unknown as Prisma.InputJsonValue,
+        initialStateHash: hashState(alteredInitial.initial),
+      },
     });
     await expect(loadWorld(db, worldId)).rejects.toThrow('생성 기록과 해시');
     await expect(db.$transaction((tx) => readView(tx, worldId))).rejects.toThrow('생성 기록과 해시');
@@ -130,7 +134,7 @@ it('AC-P2-20 초기화는 이전 원본의 관계 사본을 새 월드에 보존
       turnTermMinutes: 60,
       endYear: null,
       replayFormat: 3,
-      ruleFeatures: [RELATIONS_FEATURE],
+
       featureData: { [RELATIONS_FEATURE]: archived },
     },
     resources,

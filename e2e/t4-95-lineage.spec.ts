@@ -6,7 +6,7 @@ import { lineageStateSchema } from '../packages/rules/src/index';
 import { newSession } from '../apps/server/src/auth/session';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { test, expect, type LegalStack } from './legalFixture';
 
@@ -41,12 +41,11 @@ test('AC-P2-32 실제 성별 선택·사람 혼인 수락·계승 동의와 세 
   initial.diplomacies = initial.diplomacies.map((row) => ({ ...row, state: 'NON_AGGRESSION', untilTick: 300000 }));
   const config = structuredClone(lineageTestConfig);
   config.birth.comingOfAgeYears = 1;
-  const { worldId } = await saveInitialWorld(stack.db, initial, {
+  const { worldId } = await saveFixtureWorld(stack.db, initial, {
     name: '가문 화면 검증',
     turnTermMinutes: 60,
     endYear: null,
     replayFormat: 3,
-    ruleFeatures: ['lineage-v1', 'personnel', 'policy'],
     featureData: { 'lineage-v1': config },
   });
   await controlClock(stack.db, worldId, 'start');
@@ -72,6 +71,12 @@ test('AC-P2-32 실제 성별 선택·사람 혼인 수락·계승 동의와 세 
     await player.page.getByLabel('통솔', { exact: true }).fill('70');
     await player.page.getByLabel('무력', { exact: true }).fill('70');
     await player.page.getByLabel('지력', { exact: true }).fill('60');
+    // 5능력치 월드는 합계 275다(packages/rules/src/general/fiveStats.ts). 정치와 매력 칸이 있으면 합을 맞춘다.
+    const politics = player.page.getByLabel('정치', { exact: true });
+    if ((await politics.count()) > 0) {
+      await politics.fill('40');
+      await player.page.getByLabel('매력', { exact: true }).fill('35');
+    }
     await group.getByRole('radio', { name: sex, exact: true }).check();
     await player.page.getByRole('button', { name: '장수 만들기', exact: true }).click();
     await expect

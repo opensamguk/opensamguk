@@ -216,20 +216,19 @@ export function IntelRecordsPanel({
   onReload?: () => void;
   reloading?: boolean;
 }) {
-  const body = !data.enabled ? (
-    <EmptyState title="이 월드에서는 첩보를 쓰지 않습니다" />
-  ) : data.items.length === 0 && ronin ? (
-    <EmptyState title="국가에 소속되면 나라의 첩보 기록을 봅니다" />
-  ) : data.items.length === 0 ? (
-    <EmptyState title="아직 첩보 기록이 없습니다">
-      <p>예턴에 첩보를 넣으면 그 도시의 그때 값이 기록됩니다.</p>
-    </EmptyState>
-  ) : (
-    <IntelRecordList records={data.items} cities={cities} {...(onSelectCity ? { onSelectCity } : {})} />
-  );
+  const body =
+    data.items.length === 0 && ronin ? (
+      <EmptyState title="국가에 소속되면 나라의 첩보 기록을 봅니다" />
+    ) : data.items.length === 0 ? (
+      <EmptyState title="아직 첩보 기록이 없습니다">
+        <p>예턴에 첩보를 넣으면 그 도시의 그때 값이 기록됩니다.</p>
+      </EmptyState>
+    ) : (
+      <IntelRecordList records={data.items} cities={cities} {...(onSelectCity ? { onSelectCity } : {})} />
+    );
   // 이름 붙은 영역은 감싸는 쪽(기록 화면의 Panel)이 준다. 여기서 같은 이름의 영역을 하나 더 만들지 않는다.
   return (
-    <div className={styles.panel} data-intel-enabled={data.enabled ? 'true' : 'false'}>
+    <div className={styles.panel}>
       {onReload ? (
         <div className={styles.toolbar}>
           <button type="button" className={styles.reload} onClick={onReload} disabled={reloading}>

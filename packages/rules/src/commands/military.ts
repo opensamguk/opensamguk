@@ -1,10 +1,10 @@
-import { actPart, numPart, textPart, destination } from './logging';
+import { actPart, cityPart, numPart, textPart, destination } from './logging';
+import { commandMoveTargets, applyMoveStep } from '../commandPaths';
 import { z } from 'zod';
 import { BALANCE } from '../balance';
 import { defineCommand, fail, noArgs, ownCity, positive, success } from './support';
 import { drillGain, recruitCost } from './statScores';
 import { crewContext, crewTypeFailure } from '../world/crewRequirements';
-import { hasTreatyPassage } from '../diplomacy/treatyClauses';
 
 export const recruitArgs = z.strictObject({ amount: positive, crewType: positive });
 
@@ -19,6 +19,7 @@ const recruits = (forced: boolean) =>
       if (failure) return failure;
       const general = view.generals[actor.generalId]!;
       const city = view.cities[general.cityKey]!;
+      if (city.kind === 'FIELD') return fail('BAD_TARGET', '전장에서는 병사를 모집할 수 없습니다.');
       const unit = actor.unitSet?.crewTypes.find((unit) => unit.id === args.crewType && unit.armType > 0);
       if (!unit) return fail('NO_UNIT_SET', '모집할 병종을 확인하세요.');
       const requirement = crewTypeFailure(unit, crewContext(view, actor));
@@ -96,19 +97,29 @@ export const militaryCommands = [
       const general = view.generals[actor.generalId]!;
       const city = view.cities[args.cityKey];
       if (!city) return fail('BAD_TARGET', '도시가 없습니다.');
-      if (!view.cities[general.cityKey]?.connections.includes(args.cityKey))
-        return fail('NOT_ADJACENT', '연결된 도시가 아닙니다.');
-      return general.nationId !== null &&
-        city.nationId !== null &&
-        city.nationId !== general.nationId &&
-        !hasTreatyPassage(view, general.nationId, city.cityKey, actor.tick ?? 0)
-        ? fail('NOT_OWN_CITY', '다른 국가 도시에는 출병해야 합니다.')
-        : null;
+      if (general.movePath?.length) return null;
+      return commandMoveTargets(view, general.id, actor.tick).some((target) => target.cityKey === city.cityKey)
+        ? null
+        : fail('NOT_ADJACENT', '이동할 수 있는 길이 없습니다.');
     },
     change(state, actor, args) {
       const general = state.generals[actor.generalId]!;
-      general.cityKey = args.cityKey;
-      return success(destination(state.cities[args.cityKey]!, '이동'));
+      const step = applyMoveStep(state, general.id, args.cityKey, actor.tick ?? 0);
+      const reached = state.cities[step.destination]!;
+      // 여러 칸 이동은 한 턴에 한 칸씩 간다. 경로 주인이 바뀌면 그 자리에서 멈춘다.
+      if (step.blocked)
+        return success([
+          cityPart(reached),
+          textPart('에서 '),
+          actPart('move', '이동'),
+          textPart(' 중단: 경로 소유 변경'),
+        ]);
+      return success([
+        ...destination(reached, '이동'),
+        ...(step.remaining.length
+          ? [textPart(' '), cityPart(state.cities[args.cityKey]!), textPart('까지 이동 중입니다.')]
+          : []),
+      ]);
     },
   }),
   defineCommand({

@@ -98,11 +98,14 @@ function ordered(values: Iterable<Descriptor>): Descriptor[] {
 export async function loadAssignmentState(
   tx: Prisma.TransactionClient,
   worldId: string,
+  loadedRows?: readonly Prisma.AssignmentOfferGetPayload<Record<string, never>>[],
 ): Promise<Pick<WorldState, 'assignmentOffers'>> {
-  const rows = await tx.assignmentOffer.findMany({
-    where: { worldId, status: 'PENDING' },
-    orderBy: [{ targetGeneralId: 'asc' }, { id: 'asc' }],
-  });
+  const rows =
+    loadedRows ??
+    (await tx.assignmentOffer.findMany({
+      where: { worldId, status: 'PENDING' },
+      orderBy: [{ targetGeneralId: 'asc' }, { id: 'asc' }],
+    }));
   return pendingAssignmentsFromRows(rows, worldId);
 }
 
@@ -111,6 +114,7 @@ export async function persistAssignmentState(
   tx: Prisma.TransactionClient,
   worldId: string,
   delta: AssignmentDelta,
+  loadedBefore?: Pick<WorldState, 'assignmentOffers'>,
 ): Promise<void> {
   const before = descriptors(delta.before);
   const witness = descriptors(delta.beforeFinish);
@@ -135,7 +139,7 @@ export async function persistAssignmentState(
   }
   if (closed.size !== all.size - final.size) throw new Error('발령 제안 종료 기록이 빠졌습니다.');
 
-  if (!isDeepStrictEqual(before, descriptors(await loadAssignmentState(tx, worldId))))
+  if (!isDeepStrictEqual(before, descriptors(loadedBefore ?? (await loadAssignmentState(tx, worldId)))))
     throw new Error('저장된 발령 제안과 before가 다릅니다.');
 
   async function close(offer: ClosedOffer) {

@@ -1,12 +1,21 @@
+import { resolverForRuleFeatures } from '../ruleCommands';
 import { describe, expect, it } from 'vitest';
 import { rngFor } from '@opensamguk/shared';
-import { commandWorld, testUnits } from '../../test/commandFixture';
+import { commandWorld as baseWorld, testUnits } from '../../test/commandFixture';
 import { commandRegistry } from '../commands/registry';
 import { runGeneralTurn } from '../commands/turn';
 import { BALANCE } from '../balance';
 import { chooseGeneralTurn, chooseNationTurn, generalTurnCandidates } from './index';
 
-const context = { tick: 100, unitSet: testUnits };
+function commandWorld() {
+  const world = baseWorld();
+  Object.assign(world.logistics!.cities['1']!, { iron: 1000, wood: 1000, horses: 1000 });
+  Object.assign(world.cityResources!.cities['1']!, { gold: 100000, rice: 100000 });
+  world.cities[1]!.defence = world.cities[1]!.defenceMax;
+  return world;
+}
+
+const context = { tick: 100, unitSet: testUnits, resolver: resolverForRuleFeatures(commandWorld()) };
 function rearWorld() {
   const world = commandWorld();
   world.cities[1]!.connections = [4];
@@ -24,7 +33,7 @@ describe('AC-M1-17 NPC 판단', () => {
     expect(candidates.length).toBeGreaterThan(0);
     for (const candidate of candidates)
       expect(
-        commandRegistry.get(candidate.key)!.check(world, { ...context, generalId: general.id }, candidate.args),
+        context.resolver!.get(candidate.key)!.check(world, { ...context, generalId: general.id }, candidate.args),
       ).toBeNull();
     expect(chooseGeneralTurn(world, general, rngFor('human-advice'), context)).toEqual({
       chosen: null,
@@ -67,9 +76,18 @@ describe('AC-M1-17 NPC 판단', () => {
   });
   it('적 접경에서 병력이 없으면 모병하고 준비가 끝나면 출병한다', () => {
     const world = commandWorld();
-    world.generals[1]!.crew = 0;
+    world.campaign!.units = world.campaign!.units.filter((unit) => unit.ownerId !== 1);
     expect(chooseGeneralTurn(world, world.generals[1]!, rngFor('npc'), context).chosen?.key).toBe('recruit');
-    world.generals[1]!.crew = 10000;
+    world.campaign!.units.push({
+      id: 4,
+      ownerId: 1,
+      commanderId: 1,
+      troops: 10000,
+      crewType: 1100,
+      train: 100,
+      atmos: 100,
+    });
+    world.campaign!.nextUnitId = 5;
     expect(chooseGeneralTurn(world, world.generals[1]!, rngFor('npc'), context).chosen).toMatchObject({
       key: 'attack',
       args: { cityKey: 2 },
@@ -90,7 +108,7 @@ describe('AC-M1-17 NPC 판단', () => {
     const world = rearWorld();
     const decision = chooseGeneralTurn(world, world.generals[1]!, rngFor('npc'), context);
     const move = decision.candidates.find((c) => c.key === 'move');
-    expect(move).toMatchObject({ args: { cityKey: 4 }, score: 60 });
+    expect(move).toMatchObject({ args: { cityKey: 4 }, score: 160 });
     expect(commandRegistry.get(decision.chosen!.key)!.category).toBe('domestic');
     expect(decision.chosen!.score).toBeGreaterThan(move!.score);
     expect(decision.chosen!.reason).toBe('후방에서는 전선 이동보다 부족한 내정을 먼저 채운다.');
@@ -118,7 +136,7 @@ describe('AC-M1-17 NPC 판단', () => {
     const general = world.generals[1]!;
     const decision = chooseGeneralTurn(world, general, rngFor('npc'), context);
     for (const c of decision.candidates)
-      expect(commandRegistry.get(c.key)!.check(world, { ...context, generalId: general.id }, c.args)).toBeNull();
+      expect(context.resolver!.get(c.key)!.check(world, { ...context, generalId: general.id }, c.args)).toBeNull();
     expect(world).toEqual(before);
     expect(chooseGeneralTurn(world, general, rngFor('npc'), context)).toEqual(decision);
   });
@@ -161,11 +179,27 @@ describe('AC-M1-17 NPC 판단', () => {
   it('국가 포상 뒤 장수 명령을 다시 판단하고 수렴 보조는 출병 점수만 바꾼다', () => {
     const world = commandWorld();
     world.generals[1]!.gold = 0;
-    world.generals[1]!.crew = 0;
-    const turn = runGeneralTurn(world, { ...context, generalId: 1 }, { commandKey: 'rest', args: {} }, 'npc');
+    world.campaign!.units = world.campaign!.units.filter((unit) => unit.ownerId !== 1);
+    const turn = runGeneralTurn(
+      world,
+      { ...context, generalId: 1 },
+      { commandKey: 'rest', args: {} },
+      'npc',
+      {},
+      context.resolver,
+    );
     expect(turn.nation?.commandKey).toBe('nation_reward');
     expect(turn.commandKey).toBe('recruit');
-    world.generals[1]!.crew = 10000;
+    world.campaign!.units.push({
+      id: 4,
+      ownerId: 1,
+      commanderId: 1,
+      troops: 10000,
+      crewType: 1100,
+      train: 100,
+      atmos: 100,
+    });
+    world.campaign!.nextUnitId = 5;
     const late = { ...context, tick: 50 * 12 * 10000 };
     const off = chooseGeneralTurn(world, world.generals[1]!, rngFor('npc'), { ...late, convergence: false });
     const on = chooseGeneralTurn(world, world.generals[1]!, rngFor('npc'), late);

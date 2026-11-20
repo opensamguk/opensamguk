@@ -9,7 +9,9 @@ import { treatyClauseEndTick } from '../diplomacy/treaty';
 import type { Actor, CommandDef, Failure } from './types';
 
 type TradeRouteView = {
-  cities: Readonly<Record<number, { nationId: number | null; connections: readonly number[]; kind?: 'CITY' | 'PASS' }>>;
+  cities: Readonly<
+    Record<number, { nationId: number | null; connections: readonly number[]; kind?: 'CITY' | 'PASS' | 'FIELD' }>
+  >;
   nations: Readonly<Record<number, unknown>>;
   diplomacies: readonly { nationA: number; nationB: number; state: string }[];
   treaties?: readonly DeepReadonly<TreatyState>[];
@@ -26,12 +28,13 @@ function atWar(diplomacies: TradeRouteView['diplomacies'], a: number, b: number)
 export function findTradeRoutes(view: TradeRouteView, nationId: number, cityKey: number, tick: number): TradeRoute[] {
   if (!Number.isSafeInteger(tick) || tick < 0) throw new RangeError('교역 시각을 확인하세요.');
   const home = view.cities[cityKey];
-  if (!home || home.kind === 'PASS' || home.nationId !== nationId || !view.nations[nationId]) return [];
+  if (!home || home.kind === 'PASS' || home.kind === 'FIELD' || home.nationId !== nationId || !view.nations[nationId])
+    return [];
   const monthlyTick = Math.floor(tick / TICKS_PER_MONTH) * TICKS_PER_MONTH;
   const result: TradeRoute[] = [];
   for (const key of [...new Set(home.connections)].sort((a, b) => a - b)) {
     const target = view.cities[key];
-    if (target?.kind === 'PASS') continue;
+    if (target?.kind === 'PASS' || target?.kind === 'FIELD') continue;
     const other = target?.nationId;
     if (other === undefined || other === null || other === nationId || !view.nations[other]) continue;
     if (atWar(view.diplomacies, nationId, other)) continue;
@@ -88,7 +91,7 @@ function check(view: WorldView, actor: Actor, args: TradeArgs): Failure | null {
     )
   )
     return null;
-  if (home.kind === 'PASS' || target.kind === 'PASS')
+  if (home.kind === 'PASS' || home.kind === 'FIELD' || target.kind === 'PASS' || target.kind === 'FIELD')
     return { code: 'BAD_STATE', message: '관문은 교역 경로에 포함되지 않습니다.' };
   if (view.nations[target.nationId] && atWar(view.diplomacies, general.nationId!, target.nationId))
     return { code: 'BAD_STATE', message: '교전 중인 국가와는 교역할 수 없습니다.' };

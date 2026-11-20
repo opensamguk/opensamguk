@@ -21,9 +21,7 @@ describe('T4-96 AC-P2-33 유산 배분 안내', () => {
 
   it('막힘 이유는 기본값 없음 → 능력치당 → 최종 최대 → 장수당 → 잔액 순이다', () => {
     const rich = { ...H, balance: 9 };
-    expect(checkHeritage({}, five(''), FIVE, rich, false).rows[0]!.why).toBe(
-      '기본 통솔에 정수를 넣으면 유산을 붙일 수 있습니다.',
-    );
+    expect(checkHeritage({}, five(''), FIVE, rich, false).rows[0]!.why).toBe('기본 통솔에 정수를 먼저 넣으세요.');
     expect(checkHeritage({ leadership: 3 }, five('55'), FIVE, rich, false).rows[0]!.why).toBe(
       '능력치 하나에는 +3까지입니다.',
     );

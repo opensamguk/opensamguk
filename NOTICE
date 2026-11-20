@@ -157,3 +157,12 @@ The art was generated for this project with Codex built-in image generation from
 tools/pixel-assets/build-pass-walls.py. Prompts and source hashes:
 opensamguk-images/public/art/sources.json. The basemap is rendered from Natural Earth (public domain) by
 tools/map-data/build-pixel-basemap.py; inputs and hashes: apps/web/src/main/pixel-basemap.json.
+
+
+Terrain Tiles on AWS (3D map heights)
+Referenced by: tools/map-data/build-height-field.py, apps/web/src/map3d/heights/*.ts
+Source: https://registry.opendata.aws/terrain-tiles/ (terrarium PNG, zoom 6)
+For the map area (94-148 E, 15-55 N) the tiles are derived from SRTM (NASA/USGS),
+GMTED2010 (USGS/NGA) and ETOPO1 (NOAA), which are US Government public domain data.
+The generated files keep one quantized height byte per map cell; the downloaded tiles
+are not stored in this repository.

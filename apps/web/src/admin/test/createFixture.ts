@@ -23,18 +23,6 @@ export const options: CreateOptions = {
       startYear: 191,
       counts: { nations: 21, generals: 491, cities: 53, gates: 8, ports: 6, fields: 13, anchors: 61 },
       resources: [],
-      ruleFeatures: [
-        'battle-affinity-v2',
-        'campaign-assignment-v2',
-        'campaign-v1',
-        'city-resources-v1',
-        'five-stats',
-        'operational-map',
-        'personnel',
-        'policy',
-        'stratagem-basic',
-        'treaty',
-      ],
       presets: [
         {
           key: 'regular',
@@ -58,6 +46,7 @@ export const draft: CreateDraft = {
   endYear: '201',
   seedMode: 'auto',
   seed: '',
+  fogOfWar: false,
 };
 
 const baseProfile = options.profiles.find((profile): profile is CreateProfile => profile.available)!;
@@ -67,13 +56,5 @@ export const expandedProfile: CreateProfile = {
   label: '통합판 확장 · 191년 군웅할거',
   featureProfileKey: 'expanded-191-v3',
   featureProfileHash: 'a'.repeat(64),
-  ruleFeatures: [
-    ...baseProfile.ruleFeatures,
-    'equipment-v1',
-    'governance-v1',
-    'heritage-v1',
-    'lineage-v1',
-    'logistics-v1',
-  ].sort(),
   suggestedEndYear: 231,
 };

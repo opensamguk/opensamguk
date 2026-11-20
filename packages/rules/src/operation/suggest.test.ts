@@ -2,8 +2,47 @@ import { describe, expect, it } from 'vitest';
 import { calculateOperationForecast } from './forecast';
 import { suggestOperationTurns, type OperationNoopCode } from './suggest';
 import { directTurn, operationInput } from './testFixture';
+import { applyCampaignPreparation, type CampaignPreparationKey } from '../campaign/preparation';
+import { applyCityUnitRecruitment } from '../cityResources/preparation';
 
 describe('작전 제안 사본', () => {
+  it('AC-M2-15 새 부곡 제안을 실제 모집·훈련·사기로 실행하면 예상 준비도에 도달한다', () => {
+    const input = operationInput({
+      current: { crew: 0, train: 0, atmos: 0 },
+      min: { crew: 100, train: 50, atmos: 50 },
+      deadlineTick: 200000,
+    });
+    input.view = structuredClone(input.view);
+    const stock = input.view.cityResources!.cities['1']!;
+    // 실제 부곡 모집의 도시 금·철 비용도 검증한다.
+    Object.assign(stock, { gold: 100000 });
+    Object.assign(input.view.logistics!.cities['1']!, { iron: 1000 });
+    const result = suggestOperationTurns(input);
+    expect(result.noop).toBeNull();
+    expect(result.slots.find((turn) => turn.commandKey === 'recruit')?.args).toEqual({
+      unitId: 'new',
+      amount: 100,
+      crewType: 1100,
+    });
+    let state = structuredClone(input.view);
+    for (const turn of result.slots) {
+      if (turn.commandKey === 'attack') break;
+      if (turn.commandKey === 'rest') continue;
+      const done =
+        turn.commandKey === 'recruit' || turn.commandKey === 'conscript'
+          ? applyCityUnitRecruitment(state, input.actor, turn.commandKey, turn.args)
+          : applyCampaignPreparation(state, input.actor, turn.commandKey as CampaignPreparationKey, turn.args);
+      if (!done.ok) throw Error(done.message);
+      state = done.state;
+    }
+    const unit = state.campaign!.units.find((unit) => unit.ownerId === 1)!;
+    expect({ crew: unit.troops, train: unit.train, atmos: unit.atmos }).toEqual(
+      calculateOperationForecast({ ...input, turns: result.slots }).expected,
+    );
+    expect(unit.train).toBeGreaterThanOrEqual(50);
+    expect(unit.atmos).toBeGreaterThanOrEqual(50);
+  });
+
   it.each([
     [0, 10],
     [9999, 10],
@@ -32,7 +71,7 @@ describe('작전 제안 사본', () => {
   it('준비 수의 고정점이 없어도 남는 칸을 직접 휴식으로 채워 READY를 만든다', () => {
     const input = operationInput({ deadlineTick: 20000, min: { crew: 100, train: 90, atmos: 90 } });
     input.turns = input.turns.map((turn, i) =>
-      i === 0 ? directTurn('recruit', { amount: 100, crewType: 1100 }) : turn,
+      i === 0 ? directTurn('recruit', { unitId: 1, amount: 100, crewType: 1100 }) : turn,
     );
     const result = suggestOperationTurns(input);
     expect(result.noop).toBeNull();
@@ -45,7 +84,7 @@ describe('작전 제안 사본', () => {
   it('블록 앞 모병을 보존하고 희석된 값에서 준비 수를 센다', () => {
     const input = operationInput({ min: { crew: 100, train: 90, atmos: 90 } });
     input.turns = input.turns.map((turn, i) =>
-      i === 0 ? directTurn('recruit', { amount: 100, crewType: 1100 }) : turn,
+      i === 0 ? directTurn('recruit', { unitId: 1, amount: 100, crewType: 1100 }) : turn,
     );
     const result = suggestOperationTurns(input);
     expect(result.slots[0]).toEqual(input.turns[0]);
@@ -61,8 +100,8 @@ describe('작전 제안 사본', () => {
     ]);
     expect(calculateOperationForecast({ ...input, turns: result.slots }).expected).toEqual({
       crew: 200,
-      train: 90,
-      atmos: 90,
+      train: 98,
+      atmos: 94,
     });
   });
 
@@ -73,13 +112,13 @@ describe('작전 제안 사본', () => {
       min: { crew: 600, train: 90, atmos: 90 },
     });
     const result = suggestOperationTurns(input);
-    expect(result.slots[1]).toEqual(directTurn('recruit', { amount: 300, crewType: 1100 }));
-    expect(result.slots.filter((turn) => turn.commandKey === 'train')).toHaveLength(5);
+    expect(result.slots[2]).toEqual(directTurn('recruit', { unitId: 1, amount: 300, crewType: 1100 }));
+    expect(result.slots.filter((turn) => turn.commandKey === 'train')).toHaveLength(4);
     expect(result.slots.filter((turn) => turn.commandKey === 'morale')).toHaveLength(5);
     expect(calculateOperationForecast({ ...input, turns: result.slots }).expected).toEqual({
       crew: 600,
-      train: 95,
-      atmos: 95,
+      train: 93,
+      atmos: 100,
     });
   });
 
@@ -132,7 +171,7 @@ describe('작전 제안 사본', () => {
     expect(suggestOperationTurns(input).noop?.code).toBe('NO_ROOM');
   });
 
-  it('모병 뒤의 훈련도 지금 상태로 검사해 조건부 NO_CREW 경고를 붙인다', () => {
+  it('새 부곡 모병 뒤의 훈련도 지금 상태로 검사해 조건부 BAD_TARGET 경고를 붙인다', () => {
     const input = operationInput({
       current: { crew: 0, train: 0, atmos: 0 },
       min: { crew: 100, train: 10, atmos: 10 },
@@ -140,7 +179,7 @@ describe('작전 제안 사본', () => {
     const before = structuredClone(input);
     const result = suggestOperationTurns(input);
     const training = result.slots.findIndex((turn) => turn.commandKey === 'train');
-    expect(result.warnings).toContainEqual(expect.objectContaining({ slot: training, code: 'NO_CREW' }));
+    expect(result.warnings).toContainEqual(expect.objectContaining({ slot: training, code: 'BAD_TARGET' }));
     expect(calculateOperationForecast({ ...input, turns: result.slots }).verdict).toBe('READY');
     expect(input).toEqual(before);
   });

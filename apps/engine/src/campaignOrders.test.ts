@@ -31,7 +31,6 @@ function fixture() {
     payload: { type: 'request', revision: 0 },
   } as unknown as EngineInput;
   const state = {
-    ruleFeatures: ['campaign-v1', 'five-stats', 'operational-map', 'personnel', 'policy'],
     generals: {},
   } as unknown as Awaited<ReturnType<typeof loadReplayState>>['state'];
   const replay = { state, turns: {}, revisions: {}, monthlyTick: 0 };

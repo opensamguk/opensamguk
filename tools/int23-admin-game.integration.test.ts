@@ -1,3 +1,5 @@
+import { ciGreenDatabaseName } from './test-database';
+import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { readdir, readFile } from 'node:fs/promises';
@@ -41,7 +43,7 @@ const { Client } = createRequire(requireDb.resolve('@prisma/adapter-pg'))('pg') 
 };
 const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
 if (!['127.0.0.1', 'localhost'].includes(source.hostname)) throw Error('자기 loopback 시험 DB가 필요합니다.');
-const name = 'int23_admin_' + randomUUID().replaceAll('-', '') + '_test';
+const name = ciGreenDatabaseName('opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test');
 const target = new URL(source),
   adminUrl = new URL(source);
 target.pathname = '/' + name;
@@ -105,9 +107,8 @@ async function startPaused(worldId: string) {
   await controlClock(db, worldId, 'start', clockNow);
   await controlClock(db, worldId, 'pause', clockNow);
 }
-async function world(quietNpcs = false, withTreaty = false) {
+async function world(quietNpcs = false) {
   const initial = commandInitial();
-  initial.ruleFeatures = ['personnel', 'policy', ...(withTreaty ? ['treaty'] : [])];
   initial.generals[2]!.officerLevel = 11;
   if (quietNpcs) for (const general of initial.generals) general.activeFromYear = 192;
   const { worldId } = await saveInitialWorld(db, initial, {
@@ -338,7 +339,17 @@ it('AC-INT-23 같은 tick 운영 기록은 개인 30행·관리자100행에서 �
   await controlClock(db, worldId, 'resume');
   const creating = call(
     'general.create',
-    { worldId, name: '기록장수', leadership: 70, strength: 70, intel: 60, portraitId: null },
+    {
+      worldId,
+      name: '기록장수',
+      leadership: 70,
+      strength: 70,
+      intel: 60,
+      sex: 'MALE' as const,
+      politics: 38,
+      charm: 37,
+      portraitId: null,
+    },
     ordinary.cookie,
   );
   await expect
@@ -435,6 +446,9 @@ it('AC-INT-23 운영 쪽지는 실제 엔진에서 한 번 보내고 개인 수�
         leadership: 70,
         strength: 70,
         intel: 60,
+        sex: 'MALE' as const,
+        politics: 38,
+        charm: 37,
         portraitId: null,
       },
       identity.cookie,
@@ -680,7 +694,17 @@ it('AC-INT-23 접수는 게임 상태를 바꾸지 않고 8종 입력·감사·�
   await controlClock(db, worldId, 'resume');
   const creating = call(
     'general.create',
-    { worldId, name: '사람장수', leadership: 70, strength: 70, intel: 60, portraitId: null },
+    {
+      worldId,
+      name: '사람장수',
+      leadership: 70,
+      strength: 70,
+      intel: 60,
+      sex: 'MALE' as const,
+      politics: 38,
+      charm: 37,
+      portraitId: null,
+    },
     ordinary.cookie,
   );
   await expect
@@ -789,7 +813,17 @@ it('AC-INT-23 사람 내보내기는 먼저 접수된 요청을 거절하고 같
   await controlClock(db, worldId, 'resume');
   const creating = call(
     'general.create',
-    { worldId, name: '퇴장전장수', leadership: 70, strength: 70, intel: 60, portraitId: null },
+    {
+      worldId,
+      name: '퇴장전장수',
+      leadership: 70,
+      strength: 70,
+      intel: 60,
+      sex: 'MALE' as const,
+      politics: 38,
+      charm: 37,
+      portraitId: null,
+    },
     ordinary.cookie,
   );
   await expect
@@ -813,7 +847,17 @@ it('AC-INT-23 사람 내보내기는 먼저 접수된 요청을 거절하고 같
   expect((await call('general.mine', { worldId }, ordinary.cookie)).data).toMatchObject({ general: null });
   const next = call(
     'general.create',
-    { worldId, name: '퇴장후장수', leadership: 70, strength: 70, intel: 60, portraitId: null },
+    {
+      worldId,
+      name: '퇴장후장수',
+      leadership: 70,
+      strength: 70,
+      intel: 60,
+      sex: 'MALE' as const,
+      politics: 38,
+      charm: 37,
+      portraitId: null,
+    },
     ordinary.cookie,
   );
   await expect
@@ -836,7 +880,17 @@ it('AC-INT-23 퇴장 참모의 인사·조약 대기 입력도 조회·아카이
   ] as const) {
     const creating = call(
       'general.create',
-      { worldId, name, leadership: 70, strength: 70, intel: 60, portraitId: null },
+      {
+        worldId,
+        name,
+        leadership: 70,
+        strength: 70,
+        intel: 60,
+        sex: 'MALE' as const,
+        politics: 38,
+        charm: 37,
+        portraitId: null,
+      },
       identity.cookie,
     );
     await expect
@@ -1011,7 +1065,6 @@ it('AC-INT-23 정식491명 부곡 월드는 병력 조정을 거절하고 금 �
     portraitMap: '191-map',
     seed: 'int23-campaign',
   });
-  initial.ruleFeatures = ['campaign-v1', 'five-stats', 'operational-map', 'personnel', 'policy'];
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '정식 부곡 운영 조치',
     turnTermMinutes: 60,
@@ -1077,13 +1130,12 @@ it('AC-INT-23 확장20기능 정식491명 월드의 운영 군주 교체·해산
     portraitMap: profile.portraitMapKey,
     seed: 'int23-expanded-nation',
   });
-  initial.ruleFeatures = profile.ruleFeatures;
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '확장 국가 운영 검증',
     turnTermMinutes: 60,
     endYear: 231,
     replayFormat: 3,
-    ruleFeatures: profile.ruleFeatures,
+
     featureData: profile.featureData,
   });
   await startPaused(worldId);
@@ -1108,8 +1160,8 @@ it('AC-INT-23 확장20기능 정식491명 월드의 운영 군주 교체·해산
   expect(await db.nation.count({ where: { worldId, id: ruler.nationId! } })).toBe(0);
   expect(await db.removedNation.count({ where: { worldId, nationId: ruler.nationId! } })).toBe(1);
   const final = await db.$transaction((tx) => loadReplayState(tx, worldId));
-  expect(final.state.ruleFeatures).toHaveLength(20);
-  expect(final.state.nationLifecycle!.nations).toEqual({});
+  expect(providedRuleKeys).toEqual(ruleRegistry.features.map((feature) => feature.key).sort());
+  expect(final.state.nationLifecycle!.nations[String(ruler.nationId!)]).toBeUndefined();
   expect(await db.message.count({ where: { worldId } })).toBe(2);
   expect(await db.nationHistory.count({ where: { worldId } })).toBe(0);
   expect(await db.battleLog.count({ where: { worldId } })).toBe(0);

@@ -1,6 +1,13 @@
+import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { readFileSync } from 'node:fs';
 import type { Prisma, PrismaClient, PublishedResource } from '../packages/db/src/index';
-import { parsePreset, worldCreateIntent, ADMIN_RESET_KIND, type ReplayOriginV3 } from '../packages/rules/src/index';
+import {
+  ruleRegistry,
+  parsePreset,
+  worldCreateIntent,
+  ADMIN_RESET_KIND,
+  type ReplayOriginV3,
+} from '../packages/rules/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { afterEach, beforeAll, expect, it, vi } from 'vitest';
 import { composeInitialWorld, type InitialResources } from '../apps/engine/src/world/resources';
@@ -20,6 +27,9 @@ import {
   resetSettingsReference,
   type ResetPreparation,
 } from '../apps/engine/src/admin/resetPreparation';
+import { readInitialResources } from '../apps/engine/src/world/resources';
+import { createDb } from '../packages/db/src/index';
+import { testDatabaseUrl } from './test-database';
 
 const worldId = '00000000-0000-4000-8000-000000000001';
 const requestId = '00000000-0000-4000-8000-000000000002';
@@ -31,9 +41,6 @@ function resource(kind: PublishedResource['kind'], name: string, path: string): 
   const content = json(path);
   return { kind, name, version: 1, content, contentHash: hashState(content), source: 'repository formal fixture' };
 }
-import { readInitialResources } from '../apps/engine/src/world/resources';
-import { createDb } from '../packages/db/src/index';
-import { testDatabaseUrl } from './test-database';
 
 const selectedResources = await (async () => {
   const db = createDb(testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL }).href);
@@ -51,13 +58,11 @@ const resources: InitialResources = {
   statRules: resource('STAT_RULES', 'five-stats', 'resources/scenario/five-stats.json'),
   portraitMap: resource('PORTRAIT_MAP', '191-map', 'resources/portraits/191-map.json'),
 };
-const features = ['campaign-v1', 'five-stats', 'operational-map', 'personnel', 'policy'].sort();
 const options: InitialWorldOptions = {
   name: '원본 정식 191년',
   turnTermMinutes: 30,
   endYear: 200,
   replayFormat: 3,
-  ruleFeatures: features,
 };
 afterEach(() => vi.restoreAllMocks());
 type World = Prisma.WorldGetPayload<Record<string, never>>;
@@ -74,6 +79,7 @@ async function capture(prepared: PreparedInitialWorld) {
       }),
     },
     publicMapSnapshot: { create: vi.fn(async () => ({})) },
+    worldExtSlice: { create: vi.fn(async () => ({})) },
     nation: { createMany, update: vi.fn(async () => ({})) },
     city: { createMany },
     general: { createMany },
@@ -98,7 +104,6 @@ async function capture(prepared: PreparedInitialWorld) {
 let sourceWorld: World;
 beforeAll(async () => {
   const initial = composeInitialWorld(resources, oldSeed);
-  initial.ruleFeatures = features;
   sourceWorld = (await capture(prepareInitialWorld(initial, options))).world;
 });
 function request(world = sourceWorld): Request {
@@ -111,7 +116,7 @@ function request(world = sourceWorld): Request {
     statRulesKey: 'five-stats',
     unitSetKey: 'basic',
     portraitMapKey: '191-map',
-    ruleFeatures: features,
+
     seed: oldSeed,
     turnTermMinutes: 30,
     endYear: 200,
@@ -208,10 +213,8 @@ async function reject(f: ReturnType<typeof fixture>, code: ResetPreparationError
 
 async function sexEditionFixture(useRequest: boolean, edition: 'first' | 'second' | 'latest' = 'first') {
   const f = fixture(useRequest),
-    ruleFeatures = [...features, 'lineage-v1'].sort(),
-    lineageOptions = { ...options, ruleFeatures, featureData: { 'lineage-v1': lineageTestConfig } },
+    lineageOptions = { ...options, featureData: { 'lineage-v1': lineageTestConfig } },
     initial = composeInitialWorld(resources, oldSeed);
-  initial.ruleFeatures = ruleFeatures;
   const old = prepareInitialWorld(initial, lineageOptions, resourceLoaders.loadSexLedgers()[0]),
     latest = prepareInitialWorld(initial, lineageOptions);
   expect(old.stateHash).not.toBe(latest.stateHash);
@@ -224,7 +227,7 @@ async function sexEditionFixture(useRequest: boolean, edition: 'first' | 'second
   Object.assign(f.world, (await capture(prepared)).world);
   if (useRequest) {
     const row = request(f.world),
-      intent = { ...(row.intent as Record<string, unknown>), ruleFeatures };
+      intent = { ...(row.intent as Record<string, unknown>) };
     f.requests[0] = { ...row, intent, intentHash: hashState(intent) } as Request;
   }
   return f;
@@ -277,12 +280,12 @@ it('AC-P2-32 최신 판과 맞는 월드도 원장 검토 오류를 감추지 �
   await reject(f, 'RESOURCE_INVALID');
 });
 
-it('AC-P2-32 가문을 끈 초기화는 성별 원장을 읽지 않는다', async () => {
+it('AC-INT-28 별도 가문 설정이 없는 초기화도 생성 당시 성별 원장을 고정한다', async () => {
   const f = fixture(),
     all = vi.spyOn(resourceLoaders, 'loadSexLedgers'),
     latest = vi.spyOn(resourceLoaders, 'loadSexLedger');
   await prepareWorldReset(f.db, worldId, 'off-sex-edition-seed', controller().signal);
-  expect(all).not.toHaveBeenCalled();
+  expect(all).toHaveBeenCalledOnce();
   expect(latest).not.toHaveBeenCalled();
 });
 
@@ -303,21 +306,8 @@ async function san10RequestFixture(
       ...(unitMode === 'expanded'
         ? { unitSet: resource('UNIT_SET', 'expanded', 'resources/unitset/expanded.json') }
         : {}),
-    },
-    san10Features = [
-      ...(unitMode === 'expanded' ? ['battle-affinity-v2'] : []),
-      'campaign-assignment-v2',
-      'campaign-v1',
-      'city-resources-v1',
-      'five-stats',
-      'operational-map',
-      'personnel',
-      'policy',
-      'stratagem-basic',
-      'treaty',
-    ].sort();
+    };
   const initial = composeInitialWorld(selected, oldSeed);
-  initial.ruleFeatures = san10Features;
   const f = fixture();
   Object.assign(
     f.world,
@@ -325,7 +315,7 @@ async function san10RequestFixture(
       await capture(
         prepareInitialWorld(initial, {
           ...options,
-          ruleFeatures: san10Features,
+
           turnTermMinutes: preset.turnTermMinutes,
           preset: { key: presetKey, value: preset },
         }),
@@ -339,7 +329,7 @@ async function san10RequestFixture(
     presetKey,
     seed: oldSeed,
     endYear: f.world.endYear,
-    ruleFeatures: san10Features.filter((feature) => unitMode !== 'expanded' || feature !== 'battle-affinity-v2'),
+
     ...(unitMode === 'basic-override' ? { unitSetKey: 'basic' } : {}),
   });
   f.rows.splice(0, f.rows.length, ...structuredClone(Object.values(selected)));
@@ -369,18 +359,18 @@ async function san10RequestFixture(
       initialStateHash: f.world.initialStateHash,
     },
   } as unknown as Request;
-  return { f, san10Features };
+  return { f };
 }
 
 it.each(['expanded', 'basic-override'] as const)(
   'AC-INT-22: 새 프리셋의 %s 초기화는 실제 선택한 병종과 자동 전투 기능을 함께 보존한다',
   async (unitMode) => {
-    const { f, san10Features } = await san10RequestFixture('san10-191', unitMode);
+    const { f } = await san10RequestFixture('san10-191', unitMode);
     const result = await prepareWorldReset(f.db, worldId, 'expanded-reset-seed', controller().signal);
     const saved = await capture(result.prepared);
     expect(saved.world.unitSetKey).toBe(unitMode === 'expanded' ? 'expanded' : 'basic');
-    expect(saved.world.ruleFeatures).toEqual(san10Features);
-    expect(saved.world.ruleFeatures.includes('battle-affinity-v2')).toBe(unitMode === 'expanded');
+    expect(providedRuleKeys).toEqual(ruleRegistry.features.map(({ key }) => key).sort());
+    expect(providedRuleKeys).toContain('battle-affinity-v2');
     expect(result.evidence.provenance).toEqual({ kind: 'request', requestId });
   },
 );
@@ -388,7 +378,7 @@ it.each(['expanded', 'basic-override'] as const)(
 it.each(['san10-191', 'san10-empty'] as const)(
   'AC-INT-18D %s의 생략된 기본 자원도 DONE 출처와155빈원장을 보존해 초기화한다',
   async (scenario) => {
-    const { f, san10Features } = await san10RequestFixture(scenario),
+    const { f } = await san10RequestFixture(scenario),
       before = structuredClone({ world: f.world, requests: f.requests, rows: f.rows });
     const result = await prepareWorldReset(f.db, worldId, 'new-seed', controller().signal),
       saved = await capture(result.prepared),
@@ -401,7 +391,7 @@ it.each(['san10-191', 'san10-empty'] as const)(
     expect(origin.initial.generals).toHaveLength(491);
     expect(origin.initial.generals.every((general) => general.userId === null)).toBe(true);
     expect(origin.initial.cities).toHaveLength(155);
-    expect(saved.world.ruleFeatures).toEqual(san10Features);
+    expect(providedRuleKeys).toEqual(ruleRegistry.features.map(({ key }) => key).sort());
     const ledger = saved.world.cityResourcesState as {
       cities: Record<string, { gold: number; rice: number; garrison: unknown[] }>;
     };
@@ -467,7 +457,6 @@ it('저장 프리셋과 원본 featureData를 쓰며 현재 파일의 이름·�
   preset.name = '저장된 독립 프리셋';
   preset.turnTermMinutes = 37;
   const initial = composeInitialWorld(resources, oldSeed);
-  initial.ruleFeatures = features;
   Object.assign(
     f.world,
     (
@@ -528,7 +517,7 @@ it('원본 초기 상태 자체의 변경과 기능·프리셋 불일치를 거�
   (a.world.replayOrigin as unknown as ReplayOriginV3).initial.cities[0]!.population++;
   await reject(a, 'ORIGIN_INVALID');
   const b = fixture();
-  b.world.ruleFeatures.push('unknown');
+  (b.world.replayOrigin as unknown as ReplayOriginV3).featureData = {};
   await reject(b, 'ORIGIN_INVALID');
   const c = fixture();
   c.world.presetKey = 'absent';
@@ -587,11 +576,11 @@ it('생성 manifest의 자원 선택·고정 해시·프리셋·간격·연도 �
   resolution.resources[0]!.contentHash = '0'.repeat(64);
   await reject(pinned, 'RESOURCE_INVALID');
 });
-it('원본 intent 기능을 바꾸고 재해시해도 원생성 기능과 다르면 거부한다', async () => {
+it('AC-INT-28 원본 intent에 폐지된 기능 선택을 넣고 재해시해도 거부한다', async () => {
   const f = fixture(),
     r = f.requests[0]!,
-    intent = r.intent as unknown as { ruleFeatures: string[] };
-  intent.ruleFeatures = ['five-stats', 'operational-map'];
+    intent = r.intent as unknown as object;
+  Object.assign(intent, { ruleFeatures: [] });
   r.intentHash = hashState(intent);
   await reject(f, 'PROVENANCE_INVALID');
 });
@@ -725,6 +714,7 @@ it('D1 공유 settings hash 추출은 승인된 C 원 recipe와 같다', () => {
   expect(resetSourceSettingsHash(w)).toBe(
     hashState({
       name: w.name,
+      fogOfWar: w.fogOfWar,
       seed: w.seed,
       scenario: w.scenarioKey,
       map: w.mapKey,
@@ -733,7 +723,7 @@ it('D1 공유 settings hash 추출은 승인된 C 원 recipe와 같다', () => {
       preset: w.preset,
       turnTermMinutes: w.turnTermMinutes,
       endYear: w.endYear,
-      ruleFeatures: w.ruleFeatures,
+
       origin: w.replayOrigin,
     }),
   );

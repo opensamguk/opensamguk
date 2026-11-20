@@ -1,0 +1,1209 @@
+{
+ "note": "D-096 진·수 분류(INT-28). 수=물길이 본업인 나루·수군 기지·섬, 싸움터=옛 싸움터 표식, 명소=산, 현성=가까운 큰 도시의 부속 현. 시나리오 기획판 아티팩트(eb764cc8) 규모 1~2 도시 기준. 이주(夷洲)는 원주민의 섬이라 이(4) 이민족 본거로 둔다(사용자 2026-11-14: \"이주는 이로 두자\"; 『資治通鑑』 卷71 \"欲俘其民以益眾\", 卷72 \"得夷洲數千人還\").",
+ "sites": [
+  {
+   "name": "대방",
+   "level": 2,
+   "category": "현성",
+   "reason": "군 치소였으나 규모 2(부속으로 둠)",
+   "source": "모드"
+  },
+  {
+   "name": "천주",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "임유",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "도하",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "노양",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "공통"
+  },
+  {
+   "name": "상락",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "양현",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "형양",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "급현",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "서현",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "환현",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "화용",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "공통"
+  },
+  {
+   "name": "적벽",
+   "level": 1,
+   "category": "수",
+   "reason": "장강 가 수전 자리(삼10 수)",
+   "source": "공통"
+  },
+  {
+   "name": "기춘",
+   "level": 2,
+   "category": "현성",
+   "reason": "군 치소였으나 규모 2(부속으로 둠)",
+   "source": "모드"
+  },
+  {
+   "name": "수현",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "저현",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "포한",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "임조",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "고",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "산상",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "성보",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "박망",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "역양",
+   "level": 2,
+   "category": "수",
+   "reason": "장강 북쪽 나루(단양·곡아와 마주)",
+   "source": "모드"
+  },
+  {
+   "name": "곡아",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "이릉",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "공통"
+  },
+  {
+   "name": "당양",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "주제",
+   "level": 2,
+   "category": "현성",
+   "reason": "군 치소였으나 규모 2(부속으로 둠)",
+   "source": "공통"
+  },
+  {
+   "name": "합포",
+   "level": 2,
+   "category": "수",
+   "reason": "남해 나루, 바다 건너 남쪽 나라 뱃길",
+   "source": "공통"
+  },
+  {
+   "name": "주천",
+   "level": 2,
+   "category": "현성",
+   "reason": "군 치소였으나 규모 2(부속으로 둠)",
+   "source": "공통"
+  },
+  {
+   "name": "고현",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "서안평",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "공통"
+  },
+  {
+   "name": "오원",
+   "level": 2,
+   "category": "현성",
+   "reason": "군 치소였으나 규모 2(부속으로 둠)",
+   "source": "통합"
+  },
+  {
+   "name": "망평",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "평곽",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "답씨",
+   "level": 2,
+   "category": "수",
+   "reason": "요동 반도 남쪽 끝 바닷길 나루",
+   "source": "모드"
+  },
+  {
+   "name": "역현",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "통합"
+  },
+  {
+   "name": "익양",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "방릉",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "공통"
+  },
+  {
+   "name": "기산",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "제갈량 북벌의 성채",
+   "source": "공통"
+  },
+  {
+   "name": "음평",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "석현",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "설",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "서평현",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "미현",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "무종",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "영성",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "임하",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "공통"
+  },
+  {
+   "name": "강양",
+   "level": 2,
+   "category": "수",
+   "reason": "장강·타강 합류 나루",
+   "source": "공통"
+  },
+  {
+   "name": "한가",
+   "level": 2,
+   "category": "현성",
+   "reason": "군 치소였으나 규모 2(부속으로 둠)",
+   "source": "공통"
+  },
+  {
+   "name": "탕거",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "안한",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "거현",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "불기",
+   "level": 2,
+   "category": "수",
+   "reason": "노산 서쪽 바닷가",
+   "source": "모드"
+  },
+  {
+   "name": "양선",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "파강",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "거소",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "원릉",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "진정",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "양국",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "위현",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "평성",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "포판",
+   "level": 2,
+   "category": "수",
+   "reason": "황하 포판 나루",
+   "source": "모드"
+  },
+  {
+   "name": "옹현",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "칠현",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "사연",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "영주",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "처현",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "임공",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "임여",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "감현",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "전당",
+   "level": 2,
+   "category": "수",
+   "reason": "절강 어귀 나루",
+   "source": "모드"
+  },
+  {
+   "name": "후관",
+   "level": 2,
+   "category": "수",
+   "reason": "회계 남쪽 바닷가(바닷길)",
+   "source": "모드"
+  },
+  {
+   "name": "동안",
+   "level": 2,
+   "category": "수",
+   "reason": "진강 하류 바닷가",
+   "source": "모드"
+  },
+  {
+   "name": "정현",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "회음",
+   "level": 2,
+   "category": "수",
+   "reason": "회수·한구 물길 합류",
+   "source": "공통"
+  },
+  {
+   "name": "구장",
+   "level": 2,
+   "category": "수",
+   "reason": "회계 동쪽 바닷가",
+   "source": "모드"
+  },
+  {
+   "name": "건안",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "공통"
+  },
+  {
+   "name": "시안",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "곡강",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "공통"
+  },
+  {
+   "name": "고도",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "임진",
+   "level": 2,
+   "category": "수",
+   "reason": "황하 서쪽 나루(포판과 마주)",
+   "source": "모드"
+  },
+  {
+   "name": "고노",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "가맹",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "낭중",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "덕양",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "백마",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "200년 관우가 안량을 벤 싸움터",
+   "source": "공통"
+  },
+  {
+   "name": "여릉",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "영녕",
+   "level": 2,
+   "category": "수",
+   "reason": "구강 하구 바닷가, 바닷길",
+   "source": "모드"
+  },
+  {
+   "name": "파구",
+   "level": 2,
+   "category": "수",
+   "reason": "동정호가 장강에 드는 어귀",
+   "source": "모드"
+  },
+  {
+   "name": "소릉",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "울림",
+   "level": 2,
+   "category": "현성",
+   "reason": "군 치소였으나 규모 2(부속으로 둠)",
+   "source": "모드"
+  },
+  {
+   "name": "영방",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "자씨",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "견현",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "조음",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "부리",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "액현",
+   "level": 2,
+   "category": "수",
+   "reason": "교동 반도 북쪽 바닷가, 요동 뱃길",
+   "source": "모드"
+  },
+  {
+   "name": "동무",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "구현",
+   "level": 2,
+   "category": "수",
+   "reason": "동해 바닷가, 소금·물고기",
+   "source": "모드"
+  },
+  {
+   "name": "염차",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "우이",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "종리",
+   "level": 2,
+   "category": "수",
+   "reason": "회수 남쪽 나루",
+   "source": "모드"
+  },
+  {
+   "name": "주현",
+   "level": 2,
+   "category": "수",
+   "reason": "장강 북쪽 기슭, 무창과 마주",
+   "source": "모드"
+  },
+  {
+   "name": "파양",
+   "level": 2,
+   "category": "수",
+   "reason": "팽려택 동쪽 기슭 고을, 파양군 치소(사용자 2026-11-14: 항구로 기능하면 수)",
+   "source": "공통"
+  },
+  {
+   "name": "의춘",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "장산",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "태말",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "임해",
+   "level": 2,
+   "category": "수",
+   "reason": "영강 어귀 바닷가, 섬 뱃길",
+   "source": "공통"
+  },
+  {
+   "name": "송양",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "예릉",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "섬현",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "작당",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "영현",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "영포",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "안륙",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "자귀",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "임강",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "공통"
+  },
+  {
+   "name": "선한",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "서성",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "공통"
+  },
+  {
+   "name": "게양",
+   "level": 2,
+   "category": "수",
+   "reason": "남해 바닷가, 바닷길",
+   "source": "모드"
+  },
+  {
+   "name": "박라",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "고요",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "모드"
+  },
+  {
+   "name": "고량",
+   "level": 2,
+   "category": "수",
+   "reason": "남해 바닷가, 바닷길",
+   "source": "모드"
+  },
+  {
+   "name": "서평",
+   "level": 2,
+   "category": "현성",
+   "reason": "군 치소였으나 규모 2(부속으로 둠)",
+   "source": "SAN10"
+  },
+  {
+   "name": "남안",
+   "level": 2,
+   "category": "현성",
+   "reason": "군 치소였으나 규모 2(부속으로 둠)",
+   "source": "SAN10"
+  },
+  {
+   "name": "가정",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "228년 마속이 패한 곳",
+   "source": "SAN10"
+  },
+  {
+   "name": "진창",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "SAN10"
+  },
+  {
+   "name": "오장원",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "234년 제갈량 진영",
+   "source": "SAN10"
+  },
+  {
+   "name": "화산",
+   "level": 2,
+   "category": "명소",
+   "reason": "서악",
+   "source": "SAN10"
+  },
+  {
+   "name": "노수",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "225년 제갈량이 건넌 강",
+   "source": "SAN10"
+  },
+  {
+   "name": "애뢰",
+   "level": 2,
+   "category": "현성",
+   "reason": "군 치소였으나 규모 2(부속으로 둠)",
+   "source": "SAN10"
+  },
+  {
+   "name": "사룡",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "SAN10"
+  },
+  {
+   "name": "흥고",
+   "level": 2,
+   "category": "현성",
+   "reason": "군 치소였으나 규모 2(부속으로 둠)",
+   "source": "SAN10"
+  },
+  {
+   "name": "항산",
+   "level": 2,
+   "category": "명소",
+   "reason": "북악",
+   "source": "SAN10"
+  },
+  {
+   "name": "백랑산",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "207년 조조가 답돈을 깬 산",
+   "source": "SAN10"
+  },
+  {
+   "name": "계교",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "191년 계교 싸움",
+   "source": "SAN10"
+  },
+  {
+   "name": "관도",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "200년 관도 싸움",
+   "source": "SAN10"
+  },
+  {
+   "name": "숭산",
+   "level": 2,
+   "category": "명소",
+   "reason": "중악",
+   "source": "SAN10"
+  },
+  {
+   "name": "의양",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "SAN10"
+  },
+  {
+   "name": "번성",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "SAN10"
+  },
+  {
+   "name": "합비",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "SAN10"
+  },
+  {
+   "name": "석정",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "228년 석정 싸움",
+   "source": "SAN10"
+  },
+  {
+   "name": "유수구",
+   "level": 2,
+   "category": "수",
+   "reason": "오의 수군 기지(유수독)",
+   "source": "SAN10"
+  },
+  {
+   "name": "장판",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "208년 장판 싸움",
+   "source": "SAN10"
+  },
+  {
+   "name": "서새산",
+   "level": 2,
+   "category": "명소",
+   "reason": "강하의 산",
+   "source": "SAN10"
+  },
+  {
+   "name": "공안",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "SAN10"
+  },
+  {
+   "name": "심양",
+   "level": 2,
+   "category": "수",
+   "reason": "장강 가 요지, 시상 곁 나루",
+   "source": "SAN10"
+  },
+  {
+   "name": "경구",
+   "level": 2,
+   "category": "수",
+   "reason": "장강 남안 나루(단도), 209년 유비가 손권을 만난 곳",
+   "source": "SAN10"
+  },
+  {
+   "name": "부춘",
+   "level": 2,
+   "category": "현성",
+   "reason": "현",
+   "source": "SAN10"
+  },
+  {
+   "name": "형산",
+   "level": 2,
+   "category": "명소",
+   "reason": "남악",
+   "source": "SAN10"
+  },
+  {
+   "name": "오소",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "기획판 전장",
+   "source": "전장"
+  },
+  {
+   "name": "창정",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "기획판 전장",
+   "source": "전장"
+  },
+  {
+   "name": "박망파",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "기획판 전장",
+   "source": "전장"
+  },
+  {
+   "name": "형양 변수",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "기획판 전장",
+   "source": "전장"
+  },
+  {
+   "name": "양성",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "기획판 전장",
+   "source": "전장"
+  },
+  {
+   "name": "현산",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "기획판 전장",
+   "source": "전장"
+  },
+  {
+   "name": "육수",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "기획판 전장",
+   "source": "전장"
+  },
+  {
+   "name": "노수 나루",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "기획판 전장",
+   "source": "전장"
+  },
+  {
+   "name": "위수 남안",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "기획판 전장",
+   "source": "전장"
+  },
+  {
+   "name": "정군산",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "기획판 전장",
+   "source": "전장"
+  },
+  {
+   "name": "소요진",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "기획판 전장",
+   "source": "전장"
+  },
+  {
+   "name": "맥성",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "기획판 전장",
+   "source": "전장"
+  },
+  {
+   "name": "효정",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "기획판 전장",
+   "source": "전장"
+  },
+  {
+   "name": "동흥제",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "기획판 전장",
+   "source": "전장"
+  },
+  {
+   "name": "상방곡",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "기획판 전장",
+   "source": "전장"
+  },
+  {
+   "name": "농서 단곡",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "기획판 전장",
+   "source": "전장"
+  },
+  {
+   "name": "음평 샛길",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "기획판 전장",
+   "source": "전장"
+  },
+  {
+   "name": "고평릉",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "기획판 전장",
+   "source": "전장"
+  },
+  {
+   "name": "환도성",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "기획판 전장",
+   "source": "전장"
+  },
+  {
+   "name": "비류수",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "기획판 전장",
+   "source": "전장"
+  },
+  {
+   "name": "양맥 골짜기",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "기획판 전장",
+   "source": "전장"
+  },
+  {
+   "name": "기리영",
+   "level": 2,
+   "category": "싸움터",
+   "reason": "기획판 전장",
+   "source": "전장"
+  }
+ ]
+}

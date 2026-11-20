@@ -1,13 +1,13 @@
 import { randomBytes, createHash, randomUUID } from 'node:crypto';
 import { request as httpRequest } from 'node:http';
 import { Writable } from 'node:stream';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import { buildServer } from '../apps/server/src/server';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { hashToken, newSession } from '../apps/server/src/auth/session';
 import { readFixture } from '../apps/server/test/readFixture';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
@@ -132,16 +132,19 @@ const credentials = () => ({ email: user.email, password });
 const nextWindow = (windowMs: number) => {
   now = (Math.floor(now / windowMs) + 1) * windowMs;
 };
+beforeEach(() => vi.stubEnv('EMAIL_VERIFICATION_REQUIRED', undefined));
+afterEach(() => vi.unstubAllEnvs());
+
 beforeAll(async () => {
   await db.world.deleteMany();
   await db.user.deleteMany();
   const passwordHash = await hashPassword(password);
   user = await db.user.create({
-    data: { email: `${randomUUID()}@example.test`, passwordHash },
+    data: { email: `${randomUUID()}@example.test`, passwordHash, emailVerifiedAt: new Date(now) },
     select: { id: true, email: true },
   });
   other = await db.user.create({
-    data: { email: `${randomUUID()}@example.test`, passwordHash },
+    data: { email: `${randomUUID()}@example.test`, passwordHash, emailVerifiedAt: new Date(now) },
     select: { id: true, email: true },
   });
   const state = await readFixture();
@@ -336,14 +339,20 @@ describe('T3-04 실제 TCP HTTP·PostgreSQL 보안', () => {
         data: { expiresAt: new Date(now + 120_000) },
       });
       const before = await snapshot();
-      const data = { worldId, revision: 120, op: { shift: 1 } };
+      const revision = (await db.general.findUniqueOrThrow({ where: { worldId_userId: { worldId, userId: user.id } } }))
+        .turnRevision;
+      const otherRevision = (
+        await db.general.findUniqueOrThrow({ where: { worldId_userId: { worldId, userId: other.id } } })
+      ).turnRevision;
+      const data = { worldId, revision, op: { shift: 1 } };
       const blocked = await send(base, 'turns.edit', data, { headers: { cookie: ownCookie } });
       expect(blocked.code).toBe('TOO_MANY_REQUESTS');
       expect(blocked.headers['retry-after']).toBe(String(Math.ceil((60_000 - (now % 60_000)) / 1000)));
       expect(blocked.headers['set-cookie'] === undefined).toBe(true);
       expect(await snapshot()).toEqual(before);
       expect(
-        (await send(base, 'turns.edit', { ...data, revision: 0 }, { headers: { cookie: otherCookie } })).data,
+        (await send(base, 'turns.edit', { ...data, revision: otherRevision }, { headers: { cookie: otherCookie } }))
+          .data,
       ).toHaveProperty('ok', true);
       nextWindow(60_000);
       expect((await send(base, 'turns.edit', data, { headers: { cookie: ownCookie } })).data).toHaveProperty(

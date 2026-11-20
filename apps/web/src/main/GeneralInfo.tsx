@@ -11,7 +11,6 @@ import { Tag } from '../ui/Tag';
 import { useTRPC } from '../trpc';
 import { meritText } from './infoView';
 import { InfoGrid } from './Panel';
-import { UnitName } from './UnitName';
 import styles from './GeneralInfo.module.css';
 import { EquipmentStatus } from '../equipment/EquipmentStatus';
 import type { EquipmentRead } from '../equipment/useEquipment';
@@ -25,14 +24,14 @@ export function formatClock(iso: string | null): string {
   return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 }
 
-// 보이는 나이. lineage-v1 월드는 가문 칸과 같게 월드 요약의 현재 게임 연도에서 출생 연도를 뺀다.
+// 보이는 나이. 가문 칸과 같게 월드 요약의 현재 게임 연도에서 출생 연도를 뺀다.
 // 저장 나이(age)는 1월 월말 정산에서야 오르므로 해가 바뀐 1월에 가문 칸보다 한 살 적게 보인다. 저장값·규칙은 바꾸지 않는다.
-// 기능이 꺼진 월드나 요약을 아직 받지 못했으면 저장 나이를 그대로 쓴다.
+// 요약을 아직 받지 못했으면 저장 나이를 그대로 쓴다.
 export function displayedAge(
   general: Pick<Home['general'], 'age' | 'birthYear'>,
   summary: WorldSummary | undefined,
 ): number {
-  if (summary === undefined || !('lineageEnabled' in summary) || summary.lineageEnabled !== true) return general.age;
+  if (summary === undefined) return general.age;
   return Math.max(0, summary.gameDate.year - general.birthYear);
 }
 
@@ -43,7 +42,6 @@ export function GeneralInfo({
   cityName,
   nation,
   onSelectCity,
-  campaignEnabled = false,
   equipment,
 }: {
   worldId: string;
@@ -51,7 +49,6 @@ export function GeneralInfo({
   cityName: string;
   nation: MapNation | undefined;
   onSelectCity: (key: number) => void;
-  campaignEnabled?: boolean;
   equipment?: EquipmentRead | undefined;
 }) {
   const g = home.general;
@@ -108,14 +105,7 @@ export function GeneralInfo({
           { label: '특기', value: g.special || '—' },
           { label: '금', value: n(g.gold) },
           { label: '쌀', value: n(g.rice) },
-          ...(campaignEnabled
-            ? [{ label: '병력·훈련·사기', value: '부곡별 현황 참조' }]
-            : [
-                { label: '병종', value: <UnitName worldId={worldId} crewType={g.crewType} /> },
-                { label: '병력', value: n(g.crew) },
-                { label: '훈련', value: n(g.train) },
-                { label: '사기', value: n(g.atmos) },
-              ]),
+          { label: '병력, 훈련, 사기', value: '부곡별 현황 참조' },
           { label: '경험', value: n(g.experience) },
           { label: '공헌', value: n(g.dedication) },
           merit.row
@@ -127,7 +117,7 @@ export function GeneralInfo({
       />
       {/* 장착 장비는 원작 장수 칸처럼 여기 둔다. 가문(T4-95)은 내 정보 화면(/me)으로 옮겼다 (INT-25). */}
       {equipment ? <EquipmentStatus read={equipment} /> : null}
-      {summary && 'relationsEnabled' in summary ? <RelationList worldId={worldId} generalId={g.id} /> : null}
+      <RelationList worldId={worldId} generalId={g.id} />
       <p className={styles.links}>
         <Link to="/w/$worldId/me" params={{ worldId }}>
           내 정보

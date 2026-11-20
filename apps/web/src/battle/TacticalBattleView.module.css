@@ -1,0 +1,436 @@
+/* 전술 전투 화면 (D-099). 옻칠과 놋쇠 틀, 둥근 모서리 없음.
+   넓은 화면에서는 감싸개를 가득 채운다(사용자 2026-11-15 "좋아 이대로"). 감싸개 높이가 정해지지 않았으면 min-height로 버틴다. */
+.council,
+.field {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-height: 560px;
+  color: #f1e4c8;
+}
+.council {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background: #241c15;
+  grid-template-columns: 280px minmax(0, 1fr) 240px;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    'left table right'
+    'compare table right'
+    'note note note';
+}
+/* 야전과 공성: 무대가 화면 전체(아래 턴 넘기기 띠 52px 빼고)이고 판은 가운데, 나머지 판은 그 위에 얹는다. */
+.field {
+  overflow: hidden;
+  background: #1d140c center / cover no-repeat;
+}
+.leftPanel {
+  grid-area: left;
+}
+.rightPanel {
+  grid-area: right;
+}
+.table {
+  grid-area: table;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: var(--space-4);
+  background: repeating-linear-gradient(45deg, rgb(255 255 255 / 3%) 0 6px, transparent 6px 12px), #3a332b;
+  border: 6px double #6e655a;
+}
+/* 회의 판은 탁자 남는 높이를 다 쓴다. */
+.table > svg {
+  flex: 1 1 0;
+  min-height: 0;
+}
+.compass {
+  position: absolute;
+  font: 700 18px var(--font-display, serif);
+  color: #cfc6b4;
+}
+.compass[data-dir='n'] {
+  top: 4px;
+  right: 30%;
+}
+.compass[data-dir='e'] {
+  bottom: 30%;
+  right: 6px;
+}
+.compass[data-dir='s'] {
+  bottom: 70px;
+  left: 30%;
+}
+.compass[data-dir='w'] {
+  top: 30%;
+  left: 6px;
+}
+.legend {
+  margin: var(--space-1) 0;
+  font-size: var(--text-sm);
+}
+.legendContest,
+.legendSupply {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin: 0 4px 0 12px;
+  vertical-align: calc(var(--glyph-mid) - 12px / 2);
+}
+.legendContest {
+  background: #fff;
+  transform: rotate(45deg) scale(0.8);
+  outline: 2px solid #1d3d6e;
+}
+.legendSupply {
+  background: #e08a2c;
+  border-radius: 50%;
+}
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-1);
+}
+.choices button,
+.playback button {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 var(--space-3);
+  border: 2px solid #3a2416;
+  border-radius: 0;
+  background: linear-gradient(180deg, #8a3b28, #5c2216);
+  color: #fff3dc;
+  font-weight: 700;
+}
+.choices button[aria-pressed='true'] {
+  background: linear-gradient(180deg, #e0563a, #a02a18);
+  outline: 3px solid #ffd65a;
+  outline-offset: -3px;
+}
+.choices button:disabled,
+.playback button:disabled {
+  opacity: 0.5;
+}
+.rightPanel dl,
+.unitCard dl {
+  margin: 0;
+  display: grid;
+  gap: 2px;
+}
+.rightPanel dl > div,
+.unitCard dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 2px 6px;
+  background: rgb(0 0 0 / 28%);
+}
+.rightPanel dt,
+.unitCard dt {
+  color: #e3c98a;
+}
+.rightPanel dd,
+.unitCard dd {
+  margin: 0;
+}
+.head {
+  background: transparent !important;
+  justify-content: center !important;
+  font-weight: 700;
+}
+.unitName {
+  margin: 0 0 var(--space-1);
+  padding-left: 6px;
+  border-left: 6px solid;
+  font-weight: 700;
+  font-size: var(--text-lg);
+}
+.unitName small {
+  display: block;
+  font-weight: 400;
+  font-size: var(--text-xs);
+  color: #d6c7a6;
+}
+.muted {
+  color: #b9aa8c;
+  font-size: var(--text-sm);
+}
+.compare {
+  grid-area: compare;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: rgb(60 40 28 / 92%);
+  border: 2px solid #8a6a34;
+}
+.compare table {
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+.compare th {
+  color: #ffd27a;
+  padding: 0 8px;
+}
+.compare td {
+  padding: 0 4px;
+}
+.pie {
+  display: inline-block;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 2px solid #1a120b;
+  flex: none;
+}
+.note {
+  grid-area: note;
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  background: #120d09;
+  color: #f1e4c8;
+}
+.hud {
+  position: absolute;
+  z-index: 5;
+  top: 12px;
+  left: 12px;
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 0 var(--space-3);
+  padding: var(--space-1) var(--space-2);
+  background: rgb(110 24 18 / 92%);
+  border: 2px solid #e2b448;
+  font-weight: 700;
+}
+.hud > div {
+  display: flex;
+  gap: var(--space-1);
+}
+.hud dt {
+  color: #ffd27a;
+}
+.hud dd {
+  margin: 0;
+}
+.windArrow {
+  display: inline-block;
+  margin-right: 2px;
+}
+.stage {
+  grid-area: stage;
+  position: absolute;
+  inset: 0 0 52px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.stage > svg {
+  flex: none;
+  width: 100%;
+  height: 100%;
+}
+/* 날씨 덮개: 256 무늬를 192로 깔고, 한 번 되풀이에 바람 쪽으로 정수 장만큼 민다(--drift-x, --drift-y). */
+.weather {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background-size: 192px 192px;
+  background-repeat: repeat;
+  animation: weatherDrift linear infinite;
+}
+/* 비 무늬는 빗줄기가 성기고 옅어(알파 최대 69) 절반 크기 무늬 한 겹을 더 깐다. 호우는 하늘빛도 어둡게. */
+.weather[data-weather='rain']::after,
+.weather[data-weather='downpour']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: inherit;
+  /* 192의 절반이라 바깥 겹과 같은 거리를 밀어도 이음매가 맞는다. */
+  background-size: 96px 96px;
+  animation: inherit;
+}
+.weather[data-weather='downpour'] {
+  background-color: rgb(20 30 40 / 28%);
+}
+.weather[data-weather='snow'] {
+  opacity: 0.85;
+}
+.weather[data-weather='fog'] {
+  opacity: 0.6;
+  background-color: rgb(220 214 200 / 30%);
+}
+@keyframes weatherDrift {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: calc(var(--drift-x) * 192px) calc(var(--drift-y) * 192px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .weather {
+    animation: none;
+  }
+}
+.eventBox {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: 30%;
+  transform: translateX(-50%);
+  min-width: 240px;
+  padding: var(--space-2) var(--space-3);
+  background: #f3e8cf;
+  color: #2a1a0c;
+  border: 3px solid #7a2a1a;
+}
+.eventBox p {
+  margin: 0;
+  font-weight: 700;
+}
+.eventBox table {
+  border-collapse: collapse;
+}
+.eventBox th,
+.eventBox td {
+  padding: 0 6px;
+}
+.side {
+  grid-area: side;
+  position: absolute;
+  z-index: 5;
+  top: 12px;
+  right: 12px;
+  width: 260px;
+  padding: var(--space-2);
+  background: rgb(36 28 21 / 92%);
+  border: 2px solid #8a6a34;
+}
+.field > .compare {
+  position: absolute;
+  z-index: 5;
+  left: 12px;
+  bottom: 64px;
+  width: 440px;
+  box-sizing: border-box;
+}
+.live {
+  margin-top: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: #4a3a10;
+  border-left: 4px solid #ffd65a;
+  font-size: var(--text-sm);
+}
+.playback {
+  grid-area: playback;
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  box-sizing: border-box;
+  min-height: 52px;
+  padding: 0 var(--space-2);
+  background: #120d09;
+  border-top: 2px solid #8a6a34;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.playback input[type='range'] {
+  width: min(320px, 50vw);
+}
+.result {
+  position: absolute;
+  z-index: 6;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  padding: var(--space-3) var(--space-6);
+  font: 700 36px var(--font-display, serif);
+  background: rgb(20 12 6 / 85%);
+  border: 3px solid #e2b448;
+  color: #ffe6a8;
+  pointer-events: none;
+}
+.siege {
+  display: block;
+}
+.crack {
+  fill: none;
+  stroke: #2a2420;
+  stroke-width: 4;
+}
+.siegeTroops {
+  font: 600 11px var(--font-body, sans-serif);
+  fill: #fff;
+}
+
+/* 휴대폰과 태블릿 가로: 겹쳐 얹지 않고 위에서 아래로 쌓는다. 판을 넓게, 옆 판은 아래로 (INT-29 양손 서랍은 무대 화면이 맡는다). */
+@media (max-width: 900px) {
+  .council,
+  .field {
+    height: auto;
+    min-height: 0;
+  }
+  .council {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-template-areas: 'table' 'right' 'left' 'compare' 'note';
+  }
+  .table > svg {
+    flex: none;
+    height: auto;
+    max-height: 60vh;
+  }
+  .field {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-2);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'hud' 'stage' 'compare' 'side' 'playback';
+  }
+  .field > .hud,
+  .field > .stage,
+  .field > .compare,
+  .field > .side,
+  .field > .playback {
+    position: relative;
+    inset: auto;
+    width: auto;
+  }
+  .field > .hud {
+    grid-area: hud;
+    justify-self: start;
+  }
+  .field > .stage {
+    aspect-ratio: 16 / 10;
+  }
+  .field > .playback {
+    border-top: 0;
+    background: transparent;
+  }
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.siegeShadow {
+  fill: rgb(40 28 18 / 33%);
+}

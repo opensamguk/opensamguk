@@ -7,6 +7,11 @@ import type { GeneratorEvent } from './journal';
 
 // HTTP 응답을 메모리 스트림으로 대체한 순수 계약 검사다. 실제 API/PG 부하 인수가 아니다.
 describe('L4 생성기 후크와 전체 본문 시간', () => {
+  it('정식 모드에서는 로컬 축소 고정물을 거부한다', async () => {
+    await expect(
+      runNativeLoad([], { mode: 'formal', seed: 'test', signal: new AbortController().signal, localRehearsal: true }),
+    ).rejects.toThrow('LOAD_FORMAL_PROFILE_REQUIRED');
+  });
   it('attempt 영속 대기와 본문 소비를 모두 duration에 포함하고 취소 후 새 후크를 내보내지 않는다', async () => {
     let clock = 0,
       abortedEvents = 0,

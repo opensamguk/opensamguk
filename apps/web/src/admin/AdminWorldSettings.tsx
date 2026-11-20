@@ -45,7 +45,7 @@ const labels: Record<Field, string> = {
   npcPlay: 'NPC 무장 플레이',
   generalCreation: '신규 장수 생성',
   truce: '야간 휴전',
-  recruitmentLocation: '모병·징병 지역 조건',
+  recruitmentLocation: '모병과 징병 지역 조건',
   foundUntil: '건국 가능 기간 (개월)',
   peace: '초반 보호 기간 (개월)',
   aggression: 'NPC 공격성',

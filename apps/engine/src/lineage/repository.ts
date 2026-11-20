@@ -75,13 +75,7 @@ export async function persistLineageState(
   next: WorldView,
 ) {
   if (!before.lineage && !next.lineage) return;
-  if (
-    !before.lineage ||
-    !next.lineage ||
-    !before.ruleFeatures?.includes('lineage-v1') ||
-    !next.ruleFeatures?.includes('lineage-v1')
-  )
-    throw Error('진행 중 가문 기능을 바꿀 수 없습니다.');
+  if (!before.lineage || !next.lineage) throw Error('진행 중 가문 기능을 바꿀 수 없습니다.');
   const original = readLineageState(before.lineage),
     final = readLineageState(next.lineage);
   if (JSON.stringify(original.config) !== JSON.stringify(final.config) || original.seed !== final.seed)

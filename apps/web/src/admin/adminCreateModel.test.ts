@@ -37,22 +37,20 @@ describe('AC-M3-04 생성 요청 확인·복구 경계', () => {
       unitSetKey: 'basic',
       endYear: 201,
       turnTermMinutes: 60,
+      fogOfWar: false,
     });
-    expect(command.input.ruleFeatures).toContain('city-resources-v1');
-    expect(command.input.ruleFeatures).not.toContain('treaty-trade');
+    expect(command.input).not.toHaveProperty('ruleFeatures');
     expect(command.input).not.toHaveProperty('featureProfileKey');
     expect(Object.isFrozen(command.input)).toBe(true);
-    expect(Object.isFrozen(command.input.ruleFeatures)).toBe(true);
     expect(JSON.stringify([options, draft])).toBe(original);
   });
-  it('AC-P2-30~34 확장판의 키·15기능을 고정하고 조회 전용 해시는 전송하지 않는다', () => {
+  it('AC-P2-30~34 확장판의 키를 고정하고 조회 전용 해시는 전송하지 않는다', () => {
     const value = { ...options, profiles: [expandedProfile] };
     const review = reviewCreation(value, { ...draft, profileId: expandedProfile.id, endYear: '231' }, viewerId, 'seed');
     const input = freezeCreation(review, requestKey).input;
     expect(review.profileLabel).toBe(expandedProfile.label);
     expect(input.featureProfileKey).toBe('expanded-191-v3');
-    expect(input.ruleFeatures).toEqual(expandedProfile.ruleFeatures);
-    expect(input.ruleFeatures).toHaveLength(15);
+    expect(input).not.toHaveProperty('ruleFeatures');
     expect(input.endYear).toBe(231);
     for (const key of ['featureProfileHash', 'expandedProfiles', 'profileId']) expect(input).not.toHaveProperty(key);
   });
@@ -176,7 +174,6 @@ describe('T4-90 판 고르기 모델', () => {
     const before = reviewCreation(options, draft, viewerId, 'seed').input;
     const after = reviewCreation(options, { ...draft, resources: {} }, viewerId, 'seed', lists()).input;
     expect(after).toEqual(before);
-    expect(after.ruleFeatures).toHaveLength(10);
     const frozen = freezeCreation(reviewCreation(options, draft, viewerId, 'seed'), requestKey).input;
     expect(frozen).toEqual({ ...before, idempotencyKey: requestKey });
     const review = reviewCreation(options, draft, viewerId, 'seed');
@@ -190,13 +187,16 @@ describe('T4-90 판 고르기 모델', () => {
     expect(review.changed).toEqual(['scenarioKey', 'mapKey']);
     expect(JSON.stringify(review.input)).not.toContain('@1');
   });
-  it('칸을 바꾸면 ruleFeatures를 생략하고 얼리는 단계에서도 빈 배열로 바꾸지 않는다', () => {
+  it('D-104 규칙 목록은 보내지 않고 안개 설정만 보낸다', () => {
     const review = reviewCreation(options, { ...draft, resources: { mapKey: 'che@2' } }, viewerId, 'seed', lists());
     expect(review.input).not.toHaveProperty('ruleFeatures');
     const input = freezeCreation(review, requestKey).input;
     expect(input).not.toHaveProperty('ruleFeatures');
     expect(Object.keys(input)).not.toContain('ruleFeatures');
     expect(JSON.stringify(input)).not.toContain('ruleFeatures');
+    expect(input.fogOfWar).toBe(false);
+    const fog = reviewCreation(options, { ...draft, fogOfWar: true }, viewerId, 'seed');
+    expect(freezeCreation(fog, requestKey).input.fogOfWar).toBe(true);
   });
   it('바뀐 조합에는 기본 프로필의 연도·수치를 싣지 않고 종료 연도 하한은 서버에 맡긴다', () => {
     const review = reviewCreation(
@@ -249,10 +249,9 @@ describe('T4-90 판 고르기 모델', () => {
       if (changed.length === 0) {
         const review = reviewCreation(value, { ...base, resources: stale }, viewerId, 'seed', lists());
         expect(review.input).toMatchObject({ scenarioKey: 'integration191', unitSetKey: 'basic' });
-        expect(review.input.ruleFeatures).toEqual(profile.ruleFeatures);
         expect(review.changed).toEqual([]);
       } else {
-        // 형식 2인 v3는 병종을 서버가 검사하지 않으므로 게시 목록의 판을 고를 수 있다. 그래도 ruleFeatures는 프로필 목록을 그대로 보낸다.
+        // 형식 2인 v3는 병종을 서버가 검사하지 않으므로 게시 목록의 판을 고를 수 있다.
         const review = reviewCreation(
           value,
           { ...base, resources: { ...stale, unitSetKey: 'basic@2' } },
@@ -262,8 +261,6 @@ describe('T4-90 판 고르기 모델', () => {
         );
         expect(review.input).toMatchObject({ scenarioKey: 'integration191', unitSetKey: 'basic@2' });
         expect(review.input).toHaveProperty('featureProfileKey', 'expanded-191-v3');
-        expect(freezeCreation(review, requestKey).input.ruleFeatures).toEqual(profile.ruleFeatures);
-        expect(review.input.ruleFeatures).toEqual(profile.ruleFeatures);
         expect(review.changed).toEqual(changed);
       }
     }

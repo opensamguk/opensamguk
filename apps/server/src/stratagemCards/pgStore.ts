@@ -67,8 +67,7 @@ export class PgStratagemCardsStore implements StratagemCardsStore {
       },
       select: { id: true },
     });
-    const state =
-      options.state && world.ruleFeatures.includes('stratagem-cards-v1') ? await readView(tx, worldId) : null;
+    const state = options.state ? await readView(tx, worldId) : null;
     return {
       authenticated: true,
       sanctioned: sanctioned !== null,
@@ -111,8 +110,7 @@ export class PgStratagemCardsStore implements StratagemCardsStore {
           status: 'PENDING',
         },
       });
-      if (snapshot.world!.ruleFeatures.includes('policy'))
-        await tx.$executeRaw`INSERT INTO "InputEvent" ("worldId","userId","generalId",kind,"idempotencyKey",payload,status)
+      await tx.$executeRaw`INSERT INTO "InputEvent" ("worldId","userId","generalId",kind,"idempotencyKey",payload,status)
         VALUES (${worldId},${identity.userId},${decision.generalId},'general.active',${`general.active:stratagem-cards:${requestId}`},'{}'::jsonb,'PENDING')
         ON CONFLICT ("worldId","generalId") WHERE status='PENDING' AND kind='general.active' DO NOTHING`;
       return event;

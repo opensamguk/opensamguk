@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import type { Page, TestInfo } from '@playwright/test';
 import { expect, type LegalStack } from './legalFixture';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { holdLease } from './game';
@@ -34,19 +34,9 @@ export async function formalConsent(
         portraitMap: '191-map',
         seed: 'legal-formal-191-' + index,
       });
-      initial.ruleFeatures = [
-        'campaign-assignment-v2',
-        'campaign-v1',
-        'five-stats',
-        'operational-map',
-        'personnel',
-        'policy',
-        'stratagem-basic',
-        'treaty',
-      ];
       expect(initial.generals).toHaveLength(491);
       expect(initial.nations).toHaveLength(21);
-      const { worldId } = await saveInitialWorld(stack.db, initial, {
+      const { worldId } = await saveFixtureWorld(stack.db, initial, {
         name: '동의 화면 정식191-' + index,
         turnTermMinutes: 60,
         endYear: 201,
@@ -69,6 +59,8 @@ export async function formalConsent(
       }
       await expect(page.getByRole('spinbutton')).toHaveCount(5);
       await page.getByLabel('이름', { exact: true }).fill('동의장수' + index);
+      // 성별은 늘 필수다(가문 규칙 상시, D-104).
+      await page.getByRole('radio', { name: '남', exact: true }).check();
       await page.getByRole('button', { name: '장수 만들기', exact: true }).click();
       await expect
         .poll(() => hold.db.inputEvent.count({ where: { worldId, kind: 'general.create', status: 'PENDING' } }))
@@ -83,9 +75,8 @@ export async function formalConsent(
       expect(await stack.db.general.count({ where: { worldId, userId: null } })).toBe(491);
       expect(await stack.db.generalTurn.count({ where: { worldId } })).toBe(492 * 30);
       expect(
-        (await stack.db.world.findUniqueOrThrow({ where: { id: worldId }, select: { ruleFeatures: true } }))
-          .ruleFeatures,
-      ).toEqual(initial.ruleFeatures);
+        (await stack.db.world.findUniqueOrThrow({ where: { id: worldId }, select: { fogOfWar: true } })).fogOfWar,
+      ).toBe(false);
     }
     const main = `/w/${worlds[0]!.id}?city=40`;
     await page.goto(stack.origin + main);

@@ -21,7 +21,7 @@ import { holdLease, releaseHold, type LeaseHold } from './game';
 // 고정 이름 t2-14-fixture-{setup,cleanup}.json에는 마지막 worker 것을 한 벌 더 쓴다.
 //
 // 시험마다 새 계정과 새 월드를 만든다. 월드는 엔진 월간 fixture를 복사하고 그 계정이 주인인 사람 장수 하나를 초기 상태에 더한다.
-// saveInitialWorld의 형식 3에 policy 기능을 지정해 저장하고 실행권을 잡은 뒤 엔진 controlClock으로 연다. 엔진은 시험이 쥔 실행권으로
+// saveFixtureWorld의 형식 3에 policy 기능을 지정해 저장하고 실행권을 잡은 뒤 엔진 controlClock으로 연다. 엔진은 시험이 쥔 실행권으로
 // 실제 TurnLoop.advanceTo만 돈다(manual). 활동 시각·explicit·전환 표지·InputEvent 결과·시계·tick은 쓰지 않는다.
 // 월드 행 직접 쓰기는 거절 조건 fixture(closeWorldForRejection) 한 곳뿐이다.
 
@@ -119,8 +119,9 @@ let template: Promise<WorldInit> | undefined;
 let passwordHash: Promise<string> | undefined;
 
 // 월간 fixture(도시 4, 국가 2, NPC 장수 3)를 복사하고 시험 계정의 사람 장수를 더한다. 외교는 비운다.
-function worldState(source: WorldInit, kind: WorldKind, userId: string, name: string): WorldInit {
+export function worldState(source: WorldInit, kind: WorldKind, userId: string, name: string): WorldInit {
   const state = structuredClone(source);
+  state.scenarioKey = 'e2e-policy';
   const npc = state.generals[0]!;
   state.generals.push({
     ...npc,
@@ -144,10 +145,10 @@ function worldState(source: WorldInit, kind: WorldKind, userId: string, name: st
 }
 
 async function createWorld(kind: WorldKind): Promise<PolicyWorld> {
-  const [{ monthlyFixture }, { saveInitialWorld }, { controlClock }, { TurnLoop }, { hashPassword }] =
+  const [{ monthlyFixture }, { saveFixtureWorld }, { controlClock }, { TurnLoop }, { hashPassword }] =
     await Promise.all([
       import('../apps/engine/test/monthlyFixture'),
-      import('../apps/engine/src/world/persistence'),
+      import('./worldFixture'),
       import('../apps/engine/src/world/clock'),
       import('../apps/engine/src/turnLoop'),
       import('../apps/server/src/auth/password'),
@@ -162,11 +163,18 @@ async function createWorld(kind: WorldKind): Promise<PolicyWorld> {
   const { userId, worldId } = await withE2eDb(async (db) => {
     // 계정 행만 만든다. 세션은 화면 로그인으로 서버가 만든다.
     const user = await db.user.create({ data: { email, passwordHash: hash }, select: { id: true } });
-    const saved = await saveInitialWorld(db, worldState(source, kind, user.id, '방침시험'), {
+    const initial = worldState(source, kind, user.id, '방침시험');
+    // 늘 켠 물류 규칙에서 수비 강화와 성벽 보수는 도시 철과 목재를 쓴다. 이 시험은 방침 선택을 보므로 물자 준비와 분리하고,
+    // 생성 기록에도 같은 비용 설정을 남긴다(tools/fixtures/recruitment.ts의 모병 비용 0과 같은 방식).
+    const { logisticsConfigSchema, providedRuleData } = await import('../packages/rules/src/index');
+    const logistics = logisticsConfigSchema.parse(providedRuleData(initial, 1440)['logistics-v1']);
+    const free = { iron: 0, wood: 0, horses: 0 };
+    logistics.build = { wall: free, defence: free };
+    const saved = await saveFixtureWorld(db, initial, {
       name,
       turnTermMinutes: 1440,
       endYear: null,
-      ruleFeatures: ['policy'],
+      featureData: { 'logistics-v1': logistics },
     });
     return { userId: user.id, worldId: saved.worldId };
   });

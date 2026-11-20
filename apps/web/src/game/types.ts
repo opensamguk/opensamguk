@@ -7,8 +7,8 @@ type Outputs = inferRouterOutputs<AppRouter>;
 export type WorldSummary = Outputs['world']['summary'];
 export type WorldMap = Outputs['world']['map'];
 type WorldMapCity = WorldMap['cities'][number];
-export type MapCity = Omit<WorldMapCity, 'region' | 'regionName'> &
-  Partial<Pick<WorldMapCity, 'region' | 'regionName'>>;
+type OptionalMapFields = 'region' | 'regionName' | 'parentCityKey' | 'detached';
+export type MapCity = Omit<WorldMapCity, OptionalMapFields> & Partial<Pick<WorldMapCity, OptionalMapFields>>;
 export type MapNation = WorldMap['nations'][number];
 export type Home = Outputs['home']['get'];
 export type CityView = Outputs['city']['get'];

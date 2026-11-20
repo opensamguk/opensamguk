@@ -4,16 +4,16 @@ import { createRequire } from 'node:module';
 import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, beforeAll, beforeEach, expect, it as test } from 'vitest';
 import { createDb } from '../packages/db/src/index';
-import { buildServer } from '../apps/server/src/server';
+import { buildFixtureServer as buildServer } from './server-fixture';
 import { authzCase } from '../apps/server/src/authz/case';
 import { categories } from '../apps/server/src/authz/coverage';
 import { newSession } from '../apps/server/src/auth/session';
 import { hashPassword } from '../apps/server/src/auth/password';
-import { testDatabaseUrl } from './test-database';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
 import { initializeResources } from './init-resources';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { initializeIntegrationResources } from './integration-resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import type { LegalPolicy } from '../apps/server/src/legal/policy';
@@ -36,7 +36,7 @@ if (!['localhost', '127.0.0.1'].includes(source.hostname)) throw new Error('loop
 for (const key of source.searchParams.keys())
   if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
     throw new Error('접속 대상 질의 인자는 쓸 수 없습니다.');
-const name = `t302_consent_${randomUUID().replaceAll('-', '')}_test`;
+const name = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
 const adminUrl = new URL(source),
   target = new URL(source);
 adminUrl.pathname = '/postgres';
@@ -81,8 +81,17 @@ function it(title: string, action: () => Promise<void>) {
 async function settle() {
   while (executions.size) await Promise.allSettled([...executions]);
 }
-const catalog = async () =>
-  (await admin.query('SELECT datname,oid::text AS oid FROM pg_database ORDER BY datname')).rows;
+const catalog = async () => {
+  const rows = (await admin.query('SELECT datname,oid::text AS oid FROM pg_database ORDER BY datname')).rows;
+  // CI의 다른 담당 DB만 비교에서 빼고 자기 DB·개발 DB의 식별자는 계속 확인한다.
+  return process.env.CI_GREEN_DATABASE
+    ? rows.filter(
+        (row) =>
+          row.datname === process.env.CI_GREEN_DATABASE ||
+          !/^opensamguk_ci_green_[a-z0-9]+_test$/.test(String(row.datname)),
+      )
+    : rows;
+};
 beforeEach(settle);
 async function user(
   role: 'USER' | 'ADMIN' = 'USER',
@@ -525,16 +534,6 @@ for (let index = 0; index < 2; index++)
       portraitMap: '191-map',
       seed: 'consent-191-' + index,
     });
-    initial.ruleFeatures = [
-      'campaign-assignment-v2',
-      'campaign-v1',
-      'five-stats',
-      'operational-map',
-      'personnel',
-      'policy',
-      'stratagem-basic',
-      'treaty',
-    ];
     expect(initial.generals).toHaveLength(491);
     expect(initial.nations).toHaveLength(21);
     const saved = await saveInitialWorld(db, initial, {
@@ -557,7 +556,7 @@ it('두 정식 월드의 미동의 변경은 전부403·무변경이며 실제 �
   const paths = Object.entries(procedures)
     .filter(([, procedure]) => procedure._def.type === 'mutation' && procedure._def.meta?.accountAccess === 'verified')
     .map(([path]) => path);
-  expect(paths).toHaveLength(47);
+  expect(paths).toHaveLength(54);
   expect(paths).toContain('account.setPortrait');
   expect(paths).toContain('entry.possess');
   expect(paths).toContain('admin.game.request');
@@ -608,7 +607,17 @@ it('두 정식 월드의 미동의 변경은 전부403·무변경이며 실제 �
   const creating = track(() =>
     call(
       'general.create',
-      { worldId, name: '동의장수', portraitId: null, leadership: 55, strength: 55, intel: 55, politics: 55, charm: 55 },
+      {
+        worldId,
+        name: '동의장수',
+        sex: 'MALE' as const,
+        portraitId: null,
+        leadership: 55,
+        strength: 55,
+        intel: 55,
+        politics: 55,
+        charm: 55,
+      },
       cookie,
     ),
   );

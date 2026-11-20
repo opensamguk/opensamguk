@@ -1,8 +1,9 @@
 import { commandRegistry } from '../commands/registry';
 import type { Actor } from '../commands/types';
 import { sameSlot, type PolicySlot } from '../policy';
-import { calculateOperationForecast, type OperationForecastInput } from './forecast';
-import { prepareOperationReadiness, type Readiness } from './timeline';
+import { calculateOperationForecast, prepareOperationForecast, type OperationForecastInput } from './forecast';
+import { applyCampaignPreparation, campaignRecruitArgs } from '../campaign/preparation';
+import { applyCityUnitRecruitment } from '../cityResources/preparation';
 
 export type OperationNoopCode = 'NO_SLOT' | 'BEYOND_WINDOW' | 'NO_ROOM' | 'UNREACHABLE';
 export interface OperationWarning {
@@ -56,23 +57,43 @@ export function suggestOperationTurns(input: OperationSuggestionInput): Operatio
   for (let p = 0; p <= k; p++) {
     const s = k - p;
     const prefix = cleaned.map((turn, i) => (i < s ? turn : directRest()));
-    const expected: Readiness = { ...calculateOperationForecast({ ...input, turns: prefix }).expected };
+    const { expected, preparation } = prepareOperationForecast({ ...input, turns: prefix });
+    const units = () => preparation.view?.campaign?.units.filter((unit) => unit.ownerId === input.generalId) ?? [];
     const preparations: PolicySlot[] = [];
     const add = (turn: PolicySlot) => {
       preparations.push(turn);
-      prepareOperationReadiness(expected, turn);
+      preparation.apply(turn);
     };
     if (expected.crew < input.min.crew) {
-      const turn = direct('recruit', { amount: input.min.crew - expected.crew, crewType: input.crewType });
-      if (!commandRegistry.get('recruit')!.args.safeParse(turn.args).success) {
+      const unit = units()
+        .filter((unit) => unit.crewType === input.crewType)
+        .sort((a, b) => a.id - b.id)[0];
+      const turn = direct('recruit', {
+        unitId: unit?.id ?? 'new',
+        amount: input.min.crew - expected.crew,
+        crewType: input.crewType,
+      });
+      if (!campaignRecruitArgs.safeParse(turn.args).success) {
         invalidRecruit = true;
         continue;
       }
       add(turn);
     }
-    while (expected.train < input.min.train && preparations.length <= p) add(direct('train'));
-    while (expected.atmos < input.min.atmos && preparations.length <= p) add(direct('morale'));
+    for (const [key, field] of [
+      ['train', 'train'],
+      ['morale', 'atmos'],
+    ] as const) {
+      while (expected[field] < input.min[field] && preparations.length <= p) {
+        const unit = units()
+          .filter((unit) => unit.troops > 0 && unit[field] < 100)
+          .sort((a, b) => a[field] - b[field] || a.id - b.id)[0];
+        if (!unit) break;
+        add(direct(key, { unitId: unit.id }));
+      }
+    }
     if (preparations.length > p) continue;
+    if (expected.crew < input.min.crew || expected.train < input.min.train || expected.atmos < input.min.atmos)
+      continue;
     const slots = structuredClone(cleaned);
     for (let i = s; i < k; i++) slots[i] = directRest();
     preparations.forEach((turn, i) => {
@@ -92,7 +113,17 @@ export function suggestOperationTurns(input: OperationSuggestionInput): Operatio
     for (const slot of changed) {
       const turn = slots[slot]!;
       if (turn.commandKey === 'rest') continue;
-      const failure = commandRegistry.get(turn.commandKey)!.check(input.view, input.actor, turn.args);
+      const prepared =
+        turn.commandKey === 'recruit' || turn.commandKey === 'conscript'
+          ? applyCityUnitRecruitment(input.view, input.actor, turn.commandKey, turn.args)
+          : turn.commandKey === 'train' || turn.commandKey === 'morale'
+            ? applyCampaignPreparation(input.view, input.actor, turn.commandKey, turn.args)
+            : null;
+      const failure = prepared
+        ? prepared.ok
+          ? null
+          : prepared
+        : commandRegistry.get(turn.commandKey)!.check(input.view, input.actor, turn.args);
       if (failure) warnings.push({ slot, code: failure.code, reason: failure.message });
     }
     warnings.sort((a, b) => a.slot - b.slot);

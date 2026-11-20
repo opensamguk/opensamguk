@@ -208,7 +208,7 @@ export function AdminInvestigation({
     <section className={styles.investigation} aria-label="다중계정 조사">
       <h3>다중계정 조사</h3>
       <p>
-        같은 월드 참가자가 공유한 IP·기기 기록을 조사 자료로 확인합니다. 공유 기록만으로 부정 플레이를 확정할 수
+        같은 월드 참가자가 공유한 IP와 기기 기록을 조사 자료로 확인합니다. 공유 기록만으로 부정 플레이를 확정할 수
         없습니다.
       </p>
       <p>

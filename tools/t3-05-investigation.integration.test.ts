@@ -11,7 +11,7 @@ import { newSession } from '../apps/server/src/auth/session';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { initializeResources } from './init-resources';
 import { initializeIntegrationResources } from './integration-resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -21,7 +21,7 @@ import { appRouter } from '../apps/server/src/router';
 import { createRateLimiter } from '../apps/server/src/security/rateLimit';
 import type { Context } from '../apps/server/src/context';
 import { hashToken } from '../apps/server/src/auth/session';
-import { testDatabaseUrl } from './test-database';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
 import { confirmDisconnectedDatabase } from './test-db-close';
 
 type Pg = {
@@ -39,7 +39,7 @@ if (!['localhost', '127.0.0.1'].includes(source.hostname)) throw new Error('loop
 for (const key of source.searchParams.keys())
   if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
     throw new Error('접속 대상 질의 인자는 쓸 수 없습니다.');
-const name = 't305_investigate_' + randomUUID().replaceAll('-', '') + '_test';
+const name = ciGreenDatabaseName('opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test');
 const target = new URL(source),
   adminUrl = new URL(source);
 target.pathname = '/' + name;
@@ -405,16 +405,6 @@ it('AC-M3-05 정식 두 월드와 실제 같은 기기 가입·장수 생성으�
       portraitMap: '191-map',
       seed: 'investigation-world-' + index,
     });
-    initial.ruleFeatures = [
-      'campaign-assignment-v2',
-      'campaign-v1',
-      'five-stats',
-      'operational-map',
-      'personnel',
-      'policy',
-      'stratagem-basic',
-      'treaty',
-    ];
     expect(initial.nations).toHaveLength(21);
     expect(initial.generals).toHaveLength(491);
     expect(initial.cities).toHaveLength(61);
@@ -431,6 +421,7 @@ it('AC-M3-05 정식 두 월드와 실제 같은 기기 가입·장수 생성으�
         {
           worldId,
           name: '조사사람' + users.indexOf(user),
+          sex: 'MALE' as const,
           portraitId: null,
           leadership: 55,
           strength: 55,

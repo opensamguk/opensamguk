@@ -9,7 +9,7 @@ import { createDb } from '../packages/db/src/index';
 
 const run = promisify(execFile);
 const url = process.env.TEST_DATABASE_URL;
-if (!url || !/^\/[a-z][a-z0-9_]*_test$/.test(new URL(url).pathname))
+if (!url || !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(new URL(url).pathname))
   throw new Error('T2-02 전용 테스트 DB가 필요합니다.');
 const root = fileURLToPath(new URL('../', import.meta.url));
 const dbRoot = join(root, 'packages/db');
@@ -29,9 +29,9 @@ describe('T2-02 실제 PostgreSQL migration', () => {
       const config = join(temp, 'prisma.config.ts');
       try {
         await db.$executeRawUnsafe(`CREATE SCHEMA "${schema}"`);
-        const before = JSON.parse(
-          await readFile(join(root, 'apps/engine/test/fixtures/replay-v1-b8f5074.json'), 'utf8'),
-        ) as { origin: { initialStateHash: string } };
+        const before = JSON.parse(await readFile(join(root, 'tools/fixtures/migration-replay-v1.json'), 'utf8')) as {
+          origin: { initialStateHash: string };
+        };
         await cp(join(dbRoot, 'prisma/migrations'), migrations, {
           recursive: true,
           filter: (source) => {

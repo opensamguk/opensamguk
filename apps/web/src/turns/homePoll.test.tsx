@@ -28,6 +28,7 @@ const notFound = () =>
 const summary = (status: WorldSummary['status'], clockMode: WorldSummary['clockMode']): WorldSummary => ({
   name: '시험 월드',
   status,
+  fogOfWar: false,
   startYear: 190,
   gameDate: { year: 190, month: 1 },
   clockMode,

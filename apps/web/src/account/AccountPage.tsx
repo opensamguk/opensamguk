@@ -243,7 +243,7 @@ export function AccountPage({ viewerId }: { viewerId: string }) {
         setMessage(
           code === 'TOO_MANY_REQUESTS'
             ? '요청이 이어져 잠시 기다려야 합니다. 대기 후 현재 정보를 다시 확인하세요.'
-            : '입력과 처리 기준을 확인하세요. 현재 정보를 다시 확인할 수 있습니다.',
+            : '입력과 처리 기준을 확인한 뒤 현재 정보를 다시 확인하세요.',
         );
       } else {
         terminal.current = 'ambiguous';

@@ -64,7 +64,7 @@ jobs:
   database-browser:
     name: opensamguk-database-browser
     if: always() && (github.event_name != 'workflow_dispatch' || (inputs.load_expected_sha == '' && inputs.runtime_resources_expected_sha == ''))
-    needs: [database-authz, database-engine, database-e2e]
+    needs: [database-authz, database-engine, database-engine-long, database-e2e]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -72,11 +72,13 @@ jobs:
         env:
           AUTHZ: ${{ needs.database-authz.result }}
           ENGINE: ${{ needs.database-engine.result }}
+          ENGINE_LONG: ${{ needs.database-engine-long.result }}
           E2E: ${{ needs.database-e2e.result }}
         run: |
-          echo "authz=$AUTHZ engine=$ENGINE e2e=$E2E"
+          echo "authz=$AUTHZ engine=$ENGINE engine-long=$ENGINE_LONG e2e=$E2E"
           test "$AUTHZ" = success
           test "$ENGINE" = success
+          test "$ENGINE_LONG" = success
           test "$E2E" = success
 
   database-authz-shard:
@@ -194,19 +196,19 @@ jobs:
 
   # Slow engine scenarios use a separate PostgreSQL service. No tests or limits are removed.
   database-engine:
-    name: opensamguk-database-engine (${{ matrix.shard }}/2)
+    name: opensamguk-database-engine (${{ matrix.shard }}/4)
     if: github.event_name != 'workflow_dispatch' || (inputs.load_expected_sha == '' && inputs.runtime_resources_expected_sha == '')
     runs-on: ubuntu-24.04
-    # 전체가 30분 한도를 넘었다. 각 조각은 같은 개별 제한과 자기 PG를 쓴다.
+    # 전체가 30분 한도를 넘었다. 각 조각은 같은 개별 제한과 자기 PG를 쓴다. 491명 월 처리 시험이 늘어 네 조각으로 나눈다.
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3, 4]
     env:
       CI: 'true'
       INTEGRATION_SUITE: engine
-      INTEGRATION_SHARD: ${{ matrix.shard }}/2
+      INTEGRATION_SHARD: ${{ matrix.shard }}/4
       DATABASE_URL: postgresql://opensamguk:opensamguk@127.0.0.1:5432/opensamguk_ci_e2e_test
       TEST_DATABASE_URL: postgresql://opensamguk:opensamguk@127.0.0.1:5432/opensamguk_ci_int_test
     services:
@@ -244,6 +246,51 @@ jobs:
         env:
           INTEGRATION_REPORT: ${{ runner.temp }}/engine-${{ matrix.shard }}.json
 
+  database-engine-long:
+    name: opensamguk-database-engine-long
+    if: github.event_name != 'workflow_dispatch' || (inputs.load_expected_sha == '' && inputs.runtime_resources_expected_sha == '')
+    runs-on: ubuntu-24.04
+    # 한 파일이 30분을 넘어 나눌 수 없는 엔진 시험만 돈다(tools/integration-partition.ts ENGINE_LONG_INTEGRATION_FILES).
+    # AC-INT-22 정식 12개월 재적재와 재생: 로컬 33분, 설치와 준비 3분.
+    timeout-minutes: 50
+    env:
+      CI: 'true'
+      INTEGRATION_SUITE: engine-long
+      DATABASE_URL: postgresql://opensamguk:opensamguk@127.0.0.1:5432/opensamguk_ci_e2e_test
+      TEST_DATABASE_URL: postgresql://opensamguk:opensamguk@127.0.0.1:5432/opensamguk_ci_int_test
+    services:
+      postgres:
+        image: postgres:18.6-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+        env:
+          POSTGRES_USER: opensamguk
+          POSTGRES_PASSWORD: opensamguk
+          POSTGRES_DB: opensamguk_ci_e2e_test
+        ports:
+          - 127.0.0.1:5432:5432
+        options: >-
+          --health-cmd "pg_isready -U opensamguk -d opensamguk_ci_e2e_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify source commit
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.22.0'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:int
+
   # Each shard has its own PostgreSQL service, so shards never share a database.
   # Every spec creates its own world and accounts when missing (e2e/game.ts e2eWorld), so file order across shards does not matter.
   database-e2e:
@@ -251,7 +298,8 @@ jobs:
     if: github.event_name != 'workflow_dispatch' || (inputs.load_expected_sha == '' && inputs.runtime_resources_expected_sha == '')
     runs-on: ubuntu-24.04
     # Worst cold case seen in PR #219: apt download 13m28s + shard 1/4 E2E about 12 min (three 180 s test timeouts) + setup 1.5 min.
-    timeout-minutes: 30
+    # PR #674 (always-on rules): shard 4/4 setup 5 min + main 11.7 + command cards 9.6 + admin end 2.9 + SAN10 up to 6 min.
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -383,7 +431,8 @@ jobs:
         if: matrix.shard == 4
         run: pnpm e2e:san10 --reporter=line
       - name: Check campaign offer fresh reads in Chromium
-        if: matrix.shard == 4
+        # 491명 NPC commit을 기다리는 다섯 사례(8~12분)다. 4번 조각이 36분으로 가장 길어, 21분인 3번 조각에서 돈다.
+        if: matrix.shard == 3
         run: pnpm e2e:campaign-offer --reporter=line
       - name: Check admin world creation actions in Chromium
         if: matrix.shard == 1

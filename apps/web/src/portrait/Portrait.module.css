@@ -76,7 +76,9 @@
 /* 줄여 그린 초상 (size). 첫 글자도 폭에 맞춰 줄이고 먹 테두리와 금선은 1px로 둔다. */
 .sized {
   border-width: 1px;
-  vertical-align: middle;
+  /* 줄 안 얼굴: 한글 가운데에 맞추고 줄 높이를 늘리지 않는다(tokens.css 규칙). */
+  vertical-align: calc(var(--glyph-mid) - var(--portrait-size) / 2);
+  margin-block: min(0px, calc((1em - var(--portrait-size)) / 2));
 }
 .sized .initial {
   font-size: calc(var(--portrait-size) * 0.42);

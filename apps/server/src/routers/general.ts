@@ -1,3 +1,4 @@
+import { readTransactionOptions } from '../readTransaction';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { TRPCError } from '@trpc/server';
@@ -14,6 +15,7 @@ import {
   policyKeySchema,
   statRulesSchema,
   storedGeneralSex,
+  courtOfficeTitle,
 } from '@opensamguk/rules';
 import { z } from 'zod';
 import { router, protectedProcedure, worldVerifiedProcedure } from '../trpc';
@@ -75,7 +77,7 @@ export const generalRouter = router({
         const general = await requireGeneral(tx, input.worldId, ctx.user.id);
         return readPolicy(tx, input.worldId, ctx.user.id, general.id);
       },
-      { isolationLevel: 'RepeatableRead' },
+      { ...readTransactionOptions },
     ),
   ),
   setPolicy: worldVerifiedProcedure
@@ -170,12 +172,7 @@ export const generalRouter = router({
               : parsed.error.message,
           cause: parsed.error,
         });
-      const checked = validateGeneralCreation(
-        payload,
-        world.statRules,
-        world.ruleFeatures.includes('lineage-v1'),
-        world.ruleFeatures.includes('heritage-v1'),
-      );
+      const checked = validateGeneralCreation(payload, world.statRules, true, true);
       if (!checked.ok) throw new TRPCError({ code: 'BAD_REQUEST', message: checked.message });
       const { portraitId } = checked.value;
       if (
@@ -235,33 +232,41 @@ export const generalRouter = router({
     ctx.db.$transaction(
       async (tx) => {
         const world = await requireWorld(tx, input.worldId);
+        const statRules = statRulesSchema.parse({ stat: world.statRules }).stat;
         const creationRules = {
-          ...statRulesSchema.parse({ stat: world.statRules }).stat,
-          count: world.ruleFeatures.includes('five-stats') ? (5 as const) : (3 as const),
-          campaignEnabled: world.ruleFeatures.includes('campaign-v1'),
+          ...statRules,
+          count: statRules.count ?? 3,
+
           generalCreationEnabled:
             effectiveWorldOptions(world.preset === null ? null : parsePreset(world.preset), world.runtimeOptions).entry
               .generalCreation === 'open',
-          personnelEnabled: world.replayFormat === 3 && world.ruleFeatures.includes('personnel'),
+
           ...(world.replayFormat === 3 &&
           effectiveWorldOptions(world.preset === null ? null : parsePreset(world.preset), world.runtimeOptions).entry
             .npcPlay === 'on'
             ? { npcPlayEnabled: true as const }
             : {}),
-          ...(world.ruleFeatures.includes('lineage-v1') ? { lineageEnabled: true as const } : {}),
-          ...(world.ruleFeatures.includes('nation-lifecycle-v1') ? { nationLifecycleEnabled: true as const } : {}),
-          ...(world.ruleFeatures.includes('heritage-v1')
-            ? {
-                heritage: await readCreationHeritage(new PgHeritageBalanceStore(tx), ctx.user.id),
-              }
-            : {}),
+
+          ...{
+            heritage: await readCreationHeritage(new PgHeritageBalanceStore(tx), ctx.user.id),
+          },
         };
         const general = await tx.general.findUnique({
           where: { worldId_userId: { worldId: input.worldId, userId: ctx.user.id } },
         });
+        const nation =
+          general?.nationId != null
+            ? await tx.nation.findUniqueOrThrow({
+                where: { worldId_id: { worldId: input.worldId, id: general.nationId } },
+                select: { level: true },
+              })
+            : null;
         if (general)
           return {
-            general: ownGeneral(storedGeneralSex(general, world.ruleFeatures.includes('lineage-v1'))),
+            general: {
+              ...ownGeneral(storedGeneralSex(general, true)),
+              courtTitle: nation ? courtOfficeTitle(nation.level, general.officerLevel) : null,
+            },
             creation: null,
             creationRules,
           };
@@ -277,7 +282,7 @@ export const generalRouter = router({
               : null;
         return { general: null, creation, creationRules };
       },
-      { isolationLevel: 'RepeatableRead' },
+      { ...readTransactionOptions },
     ),
   ),
 });

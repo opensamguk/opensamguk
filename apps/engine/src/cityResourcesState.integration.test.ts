@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb, type Prisma } from '@opensamguk/db';
-import { emptyCampaignState, emptyCityResourcesState, toWorldState, type WorldState } from '@opensamguk/rules';
+import { emptyCityResourcesState, type WorldState } from '@opensamguk/rules';
 import { monthlyFixture } from '../test/monthlyFixture';
+import { saveInitialWorld } from './world/persistence';
+import { loadReplayState } from './monthly';
 import { loadInitialWorldFromDb } from './world/resources';
 import { persistCityResourcesState, readStoredCityResources } from './cityResourcesState';
 
@@ -13,7 +15,7 @@ const parsed = new URL(url);
 if (
   !['postgres:', 'postgresql:'].includes(parsed.protocol) ||
   !['localhost', '127.0.0.1'].includes(parsed.hostname) ||
-  !['', '5432', '5433', '5434', '5435'].includes(parsed.port) ||
+  !['', '5432', '5433', '5434', '5435', '5561'].includes(parsed.port) ||
   !/^\/[a-z][a-z0-9_]*_test$/.test(parsed.pathname) ||
   parsed.searchParams.has('host') ||
   parsed.searchParams.has('port')
@@ -39,50 +41,20 @@ afterAll(async () => {
   }
 });
 const json = (value: unknown): Prisma.InputJsonValue => JSON.parse(JSON.stringify(value));
-async function fixture(enabled = true) {
-  const world = toWorldState(source),
-    seed = `city-storage-${randomUUID()}`;
-  world.ruleFeatures = enabled
-    ? [
-        'campaign-assignment-v2',
-        'campaign-v1',
-        'city-resources-v1',
-        'five-stats',
-        'operational-map',
-        'personnel',
-        'policy',
-      ]
-    : [];
-  if (enabled) {
-    world.campaign = emptyCampaignState(world, seed, 'storage-contract');
-    world.cityResources = emptyCityResourcesState(world);
-  }
-  const row = await db.world.create({
-    data: {
-      name: 'AC-INT-18B 저장 계약',
-      scenarioKey: source.scenarioKey,
-      mapKey: source.mapKey,
-      unitSetKey: source.unitSetKey,
-      seed,
-      startYear: source.startYear,
-      initialStateHash: 'storage-contract-only',
-      statRules: json(source.statRules),
-      unitSet: json(source.unitSet),
-      turnTermMinutes: 60,
-      replayFormat: enabled ? 3 : 1,
-      ruleFeatures: world.ruleFeatures,
-      ...(enabled
-        ? {
-            campaignState: json(world.campaign),
-            operationalMap: json(source.operationalMap),
-            cityResourcesState: json(world.cityResources),
-          }
-        : {}),
-    },
+async function fixture() {
+  const init = structuredClone(source);
+  init.seed = `storage-${randomUUID()}`;
+  const { worldId } = await saveInitialWorld(db, init, {
+    name: '도시 자원 저장 계약',
+    turnTermMinutes: 60,
+    endYear: null,
   });
-  ids.push(row.id);
+  ids.push(worldId);
+  const row = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+  const { state: world } = await db.$transaction((tx) => loadReplayState(tx, worldId));
   return { row, world };
 }
+
 function changed(before: WorldState) {
   const next = structuredClone(before);
   next.cityResources!.cities[Object.keys(next.cities)[0]!] = {
@@ -99,10 +71,10 @@ const locked = async (id: string, before: WorldState, next: WorldState) =>
   });
 
 describe('AC-INT-18B 실제 PostgreSQL 도시 원장', () => {
-  it('기존 판은 NULL이고 새 판은 0으로 시작해 연결을 다시 열어도 보존된다', async () => {
-    const old = await fixture(false),
+  it('필수 도시 원장은 0으로 시작해 연결을 다시 열어도 보존된다', async () => {
+    const old = await fixture(),
       current = await fixture();
-    expect(old.row.cityResourcesState).toBeNull();
+    expect(old.row.cityResourcesState).toEqual(old.world.cityResources);
     expect(current.row.cityResourcesState).toEqual(emptyCityResourcesState(current.world));
     const reopened = createDb(url);
     try {
@@ -110,7 +82,9 @@ describe('AC-INT-18B 실제 PostgreSQL 도시 원장', () => {
       expect(readStoredCityResources(row.cityResourcesState, current.world, [1100])).toEqual(
         current.world.cityResources,
       );
-      expect((await reopened.world.findUniqueOrThrow({ where: { id: old.row.id } })).cityResourcesState).toBeNull();
+      expect((await reopened.world.findUniqueOrThrow({ where: { id: old.row.id } })).cityResourcesState).toEqual(
+        old.world.cityResources,
+      );
     } finally {
       await reopened.$disconnect();
     }
@@ -142,17 +116,17 @@ describe('AC-INT-18B 실제 PostgreSQL 도시 원장', () => {
     const row = await db.world.findUniqueOrThrow({ where: { id: f.row.id } });
     expect(readStoredCityResources(row.cityResourcesState, next, [1100])).toEqual(next.cityResources);
   });
-  it('DB 제약이 OFF 비NULL·ON NULL·의존 누락·형식 변경을 막는다', async () => {
+  it('DB 제약이 필수 상태 NULL·의존 누락·형식 변경을 막는다', async () => {
     const f = await fixture(),
-      old = await fixture(false);
+      old = await fixture();
     await expect(
-      db.world.update({ where: { id: old.row.id }, data: { cityResourcesState: json(f.world.cityResources) } }),
+      db.world.update({ where: { id: old.row.id }, data: { cityResourcesState: json(null) } }),
     ).rejects.toThrow();
     await expect(
       db.$executeRaw`UPDATE "World" SET "cityResourcesState" = NULL WHERE id = ${f.row.id}`,
     ).rejects.toThrow();
     for (const data of [
-      { ruleFeatures: f.row.ruleFeatures.filter((key) => key !== 'campaign-assignment-v2') },
+      { campaignState: json(null) },
       { cityResourcesState: json({ version: 2, cities: {} }) },
       { cityResourcesState: json({ version: 1, cities: [] }) },
       { cityResourcesState: {} },

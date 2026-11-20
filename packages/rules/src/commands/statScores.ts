@@ -7,7 +7,7 @@ type General = WorldView['generals'][number];
 type LegacyStat = 'leadership' | 'strength' | 'intel';
 
 export function commandFiveStats(view: WorldView, general: General): FiveStats | null {
-  if (!view.ruleFeatures?.includes('five-stats')) return null;
+  if (!Object.hasOwn(general, 'politics') && !Object.hasOwn(general, 'charm')) return null;
   return fiveStatsSchema.parse(Object.fromEntries(FIVE_STAT_KEYS.map((key) => [key, general[key]])));
 }
 

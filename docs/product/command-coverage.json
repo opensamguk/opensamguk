@@ -13340,24 +13340,14 @@
           "reason": "인증된 수뇌 계정이 자기 개인·직책 예턴에서 저장하고 실행하는 경로를 확인했다."
         },
         "engine": {
-          "status": "partial",
-          "evidence": [
-            {
-              "kind": "test",
-              "ref": "https://github.com/opensamguk/opensamguk/blob/63bf3a264454562d26a66b970dd1750952625b6e/tools/int18-city-resources.integration.test.ts#L399"
-            }
-          ],
-          "reason": "실제 엔진이 두 예턴을 실행하고 해당 칸을 소비했다."
+          "status": "missing",
+          "evidence": [],
+          "reason": "현행 resolver에서 제거됨. 새 부곡은 recruit의 unitId=new로 모집한다."
         },
         "effectsCostsFailures": {
-          "status": "partial",
-          "evidence": [
-            {
-              "kind": "test",
-              "ref": "https://github.com/opensamguk/opensamguk/blob/63bf3a264454562d26a66b970dd1750952625b6e/tools/int18-city-resources.integration.test.ts#L399"
-            }
-          ],
-          "reason": "빈 부곡 생성과 도시 수비병 배속 수량을 실제 DB에서 확인했다."
+          "status": "missing",
+          "evidence": [],
+          "reason": "현행 resolver에서 제거됨. 새 부곡은 recruit의 unitId=new로 모집한다."
         },
         "persistence": {
           "status": "partial",
@@ -13480,6 +13470,146 @@
         }
       },
       "blockers": ["개인·국가 예턴 카드의 실제 브라우저 동작, 재시작·재생과 전 단계 검증 기록이 남아 있다."]
+    },
+    {
+      "id": "build",
+      "target": "general",
+      "sourceIds": [],
+      "replacementReason": "INT-29에서 사용자가 승인한 성 건물 건설 명령이다. D-061 형식으로 추가 승인을 기록한다.",
+      "approvalRefs": ["D-061"],
+      "acIds": ["AC-M1-14"],
+      "queueIds": [],
+      "ownerProfile": "opensamguk-implement",
+      "reviewerProfile": "opensamguk-review",
+      "paths": ["packages/rules/src/construction/land.ts"],
+      "stages": {
+        "ui": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "고정 승인 기준 등록과 명령별 검증 증거가 필요하다."
+        },
+        "api": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "고정 승인 기준 등록과 명령별 검증 증거가 필요하다."
+        },
+        "authorization": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "고정 승인 기준 등록과 명령별 검증 증거가 필요하다."
+        },
+        "engine": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "고정 승인 기준 등록과 명령별 검증 증거가 필요하다."
+        },
+        "effectsCostsFailures": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "고정 승인 기준 등록과 명령별 검증 증거가 필요하다."
+        },
+        "persistence": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "고정 승인 기준 등록과 명령별 검증 증거가 필요하다."
+        },
+        "restart": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "고정 승인 기준 등록과 명령별 검증 증거가 필요하다."
+        },
+        "replay": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "고정 승인 기준 등록과 명령별 검증 증거가 필요하다."
+        },
+        "independentReview": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "고정 승인 기준 등록과 명령별 검증 증거가 필요하다."
+        },
+        "exactShaValidation": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "고정 승인 기준 등록과 명령별 검증 증거가 필요하다."
+        },
+        "merge": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "고정 승인 기준 등록과 명령별 검증 증거가 필요하다."
+        }
+      },
+      "blockers": ["고정 승인 기준에 명령 추가 필요"]
+    },
+    {
+      "id": "demolish",
+      "target": "general",
+      "sourceIds": [],
+      "replacementReason": "INT-29에서 사용자가 승인한 성 건물 철거 명령이다. D-061 형식으로 추가 승인을 기록한다.",
+      "approvalRefs": ["D-061"],
+      "acIds": ["AC-M1-14"],
+      "queueIds": [],
+      "ownerProfile": "opensamguk-implement",
+      "reviewerProfile": "opensamguk-review",
+      "paths": ["packages/rules/src/construction/land.ts"],
+      "stages": {
+        "ui": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "고정 승인 기준 등록과 명령별 검증 증거가 필요하다."
+        },
+        "api": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "고정 승인 기준 등록과 명령별 검증 증거가 필요하다."
+        },
+        "authorization": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "고정 승인 기준 등록과 명령별 검증 증거가 필요하다."
+        },
+        "engine": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "고정 승인 기준 등록과 명령별 검증 증거가 필요하다."
+        },
+        "effectsCostsFailures": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "고정 승인 기준 등록과 명령별 검증 증거가 필요하다."
+        },
+        "persistence": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "고정 승인 기준 등록과 명령별 검증 증거가 필요하다."
+        },
+        "restart": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "고정 승인 기준 등록과 명령별 검증 증거가 필요하다."
+        },
+        "replay": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "고정 승인 기준 등록과 명령별 검증 증거가 필요하다."
+        },
+        "independentReview": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "고정 승인 기준 등록과 명령별 검증 증거가 필요하다."
+        },
+        "exactShaValidation": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "고정 승인 기준 등록과 명령별 검증 증거가 필요하다."
+        },
+        "merge": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "고정 승인 기준 등록과 명령별 검증 증거가 필요하다."
+        }
+      },
+      "blockers": ["고정 승인 기준에 명령 추가 필요"]
     }
   ]
 }

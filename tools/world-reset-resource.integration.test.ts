@@ -1,4 +1,4 @@
-import { readInitialResources } from '../apps/engine/src/world/resources';
+import { readInitialResources, loadSexLedger } from '../apps/engine/src/world/resources';
 import { createDb } from '../packages/db/src/index';
 import { testDatabaseUrl } from './test-database';
 
@@ -14,6 +14,9 @@ const selectedResources = await (async () => {
 import type { Prisma, PrismaClient } from '../packages/db/src/index';
 import {
   buildInitialWorld,
+  applySexLedger,
+  providedRuleData,
+  replayResourceHashInput,
   requestWorldResetInput,
   adminResetPayloadSchema,
   adminResetRejectMessages,
@@ -34,17 +37,14 @@ const initial = buildInitialWorld({
   statRules: selectedResources.statRules.content,
   seed: 'source',
 });
+initial.generals = applySexLedger(initial, loadSexLedger(initial.scenarioKey));
+const featureData = providedRuleData(initial, 60);
 const origin = {
   version: 3,
   initial,
+  featureData,
   initialStateHash: hashState(initial),
-  resourceHash: hashState({
-    scenarioKey: initial.scenarioKey,
-    mapKey: initial.mapKey,
-    unitSetKey: initial.unitSetKey,
-    statRules: initial.statRules,
-    unitSet: initial.unitSet,
-  }),
+  resourceHash: hashState(replayResourceHashInput(initial, featureData)),
 };
 type Event = Prisma.InputEventGetPayload<Record<string, never>>;
 function input() {
@@ -63,7 +63,7 @@ function fixture() {
       name: '원본',
       clockRevision: 2,
       replayFormat: 3,
-      ruleFeatures: [],
+
       replayOrigin: structuredClone(origin),
       status: 'PAUSED',
       endedAt: null as Date | null,
@@ -182,6 +182,7 @@ function applied(event: Event) {
       contentHash: 'a'.repeat(64),
     })),
     settings: {
+      fogOfWar: false,
       name: '원본',
       scenarioKey: '1030',
       mapKey: 'che',
@@ -190,7 +191,7 @@ function applied(event: Event) {
       presetHash: null,
       turnTermMinutes: 30,
       endYear: null,
-      ruleFeatures: [],
+
       featureDataHash: 'a'.repeat(64),
     },
   } as Prisma.JsonObject;

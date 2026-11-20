@@ -21,7 +21,8 @@ import { categories } from '../apps/server/src/authz/coverage';
 import { loadFeatureProfile, loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
-import { acquireLease, releaseLease } from '../apps/engine/src/lease';
+import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
+import { settlePendingBattle } from '../apps/engine/test/tacticalSettlement';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { exportReplay, replayArchive } from '../apps/engine/src/replay';
@@ -34,28 +35,18 @@ if (!url) throw new Error('전용 물류 API 테스트 DB가 필요합니다.');
 const target = new URL(url);
 if (
   !['postgres:', 'postgresql:'].includes(target.protocol) ||
-  !['127.0.0.1', 'localhost'].includes(target.hostname) ||
-  !/^\/[a-z][a-z0-9_]*_test$/.test(target.pathname) ||
+  !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(target.pathname) ||
   target.searchParams.has('host') ||
   target.searchParams.has('port')
 )
-  throw new Error('loopback 전용 테스트 DB를 확인하세요.');
+  throw new Error('전용 테스트 DB를 확인하세요.');
 const db = createDb(url),
   worldIds: string[] = [],
   userIds: string[] = [];
 const now = Date.now();
 const app = await buildServer({ db, now: () => now, logging: false });
 let base: string, initial: WorldInit;
-const features = [
-  'campaign-assignment-v2',
-  'campaign-v1',
-  'city-resources-v1',
-  'five-stats',
-  'logistics-v1',
-  'operational-map',
-  'personnel',
-  'policy',
-];
+
 type Out = inferRouterOutputs<AppRouter>;
 type Results = {
   'world.summary': Out['world']['summary'];
@@ -109,7 +100,7 @@ async function advance(id: string, tick: number, fail = false) {
               throw new Error('after-consumption-save');
             },
           }
-        : {},
+        : { beforeCommit: (tx) => renewLease(tx, lease) },
     ).advanceTo(tick);
   } finally {
     await releaseLease(db, lease);
@@ -125,6 +116,7 @@ function creation(name: string) {
     intel: per,
     politics: per,
     charm: per,
+    sex: 'MALE' as const,
     portraitId: null,
   };
 }
@@ -167,13 +159,24 @@ function logisticsConfig(cityKey: number): LogisticsConfig {
   };
 }
 async function fixture({ fundedRecruitment = false, expandedRecruitment = false } = {}) {
+  const started = performance.now();
   const seed = randomUUID(),
     payload = creation('물류군주');
   const source = structuredClone(initial);
-  if (expandedRecruitment) source.generals = source.generals.filter((general) => general.officerLevel === 12);
+  source.scenarioKey = 'test-logistics-api';
+  source.diplomacies = [];
+  source.nations = source.nations.slice(0, 1);
+  const retainedNation = source.nations[0]!.id;
+  source.generals = source.generals.filter(
+    (general) => general.officerLevel === 12 && general.nationId === retainedNation,
+  );
+  source.cities = source.cities.map((city) => ({
+    ...city,
+    nationId: city.nationId === retainedNation ? retainedNation : null,
+  }));
   const neutral = initial.cities.filter(
     (city) =>
-      city.kind !== 'PASS' &&
+      (city.kind === undefined || city.kind === 'CITY') &&
       city.nationId === null &&
       city.population > 0 &&
       city.commerce > 0 &&
@@ -192,7 +195,9 @@ async function fixture({ fundedRecruitment = false, expandedRecruitment = false 
       startYear: initial.startYear,
       tick: 0,
       monthlyTick: 0,
-      cityKeys: initial.cities.filter((city) => city.kind !== 'PASS').map((city) => city.cityKey),
+      cityKeys: initial.cities
+        .filter((city) => city.kind === undefined || city.kind === 'CITY')
+        .map((city) => city.cityKey),
       unitSet: initial.unitSet,
     });
     if (preview.nextTurnTick < 10_000 && neutral.some((city) => city.cityKey === preview.cityKey)) {
@@ -223,7 +228,7 @@ async function fixture({ fundedRecruitment = false, expandedRecruitment = false 
       turnTermMinutes: 60,
       endYear: 201,
       replayFormat: 3,
-      ruleFeatures: features,
+
       featureData: { 'logistics-v1': config },
     },
   );
@@ -253,6 +258,13 @@ async function fixture({ fundedRecruitment = false, expandedRecruitment = false 
   expect(state.state.cityResources!.cities[String(cityKey)]!.gold).toBeGreaterThan(7);
   if (beforeTaxGold !== undefined)
     expect(state.state.cityResources!.cities[String(cityKey)]!.gold).toBeGreaterThan(beforeTaxGold);
+  console.info(
+    JSON.stringify({
+      event: 'logistics-preparation',
+      ms: performance.now() - started,
+      generals: source.generals.length,
+    }),
+  );
   return { id, player, generalId: general.id, cityKey, seed, config, state };
 }
 async function visitorAtCity(world: Awaited<ReturnType<typeof fixture>>) {
@@ -266,7 +278,9 @@ async function visitorAtCity(world: Awaited<ReturnType<typeof fixture>>) {
       startYear: initial.startYear,
       monthlyTick: 10_000,
       tick: 10_000,
-      cityKeys: initial.cities.filter((city) => city.kind !== 'PASS').map((city) => city.cityKey),
+      cityKeys: initial.cities
+        .filter((city) => city.kind === undefined || city.kind === 'CITY')
+        .map((city) => city.cityKey),
       unitSet: initial.unitSet,
     });
     if (preview.cityKey !== world.cityKey) continue;
@@ -284,7 +298,7 @@ beforeAll(async () => {
     portraitMap: '191-map',
     seed: 'logistics-api',
   });
-  initial.ruleFeatures = [...features];
+  initial.scenarioKey = 'tools-logistics-fixture';
   initial.generals = initial.generals.map((general) => ({ ...general, crew: 0, nextTurnTick: 1_000_000 }));
   base = await app.listen({ host: '127.0.0.1', port: 0 });
 });
@@ -307,6 +321,8 @@ describe('AC-P2-30 실제 HTTP 물류 접수·조회·엔진', () => {
   ])(
     '수송 중 도시 점령 뒤 $reason 창고·원장과 재생이 일치한다',
     async ({ reason, target, attackerCity, recipient }) => {
+      const preparationTick = 40000;
+      const started = performance.now();
       // 완–여남–초는 실제 통합 지도에서 우회 없이 두 홉으로 연결된다.
       const from = 10,
         middle = 20,
@@ -329,7 +345,7 @@ describe('AC-P2-30 실제 HTTP 물류 접수·조회·엔진', () => {
           cityKey: nation.capitalCityKey!,
           activeFromYear: source.startYear,
           rice: 20_000,
-          nextTurnTick: index === 0 ? 100 : 1_000_000,
+          nextTurnTick: index === 0 ? preparationTick + 100 : 1_000_000,
         };
       });
       source.diplomacies = [{ nationA: attackId, nationB: defendId, state: 'WAR', untilTick: 0 }];
@@ -341,6 +357,15 @@ describe('AC-P2-30 실제 HTTP 물류 접수·조회·엔진', () => {
           city.defence = 0;
         }
       }
+      const homeCity = source.cities.find((city) => city.cityKey === attackerCity)!;
+      homeCity.agriculture = homeCity.agricultureMax = 2_000_000;
+      homeCity.commerce = homeCity.commerceMax = 2_000_000;
+      const homeSite = source.operationalMap!.sites.find(
+        (site) => site.kind === 'CITY' && site.anchorKey === attackerCity,
+      )!;
+      if (homeSite.kind !== 'CITY') throw new Error('출병 준비 도시가 없습니다.');
+      homeSite.initial.agriculture = homeSite.max.agriculture = 2_000_000;
+      homeSite.initial.commerce = homeSite.max.commerce = 2_000_000;
       // 전투를 한 차례에 끝내도록 낮춘 성벽·수비도 원생성 지도와 일치시킨다.
       const site = source.operationalMap!.sites.find((row) => row.kind === 'CITY' && row.anchorKey === target);
       if (site?.kind !== 'CITY') throw new Error('점령 대상 도시가 없습니다.');
@@ -352,7 +377,7 @@ describe('AC-P2-30 실제 HTTP 물류 접수·조회·엔진', () => {
         turnTermMinutes: 60,
         endYear: 201,
         replayFormat: 3,
-        ruleFeatures: features,
+
         featureData: { 'logistics-v1': config },
       });
       worldIds.push(worldId);
@@ -395,13 +420,16 @@ describe('AC-P2-30 실제 HTTP 물류 접수·조회·엔진', () => {
         }
       }
       await controlClock(db, worldId, 'start');
+      await advance(worldId, preparationTick);
+      console.info(JSON.stringify({ event: 'logistics-capture-preparation', ms: performance.now() - started }));
+      const progress = (tick: number) => advance(worldId, preparationTick + tick);
       const ruler = await db.general.findUniqueOrThrow({
         where: { worldId_id: { worldId, id: source.generals[0]!.id } },
       });
       const commands = [
-        { commandKey: 'form_unit', args: { crewType } },
-        { commandKey: 'recruit', args: { amount: 100, crewType } },
-        { commandKey: 'morale', args: { target: 'city', crewType } },
+        { commandKey: 'rest', args: {} },
+        { commandKey: 'recruit', args: { amount: 100, crewType, unitId: 'new' } },
+        { commandKey: 'morale', args: {} },
         { commandKey: 'attack', args: { cityKey: target } },
       ];
       const edited = await rpc(
@@ -414,21 +442,10 @@ describe('AC-P2-30 실제 HTTP 물류 접수·조회·엔진', () => {
         attacker,
       );
       expect(edited.status, JSON.stringify(edited.error)).toBe(200);
-      await advance(worldId, 20_100);
+      await progress(20_100);
       const [unit] = (await snapshot(worldId)).state.campaign!.units;
-      expect(unit).toMatchObject({ commanderId: source.generals[0]!.id, troops: 0 });
-      const allocation = await rpc(
-        'cityResources.allocate',
-        {
-          worldId,
-          requestId: randomUUID(),
-          expectedUserId: attacker.id,
-          payload: { cityKey: attackerCity, unitId: unit!.id, crewType, amount: 100 },
-        },
-        attacker,
-      );
-      expect(allocation.data, JSON.stringify(allocation.error)).toMatchObject({ status: 'pending' });
-      await advance(worldId, 30_000);
+      expect(unit).toMatchObject({ commanderId: source.generals[0]!.id, troops: 100 });
+      await progress(30_000);
       const before = (await snapshot(worldId)).state;
       expect(before.campaign!.units[0]!.troops).toBe(100);
       expect(before.campaign!.units[0]!.atmos).toBeGreaterThan(0);
@@ -444,14 +461,17 @@ describe('AC-P2-30 실제 HTTP 물류 접수·조회·엔진', () => {
         defender,
       );
       expect(dispatch.data, JSON.stringify(dispatch.error)).toMatchObject({ status: 'pending' });
-      await advance(worldId, 30_000);
+      await progress(30_000);
       const sailing = (await snapshot(worldId)).state.logistics!;
-      expect(sailing.convoys).toMatchObject([{ path: [from, middle, to], arriveTick: 40_000, goods: { wood: 20 } }]);
+      expect(sailing.convoys).toMatchObject([
+        { path: [from, middle, to], arriveTick: preparationTick + 40_000, goods: { wood: 20 } },
+      ]);
       expect(sailing.cities[String(from)]!.wood).toBe(before.logistics!.cities[String(from)]!.wood - 20);
-      await advance(worldId, 30_100);
+      await progress(30_100);
+      await settlePendingBattle(db, worldId);
       const captured = (await snapshot(worldId)).state;
       const logs = await db.generalLog.findMany({
-        where: { worldId, tick: 30_100, generalId: source.generals[0]!.id, commandKey: 'attack' },
+        where: { worldId, tick: preparationTick + 30_100, generalId: source.generals[0]!.id, commandKey: 'attack' },
         select: { kind: true, text: true },
       });
       expect(captured.cities[target]!.nationId, JSON.stringify(logs)).toBe(attackId);
@@ -459,11 +479,11 @@ describe('AC-P2-30 실제 HTTP 물류 접수·조회·엔진', () => {
       if (reason === 'RETURN') expect(captured.cities[to]).toMatchObject({ nationId: defendId, supplied: false });
       expect(captured.logistics!.convoys).toEqual(sailing.convoys);
 
-      await advance(worldId, 40_000);
+      await progress(40_000);
       const after = await snapshot(worldId);
       expect(after.state.logistics!.convoys).toEqual([]);
       const movements = await db.logisticsMovement.findMany({
-        where: { worldId, tick: 40_000, good: 'wood' },
+        where: { worldId, tick: preparationTick + 40_000, good: 'wood' },
         orderBy: { ordinal: 'asc' },
         select: { holder: true, holderId: true, good: true, delta: true, reason: true },
       });
@@ -482,7 +502,7 @@ describe('AC-P2-30 실제 HTTP 물류 접수·조회·엔진', () => {
             (cityKey === recipient ? 20 : 0),
         );
       const archive = await exportReplay(db, worldId);
-      const replayed = replayArchive(archive, 4);
+      const replayed = replayArchive(archive, 8);
       expect(replayed.map(({ stateHash }) => stateHash)).toEqual(archive.months.map(({ stateHash }) => stateHash));
       expect(replayed.at(-1)?.stateHash).toBe(hashState(after));
     },
@@ -651,94 +671,105 @@ describe('AC-P2-30 실제 HTTP 물류 접수·조회·엔진', () => {
     expect(replayed.at(-1)!.stateHash).toBe(hashState(state));
   });
 
-  it('D-072 창극병·차병의 공개 비용을 실제 모집에 적용하고 부족 실패까지 재생한다', async () => {
-    const world = await fixture({ fundedRecruitment: true, expandedRecruitment: true });
-    const recruitmentTick = 36 * TICKS_PER_MONTH;
-    for (let tick = 12 * TICKS_PER_MONTH; tick <= recruitmentTick; tick += 12 * TICKS_PER_MONTH)
-      await advance(world.id, tick);
+  describe('D-072 창극병·차병 공개 비용과 부족 실패 재생', () => {
+    let world: Awaited<ReturnType<typeof fixture>>;
+    let preparedMonths = 0;
+    // 실측: 실제 36개월 준비만 28.7초이므로 각 연도 진행과 비용·재생 검증을 나눈다.
+    it.each([12, 24, 36])('실제 %i개월의 모집 재고를 준비한다', async (months) => {
+      if (months === 12) world = await fixture({ fundedRecruitment: true, expandedRecruitment: true });
+      if (preparedMonths !== months - 12) throw Error('앞선 모집 재고 준비가 끝나지 않았습니다.');
+      const started = performance.now();
+      await advance(world.id, months * TICKS_PER_MONTH);
+      expect((await snapshot(world.id)).monthlyTick).toBe(months * TICKS_PER_MONTH);
+      preparedMonths = months;
+      console.info(JSON.stringify({ event: 'logistics-D072-progress', months, ms: performance.now() - started }));
+    });
+    it('공개 비용의 실제 모집·부족 실패와 39개월 전체 재생을 보존한다', async () => {
+      if (preparedMonths !== 36) throw Error('36개월 모집 재고 준비가 끝나지 않았습니다.');
+      const recruitmentTick = 36 * TICKS_PER_MONTH;
+      const purchase = await rpc(
+        'logistics.submit',
+        {
+          worldId: world.id,
+          expectedUserId: world.player.id,
+          requestId: randomUUID(),
+          payload: { type: 'trade', cityKey: world.cityKey, good: 'iron', side: 'buy', amount: 6 },
+        },
+        world.player,
+      );
+      expect(purchase.status).toBe(200);
+      await advance(world.id, recruitmentTick);
 
-    const purchase = await rpc(
-      'logistics.submit',
-      {
-        worldId: world.id,
-        expectedUserId: world.player.id,
-        requestId: randomUUID(),
-        payload: { type: 'trade', cityKey: world.cityKey, good: 'iron', side: 'buy', amount: 6 },
-      },
-      world.player,
-    );
-    expect(purchase.status).toBe(200);
-    await advance(world.id, recruitmentTick);
+      const generalKey = { worldId_id: { worldId: world.id, id: world.generalId } };
+      const ruler = await db.general.findUniqueOrThrow({ where: generalKey });
+      const commands = [
+        { commandKey: 'recruit', args: { amount: 100, crewType: 1400 } },
+        { commandKey: 'recruit', args: { amount: 101, crewType: 1500 } },
+        { commandKey: 'recruit', args: { amount: 100, crewType: 1500 } },
+      ];
+      expect(
+        (
+          await rpc(
+            'turns.set',
+            {
+              worldId: world.id,
+              revision: ruler.turnRevision,
+              slots: Array.from({ length: 30 }, (_, i) => commands[i] ?? null),
+            },
+            world.player,
+          )
+        ).status,
+      ).toBe(200);
+      await advance(world.id, recruitmentTick);
 
-    const generalKey = { worldId_id: { worldId: world.id, id: world.generalId } };
-    const ruler = await db.general.findUniqueOrThrow({ where: generalKey });
-    const commands = [
-      { commandKey: 'recruit', args: { amount: 100, crewType: 1400 } },
-      { commandKey: 'recruit', args: { amount: 101, crewType: 1500 } },
-      { commandKey: 'recruit', args: { amount: 100, crewType: 1500 } },
-    ];
-    expect(
-      (
-        await rpc(
-          'turns.set',
-          {
-            worldId: world.id,
-            revision: ruler.turnRevision,
-            slots: Array.from({ length: 30 }, (_, i) => commands[i] ?? null),
-          },
-          world.player,
-        )
-      ).status,
-    ).toBe(200);
-    await advance(world.id, recruitmentTick);
-
-    const key = String(world.cityKey);
-    for (const [index, expected] of [
-      [{ good: 'iron', delta: -2 }],
-      [
-        { good: 'iron', delta: -4 },
-        { good: 'wood', delta: -20 },
-      ],
-      [],
-    ].entries()) {
-      const { nextTurnTick: tick } = await db.general.findUniqueOrThrow({ where: generalKey });
-      const before = (await snapshot(world.id)).state;
-      await advance(world.id, tick);
-      const after = (await snapshot(world.id)).state;
-      const rows = await db.logisticsMovement.findMany({
-        where: { worldId: world.id, tick, holder: 'city', holderId: world.cityKey, reason: 'CONSUME' },
-        orderBy: { ordinal: 'asc' },
-        select: { good: true, delta: true },
-      });
-      expect(rows).toEqual(expected);
-      const oldStock = before.logistics!.cities[key]!;
-      expect(after.logistics!.cities[key]).toMatchObject({
-        iron: oldStock.iron + (expected.find(({ good }) => good === 'iron')?.delta ?? 0),
-        wood: oldStock.wood + (expected.find(({ good }) => good === 'wood')?.delta ?? 0),
-        horses: oldStock.horses,
-      });
-      const resource = after.cityResources!.cities[key]!;
-      const previous = before.cityResources!.cities[key]!;
-      if (expected.length) {
-        const { amount, crewType } = commands[index]!.args;
-        expect(resource.garrison.find((row) => row.crewType === crewType)?.troops).toBe(amount);
-        expect(after.cities[world.cityKey]!.population).toBe(before.cities[world.cityKey]!.population - amount);
-      } else {
-        expect(resource).toEqual(previous);
-        expect(after.cities[world.cityKey]!.population).toBe(before.cities[world.cityKey]!.population);
-        expect(
-          await db.generalLog.findFirst({ where: { worldId: world.id, generalId: ruler.id, tick, kind: 'failure' } }),
-        ).toMatchObject({
-          commandKey: 'recruit',
-          text: expect.stringContaining('도시의 철·목재·말이 부족합니다.'),
+      const key = String(world.cityKey);
+      for (const [index, expected] of [
+        [{ good: 'iron', delta: -2 }],
+        [
+          { good: 'iron', delta: -4 },
+          { good: 'wood', delta: -20 },
+        ],
+        [],
+      ].entries()) {
+        const { nextTurnTick: tick } = await db.general.findUniqueOrThrow({ where: generalKey });
+        const before = (await snapshot(world.id)).state;
+        await advance(world.id, tick);
+        const after = (await snapshot(world.id)).state;
+        const rows = await db.logisticsMovement.findMany({
+          where: { worldId: world.id, tick, holder: 'city', holderId: world.cityKey, reason: 'CONSUME' },
+          orderBy: { ordinal: 'asc' },
+          select: { good: true, delta: true },
         });
+        expect(rows).toEqual(expected);
+        const oldStock = before.logistics!.cities[key]!;
+        expect(after.logistics!.cities[key]).toMatchObject({
+          iron: oldStock.iron + (expected.find(({ good }) => good === 'iron')?.delta ?? 0),
+          wood: oldStock.wood + (expected.find(({ good }) => good === 'wood')?.delta ?? 0),
+          horses: oldStock.horses,
+        });
+        const resource = after.cityResources!.cities[key]!;
+        const previous = before.cityResources!.cities[key]!;
+        if (expected.length) {
+          const { amount, crewType } = commands[index]!.args;
+          expect(resource.garrison.find((row) => row.crewType === crewType)?.troops).toBe(amount);
+          expect(after.cities[world.cityKey]!.population).toBe(before.cities[world.cityKey]!.population - amount);
+        } else {
+          expect(resource).toEqual(previous);
+          expect(after.cities[world.cityKey]!.population).toBe(before.cities[world.cityKey]!.population);
+          expect(
+            await db.generalLog.findFirst({ where: { worldId: world.id, generalId: ruler.id, tick, kind: 'failure' } }),
+          ).toMatchObject({
+            commandKey: 'recruit',
+            text: expect.stringContaining('도시의 철, 목재, 말이 부족합니다.'),
+          });
+        }
+        await advance(world.id, Math.ceil(tick / TICKS_PER_MONTH) * TICKS_PER_MONTH);
       }
-      await advance(world.id, Math.ceil(tick / TICKS_PER_MONTH) * TICKS_PER_MONTH);
-    }
-    const archive = await exportReplay(db, world.id);
-    const replayed = replayArchive(archive, 39);
-    expect(replayed.map(({ stateHash }) => stateHash)).toEqual(archive.months.map(({ stateHash }) => stateHash));
-    expect(replayed.at(-1)?.stateHash).toBe(hashState(await snapshot(world.id)));
+      const archive = await exportReplay(db, world.id);
+      const replayed = replayArchive(archive, 39);
+      expect(replayed.map(({ stateHash }) => stateHash)).toEqual(archive.months.map(({ stateHash }) => stateHash));
+      expect(replayed.at(-1)?.stateHash).toBe(hashState(await snapshot(world.id)));
+    });
   });
 
   it('예약 뒤 재고가 사라지면 모집을 거부하고 금·인구·수비병·재화는 보존한다', async () => {
@@ -799,7 +830,7 @@ describe('AC-P2-30 실제 HTTP 물류 접수·조회·엔진', () => {
       select: { commandKey: true, kind: true, text: true },
     });
     expect(
-      logs.some((row) => row.commandKey === 'recruit' && row.text.includes('도시의 철·목재·말이 부족합니다.')),
+      logs.some((row) => row.commandKey === 'recruit' && row.text.includes('도시의 철, 목재, 말이 부족합니다.')),
       JSON.stringify(logs),
     ).toBe(true);
     expect(after.state.logistics).toEqual(before.state.logistics);
@@ -838,7 +869,7 @@ describe('AC-P2-30 실제 HTTP 물류 접수·조회·엔진', () => {
 
   it('사람 생성·건국·생산 뒤 HTTP 교역·증축 결과를 원생성에서 두 월 재생한다', async () => {
     const world = await fixture();
-    expect((await rpc('world.summary', { worldId: world.id }, world.player)).data?.logisticsEnabled).toBe(true);
+    expect((await rpc('world.summary', { worldId: world.id }, world.player)).status).toBe(200);
     const before = await rpc('logistics.get', { worldId: world.id, cityKey: world.cityKey }, world.player);
     expect(before.status).toBe(200);
     if (!before.data?.visible || !before.data.own) throw new Error('자기 재고가 보이지 않습니다.');

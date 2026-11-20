@@ -25,7 +25,7 @@ type PersonnelMember = {
 };
 export type PersonnelBoard = {
   actorId: number;
-  officeEffectsEnabled?: true;
+
   officeCities?: { cityKey: number; name: string }[];
   appoint: Allowed;
   levels: { officerLevel: number; title: string; holderId: number | null }[];
@@ -78,13 +78,13 @@ export async function readPersonnelBoard(
         ? localOfficeTitle(row.officerLevel)
         : (courtTitle(row.officerLevel) ?? titleFor(row.officerLevel)),
     isHuman: row.userId !== null,
-    city: { cityKey: row.city.cityKey, name: row.city.name },
+    city: { cityKey: row.city?.cityKey ?? 0, name: row.city?.name ?? '위치 미지정' },
     ...(officeEffectsEnabled
       ? {
           officerCityKey: row.officerCityKey ?? null,
           resident: isOfficeResident(
-            { ...row, nationId: actor.nationId, cityKey: row.city.cityKey },
-            row.city.nationId ?? null,
+            { ...row, nationId: actor.nationId, cityKey: row.city?.cityKey ?? 0 },
+            row.city?.nationId ?? null,
           ),
         }
       : {}),
@@ -94,12 +94,11 @@ export async function readPersonnelBoard(
     actorId: actor.id,
     ...(officeEffectsEnabled
       ? {
-          officeEffectsEnabled: true as const,
           officeCities: await tx.city.findMany({
             where: {
               worldId: input.worldId,
               nationId: actor.nationId,
-              OR: [{ kind: null }, { kind: { not: 'PASS' } }],
+              OR: [{ kind: null }, { kind: 'CITY' }],
             },
             orderBy: { cityKey: 'asc' },
             select: { cityKey: true, name: true },

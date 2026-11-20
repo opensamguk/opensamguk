@@ -483,7 +483,7 @@ function IssueList({ issues, map, dispatch }: { issues: Issue[]; map: MapV2; dis
         검증 <span className="num">{issues.length}</span>건
       </h2>
       {issues.length === 0 ? (
-        <p className={styles.ok}>C-M3 지도 항목을 모두 통과했습니다.</p>
+        <p className={styles.ok}>지도 검증을 모두 통과했습니다.</p>
       ) : (
         <ul className={styles.issues}>
           {issues.map((issue, i) => (

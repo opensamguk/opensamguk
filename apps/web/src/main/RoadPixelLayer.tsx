@@ -8,6 +8,7 @@ const FILL: Record<RoadMode, string> = {
   BRIDGE: '#a8822f',
   FORD: '#b9a27a',
   RIVER: '#9fc4d8',
+  SEA: '#9fc4d8',
 };
 
 // modes를 주면 그 길만 그린다. 확대 타일이 땅길·다리를 그릴 때 여울·물길만 남긴다.

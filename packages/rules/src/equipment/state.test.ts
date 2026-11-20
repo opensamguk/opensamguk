@@ -10,7 +10,6 @@ import { TEST_EQUIPMENT_CONFIG } from './testFixture';
 
 const fixture = () => {
   const world = commandWorld();
-  world.ruleFeatures = ['equipment-v1'];
   world.equipment = initialEquipment(TEST_EQUIPMENT_CONFIG);
   return world;
 };
@@ -102,16 +101,15 @@ it('AC-P2-12 자기 장착만 합산하고 저장 능력치와 다른 장수를 
   expect(world).toEqual(before);
 });
 
-it('AC-P2-12 끈 판에서는 주입된 장착을 계산하지 않고 없는 상태 칸도 만들지 않는다', () => {
+it('AC-P2-12 상시 제공 판은 장착을 계산하고 누락 원장은 거부한다', () => {
   const world = commandWorld(),
     before = structuredClone(world);
   expect(equipmentBonus(world, 1)).toEqual({ leadership: 0, strength: 0, intel: 0 });
-  expect(Object.hasOwn(cloneWorld(world), 'equipment')).toBe(false);
+  expect(Object.hasOwn(cloneWorld(world), 'equipment')).toBe(true);
   expect(world).toEqual(before);
   world.equipment = initialEquipment(TEST_EQUIPMENT_CONFIG);
   world.equipment.generals['1'] = { book: 'book_01' };
-  expect(equipmentBonus(world, 1).intel).toBe(0);
-  world.ruleFeatures = ['equipment-v1'];
+  expect(equipmentBonus(world, 1).intel).toBe(3);
   delete world.equipment;
   expect(() => equipmentBonus(world, 1)).toThrow();
 });

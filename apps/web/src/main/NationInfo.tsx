@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { retryUnlessClientError } from '../game/errors';
 import { formatYearMonth, personalLogDate } from '../game/gameDate';
 import { displayName, officerName } from '../game/names';
-import { useWorldMap, useWorldRules, useWorldSummary } from '../game/queries';
+import { useWorldMap, useWorldSummary } from '../game/queries';
 import { QueryError } from '../game/QueryState';
 import {
   isDetailedCity,
@@ -45,7 +45,6 @@ import {
   type ArmyFields,
 } from './infoView';
 import { InfoGrid } from './Panel';
-import { unitNameOf } from './UnitName';
 import styles from './NationInfo.module.css';
 
 const HIDDEN_NATION = '다른 국가 정보';
@@ -136,8 +135,8 @@ export function NationFinanceGrid({ nation }: { nation: NationSummary }) {
       <p className={styles.financeTitle}>다음 정산 예상</p>
       <InfoGrid
         items={[
-          { label: '세금', value: `금 ${n(gold.gross)} · ${due(gold)}`, title: '상업·주민으로 걷는 금', wide: true },
-          { label: '세곡', value: `쌀 ${n(rice.gross)} · ${due(rice)}`, title: '농업·주민으로 걷는 쌀', wide: true },
+          { label: '세금', value: `금 ${n(gold.gross)} · ${due(gold)}`, title: '상업과 주민으로 걷는 금', wide: true },
+          { label: '세곡', value: `쌀 ${n(rice.gross)} · ${due(rice)}`, title: '농업과 주민으로 걷는 쌀', wide: true },
           {
             label: rate === undefined ? '봉급' : `봉급(지급률 ${Math.round(rate * 100)}%)`,
             value: `금 ${n(gold.payroll)} · 쌀 ${n(rice.payroll)}`,
@@ -230,7 +229,7 @@ export function NationInfo({
   if (nation === null)
     return (
       <>
-        <EmptyState title="재야입니다">국가에 임관하면 국고·군량과 소속 장수를 여기서 봅니다.</EmptyState>
+        <EmptyState title="재야입니다">국가에 임관하면 국고, 군량과 소속 장수를 여기서 봅니다.</EmptyState>
         <p className={styles.links}>
           <Link to="/w/$worldId/nation/governance" params={{ worldId }}>
             통치
@@ -289,9 +288,9 @@ export function NationTotalsGrid({ generals }: { generals: NationGenerals }) {
           { label: '장수 쌀', value: `${n(totals.rice)} (평균 ${n(totals.averageRice)})` },
           { label: '병력', value: `${n(totals.troops)} / ${n(totals.maxTroops)}` },
           { label: '병력 있는 장수', value: `${n(totals.withTroops)} / ${n(totals.count)}명` },
-          { label: '훈련·사기 90 이상', value: ready(totals.ready90) },
-          { label: '훈련·사기 80 이상', value: ready(totals.ready80) },
-          { label: '훈련·사기 60 이상', value: ready(totals.ready60) },
+          { label: '훈련과 사기 90 이상', value: ready(totals.ready90) },
+          { label: '훈련과 사기 80 이상', value: ready(totals.ready80) },
+          { label: '훈련과 사기 60 이상', value: ready(totals.ready60) },
         ]}
       />
     </div>
@@ -311,7 +310,6 @@ export function NationTables({
   const query = useNation(worldId, nationId);
   const map = useWorldMap(worldId).data;
   const summary = useWorldSummary(worldId).data;
-  const crewTypes = useWorldRules(worldId).data?.unitSet.crewTypes;
   // 소유 도시 표에서 펼친 도시 (원작 세력 도시의 암행부 연동). 한 번에 한 도시만 펼친다.
   const [openCity, setOpenCity] = useState<number | null>(null);
   const panelId = useId();
@@ -322,8 +320,6 @@ export function NationTables({
   if (query.isError)
     return <QueryError error={query.error} notFound="없는 국가입니다" onRetry={() => void query.refetch()} />;
   const data = query.data;
-  const campaign = 'campaignEnabled' in data && data.campaignEnabled;
-  const fiveStats = 'fiveStats' in data && data.fiveStats;
   // 수도는 지도 응답에 모든 국가 것이 있다. 소속국 응답의 값을 먼저 쓴다.
   const capitalKey = isMemberNation(data)
     ? data.capitalCityKey
@@ -466,27 +462,12 @@ export function NationTables({
     { key: 'leadership', label: '통솔', ...num((g) => g.leadership) },
     { key: 'strength', label: '무력', ...num((g) => g.strength) },
     { key: 'intel', label: '지력', ...num((g) => g.intel) },
-    ...(fiveStats
-      ? [
-          { key: 'politics', label: '정치', ...num((g) => g.politics) },
-          { key: 'charm', label: '매력', ...num((g) => g.charm) },
-        ]
-      : []),
-    // 부곡 월드는 병종이 부곡마다 달라 장수 병종 열을 두지 않는다.
-    ...(campaign
-      ? []
-      : [
-          {
-            key: 'crewType',
-            label: '병종',
-            sortValue: (g: General) => (isDetailedGeneral(g) ? g.crewType : null),
-            render: (g: General) => (isDetailedGeneral(g) ? unitNameOf(crewTypes, g.crewType).name : '—'),
-            title: (g: General) => (isDetailedGeneral(g) ? unitNameOf(crewTypes, g.crewType).title : HIDDEN_NATION),
-          },
-        ]),
-    { key: 'crew', label: campaign ? '지휘 병력' : '병력', ...num((g) => armyOf(g).troops) },
-    { key: 'train', label: campaign ? '평균 훈련' : '훈련', ...num((g) => armyOf(g).train) },
-    { key: 'atmos', label: campaign ? '평균 사기' : '사기', ...num((g) => armyOf(g).atmos) },
+    { key: 'politics', label: '정치', ...num((g) => g.politics) },
+    { key: 'charm', label: '매력', ...num((g) => g.charm) },
+    // 병종은 부곡마다 달라 장수 병종 열을 두지 않는다.
+    { key: 'crew', label: '지휘 병력', ...num((g) => armyOf(g).troops) },
+    { key: 'train', label: '평균 훈련', ...num((g) => armyOf(g).train) },
+    { key: 'atmos', label: '평균 사기', ...num((g) => armyOf(g).atmos) },
     {
       key: 'care',
       label: '관리',
@@ -526,9 +507,6 @@ export function NationTables({
             worldId={worldId}
             city={opened}
             generals={stationed.get(opened.key) ?? []}
-            crewTypes={crewTypes}
-            campaign={campaign}
-            fiveStats={fiveStats}
             inspection={inspection}
             names={names}
             summary={summary}
@@ -570,7 +548,6 @@ export function NationTables({
 }
 
 type DetailedNationGeneral = Extract<NationGenerals[number], { leadership: number }>;
-type CrewTypes = NonNullable<ReturnType<typeof useWorldRules>['data']>['unitSet']['crewTypes'];
 
 // 다음 턴. 직책자는 감찰 자료의 서버 시각을 쓰고, 그 밖에는 장수의 nextTurnTick으로 센 게임 연월만 쓴다.
 // 화면에서 시각을 지어내지 않는다 (턴 시각은 서버가 준 값만 보인다).
@@ -591,9 +568,6 @@ export function StationedPanel({
   worldId,
   city,
   generals,
-  crewTypes,
-  campaign,
-  fiveStats,
   inspection,
   names,
   summary,
@@ -603,9 +577,6 @@ export function StationedPanel({
   worldId: string;
   city: { key: number; name: string };
   generals: readonly DetailedNationGeneral[];
-  crewTypes: CrewTypes | undefined;
-  campaign: boolean;
-  fiveStats: boolean;
   inspection: Map<number, InspectionRow> | null;
   names: ArgNames;
   summary: WorldSummary | undefined;
@@ -632,9 +603,6 @@ export function StationedPanel({
         <StationedTable
           caption={`${city.name} 배치 장수 ${generals.length}명`}
           generals={generals}
-          crewTypes={crewTypes}
-          campaign={campaign}
-          fiveStats={fiveStats}
           inspection={inspection}
           names={names}
           summary={summary}
@@ -662,9 +630,6 @@ function CityBandLine({ worldId, cityKey }: { worldId: string; cityKey: number }
 export function StationedTable({
   caption,
   generals,
-  crewTypes,
-  campaign,
-  fiveStats,
   inspection,
   names,
   summary,
@@ -672,9 +637,6 @@ export function StationedTable({
 }: {
   caption: string;
   generals: readonly DetailedNationGeneral[];
-  crewTypes: CrewTypes | undefined;
-  campaign: boolean;
-  fiveStats: boolean;
   inspection: Map<number, InspectionRow> | null;
   names: ArgNames;
   summary: WorldSummary | undefined;
@@ -686,9 +648,7 @@ export function StationedTable({
     sortValue: (g: G) => pick(g),
     render: (g: G) => n(pick(g)),
   });
-  const statKeys = fiveStats
-    ? (['leadership', 'strength', 'intel', 'politics', 'charm'] as const)
-    : (['leadership', 'strength', 'intel'] as const);
+  const statKeys = ['leadership', 'strength', 'intel', 'politics', 'charm'] as const;
   const columns: Column<G>[] = [
     {
       key: 'name',
@@ -705,28 +665,17 @@ export function StationedTable({
     },
     {
       key: 'stats',
-      label: fiveStats ? '통·무·지·정·매' : '통·무·지',
+      label: '통·무·지·정·매',
       numeric: true,
       sortValue: (g) => g.leadership,
       render: (g) => statKeys.map((key) => g[key] ?? '—').join(' / '),
-      title: () => (fiveStats ? '통솔 / 무력 / 지력 / 정치 / 매력' : '통솔 / 무력 / 지력'),
+      title: () => '통솔 / 무력 / 지력 / 정치 / 매력',
     },
     { key: 'gold', label: '금', ...num((g) => g.gold) },
     { key: 'rice', label: '쌀', ...num((g) => g.rice) },
-    ...(campaign
-      ? []
-      : [
-          {
-            key: 'crewType',
-            label: '병종',
-            sortValue: (g: G) => g.crewType,
-            render: (g: G) => unitNameOf(crewTypes, g.crewType).name,
-            title: (g: G) => unitNameOf(crewTypes, g.crewType).title,
-          },
-        ]),
-    { key: 'crew', label: campaign ? '지휘 병력' : '병력', ...num((g) => armyOf(g).troops) },
-    { key: 'train', label: campaign ? '평균 훈련' : '훈련', ...num((g) => armyOf(g).train) },
-    { key: 'atmos', label: campaign ? '평균 사기' : '사기', ...num((g) => armyOf(g).atmos) },
+    { key: 'crew', label: '지휘 병력', ...num((g) => armyOf(g).troops) },
+    { key: 'train', label: '평균 훈련', ...num((g) => armyOf(g).train) },
+    { key: 'atmos', label: '평균 사기', ...num((g) => armyOf(g).atmos) },
     {
       key: 'next',
       label: '다음 턴',

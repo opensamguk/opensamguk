@@ -32,8 +32,10 @@ type CityField =
   | 'wallMax';
 
 export interface OwnShape {
-  general: { gold: number; rice: number; injury: number; crew?: number; train?: number; atmos?: number };
+  general: { gold: number; rice: number; injury: number };
   city: Partial<Record<CityField, number>>;
+  // 늘 켠 규칙에서 병력 정본은 부곡이다(결정 19). 훈련 방침 사례는 그 장수가 소유하고 지휘하는 부곡 하나를 둔다.
+  unit?: { troops: number; train: number; atmos: number };
 }
 
 // 활동 기준(tick 0)을 확정한 뒤 한 번 부른다. 시계가 0이고 남은 입력이 없을 때만 쓴다.
@@ -74,6 +76,28 @@ export async function prepareOwnTurn(world: PolicyWorld, shape: OwnShape, dueTic
     data: shape.general,
   });
   if (own.count !== 1) throw new Error('수도에 있는 자기 사람 장수를 찾지 못했습니다.');
+  if (shape.unit) {
+    const row = await db.world.findUniqueOrThrow({ where: { id: world.id }, select: { campaignState: true } });
+    const campaign = row.campaignState as unknown as {
+      revision: number;
+      nextUnitId: number;
+      units: Array<{ ownerId: number }>;
+    };
+    const unit = {
+      id: campaign.nextUnitId,
+      ownerId: world.generalId,
+      commanderId: world.generalId,
+      crewType: 1100,
+      ...shape.unit,
+    };
+    const next = {
+      ...campaign,
+      revision: campaign.revision + 1,
+      nextUnitId: campaign.nextUnitId + 1,
+      units: [...campaign.units.filter((u) => u.ownerId !== world.generalId), unit],
+    };
+    await db.world.update({ where: { id: world.id }, data: { campaignState: next as object } });
+  }
   if (Object.keys(shape.city).length > 0)
     await db.city.update({
       where: { worldId_cityKey: { worldId: world.id, cityKey: CAPITAL_CITY } },

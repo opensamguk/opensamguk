@@ -3,7 +3,11 @@ import type { QueuedInputHandler } from '../features';
 import { PgGovernanceRepository } from './repository';
 import { processGovernanceOrder } from './service';
 
-export const processGovernanceInput: QueuedInputHandler = async (tx, world, event, context) => {
+// 순환 import 중 등록표가 읽을 수 있도록 함수 선언으로 둔다.
+export function processGovernanceInput(...args: Parameters<QueuedInputHandler>): ReturnType<QueuedInputHandler> {
+  return handleGovernanceInput(...args);
+}
+const handleGovernanceInput: QueuedInputHandler = async (tx, world, event, context) => {
   if (event.kind !== 'governance.act') throw new Error('황실 입력 종류를 확인하세요.');
   const result = await processGovernanceOrder(new PgGovernanceRepository(tx), {
     worldId: world.id,

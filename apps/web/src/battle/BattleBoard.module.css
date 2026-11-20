@@ -1,0 +1,164 @@
+.board {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 72vh;
+  background: #2b241c;
+}
+.board[data-compact='true'] {
+  max-height: 46vh;
+}
+/* 화면을 채우는 배치: 감싸개 크기에 맞춰 가운데 놓고, 바탕은 전투 화면의 땅 그림이 보이게 비운다. */
+.board[data-fit='true'] {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  background: transparent;
+}
+.tile {
+  stroke: rgb(60 45 25 / 35%);
+  stroke-width: 1;
+}
+.tile:hover {
+  filter: brightness(1.12);
+}
+.reach {
+  fill: rgb(255 214 90 / 22%);
+  stroke: #ffd65a;
+  stroke-width: 2;
+  pointer-events: none;
+}
+.route {
+  fill: none;
+  stroke: rgb(214 60 120 / 80%);
+  stroke-width: 10;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.arrowHead {
+  fill: rgb(214 60 120 / 90%);
+}
+.base {
+  stroke: #1d3d6e;
+  stroke-width: 2;
+}
+.supply {
+  stroke: #6b3a10;
+  stroke-width: 2;
+}
+.unit {
+  cursor: pointer;
+}
+.footprint {
+  fill: rgb(255 255 255 / 12%);
+  stroke-width: 2;
+}
+.unit[data-selected='true'] .footprint {
+  fill: rgb(255 230 120 / 35%);
+  stroke: #ffe07a;
+  stroke-width: 3;
+}
+.unit[data-status='confused'] .token {
+  opacity: 0.6;
+}
+.token {
+  stroke: #1a120b;
+  stroke-width: 1.5;
+}
+.crew {
+  font: 700 12px var(--font-body, sans-serif);
+  fill: #fff7e6;
+  text-anchor: middle;
+  pointer-events: none;
+}
+.commander {
+  fill: #ffd34d;
+  stroke: #3a2a10;
+}
+.troopsBg {
+  fill: rgb(20 14 8 / 78%);
+}
+.troops {
+  font: 600 9px var(--font-body, sans-serif);
+  fill: #fff;
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+/* 지형 칸 그림과 병종 그림 (Codex). 그림은 누름을 가로채지 않는다. */
+.tileArt {
+  pointer-events: none;
+}
+.unitShadow {
+  opacity: 0.55;
+}
+.unitSprite {
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* D-105 야전 칸 규칙: 칸 표시(이동, 공격, 고름, 가림), 지물, 불 */
+.mark {
+  pointer-events: none;
+}
+/* 가림 그림(알파 195)은 그대로면 구멍처럼 검어 지형 윤곽이 조금 비치게 한다. */
+.mark[data-mark='fog'] {
+  opacity: 0.78;
+}
+/* 작전 회의 판은 진로를 짜는 지도라 지형이 더 비치게 한다. 지형과 지물은 공개 정보다 (D-105). */
+.board[data-compact='true'] .mark[data-mark='fog'] {
+  opacity: 0.5;
+}
+.marks polygon {
+  pointer-events: none;
+}
+.fogShade {
+  fill: rgb(10 8 6 / 62%);
+}
+.attackShade {
+  fill: rgb(214 40 30 / 26%);
+  stroke: #e0402e;
+  stroke-width: 2;
+}
+.fireShade {
+  fill: rgb(240 110 30 / 70%);
+  stroke: #ffcf5a;
+  stroke-width: 1.5;
+  pointer-events: none;
+}
+.object {
+  pointer-events: none;
+}
+/* 시야 밖 칸의 솟은 그림(숲, 산, 지물)도 함께 어둡게 한다. 가림 표시는 칸 바닥만 덮기 때문이다. */
+[data-fog='true'] .tileArt,
+.object[data-fog='true'] {
+  filter: brightness(0.45) saturate(0.6);
+}
+.strip {
+  overflow: hidden;
+  pointer-events: none;
+}
+/* 가로로 이어 붙인 장을 한 장씩 넘긴다. 권장 간격: 불 120ms, 커서 300ms (README-FIELD-GRID.md). */
+.fireStrip {
+  animation: stripFour 480ms steps(4) infinite;
+}
+.cursorStrip {
+  animation: stripTwo 600ms steps(2) infinite;
+}
+@keyframes stripFour {
+  to {
+    transform: translateX(-1024px);
+  }
+}
+@keyframes stripTwo {
+  to {
+    transform: translateX(-512px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fireStrip,
+  .cursorStrip {
+    animation: none;
+  }
+}

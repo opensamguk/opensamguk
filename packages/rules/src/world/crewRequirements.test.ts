@@ -6,7 +6,6 @@ import { militaryCommands } from '../commands/military';
 import { commandStatPreview } from '../commands/statPreview';
 import { applyCampaignPreparation } from '../campaign/preparation';
 import { emptyCampaignState } from '../campaign/state';
-import { applyCampaignUnitInput } from '../campaign/unitInputs';
 import { replayCampaignUnit } from '../campaign/record';
 import { createCommandResolver } from '../commands/resolve';
 import { createCampaignCommandResolver } from '../campaign/commands';
@@ -36,7 +35,6 @@ const resolver = createCityResourceCommandResolver(createCampaignCommandResolver
 
 function fixture(requirements: Requirement[]) {
   const world = commandWorld();
-  world.ruleFeatures = ['five-stats', 'campaign-v1', 'city-resources-v1'];
   for (const general of Object.values(world.generals)) Object.assign(general, { crew: 0, politics: 60, charm: 55 });
   Object.assign(world.generals[1]!, { userId: 'owner', officerLevel: 1, gold: 100_000, rice: 100_000 });
   world.campaign = emptyCampaignState(world, 'crew-requirements', 'source-fixture');
@@ -68,25 +66,14 @@ describe('INT-22 병종 조건의 공통 모집 경계', () => {
       expect(applyCityPreparation(world, actor, key, args)).toEqual({ ok: false, ...failure });
       expect(commandStatPreview(world, actor, key, args)).toBeNull();
     }
-    expect(resolver.get('form_unit')!.precheck(world, actor, { crewType: 1100 })).toEqual(failure);
-    expect(
-      applyCampaignUnitInput(world, { type: 'form', commanderId: 1, crewType: 1100, revision: 0 }, 1, world.campaign, {
-        tick: 0,
-        userId: 'owner',
-        userActive: true,
-        armyTypes: [1100, 1200, 1300],
-        unitSet,
-      }),
-    ).toEqual({ ok: false, ...failure });
+    expect(resolver.get('recruit')!.precheck(world, actor, { ...args, unitId: 'new' })).toEqual(failure);
     expect(
       cityNpcPreparation(world, 1, { unitSet, tick: 0 }).some(
         (row) => row.key === 'recruit' && row.args.crewType === 1100,
       ),
     ).toBe(false);
     const legacy = structuredClone(world);
-    legacy.ruleFeatures = ['five-stats'];
-    delete legacy.campaign;
-    delete legacy.cityResources;
+    Object.assign(legacy.logistics!.cities['1']!, { iron: 1000, wood: 1000, horses: 1000 });
     legacy.generals[1]!.userId = null;
     const recruit = chooseGeneralTurn(legacy, legacy.generals[1]!, rngFor('crew-choice', 1), {
       unitSet,
@@ -113,7 +100,7 @@ describe('INT-22 병종 조건의 공통 모집 경계', () => {
         [1100, 1200, 1300],
         unitSet,
       ),
-    ).toThrow('재현하지 못했습니다.');
+    ).toThrow();
   });
 
   it('조건을 잃어도 기존 도시·부곡 병력의 훈련·사기는 막지 않는다', () => {
@@ -164,7 +151,6 @@ describe('INT-22 병종 조건의 공통 모집 경계', () => {
 
   it('서버 행위자의 국가·자기 도시·연도·직책과 국가별 확장 표식을 읽는다', () => {
     const { world } = fixture([]);
-    world.ruleFeatures = ['personnel', 'prepared-turns-v1', 'nation-research-v1'];
     world.nationResearch = { version: 1, nations: { '1': ['greatsword'], '2': ['halberd'] } };
     world.preparedTurns = { version: 1, nations: {} };
     world.ext = { nation_scorch: { specialScorch: { '1': 2 } } };

@@ -1,0 +1,636 @@
+{
+ "cut": [
+  {
+   "id": "route:san10-ea47",
+   "from": "이주",
+   "to": "건안",
+   "reason": "건안은 민강 상류 산골이라 바닷길 출발지가 아니다"
+  },
+  {
+   "id": "route:san10-expanded-444",
+   "from": "음평 샛길",
+   "to": "검각",
+   "reason": "음평 샛길은 검각을 비켜 강유로 가는 길이다(蜀書 姜維傳 「自陰平由景谷道旁入」)"
+  },
+  {
+   "id": "route:add-5-10093",
+   "from": "음평",
+   "to": "성도",
+   "reason": "사서에 없는 직통 길. 음평에서 성도로는 검각 본길이나 강유 샛길로만 간다"
+  },
+  {
+   "id": "route:add-5-1126",
+   "from": "저",
+   "to": "성도",
+   "reason": "저족 땅(음평 북쪽)에서 성도로 곧장 가는 길은 음평·검각을 건너뛰는 우회로다. 음평을 거친다"
+  },
+  {
+   "id": "route:san10-r08-2",
+   "from": "재동",
+   "to": "성도",
+   "reason": "면죽관을(를) 거치지 않고 관문 곁을 지나 양쪽을 바로 잇는 우회로"
+  },
+  {
+   "id": "route:san10-r33-1",
+   "from": "화산",
+   "to": "무관",
+   "reason": "동관을(를) 거치지 않고 관문 곁을 지나 양쪽을 바로 잇는 우회로"
+  },
+  {
+   "id": "route:land-100-42",
+   "from": "홍농",
+   "to": "동관",
+   "reason": "함곡관을(를) 거치지 않고 관문 곁을 지나 양쪽을 바로 잇는 우회로"
+  },
+  {
+   "id": "route:san10-r34-2",
+   "from": "숭산",
+   "to": "허창",
+   "reason": "호로관을(를) 거치지 않고 관문 곁을 지나 양쪽을 바로 잇는 우회로"
+  },
+  {
+   "id": "route:san10-r45-1",
+   "from": "업",
+   "to": "상당",
+   "reason": "호관을(를) 거치지 않고 관문 곁을 지나 양쪽을 바로 잇는 우회로"
+  },
+  {
+   "id": "route:add-96-1126",
+   "from": "저",
+   "to": "서평",
+   "reason": "삼각형 지름길(돌아가는 길이 1.02배)"
+  },
+  {
+   "id": "route:add-97-1122",
+   "from": "남만",
+   "to": "영창",
+   "reason": "삼각형 지름길(돌아가는 길이 1.07배)"
+  },
+  {
+   "id": "route:add-10035-10039",
+   "from": "모로비리",
+   "to": "안야",
+   "reason": "삼각형 지름길(돌아가는 길이 1.05배)"
+  },
+  {
+   "id": "route:add-1126-10040",
+   "from": "임조",
+   "to": "저",
+   "reason": "삼각형 지름길(돌아가는 길이 1.07배)"
+  },
+  {
+   "id": "route:add-1125-10100",
+   "from": "정양",
+   "to": "흉노",
+   "reason": "삼각형 지름길(돌아가는 길이 1.05배)"
+  },
+  {
+   "id": "route:add-10074-10080",
+   "from": "운중",
+   "to": "대",
+   "reason": "삼각형 지름길(돌아가는 길이 1.04배)"
+  },
+  {
+   "id": "route:add-10080-10100",
+   "from": "대",
+   "to": "정양",
+   "reason": "삼각형 지름길(돌아가는 길이 1.07배)"
+  },
+  {
+   "id": "route:add-1124-10080",
+   "from": "대",
+   "to": "선비",
+   "reason": "삼각형 지름길(돌아가는 길이 1.04배)"
+  },
+  {
+   "id": "route:add-10080-10159",
+   "from": "대",
+   "to": "안문",
+   "reason": "삼각형 지름길(돌아가는 길이 1.09배)"
+  },
+  {
+   "id": "route:add-11-1098",
+   "from": "수춘",
+   "to": "의양",
+   "reason": "수춘 연결 수 6개 상한"
+  },
+  {
+   "id": "route:add-11-20",
+   "from": "수춘",
+   "to": "여남",
+   "reason": "수춘 연결 수 6개 상한"
+  },
+  {
+   "id": "route:add-11-56",
+   "from": "수춘",
+   "to": "여강",
+   "reason": "수춘 연결 수 6개 상한"
+  },
+  {
+   "id": "route:add-4-10212",
+   "from": "장안",
+   "to": "북지",
+   "reason": "장안 연결 수 6개 상한"
+  },
+  {
+   "id": "route:add-4-10213",
+   "from": "장안",
+   "to": "조음",
+   "reason": "장안 연결 수 6개 상한"
+  },
+  {
+   "id": "route:add-3-10",
+   "from": "완",
+   "to": "낙양",
+   "reason": "완 연결 수 6개 상한"
+  },
+  {
+   "id": "route:add-45-53",
+   "from": "무릉",
+   "to": "영안",
+   "reason": "무릉 연결 수 6개 상한"
+  }
+ ],
+ "add": [
+  {
+   "id": "route:plan-sea-1153-10153",
+   "from": "이주",
+   "to": "후관",
+   "mode": "SEA",
+   "reason": "이주는 회계 바다 밖 섬. 동야(후관)가 회계 남쪽 바닷길 출발지(『後漢書』 郡國志 주 \"皆從東冶汎海而至\")"
+  },
+  {
+   "id": "route:plan-land-10316-10900",
+   "from": "음평 샛길",
+   "to": "강유",
+   "mode": "LAND",
+   "reason": "음평 샛길(경곡 걸어서 가는 길)은 강유로 나온다(鄧艾傳 「先登至江由」)"
+  },
+  {
+   "id": "route:plan-land-10900-87",
+   "from": "강유",
+   "to": "면죽관",
+   "mode": "LAND",
+   "reason": "등애는 강유에서 부·면죽으로 나아갔다(鄧艾傳)"
+  },
+  {
+   "id": "route:plan-land-10093-102",
+   "from": "음평",
+   "to": "검각",
+   "mode": "LAND",
+   "reason": "음평 본길은 백수를 거쳐 검각으로 간다(鄧艾傳 「退趣白水……合守劍閣」)"
+  },
+  {
+   "id": "route:plan-land-10053-7",
+   "from": "역양",
+   "to": "건업",
+   "mode": "LAND",
+   "reason": "역양은(는) 길이 하나뿐인 막다른 큰 거점"
+  },
+  {
+   "id": "route:plan-land-10066-1078",
+   "from": "구진",
+   "to": "합포",
+   "mode": "LAND",
+   "reason": "구진은(는) 길이 하나뿐인 막다른 큰 거점"
+  },
+  {
+   "id": "route:plan-land-10104-1135",
+   "from": "구노",
+   "to": "지유국",
+   "mode": "LAND",
+   "reason": "구노은(는) 길이 하나뿐인 막다른 큰 거점"
+  },
+  {
+   "id": "route:plan-river-1070-27",
+   "from": "강양",
+   "to": "강주",
+   "mode": "RIVER",
+   "reason": "장강 수로"
+  },
+  {
+   "id": "route:plan-river-27-1071",
+   "from": "강주",
+   "to": "임강",
+   "mode": "RIVER",
+   "reason": "장강 수로"
+  },
+  {
+   "id": "route:plan-river-1071-45",
+   "from": "임강",
+   "to": "영안",
+   "mode": "RIVER",
+   "reason": "장강 수로"
+  },
+  {
+   "id": "route:plan-river-45-10238",
+   "from": "영안",
+   "to": "자귀",
+   "mode": "RIVER",
+   "reason": "장강 수로"
+  },
+  {
+   "id": "route:plan-river-10238-1104",
+   "from": "자귀",
+   "to": "이릉",
+   "mode": "RIVER",
+   "reason": "장강 수로"
+  },
+  {
+   "id": "route:plan-river-1104-13",
+   "from": "이릉",
+   "to": "강릉",
+   "mode": "RIVER",
+   "reason": "장강 수로"
+  },
+  {
+   "id": "route:plan-river-13-10195",
+   "from": "강릉",
+   "to": "파구",
+   "mode": "RIVER",
+   "reason": "장강 수로"
+  },
+  {
+   "id": "route:plan-river-10195-1107",
+   "from": "파구",
+   "to": "적벽",
+   "mode": "RIVER",
+   "reason": "장강 수로"
+  },
+  {
+   "id": "route:plan-river-1107-52",
+   "from": "적벽",
+   "to": "강하",
+   "mode": "RIVER",
+   "reason": "장강 수로"
+  },
+  {
+   "id": "route:plan-river-52-10223",
+   "from": "강하",
+   "to": "주현",
+   "mode": "RIVER",
+   "reason": "장강 수로"
+  },
+  {
+   "id": "route:plan-river-10223-10033",
+   "from": "주현",
+   "to": "기춘",
+   "mode": "RIVER",
+   "reason": "장강 수로"
+  },
+  {
+   "id": "route:plan-river-10033-1109",
+   "from": "기춘",
+   "to": "심양",
+   "mode": "RIVER",
+   "reason": "장강 수로"
+  },
+  {
+   "id": "route:plan-river-1109-15",
+   "from": "심양",
+   "to": "시상",
+   "mode": "RIVER",
+   "reason": "장강 수로"
+  },
+  {
+   "id": "route:plan-river-15-10023",
+   "from": "시상",
+   "to": "환현",
+   "mode": "RIVER",
+   "reason": "장강 수로"
+  },
+  {
+   "id": "route:plan-river-10023-1102",
+   "from": "환현",
+   "to": "유수구",
+   "mode": "RIVER",
+   "reason": "장강 수로"
+  },
+  {
+   "id": "route:plan-river-1102-10053",
+   "from": "유수구",
+   "to": "역양",
+   "mode": "RIVER",
+   "reason": "장강 수로"
+  },
+  {
+   "id": "route:plan-river-10053-7",
+   "from": "역양",
+   "to": "건업",
+   "mode": "RIVER",
+   "reason": "장강 수로"
+  },
+  {
+   "id": "route:plan-river-7-1113",
+   "from": "건업",
+   "to": "경구",
+   "mode": "RIVER",
+   "reason": "장강 수로"
+  },
+  {
+   "id": "route:plan-river-24-1067",
+   "from": "한중",
+   "to": "서성",
+   "mode": "RIVER",
+   "reason": "한수 수로"
+  },
+  {
+   "id": "route:plan-river-1067-6",
+   "from": "서성",
+   "to": "양양",
+   "mode": "RIVER",
+   "reason": "한수 수로"
+  },
+  {
+   "id": "route:plan-river-6-52",
+   "from": "양양",
+   "to": "강하",
+   "mode": "RIVER",
+   "reason": "한수 수로"
+  },
+  {
+   "id": "route:plan-river-11-10222",
+   "from": "수춘",
+   "to": "종리",
+   "mode": "RIVER",
+   "reason": "회수 수로"
+  },
+  {
+   "id": "route:plan-river-10222-10221",
+   "from": "종리",
+   "to": "우이",
+   "mode": "RIVER",
+   "reason": "회수 수로"
+  },
+  {
+   "id": "route:plan-river-10221-1111",
+   "from": "우이",
+   "to": "회음",
+   "mode": "RIVER",
+   "reason": "회수 수로"
+  },
+  {
+   "id": "route:plan-river-10017-1090",
+   "from": "형양",
+   "to": "백마",
+   "mode": "RIVER",
+   "reason": "황하 하류 수로"
+  },
+  {
+   "id": "route:plan-river-1090-18",
+   "from": "백마",
+   "to": "복양",
+   "mode": "RIVER",
+   "reason": "황하 하류 수로"
+  },
+  {
+   "id": "route:plan-river-18-10192",
+   "from": "복양",
+   "to": "제남",
+   "mode": "RIVER",
+   "reason": "황하 하류 수로"
+  },
+  {
+   "id": "route:plan-river-10192-10220",
+   "from": "제남",
+   "to": "염차",
+   "mode": "RIVER",
+   "reason": "황하 하류 수로"
+  },
+  {
+   "id": "route:plan-river-1090-1",
+   "from": "백마",
+   "to": "업",
+   "mode": "RIVER",
+   "reason": "백구 수로(조조가 판 군량 길, 204년)"
+  }
+ ],
+ "mode": [
+  {
+   "id": "route:san10-expanded-212",
+   "from": "답씨",
+   "to": "동래",
+   "mode": "SEA",
+   "reason": "아티팩트 출처 해로(가져오기에서 육로로 바뀌었던 것)"
+  },
+  {
+   "id": "route:san10-expanded-213",
+   "from": "모로비리",
+   "to": "주호",
+   "mode": "SEA",
+   "reason": "아티팩트 출처 해로(가져오기에서 육로로 바뀌었던 것)"
+  },
+  {
+   "id": "route:san10-expanded-192",
+   "from": "낙양",
+   "to": "하내",
+   "mode": "FORD",
+   "reason": "황하를 건너는 길: 맹진(孟津)"
+  },
+  {
+   "id": "route:add-23-10017",
+   "from": "형양",
+   "to": "하내",
+   "mode": "FORD",
+   "reason": "황하를 건너는 길: 소평진(小平津)"
+  },
+  {
+   "id": "route:san10-expanded-246",
+   "from": "백마",
+   "to": "급현",
+   "mode": "FORD",
+   "reason": "황하를 건너는 길: 백마진(白馬津)"
+  },
+  {
+   "id": "route:san10-f04-1",
+   "from": "백마",
+   "to": "업",
+   "mode": "FORD",
+   "reason": "황하를 건너는 길: 백마진(白馬津)·여양"
+  },
+  {
+   "id": "route:san10-expanded-247",
+   "from": "오소",
+   "to": "급현",
+   "mode": "FORD",
+   "reason": "황하를 건너는 길: 연진(延津)"
+  },
+  {
+   "id": "route:san10-expanded-359",
+   "from": "위현",
+   "to": "창정",
+   "mode": "FORD",
+   "reason": "황하를 건너는 길: 창정진(倉亭津)"
+  },
+  {
+   "id": "route:san10-f02-1",
+   "from": "평원",
+   "to": "태산",
+   "mode": "FORD",
+   "reason": "황하를 건너는 길: 황하 하류 나루"
+  },
+  {
+   "id": "route:add-10178-10192",
+   "from": "감릉",
+   "to": "제남",
+   "mode": "FORD",
+   "reason": "황하를 건너는 길: 황하 하류 나루"
+  },
+  {
+   "id": "route:add-10139-10178",
+   "from": "감릉",
+   "to": "동평",
+   "mode": "FORD",
+   "reason": "황하를 건너는 길: 황하 하류 나루"
+  },
+  {
+   "id": "route:san10-expanded-363",
+   "from": "포판",
+   "to": "임진",
+   "mode": "FORD",
+   "reason": "황하를 건너는 길: 포판진(蒲阪津)"
+  },
+  {
+   "id": "route:add-42-10125",
+   "from": "홍농",
+   "to": "포판",
+   "mode": "FORD",
+   "reason": "황하를 건너는 길: 황하 남쪽 굽이 나루"
+  },
+  {
+   "id": "route:add-1089-10213",
+   "from": "평양",
+   "to": "조음",
+   "mode": "FORD",
+   "reason": "황하를 건너는 길: 진·섬 사이 황하 나루"
+  }
+ ],
+ "level": [
+  {
+   "name": "게양",
+   "level": 2,
+   "reason": "『後漢書』 郡國志 남해군 揭陽縣. 항구로 쓴 기록 없음(번우가 남해 바닷길 중심)"
+  },
+  {
+   "name": "역양",
+   "level": 5,
+   "reason": "군·주 치소(사용자 2026-11-15 추천대로)"
+  },
+  {
+   "name": "주제",
+   "level": 5,
+   "reason": "군·주 치소(사용자 2026-11-15 추천대로)"
+  },
+  {
+   "name": "합포",
+   "level": 5,
+   "reason": "군·주 치소(사용자 2026-11-15 추천대로)"
+  },
+  {
+   "name": "주천",
+   "level": 5,
+   "reason": "군·주 치소(사용자 2026-11-15 추천대로)"
+  },
+  {
+   "name": "오원",
+   "level": 5,
+   "reason": "군·주 치소(사용자 2026-11-15 추천대로)"
+  },
+  {
+   "name": "음평",
+   "level": 5,
+   "reason": "군·주 치소(사용자 2026-11-15 추천대로)"
+  },
+  {
+   "name": "남안",
+   "level": 5,
+   "reason": "군·주 치소(사용자 2026-11-15 추천대로)"
+  }
+ ],
+ "check": {
+  "routes": 585,
+  "unreachable": []
+ },
+ "rename": [
+  {
+   "id": "city:7",
+   "from": "건업",
+   "to": "말릉"
+  },
+  {
+   "id": "city:40",
+   "from": "천수",
+   "to": "한양"
+  },
+  {
+   "id": "city:45",
+   "from": "영안",
+   "to": "어복"
+  },
+  {
+   "id": "city:2",
+   "from": "허창",
+   "to": "허"
+  },
+  {
+   "id": "city:22",
+   "from": "서량",
+   "to": "무위"
+  },
+  {
+   "id": "city:10227",
+   "from": "장산",
+   "to": "오상"
+  },
+  {
+   "id": "city:1115",
+   "from": "임해",
+   "to": "장안현"
+  },
+  {
+   "id": "city:28",
+   "from": "건녕",
+   "to": "익주군"
+  },
+  {
+   "id": "pass:71",
+   "from": "호로관",
+   "to": "성고"
+  },
+  {
+   "id": "city:1077",
+   "from": "흥고",
+   "to": "완온"
+  },
+  {
+   "id": "city:1098",
+   "from": "의양",
+   "to": "평춘"
+  },
+  {
+   "id": "city:1108",
+   "from": "공안",
+   "to": "잔릉"
+  },
+  {
+   "id": "city:1113",
+   "from": "경구",
+   "to": "단도"
+  },
+  {
+   "id": "city:10304",
+   "from": "양성",
+   "to": "양인"
+  },
+  {
+   "id": "city:10315",
+   "from": "농서 단곡",
+   "to": "단곡"
+  },
+  {
+   "id": "city:10320",
+   "from": "양맥 골짜기",
+   "to": "양구"
+  }
+ ]
+}

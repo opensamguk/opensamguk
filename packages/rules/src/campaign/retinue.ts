@@ -5,7 +5,8 @@ import { BALANCE } from '../balance';
 import { FIVE_STAT_KEYS, type FiveStats } from '../general/fiveStats';
 
 export const INITIAL_RENOWN_CAPACITY = 30;
-export type SourcedFiveStats = FiveStats & { source: string };
+export type SourcedFiveStats = Pick<FiveStats, 'leadership' | 'strength' | 'intel'> &
+  Partial<Pick<FiveStats, 'politics' | 'charm'>> & { source: string };
 export type RetinuePerson = { id: number; worldId: string; nationId: number | null; stats: SourcedFiveStats };
 export type RetinueLink = { masterId: number; personId: number; relation: 'STAFF' | 'LIEUTENANT' | 'GUEST' };
 const natural = (n: number) => Number.isSafeInteger(n) && n >= 0;
@@ -13,9 +14,11 @@ const positive = (n: number) => natural(n) && n > 0;
 export function retinuePersonCost(stats: SourcedFiveStats): number {
   if (!stats || typeof stats.source !== 'string' || !stats.source.trim()) throw new Error('STATS_SOURCE_REQUIRED');
   let sum = 0;
-  for (const key of FIVE_STAT_KEYS) {
+  const keys = stats.politics === undefined && stats.charm === undefined ? FIVE_STAT_KEYS.slice(0, 3) : FIVE_STAT_KEYS;
+  for (const key of keys) {
     const value = stats[key];
-    if (!Number.isInteger(value) || value < 0 || value > 100) throw new Error('FIVE_STATS_REQUIRED');
+    if (value === undefined || !Number.isInteger(value) || value < 0 || value > 100)
+      throw new Error('FIVE_STATS_REQUIRED');
     sum += value;
   }
   return Math.max(1, Math.ceil(sum / 50));

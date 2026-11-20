@@ -152,7 +152,7 @@ const applied: ResetReply = {
       presetHash: null,
       turnTermMinutes: 60,
       endYear: 201,
-      ruleFeatures: [],
+      fogOfWar: false,
       featureDataHash: 'a'.repeat(64),
     },
   },

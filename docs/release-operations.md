@@ -8,7 +8,7 @@
 
 서버 1대 + Docker Compose (PostgreSQL, server, engine, Caddy) + Cloudflare(DNS·CDN)
 
-<!-- TODO(M2): compose 파일 위치와 서비스 목록. -->
+기본 구성은 `deploy/compose.yml`이다. PostgreSQL·server·engine·Caddy를 상시 실행하며 `migrate`는 배포 때만 실행한다. 공인 포트 없이 터널로 연결하는 `deploy/compose.tunnel.yml`은 기본 서비스 정의를 재사용하고 `cloudflared`를 더한다. 현재 `release-compose-driver.ps1`은 산출물 안의 터널 구성을 사용한다. 호스트의 비밀 volume과 환경 파일은 산출물과 별도로 준비한다. 이 절은 코드 대조로 확인했으며 실제 운영 호스트 구성은 미검증이다.
 
 ## 2. 배포
 
@@ -23,7 +23,7 @@
 저장소의 Compose 배포 실행기는 `tools/release-compose-driver.ps1`이다. `OPENSAMGUK_RELEASE_COMPOSE_CONFIG`가 가리키는 호스트 설정에는 위 DB·프로젝트·Docker 항목과 `bashExecutable`, `backupScript`, `backupScriptSha256`, `backupDirectory`, `backupDockerConfig`, `runtimeDirectory`, `publicOrigin`을 지정한다. 현재 서비스 정지, 기존 `backup.sh`로 백업, 새 migration 적용, 서비스와 공개 HTML 해시 확인 순서로 실행한다. migration 시도 또는 새 writer 기동 뒤 실패하면 서비스를 정지하고 호스트 점검을 기다린다.
 
 되돌리기는 현재 DB를 그대로 쓰는 경우에 같은 실행기를 등록한다. Compose 설정의 `rollbackPairs`에는 소유자가 애플리케이션 데이터 호환성을 검토한 `fromRevision`, `revision`, `currentManifest`, `currentManifestSha256`, `targetManifestSha256`을 지정한다. 실행기는 양쪽 산출물의 migration 이름·해시와 자원 SQL 해시, 현재 이미지 ID, 실제 DB의 적용 기록을 모두 확인한다. 서비스 정지와 백업 뒤 같은 DB로 이전 이미지를 기동하고 공개 화면을 확인한다. DB 스키마 또는 자료 계약이 다르면 별도 DB 복원과 전환 절차를 검증한 뒤 승인한다. 스키마가 다른 배포판의 전환은 별도 승인을 거친다. 아래 단계에서 승인된 백업을 격리 DB로 준비할 수 있다.
-<!-- TODO(M2): 명령 하나로 배포 (AC-M2-08). migration 적용 → server·engine 재시작 → 상태 확인. -->
+관리자는 `/admin/releases`에서 현재 운영판과 승인된 대상을 확인하고 배포판을 고른 뒤 사유를 입력해 배포 요청을 보낸다. 화면은5초마다 상태를 읽는다. 접수 응답이 없으면 같은 요청 확인을 사용한다. 접수·실행 중·호스트 점검 필요 요청이 있으면 새 요청을 막는다. 호스트가 실행한 뒤 완료 이력을 확인해야 하며 접수만으로 배포 성공으로 세지 않는다. 화면과 호스트의 연결은 소스로 확인했으며 이 작업에서 실제 배포는 실행하지 않았다(미검증).
 
 ### 로컬 산출물 사전 확인 (T2-15 B2b3a)
 
@@ -83,7 +83,11 @@
 
 ## 3. 되돌리기
 
-<!-- TODO(M2): 이전 이미지 태그로 되돌리는 절차. migration이 있으면 어떻게 하나. 리허설 기록 남기기. -->
+`/admin/releases`의 승인 목록에서 되돌리기 대상을 선택하고 사유를 적어 요청한다. 현재 판이 바뀌거나 후보의 manifest 해시가 달라지면 다시 조회한다. 응답이 유실되면 같은 요청 확인을 사용한다. 호스트 설정의 `ROLLBACK` 실행기와 `rollbackPairs`에 등록한 조합만 허용한다.
+
+실행기는 현재 이미지와 승인한 두 manifest, 실제 DB의 migration 이름·체크섬, 자원 SQL 해시를 대조한다. 같은 DB로 돌아갈 수 있는 조합이면 서비스 정지와 사전 백업 뒤 이전 이미지를 기동한다. 공개 `/healthz`·`/healthz/engine`·`/login`·`/trpc/world.publicMaps`의200응답, HTML 해시와 server·engine의 판을 확인한다. 역방향 migration을 자동 실행하지 않는다. 스키마나 자료 계약이 다르면 위 실행기로 되돌릴 수 없으며 §4의 격리 복원과 별도 전환 검증이 필요하다.
+
+migration 시도 또는 새 writer 기동 뒤 실패하면 실행기는 서비스를 정지한다. 호스트가 `NEEDS_OWNER`를 표시하면 실제 이미지·DB와 실행 기록을 점검한 뒤 `-ResolveRequest <UUID>`로 확정한다. 실제 배포·되돌리기 리허설과 장애 복귀는 미검증이며 AC-M3-10은 미완료다.
 
 ## 4. 백업과 복구
 
@@ -155,7 +159,11 @@ Compose 대상은 항상 절대 경로의 `--env-file`, `-f`와 `--project-name`
 
 ## 6. 장애 대응
 
-<!-- TODO(M2): 엔진이 멈췄을 때 (알림 → 로그 확인 → 리스 상태 → 재시작). 월드 일시정지 기준. -->
+공개 `/healthz`로 DB 연결을 확인하고 `/healthz/engine`으로 진행 중·일시정지 월드의 엔진 상태를 확인한다. 후자는 heartbeat가 없거나 마지막 기록이120초보다 오래됐거나 지연이300초를 넘으면503을 반환한다. 읽기 실패도503이며 월드 수와 지연 월드 수는null이다. 이 기준은 API의 생존 점검 기준이며 AC-M3-07의 턴 지연10초 기준과 별개다.
+
+관리자는 `/admin/worlds`에서 월드 조회를 눌러 마지막 기록 시각·처리 tick·지연·오류 안내를 확인한다. 자동 갱신이 없으므로 다시 조회해 시각이 움직이는지 본다. 오류 원문은 콘솔에 표시하지 않는다. 배포 직후라면 배포 이력의 호스트 점검 필요 상태와 호스트 실행 기록도 확인한다. 로그를 공유할 때 연결 문자열·쿠키·토큰을 포함하지 않는다.
+
+리스가 살아 있는지와 기존 엔진이 실제 실행 중인지 운영 호스트에서 확인한 뒤 복구 방식을 정한다. 시계 일시정지 요청도 엔진이 적용하므로 엔진이 멈춘 동안 PENDING이면 정지 완료로 세지 않는다. 리스 강제 삭제·월드 DB 직접 수정·중복 엔진 기동을 이 문서의 복구 절차로 사용하지 않는다. 운영 알림 수신, 리스 점검 명령, 안전한 재시작, 일시정지 판단과 장애 리허설은 미검증이다.
 
 ## 7. 모니터링 (M3)
 

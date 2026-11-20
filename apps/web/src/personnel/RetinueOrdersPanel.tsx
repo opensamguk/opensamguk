@@ -97,7 +97,7 @@ function OrdersBoard({ worldId, userId, accountNotice }: { worldId: string; user
   const [consent, setConsent] = useState<Record<number, boolean>>({});
   const busy = useRef(false),
     alive = useRef(false),
-    searchRef = useRef<HTMLInputElement>(null);
+    focusRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     alive.current = true;
     return () => {
@@ -123,7 +123,6 @@ function OrdersBoard({ worldId, userId, accountNotice }: { worldId: string; user
   }, [board.data?.actorId]);
   const commands = useQuery(trpc.commands.list.queryOptions({ worldId }));
   const map = useQuery(trpc.world.map.queryOptions({ worldId }));
-  const summary = useQuery(trpc.world.summary.queryOptions({ worldId }));
   const home = useQuery(trpc.home.get.queryOptions({ worldId }));
   const { units, note: unitNote } = useWorldUnits(worldId);
   const order = useMutation(trpc.campaign.order.mutationOptions());
@@ -258,10 +257,9 @@ function OrdersBoard({ worldId, userId, accountNotice }: { worldId: string; user
             defaultCrewType={home.data?.general.crewType}
             units={units}
             unitNote={unitNote}
-            cityResources={summary.data?.cityResourcesEnabled === true}
             blockedReason={disabled ? '다른 요청의 처리를 기다리세요.' : !recipientId ? '받을 장수를 고르세요.' : null}
             targetLabel="보낼 지시"
-            searchRef={searchRef}
+            focusRef={focusRef}
             onPut={setCommand}
           />
         ) : null}

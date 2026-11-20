@@ -5,7 +5,7 @@ import { afterAll, beforeAll, beforeEach, expect, it as test } from 'vitest';
 import { createDb, notifyWorld } from '../packages/db/src/index';
 import { lineageResultSchema, lineageStateSchema, type LineageInput } from '../packages/rules/src/index';
 import { lineageTestConfig } from '../packages/rules/src/lineage/testFixture';
-import { buildServer } from '../apps/server/src/server';
+import { buildFixtureServer as buildServer } from './server-fixture';
 import { newSession } from '../apps/server/src/auth/session';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { newAccountToken } from '../apps/server/src/auth/accountToken';
@@ -15,11 +15,11 @@ import { categories } from '../apps/server/src/authz/coverage';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { initializeResources } from './init-resources';
 import { initializeIntegrationResources } from './integration-resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
-import { testDatabaseUrl } from './test-database';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
 import { confirmDisconnectedDatabase } from './test-db-close';
 
 type Pg = {
@@ -37,7 +37,7 @@ if (!['localhost', '127.0.0.1'].includes(source.hostname)) throw new Error('loop
 for (const key of source.searchParams.keys())
   if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
     throw new Error('접속 대상 질의 인자는 쓸 수 없습니다.');
-const name = 't302_withdrawal_' + randomUUID().replaceAll('-', '') + '_test';
+const name = ciGreenDatabaseName('opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test');
 const target = new URL(source),
   adminUrl = new URL(source);
 target.pathname = '/' + name;
@@ -498,17 +498,6 @@ for (const index of [0, 1])
       seed: 'account-withdrawal-' + index,
     });
     const lineage = index === 1;
-    initial.ruleFeatures = [
-      'campaign-assignment-v2',
-      'campaign-v1',
-      'five-stats',
-      ...(lineage ? ['lineage-v1'] : []),
-      'operational-map',
-      'personnel',
-      'policy',
-      'stratagem-basic',
-      'treaty',
-    ];
     expect(initial.nations).toHaveLength(21);
     expect(initial.generals).toHaveLength(491);
     const { worldId } = await saveInitialWorld(db, initial, {
@@ -529,6 +518,7 @@ for (const index of [0, 1])
               {
                 worldId,
                 name: '탈퇴검증' + actorIndex,
+                sex: 'MALE' as const,
                 portraitId: null,
                 leadership: 55,
                 strength: 55,

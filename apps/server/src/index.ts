@@ -22,8 +22,8 @@ try {
   console.error('로그인 조사 키 설정을 확인하세요.');
   process.exit(1);
 }
-const [{ createDb }, { buildServer }] = await Promise.all([import('@opensamguk/db'), import('./server')]);
-const db = createDb(databaseUrl);
+const [{ createServerDb }, { buildServer }] = await Promise.all([import('./db'), import('./server')]);
+const db = createServerDb(databaseUrl);
 const port = Number(process.env.SERVER_PORT ?? 3001);
 const server = await buildServer({ db, mailTransport, ...(loginAudit === undefined ? {} : { loginAudit }) });
 const dispatcher = startNotificationDispatcher(

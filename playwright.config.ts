@@ -34,6 +34,9 @@ export default defineConfig({
     '**/t2-07-nonaggression-expiry.spec.ts',
   ],
   forbidOnly: isCI,
+  // CI 기계는 늘 켠 규칙의 엔진, Vite, 서버, DB를 함께 돌려 응답이 5초를 넘는 때가 있다(PR #674, 최대 5.4초).
+  // 화면 확인의 기본 기다림을 CI에서만 10초로 둔다. 시험마다 늘려 둔 기다림은 그대로다.
+  expect: { timeout: isCI ? 10_000 : 5_000 },
   use: { baseURL: 'http://127.0.0.1:5173' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
@@ -41,5 +44,7 @@ export default defineConfig({
     url: 'http://127.0.0.1:5173',
     reuseExistingServer: !isCI,
     timeout: 60_000,
+    // CI에서는 감독과 엔진 자식의 출력을 기록에 남긴다. 엔진이 반복 종료되면 heartbeat에는 일반 문구만 남아 원인을 볼 수 없다.
+    stdout: isCI ? 'pipe' : 'ignore',
   },
 });

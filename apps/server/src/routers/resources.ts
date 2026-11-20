@@ -56,7 +56,7 @@ export const resourcesRouter = router({
           : {}),
         statRules: {
           ...statRulesSchema.parse({ stat: stored.statRules }).stat,
-          count: world.ruleFeatures.includes('five-stats') ? (5 as const) : (3 as const),
+          count: 5 as const,
         },
       };
     }),

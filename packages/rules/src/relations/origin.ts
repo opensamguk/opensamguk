@@ -1,22 +1,20 @@
-import { checkReplayOrigin, replayResourceHashInput } from '../ruleRegistry';
+import { checkedReplayOrigin, replayResourceHashInput } from '../ruleRegistry';
 import { readRelationsData, RELATIONS_FEATURE } from './data';
 
 export function readStoredRelations(
   world: {
     replayFormat: number;
-    ruleFeatures: readonly string[];
+
     replayOrigin: unknown;
     initialStateHash: string;
   },
   hash: (value: unknown) => string,
+  checkedOrigin?: ReturnType<typeof checkedReplayOrigin>,
 ) {
-  if (!world.ruleFeatures.includes(RELATIONS_FEATURE)) return undefined;
-  const origin: unknown = world.replayOrigin;
-  checkReplayOrigin(origin);
+  const origin = checkedReplayOrigin(world.replayOrigin, checkedOrigin);
   if (
     world.replayFormat !== 3 ||
     origin.version !== 3 ||
-    !origin.initial.ruleFeatures?.includes(RELATIONS_FEATURE) ||
     origin.initialStateHash !== world.initialStateHash ||
     origin.initialStateHash !== hash(origin.initial) ||
     origin.resourceHash !== hash(replayResourceHashInput(origin.initial, origin.featureData))

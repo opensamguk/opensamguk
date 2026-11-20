@@ -1,8 +1,7 @@
 // 짧은 종료 시험용이다. 1030 완주 데모나 AC-M1-17 증거로 쓰지 않는다.
 import { nextActionSequence, type PrismaClient, type Prisma } from '@opensamguk/db';
-import { emptyTurns, type WorldInit } from '@opensamguk/rules';
+import { emptyQueue, type WorldInit } from '@opensamguk/rules';
 import { monthlyFixture } from './monthlyFixture';
-import { warFixture } from './warFixture';
 import { saveInitialWorld } from '../src/world/persistence';
 import { controlClock } from '../src/world/clock';
 import { acquireLease, releaseLease } from '../src/lease';
@@ -11,18 +10,18 @@ import { TurnLoop } from '../src/turnLoop';
 export async function seasonInitial(reason: 'END_YEAR' | 'UNIFIED'): Promise<WorldInit> {
   if (reason === 'END_YEAR') {
     const initial = await monthlyFixture();
+    initial.scenarioKey = 'engine-season-fixture';
     initial.generals = [];
     return initial;
   }
-  const initial = await warFixture();
-  initial.cities = initial.cities.slice(0, 2).map((city) => ({
-    ...city,
-    connections: [city.cityKey === 1 ? 2 : 1],
-    wall: 0,
-    defence: 0,
-  }));
+  const initial = await monthlyFixture();
+  initial.scenarioKey = 'engine-season-fixture';
+  initial.cities.forEach((city) => {
+    city.nationId = 1;
+  });
+  initial.nations = initial.nations.slice(0, 1);
   initial.generals = initial.generals.slice(0, 1);
-  delete initial.nationTurns;
+  initial.diplomacies = [];
   return initial;
 }
 
@@ -36,13 +35,12 @@ export async function recordTestTurns(
   await db.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${worldId} FOR UPDATE`;
     const general = await tx.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: generalId } } });
-    const turns = emptyTurns();
-    turns[0] = { commandKey, args };
+    const turns = emptyQueue();
+    turns[0] = { commandKey, args, explicit: true };
     await tx.generalTurn.deleteMany({ where: { worldId, generalId } });
     await tx.generalTurn.createMany({
       data: turns.map((turn, slot) => ({
         ...turn,
-        explicit: true,
         worldId,
         generalId,
         slot,
@@ -54,7 +52,8 @@ export async function recordTestTurns(
       data: { turnRevision: { increment: 1 } },
     });
     const sequence = await nextActionSequence(tx, worldId);
-    await tx.inputEvent.create({
+    const world = await tx.world.findUniqueOrThrow({ where: { id: worldId }, select: { clockTick: true } });
+    const event = await tx.inputEvent.create({
       data: {
         worldId,
         userId: general.userId ?? 'season-fixture',
@@ -64,9 +63,14 @@ export async function recordTestTurns(
         idempotencyKey: `fixture-${sequence}`,
         status: 'APPLIED',
         payload: { turns, revision: general.turnRevision } as unknown as Prisma.InputJsonValue,
-        result: { revision: general.turnRevision + 1 },
+        result: { revision: general.turnRevision + 1, activeTick: world.clockTick },
       },
     });
+    if (general.userId !== null)
+      await tx.general.update({
+        where: { worldId_id: { worldId, id: generalId } },
+        data: { lastActiveTick: Math.max(general.lastActiveTick ?? 0, world.clockTick), lastActiveAt: event.createdAt },
+      });
   });
 }
 
@@ -78,12 +82,11 @@ export async function prepareSeasonWorld(
 ) {
   const initial = await seasonInitial(reason);
   const { worldId } = await saveInitialWorld(db, initial, {
-    replayFormat: 'legacy',
     name: `종료 시험 ${reason}`,
     turnTermMinutes: 60,
     endYear: initial.startYear,
   });
-  if (reason === 'UNIFIED') await recordTestTurns(db, worldId, 1, 'attack', { cityKey: 2 });
+  if (reason === 'UNIFIED') await recordTestTurns(db, worldId, 1, 'rest');
   await options.beforeStart?.(worldId);
   await controlClock(db, worldId, 'start');
   return { worldId, initial };

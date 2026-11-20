@@ -39,11 +39,10 @@ export type SexLedger = z.infer<typeof sexLedgerSchema>;
 
 export function applySexLedger<G extends { id: number; name: string; sex?: GeneralSex }>(
   initial: { scenarioKey: string; generals: G[] },
-  ledger: SexLedger,
+  ledger?: SexLedger,
 ): Array<G & { sex: GeneralSex }> {
   const { name, version } = parseResourceKey(initial.scenarioKey);
-  const covered = ledger.scenarios.includes(name) || ledger.scenarios.includes(`${name}@${version}`);
-  if (covered) {
+  if (ledger && (ledger.scenarios.includes(name) || ledger.scenarios.includes(`${name}@${version}`))) {
     if (initial.generals.some((general) => Object.hasOwn(general, 'sex')))
       throw Error('성별 원장 대상 시나리오에 직접 성별을 지정할 수 없습니다.');
     const generals = new Map(initial.generals.map((general) => [general.id, general]));

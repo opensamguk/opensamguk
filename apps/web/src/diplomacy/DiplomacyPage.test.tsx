@@ -121,7 +121,7 @@ afterEach(cleanup);
 
 describe('외교실 첫 세 조항 화면', () => {
   it('확장 조항의 당사국·도시·금액·기간을 견적과 제안에 함께 보낸다', async () => {
-    on('treaty.list', () => ({ ...listPage({ tradeEnabled: true }), expandedEnabled: true }));
+    on('treaty.list', () => listPage({}));
     on('world.map', () => ({
       cities: [
         { key: 11, name: '허창', nationId: 1 },
@@ -190,8 +190,8 @@ describe('외교실 첫 세 조항 화면', () => {
     expect(form.queryByRole('combobox', { name: '이양할 도시' })).toBeNull();
   });
 
-  it('교역 기능이 있는 월드의 조항 작성은 실제 견적·제안 입력에 교역 기간을 넣는다', async () => {
-    on('treaty.list', () => listPage({ tradeEnabled: true }));
+  it('조항 작성은 실제 견적·제안 입력에 교역 기간을 넣는다', async () => {
+    on('treaty.list', () => listPage({}));
     on('treaty.quote', () => ({ cost: { mine: 100, theirs: 100 }, problem: null }));
     on(
       'treaty.propose',
@@ -335,7 +335,8 @@ describe('외교실 첫 세 조항 화면', () => {
       '제안 · 상대가 거절함',
       '제안 · 받아들여지지 않음 (이미 맺은 관계라 이 조항을 제안할 수 없습니다.)',
     ]);
-    expect(screen.queryByText(/신의|파기/)).toBeNull();
+    // 신의 탭은 늘 있다(D-104). 카드와 기록에는 신의, 파기 글자가 없다.
+    expect(screen.queryAllByText(/신의|파기/).filter((node) => !node.closest('nav'))).toEqual([]);
   });
 
   it('받은 제안을 거절하면 APPLIED DECLINED를 거절로 보이고 목록을 다시 받는다', async () => {
@@ -406,7 +407,7 @@ describe('외교실 첫 세 조항 화면', () => {
     expect(screen.queryByText('조약을 맺었습니다.')).toBeNull();
   });
 
-  it('조약서는 첫 세 조항만 고르고 뒤 네 조항은 지원하지 않는다고 보인다. 제안에는 기한 칸을 보내지 않는다', async () => {
+  it('조약서는 모든 조항을 고를 수 있고 제안에는 기한 칸을 보내지 않는다', async () => {
     const quote: Quote = { cost: { mine: 600, theirs: 400 }, problem: null };
     on('treaty.list', () => listPage({}));
     on('treaty.quote', () => quote);
@@ -424,9 +425,8 @@ describe('외교실 첫 세 조항 화면', () => {
     renderPage('write');
     const form = await screen.findByRole('form', { name: '조약서 쓰기' });
     for (const label of ['통행 허용', '정기 원조', '교역 허용', '도시 이양']) {
-      const box = within(form).getByLabelText(label) as HTMLInputElement;
-      expect(box.disabled).toBe(true);
-      expect(box.closest('[data-unsupported]')?.textContent).toContain('아직 지원하지 않는 조항입니다.');
+      expect(within(form).getByLabelText(label)).toBeTruthy();
+      expect(form.querySelector('[data-unsupported]')).toBeNull();
     }
     expect(within(form).queryByText(/신의/)).toBeNull();
 
@@ -515,7 +515,7 @@ describe('외교실 국가 탭 (INT-20)', () => {
         .map((cell) => cell.textContent),
     ).toEqual(['국가', '국력', '장수', '도시', '우리와의 관계', '이어 보기']);
     await waitFor(() =>
-      expect(screen.getByTestId('nation-stats-note').textContent).toBe('국력·장수·도시는 191년 2월 정산 기준입니다.'),
+      expect(screen.getByTestId('nation-stats-note').textContent).toBe('국력, 장수, 도시는 191년 2월 정산 기준입니다.'),
     );
     await waitFor(() => expect(screen.getByTestId('relation-months-left').textContent).toBe(' (6개월 남음)'));
     // 시험의 Link 대역은 aria-label을 넘기지 않으므로 줄 글자로 본다. 스냅숏에 없는 국가는 —로 둔다.
@@ -565,7 +565,7 @@ describe('외교실 국가 탭 (INT-20)', () => {
     on('world.summary', () => ({ gameDate: { year: 191, month: 3 } }));
     renderPage('nations');
     await waitFor(() =>
-      expect(screen.getByTestId('nation-stats-note').textContent).toBe('국력·장수·도시를 불러오지 못했습니다.'),
+      expect(screen.getByTestId('nation-stats-note').textContent).toBe('국력, 장수, 도시를 불러오지 못했습니다.'),
     );
     expect(
       within(screen.getByTestId('nation-relations'))

@@ -4,6 +4,7 @@ import { commandWorld } from '../../test/commandFixture';
 import { applyEffects } from '../commands/effects';
 import { createCommandResolver } from '../commands/resolve';
 import { cloneWorld } from '../model/clone';
+import { deepFreeze } from '../personnel/testFixture';
 import { initialStratagemCards } from './state';
 import { createStratagemCardResolver } from './resolver';
 import { TEST_STRATAGEM_CARDS_CONFIG } from './testFixture';
@@ -14,7 +15,6 @@ const base = createCommandResolver({ general: ['fire_attack', 'sabotage', 'incit
   target = { cityKey: 2 };
 const setup = () => {
   const world = commandWorld();
-  world.ruleFeatures = ['five-stats', 'stratagem-basic', 'stratagem-cards-v1'];
   for (const general of Object.values(world.generals)) {
     general.politics = general.intel;
     general.charm = general.leadership;
@@ -27,6 +27,18 @@ const failingRoll = () => {
   vi.spyOn(rng, 'next').mockReturnValue(0.999999);
   return rng;
 };
+
+it('AC-INT-04 패를 쓰지 않는 명령도 원본을 보존하고 독립된 결과를 낸다', () => {
+  const world = deepFreeze(setup());
+  const rest = createCommandResolver({ general: [], nation: [] });
+  const ordinary = rest.run(world, actor, 'rest', {}, createRng('rest'));
+  const result = createStratagemCardResolver(rest).run(world, actor, 'rest', {}, createRng('rest'));
+  if ('code' in ordinary || 'code' in result) throw Error('rest fixture');
+  const after = applyEffects(world, result.effects);
+  expect(after).toEqual(applyEffects(world, ordinary.effects));
+  after.generals[1]!.gold++;
+  expect(after.generals[1]!.gold).toBe(world.generals[1]!.gold + 1);
+});
 
 it.each(['fire_attack', 'sabotage', 'incite', 'plunder'])('AC-P2-23 %s는 확률 실패에도 해당 패 한 장만 쓴다', (key) => {
   const world = setup(),
@@ -96,11 +108,15 @@ it('AC-P2-23 같은 국가 두 장수가 한 장을 함께 쓰면 먼저 실행�
 
 it('AC-P2-23 일반 명령과 기능을 끈 월드의 결과·난수 소비는 그대로다', () => {
   const off = commandWorld();
-  for (const key of ['fire_attack', 'farm']) {
+  for (const key of ['farm']) {
     const args = key === 'farm' ? {} : target,
       left = createRng('off-golden'),
       right = createRng('off-golden');
-    expect(resolver.run(off, actor, key, args, left)).toEqual(base.run(off, actor, key, args, right));
+    const wrapped = resolver.run(off, actor, key, args, left);
+    const plain = base.run(off, actor, key, args, right);
+    if ('code' in wrapped || 'code' in plain) throw Error('내정 고정물 실패');
+    expect(applyEffects(off, wrapped.effects)).toEqual(applyEffects(off, plain.effects));
+    expect(wrapped.logs).toEqual(plain.logs);
     expect(left.next()).toBe(right.next());
   }
   const on = setup(),

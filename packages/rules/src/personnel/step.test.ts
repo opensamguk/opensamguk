@@ -18,6 +18,21 @@ function unchanged(state: OfficeView, offices: OfficeRevisions = {}): PersonnelR
 }
 
 describe('인사 step의 저장 묶음', () => {
+  it('AC-INT-04 독점한 실행 결과도 원본·증인·인사 검사를 보존한다', () => {
+    const before = personnelWorld();
+    const saved = structuredClone(before);
+    const assigned = applied(assignGeneral(before, 4, 3, 4, 100));
+    const raw = { ...assigned, offices: {} };
+    const expected = completePersonnelStep(deepFreeze(before), {}, deepFreeze(structuredClone(raw)), 100);
+    const actual = completePersonnelStep(before, {}, raw, 100, raw.state);
+    expect(actual).toEqual(expected);
+    expect(actual.state).toBe(raw.state);
+    expect(before).toEqual(saved);
+    expect(() => completePersonnelStep(before, {}, raw, 100, structuredClone(raw.state))).toThrow(
+      PersonnelInvariantError,
+    );
+    expect(() => completePersonnelStep(before, {}, unchanged(before), 100, before)).toThrow(PersonnelInvariantError);
+  });
   it('같은 step에서 생겼다가 해임으로 취소된 제안의 W와 종료 로그를 보존한다', () => {
     const before = personnelWorld();
     const assigned = applied(assignGeneral(before, 4, 3, 4, 100));
@@ -43,6 +58,25 @@ describe('인사 step의 저장 묶음', () => {
     expect({ before, raw }).toEqual(saved);
     expect(packet.assignment.beforeFinish.assignmentOffers).not.toBe(raw.state.assignmentOffers);
     expect(packet.logs[0]).not.toBe(raw.logs[0]);
+  });
+
+  it('독점한 실행 결과에서도 같은 step에서 생겼다가 취소된 제안의 종료 기록이 상태와 맞는다', () => {
+    // ownedAfter를 넘기면 동기화가 실행 결과 객체를 그대로 쓰고 취소가 그 객체의 제안을 지운다.
+    // 비교할 제안 id를 동기화 전에 뜨지 않으면 '발령 제안 종료 기록이 상태와 다릅니다'로 턴이 멈춘다.
+    const before = personnelWorld();
+    const assigned = applied(assignGeneral(before, 4, 3, 4, 100));
+    const dismissed = applied(dismissOfficer(assigned.state, 1, 4));
+    const raw = () => ({
+      state: structuredClone(dismissed.state),
+      offices: {},
+      closedOffers: [...assigned.closedOffers, ...dismissed.closedOffers],
+      logs: [...assigned.logs, ...dismissed.logs],
+    });
+    const expected = completePersonnelStep(deepFreeze(structuredClone(before)), {}, deepFreeze(raw()), 100);
+    const owned = raw();
+    const actual = completePersonnelStep(before, {}, owned, 100, owned.state);
+    expect(actual).toEqual(expected);
+    expect(actual.assignment.closedOffers.map((offer) => offer.cancelReason)).toEqual(['ISSUER_LOST_OFFICE']);
   });
 
   it('B의 교체 종료와 W의 새 제안 취소를 빠짐없이 전달한다', () => {

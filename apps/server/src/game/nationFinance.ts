@@ -13,7 +13,6 @@ type City = TaxCity & { populationMax: number };
 type Member = { activeFromYear: number; removedAt: number | null };
 type World = Parameters<typeof worldClock>[0] & {
   startYear: number;
-  ruleFeatures: readonly string[];
 };
 
 export function nationPopulation(settlements: readonly City[]) {
@@ -51,7 +50,7 @@ export function projectNationFinance(
     financeEstimate: {
       gold: gold.totals,
       rice: rice.totals,
-      destination: world.ruleFeatures.includes('city-resources-v1') ? ('city' as const) : ('nation' as const),
+      destination: 'city' as const,
     },
     cityIncome: new Map(
       settlements.map((city) => [

@@ -1,10 +1,13 @@
+import { prepareBattleFixture } from '../test/battleFixture';
+import { recordTestTurns } from '../test/seasonFixture';
+import { saveFixtureWorld as saveInitialWorld } from '../test/worldFixture';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createDb } from '@opensamguk/db';
 import { hashState } from '@opensamguk/shared/node';
-import { publicNationPower, toWorldState } from '@opensamguk/rules';
+import { publicNationPower, initialReplayState, runReplayAction } from '@opensamguk/rules';
 import { monthlyFixture } from '../test/monthlyFixture';
 import { warFixture } from '../test/warFixture';
-import { saveInitialWorld, readWorldState } from './world/persistence';
+import { readWorldState } from './world/persistence';
 import { controlClock } from './world/clock';
 import { acquireLease, renewLease } from './lease';
 import { TurnLoop } from './turnLoop';
@@ -14,16 +17,19 @@ const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
 const db = createDb(url);
 const worlds: string[] = [];
+const users: string[] = [];
 afterAll(async () => {
   await db.world.deleteMany({ where: { id: { in: worlds } } });
+  await db.user.deleteMany({ where: { id: { in: users } } });
   await db.$disconnect();
 });
 
 describe('T2-22 / AC-M2-19 엔진 순위 집계', () => {
   it('첫 정산에서 등장 장수만 집계하고 캐시 롤백·교체와 기존 재생 해시를 보존한다', async () => {
     const initial = await monthlyFixture();
+    initial.generals[0]!.deathYear = initial.startYear + 100;
     const { worldId, stateHash } = await saveInitialWorld(db, initial, {
-      replayFormat: 'legacy',
+      replayFormat: 3,
       name: '순위 월간',
       turnTermMinutes: 60,
       endYear: null,
@@ -52,7 +58,9 @@ describe('T2-22 / AC-M2-19 엔진 순위 집계', () => {
     expect(generals.map((g) => g.id)).toEqual([1, 2]);
     expect(generals[0]).toMatchObject({ wins: 7, captures: 3 });
     const nations = first.nations as Array<{ id: number; cities: number; generals: number; power: number }>;
-    const settled = toWorldState(await readWorldState(db, worldId));
+    let replay = initialReplayState(initial);
+    while (replay.monthlyTick < 10000) replay = runReplayAction(replay, initial.seed, initial.unitSet);
+    const settled = replay.state;
     for (const nation of nations) {
       expect(nation.power).toBe(
         publicNationPower(settled, nation.id, { seed: initial.seed, tick: 10000, year: initial.startYear }),
@@ -77,30 +85,23 @@ describe('T2-22 / AC-M2-19 엔진 순위 집계', () => {
 
   it('전투 누계는 실패한 턴에서 롤백되고 재시도·엔진 재시작에도 한 번만 저장된다', async () => {
     const initial = await warFixture();
-    const { worldId } = await saveInitialWorld(db, initial, {
-      replayFormat: 'legacy',
-      name: '순위 전투',
-      turnTermMinutes: 60,
-      endYear: null,
-    });
+    delete initial.nationTurns;
+    const { worldId, lease, users: ownedUsers } = await prepareBattleFixture(db, initial);
     worlds.push(worldId);
-    await controlClock(db, worldId, 'start');
-    const lease = (await acquireLease(db, worldId))!;
-    await db.generalTurn.create({
-      data: { worldId, generalId: 1, slot: 0, explicit: true, commandKey: 'attack', args: { cityKey: 2 } },
-    });
+    users.push(...ownedUsers);
+    await recordTestTurns(db, worldId, 1, 'attack', { cityKey: 2 });
     const actor = () => db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
     const interrupted = new TurnLoop(db, lease, {
       beforeCommit: async () => {
         throw new Error('전공 저장 중단');
       },
     });
-    await expect(interrupted.advanceTo(100)).rejects.toThrow('전공 저장 중단');
-    expect(await actor()).toMatchObject({ battleWins: 0, captures: 0, nextTurnTick: 100 });
+    await expect(interrupted.advanceTo(100100)).rejects.toThrow('전공 저장 중단');
+    expect(await actor()).toMatchObject({ battleWins: 0, captures: 0, nextTurnTick: 100100 });
     expect(await db.battleLog.count({ where: { worldId } })).toBe(0);
-    await new TurnLoop(db, lease).advanceTo(100);
-    expect(await actor()).toMatchObject({ battleWins: 2, captures: 1, nextTurnTick: 10100 });
-    await new TurnLoop(db, lease).advanceTo(100);
+    await new TurnLoop(db, lease).advanceTo(100100);
+    expect(await actor()).toMatchObject({ battleWins: 2, captures: 1, nextTurnTick: 110100 });
+    await new TurnLoop(db, lease).advanceTo(100100);
     expect(await actor()).toMatchObject({ battleWins: 2, captures: 1 });
     const state = await db.$transaction((tx) => tx.general.findMany({ where: { worldId } }));
     expect(state.filter((g) => g.id !== 1).every((g) => g.battleWins === 0 && g.captures === 0)).toBe(true);

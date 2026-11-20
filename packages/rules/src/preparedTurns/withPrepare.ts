@@ -22,7 +22,7 @@ export function withPrepare(definition: CommandDef, spec: { preReqTurn: number }
       if (!general || general.nationId === null) throw new Error('준비할 국가가 없습니다.');
       const nationId = general.nationId,
         officerLevel = general.officerLevel;
-      const ledger = readPreparedTurns(view.preparedTurns, view);
+      const ledger = readPreparedTurns(view.preparedTurns);
       if (!ledger) throw new Error('명령 준비 기능이 필요합니다.');
       const progress = advancePrepare(ledger.nations[nationId]?.[officerLevel], definition.key, args, spec.preReqTurn);
       if (progress.phase === 'prepare') {
@@ -49,8 +49,12 @@ export function trackNationTurn(
   commandKey: string,
   result: CommandResult | Failure,
 ): WorldState {
-  const ledger = readPreparedTurns(state.preparedTurns, state);
-  if (!ledger || 'code' in result) return state;
+  const ledger = readPreparedTurns(state.preparedTurns);
+  if (!ledger) return state;
+  if ('code' in result) {
+    if (result.clearPreparation) clearRecord(state, actor.nationId, actor.officerLevel);
+    return state;
+  }
   const record = ledger.nations[actor.nationId]?.[actor.officerLevel];
   if (record && record.commandKey !== commandKey) clearRecord(state, actor.nationId, actor.officerLevel);
   return state;

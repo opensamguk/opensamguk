@@ -1,17 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { rngFor } from '@opensamguk/shared';
 import { commandWorld, testUnits } from '../../test/commandFixture';
-import { applyEffects } from '../commands/effects';
-import { militaryCommands } from '../commands/military';
+import { applyCampaignPreparation, type CampaignPreparationKey } from '../campaign/preparation';
 import { emptyTurns, type QueuedTurn } from '../replay';
-import { calculateOperationTimeline, type OperationTimelineInput, type Readiness } from './timeline';
+import { calculateOperationTimeline, type OperationTimelineInput } from './timeline';
 
 const attack = (cityKey = 2): QueuedTurn => ({ commandKey: 'attack', args: { cityKey } });
 const recruit = (amount: number, commandKey = 'recruit'): QueuedTurn => ({
   commandKey,
-  args: { amount, crewType: 1100 },
+  args: { unitId: 1, amount, crewType: 1100 },
 });
-const drill = (commandKey: 'train' | 'morale'): QueuedTurn => ({ commandKey, args: {} });
+const drill = (commandKey: 'train' | 'morale'): QueuedTurn => ({ commandKey, args: { unitId: 1 } });
 function input(overrides: Partial<OperationTimelineInput> = {}): OperationTimelineInput {
   return {
     startYear: 191,
@@ -27,9 +25,71 @@ function input(overrides: Partial<OperationTimelineInput> = {}): OperationTimeli
 function turns(...commands: QueuedTurn[]): QueuedTurn[] {
   return [...commands, ...emptyTurns().slice(commands.length)];
 }
-const readiness = ({ crew, train, atmos }: Readiness): Readiness => ({ crew, train, atmos });
 
 describe('작전 타임라인 0단계', () => {
+  it('AC-M3-13 선택한 부곡만 실제 지휘관 증가량으로 훈련하고 병력 가중 평균을 낸다', () => {
+    const view = commandWorld();
+    Object.assign(view.generals[4]!, { nationId: 1, cityKey: 1, leadership: 100, charm: 100 });
+    view.campaign!.links = [{ masterId: 1, personId: 4, relation: 'LIEUTENANT' }];
+    view.campaign!.units = [
+      { id: 1, ownerId: 1, commanderId: 1, troops: 100, crewType: 1100, train: 90, atmos: 90 },
+      { id: 2, ownerId: 1, commanderId: 4, troops: 300, crewType: 1100, train: 20, atmos: 30 },
+      { id: 3, ownerId: 2, commanderId: 2, troops: 500, crewType: 1100, train: 0, atmos: 0 },
+    ];
+    view.campaign!.nextUnitId = 4;
+    const before = structuredClone(view);
+    let actual = view;
+    const preparation = [
+      { commandKey: 'train', args: { unitId: 2 } },
+      { commandKey: 'morale', args: { unitId: 2 } },
+    ];
+    for (const turn of preparation) {
+      const result = applyCampaignPreparation(
+        actual,
+        { generalId: 1 },
+        turn.commandKey as CampaignPreparationKey,
+        turn.args,
+      );
+      if (!result.ok) throw Error(result.message);
+      actual = result.state;
+    }
+    const units = actual.campaign!.units.filter((unit) => unit.ownerId === 1);
+    const result = calculateOperationTimeline(
+      input({
+        current: { crew: 400, train: 37, atmos: 45 },
+        view: before,
+        generalId: 1,
+        turns: turns(...preparation, attack()),
+      }),
+    );
+    expect(result.expected).toEqual({
+      crew: 400,
+      train: Math.floor(units.reduce((sum, unit) => sum + unit.troops * unit.train, 0) / 400),
+      atmos: Math.floor(units.reduce((sum, unit) => sum + unit.troops * unit.atmos, 0) / 400),
+    });
+    expect(actual.campaign!.units[0]).toEqual(before.campaign!.units[0]);
+    expect(actual.campaign!.units[2]).toEqual(before.campaign!.units[2]);
+    expect(view).toEqual(before);
+  });
+
+  it('AC-M2-15 도시 수비병 모집과 남의 부곡 훈련은 출병 준비에 더하지 않는다', () => {
+    const view = commandWorld();
+    const current = { crew: 10000, train: 100, atmos: 100 };
+    const result = calculateOperationTimeline(
+      input({
+        view,
+        generalId: 1,
+        current,
+        turns: turns(
+          { commandKey: 'recruit', args: { amount: 100, crewType: 1100 } },
+          { commandKey: 'train', args: { unitId: 2 } },
+          attack(),
+        ),
+      }),
+    );
+    expect(result.expected).toEqual(current);
+  });
+
   it.each([
     [9999, 'READY'],
     [10000, 'LATE'],
@@ -110,17 +170,29 @@ describe('작전 타임라인 0단계', () => {
 
   it.each(['recruit', 'conscript'])('%s의 희석을 실제 명령 실행과 대조한다', (key) => {
     let state = commandWorld();
-    Object.assign(state.generals[1]!, { crew: 137, train: 91, atmos: 87 });
-    const initial = readiness(state.generals[1]!);
+    Object.assign(state.campaign!.units[0]!, { troops: 137, train: 91, atmos: 87 });
+    const initial = { crew: 137, train: 91, atmos: 87 };
+    const before = structuredClone(state);
     const preparation = [recruit(211, key), drill('train'), drill('morale'), recruit(17, key)];
     for (const turn of preparation) {
-      const command = militaryCommands.find(({ key }) => key === turn.commandKey)!;
-      const result = command.execute(state, { generalId: 1, unitSet: testUnits }, turn.args, rngFor('operation'));
-      state = applyEffects(state, result.effects);
+      const result = applyCampaignPreparation(
+        state,
+        { generalId: 1, unitSet: testUnits },
+        turn.commandKey as CampaignPreparationKey,
+        turn.args,
+      );
+      if (!result.ok) throw Error(result.message);
+      state = result.state;
     }
-    const result = calculateOperationTimeline(input({ current: initial, turns: turns(...preparation, attack()) }));
-    expect(result.expected).toEqual(readiness(state.generals[1]!));
-    expect(result.expected).toEqual({ crew: 365, train: 42, atmos: 41 });
+    const result = calculateOperationTimeline(
+      input({ current: initial, turns: turns(...preparation, attack()), view: before, generalId: 1 }),
+    );
+    expect(result.expected).toEqual({
+      crew: state.campaign!.units[0]!.troops,
+      train: state.campaign!.units[0]!.train,
+      atmos: state.campaign!.units[0]!.atmos,
+    });
+    expect(result.expected).toEqual({ crew: 365, train: 44, atmos: 42 });
   });
 
   it('병력이 없을 때 모병하면 훈련과 사기는 0으로 희석된다', () => {
@@ -132,14 +204,19 @@ describe('작전 타임라인 0단계', () => {
 
   it('훈련과 사기 증가는 실제 명령과 같이 100에서 멈춘다', () => {
     let state = commandWorld();
-    Object.assign(state.generals[1]!, { train: 95, atmos: 98 });
-    const current = readiness(state.generals[1]!);
+    Object.assign(state.campaign!.units[0]!, { troops: 10000, train: 95, atmos: 98 });
+    const current = { crew: 10000, train: 95, atmos: 98 };
     for (const commandKey of ['train', 'morale'] as const) {
-      const command = militaryCommands.find(({ key }) => key === commandKey)!;
-      state = applyEffects(state, command.execute(state, { generalId: 1 }, {}, rngFor('cap')).effects);
+      const result = applyCampaignPreparation(state, { generalId: 1 }, commandKey, { unitId: 1 });
+      if (!result.ok) throw Error(result.message);
+      state = result.state;
     }
     const result = calculateOperationTimeline(input({ current, turns: turns(drill('train'), drill('morale')) }));
-    expect(result.expected).toEqual(readiness(state.generals[1]!));
+    expect(result.expected).toEqual({
+      crew: state.campaign!.units[0]!.troops,
+      train: state.campaign!.units[0]!.train,
+      atmos: state.campaign!.units[0]!.atmos,
+    });
     expect(result.expected).toEqual({ crew: 10000, train: 100, atmos: 100 });
   });
 

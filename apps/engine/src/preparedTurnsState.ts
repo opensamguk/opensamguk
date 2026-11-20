@@ -7,8 +7,8 @@ export async function persistPreparedTurns(
   before: WorldView,
   next: WorldView,
 ) {
-  const original = readPreparedTurns(before.preparedTurns, before),
-    final = readPreparedTurns(next.preparedTurns, next);
+  const original = readPreparedTurns(before.preparedTurns),
+    final = readPreparedTurns(next.preparedTurns);
   if (!original && !final) return;
   if (!original || !final) throw new Error('진행 중 명령 준비 기능을 바꿀 수 없습니다.');
   if (JSON.stringify(original) === JSON.stringify(final)) return;

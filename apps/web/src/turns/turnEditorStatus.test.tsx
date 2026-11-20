@@ -11,13 +11,32 @@ import {
 } from '@tanstack/react-router';
 import { createTRPCClient, TRPCClientError, type TRPCLink } from '@trpc/client';
 import { observable } from '@trpc/server/observable';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import type { WorldSummary } from '../game/types';
 import { TRPCProvider } from '../trpc';
 import type { CommandInfo } from './CommandPicker';
 import type { Check, TurnList, TurnSource, TurnSourceFactory } from './source';
 import { TurnEditor, type TurnEditorStatus } from './TurnEditor';
+
+// 명령은 띠 위 세부 메뉴에서 고른다(띠 아래 목록과 검색 칸은 없다). 시험은 그 명령이 든 묶음 패를 차례로 눌러
+// 세부 메뉴에 띄운 뒤 그 단추를 돌려준다. 인자 없는 명령은 누르면 바로 들어가고, 인자가 있으면 인자 창이 열린다.
+function commandButton(name: string, root: HTMLElement = document.body): HTMLButtonElement {
+  const scope = within(root);
+  const find = () =>
+    scope.queryAllByRole('button', { name }).find((button) => button.closest('[aria-label$="세부 명령"]')) as
+      HTMLButtonElement | undefined;
+  const open = find();
+  if (open) return open;
+  for (const bandGroup of scope.getAllByRole('group', { name: '명령 분류' })) {
+    for (const plaque of within(bandGroup).getAllByRole('button')) {
+      if (plaque.getAttribute('aria-expanded') !== 'true') fireEvent.click(plaque);
+      const found = find();
+      if (found) return found;
+    }
+  }
+  throw new Error(`세부 메뉴에서 ${name} 명령을 찾지 못했습니다.`);
+}
 
 // T4-97 U2: 편집기가 바깥 띠에 알리는 저장 상태. 가짜 tRPC와 가짜 칸 연결로 실제 편집기를 띄운다.
 
@@ -33,6 +52,7 @@ const notFound = () =>
 const summary = (status: WorldSummary['status']): WorldSummary => ({
   name: '시험 월드',
   status,
+  fogOfWar: false,
   startYear: 190,
   gameDate: { year: 190, month: 1 },
   clockMode: 'REALTIME',
@@ -142,8 +162,12 @@ it('T4-97 AC-P2-34 최초 조회·저장된 목록·미저장 편집을 구분�
 
   fireEvent.click(document.querySelector('tr[data-slot="1"]')!);
   await waitFor(() => expect(onStatus).toHaveBeenLastCalledWith({ kind: 'saved', behind: false, selection: 1 }));
-  fireEvent.click(screen.getByRole('radio', { name: '농지 개간' }));
-  fireEvent.click(screen.getByRole('button', { name: '1번 칸에 넣기' }));
+  // 인자 없는 명령은 누르는 순간 고른 칸에 저장하므로 저장 중을 거쳐 저장된 목록으로 돌아온다.
+  fireEvent.click(commandButton('농지 개간'));
+  await waitFor(() => expect(onStatus).toHaveBeenCalledWith({ kind: 'saving', edits: 1 }));
+  await waitFor(() => expect(onStatus).toHaveBeenLastCalledWith({ kind: 'saved', behind: false, selection: 1 }));
+  // 미저장 편집은 저장하지 않는 편집(밀기)으로 만든다.
+  fireEvent.click(screen.getByRole('button', { name: '밀기' }));
   await waitFor(() =>
     expect(onStatus).toHaveBeenLastCalledWith({ kind: 'unsaved', edits: 1, behind: false, selection: 1 }),
   );
@@ -172,8 +196,8 @@ it('AC-M1-08 선택한 칸에 한 번에 저장하고 충돌하면 방금 넣은
   await open((input) => ({ ...makeSource(null)(input), save }), 'RUNNING', vi.fn());
   await screen.findByRole('grid', { name: '예턴 30칸' });
   fireEvent.click(document.querySelector('tr[data-slot="1"]')!);
-  fireEvent.click(await screen.findByRole('radio', { name: '농지 개간' }));
-  fireEvent.click(screen.getByRole('button', { name: '1번 칸에 저장' }));
+  // 인자 없는 명령은 누르는 순간 고른 칸에 저장한다.
+  fireEvent.click(await waitFor(() => commandButton('농지 개간')));
   await waitFor(() =>
     expect(save.mock.calls[0]?.[0]).toMatchObject({
       revision: 1,
@@ -201,13 +225,17 @@ it('T4-86 AC-P2-26 병종표 조회가 실패해도 표는 병종 번호로 적�
   await open(source, 'RUNNING', onStatus);
   await waitFor(() => expect(document.querySelector('tr[data-slot="1"]')?.textContent).toContain('병종 1300'));
   fireEvent.click(document.querySelector('tr[data-slot="2"]')!);
-  fireEvent.click(screen.getByRole('radio', { name: '농지 개간' }));
-  fireEvent.click(screen.getByRole('button', { name: '2번 칸에 넣기' }));
-  await waitFor(() =>
-    expect(onStatus).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'unsaved', edits: 1 })),
-  );
-  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  // 인자 없는 명령은 누르는 순간 고른 칸에 저장한다.
+  fireEvent.click(commandButton('농지 개간'));
   await waitFor(() => expect(save).toHaveBeenCalledOnce());
+  // 병종표 없이도 저장된 징병은 병종 번호 그대로 남고 2번 칸에 농지 개간이 들어간다.
+  const sent = (save.mock.calls[0] as unknown[] | undefined)?.[0] as { revision: number; slots: unknown[] };
+  expect(sent.revision).toBe(1);
+  expect(sent.slots.slice(0, 2)).toMatchObject([
+    { commandKey: 'recruit', args: { amount: 100, crewType: 1300 } },
+    { commandKey: 'farm', args: {} },
+  ]);
+  await waitFor(() => expect(onStatus).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'saved' })));
 });
 
 it('INT-25 넣은 명령은 최근 넣은 명령 줄에 남고 누르면 고른 칸에 같은 넣기 경로로 넣는다', async () => {
@@ -217,8 +245,7 @@ it('INT-25 넣은 명령은 최근 넣은 명령 줄에 남고 누르면 고른 
   // 아직 넣은 명령이 없으면 줄을 그리지 않는다.
   expect(screen.queryByRole('group', { name: '최근 넣은 명령' })).toBeNull();
   fireEvent.click(document.querySelector('tr[data-slot="1"]')!);
-  fireEvent.click(screen.getByRole('radio', { name: '농지 개간' }));
-  fireEvent.click(screen.getByRole('button', { name: '1번 칸에 넣기' }));
+  fireEvent.click(commandButton('농지 개간'));
   const recent = await screen.findByRole('group', { name: '최근 넣은 명령' });
   expect(recent.textContent).toContain('농지 개간');
   expect(JSON.parse(localStorage.getItem('opensamguk.recentCommands.v1:u1:w1')!)).toEqual([
@@ -230,8 +257,9 @@ it('INT-25 넣은 명령은 최근 넣은 명령 줄에 남고 누르면 고른 
   fireEvent.click(document.querySelector('tr[data-slot="2"]')!);
   fireEvent.click(screen.getByRole('button', { name: '농지 개간 다시 넣기' }));
   await waitFor(() => expect(document.querySelector('tr[data-slot="2"]')?.textContent).toContain('농지 개간'));
+  // 세부 명령으로 넣은 1번 칸은 바로 저장했으므로 미저장 편집은 최근 명령으로 넣은 하나다.
   await waitFor(() =>
-    expect(onStatus).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'unsaved', edits: 2 })),
+    expect(onStatus).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'unsaved', edits: 1 })),
   );
 
   // 다시 열어도 계정·월드의 localStorage에서 읽는다.

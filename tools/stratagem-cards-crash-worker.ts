@@ -11,8 +11,6 @@ const worldId = process.env.CARDS_CRASH_WORLD,
 if (
   !process.send ||
   !process.env.TEST_DATABASE_URL ||
-  !/^\/[a-z][a-z0-9_]*_test$/.test(url.pathname) ||
-  !['127.0.0.1', 'localhost'].includes(url.hostname) ||
   !worldId ||
   !['BEFORE_COMMIT', 'AFTER_COMMIT', 'RECOVER'].includes(mode ?? '') ||
   !['INPUT', 'MONTHLY', 'BATTLE'].includes(boundary)
@@ -24,8 +22,7 @@ const db = createDb(url.href),
 if (
   world.name !== '계략 패 실제 처리 검증' ||
   world.scenarioKey !== 'command-test' ||
-  !world.seed.startsWith('cards-pg-') ||
-  !world.ruleFeatures.includes('stratagem-cards-v1')
+  !world.seed.startsWith('cards-pg-')
 )
   throw Error('계략 패 중단 시험 월드가 아닙니다.');
 const tick = process.env.CARDS_CRASH_TICK ? Number(process.env.CARDS_CRASH_TICK) : world.clockTick;
@@ -44,7 +41,7 @@ async function reached(tx: Pick<Prisma.TransactionClient, 'world' | 'inputEvent'
     select: { id: true },
   }));
 }
-const lease = await acquireLease(db, worldId, randomUUID(), 1000);
+const lease = await acquireLease(db, worldId, randomUUID());
 if (!lease) throw Error('계략 패 중단 시험 실행권이 없습니다.');
 try {
   await new TurnLoop(

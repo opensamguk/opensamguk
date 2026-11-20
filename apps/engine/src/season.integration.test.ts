@@ -75,9 +75,9 @@ async function checkEnd(worldId: string, reason: 'END_YEAR' | 'UNIFIED') {
     expect(value.archive).toHaveLength(1);
     expect(archive.months).toHaveLength(0);
     expect(value.logs.length).toBeGreaterThan(0);
+    expect(value.logs[0]?.tick).toBe(result.endedTick);
     expect(new Set(value.logs.map((log) => log.sequence)).size).toBe(1);
     expect(value.logs.map((log) => log.ordinal).sort((a, b) => a - b)).toEqual(value.logs.map((_, ordinal) => ordinal));
-    expect(value.logs[0]?.text).toContain('점령');
     expect(result.winnerName).toBeTruthy();
     expect(result.winnerColor).toBeTruthy();
   } else {
@@ -233,10 +233,18 @@ it('종료 연도 정산과 같은 tick인 장수 턴은 실행하지 않는다'
   const initial = await seasonInitial('END_YEAR');
   const template = await seasonInitial('UNIFIED');
   initial.generals = [
-    { ...template.generals[0]!, nationId: 1, cityKey: 1, crew: 0, gold: 0, rice: 0, nextTurnTick: 120000 },
+    {
+      ...template.generals[0]!,
+      nationId: 1,
+      cityKey: 1,
+      crew: 0,
+      gold: 0,
+      rice: 0,
+      deathYear: initial.startYear + 50,
+      nextTurnTick: 120000,
+    },
   ];
   const { worldId } = await saveInitialWorld(db, initial, {
-    replayFormat: 'legacy',
     name: '경계',
     turnTermMinutes: 60,
     endYear: initial.startYear,
@@ -246,7 +254,7 @@ it('종료 연도 정산과 같은 tick인 장수 턴은 실행하지 않는다'
   const lease = (await acquireLease(db, worldId))!;
   try {
     await new TurnLoop(db, lease).advanceTo(120000);
-    expect(await db.generalLog.count({ where: { worldId } })).toBe(0);
+    expect(await db.generalLog.count({ where: { worldId, commandKey: 'rest' } })).toBe(0);
     const finished = await checkEnd(worldId, 'END_YEAR');
     expect(finished.archive).toHaveLength(1);
   } finally {
@@ -308,7 +316,6 @@ it('월드를 지정하지 않은 runEngine은 종료 뒤 다음 RUNNING 월드�
 it('운영 모드는 PREOPEN·ENDED·같은 모드를 거부하고 동시 전환은 한 번 적용한다', async () => {
   const initial = await seasonInitial('END_YEAR');
   const { worldId } = await saveInitialWorld(db, initial, {
-    replayFormat: 'legacy',
     name: '거부',
     turnTermMinutes: 60,
     endYear: initial.startYear,

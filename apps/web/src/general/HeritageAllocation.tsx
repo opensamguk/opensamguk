@@ -112,7 +112,7 @@ export function HeritageAllocation({
       ) : null}
       {stale ? (
         <div className={styles.heritageStale}>
-          <p>다른 월드에서 먼저 썼을 수 있어 보유 점수가 달라졌을 수 있습니다. 배분은 그대로 두었습니다.</p>
+          <p>다른 월드에서 먼저 써서 보유 점수가 달라졌을 수 있습니다. 배분은 그대로 두었습니다.</p>
           <p>
             <button ref={refreshButton} type="button" className={styles.secondary} onClick={onRefresh}>
               잔액 다시 확인

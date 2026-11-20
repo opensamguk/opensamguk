@@ -3,7 +3,7 @@ import { Link } from '@tanstack/react-router';
 import { useMemo } from 'react';
 import { retryUnlessClientError } from '../game/errors';
 import { displayName, officerName } from '../game/names';
-import { useHome, useWorldMap, useWorldRules, useWorldUnits } from '../game/queries';
+import { useHome, useWorldMap, useWorldUnits } from '../game/queries';
 import { QueryError } from '../game/QueryState';
 import {
   isDetailedCity,
@@ -36,7 +36,6 @@ import {
   type StatBand,
 } from './infoView';
 import { levelName } from './siteMarkers';
-import { unitNameOf } from './UnitName';
 import { LogisticsPanel } from '../city/LogisticsPanel';
 
 const HIDDEN_CITY = '다른 국가의 도시입니다';
@@ -61,14 +60,13 @@ export function useCity(worldId: string, cityKey: number | null) {
 
 // 도시 정보 칸. 원작 CityBasicCard처럼 제목·지배 국가·수치 막대를 두고, 주둔 장수 표를 붙인다.
 // 공개 범위 밖이면 서버가 수치를 빼고 보낸다. 그 칸은 —와 이유로 보여 준다.
-// 첩보 기능 월드의 타국 도시는 서버가 준 가장 최근 첩보 기록(fog.intel)을 기록 연월과 함께 보인다 (INT-25).
+// 안개 월드의 타국 도시는 서버가 준 가장 최근 첩보 기록(fog.intel)을 기록 연월과 함께 보인다 (INT-25).
 export function CityInfo({
   worldId,
   cityKey,
   nations,
   onSelectCity,
   showGenerals = true,
-  logisticsEnabled = false,
   summary = false,
 }: {
   worldId: string;
@@ -76,8 +74,6 @@ export function CityInfo({
   nations: readonly MapNation[];
   onSelectCity?: (key: number) => void;
   showGenerals?: boolean;
-  // world.summary.logisticsEnabled가 true인 월드에서만 물류 칸을 그리고 조회한다 (T4-93).
-  logisticsEnabled?: boolean;
   // 메인의 요약 칸 (INT-25). 주둔 장수 표·물류는 도시 화면으로 보내고 링크만 둔다.
   summary?: boolean;
 }) {
@@ -162,16 +158,16 @@ export function CityInfo({
         </p>
       ) : (
         <p className={styles.note} role="note">
-          {HIDDEN_CITY}. 공개 범위에 따라 최대치와 확인 가능한 수치를 표시합니다.
+          {HIDDEN_CITY}. 최대치와 공개된 수치만 보입니다.
         </p>
       )}
       <CityStats rows={rows} />
-      {/* 태수·군사·종사는 관직 효과 월드에서 서버가 officers로 준다(타국 도시는 첩보 기능이면 빠진다). */}
-      {data.nationId !== null && data.kind !== 'PASS' && data.officeEffectsEnabled && data.officers ? (
-        <CityOffices officers={data.officers} secretaryEnabled={data.secretaryEnabled === true} />
+      {/* 태수·군사·종사는 서버가 officers로 준다(안개 월드의 타국 도시는 빠진다). */}
+      {data.nationId !== null && data.kind !== 'PASS' && data.officers ? (
+        <CityOffices officers={data.officers} />
       ) : null}
       {isDetailedCity(data) ? <CityFacts city={data} /> : null}
-      {garrisonHidden ? null : <GarrisonLine generals={data.generals} campaign={data.campaignEnabled === true} />}
+      {garrisonHidden ? null : <GarrisonLine generals={data.generals} />}
       {/* 도시 금·쌀·수비병(INT-18)은 모병·배속 명령과 함께 쓰므로 메인에도 둔다. */}
       <CityResourcesPanel worldId={worldId} cityKey={cityKey} />
       {summary ? (
@@ -183,17 +179,15 @@ export function CityInfo({
               주둔 장수 {data.generals.length}명
             </Link>
           )}
-          {logisticsEnabled ? (
-            <Link to="/w/$worldId/city/$cityKey" params={{ worldId, cityKey: String(cityKey) }} hash="logistics">
-              물류
-            </Link>
-          ) : null}
+          <Link to="/w/$worldId/city/$cityKey" params={{ worldId, cityKey: String(cityKey) }} hash="logistics">
+            물류
+          </Link>
         </p>
-      ) : logisticsEnabled ? (
+      ) : (
         <div id="logistics">
           <LogisticsPanel worldId={worldId} cityKey={cityKey} />
         </div>
-      ) : null}
+      )}
       {data.links.length > 0 ? (
         <p className={styles.links}>
           <span className={styles.meta}>연결</span>
@@ -207,19 +201,13 @@ export function CityInfo({
           ))}
         </p>
       ) : null}
-      {/* 첩보 기능 월드의 타국 도시는 서버가 장수 목록을 비워 보낸다. 없는 것과 못 보는 것을 가른다. */}
+      {/* 안개 월드의 타국 도시는 서버가 장수 목록을 비워 보낸다. 없는 것과 못 보는 것을 가른다. */}
       {showGenerals && !summary && garrisonHidden ? (
         <p className={styles.meta} data-garrison="hidden">
           {GARRISON_HIDDEN}. 첩보로 확인합니다.
         </p>
       ) : showGenerals && !summary ? (
-        <Garrison
-          worldId={worldId}
-          generals={data.generals}
-          nations={nationById}
-          campaign={data.campaignEnabled === true}
-          fiveStats={data.fiveStats === true}
-        />
+        <Garrison worldId={worldId} generals={data.generals} nations={nationById} />
       ) : null}
     </div>
   );
@@ -300,7 +288,7 @@ export function CityStats({ rows }: { rows: readonly CityStatRow[] }) {
               <td className={statStyles.barCell}>
                 {row.max !== undefined && row.value !== null ? (
                   <span
-                    className={statStyles.bar}
+                    className={`${statStyles.bar} kit-gauge`}
                     role="meter"
                     aria-label={`${row.label} ${row.value} / ${row.max}`}
                     aria-valuenow={row.value}
@@ -402,16 +390,15 @@ function CityFacts({ city }: { city: CityDetailFields }) {
 }
 
 // 주둔 병력 요약 (원작 현재 도시의 병장(총)·90병장·60병장·적군 칸). 아군은 수치를 받은 같은 국가 장수다.
-export function GarrisonLine({ generals, campaign }: { generals: readonly GeneralView[]; campaign: boolean }) {
+export function GarrisonLine({ generals }: { generals: readonly GeneralView[] }) {
   const sum = garrisonSummary(generals);
   return (
     <p className={styles.facts} data-testid="garrison-summary">
       <span>
-        {campaign ? '아군 지휘 병력' : '아군 병력'} {n(sum.troops)} · 병력 있는 장수 {n(sum.withTroops)}명 / 아군{' '}
-        {n(sum.allies)}명
+        아군 지휘 병력 {n(sum.troops)} · 병력 있는 장수 {n(sum.withTroops)}명 / 아군 {n(sum.allies)}명
       </span>
       <span>
-        훈련·사기 90 이상 {n(sum.ready90.troops)}명({n(sum.ready90.count)}장수) · 60 이상 {n(sum.ready60.troops)}명(
+        훈련과 사기 90 이상 {n(sum.ready90.troops)}명({n(sum.ready90.count)}장수) · 60 이상 {n(sum.ready60.troops)}명(
         {n(sum.ready60.count)}장수)
       </span>
       {sum.foreign + sum.ronin > 0 ? (
@@ -462,16 +449,11 @@ function Garrison({
   worldId,
   generals,
   nations,
-  campaign,
-  fiveStats,
 }: {
   worldId: string;
   generals: readonly GeneralView[];
   nations: Map<number, MapNation>;
-  campaign: boolean;
-  fiveStats: boolean;
 }) {
-  const crewTypes = useWorldRules(worldId).data?.unitSet.crewTypes;
   // 직책자만 감찰 자료로 같은 국가 장수의 예턴 앞 5칸을 본다 (원작 현재 도시의 명령 열). 일반 장수는 열이 없다.
   const inspection = useInspectionRows(worldId);
   const names = useArgNames(worldId);
@@ -513,40 +495,12 @@ function Garrison({
     { key: 'leadership', label: '통솔', ...num((g) => g.leadership) },
     { key: 'strength', label: '무력', ...num((g) => g.strength) },
     { key: 'intel', label: '지력', ...num((g) => g.intel) },
-    ...(fiveStats
-      ? [
-          { key: 'politics', label: '정치', ...num((g) => g.politics) },
-          { key: 'charm', label: '매력', ...num((g) => g.charm) },
-        ]
-      : []),
-    // 부곡 월드는 병종이 부곡마다 달라 장수 병종 열을 두지 않는다.
-    ...(campaign
-      ? []
-      : [
-          {
-            key: 'crewType',
-            label: '병종',
-            sortValue: (g: GeneralView) => (isDetailedGeneral(g) ? g.crewType : null),
-            render: (g: GeneralView) => (isDetailedGeneral(g) ? unitNameOf(crewTypes, g.crewType).name : '—'),
-            title: (g: GeneralView) =>
-              isDetailedGeneral(g) ? unitNameOf(crewTypes, g.crewType).title : HIDDEN_GENERAL,
-          },
-        ]),
-    {
-      key: 'crew',
-      label: campaign ? '지휘 병력' : '병력',
-      ...num((g) => (campaign && 'commandedArmy' in g ? g.commandedArmy.troops : g.crew)),
-    },
-    {
-      key: 'train',
-      label: campaign ? '평균 훈련' : '훈련',
-      ...num((g) => (campaign ? ('commandedArmy' in g ? g.commandedArmy.train : undefined) : g.train)),
-    },
-    {
-      key: 'atmos',
-      label: campaign ? '평균 사기' : '사기',
-      ...num((g) => (campaign ? ('commandedArmy' in g ? g.commandedArmy.atmos : undefined) : g.atmos)),
-    },
+    { key: 'politics', label: '정치', ...num((g) => g.politics) },
+    { key: 'charm', label: '매력', ...num((g) => g.charm) },
+    // 병종은 부곡마다 달라 장수 병종 열을 두지 않는다.
+    { key: 'crew', label: '지휘 병력', ...num((g) => ('commandedArmy' in g ? g.commandedArmy.troops : g.crew)) },
+    { key: 'train', label: '평균 훈련', ...num((g) => ('commandedArmy' in g ? g.commandedArmy.train : undefined)) },
+    { key: 'atmos', label: '평균 사기', ...num((g) => ('commandedArmy' in g ? g.commandedArmy.atmos : undefined)) },
     ...(inspection
       ? [
           {

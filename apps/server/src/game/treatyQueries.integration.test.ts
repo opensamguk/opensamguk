@@ -53,6 +53,7 @@ beforeAll(async () => {
 // 저장 행 검사에만 쓰는 legacy row다. opt-in factory의 증거가 아니다.
 function world(patch: Partial<World> = {}): World {
   return {
+    fogOfWar: false,
     runtimeOptions: null,
     officeEffects: null,
     id: 'world',
@@ -95,8 +96,8 @@ function world(patch: Partial<World> = {}): World {
     actionSequence: 30,
     policyFromSequence: null,
     treatyFormat: null,
-    replayFormat: 1,
-    ruleFeatures: [],
+    replayFormat: 3,
+
     personnelFormat: null,
     replayOrigin: null,
     commandMeta: null,
@@ -239,8 +240,10 @@ describe('T2-07 / AC-M2-06 조약 저장 행과 상세 투영 단위', () => {
   });
 
   it('legacy를 opt-in으로 만들지 않고 저장 표시 불일치를 내부 오류로 낸다', () => {
-    expect(() => requireTreatyWorld(world())).toThrow('조약 기능을 쓰지 않는 월드입니다.');
-    expect(() => requireTreatyWorld(world({ treatyFormat: 1 }))).toThrow('저장된 조약을 확인하지 못했습니다.');
+    expect(() => requireTreatyWorld(world({ replayFormat: 1 }))).toThrow('조약 기능을 쓰지 않는 월드입니다.');
+    expect(() => requireTreatyWorld(world({ replayFormat: 1, treatyFormat: 1 }))).toThrow(
+      '저장된 조약을 확인하지 못했습니다.',
+    );
   });
 
   it('T4-17 B ext 단독은 조약 단독과 달리 같은 PRECONDITION_FAILED로 거부한다', () => {
@@ -255,6 +258,7 @@ describe('T2-07 / AC-M2-06 조약 저장 행과 상세 투영 단위', () => {
     expect(() =>
       requireTreatyWorld(
         world({
+          replayFormat: 1,
           treatyFormat: 1,
           replayOrigin: {
             ...common,
@@ -264,6 +268,7 @@ describe('T2-07 / AC-M2-06 조약 저장 행과 상세 투영 단위', () => {
       ),
     ).not.toThrow();
     const stored = world({
+      replayFormat: 1,
       policyFromSequence: 0,
       replayOrigin: {
         ...common,

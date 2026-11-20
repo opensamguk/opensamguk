@@ -239,23 +239,16 @@ export async function processInputs(
   if (!kind || kind.route !== 'queued') throw new Error('등록되지 않은 대기 입력 종류입니다.');
   const handlers = queuedInputHandlers(registry);
   const sequence = await nextActionSequence(tx, world.id);
-  const before = world.ruleFeatures.some((key) => key === 'personnel' || key === 'reputation-v1')
-    ? await loadReplayState(tx, world.id)
-    : null;
-  const enabled = kind.feature === null || world.ruleFeatures.includes(kind.feature);
+  const before = await loadReplayState(tx, world.id);
   const actor =
-    !enabled || event.generalId === null
+    event.generalId === null
       ? null
       : await tx.general.findUnique({
           where: { worldId_id: { worldId: world.id, id: event.generalId } },
           select: { removedAt: true },
         });
-  const outcome = !enabled
-    ? {
-        status: 'REJECTED' as const,
-        result: { code: 'FEATURE_DISABLED', message: '이 월드에서 켜지 않은 기능입니다.' },
-      }
-    : actor?.removedAt != null
+  const outcome =
+    actor?.removedAt != null
       ? {
           status: 'REJECTED' as const,
           result: removedGeneralResult(event.kind, tick),
@@ -272,8 +265,7 @@ export async function processInputs(
       result: outcome.result,
     };
     for (const feature of registry.features)
-      if (world.ruleFeatures.includes(feature.key) && feature.key !== kind.feature)
-        await feature.afterQueuedInput?.(tx, world, before, input);
+      if (feature.key !== kind.feature) await feature.afterQueuedInput?.(tx, world, before, input);
   }
   if (event.kind === POSSESSION_KIND && outcome.status === 'APPLIED') {
     if (outcome.generalId === undefined) throw Error('맡은 장수의 적용 ID가 없습니다.');
@@ -291,7 +283,7 @@ const processGeneralCreation: QueuedInputHandler = async (tx, world, event, { ti
   const reject = (code: CreationCode) => ({ status: 'REJECTED' as const, result: creationFailure(code) });
   const modern =
     world.replayFormat === 3
-      ? world.ruleFeatures.includes('policy')
+      ? true
       : isPolicyMode({ fromSequence: world.policyFromSequence, actionSequence: world.actionSequence });
   await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${event.userId} FOR SHARE`;
   const existing = await tx.general.findMany({
@@ -310,18 +302,9 @@ const processGeneralCreation: QueuedInputHandler = async (tx, world, event, { ti
   if (block && block.code !== 'PENDING') return reject(block.code);
   const actor = await tx.user.findUnique({ where: { id: event.userId } });
   if (!actor || actor.status !== 'ACTIVE') return reject('ACTOR_INACTIVE');
-  const parsed = validateGeneralCreation(
-    event.payload,
-    world.statRules,
-    world.ruleFeatures.includes('lineage-v1'),
-    world.ruleFeatures.includes('heritage-v1'),
-  );
+  const parsed = validateGeneralCreation(event.payload, world.statRules, true, true);
   if (!parsed.ok) return reject(parsed.code);
-  if (
-    world.ruleFeatures.includes('lineage-v1') &&
-    existing.length >= readLineageState(world.lineageState).config.limits.maxGenerals
-  )
-    return reject('WORLD_FULL');
+  if (existing.length >= readLineageState(world.lineageState).config.limits.maxGenerals) return reject('WORLD_FULL');
   if (existing.some((g) => g.name.normalize('NFC').trim() === parsed.value.name)) return reject('NAME_TAKEN');
   const cities = await tx.city.findMany({
     where: { worldId: world.id, OR: [{ kind: null }, { kind: 'CITY' }] },

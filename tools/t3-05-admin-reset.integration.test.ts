@@ -16,7 +16,7 @@ import { saveInitialWorld, prepareInitialWorld, savePreparedInitialWorld } from 
 import { controlClock } from '../apps/engine/src/world/clock';
 import { initializeResources } from './init-resources';
 import { initializeIntegrationResources } from './integration-resources';
-import { testDatabaseUrl } from './test-database';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
 import { confirmDisconnectedDatabase } from './test-db-close';
 import { acquireLease, releaseLease, renewLease, type Lease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -52,11 +52,10 @@ const { Client } = createRequire(requireDb.resolve('@prisma/adapter-pg'))('pg') 
 };
 if (!process.env.TEST_DATABASE_URL) throw new Error('전용 시험 DB가 필요합니다.');
 const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-if (!['localhost', '127.0.0.1'].includes(source.hostname)) throw new Error('loopback 시험 서버가 필요합니다.');
 for (const key of source.searchParams.keys())
   if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
     throw new Error('접속 대상 질의 인자는 쓸 수 없습니다.');
-const name = 't305_reset_d1_' + randomUUID().replaceAll('-', '') + '_test',
+const name = ciGreenDatabaseName('opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test'),
   target = new URL(source),
   adminUrl = new URL(source);
 target.pathname = '/' + name;
@@ -212,7 +211,10 @@ async function cleanupWithReservedClose(
   return closed;
 }
 async function dropExactOwnedDatabase(client: Pg, expectedName: string, expectedOid: string, signal: AbortSignal) {
-  if (!/^t305_reset_d1_[a-f0-9]{32}_test$/.test(expectedName) || !/^[1-9]\d*$/.test(expectedOid))
+  if (
+    !(/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(expectedName) || expectedName === ciGreenDatabaseName('')) ||
+    !/^[1-9]\d*$/.test(expectedOid)
+  )
     throw new Error('자기 시험 DB 식별자를 확인하세요.');
   const identity = (
     await checked(
@@ -226,7 +228,8 @@ async function dropExactOwnedDatabase(client: Pg, expectedName: string, expected
   await checked(() => client.query('DROP DATABASE "' + expectedName + '"'), signal);
 }
 async function createOwnedDatabase(client: Pg, expectedName: string, marker: DatabaseOwnership, signal: AbortSignal) {
-  if (!/^t305_reset_d1_[a-f0-9]{32}_test$/.test(expectedName)) throw new Error('자기 시험 DB 이름을 확인하세요.');
+  if (!(/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(expectedName) || expectedName === ciGreenDatabaseName('')))
+    throw new Error('자기 시험 DB 이름을 확인하세요.');
   const baseline = (
     await checked(() => client.query('SELECT oid FROM pg_database WHERE datname=$1', [expectedName]), signal)
   ).rows;
@@ -256,7 +259,11 @@ async function auditCreatedDatabase(
 ) {
   receipt.attempted = true;
   receipt.catalog = 'unknown';
-  if (!marker.baselineAbsent || !marker.creationAttempted || !/^t305_reset_d1_[a-f0-9]{32}_test$/.test(expectedName))
+  if (
+    !marker.baselineAbsent ||
+    !marker.creationAttempted ||
+    (!/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(expectedName) && expectedName !== ciGreenDatabaseName(''))
+  )
     throw new Error('자기 CREATE 시도 근거 미확인: DB 보존');
   const rows = (
     await checked(
@@ -319,6 +326,7 @@ async function tables() {
   ).rows.map((row) => String(row.tablename));
 }
 async function fullFootprint(exclude: readonly string[] = []) {
+  const started = performance.now();
   const hash = createHash('sha256');
   for (const table of await tables()) {
     if (exclude.includes(table)) continue;
@@ -326,13 +334,15 @@ async function fullFootprint(exclude: readonly string[] = []) {
     const quoted = '"' + table.replaceAll('"', '""') + '"';
     const rows = await checked(() =>
       gate.query(
-        "SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text),'[]'::jsonb)::text AS body FROM " +
+        // 모든 행·필드를 해시하되 큰 JSON 대신 고정 길이 지문을 정렬한다. 중복 행도 각각 포함한다.
+        "WITH row_hashes AS MATERIALIZED (SELECT encode(sha256(convert_to(to_jsonb(t)::text, 'UTF8')), 'hex') AS value FROM " +
           quoted +
-          ' t',
+          " t) SELECT encode(sha256(convert_to(COALESCE(string_agg(value, '' ORDER BY value), ''), 'UTF8')), 'hex') AS body FROM row_hashes",
       ),
     );
     hash.update(table + '\n' + String(rows.rows[0]!.body) + '\n');
   }
+  console.info('admin-reset-footprint', JSON.stringify({ elapsedMs: Math.round(performance.now() - started) }));
   return hash.digest('hex');
 }
 beforeAll(
@@ -444,7 +454,7 @@ async function actor(role: 'ADMIN' | 'USER' = 'ADMIN', verified = true, consent 
   return { id: user.id, cookie: 'sid=' + session.token, sessionId: session.id };
 }
 // 기존 공장으로 만든 전제 조건이다. CLI나 초기화 소비자 실행 근거로 세지 않는다.
-async function world(options: { ruleFeatures?: ['policy'] } = {}) {
+async function world() {
   const state = await checked(() =>
     loadInitialWorldFromDb(db, {
       scenario: 'integration191',
@@ -454,15 +464,10 @@ async function world(options: { ruleFeatures?: ['policy'] } = {}) {
       seed: randomUUID(),
     }),
   );
-  const selected =
-    options.ruleFeatures === undefined
-      ? {}
-      : { ruleFeatures: [...new Set([...(state.ruleFeatures ?? []), ...options.ruleFeatures])] };
-  const featureState = { ...state, ...selected };
   expect(state.nations).toHaveLength(21);
   expect(state.generals).toHaveLength(491);
   const saved = await checked(() =>
-    saveInitialWorld(db, featureState, { name: '초기화 접수 보존', turnTermMinutes: 30, endYear: 200, ...selected }),
+    saveInitialWorld(db, state, { name: '초기화 접수 보존', turnTermMinutes: 30, endYear: 200, replayFormat: 3 }),
   );
   await checked(() => controlClock(db, saved.worldId, 'start'));
   await checked(() => controlClock(db, saved.worldId, 'pause'));
@@ -905,6 +910,7 @@ async function human(worldId: string, owner: Actor, signal: AbortSignal, index: 
       {
         worldId,
         name: '보존사람' + index,
+        sex: 'MALE' as const,
         portraitId: null,
         leadership: 55,
         strength: 55,
@@ -950,7 +956,7 @@ let resetOwner: Actor | undefined,
 it('AC-M3-04 D2 정식21국491명 두 월드에 실제 사람·30예약·기록을 준비한다', async (signal) => {
   resetOwner = await actor();
   for (const index of [0, 1]) {
-    const source = await world({ ruleFeatures: ['policy'] });
+    const source = await world();
     preservedWorlds.push(source.id);
     await human(source.id, resetOwner, signal, index);
     expect(await checked(() => db.nation.count({ where: { worldId: source.id } }))).toBe(21);
@@ -989,7 +995,6 @@ it('AC-M3-04 D2 실제 접수·엔진은 원본·타월드·사람·30칸을 보
     scenarioKey: source.scenarioKey,
     mapKey: source.mapKey,
     preset: source.preset,
-    ruleFeatures: source.ruleFeatures,
   });
   expect(await existingRows(preservedWorlds, source.id, event.id)).toBe(before);
   expect(await checked(() => db.worldResult.count({ where: { worldId: source.id } }))).toBe(0);
@@ -1057,9 +1062,9 @@ for (const mode of ['role', 'status', 'sanction', 'logout', 'revision', 'name', 
   });
 for (const table of ['World', 'Nation', 'General', 'GeneralTurn', 'AuditLog'] as const)
   it('AC-M3-04 D2 ' + table + ' 실제 INSERT 거부는 원본·mapping·새 월드 전체를 롤백한다', async (signal) => {
-    // 초기 GeneralTurn 쓰기는 정책 기능을 고른 월드에서만 발생한다.
+    // 현재 모든 월드는 초기 GeneralTurn 원장을 준비한다.
     const owner = await actor(),
-      source = await world(table === 'GeneralTurn' ? { ruleFeatures: ['policy'] } : {}),
+      source = await world(),
       payload = input(owner, source);
     await accepted(owner, payload, signal);
     const event = await eventFor(payload),
@@ -1428,6 +1433,7 @@ it('AC-M3-04 D3 초기화로 만든 정식 월드를 다시 초기화해도 같�
   expect(await checked(() => db.general.count({ where: { worldId: next.id, userId: { not: null } } }))).toBe(0);
   expect(replayToEnd(await checked(() => exportReplay(db, source.id)))).toMatchObject({ reason: 'ADMIN_RESET' });
 });
+// 전체 DB 스냅샷 4회가 30초를 넘었다. 중복 1회를 줄인 실측 24.8초로 기존 제한을 유지한다.
 it('AC-M3-04 D3 초기화 종료 뒤 게임 쓰기·재개는 거부하고 기존 사람·30칸은 그대로 읽는다', async (signal) => {
   if (!resetOwner || !resetPayload) throw new Error('앞선 정식 사람 고정물이 필요합니다.');
   const worldId = resetPayload.worldId,
@@ -1442,6 +1448,7 @@ it('AC-M3-04 D3 초기화 종료 뒤 게임 쓰기·재개는 거부하고 기�
       {
         worldId,
         name: '종료뒤생성',
+        sex: 'MALE' as const,
         portraitId: null,
         leadership: 55,
         strength: 55,
@@ -1462,9 +1469,8 @@ it('AC-M3-04 D3 초기화 종료 뒤 게임 쓰기·재개는 거부하고 기�
   );
   expect(await checked(() => db.generalTurn.count({ where: { worldId, generalId: current.id } }))).toBe(30);
   expect(await fullFootprint()).toBe(before);
-  const stable = await fullFootprint();
   await expect(controlClock(db, worldId, 'resume')).rejects.toThrow();
-  expect(await fullFootprint()).toBe(stable);
+  expect(await fullFootprint()).toBe(before);
 });
 it('AC-M3-04 D3 접수된 일반 입력은 초기화 뒤 WORLD_CLOSED만 기록하고 원본 게임을 바꾸지 않는다', async (signal) => {
   const owner = await actor(),
@@ -1477,6 +1483,7 @@ it('AC-M3-04 D3 접수된 일반 입력은 초기화 뒤 WORLD_CLOSED만 기록�
     {
       worldId: source.id,
       name: '대기장수',
+      sex: 'MALE' as const,
       portraitId: null,
       leadership: 55,
       strength: 55,
@@ -1523,15 +1530,6 @@ it('AC-M3-04 D3 접수된 일반 입력은 초기화 뒤 WORLD_CLOSED만 기록�
 });
 
 // AC-INT-18D/AC-M3-04: dedicated formal-world contract tests, not full-season acceptance.
-const cityResetFeatures = [
-  'campaign-assignment-v2',
-  'campaign-v1',
-  'city-resources-v1',
-  'five-stats',
-  'operational-map',
-  'personnel',
-  'policy',
-];
 type CityResetWorld = Awaited<ReturnType<typeof world>>;
 type CreateReceipt = {
   userId: string;
@@ -1547,10 +1545,9 @@ async function assertFreshCityResetWorld(id: string) {
   checkReplayOrigin(origin);
   if (origin.version !== 3) throw new Error('도시 초기화의 형식3 원생성이 필요합니다.');
   expect(row).toMatchObject({ status: 'PREOPEN', clockTick: 0, clockRevision: 0, startedAt: null, endedAt: null });
-  const expectedFeatures =
-    row.officeEffects == null ? cityResetFeatures : [...cityResetFeatures, 'office-effects'].sort();
-  expect(row.ruleFeatures).toEqual(expectedFeatures);
-  expect(origin.initial.ruleFeatures).toEqual(expectedFeatures);
+  expect(Object.keys(origin.featureData ?? {})).toEqual(
+    expect.arrayContaining(['policy', 'logistics-v1', 'lineage-v1', 'office-effects']),
+  );
   expect(row.initialStateHash).toBe(hashState(origin.initial));
   expect(origin.resourceHash).toBe(resourceHashV3(origin));
   expect(Object.hasOwn(origin.initial, 'cityResources')).toBe(false);
@@ -1606,7 +1603,9 @@ async function cityReset(owner: Actor, source: CityResetWorld, signal: AbortSign
       charm: general.charm,
     }));
   expect(identities(nextOrigin.initial)).toEqual(identities(oldOrigin.initial));
-  expect(next.ruleFeatures).toEqual(source.ruleFeatures);
+  expect(next.cityResourcesState).not.toBeNull();
+  expect(next.campaignState).not.toBeNull();
+  expect(next.nationResearchState).not.toBeNull();
   expect(next.seed).toBe(adminResetPayloadSchema.parse(event.payload).effectiveSeed);
   const oldArchive = await checked(() => exportReplay(db, source.id));
   expect(replayToEnd(oldArchive)).toMatchObject({ reason: 'ADMIN_RESET', winnerNationId: null });
@@ -1624,7 +1623,9 @@ async function cityReset(owner: Actor, source: CityResetWorld, signal: AbortSign
 let cityOwner: Actor | undefined,
   cliCitySource: CityResetWorld | undefined,
   peerCityWorld: CityResetWorld | undefined,
-  lastCityTarget: CityResetWorld | undefined;
+  lastCityTarget: CityResetWorld | undefined,
+  cityResetArchive: Awaited<ReturnType<typeof exportReplay>> | undefined,
+  cityResetPayload: ReturnType<typeof input> | undefined;
 it('AC-INT-18D AC-M3-04 실제 게시 CLI의 도시 판과 두 월드 사람30칸·첫 세수를 준비한다', async (signal) => {
   cityOwner = await actor();
   const result = await hook(
@@ -1643,8 +1644,6 @@ it('AC-INT-18D AC-M3-04 실제 게시 CLI의 도시 판과 두 월드 사람30�
             'five-stats',
             '--portrait-map',
             '191-map',
-            '--rule-features',
-            cityResetFeatures.join(','),
             '--seed',
             'city-reset-cli-source',
             '--turn-term',
@@ -1685,13 +1684,11 @@ it('AC-INT-18D AC-M3-04 실제 게시 CLI의 도시 판과 두 월드 사람30�
       seed: 'city-reset-peer-source',
     }),
   );
-  initial.ruleFeatures = [...cityResetFeatures];
   const peer = await checked(() =>
     saveInitialWorld(db, initial, {
       name: '도시 초기화 격리 정식191',
       turnTermMinutes: 30,
       endYear: 200,
-      ruleFeatures: [...cityResetFeatures],
     }),
   );
   await assertFreshCityResetWorld(peer.worldId);
@@ -1715,6 +1712,7 @@ it('AC-INT-18D AC-M3-04 실제 게시 CLI의 도시 판과 두 월드 사람30�
     expect(await checked(() => db.generalTurn.count({ where: { worldId: row.id, generalId: person.id } }))).toBe(30);
   }
 }, 120000);
+// 수출과 독립 재생 두 회의 합이 62.4초였다. 같은 실제 원장을 이어 검증하되 CPU 단계를 나눈다.
 it('AC-INT-18D AC-M3-04 도시 초기화는 원본 세수·사람·30칸과 타월드를 보존하고 빈61원장만 만든다', async (signal) => {
   if (!cityOwner || !cliCitySource || !peerCityWorld) throw new Error('앞선 도시 정식 두 월드가 필요합니다.');
   const started = performance.now(),
@@ -1740,19 +1738,25 @@ it('AC-INT-18D AC-M3-04 도시 초기화는 원본 세수·사람·30칸과 타�
   expect(ended.cityResourcesState).toEqual(ledger);
   expect(await existingRows([cliCitySource.id, peerCityWorld.id], cliCitySource.id, event.id)).toBe(before);
   phase('after-snapshot');
-  const sourceArchive = await checked(() => exportReplay(db, cliCitySource!.id)),
+  cityResetArchive = await checked(() => exportReplay(db, cliCitySource!.id));
+  cityResetPayload = payload;
+  phase('exported');
+}, 60000);
+it('AC-INT-18D AC-M3-04 도시 초기화의 실제 원장은 두 번 재생하고 중복 요청도 같은 월드를 읽는다', async (signal) => {
+  if (!cityOwner || !cliCitySource || !lastCityTarget || !cityResetArchive || !cityResetPayload)
+    throw new Error('앞선 실제 도시 초기화와 수출 원장이 필요합니다.');
+  const sourceArchive = cityResetArchive,
+    payload = cityResetPayload,
     replayed = replayToEnd(sourceArchive);
   expect(replayed).toMatchObject({ reason: 'ADMIN_RESET', winnerNationId: null });
   expect(replayToEnd(JSON.parse(JSON.stringify(sourceArchive)))).toEqual(replayed);
-  phase('replayed');
   const count = await checked(() => db.world.count()),
     same = await call('admin.world.resetRequest', query(payload), signal, cityOwner);
   expect(same.data).toMatchObject({ status: 'APPLIED', plannedNewWorldId: lastCityTarget.id });
   expect(await request(cityOwner, payload, signal)).toEqual(same);
   await apply(cliCitySource.id, signal);
   expect(await checked(() => db.world.count())).toBe(count);
-  phase('idempotency-verified');
-});
+}, 60000);
 it('AC-INT-18D AC-M3-04 실제 생성 DONE과 초기화 APPLIED 출처는 같은 도시 기능·게시 자료로 다시 초기화한다', async (signal) => {
   if (!cityOwner) throw new Error('도시 초기화 관리자가 필요합니다.');
   const key = randomUUID(),
@@ -1766,7 +1770,7 @@ it('AC-INT-18D AC-M3-04 실제 생성 DONE과 초기화 APPLIED 출처는 같은
         mapKey: 'integration',
         statRulesKey: 'five-stats',
         portraitMapKey: '191-map',
-        ruleFeatures: cityResetFeatures.filter((feature) => !['five-stats', 'operational-map'].includes(feature)),
+
         seed: 'city-reset-done-source',
         turnTermMinutes: 30,
         endYear: 200,
@@ -1797,7 +1801,7 @@ it('AC-INT-18D AC-M3-04 실제 생성 DONE과 초기화 APPLIED 출처는 같은
   expect(first.applied.resources).toEqual(createRefs);
   lastCityTarget = second.next;
 });
-it('AC-INT-18D AC-M3-04 새 도시 원장 NULL은 초기화 전체를 롤백하고 구판은 SQLNULL을 유지한다', async (signal) => {
+it('AC-INT-18D AC-M3-04 새 도시 원장 NULL은 초기화 전체를 롤백하고 기본 생성의 초기화도 원장을 준비한다', async (signal) => {
   if (!cityOwner || !lastCityTarget) throw new Error('실제 도시 초기화 대상이 필요합니다.');
   const source = await pauseFreshCityWorld(lastCityTarget.id),
     payload = input(cityOwner, source),
@@ -1819,19 +1823,18 @@ it('AC-INT-18D AC-M3-04 새 도시 원장 NULL은 초기화 전체를 롤백하�
     );
   });
   await assertNoLiveLease(source.id);
-  const old = await world({ ruleFeatures: ['policy'] }),
+  const old = await world(),
     oldPayload = input(cityOwner, old),
     oldReceipt = await accepted(cityOwner, oldPayload, signal);
   expect(await apply(old.id, signal)).toMatchObject({ status: 'ENDED' });
   const legacy = await checked(() => db.world.findUniqueOrThrow({ where: { id: oldReceipt.plannedNewWorldId } }));
-  expect(legacy.ruleFeatures).not.toContain('city-resources-v1');
-  expect(legacy.cityResourcesState).toBeNull();
+  expect(legacy.cityResourcesState).not.toBeNull();
   expect(
     Object.hasOwn(
       (await checked(() => db.$transaction((tx) => loadReplayState(tx, legacy.id)))).state,
       'cityResources',
     ),
-  ).toBe(false);
+  ).toBe(true);
 });
 
 afterAll(async () => {

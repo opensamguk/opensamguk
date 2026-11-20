@@ -17,8 +17,8 @@ import {
 import { endFootprint } from './adminEndSetup';
 import { changeAdminRole } from '../apps/server/src/admin/roleStore';
 import { processWorldCreateRequest } from '../apps/engine/src/admin/createRequests';
-import { creationFeatures, creationSelection } from '../apps/server/src/admin/worldCreateOptions';
-import { defaultOfficeEffects, OFFICE_EFFECTS_FEATURE } from '../packages/rules/src/index';
+import { creationSelection } from '../apps/server/src/admin/worldCreateOptions';
+import { defaultOfficeEffects } from '../packages/rules/src/index';
 
 test.describe.configure({ mode: 'serial' });
 const closers: Array<() => Promise<unknown>> = [];
@@ -123,7 +123,7 @@ test('AC-M3-04 CH-01 실제 생성은 PREOPEN·191·21국491NPC61거점·감사1
     status: 'PREOPEN',
     clockTick: 0,
     startYear: 191,
-    ruleFeatures: [...creationFeatures, OFFICE_EFFECTS_FEATURE].sort(),
+    fogOfWar: false,
     officeEffects: defaultOfficeEffects,
   });
   expect(await legalStack.db.nation.count({ where: { worldId: id } })).toBe(21);
@@ -180,21 +180,13 @@ test('AC-M3-04 CH-03 실제 읽기 응답의 표식 변경 주입은 POST0으로
     expect(packet.result.data).toMatchObject({
       userId: actor.id,
       profiles: [
-        { id: 'integration-v01', available: true, ruleFeatures: [...creationFeatures] },
+        { id: 'integration-v01', available: true },
         { id: 'san10-191', available: false, code: 'RESOURCES_UNAVAILABLE' },
         { id: 'san10-empty', available: false, code: 'RESOURCES_UNAVAILABLE' },
         {
           id: 'integration-v01-expanded',
           available: true,
           featureProfileKey: 'expanded-191-v3',
-          ruleFeatures: [
-            ...creationFeatures,
-            'equipment-v1',
-            'governance-v1',
-            'heritage-v1',
-            'lineage-v1',
-            'logistics-v1',
-          ].sort(),
         },
         { id: 'san10-191-expanded', available: false, code: 'RESOURCES_UNAVAILABLE' },
         { id: 'san10-191-lifecycle', available: false, code: 'RESOURCES_UNAVAILABLE' },
@@ -400,7 +392,6 @@ test('AC-M3-04 CH-09 실제429의 기한 뒤에도 자동 POST 없이 같은 요
     idempotencyKey: randomUUID(),
     name: 'rate 준비',
     ...creationSelection,
-    ruleFeatures: [...creationFeatures],
     seed: 'rate-preload',
     turnTermMinutes: 60,
     endYear: 201,

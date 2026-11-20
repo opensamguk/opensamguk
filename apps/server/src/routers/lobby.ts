@@ -1,3 +1,5 @@
+import { readTransactionOptions } from '../readTransaction';
+import { providedRuleKeys } from '@opensamguk/rules';
 import { readPublishedResources, type Prisma } from '@opensamguk/db';
 import { TRPCError } from '@trpc/server';
 import {
@@ -12,18 +14,27 @@ import {
   scenarioIdentitySchema,
   toGameDate,
   parseResourceKey,
+  HUMAN_GENERAL_LIMIT,
 } from '@opensamguk/rules';
 import { z } from 'zod';
 import { publicProcedure, router } from '../trpc';
-import { worldClock } from '../queries';
+import { worldClock, worldInput } from '../queries';
+import { lobbyEntry, lobbySettings } from '../game/lobbySummary';
+import { publicHeadlines } from '../game/publicHeadlines';
 
 export async function scenarioTitle(key: string, db: Pick<Prisma.TransactionClient, 'gameResource'>): Promise<string> {
+  return (await scenarioDetails(key, db)).title;
+}
+
+async function scenarioDetails(key: string, db: Pick<Prisma.TransactionClient, 'gameResource'>) {
   try {
     const ref = parseResourceKey(key);
     const [resource] = await readPublishedResources(db, [{ kind: 'SCENARIO', ...ref }]);
-    const value = scenarioIdentitySchema.parse(resource!.content);
+    const value = scenarioIdentitySchema
+      .extend({ fiction: z.union([z.literal(0), z.literal(1)]).optional() })
+      .parse(resource!.content);
     if (value.id !== ref.name) throw new Error();
-    return value.title;
+    return value;
   } catch {
     throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
   }
@@ -33,6 +44,13 @@ const presetNameSchema = z.object({ name: z.string().min(1) });
 const statusOrder = { RUNNING: 0, PREOPEN: 1, PAUSED: 2, ENDED: 3 } as const;
 
 export const lobbyRouter = router({
+  headlines: publicProcedure
+    .input(worldInput.extend({ limit: z.number().int().min(1).max(50).default(20) }).strict())
+    .query(({ ctx, input }) =>
+      ctx.db.$transaction((tx) => publicHeadlines(tx, input, ctx.now, ctx.publicMapConfig.delayMinutes), {
+        ...readTransactionOptions,
+      }),
+    ),
   worlds: publicProcedure
     .input(z.strictObject({ includeEnded: z.boolean().optional() }).optional())
     .query(({ ctx, input }) =>
@@ -47,7 +65,8 @@ export const lobbyRouter = router({
               preset: true,
               runtimeOptions: true,
               replayFormat: true,
-              ruleFeatures: true,
+
+              statRules: true,
               scenarioKey: true,
               startYear: true,
               clockMode: true,
@@ -61,6 +80,16 @@ export const lobbyRouter = router({
             },
           });
           const ids = worlds.map((world) => world.id);
+          const counts = await tx.general.groupBy({
+            by: ['worldId'],
+            where: { worldId: { in: ids }, userId: null, removedAt: null },
+            _count: true,
+          });
+          const nationCounts = await tx.nation.groupBy({
+            by: ['worldId'],
+            where: { worldId: { in: ids } },
+            _count: true,
+          });
           const mine = ctx.user
             ? await tx.general.findMany({
                 where: { worldId: { in: ids }, userId: ctx.user.id },
@@ -92,7 +121,7 @@ export const lobbyRouter = router({
           const scenarioTitles = new Map(
             await Promise.all(
               [...new Set(worlds.map((world) => world.scenarioKey))].map(
-                async (key) => [key, await scenarioTitle(key, tx)] as const,
+                async (key) => [key, await scenarioDetails(key, tx)] as const,
               ),
             ),
           );
@@ -104,6 +133,12 @@ export const lobbyRouter = router({
           );
           return worlds.map((world) => {
             const general = byWorld.get(world.id);
+            const options = effectiveWorldOptions(
+              world.preset === null ? null : parsePreset(world.preset),
+              world.runtimeOptions,
+            );
+            const npcGenerals = counts.find((row) => row.worldId === world.id)?._count ?? 0;
+            const joinModes = lobbyEntry(world, options, world._count.generals, npcGenerals);
             const preset = world.preset === null ? null : presetNameSchema.safeParse(world.preset);
             if (preset && !preset.success) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
             return {
@@ -111,7 +146,7 @@ export const lobbyRouter = router({
               name: world.name,
               status: world.status,
               presetName: preset?.success ? preset.data.name : null,
-              scenarioTitle: scenarioTitles.get(world.scenarioKey)!,
+              scenarioTitle: scenarioTitles.get(world.scenarioKey)!.title,
               startYear: world.startYear,
               gameDate:
                 world.status === 'ENDED' && world.result
@@ -120,6 +155,27 @@ export const lobbyRouter = router({
               turnTermMinutes: world.turnTermMinutes,
               startedAt: world.startedAt?.toISOString() ?? null,
               humanGenerals: world._count.generals,
+              capacity: HUMAN_GENERAL_LIMIT,
+              registrationClosed: joinModes.length === 0,
+              npcGenerals,
+              nations: nationCounts.find((row) => row.worldId === world.id)?._count ?? 0,
+              settingsSummary: lobbySettings(
+                providedRuleKeys,
+                options,
+                world.statRules,
+                scenarioTitles.get(world.scenarioKey)!.fiction,
+              ),
+              upcomingPreopen:
+                world.status === 'PREOPEN'
+                  ? {
+                      preopenAt: world.createdAt.toISOString(),
+                      openAt: null,
+                      scenarioTitle: scenarioTitles.get(world.scenarioKey)!.title,
+                      turnTermMinutes: world.turnTermMinutes,
+                      startYear: world.startYear,
+                    }
+                  : null,
+              joinModes,
               winner:
                 world.status === 'ENDED' && world.result?.winnerName != null && world.result.winnerColor != null
                   ? { name: world.result.winnerName, color: world.result.winnerColor }
@@ -136,23 +192,20 @@ export const lobbyRouter = router({
                     nationName: general.nation?.name ?? null,
                     nationColor: general.nation?.color ?? null,
                     portraitId: general.portraitId,
-                    officerTitle:
-                      world.ruleFeatures.includes('office-effects') && isLocalOffice(general.officerLevel)
-                        ? localOfficeTitle(general.officerLevel)
-                        : (officerTitle(general.officerLevel) ?? (general.nation ? '장수' : '재야')),
+                    officerTitle: isLocalOffice(general.officerLevel)
+                      ? localOfficeTitle(general.officerLevel)
+                      : (officerTitle(general.officerLevel) ?? (general.nation ? '장수' : '재야')),
                     courtTitle: general.nation
                       ? (nationRank(general.nation.level)?.offices.find(
                           (office) => office.officerLevel === general.officerLevel,
                         )?.title ?? null)
                       : null,
-                    cityName: general.city.name,
+                    cityName: general.city?.name ?? '',
                     stats: {
                       leadership: general.leadership,
                       strength: general.strength,
                       intel: general.intel,
-                      ...(world.ruleFeatures.includes('five-stats')
-                        ? { politics: general.politics ?? 0, charm: general.charm ?? 0 }
-                        : {}),
+                      ...{ politics: general.politics ?? 0, charm: general.charm ?? 0 },
                     },
                   }
                 : null,
@@ -171,7 +224,7 @@ export const lobbyRouter = router({
             };
           });
         },
-        { isolationLevel: 'RepeatableRead' },
+        { ...readTransactionOptions },
       ),
     ),
   notices: publicProcedure.input(z.undefined()).query(async ({ ctx }) => {

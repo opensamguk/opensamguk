@@ -54,13 +54,13 @@ describe('T2-07 / AC-M2-06·14 교역 조항 선택', () => {
   it.each([0, 121])('교역 %i개월은 잘못된 조항이다', (months) =>
     expect(proposal([{ kind: 'trade', months }])).toMatchObject({ ok: false, result: { code: 'BAD_INPUT' } }),
   );
-  it('다른 미연결 조항은 계속 거절한다', () =>
+  it('기간이 없는 통행 조항을 거절한다', () =>
     expect(
       proposal([
         { kind: 'passage', cityKeys: [1] },
         { kind: 'trade', months: 12 },
       ]),
-    ).toMatchObject({ ok: false, result: { code: 'CLAUSE_NOT_CONNECTED' } }));
+    ).toMatchObject({ ok: false, result: { code: 'BAD_INPUT' } }));
   it('교역 포함 제안 기록은 선택된 기능 문맥에서만 해독한다', () => {
     const result = proposal();
     if (!result.ok) throw Error('제안 실패');

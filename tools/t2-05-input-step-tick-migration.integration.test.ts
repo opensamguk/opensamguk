@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { setTimeout as delay } from 'node:timers/promises';
 import { expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
-import { testDatabaseUrl } from './test-database';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
 
 type PgClient = {
   connect(): Promise<void>;
@@ -177,10 +177,10 @@ async function verifyValues(client: PgClient, db: ReturnType<typeof createDb>) {
   }
 
   // 상태·sequence·result·tick과 World 변경이 같은 트랜잭션에서 함께 되돌아간다.
-  const world = await db.world.findUniqueOrThrow({ where: { id: 'tick-world' } });
+  const world = await client.query('SELECT id,"actionSequence" FROM "World" WHERE id=$1', ['tick-world']);
   await expect(
     db.$transaction(async (tx) => {
-      await tx.world.update({ where: { id: world.id }, data: { actionSequence: 50 } });
+      await tx.$executeRaw`UPDATE "World" SET "actionSequence"=50 WHERE id='tick-world'`;
       const updated = await tx.inputEvent.update({
         where: { id: pending.id },
         data: { status: 'APPLIED', sequence: 50, result: { general: 'rollback' }, stepTick: 0 },
@@ -190,7 +190,7 @@ async function verifyValues(client: PgClient, db: ReturnType<typeof createDb>) {
     }),
   ).rejects.toThrow('입력 tick 롤백 시험');
   expect(await db.inputEvent.findUniqueOrThrow({ where: { id: pending.id } })).toEqual(pending);
-  expect(await db.world.findUniqueOrThrow({ where: { id: world.id } })).toEqual(world);
+  expect(await client.query('SELECT id,"actionSequence" FROM "World" WHERE id=$1', ['tick-world'])).toEqual(world);
 }
 
 it('T2-05 N4 입력 tick migration은 기존 행·null·0을 보존하고 CHECK와 롤백을 지킨다', async () => {
@@ -201,14 +201,18 @@ it('T2-05 N4 입력 tick migration은 기존 행·null·0을 보존하고 CHECK�
   } catch {
     throw new Error('시험 접속값을 확인하세요.');
   }
-  if (!['127.0.0.1', 'localhost'].includes(source.hostname) || !['5432', '5433'].includes(source.port || '5432'))
+  if (
+    !['127.0.0.1', 'localhost'].includes(source.hostname) ||
+    !['5432', '5433', '5561'].includes(source.port || '5432')
+  )
     throw new Error('loopback 5432 또는 5433 시험 서버가 필요합니다.');
   for (const key of source.searchParams.keys())
     if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
       throw new Error('접속 대상 질의 인자는 쓸 수 없습니다.');
   source.port ||= '5432';
-  const name = `t205_input_tick_${randomUUID().replaceAll('-', '')}_test`;
-  if (!/^t205_input_tick_[a-f0-9]{32}_test$/.test(name)) throw new Error('자체 DB 이름을 확인하세요.');
+  const name = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
+  if (!(/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(name) || name === ciGreenDatabaseName('')))
+    throw new Error('자체 DB 이름을 확인하세요.');
   const adminUrl = new URL(source),
     target = new URL(source);
   adminUrl.pathname = '/postgres';
@@ -241,7 +245,10 @@ it('T2-05 N4 입력 tick migration은 기존 행·null·0을 보존하고 CHECK�
     console.info('T2-05 입력 tick DB 생성', JSON.stringify({ name, createdOid }));
     expect(createdOid).not.toBeNull();
     await client.connect();
-    const directories = (await readdir(migrations)).filter((directory) => /^\d{14}_/.test(directory)).sort();
+    // 이행 시 기존 월드를 비우도록 정한 always-on 전환 직전까지만 옛 행을 유지한다.
+    const directories = (await readdir(migrations))
+      .filter((directory) => /^\d{14}_/.test(directory) && directory < '20261223000000_always_on_rules')
+      .sort();
     expect(directories.slice(0, required21.length)).toEqual(required21);
     expect(directories[required21.length]).toBe(marker);
     async function apply(directory: string) {

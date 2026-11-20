@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { controlClock } from '../apps/engine/src/world/clock';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld, attachFixtureOwners } from './worldFixture';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { createAccount, withE2eDb } from './account';
 import { holdLease, releaseHold } from './game';
@@ -10,12 +10,11 @@ test('AC-M2-06 두 군주가 실제 통행·정기 원조·도시 이양 조약�
   test.setTimeout(120_000);
   const { worldId } = await withE2eDb(async (db) => {
     const initial = await loadInitialWorldFromDb(db, { scenario: '1030', map: 'che', seed: 'expanded-treaty-browser' });
-    return saveInitialWorld(db, initial, {
+    return saveFixtureWorld(db, initial, {
       name: 'E2E 확장 조약',
       turnTermMinutes: 120,
       endYear: 300,
       replayFormat: 3,
-      ruleFeatures: ['treaty', 'treaty-break', 'treaty-expanded', 'treaty-trade'],
     });
   });
   const hold = await holdLease(worldId);
@@ -60,7 +59,7 @@ test('AC-M2-06 두 군주가 실제 통행·정기 원조·도시 이양 조약�
       const ruler = await hold.db.general.findFirstOrThrow({
         where: { worldId, nationId: nation.id, officerLevel: 12 },
       });
-      await hold.db.general.update({ where: { worldId_id: { worldId, id: ruler.id } }, data: { userId: actor.id } });
+      await attachFixtureOwners(hold.db, worldId, [{ id: ruler.id, userId: actor.id }]);
       await hold.db.nation.update({
         where: { worldId_id: { worldId, id: nation.id } },
         data: { isNpc: false, gold: 100_000, rice: 100_000 },

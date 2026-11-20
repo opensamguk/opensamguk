@@ -5,7 +5,7 @@ import { accountMailLink } from './mailbox';
 import { holdLease } from './game';
 import { cleanupHeldWorld } from './heldWorldCleanup';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 
@@ -220,18 +220,9 @@ scenario(
         portraitMap: '191-map',
         seed: 'public-required-ui-191',
       });
-      initial.ruleFeatures = [
-        'campaign-v1',
-        'five-stats',
-        'operational-map',
-        'personnel',
-        'policy',
-        'stratagem-basic',
-        'treaty',
-      ];
       expect(initial.generals).toHaveLength(491);
       expect(initial.nations).toHaveLength(21);
-      return saveInitialWorld(db, initial, { name: '공개 인증 화면 정식191', turnTermMinutes: 60, endYear: 201 });
+      return saveFixtureWorld(db, initial, { name: '공개 인증 화면 정식191', turnTermMinutes: 60, endYear: 201 });
     });
     let hold: Awaited<ReturnType<typeof holdLease>> | undefined;
     let failure: unknown;
@@ -253,6 +244,8 @@ scenario(
       await page.getByRole('link', { name: '계속하기', exact: true }).click();
       await expect(page.getByRole('spinbutton')).toHaveCount(5);
       await page.getByLabel('이름', { exact: true }).fill('인증화면장수');
+      // 성별은 늘 필수다(가문 규칙 상시, D-104).
+      await page.getByRole('radio', { name: '남', exact: true }).check();
       await page.getByRole('button', { name: '장수 만들기', exact: true }).click();
       await expect
         .poll(() => hold!.db.inputEvent.count({ where: { worldId, kind: 'general.create', status: 'PENDING' } }))

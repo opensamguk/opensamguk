@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -9,10 +10,14 @@ import { newSession } from '../apps/server/src/auth/session';
 import { authzCase } from '../apps/server/src/authz/case';
 import { readView } from '../apps/server/src/game/queries';
 import { loadWorld } from '../apps/engine/src/worldLoader';
-import { saveInitialWorld, readWorldState } from '../apps/engine/src/world/persistence';
+import { readWorldState } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { commandInitial } from '../packages/rules/test/commandFixture';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { adviseGeneral, parsePreset, unitSetSchema, STANDARD_EQUIPMENT_CONFIG } from '../packages/rules/src/index';
+import { recruitmentFixtureData } from './fixtures/recruitment';
+import { recordTestTurns } from '../apps/engine/test/seasonFixture';
+import { controlClock } from '../apps/engine/src/world/clock';
 import { worldResolver } from '../apps/server/src/game/resolver';
 import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -66,7 +71,7 @@ function setNotice(worldId: string, actor: Actor, body: string, directive?: unkn
     actor,
   );
 }
-async function fixture(preset?: 'beginner' | 'regular') {
+async function fixture(preset?: 'beginner' | 'regular', ready = false) {
   const ruler = await identity(),
     enemy = await identity(),
     free = await identity();
@@ -74,9 +79,16 @@ async function fixture(preset?: 'beginner' | 'regular') {
   initial.generals[0]!.userId = ruler.id;
   initial.generals[1]!.userId = enemy.id;
   initial.generals[3]!.userId = free.id;
-  initial.ruleFeatures = ['policy'];
+  if (ready) {
+    initial.cities[0]!.commerce = initial.cities[0]!.commerceMax = 2_000_000;
+    initial.generals[0]!.gold = 100000;
+    const site = initial.operationalMap!.sites.find((site) => site.kind === 'CITY' && site.anchorKey === 1)!;
+    if (site.kind !== 'CITY') throw new Error('조언 준비 도시가 없습니다.');
+    site.initial.commerce = site.max.commerce = 2_000_000;
+  }
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '군사 조언 검증',
+    featureData: recruitmentFixtureData(initial),
     turnTermMinutes: 60,
     endYear: 231,
     replayFormat: 3,
@@ -92,6 +104,25 @@ async function fixture(preset?: 'beginner' | 'regular') {
       : {}),
   });
   worlds.push(worldId);
+  if (ready) {
+    await controlClock(db, worldId, 'start');
+    const lease = (await acquireLease(db, worldId))!;
+    try {
+      const loop = new TurnLoop(db, lease);
+      await loop.advanceTo(10000);
+      for (const [key, args] of [
+        ['recruit', { amount: 100, crewType: 1100, unitId: 'new' }],
+        ...Array.from({ length: 5 }, () => ['train', {}]),
+        ...Array.from({ length: 5 }, () => ['morale', {}]),
+      ] as Array<[string, Record<string, string | number>]>) {
+        const general = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
+        await recordTestTurns(db, worldId, 1, key, args);
+        await loop.advanceTo(general.nextTurnTick);
+      }
+    } finally {
+      await releaseLease(db, lease);
+    }
+  }
   return { worldId, ruler, enemy, free };
 }
 async function advance(worldId: string) {
@@ -220,7 +251,7 @@ describe('T3-07 AC-M3-13 실제 HTTP 군사 조언', () => {
       const before = await snapshot(f.worldId);
       const result = await advice(f.worldId, f.ruler);
       expect(result.status).toBe(200);
-      expect(result.data!.basis).toEqual({ tick: 0, revision: 0, userId: f.ruler.id, actorId: 1 });
+      expect(result.data!.basis).toEqual({ tick: 0, revision: 1, userId: f.ruler.id, actorId: 1 });
       expect(result.data!.expandedByDefault).toBe(false);
       expect(result.data!.items[0]).toMatchObject({ source: 'notice', commandKey: 'rest', reason: '우리 국가의 지시' });
       expect(JSON.stringify(result)).not.toContain('타국 비공개');
@@ -261,7 +292,7 @@ describe('T3-07 AC-M3-13 실제 HTTP 군사 조언', () => {
     expect((await advice(f.worldId, f.ruler)).data!.items).toEqual([]);
     await db.general.update({ where, data: { nextTurnTick: 120000 } });
     expect((await advice(f.worldId, f.ruler)).data!.items.length).toBeGreaterThan(0);
-    await db.general.update({ where, data: { activeFromYear: 2147483647 } });
+    await db.general.update({ where, data: { activeFromYear: 193 } });
     expect((await advice(f.worldId, f.ruler)).data!.items).toEqual([]);
     await db.general.update({ where, data: { activeFromYear: 175, removedAt: 1 } });
     expect((await advice(f.worldId, f.ruler)).data!.items).toEqual([]);
@@ -448,14 +479,15 @@ describe('T3-07 AC-M3-13 실제 HTTP 군사 조언', () => {
   });
 
   it('현재 예턴이 준비됨이면 작전 추천을 추가하지 않는다', async () => {
-    const f = await fixture();
+    const f = await fixture(undefined, true);
+    const general = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId: f.worldId, id: 1 } } });
     const operation = await db.operation.create({
       data: {
         worldId: f.worldId,
         nationId: 1,
         createdById: 1,
         targetCityKey: 2,
-        targetTick: 10000n,
+        targetTick: BigInt(general.nextTurnTick + 1),
         minCrew: 100,
         minTrain: 50,
         minAtmos: 50,
@@ -476,6 +508,16 @@ describe('T3-07 AC-M3-13 실제 HTTP 군사 조언', () => {
       f.ruler,
     );
     expect(forecast.data!.timeline[0]!.verdict).toBe('READY');
+    const inspection = await call<Outputs['inspection']['members']>(
+      'inspection.members',
+      { worldId: f.worldId },
+      f.ruler,
+    );
+    const member = inspection.data!.items.find((member) => member.generalId === 1)!;
+    expect(member.crew).toBe(100);
+    expect(member.train).toBeGreaterThanOrEqual(50);
+    expect(member.atmos).toBeGreaterThanOrEqual(50);
+
     expect((await advice(f.worldId, f.ruler)).data!.items.every((item) => item.source !== 'operation')).toBe(true);
   });
 
@@ -488,8 +530,7 @@ describe('T3-07 AC-M3-13 실제 HTTP 군사 조언', () => {
       statRules: 'five-stats',
       portraitMap: '191-map',
     });
-    const features = [...profile.ruleFeatures, 'equipment-v1'].sort();
-    initial.ruleFeatures = features;
+    [...providedRuleKeys, 'equipment-v1'].sort();
     expect(initial.generals).toHaveLength(491);
     const actor = await identity();
     const general = initial.generals.find(
@@ -500,7 +541,7 @@ describe('T3-07 AC-M3-13 실제 HTTP 군사 조언', () => {
       turnTermMinutes: 60,
       endYear: 231,
       replayFormat: 3,
-      ruleFeatures: features,
+
       featureData: { ...profile.featureData, 'equipment-v1': STANDARD_EQUIPMENT_CONFIG },
     });
     worlds.push(worldId);
@@ -519,7 +560,7 @@ describe('T3-07 AC-M3-13 실제 HTTP 군사 조언', () => {
       turnTermMinutes: 60,
       endYear: 231,
       replayFormat: 3,
-      ruleFeatures: features,
+
       featureData: { ...profile.featureData, 'equipment-v1': STANDARD_EQUIPMENT_CONFIG },
     });
     worlds.push(second.worldId);

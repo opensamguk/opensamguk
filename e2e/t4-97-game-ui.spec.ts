@@ -1,7 +1,7 @@
 import type { inferRouterOutputs } from '@trpc/server';
 import type { AppRouter } from '../apps/server/src/router';
 import { readFixture } from '../apps/server/test/readFixture';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld, attachFixtureOwners } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { holdLease, releaseHold } from './game';
 import { test, expect, apiQuery } from './t210-fixture';
@@ -14,20 +14,18 @@ test('T4-97 메인 HUD 계정 메뉴·예턴 상태·도시에서 명령 고르�
   test.setTimeout(120_000);
   const actor = await world.user('ruler');
   const initial = await readFixture();
-  initial.ruleFeatures = ['personnel'];
   initial.generals[0] = { ...initial.generals[0]!, nextTurnTick: 1_000_000 };
-  const { worldId } = await saveInitialWorld(world.hold.db, initial, {
+  const { worldId } = await saveFixtureWorld(world.hold.db, initial, {
     name: '메인 HUD 인수',
     turnTermMinutes: 60,
     endYear: 201,
     replayFormat: 3,
-    ruleFeatures: ['personnel'],
   });
   const hold = await holdLease(worldId);
   const { page } = actor;
   const generalId = initial.generals[0]!.id;
   try {
-    await hold.db.general.update({ where: { worldId_id: { worldId, id: generalId } }, data: { userId: actor.userId } });
+    await attachFixtureOwners(hold.db, worldId, [{ id: generalId, userId: actor.userId }]);
     await controlClock(hold.db, worldId, 'start');
     await page.goto(`/w/${worldId}`);
     const editor = page.getByTestId('turn-editor');
@@ -103,29 +101,48 @@ test('T4-97 메인 HUD 계정 메뉴·예턴 상태·도시에서 명령 고르�
     const map = await apiQuery<Outputs['world']['map']>(actor, 'world.map', { worldId });
     const target = map.cities.find((city) => city.key !== initial.generals[0]!.cityKey)!;
     const commands = await apiQuery<Outputs['commands']['list']>(actor, 'commands.list', { worldId });
+    // 인자가 도시 하나뿐인 이동 명령을 고른다. cityKey만 보고 첫 명령을 고르면 INT-29의 성 건물 명령처럼 다른 인자도
+    // 필요한 명령이 잡혀 넣기 단추가 막힌다.
     const move = commands.find((command) => {
       const properties = (command.argsSchema as { properties?: Record<string, unknown> }).properties ?? {};
-      return 'cityKey' in properties;
+      return command.key === 'move' && Object.keys(properties).join() === 'cityKey';
     })!;
+    expect(move).toBeDefined();
     await page.getByTestId('world-map').locator(`[data-city-key="${target.key}"]`).click();
     await expect(page).toHaveURL(new RegExp(`[?&]city=${target.key}`));
     await editor.getByRole('button', { name: '선택 해제', exact: true }).click();
     const cityPanel = page.getByRole('region', { name: '도시 정보', exact: true });
     await cityPanel.getByRole('button', { name: '이 도시로 명령 고르기', exact: true }).click();
-    // 고른 칸이 없으므로 칸 목록으로 간다. 칸에서 Enter를 누르면 그 칸을 고르고 명령 찾기로 간다.
+    // 고른 칸이 없으므로 칸 목록으로 간다. 칸에서 Enter를 누르면 그 칸을 고르고 명령 띠의 첫 패로 간다(INT-29).
     const rowFocused = await editor.evaluate(
       (node) => node.contains(document.activeElement) && Boolean(document.activeElement?.matches('tr[data-slot]')),
     );
     expect(rowFocused).toBe(true);
     await page.keyboard.press('Enter');
-    await expect(editor.getByRole('searchbox')).toBeFocused();
+    await expect(editor.getByRole('group', { name: '명령 분류' }).first().getByRole('button').first()).toBeFocused();
     await expect(turnShortcut).toHaveAttribute('data-turn-status', 'saved');
+    await editor.getByLabel('명령 찾기').fill(move.name);
     await editor.getByRole('radio', { name: move.name, exact: true }).check();
     await expect(
       page.getByRole('radiogroup', { name: '대상 도시' }).getByRole('radio', { name: new RegExp(`^${target.name}`) }),
     ).toHaveAttribute('aria-checked', 'true');
     const slot = Number(await editor.locator('tr[aria-selected="true"]').getAttribute('data-slot'));
-    await editor.getByRole('button', { name: `${slot}번 칸에 넣기`, exact: true }).click();
+    // 인자가 있는 명령은 인자 화면(대상 도시 목록이 있는 dialog)에서 넣는다. 성 화면에서는 이 화면이 예턴 편집기 밖에
+    // 그려지므로 화면 전체에서 찾는다. 막힌 단추는 이름에 '(사용 불가)'가 붙으니, 막혀 있으면 이유를 펼쳐 실패 문구에 담는다.
+    const argsScreen = page.getByTestId('command-args-screen');
+    // 단계가 여럿인 인자 화면은 마지막 단계에서만 넣기 단추를 보인다(CommandArgsScreen의 data-final). 다음 단계로 끝까지 간다.
+    for (let guard = 0; guard < 5; guard++) {
+      const next = argsScreen.getByRole('button', { name: /^다음: / });
+      if ((await next.count()) === 0) break;
+      await next.click();
+    }
+    const blocked = argsScreen.getByRole('button', { name: `${slot}번 칸에 넣기 (사용 불가)`, exact: true });
+    if ((await blocked.count()) > 0) {
+      await blocked.first().click();
+      const reason = await argsScreen.getByRole('note').first().textContent();
+      throw new Error(`${slot}번 칸에 넣기 단추가 막혀 있습니다: ${reason ?? '이유 없음'}`);
+    }
+    await argsScreen.getByRole('button', { name: `${slot}번 칸에 넣기`, exact: true }).click();
     await expect(turnShortcut).toHaveAttribute('data-turn-status', 'unsaved');
     await expect(turnStatus).toHaveText('저장하지 않은 편집 1건');
     await expect(turnShortcut.locator('[aria-hidden="true"]')).toHaveText('1');
@@ -155,12 +172,14 @@ test('T4-97 메인 HUD 계정 메뉴·예턴 상태·도시에서 명령 고르�
       await expect(lateShortcut).toHaveAttribute('aria-selected', 'true');
       await late.getByRole('button', { name: '선택 해제', exact: true }).click();
       await late.locator('tr[data-slot="29"]').click();
+      await late.getByLabel('명령 찾기').fill('농지 개간');
       await late.getByRole('radio', { name: '농지 개간', exact: true }).check();
       await late.getByRole('button', { name: '29번 칸에 넣기', exact: true }).click();
       await expect(lateShortcut).toHaveAttribute('data-status', 'unsaved');
       await expect(lateShortcut.locator('[aria-hidden="true"]')).toHaveText('1');
       await editor.getByRole('button', { name: '선택 해제', exact: true }).click();
       await editor.locator('tr[data-slot="30"]').click();
+      await editor.getByLabel('명령 찾기').fill('농지 개간');
       await editor.getByRole('radio', { name: '농지 개간', exact: true }).check();
       await editor.getByRole('button', { name: '30번 칸에 넣기', exact: true }).click();
       await editor.getByRole('button', { name: '저장', exact: true }).click();

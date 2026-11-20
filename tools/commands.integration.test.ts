@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createRng } from '../packages/shared/src/rng';
-import { applyEffects, buildInitialWorld, commands, runCommand, toWorldState } from '../packages/rules/src/index';
+import { applyEffects, buildInitialWorld, commands, runCommand, initialReplayState } from '../packages/rules/src/index';
 
 import { createDb } from '../packages/db/src/index';
 import type { MapResource, ScenarioResource, UnitSetResource } from '../packages/rules/src/world/resources';
@@ -22,7 +22,11 @@ const unitSet = resources.unitSet.content as UnitSetResource;
 const statRules = resources.statRules.content;
 
 function fixture() {
-  const state = toWorldState(buildInitialWorld({ map, scenario, unitSet, statRules, seed: 'command-fixture' }));
+  const initial = buildInitialWorld({ map, scenario, unitSet, statRules, seed: 'command-fixture' });
+  initial.generals = initial.generals.map((general) => ({ ...general, sex: 'UNKNOWN' }));
+  const state = initialReplayState(initial).state;
+  for (const stock of Object.values(state.logistics!.cities))
+    Object.assign(stock, { iron: 1000, wood: 1000, horses: 1000 });
   const general = Object.values(state.generals).find((general) => general.name === '조조')!;
   general.cityKey = state.nations[general.nationId!]!.capitalCityKey;
   general.injury = 10;

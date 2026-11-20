@@ -1,4 +1,4 @@
-import { INTEL_FEATURE, getIntelSliceSchema, nowTick, unitSetSchema } from '@opensamguk/rules';
+import { getIntelSliceSchema, nowTick, unitSetSchema } from '@opensamguk/rules';
 import { requireGeneral, requireWorld } from '../game/queries';
 import { requireIntelReader } from '../game/fog';
 import { intelPolicy } from '../intelPolicy';
@@ -14,9 +14,7 @@ export const intelRouter = router({
         await requireIntelReader(tx, ctx, input.worldId, started);
         const world = await requireWorld(tx, input.worldId);
         const general = await requireGeneral(tx, world.id, ctx.user.id);
-        if (world.replayFormat !== 3 || !world.ruleFeatures.includes(INTEL_FEATURE))
-          return { enabled: false, items: [] };
-        if (general.nationId === null || general.removedAt !== null) return { enabled: true, items: [], alerts: [] };
+        if (general.nationId === null || general.removedAt !== null) return { items: [], alerts: [] };
         const row = await tx.worldExtSlice.findUnique({
           where: { worldId_key: { worldId: world.id, key: 'intel' } },
           select: { value: true },
@@ -41,7 +39,7 @@ export const intelRouter = router({
           ORDER BY history."tick" DESC, alert."position" DESC
           LIMIT 30
         `;
-        return { enabled: true, items, alerts };
+        return { items, alerts };
       },
       { isolationLevel: 'RepeatableRead' },
     );

@@ -13,6 +13,7 @@ export interface Actor {
   campaignOrderId?: number;
 }
 export interface Failure {
+  clearPreparation?: boolean;
   code:
     | 'NO_ACTOR'
     | 'NOT_NATION'
@@ -29,14 +30,17 @@ export interface Failure {
     | 'NOT_RULER'
     | 'BAD_TARGET'
     | 'NOT_ADJACENT'
+    | 'BLOCKED_BY_COUNTY'
     | 'NOT_WAR'
     | 'BAD_STATE'
+    | 'STALE_SUPPLY_PREVIEW'
     | 'NO_POPULATION'
     | 'NO_OFFER'
     | 'NO_UNIT_SET'
     | 'COMMAND_DISABLED'
     | 'VASSAL_BOUND'
-    | 'PROTECTED';
+    | 'PROTECTED'
+    | 'BATTLE_BUSY';
   message: string;
 }
 export interface LogEntry {
@@ -46,6 +50,7 @@ export interface LogEntry {
 }
 export interface CommandResult {
   effects: Effect[];
+  cityResize?: import('../cityUpgrade/upgrade').CityResize;
   logs: LogEntry[];
   reports?: { generalId: number; text: string; parts?: LogPart[]; defenderId?: number; cityKey?: number }[];
   // 실제로 해결한 공격의 점령 전 대상이다. 알림·보고용이며 상태에는 넣지 않는다.

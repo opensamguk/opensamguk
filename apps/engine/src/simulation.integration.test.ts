@@ -7,6 +7,7 @@ import {
   runGeneralTurn,
   runReplayAction,
   toWorldState,
+  resolverForRuleFeatures,
   type WorldInit,
 } from '@opensamguk/rules';
 import { loadInitialWorldFromDb } from './world/resources';
@@ -19,9 +20,12 @@ afterAll(() => db.$disconnect());
 
 async function smallWorld(): Promise<WorldInit> {
   const initial = await loadInitialWorldFromDb(db, { scenario: '1030', map: 'che', seed: 'memory-replay' });
-  initial.generals = initial.generals
-    .slice(0, 5)
-    .map((general, i) => ({ ...general, activeFromYear: i === 4 ? initial.startYear + 1 : initial.startYear }));
+  initial.scenarioKey = 'engine-simulation-fixture';
+  initial.generals = initial.generals.slice(0, 5).map((general, i) => ({
+    ...general,
+    sex: 'UNKNOWN',
+    activeFromYear: i === 4 ? initial.startYear + 1 : initial.startYear,
+  }));
   return initial;
 }
 
@@ -29,7 +33,7 @@ describe('AC-M1-17 메모리 실행기', () => {
   it('실제 명령·월간 정산의 행동별 재생과 같은 상태·턴 수를 얻는다', async () => {
     const initial = await smallWorld();
     const before = structuredClone(initial);
-    const result = simulateGame(initial, { maxYear: initial.startYear });
+    const result = simulateGame(initial, { maxYear: initial.startYear, convergence: false });
     let replay = initialReplayState(initial);
     let turns = 0;
     const nationCommandCounts: Record<string, number> = {};
@@ -40,8 +44,16 @@ describe('AC-M1-17 메모리 실행기', () => {
         const turn = runGeneralTurn(
           replay.state,
           { generalId: action.generalId, tick: action.tick, unitSet: initial.unitSet },
-          { commandKey: 'rest', args: {} },
+          { commandKey: 'rest', args: {}, explicit: false },
           initial.seed,
+          {
+            ...(replay.policy?.policies[action.generalId] ? { policy: replay.policy.policies[action.generalId] } : {}),
+            ...(replay.revisions[action.generalId] !== undefined
+              ? { turnRevision: replay.revisions[action.generalId]! }
+              : {}),
+          },
+          resolverForRuleFeatures(replay.state),
+          { offices: replay.offices ?? {} },
         );
         if (turn.nation)
           nationCommandCounts[turn.nation.commandKey] = (nationCommandCounts[turn.nation.commandKey] ?? 0) + 1;
@@ -53,7 +65,7 @@ describe('AC-M1-17 메모리 실행기', () => {
     expect(result).toMatchObject({ outcome: '종료연도', finalYear: initial.startYear, finalMonth: 12, winner: null });
     expect(Object.keys(result.commandCounts)).not.toEqual(['rest']);
     expect(result.nationCommandCounts).toEqual(nationCommandCounts);
-    expect(simulateGame(initial, { maxYear: initial.startYear }).stateHash).toBe(result.stateHash);
+    expect(simulateGame(initial, { maxYear: initial.startYear, convergence: false }).stateHash).toBe(result.stateHash);
     expect(initial).toEqual(before);
   });
   it('자기 도시가 아닌 중립 도시가 남으면 통일로 세지 않는다', async () => {
@@ -72,9 +84,9 @@ describe('AC-M1-17 메모리 실행기', () => {
     initial.generals[0]!.userId = 'human';
     expect(() => simulateGame(initial)).toThrow('NPC 전용');
   });
-  it('월단평 기능을 기존 NPC 전용 시뮬레이터로 조용히 실행하지 않는다', async () => {
+  it('전체 규칙의 NPC 시뮬레이션은 같은 종료연도에서 결정론적으로 재실행된다', async () => {
     const initial = await smallWorld();
-    initial.ruleFeatures = ['reputation-v1'];
-    expect(() => simulateGame(initial)).toThrow('형식 3 재생');
+    const options = { maxYear: initial.startYear };
+    expect(simulateGame(initial, options).stateHash).toBe(simulateGame(initial, options).stateHash);
   });
 });

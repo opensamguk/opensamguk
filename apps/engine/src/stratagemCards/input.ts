@@ -5,7 +5,11 @@ import { databaseNow } from '../lease';
 import { loadWorld } from '../worldLoader';
 import { persistEffects } from '../persist';
 
-export const processStratagemCardsInput: QueuedInputHandler = async (tx, world, event, context) => {
+// 순환 import 중 등록표가 읽을 수 있도록 함수 선언으로 둔다.
+export function processStratagemCardsInput(...args: Parameters<QueuedInputHandler>): ReturnType<QueuedInputHandler> {
+  return handleStratagemCardsInput(...args);
+}
+const handleStratagemCardsInput: QueuedInputHandler = async (tx, world, event, context) => {
   if (event.kind !== 'stratagem-cards.act') throw Error('계략 패 입력 종류를 확인하세요.');
   const reject = (code: string, message: string) => ({ status: 'REJECTED' as const, result: { code, message } });
   if (world.status !== 'RUNNING') return reject('WORLD_CLOSED', '실행 중인 월드가 아닙니다.');

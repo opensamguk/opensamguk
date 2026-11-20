@@ -29,13 +29,12 @@ export const cityScaleRecordSchema = z.strictObject({
         ruin: z.literal(true).optional(),
       }),
     )
-    .min(1)
     .max(300)
     .refine((rows) => rows.every((row, index) => index === 0 || rows[index - 1]!.cityKey < row.cityKey)),
 });
 export type CityScaleRecord = z.infer<typeof cityScaleRecordSchema>;
 export type CityScaleValues = MapResource['cities'][number]['max'];
-export type ScaleAnchor = MapResource['cities'][number] & { kind?: 'CITY' | 'PASS' };
+export type ScaleAnchor = MapResource['cities'][number] & { kind?: 'CITY' | 'PASS' | 'FIELD' };
 type ScaleRequest = NonNullable<ScenarioResource['cityScale']>['cities'][number];
 
 export function ruinMaximum(base: Readonly<CityScaleValues>, percent: 10 | 40 | 70): CityScaleValues {
@@ -45,7 +44,7 @@ export function ruinMaximum(base: Readonly<CityScaleValues>, percent: 10 | 40 | 
 }
 
 export function checkMapCityScale(city: ScaleAnchor): void {
-  if (city.kind === 'PASS') return;
+  if (city.kind === 'PASS' || city.kind === 'FIELD') return;
   if (!Number.isInteger(city.level) || city.level < 0 || city.level > 9) throw new Error('도시 규모는 0~9여야 합니다.');
   if (city.level === 9 && !['낙양', '장안'].includes(city.name))
     throw new Error('경 규모는 낙양과 장안에만 지정할 수 있습니다.');
@@ -58,6 +57,33 @@ export function checkMapCityScale(city: ScaleAnchor): void {
     throw new Error('무 규모의 초기값과 최대치를 확인하세요.');
 }
 
+type ScaleSample = { level: number; kind?: string; max: CityScaleValues };
+function scaleSample(source: readonly ScaleSample[], level: number, county = false) {
+  const rows = source.filter(
+    (city) =>
+      !['PASS', 'PORT', 'FIELD'].includes(city.kind ?? '') &&
+      (county && level < 5 ? city.level >= 1 && city.level <= 4 : city.level === level),
+  );
+  if (!rows.length) throw new Error('목표 규모의 최대치를 계산할 지도 표본이 없습니다.');
+  return rows;
+}
+const scaleSum = (cities: readonly ScaleSample[], field: (typeof CITY_SCALE_FIELDS)[number]) =>
+  cities.reduce((total, city) => total + BigInt(city.max[field]), 0n);
+const roundRatio = (numerator: bigint, denominator: bigint) =>
+  Number(numerator / denominator) + Math.round(Number(numerator % denominator) / Number(denominator));
+export function cityScaleIncrease(source: readonly ScaleSample[], from: number, to: number): CityScaleValues {
+  const lower = scaleSample(source, to === 9 ? 7 : from, true);
+  const upper = scaleSample(source, to === 9 ? 8 : to);
+  const a = BigInt(lower.length),
+    b = BigInt(upper.length);
+  return Object.fromEntries(
+    CITY_SCALE_FIELDS.map((field) => [
+      field,
+      roundRatio(scaleSum(upper, field) * a - scaleSum(lower, field) * b, a * b),
+    ]),
+  ) as CityScaleValues;
+}
+
 // 평균은 변경 전 지도에서 한 번만 구한다. 여러 덮어쓰기의 순서가 결과를 바꾸지 않는다.
 export function resolveCityScale<T extends ScaleAnchor>(
   source: readonly T[],
@@ -68,26 +94,17 @@ export function resolveCityScale<T extends ScaleAnchor>(
   const requested = new Map<string, ScaleRequest>();
   for (const request of requests) {
     const city = byName.get(request.city);
-    if (!city || city.kind === 'PASS') throw new Error('도시 규모 지정 대상은 지도에 있는 도시여야 합니다.');
+    if (!city || city.kind === 'PASS' || city.kind === 'FIELD')
+      throw new Error('도시 규모 지정 대상은 지도에 있는 도시여야 합니다.');
     if (requested.has(request.city)) throw new Error('도시 규모 지정이 겹칩니다.');
     if (request.level === undefined && request.ruin !== true) throw new Error('도시 규모나 폐허 상태를 지정하세요.');
     if (request.level !== undefined && (!Number.isInteger(request.level) || request.level < 0 || request.level > 9))
       throw new Error('도시 규모는 0~9여야 합니다.');
     requested.set(request.city, request);
   }
-  const sample = (level: number) => {
-    const sample = source.filter((city) => city.kind !== 'PASS' && city.level === level);
-    if (!sample.length) throw new Error('목표 규모의 최대치를 계산할 지도 표본이 없습니다.');
-    return sample;
-  };
-  const sum = (cities: readonly T[], field: (typeof CITY_SCALE_FIELDS)[number]) =>
-    cities.reduce((total, city) => total + BigInt(city.max[field]), 0n);
-  // 정수 나눗셈의 나머지만 반올림해 평균 차이의 양·음 반 정수 경계를 보존한다.
-  const roundRatio = (numerator: bigint, denominator: bigint) =>
-    Number(numerator / denominator) + Math.round(Number(numerator % denominator) / Number(denominator));
   const rows: CityScaleRecord['cities'] = [];
   const cities = source.map((city) => {
-    if (city.kind === 'PASS') return city;
+    if (city.kind === 'PASS' || city.kind === 'FIELD') return city;
     const request = requested.get(city.name);
     const level = request?.level ?? city.level;
     let max = { ...city.max };
@@ -99,18 +116,11 @@ export function resolveCityScale<T extends ScaleAnchor>(
       } else if (level === 9) {
         if (city.level !== 8 || !['낙양', '장안'].includes(city.name))
           throw new Error('경 규모로 바꿀 대상은 특 규모의 낙양이나 장안이어야 합니다.');
-        const large = sample(7),
-          special = sample(8),
-          largeCount = BigInt(large.length),
-          specialCount = BigInt(special.length);
-        for (const field of CITY_SCALE_FIELDS)
-          max[field] += roundRatio(
-            sum(special, field) * largeCount - sum(large, field) * specialCount,
-            largeCount * specialCount,
-          );
+        const increase = cityScaleIncrease(source, 8, 9);
+        for (const field of CITY_SCALE_FIELDS) max[field] += increase[field];
       } else {
-        const target = sample(level);
-        for (const field of CITY_SCALE_FIELDS) max[field] = roundRatio(sum(target, field), BigInt(target.length));
+        const target = scaleSample(source, level);
+        for (const field of CITY_SCALE_FIELDS) max[field] = roundRatio(scaleSum(target, field), BigInt(target.length));
       }
     }
     for (const field of CITY_SCALE_FIELDS)

@@ -13,7 +13,7 @@ function fixture() {
     clockTick: 0,
     clockAnchorAt: null,
     turnTermMinutes: 60,
-    ruleFeatures: [] as string[],
+
     preset: null,
     runtimeOptions: null,
   };
@@ -21,6 +21,7 @@ function fixture() {
 describe('AC-INT-18B 월드 요약의 도시 자원 표시', () => {
   it('구판의 기존 값을 유지하고 휴전이 없음을 표시한다', () => {
     expect(worldSummary(fixture(), 0)).toEqual({
+      fogOfWar: false,
       name: '도시 원장 판',
       status: 'PAUSED',
       startYear: 191,
@@ -34,14 +35,12 @@ describe('AC-INT-18B 월드 요약의 도시 자원 표시', () => {
       truce: null,
     });
     const existing = fixture();
-    existing.ruleFeatures = ['campaign-v1'];
     expect(Object.hasOwn(worldSummary(existing, 0), 'cityResourcesEnabled')).toBe(false);
   });
-  it('새 판 표시만 조건부로 추가하고 원장이나 자원을 노출하지 않는다', () => {
+  it('AC-INT-28 기능 선택 없이 공개 요약만 반환한다', () => {
     const before = fixture(),
       current = fixture();
-    current.ruleFeatures = ['city-resources-v1'];
-    expect(worldSummary(current, 0)).toEqual({ ...worldSummary(before, 0), cityResourcesEnabled: true });
-    expect(current.ruleFeatures).toEqual(['city-resources-v1']);
+    expect(worldSummary(current, 0)).toEqual(worldSummary(before, 0));
+    expect(worldSummary(current, 0)).not.toHaveProperty('cityResources');
   });
 });

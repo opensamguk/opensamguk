@@ -38,8 +38,10 @@ export async function reconcileLineageOrder(
   repository: LineageRepository,
   worldId: string,
   at: { tick: number; sequence: number },
+  loadedState?: Awaited<ReturnType<LineageRepository['load']>>,
 ) {
-  const before = await repository.load(worldId),
+  const before = loadedState ?? (await repository.load(worldId)),
     next = reconcileLineage(before, at.tick);
   if (JSON.stringify(before.lineage) !== JSON.stringify(next.lineage)) await repository.save(worldId, before, next, at);
+  return next;
 }

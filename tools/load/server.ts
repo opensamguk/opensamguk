@@ -4,6 +4,21 @@ import { createDb } from '../../packages/db/src/index';
 import { buildServer } from '../../apps/server/src/server';
 import { LOAD_FIXTURE_POLICY, loadDatabaseName } from './contract';
 
+export function localRehearsalDatabaseUrl(raw: string | undefined): string {
+  try {
+    const url = new URL(raw ?? '');
+    if (!['postgres:', 'postgresql:'].includes(url.protocol) || !url.username || !url.password) throw new Error();
+    url.hostname = '127.0.0.1';
+    url.port = '5561';
+    url.pathname = '/opensamguk_int29_test';
+    url.search = '';
+    url.hash = '';
+    return url.href;
+  } catch {
+    throw new Error('LOAD_LOCAL_DATABASE_CONFIG_INVALID');
+  }
+}
+
 export function loadDatabaseUrl(env: NodeJS.ProcessEnv): string {
   // URL/JSON 파싱 예외의 입력 조각을 출력하지 않는다.
   try {

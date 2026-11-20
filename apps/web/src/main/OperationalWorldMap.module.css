@@ -217,6 +217,15 @@
   height: 10px;
   border: 1px solid var(--color-ink);
 }
+/* 거점 설명(아티팩트 사서 요약): 자르지 않고 전체를 보인다(사용자 2026-11-14: "설명이 전체가 다 나오게 해"). */
+.tooltipDescription {
+  max-width: 320px;
+  margin: 4px 0 0;
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  color: var(--color-text-muted, #5b5144);
+  white-space: normal;
+}
 .tooltipNote {
   font-family: var(--font-pixel);
   font-size: var(--text-xs);

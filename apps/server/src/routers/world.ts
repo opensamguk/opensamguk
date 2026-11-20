@@ -4,9 +4,9 @@ import { protectedProcedure, publicProcedure, router } from '../trpc';
 import { countHumanGenerals, readWorld, viewerGeneral, worldInput, worldSummary } from '../queries';
 import { mapCity, publicMapInfo } from '../visibility';
 import {
+  countyDetached,
   cityRegionName,
   HUMAN_GENERAL_LIMIT,
-  INTEL_FEATURE,
   LINEAGE_EXITED_YEAR,
   readOperationalMap,
   operationalMapDisplay,
@@ -139,10 +139,10 @@ export const worldRouter = router({
       });
       const world = await tx.world.findUniqueOrThrow({
         where: { id: input.worldId },
-        select: { operationalMap: true, ruleFeatures: true, replayOrigin: true, mapKey: true },
+        select: { operationalMap: true, replayOrigin: true, mapKey: true, governanceState: true },
       });
-      const map = readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin);
-      const fogEnabled = worldInfo.ruleFeatures.includes(INTEL_FEATURE);
+      const map = readOperationalMap(world.operationalMap, world.replayOrigin);
+      const fogEnabled = worldInfo.fogOfWar;
       const viewer = fogEnabled ? await viewerGeneral(tx, input.worldId, ctx.user.id) : null;
       const ownNation = viewer?.removedAt === null ? viewer.nationId : null;
       const generals = await tx.general.findMany({
@@ -163,17 +163,27 @@ export const worldRouter = router({
         orderBy: { id: 'asc' },
         select: { id: true, name: true, cityKey: true, nationId: true, portraitId: true, userId: true },
       });
-      const ruins = await readCityScaleProjection(tx, input.worldId, world.ruleFeatures, cities);
+      const ruins = await readCityScaleProjection(tx, input.worldId, cities);
       const backgrounds = await readMapBackgrounds(tx, [world.mapKey]);
+      const cityIndex = Object.fromEntries(cities.map((city) => [city.cityKey, city]));
+      const governance = world.governanceState as { config?: { seatCityKey?: number } } | null;
       return {
+        emperorCityKey: governance?.config?.seatCityKey ?? null,
         background: backgrounds.get(world.mapKey) ?? null,
         cities: cities.map((city) => ({
           ...mapCity(city),
+          ...(!fogEnabled || city.nationId === ownNation || city.cityKey === viewer?.cityKey
+            ? { state: city.state ?? 0, stateTerm: city.stateTerm ?? 0 }
+            : { state: undefined, stateTerm: undefined }),
+          detached: countyDetached(city, cityIndex),
           region: city.region,
           regionName: cityRegionName(city.region, world.mapKey, map?.regionScheme),
           ...(ruins ? { ruin: ruins.get(city.cityKey) ?? null } : {}),
         })),
         nations,
+        ...(map?.capturableFields
+          ? { siteOwnership: cities.map((city) => ({ anchorKey: city.cityKey, nationId: city.nationId })) }
+          : {}),
         generals: generals.map(({ userId, ...general }) => ({ ...general, isHuman: userId !== null })),
         ...(map ? { operationalMap: operationalMapDisplay(map) } : {}),
       };

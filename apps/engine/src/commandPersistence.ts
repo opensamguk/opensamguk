@@ -3,6 +3,7 @@ import { logPartsRecord } from '@opensamguk/shared';
 import type { Prisma } from '@opensamguk/db';
 import type { RealtimeSignal } from '@opensamguk/db';
 import type { CommandResult, WorldState } from '@opensamguk/rules';
+import { invalidatedProposalProposers } from '@opensamguk/rules';
 import { loadWorld } from './worldLoader';
 import { persistPublicNationEvents, persistRemovedNations, type ActionAt } from './nationArchive';
 import { persistCampaignState, readCampaignArmyTypes } from './campaignState';
@@ -21,10 +22,13 @@ export async function loadCommandState(
   tx: Prisma.TransactionClient,
   worldId: string,
   lockedWorld?: Pick<Prisma.WorldGetPayload<Record<string, never>>, 'commandMeta'>,
+  loadedSlots?: readonly Prisma.NationTurnGetPayload<Record<string, never>>[],
 ): Promise<Pick<WorldState, 'commandMeta' | 'nationTurns'>> {
   const world =
     lockedWorld ?? (await tx.world.findUniqueOrThrow({ where: { id: worldId }, select: { commandMeta: true } }));
-  const slots = await tx.nationTurn.findMany({ where: { worldId }, orderBy: [{ nationId: 'asc' }, { slot: 'asc' }] });
+  const slots =
+    loadedSlots ??
+    (await tx.nationTurn.findMany({ where: { worldId }, orderBy: [{ nationId: 'asc' }, { slot: 'asc' }] }));
   const nationTurns: NonNullable<WorldState['nationTurns']> = {};
   for (const slot of slots) {
     nationTurns[slot.nationId] ??= Array.from({ length: 30 }, () => ({ commandKey: 'nation_rest', args: {} }));
@@ -48,17 +52,24 @@ export async function persistCommandState(
 ) {
   // 같은 잠긴 트랜잭션에서 읽은 사본은 다시 조회하지 않는다.
   const before = previous ?? (await loadWorld(tx, worldId));
+  {
+    const proposerIds = invalidatedProposalProposers(before, state);
+    if (proposerIds.length)
+      await tx.commandProposal.updateMany({
+        where: { worldId, proposerId: { in: proposerIds }, status: 'PENDING' },
+        data: { status: 'EXPIRED' },
+      });
+  }
   await persistNationLifecycle(tx, worldId, before, state);
   await persistNationStrategy(tx, worldId, before, state);
   await persistPreparedTurns(tx, worldId, before, state);
   await persistNationResearch(tx, worldId, before, state);
   await persistCampaignState(tx, worldId, before, state);
-  const cityArmyTypes = before.ruleFeatures?.includes('city-resources-v1')
-    ? (knownCityArmyTypes ??
-      readCampaignArmyTypes(
-        await tx.world.findUniqueOrThrow({ where: { id: worldId }, select: { unitSet: true, replayOrigin: true } }),
-      ))
-    : [];
+  const cityArmyTypes =
+    knownCityArmyTypes ??
+    readCampaignArmyTypes(
+      await tx.world.findUniqueOrThrow({ where: { id: worldId }, select: { unitSet: true, replayOrigin: true } }),
+    );
   await persistCityResourcesState(tx, worldId, before, state, cityArmyTypes);
   await persistLogisticsState(tx, worldId, before, state);
   await persistGovernanceState(tx, worldId, before, state);
@@ -98,7 +109,10 @@ export async function persistCommandState(
       // 장수 턴의 nextTurnTick·revision은 TurnLoop의 조건부 갱신만 바꾼다.
       const { nextTurnTick, ...data } = general;
       void nextTurnTick;
-      await tx.general.update({ where: { worldId_id: { worldId, id: general.id } }, data });
+      await tx.general.update({
+        where: { worldId_id: { worldId, id: general.id } },
+        data: { ...data, movePath: [...(general.movePath ?? [])] },
+      });
     }
   }
   if (JSON.stringify(state.diplomacies) !== JSON.stringify(before.diplomacies)) {
@@ -175,7 +189,7 @@ export async function appendNationHistory(
   tick: number,
   nationId: number,
   text: string,
-  kind?: 'intel',
+  kind?: 'intel' | 'proposal',
   parts?: unknown,
 ) {
   const where = { worldId_tick_nationId: { worldId, tick, nationId } };
@@ -184,6 +198,7 @@ export async function appendNationHistory(
   const events = Array.isArray(data.events) ? data.events : [];
   const alerts = Array.isArray(data.intelAlerts) ? data.intelAlerts : [];
   const structured = Array.isArray(data.structuredEvents) ? data.structuredEvents : [];
+  const proposals = Array.isArray(data.proposals) ? data.proposals : [];
   const record = logPartsRecord(text, parts);
   const next = {
     ...data,
@@ -193,6 +208,7 @@ export async function appendNationHistory(
     ],
     events: [...events, record.text],
     ...(kind === 'intel' ? { intelAlerts: [...alerts, record.text] } : {}),
+    ...(kind === 'proposal' ? { proposals: [...proposals, { kind, text: record.text }] } : {}),
   };
   await tx.nationHistory.upsert({
     where,

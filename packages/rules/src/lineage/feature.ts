@@ -44,9 +44,9 @@ export const lineageFeature: RuleFeatureDefinition = {
   key: 'lineage-v1',
   requires: ['personnel'],
   conflicts: [],
-  checkOrigin({ initial, data }) {
+  checkOrigin({ initial, data, initialWorld }) {
     if (Object.hasOwn(initial, 'lineage')) throw Error('가문은 원생성의 빈 관계에서 시작합니다.');
-    initialLineageState(data, toWorldState(initial), initial.seed);
+    initialLineageState(data, initialWorld ?? toWorldState(initial), initial.seed);
   },
   initReplayState(replay, { initial, data }) {
     if (Object.hasOwn(replay.state, 'lineage')) throw Error('가문 초기화가 중복됐습니다.');

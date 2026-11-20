@@ -1,7 +1,8 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
-import type { PrismaClient } from '@opensamguk/db';
+import type { Prisma, PrismaClient } from '@opensamguk/db';
+import { errorDiagnostic } from '@opensamguk/shared/node';
 import { ADMIN_CLOCK_KINDS, POSSESSION_KIND } from '@opensamguk/rules';
 import { stopOwnedChild } from './process-lifecycle';
 import { processWorldCreateRequest } from './admin/createRequests';
@@ -16,6 +17,9 @@ export type SupervisorEvent = {
   kind: 'started' | 'retry' | 'halted' | 'removed' | 'discovery-error' | 'record-error' | 'creation-error';
   pid?: number;
   delayMs?: number;
+  diagnostic?: object;
+  exitCode?: number | null;
+  signal?: NodeJS.Signals | null;
 };
 
 export function restartDelay(crashes: number): number {
@@ -54,7 +58,7 @@ function spawnEngine(worldId: string): ChildProcess {
     ),
     {
       env: process.env,
-      stdio: process.platform === 'win32' ? ['ignore', 'ignore', 'ignore', 'ipc'] : 'ignore',
+      stdio: process.platform === 'win32' ? ['ignore', 'ignore', 'inherit', 'ipc'] : ['ignore', 'ignore', 'inherit'],
     },
   );
 }
@@ -65,6 +69,8 @@ export async function runSupervisor(
     signal: AbortSignal;
     onEvent?: (event: SupervisorEvent) => void;
     spawnChild?: (worldId: string) => ChildProcess;
+    // 같은 DB를 함께 쓰는 시험이 다른 시험의 월드를 띄우지 않게 발견 범위를 좁힌다. 운영 감독은 쓰지 않는다.
+    worldScope?: Prisma.WorldWhereInput;
   },
 ): Promise<void> {
   const worlds = new Map<string, ManagedWorld>();
@@ -77,8 +83,8 @@ export async function runSupervisor(
     if (creationWork || options.signal.aborted) return;
     const work = processWorldCreateRequest(db, options.signal).then(
       () => undefined,
-      () => {
-        if (!options.signal.aborted) emit({ kind: 'creation-error' });
+      (error: unknown) => {
+        if (!options.signal.aborted) emit({ kind: 'creation-error', diagnostic: errorDiagnostic(error) });
       },
     );
     creationWork = work;
@@ -112,8 +118,8 @@ export async function runSupervisor(
         },
         { timeout: 5000, maxWait: 5000 },
       )
-      .catch(() => {
-        emit({ worldId, kind: 'record-error' });
+      .catch((error: unknown) => {
+        emit({ worldId, kind: 'record-error', diagnostic: errorDiagnostic(error) });
       });
     pending.add(work);
     void work.finally(() => pending.delete(work));
@@ -122,7 +128,7 @@ export async function runSupervisor(
   function start(worldId: string, state: ManagedWorld) {
     let child: ChildProcess;
     const startedAt = now();
-    const failed = () => {
+    const failed = (details: Pick<SupervisorEvent, 'diagnostic' | 'exitCode' | 'signal'> = {}) => {
       delete state.child;
       if (state.stopping || options.signal.aborted) return;
       const at = now();
@@ -133,19 +139,19 @@ export async function runSupervisor(
       state.halted = state.crashes.length >= CRASH_LIMIT;
       const delayMs = restartDelay(state.consecutive);
       state.restartAt = at + delayMs;
-      emit({ worldId, kind: state.halted ? 'halted' : 'retry', delayMs });
+      emit({ worldId, kind: state.halted ? 'halted' : 'retry', delayMs, ...details });
       recordFailure(worldId, state.halted);
     };
     try {
       child = spawnChild(worldId);
-    } catch {
-      failed();
+    } catch (error) {
+      failed({ diagnostic: errorDiagnostic(error) });
       return;
     }
     state.child = child;
     state.exited = new Promise<void>((resolve) => {
       let finished = false;
-      const finish = async (code?: number | null) => {
+      const finish = async (code?: number | null, signal?: NodeJS.Signals | null, error?: Error) => {
         if (finished) return;
         finished = true;
         if (code === 0) {
@@ -161,11 +167,15 @@ export async function runSupervisor(
             /* DB 오류는 기존 재시작 경로에서 다룬다. */
           }
         }
-        failed();
+        failed({
+          ...(code === undefined ? {} : { exitCode: code }),
+          ...(signal === undefined ? {} : { signal }),
+          ...(error ? { diagnostic: errorDiagnostic(error) } : {}),
+        });
         resolve();
       };
-      child.once('error', () => void finish());
-      child.once('exit', (code) => void finish(code));
+      child.once('error', (error) => void finish(undefined, undefined, error));
+      child.once('exit', (code, signal) => void finish(code, signal));
     });
     emit({ worldId, kind: 'started', ...(child.pid === undefined ? {} : { pid: child.pid }) });
   }
@@ -185,6 +195,7 @@ export async function runSupervisor(
         try {
           const active = await db.world.findMany({
             where: {
+              ...(options.worldScope ? { AND: [options.worldScope] } : {}),
               OR: [
                 { status: { in: ['RUNNING', 'PAUSED'] } },
                 {
@@ -224,8 +235,8 @@ export async function runSupervisor(
             }
           }
           discoverCreation();
-        } catch {
-          emit({ kind: 'discovery-error' });
+        } catch (error) {
+          emit({ kind: 'discovery-error', diagnostic: errorDiagnostic(error) });
         }
       }
       for (const [worldId, state] of worlds) {

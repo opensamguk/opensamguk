@@ -108,8 +108,7 @@ export function HelpPage({ doc }: { doc: string }) {
             <BlockList blocks={blocks} />
           ) : doc === CATALOG_DOC ? (
             <EmptyState title="명령 목록은 준비 중입니다">
-              명령 정의에서 자동으로 만드는 목록입니다. 그동안은 예턴 편집기의 명령 찾기와 사전 검사 열로 조건을
-              확인하세요.
+              그동안은 예턴 편집기의 명령 띠와 사전 검사 열로 조건을 확인하세요.
             </EmptyState>
           ) : (
             <EmptyState title="없는 도움말입니다">
@@ -124,9 +123,10 @@ export function HelpPage({ doc }: { doc: string }) {
   );
 }
 
-// 문서 머리의 상태·근거 안내(> 상태: …)는 작성자용이라 화면에서는 뺀다.
+// 문서 머리의 상태 안내(> 상태: …)와 끝의 근거 줄(근거: …)은 작성자용이라 화면에서는 뺀다.
 function visibleBlocks(blocks: Block[]): Block[] {
   return blocks.filter((block) => {
+    if (block.kind === 'paragraph') return !block.lines[0]?.[0]?.text.startsWith('근거:');
     if (block.kind !== 'quote') return true;
     const first = block.blocks[0];
     return !(first?.kind === 'paragraph' && first.lines[0]?.[0]?.text.startsWith('상태:'));

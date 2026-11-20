@@ -10,6 +10,7 @@ import {
   adminClockPayloadSchema,
   adminClockExpectedStatus,
   adminClockRejectMessages,
+  tacticalClock,
   type AdminClockAction,
   type AdminClockRejectCode,
 } from '@opensamguk/rules';
@@ -19,6 +20,8 @@ import { processAdminEnd } from './end';
 import { processAdminReset, type PendingResetPreparation } from './reset';
 import { processAdminGame } from './game';
 import { processAdminSetting } from './settings';
+import { loadWorld } from '../worldLoader';
+import { persistEffects } from '../persist';
 
 // TurnLoop가 리스→World를 잠근 같은 트랜잭션에서만 호출한다.
 export async function processAdminInputs(
@@ -88,6 +91,20 @@ export async function processAdminInputs(
   }
   const status = code ? ('REJECTED' as const) : ('APPLIED' as const),
     sequence = await nextActionSequence(tx, world.id);
+  if (!code && world.campaignState) {
+    const before = await loadWorld(tx, world.id);
+    if (before.campaign?.tactical) {
+      const next = tacticalClock(before, action, now.getTime());
+      await persistEffects(
+        tx,
+        world.id,
+        next,
+        [{ kind: 'world', state: next }],
+        { tick: after.tick, sequence },
+        before,
+      );
+    }
+  }
   const updated = await tx.inputEvent.updateMany({
     where: { id: event.id, status: 'PENDING' },
     data: { status, result, sequence, tick: after.tick },

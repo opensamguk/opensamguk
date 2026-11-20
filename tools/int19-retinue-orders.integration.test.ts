@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { hashState } from '../packages/shared/src/node/hashState';
-import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb, loadSexLedger } from '../apps/engine/src/world/resources';
+import { applySexLedger } from '../packages/rules/src/index';
 import {
   applyCampaignOrder,
   applyRecordedInput,
@@ -9,7 +10,6 @@ import {
   resolverForRuleFeatures,
   runGeneralTurn,
 } from '../packages/rules/src/index';
-import { creationFeatures } from '../apps/server/src/admin/worldCreateOptions';
 
 import { createDb } from '../packages/db/src/index';
 import { testDatabaseUrl } from './test-database';
@@ -33,13 +33,14 @@ it('AC-INT-19B 정식191년21국491명에서 사람 생성·정상출사·NPC지
   });
   expect(initial.generals).toHaveLength(491);
   expect(initial.nations).toHaveLength(21);
+  initial.generals = applySexLedger(initial, loadSexLedger(initial.scenarioKey));
   const original = structuredClone(initial),
     originHash = hashState(initial);
-  initial.ruleFeatures = [...creationFeatures];
   const replay = initialReplayState(initial, { policy: { version: 1, turnTermMinutes: 60 } });
   expect(replay.state.campaign).not.toHaveProperty('orders');
   const payload = {
     name: '지시수신',
+    sex: 'MALE' as const,
     portraitId: null,
     leadership: 55,
     strength: 55,
@@ -114,9 +115,8 @@ it('AC-INT-19B 정식191년21국491명에서 사람 생성·정상출사·NPC지
   );
   expect(replayed.state).toEqual(result.state);
   expect(replayed.turns).toEqual(created.turns);
-  expect(initial).toEqual({ ...original, ruleFeatures: [...creationFeatures] });
+  expect(initial).toEqual({ ...original });
   const unchangedOrigin = { ...initial };
-  if (Object.hasOwn(original, 'ruleFeatures')) unchangedOrigin.ruleFeatures = original.ruleFeatures!;
-  else delete unchangedOrigin.ruleFeatures;
+
   expect(hashState(unchangedOrigin)).toBe(originHash);
 });

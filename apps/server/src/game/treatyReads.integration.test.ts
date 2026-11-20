@@ -36,6 +36,7 @@ const json = (value: unknown): Prisma.JsonValue => JSON.parse(JSON.stringify(val
 // selector와 조회 투영을 위한 저장 행 단위다. DB 생성·factory·HTTP의 증거가 아니다.
 function world(patch: Partial<World> = {}): World {
   return {
+    fogOfWar: false,
     runtimeOptions: null,
     officeEffects: null,
     id: 'world',
@@ -79,7 +80,7 @@ function world(patch: Partial<World> = {}): World {
     policyFromSequence: null,
     treatyFormat: 1,
     replayFormat: 1,
-    ruleFeatures: [],
+
     personnelFormat: null,
     replayOrigin: json({
       version: 6,
@@ -94,7 +95,9 @@ function world(patch: Partial<World> = {}): World {
 }
 function general(patch: Partial<General> = {}): General {
   return {
+    cityAnchorKey: null,
     ...initial.generals[0]!,
+    movePath: [],
     officerCityKey: null,
     removedAt: null,
     sex: null,
@@ -192,6 +195,9 @@ function fixture() {
     {
       ...initial.cities[0]!,
       kind: null,
+      state: null,
+      stateTerm: null,
+      parentCityKey: null,
       worldId: 'world',
       nationId: 1,
       _count: { _all: 1 },
@@ -203,6 +209,9 @@ function fixture() {
     {
       ...initial.cities[1]!,
       kind: null,
+      state: null,
+      stateTerm: null,
+      parentCityKey: null,
       worldId: 'world',
       nationId: 2,
       _count: { _all: 1 },
@@ -733,7 +742,7 @@ describe('T2-07 / AC-M2-06 새 조회 leaf 보조 단위', () => {
     f.nationQuery.mockResolvedValue(nation(2));
     expect(
       await quoteTreaty(f.db, { ...identity, payload: { toNationId: 2, clauses: [{ kind: 'trade', months: 12 }] } }),
-    ).toMatchObject({ cost: null, problem: { code: 'CLAUSE_NOT_CONNECTED' } });
+    ).toMatchObject({ cost: { mine: 100, theirs: 100 }, problem: null });
     expect(
       await quoteTreaty(f.db, { ...identity, payload: { toNationId: 2, clauses: [{ kind: 'peace' }] } }),
     ).toMatchObject({ cost: { mine: 0, theirs: 0 }, problem: { code: 'TREATY_RELATION' } });

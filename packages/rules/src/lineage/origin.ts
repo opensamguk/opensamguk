@@ -7,7 +7,7 @@ import { statRulesSchema, unitSetSchema } from '../world/resources';
 
 interface LineageWorldRecord {
   replayFormat: number;
-  ruleFeatures: readonly string[];
+
   replayOrigin: unknown;
   monthlyTick: number;
   lineageState: unknown;
@@ -16,7 +16,7 @@ const originSchema = z.object({
   version: z.literal(3),
   initial: z.object({
     seed: z.string().min(1),
-    ruleFeatures: z.array(z.string()),
+
     statRules: z.unknown(),
     unitSet: z.unknown(),
   }),
@@ -32,17 +32,8 @@ export function readLineageResources(world: Pick<LineageWorldRecord, 'replayOrig
 }
 
 export function readStoredLineage(world: LineageWorldRecord, state: WorldView) {
-  if (!world.ruleFeatures.includes('lineage-v1')) {
-    if (world.lineageState != null) throw Error('가문 기능을 끈 월드에 저장 상태가 있습니다.');
-    return undefined;
-  }
   const origin = originSchema.parse(world.replayOrigin);
-  if (
-    world.replayFormat !== 3 ||
-    !world.ruleFeatures.includes('personnel') ||
-    JSON.stringify(world.ruleFeatures) !== JSON.stringify(origin.initial.ruleFeatures)
-  )
-    throw Error('가문의 규칙 기능이 원생성과 다릅니다.');
+  if (world.replayFormat !== 3 || false) throw Error('가문의 규칙 기능이 원생성과 다릅니다.');
   const config = lineageConfigSchema.parse(origin.featureData['lineage-v1']),
     stored = readLineageState(world.lineageState);
   if (JSON.stringify(stored.config) !== JSON.stringify(config) || stored.seed !== origin.initial.seed)

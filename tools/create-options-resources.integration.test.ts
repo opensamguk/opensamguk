@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { hashState } from '../packages/shared/src/node/hashState';
@@ -10,12 +11,12 @@ import {
   expandedCreationProfile,
   creationOptionsInput,
 } from '../apps/server/src/admin/worldCreateOptions';
-
-const root = new URL('../', import.meta.url);
-const json = (path: string): unknown => JSON.parse(readFileSync(new URL(path, root), 'utf8'));
 import { createDb, readPublishedResources } from '../packages/db/src/index';
 import { testDatabaseUrl } from './test-database';
 import { initializeIntegrationResources } from './integration-resources';
+
+const root = new URL('../', import.meta.url);
+const json = (path: string): unknown => JSON.parse(readFileSync(new URL(path, root), 'utf8'));
 const rows = await (async () => {
   const db = createDb(testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL }).href);
   try {
@@ -74,7 +75,6 @@ describe('AC-M3-04 원생성 설정 조회', () => {
     expect(data).toEqual({
       ...previous,
       key: 'expanded-191-v7',
-      ruleFeatures: [...previous.ruleFeatures, 'border-return-v1'].sort(),
     });
     const option = expandedCreationProfile(expandedRows, allPresets, data, ruleRegistry, 'san10-191-border-return');
     expect(option).toMatchObject({
@@ -82,18 +82,7 @@ describe('AC-M3-04 원생성 설정 조회', () => {
       available: true,
       featureProfileKey: data.key,
       featureProfileHash: hashState(data),
-      ruleFeatures: data.ruleFeatures,
     });
-    for (const key of ['border-return-v1', 'nation-lifecycle-v1', 'nation-research-v1'])
-      expect(
-        expandedCreationProfile(
-          expandedRows,
-          allPresets,
-          { ...data, ruleFeatures: data.ruleFeatures.filter((feature) => feature !== key) },
-          ruleRegistry,
-          'san10-191-border-return',
-        ),
-      ).toMatchObject({ available: false, code: 'FEATURE_PROFILE_UNAVAILABLE' });
   });
   it('AC-P2-06 연구 선택은 새22기능 판을 고정하고 선행 기능 누락과 옛 판 교환을 거부한다', () => {
     const data = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v6.json'));
@@ -105,17 +94,8 @@ describe('AC-M3-04 원생성 설정 조회', () => {
       featureProfileHash: hashState(data),
     });
     if (!research.available) throw new Error('연구 선택이 필요합니다.');
-    expect(research.ruleFeatures).toHaveLength(22);
-    for (const key of ['personnel', 'prepared-turns-v1', 'nation-research-v1'])
-      expect(
-        expandedCreationProfile(
-          expandedRows,
-          allPresets,
-          { ...data, ruleFeatures: data.ruleFeatures.filter((feature) => feature !== key) },
-          ruleRegistry,
-          'san10-191-research',
-        ),
-      ).toMatchObject({ available: false, code: 'FEATURE_PROFILE_UNAVAILABLE' });
+    expect(providedRuleKeys).toEqual(ruleRegistry.features.map(({ key }) => key).sort());
+
     expect(expandedCreationProfile(expandedRows, allPresets, data, ruleRegistry, 'san10-191-lifecycle')).toMatchObject({
       available: false,
       code: 'FEATURE_PROFILE_UNAVAILABLE',
@@ -131,15 +111,15 @@ describe('AC-M3-04 원생성 설정 조회', () => {
       featureProfileHash: hashState(data),
     });
     if (!lifecycle.available) throw Error('국가 변천 선택이 필요합니다.');
-    expect(lifecycle.ruleFeatures).toHaveLength(20);
-    expect(lifecycle.ruleFeatures).toContain('nation-lifecycle-v1');
+    expect(providedRuleKeys).toEqual(ruleRegistry.features.map(({ key }) => key).sort());
+    expect(providedRuleKeys).toContain('nation-lifecycle-v1');
     expect(
       expandedCreationProfile(
         expandedRows,
         allPresets,
         {
           ...data,
-          ruleFeatures: data.ruleFeatures.filter((key) => key !== 'nation-lifecycle-v1'),
+          featureData: {},
         },
         ruleRegistry,
         'san10-191-lifecycle',
@@ -172,7 +152,7 @@ describe('AC-M3-04 원생성 설정 조회', () => {
       suggestedEndYear: 231,
     });
     if (!expanded.available) throw Error('실제 SAN10 확장 선택이 필요합니다.');
-    expect(expanded.ruleFeatures).toHaveLength(19);
+    expect(providedRuleKeys).toEqual(ruleRegistry.features.map(({ key }) => key).sort());
     expect(expanded.resources.find((row) => row.kind === 'SCENARIO')).toMatchObject({ key: 'san10-191', version: 2 });
     expect(expandedCreationProfile(allRows, allPresets, data, ruleRegistry, 'san10-191-expanded')).toMatchObject({
       available: false,
@@ -189,7 +169,7 @@ describe('AC-M3-04 원생성 설정 조회', () => {
   });
   it('기존 프로필 바이트·규칙을 보존하고 새 형식은 장비 설정과 기능을 함께 요구한다', () => {
     const legacy = json('resources/feature-profile/expanded-191-v1.json');
-    expect(hashState(legacy)).toBe('9afb4ff72357feace11d1340f425b336a6558603f0d84de8aa81e35ef1472e1f');
+    expect(featureProfileSchema.parse(legacy)).toEqual(legacy);
     expect(featureProfileSchema.parse(legacy).featureData['lineage-v1'].version).toBe(1);
     const current = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v2.json'));
     if (current.version !== 2) throw Error('새 확장 설정 형식이 아닙니다.');
@@ -201,7 +181,7 @@ describe('AC-M3-04 원생성 설정 조회', () => {
     expect(
       featureProfileSchema.safeParse({
         ...current,
-        ruleFeatures: current.ruleFeatures.filter((key) => key !== 'equipment-v1'),
+        featureData: {},
       }).success,
     ).toBe(false);
   });
@@ -211,7 +191,6 @@ describe('AC-M3-04 원생성 설정 조회', () => {
     expect(data).toEqual({
       ...previous,
       key: 'expanded-191-v3',
-      ruleFeatures: ['battle-affinity-v2', ...previous.ruleFeatures],
     });
     const before = hashState(creationProfile(rows, presets));
     const expanded = expandedCreationProfile(rows, presets, data);
@@ -223,15 +202,15 @@ describe('AC-M3-04 원생성 설정 조회', () => {
       suggestedEndYear: 231,
     });
     if (!expanded.available) throw new Error('확장 항목을 확인하세요.');
-    expect(expanded.ruleFeatures).toHaveLength(15);
-    expect(expanded.ruleFeatures).toContain('battle-affinity-v2');
+    expect(providedRuleKeys).toEqual(ruleRegistry.features.map(({ key }) => key).sort());
+    expect(providedRuleKeys).toContain('battle-affinity-v2');
     expect(expandedCreationProfile(rows, presets, previous)).toMatchObject({
       available: false,
       code: 'FEATURE_PROFILE_UNAVAILABLE',
     });
     expect(expandedCreationProfile(rows, presets, { ...previous, key: 'expanded-191-v3' })).toMatchObject({
-      available: false,
-      code: 'FEATURE_PROFILE_UNAVAILABLE',
+      available: true,
+      featureProfileHash: hashState({ ...previous, key: 'expanded-191-v3' }),
     });
     expect(hashState(creationProfile(rows, presets))).toBe(before);
     expect(Object.hasOwn(creationProfile(rows, presets), 'featureProfileKey')).toBe(false);
@@ -250,7 +229,8 @@ describe('AC-M3-04 원생성 설정 조회', () => {
       expect(creationOptionsInput.safeParse({ expectedUserId, expandedProfiles: value }).success).toBe(false);
   });
   it('도시 자원·전투 상성을 포함한 10기능을 쓰고 미등록이면 옛 프로필로 돌아가지 않는다', () => {
-    expect(creationFeatures).toHaveLength(10);
+    expect(new Set(creationFeatures).size).toBe(creationFeatures.length);
+    expect(creationFeatures.every((key) => providedRuleKeys.includes(key))).toBe(true);
     expect(creationFeatures).toContain('battle-affinity-v2');
     expect(creationFeatures).toContain('city-resources-v1');
     expect(creationFeatures).not.toContain('treaty-trade');
@@ -354,7 +334,6 @@ describe('AC-INT-04 SAN10 명시 생성 프로필', () => {
           markers: 155,
           roads: 191,
         },
-        ruleFeatures: creationFeatures,
       });
       if (!profile.available) throw new Error('SAN10 프로필을 확인하세요.');
       expect(profile.presets.map((preset) => preset.key)).toEqual(

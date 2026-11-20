@@ -2,27 +2,23 @@ import { readFileSync } from 'node:fs';
 import { expect, it, vi } from 'vitest';
 import type { Prisma, PrismaClient } from '../packages/db/src/index';
 import {
-  applyCapsRecordedInput,
-  buildYearbook,
   capsResourceHashInput,
+  checkReplayOrigin,
+  replayResourceHashInput,
   emptyQueue,
-  monthlyDate,
-  nextGameAction,
-  parseCapsOrigin,
-  runCapsReplayAction,
-  selectSupportedCapabilities,
-  startCapsReplay,
   TICKS_PER_MONTH,
   type CapsOrigin,
-  type RecordedInput,
   type WorldInit,
   type WorldPreset,
 } from '../packages/rules/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { engineResolver, verifyWorldExt } from '../apps/engine/src/extState';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
-import { readCapsArchive, replayCapsArchive, exportCapsArchive, type CapsArchive } from '../apps/engine/src/replayCaps';
-import { replayArchive } from '../apps/engine/src/replay';
+import { exportReplay, readArchive, replayArchive } from '../apps/engine/src/replay';
+import monthlyJson from '../apps/engine/test/fixtures/monthly-initial.json';
+import { storedFixture, storedReaders } from '../apps/engine/test/storedFixture';
+import { recordedArchive } from '../apps/engine/test/replayFixture';
+import { exportDatabase } from '../apps/engine/test/replayFeaturesFixture';
 import { worldResolver } from '../apps/server/src/game/resolver';
 import { assertEnabledSlots, displaySlots, parseSlot } from '../apps/server/src/game/slots';
 import { turnsRouter } from '../apps/server/src/routers/turns';
@@ -30,6 +26,7 @@ import { commandsRouter, commandList } from '../apps/server/src/routers/commands
 import { authenticate } from '../apps/server/src/auth/session';
 import { createRateLimiter } from '../apps/server/src/security/rateLimit';
 import type { Context } from '../apps/server/src/context';
+import { monthlyFixture } from '../apps/engine/test/monthlyFixture';
 
 const fixed = JSON.parse(
   readFileSync(new URL('../apps/engine/test/fixtures/ext-fire-5bd54b2.json', import.meta.url), 'utf8'),
@@ -62,7 +59,7 @@ function world() {
     id: 'unit-ext',
     preset,
     replayFormat: 1,
-    ruleFeatures: [],
+
     replayOrigin: origin(),
     initialStateHash: hashState(initial),
     treatyFormat: null,
@@ -89,6 +86,7 @@ function creationDb() {
     generalTurn: { createMany: createMany() },
     diplomacy: { createMany: createMany() },
     nationTurn: { createMany: createMany() },
+    worldExtSlice: { create: vi.fn().mockResolvedValue({}) },
     $queryRaw: vi.fn().mockResolvedValue([]),
     $executeRaw: vi.fn().mockRejectedValue(new Error('조각 쓰기를 허용하지 않습니다.')),
   };
@@ -98,36 +96,30 @@ function creationDb() {
   return { db: { $transaction: transaction } as unknown as PrismaClient, tx, transaction };
 }
 
-it('명시 opt-in 생성은 정규 descriptor와 초기 해시를 쓰고 상태 조각은 만들지 않는다', async () => {
+it('AC-INT-28 별도 선택 없이 전체 제공 규칙의 생성 기록과 정보 조각을 저장한다', async () => {
   const f = creationDb();
-  const unsorted = { ...preset, commands: { general: ['sabotage', 'fire_attack'], nation: [] } };
-  const original = structuredClone(unsorted);
-  const result = await saveInitialWorld(f.db, initial, {
+  const source = await monthlyFixture();
+  source.scenarioKey = 'unit-ext';
+  const original = structuredClone(source);
+  const result = await saveInitialWorld(f.db, source, {
     name: '단위 확장',
     turnTermMinutes: 60,
     endYear: null,
-    extFormat: 1,
-    preset: { key: 'unit-ext', value: unsorted },
   });
   const data = f.tx.world.create.mock.calls[0]![0].data;
-  const parsed = parseCapsOrigin(data.replayOrigin);
-  expect(parsed.capabilities.ext).toMatchObject({
-    version: 1,
-    commands: { general: ['fire_attack', 'sabotage'], nation: [] },
-    resources: {},
-    sliceKeys: [],
-  });
+  const parsed: unknown = data.replayOrigin;
+  checkReplayOrigin(parsed);
+  expect(parsed.version).toBe(3);
   expect(Object.hasOwn(parsed.initial, 'ext')).toBe(false);
   expect(data.initialStateHash).toBe(hashState(parsed.initial));
   expect(result.stateHash).toBe(data.initialStateHash);
-  expect(parsed.resourceHash).toBe(hashState(capsResourceHashInput(parsed)));
-  const stored = { ...world(), ...data, preset: data.preset, replayOrigin: parsed };
-  expect(engineResolver(stored).resolver.get('fire_attack')?.name).toBe('화계');
-  expect(worldResolver(stored).commands?.general).toEqual(['fire_attack', 'sabotage']);
-  expect(data.policyFromSequence).toBe(0);
-  expect(Object.hasOwn(data, 'treatyFormat')).toBe(false);
+  if (parsed.version !== 3) throw new Error('재생 형식 3이 필요합니다.');
+  expect(parsed.resourceHash).toBe(hashState(replayResourceHashInput(parsed.initial, parsed.featureData)));
+  expect(f.tx.worldExtSlice.create).toHaveBeenCalledExactlyOnceWith({
+    data: { worldId: 'unit-ext', key: 'intel', value: {} },
+  });
   expect(f.tx.$executeRaw).not.toHaveBeenCalled();
-  expect(unsorted).toEqual(original);
+  expect(source).toEqual(original);
 });
 
 it('opt-in 누락·조합·형식·초기 조각 오류는 생성 TX 전에 거부한다', async () => {
@@ -192,7 +184,13 @@ it('끈 목록·파싱은 그대로고 켠 목록만 확장 입력과 표시를 
   expect(() => parseSlot({ ...turn, args: { cityKey: Infinity } }, true)).toThrow();
 });
 
-function api(row: unknown = world(), userId: string | null = 'n1-fixture-actor') {
+function currentWorld() {
+  const state = structuredClone(monthlyJson.initial) as unknown as WorldInit;
+  const stored = storedFixture(state);
+  stored.world.stratagemCardsState!.nations['1']!.hand = ['fire_attack'];
+  return { ...world(), ...stored.world, preset: null };
+}
+function api(row: unknown = currentWorld(), userId: string | null = 'n1-fixture-actor') {
   const general = {
     ...initial.generals.find((value) => value.userId === userId)!,
     turnRevision: 0,
@@ -200,7 +198,8 @@ function api(row: unknown = world(), userId: string | null = 'n1-fixture-actor')
     lastActiveTick: null,
   };
   const tx = {
-    $queryRaw: vi.fn().mockResolvedValue([]),
+    ...storedReaders(monthlyJson.initial as unknown as WorldInit, 'unit-ext'),
+    $queryRaw: vi.fn().mockResolvedValue([{ key: 'intel', value: {} }]),
     world: {
       findUnique: vi.fn().mockResolvedValue(row),
       findUniqueOrThrow: vi.fn().mockResolvedValue(row),
@@ -208,7 +207,14 @@ function api(row: unknown = world(), userId: string | null = 'n1-fixture-actor')
     },
     general: {
       findUnique: vi.fn().mockResolvedValue(general),
-      findMany: vi.fn().mockResolvedValue(initial.generals),
+      findMany: vi.fn().mockResolvedValue(
+        monthlyJson.initial.generals.map((g) => ({
+          ...g,
+          worldId: 'unit-ext',
+          turnRevision: 0,
+          residenceTick: null,
+        })),
+      ),
       update: vi.fn().mockResolvedValue(general),
     },
     generalTurn: {
@@ -221,8 +227,12 @@ function api(row: unknown = world(), userId: string | null = 'n1-fixture-actor')
       findFirst: vi.fn().mockResolvedValue(null),
       create: vi.fn().mockResolvedValue({ createdAt: new Date(1000) }),
     },
-    city: { findMany: vi.fn().mockResolvedValue(initial.cities) },
-    nation: { findMany: vi.fn().mockResolvedValue(initial.nations) },
+    city: {
+      findMany: vi.fn().mockResolvedValue(monthlyJson.initial.cities.map((c) => ({ ...c, worldId: 'unit-ext' }))),
+    },
+    nation: {
+      findMany: vi.fn().mockResolvedValue(monthlyJson.initial.nations.map((n) => ({ ...n, worldId: 'unit-ext' }))),
+    },
     diplomacy: { findMany: vi.fn().mockResolvedValue(initial.diplomacies) },
     treaty: { findMany: vi.fn().mockResolvedValue([]) },
   };
@@ -257,20 +267,14 @@ it('새 예턴을 정규 router로 저장하고 세션의 장수·revision·활�
   );
   expect(f.tx.generalTurn.createMany.mock.calls[0]?.[0].data).toHaveLength(30);
   expect((await f.commands.list({ worldId: 'unit-ext' })).some((d) => d.key === 'fire_attack')).toBe(true);
-  expect(await f.caller.precheck({ worldId: 'unit-ext', commandKey: 'fire_attack', args: { cityKey: 2 } })).toEqual({
+  expect(
+    await f.caller.precheck({ worldId: 'unit-ext', commandKey: 'fire_attack', args: { cityKey: 2 } }),
+  ).toMatchObject({
     ok: true,
   });
   expect(await f.caller.precheck({ worldId: 'unit-ext', commandKey: 'sabotage', args: { cityKey: 2 } })).toMatchObject({
-    ok: false,
-    code: 'COMMAND_DISABLED',
+    ok: true,
   });
-  await expect(
-    f.caller.set({
-      worldId: 'unit-ext',
-      revision: 0,
-      slots: [{ commandKey: 'sabotage', args: { cityKey: 2 } }, ...Array<null>(29).fill(null)],
-    }),
-  ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: '이 월드에서 꺼진 명령입니다.' });
   expect(
     await f.caller.edit({
       worldId: 'unit-ext',
@@ -330,117 +334,61 @@ it('끈·없는 월드의 확장 입력은 기존 입력 오류가 종료·방�
   });
 });
 
-function archiveFixture(): CapsArchive {
-  const source = origin();
-  const config = {
-    endYear: null,
-    outcomeFromSequence: 0,
-    policy: { version: 1 as const, fromSequence: 0, turnTermMinutes: 60 },
-  };
-  const selected = selectSupportedCapabilities(source, config);
-  const input: RecordedInput = {
+async function archiveFixture() {
+  const initial = await monthlyFixture();
+  const input = {
     sequence: 1,
-    kind: 'turns.set',
-    status: 'APPLIED',
+    tick: null,
     generalId: 1,
+    kind: 'turns.set',
+    status: 'APPLIED' as const,
     payload: { turns: slots(), revision: 0 },
     result: { revision: 1, activeTick: 0 },
   };
-  // 앱 재생기를 검사한다. 규칙 함수를 따로 순회해 월간 대조값을 만든다.
-  let replay = startCapsReplay(source, selected);
-  replay = applyCapsRecordedInput(replay, input, { selection: selected });
-  const months: CapsArchive['months'] = [];
   let sequence = 1;
-  while (months.length < 12) {
-    const action = nextGameAction(replay);
-    replay = runCapsReplayAction(replay, source.initial.seed, source.initial.unitSet, selected);
-    sequence++;
-    if (action.kind === 'monthly') {
-      const date = monthlyDate(source.initial.startYear, action.tick);
-      months.push({
-        tick: action.tick,
-        year: date.year,
-        month: date.month,
-        sequence,
-        stateHash: hashState(replay),
-        data: buildYearbook(replay.state, date.year),
-      });
-    }
-    if (sequence > 10000) throw new Error('고정물의 월간 기록을 만들지 못했습니다.');
-  }
-  return { version: 6, origin: source, config, inputs: [input], months, end: null, afterEnd: [] };
+  let archive = recordedArchive(initial, sequence, [input]);
+  while (archive.months.length < 12) archive = recordedArchive(initial, ++sequence, [input]);
+  return archive;
 }
 
-it('앱의 archive6 walker와 공개 재생 dispatcher가 화계 12개월 해시를 재현한다 (순수 adapter 단위)', () => {
-  const archive = archiveFixture();
-  const expected = archive.months.map(({ tick, stateHash }) => ({ tick, stateHash }));
-  expect(replayCapsArchive(archive)).toEqual(expected);
-  expect(replayArchive(archive)).toEqual(expected);
+it('AC-INT-28 format3 dispatcher reproduces twelve months with the fire command input', async () => {
+  const archive = await archiveFixture();
+  expect(replayArchive(archive, 12)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
   expect(archive.months[0]?.tick).toBe(TICKS_PER_MONTH);
 });
-
-it('확장 archive의 R7~R13 위반은 앱 reader가 원문을 바꾸지 않고 거부한다', () => {
-  const archive = archiveFixture();
-  const invalid = [
-    (a: CapsArchive) => {
-      a.origin.capabilities.ext!.commands = { general: ['sabotage'], nation: [] };
+it('AC-INT-28 reader rejects corrupt envelopes without changing the source', async () => {
+  const archive = await archiveFixture();
+  for (const mutate of [
+    (a: typeof archive) => {
+      a.origin.resourceHash = 'bad';
     },
-    (a: CapsArchive) => {
+    (a: typeof archive) => {
       a.origin.initial.ext = {};
     },
-    (a: CapsArchive) => {
-      a.origin.resourceHash = 'wrong';
+    (a: typeof archive) => {
+      a.origin.featureData = {};
     },
-    (a: CapsArchive) => {
+    (a: typeof archive) => {
       a.inputs[0]!.payload = { bad: NaN };
     },
-    (a: CapsArchive) => {
-      delete (a as Partial<CapsArchive>).afterEnd;
+    (a: typeof archive) => {
+      delete (a as Partial<typeof archive>).afterEnd;
     },
-    (a: CapsArchive) => {
-      (a.inputs[0]!.payload as { turns: { commandKey: string }[] }).turns[0]!.commandKey = 'incite';
+    (a: typeof archive) => {
+      a.inputs[0]!.kind = 'unknown';
     },
-    (a: CapsArchive) => {
-      delete a.origin.initial.presetRules;
-    },
-  ];
-  for (const change of invalid) {
-    const value = structuredClone(archive);
-    change(value);
-    const before = structuredClone(value);
-    expect(() => readCapsArchive(value)).toThrow();
-    expect(value).toEqual(before);
+  ]) {
+    const broken = structuredClone(archive);
+    mutate(broken);
+    const before = structuredClone(broken);
+    expect(() => readArchive(broken)).toThrow();
+    expect(broken).toEqual(before);
   }
 });
-
-it('실제 수출 adapter는 저장된 정상 선택으로 archive6를 만들고 조약 guard를 보존한다 (메모리 조회)', async () => {
-  const archive = archiveFixture();
-  const row = world();
-  const selected = {
-    kind: 'caps' as const,
-    origin: archive.origin,
-    selection: selectSupportedCapabilities(archive.origin, archive.config),
-  };
-  const tx = {
-    treaty: { findMany: vi.fn().mockResolvedValue([]) },
-    yearbookSnapshot: { findMany: vi.fn().mockResolvedValue(archive.months) },
-    worldResult: { findUnique: vi.fn().mockResolvedValue(null) },
-    inputEvent: { findMany: vi.fn().mockResolvedValue(archive.inputs) },
-  };
-  expect(
-    await exportCapsArchive(
-      tx as unknown as Prisma.TransactionClient,
-      row as unknown as Prisma.WorldGetPayload<Record<string, never>>,
-      selected,
-    ),
-  ).toEqual(archive);
-  expect(tx.treaty.findMany).toHaveBeenCalledOnce();
-  tx.treaty.findMany.mockResolvedValue([{ id: 1 }]);
-  await expect(
-    exportCapsArchive(
-      tx as unknown as Prisma.TransactionClient,
-      row as unknown as Prisma.WorldGetPayload<Record<string, never>>,
-      selected,
-    ),
-  ).rejects.toThrow('조약을 끈 월드');
+it('AC-INT-28 export uses the current origin and validates all ledgers', async () => {
+  const archive = await archiveFixture();
+  expect(await exportReplay(exportDatabase(archive).db, 'baseline')).toEqual(archive);
+  const broken = structuredClone(archive);
+  broken.origin.featureData = {};
+  await expect(exportReplay(exportDatabase(broken).db, 'baseline')).rejects.toThrow();
 });

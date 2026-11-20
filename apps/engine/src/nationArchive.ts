@@ -12,7 +12,14 @@ export async function persistPublicNationEvents(
   next: WorldState,
   at: ActionAt,
 ) {
-  const data: { kind: string; text: string; parts?: Prisma.InputJsonValue; partsVersion?: number }[] = [];
+  const data: {
+    kind: string;
+    text: string;
+    parts?: Prisma.InputJsonValue;
+    partsVersion?: number;
+    nations: { id: number; name: string; color: string }[];
+  }[] = [];
+  const identity = ({ id, name, color }: { id: number; name: string; color: string }) => ({ id, name, color });
   const nationPart = ({ id, name, color }: { id: number; name: string; color: string }): LogPart => ({
     t: 'nation',
     id,
@@ -24,11 +31,16 @@ export async function persistPublicNationEvents(
       data.push({
         kind: 'found',
         ...storedLog(`${nation.name} 건국`, [nationPart(nation), { t: 'text', v: ' 건국' }]),
+        nations: [identity(nation)],
       });
   }
   for (const nation of Object.values(before.nations)) {
     if (!next.nations[nation.id])
-      data.push({ kind: 'fall', ...storedLog(`${nation.name} 멸망`, [nationPart(nation), { t: 'text', v: ' 멸망' }]) });
+      data.push({
+        kind: 'fall',
+        ...storedLog(`${nation.name} 멸망`, [nationPart(nation), { t: 'text', v: ' 멸망' }]),
+        nations: [identity(nation)],
+      });
   }
   for (const city of Object.values(next.cities)) {
     const previous = before.cities[city.cityKey]?.nationId;
@@ -42,6 +54,7 @@ export async function persistPublicNationEvents(
           { t: 'city', key: city.cityKey, name: city.name },
           { t: 'text', v: ' 점령' },
         ]),
+        nations: [identity(owner)],
       });
   }
   if (before.diplomacies !== next.diplomacies) {
@@ -64,6 +77,7 @@ export async function persistPublicNationEvents(
             { t: 'text', v: ' 사이 ' },
             { t: 'act', key: 'declare', name: '선전포고' },
           ]),
+          nations: [identity(a), identity(b)],
         });
     }
   }

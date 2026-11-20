@@ -64,9 +64,12 @@ export async function assertPersonnelStorage(
   tx: Prisma.TransactionClient,
   worldId: string,
   enabled: boolean,
+  loadedNationTurns?: readonly Prisma.NationTurnGetPayload<Record<string, never>>[],
 ): Promise<void> {
   if (enabled) {
-    const legacy = await tx.nationTurn.findFirst({ where: { worldId }, select: { nationId: true } });
+    const legacy = loadedNationTurns
+      ? loadedNationTurns[0]
+      : await tx.nationTurn.findFirst({ where: { worldId }, select: { nationId: true } });
     if (legacy) throw new Error('인사 기능을 켠 월드에 기존 국가 예턴이 있습니다.');
     return;
   }
@@ -84,14 +87,17 @@ export async function assertPersonnelStorage(
 export async function loadOfficeState(
   tx: Prisma.TransactionClient,
   worldId: string,
+  loadedRows?: Pick<import('./worldReadRows').WorldReadRows, 'offices' | 'officeTurns'>,
 ): Promise<Pick<OfficeState, 'officeTurns'> & { offices: OfficeRevisions }> {
-  const [officeRows, turnRows] = await Promise.all([
-    tx.nationOffice.findMany({ where: { worldId }, orderBy: [{ nationId: 'asc' }, { officerLevel: 'asc' }] }),
-    tx.nationOfficeTurn.findMany({
-      where: { worldId },
-      orderBy: [{ nationId: 'asc' }, { officerLevel: 'asc' }, { slot: 'asc' }],
-    }),
-  ]);
+  const [officeRows, turnRows] = loadedRows
+    ? [loadedRows.offices, loadedRows.officeTurns]
+    : await Promise.all([
+        tx.nationOffice.findMany({ where: { worldId }, orderBy: [{ nationId: 'asc' }, { officerLevel: 'asc' }] }),
+        tx.nationOfficeTurn.findMany({
+          where: { worldId },
+          orderBy: [{ nationId: 'asc' }, { officerLevel: 'asc' }, { slot: 'asc' }],
+        }),
+      ]);
   const offices = officeRevisions(officeRows);
   const officeTurns: OfficeTurns = {};
   for (const row of turnRows) {

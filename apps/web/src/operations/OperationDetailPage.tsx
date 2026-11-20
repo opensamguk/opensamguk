@@ -127,7 +127,7 @@ function Detail({ worldId, op }: { worldId: string; op: OperationDetail }) {
             </Tag>
           ))}
           <span className={styles.muted}>
-            판정은 예턴만 본 예상입니다. 금·쌀, 병종, 경로, 교전 상태는 실행 때 다시 검사합니다.
+            판정은 예턴만 본 예상입니다. 금과 쌀, 병종, 경로, 교전 상태는 실행 때 다시 검사합니다.
           </span>
         </p>
         <table className={styles.timeline} data-testid="operation-timeline">

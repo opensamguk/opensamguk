@@ -1,7 +1,8 @@
+import { canExecuteCityUpgradeCommand, shiftCityLandTurns } from '../cityUpgrade/upgrade';
 import type { CommandResolver } from './resolve';
 import { rngFor } from '@opensamguk/shared';
 import { BALANCE } from '../balance';
-import { toGameDate } from '../clock/clock';
+import { applyLastNationRecruitmentLock } from './recruitmentLock';
 import type { DeepReadonly, WorldState } from '../model/world';
 import type { Actor, CommandResult, Failure } from './types';
 import { applyEffects } from './effects';
@@ -25,15 +26,6 @@ export type PersonnelTurnChange = Readonly<{
   logs: PersonnelLog[];
 }>;
 
-function applyLastNationRecruitmentLock(state: WorldState, result: CommandResult | Failure, tick: number) {
-  const lock = state.commandMeta?.lastNationRecruitmentLock;
-  if (lock === undefined || lock.blockedNationId !== undefined) return;
-  const defender = 'code' in result ? undefined : result.attackTarget?.defendingNationId;
-  if (defender == null || state.nations[defender] || toGameDate(state.startYear, tick).year < lock.fromYear) return;
-  const remaining = Object.values(state.nations);
-  if (remaining.length === 1) lock.blockedNationId = remaining[0]!.id;
-}
-
 export function runGeneralTurn(
   state: WorldState,
   actor: Actor,
@@ -54,6 +46,8 @@ export function runGeneralTurn(
       throw new PersonnelInvariantError('인사 기능을 켠 월드에 국가 예턴이 있습니다.');
     assertTick(actor.tick as number);
   }
+  const pendingMove = state.generals[actor.generalId]?.movePath;
+  if (pendingMove?.length) command = { commandKey: 'move', args: { cityKey: pendingMove.at(-1)! }, explicit: true };
   const take = personnel === undefined ? null : takeOfficeTurn(state, personnel.offices, actor.generalId);
   const personnelChange: PersonnelTurnChange | undefined =
     personnel === undefined
@@ -90,6 +84,7 @@ export function runGeneralTurn(
       if (
         !canExecuteNationCommand(take.officerLevel, slot.commandKey) &&
         !canExecuteCityNationCommand(next, take.officerLevel, slot.commandKey) &&
+        !canExecuteCityUpgradeCommand(next, take.officerLevel, slot.commandKey) &&
         !canExecuteResearchNationCommand(next, take.officerLevel, slot.commandKey)
       )
         throw new PersonnelInvariantError('직책 칸 명령과 인자가 올바르지 않습니다.');
@@ -153,13 +148,25 @@ export function runGeneralTurn(
     }
     nation = { commandKey: slot.commandKey, result, nationId };
   }
-  const instructed = takeCampaignOrder(next, actor.generalId, options.turnRevision, command, actor.tick ?? 0);
+  const resize = nation && !('code' in nation.result) ? nation.result.cityResize : undefined;
+  if (resize && state.generals[actor.generalId]?.cityKey === resize.cityKey) {
+    const shifted = structuredClone(command);
+    shiftCityLandTurns([shifted], resize);
+    command = shifted;
+  }
+  const instructed = pendingMove?.length
+    ? { state: next, order: undefined }
+    : takeCampaignOrder(next, actor.generalId, options.turnRevision, command, actor.tick ?? 0);
   next = instructed.state as WorldState;
   let selected = instructed.order ? { ...instructed.order.command, explicit: true } : command;
   if (!instructed.order && general.userId !== null && command.explicit === false && options.policy !== undefined) {
     const policy = runPolicyCommand(next, { ...actor, target: 'general' }, options.policy, seed, resolver);
     next = applyEffects(next, policy.result.effects);
-    applyLastNationRecruitmentLock(next, policy.result, actor.tick ?? 0);
+    applyLastNationRecruitmentLock(
+      next,
+      'code' in policy.result ? undefined : policy.result.attackTarget?.defendingNationId,
+      actor.tick ?? 0,
+    );
     return {
       state: next,
       result: policy.result,
@@ -190,7 +197,11 @@ export function runGeneralTurn(
     rngFor(seed, 'turn', actor.tick ?? 0, actor.generalId),
   );
   next = applyEffects(next, 'code' in result ? [] : result.effects);
-  applyLastNationRecruitmentLock(next, result, actor.tick ?? 0);
+  applyLastNationRecruitmentLock(
+    next,
+    'code' in result ? undefined : result.attackTarget?.defendingNationId,
+    actor.tick ?? 0,
+  );
   if (instructed.order)
     next = finishCampaignOrder(
       next,

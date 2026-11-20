@@ -6,7 +6,11 @@ import { loadReplayState } from './monthly';
 import { persistEffects } from './persist';
 
 // 입력 처리기가 확보한 리스·World 잠금과 같은 트랜잭션을 쓴다.
-export const processCityResourceInput: QueuedInputHandler = async (tx, world, event, { tick, sequence }) => {
+// 순환 import 중 등록표가 읽을 수 있도록 함수 선언으로 둔다.
+export function processCityResourceInput(...args: Parameters<QueuedInputHandler>): ReturnType<QueuedInputHandler> {
+  return handleCityResourceInput(...args);
+}
+const handleCityResourceInput: QueuedInputHandler = async (tx, world, event, { tick, sequence }) => {
   const reject = (code: string, message: string) => ({ status: 'REJECTED' as const, result: { code, message } });
   if (event.kind !== 'city.resources') throw new Error('도시 자원 입력 종류를 확인하세요.');
   if (world.status !== 'RUNNING') return reject('WORLD_CLOSED', '실행 중인 월드가 아닙니다.');

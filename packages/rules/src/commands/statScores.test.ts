@@ -8,7 +8,7 @@ import { domesticStatScore, drillGain, recruitCost } from './statScores';
 
 function world() {
   const state = commandWorld();
-  state.ruleFeatures = ['five-stats'];
+  Object.assign(state.logistics!.cities['1']!, { iron: 1000, wood: 1000, horses: 1000 });
   Object.assign(state.generals[1]!, { politics: 50, charm: 50 });
   return state;
 }
@@ -25,13 +25,23 @@ describe('AC-INT-15 새 판의 명령 능력치', () => {
         charm: value,
       });
       const legacy = commandWorld();
+      Object.assign(legacy.logistics!.cities['1']!, { iron: 1000, wood: 1000, horses: 1000 });
+      delete legacy.generals[1]!.politics;
+      delete legacy.generals[1]!.charm;
       legacy.generals[1]![spec.stat] = value;
       const rng = createRng('int15-domestic');
       const control = createRng('int15-domestic');
       const command = makeInvestment(spec);
-      expect(command.execute(next, { generalId: 1 }, {}, rng)).toEqual(
-        command.execute(legacy, { generalId: 1 }, {}, control),
-      );
+      const actual = command.execute(next, { generalId: 1 }, {}, rng);
+      const expected = command.execute(legacy, { generalId: 1 }, {}, control);
+      const consumed = (result: typeof actual) => ({
+        ...result,
+        effects: result.effects.map((effect) =>
+          effect.kind === 'world' ? { kind: 'world', logistics: effect.state.logistics } : effect,
+        ),
+      });
+      expect(consumed(actual)).toEqual(consumed(expected));
+      expect(next.generals[1]!.gold).toBe(100000);
       expect(rng.next()).toBe(control.next());
     }
   });

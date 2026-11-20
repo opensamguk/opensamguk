@@ -281,9 +281,13 @@ export async function dateOf(world: PreparedWorld, tick: number): Promise<string
   return `${year}년 ${month}월`;
 }
 
-async function borderWorld() {
+export async function borderWorld() {
   const { warFixture } = await import('../apps/engine/test/warFixture');
   const initial = await warFixture();
+  // 재구성한 명단은 역사 1030 성별 원장의 대상이 아니다.
+  initial.scenarioKey = 'e2e-timelapse';
+  initial.cityScale = { cities: [] };
+  delete initial.nationTurns;
   // 조기 통일을 막는 경계 도시 (nationArchive.integration.test.ts:33-40과 같음).
   initial.cities.push({
     ...initial.cities[0]!,
@@ -306,8 +310,8 @@ export const LEGEND_NATIONS: StoredNation[] = Array.from({ length: 16 }, (_, i) 
 
 // E8만 쓰는 실제 DB 월드. 국가마다 도시 하나와 공백 도시 하나를 두고 첫 달 저장값을 넣는다.
 export async function createLegendWorld(db: PrismaClient): Promise<PreparedWorld> {
-  const [{ saveInitialWorld }, { toGameDate }] = await Promise.all([
-    import('../apps/engine/src/world/persistence'),
+  const [{ saveFixtureWorld }, { toGameDate }] = await Promise.all([
+    import('./worldFixture'),
     import('../packages/rules/src/index'),
   ]);
   const initial = await borderWorld();
@@ -324,8 +328,7 @@ export async function createLegendWorld(db: PrismaClient): Promise<PreparedWorld
   }));
   initial.nations = LEGEND_NATIONS.map((entry) => ({ ...nation, ...entry, capitalCityKey: entry.id }));
   const name = `E2E 범례 ${randomUUID().slice(0, 8)}`;
-  const { worldId } = await saveInitialWorld(db, initial, {
-    replayFormat: 'legacy',
+  const { worldId } = await saveFixtureWorld(db, initial, {
     name,
     turnTermMinutes: 60,
     endYear: null,
@@ -349,9 +352,9 @@ export async function createLegendWorld(db: PrismaClient): Promise<PreparedWorld
   return { id: worldId, name, startYear: initial.startYear, ticks: [tick] };
 }
 
-async function prepareWorlds(db: PrismaClient): Promise<PreparedWorlds> {
-  const [{ saveInitialWorld }, { controlClock }, lease, { TurnLoop }, rules, dbModule] = await Promise.all([
-    import('../apps/engine/src/world/persistence'),
+export async function prepareWorlds(db: PrismaClient): Promise<PreparedWorlds> {
+  const [{ saveFixtureWorld }, { controlClock }, lease, { TurnLoop }, rules, dbModule] = await Promise.all([
+    import('./worldFixture'),
     import('../apps/engine/src/world/clock'),
     import('../apps/engine/src/lease'),
     import('../apps/engine/src/turnLoop'),
@@ -361,8 +364,7 @@ async function prepareWorlds(db: PrismaClient): Promise<PreparedWorlds> {
   const tag = randomUUID().slice(0, 8);
   const save = async (label: string, initial: Awaited<ReturnType<typeof borderWorld>>) => {
     const name = `E2E 영토 ${tag} ${label}`;
-    const { worldId } = await saveInitialWorld(db, initial, {
-      replayFormat: 'legacy',
+    const { worldId } = await saveFixtureWorld(db, initial, {
       name,
       turnTermMinutes: 60,
       endYear: null,
@@ -414,12 +416,79 @@ async function prepareWorlds(db: PrismaClient): Promise<PreparedWorlds> {
 
   // P는 실제 엔진으로 정산 저장과 출병 멸망을 지난다 (nationArchive.integration.test.ts R1/S3와 같은 장면).
   const initial = await borderWorld();
-  initial.generals[0]!.nextTurnTick = 10_100;
+  // 6월 세수로 도시 금 2,000을 확보한 뒤 100명분 철 2개를 구입한다.
+  initial.statRules = { count: 5, total: 275, min: 15, max: 90 };
+  for (const general of initial.generals) {
+    general.leadership = 80;
+    general.strength = 70;
+    general.intel = 60;
+    general.politics = 40;
+    general.charm = 25;
+  }
+  initial.cities[0]!.commerce = 1000;
+  initial.cities[1]!.wall = 0;
+  initial.generals[0]!.nextTurnTick = 60_100;
+  initial.cities.find((city) => city.cityKey === 4)!.connections.push(999);
+  initial.cities.find((city) => city.cityKey === 999)!.connections = [4];
+  // 전술 전투와 행군 보급이 사용하는 경로를 생성 기록에 함께 둔다.
+  const { commandInitial } = await import('../packages/rules/test/commandFixture');
+  initial.operationalMap = {
+    ...commandInitial().operationalMap!,
+    // 화면의 운영 지도는 실제 GIS 바탕 지도의 해시와 경계가 맞을 때만 그린다(apps/web/src/main/operationalGeography.ts의
+    // OPERATIONAL_GIS_SHA256, mapEditor/geodata/natural-earth.json의 bounds). 규칙 고정물의 가짜 해시로는 영토 재생 지도가
+    // "지도 판이 맞지 않습니다"로 그려지지 않는다.
+    basemap: {
+      source: 'natural-earth-5.1.2',
+      projection: 'WGS84 plate carree',
+      sha256: '7aebb196cd19b2edf936cc5d6ef401d5582e0cb5662f5521b9016930d84da11e',
+      bounds: [94, 17, 132.57142857142856, 44],
+    },
+    sites: initial.cities.map((city) => {
+      city.kind = 'CITY';
+      return {
+        id: `city:${city.cityKey}`,
+        kind: 'CITY' as const,
+        name: city.name,
+        anchorKey: city.cityKey,
+        level: city.level,
+        region: city.region,
+        position: { x: city.x, y: city.y },
+        initial: {
+          population: city.population,
+          agriculture: city.agriculture,
+          commerce: city.commerce,
+          security: city.security,
+          defence: city.defence,
+          wall: city.wall,
+        },
+        max: {
+          population: city.populationMax,
+          agriculture: city.agricultureMax,
+          commerce: city.commerceMax,
+          security: city.securityMax,
+          defence: city.defenceMax,
+          wall: city.wallMax,
+        },
+      };
+    }),
+    routes: initial.cities.flatMap((city) =>
+      city.connections
+        .filter((key) => city.cityKey < key)
+        .map((key) => ({
+          id: `route:${city.cityKey}:${key}`,
+          from: `city:${city.cityKey}`,
+          to: `city:${key}`,
+          mode: 'LAND' as const,
+          direction: 'BOTH' as const,
+          enabled: true,
+        })),
+    ),
+  };
   const userPrefix = `t4-36-${tag}-g`;
   for (const general of initial.generals) {
-    general.userId = `${userPrefix}${general.id}`;
+    general.userId = randomUUID();
     await db.user.create({
-      data: { id: general.userId, email: `${general.userId}@example.test`, passwordHash: 'fixture-only' },
+      data: { id: general.userId, email: `${userPrefix}${general.id}@example.test`, passwordHash: 'fixture-only' },
     });
   }
   const p = await save('P', initial);
@@ -436,17 +505,35 @@ async function prepareWorlds(db: PrismaClient): Promise<PreparedWorlds> {
     });
     check(first.map(({ nationId }) => nationId).join() === '1,2', '첫 정산 저장 국가가 1·2가 아닙니다.');
 
-    // 장수 1의 출병 예턴을 API가 쓰는 것과 같은 행으로 넣는다 (nationArchive.integration.test.ts:60-96).
+    await lease.renewLease(db, held);
+    await loop.advanceTo(60_000);
+    const actor = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId: p.id, id: 1 } } });
+    const goods = await db.inputEvent.create({
+      data: {
+        worldId: p.id,
+        userId: actor.userId!,
+        generalId: 1,
+        kind: 'logistics.order',
+        idempotencyKey: 'timelapse-iron',
+        status: 'PENDING',
+        payload: { type: 'trade', cityKey: 1, good: 'iron', side: 'buy', amount: 2 },
+      },
+    });
+    await loop.advanceTo(60_000);
+    check((await db.inputEvent.findUniqueOrThrow({ where: { id: goods.id } })).status === 'APPLIED', 'P 철 구입 실패');
+
+    // 실제 모병·사기진작·출병 명령을 예턴에 넣는다.
     await db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${p.id} FOR UPDATE`;
       const actor = await tx.general.findUniqueOrThrow({ where: { worldId_id: { worldId: p.id, id: 1 } } });
-      const turns = rules.emptyTurns();
-      turns[0] = { commandKey: 'attack', args: { cityKey: 2 } };
+      const turns = rules.emptyQueue();
+      turns[0] = { commandKey: 'recruit', args: { unitId: 'new', amount: 100, crewType: 1100 }, explicit: true };
+      turns[1] = { commandKey: 'morale', args: { unitId: 1 }, explicit: true };
+      turns[2] = { commandKey: 'attack', args: { cityKey: 2 }, explicit: true };
       await tx.generalTurn.deleteMany({ where: { worldId: p.id, generalId: 1 } });
       await tx.generalTurn.createMany({
         data: turns.map((turn, slot) => ({
           ...turn,
-          explicit: true,
           worldId: p.id,
           generalId: 1,
           slot,
@@ -458,7 +545,8 @@ async function prepareWorlds(db: PrismaClient): Promise<PreparedWorlds> {
         data: { turnRevision: { increment: 1 } },
       });
       const sequence = await dbModule.nextActionSequence(tx, p.id);
-      await tx.inputEvent.create({
+      const { clockTick } = await tx.world.findUniqueOrThrow({ where: { id: p.id }, select: { clockTick: true } });
+      const event = await tx.inputEvent.create({
         data: {
           worldId: p.id,
           userId: actor.userId!,
@@ -468,23 +556,63 @@ async function prepareWorlds(db: PrismaClient): Promise<PreparedWorlds> {
           status: 'APPLIED',
           sequence,
           payload: { turns, revision: actor.turnRevision } as unknown as Prisma.InputJsonValue,
-          result: { revision: actor.turnRevision + 1 },
+          result: { revision: actor.turnRevision + 1, activeTick: clockTick },
         },
+      });
+      await tx.general.update({
+        where: { worldId_id: { worldId: p.id, id: 1 } },
+        data: { lastActiveTick: Math.max(actor.lastActiveTick ?? 0, clockTick), lastActiveAt: event.createdAt },
       });
     });
     await lease.renewLease(db, held);
-    await loop.advanceTo(10_100);
+    const executions = await loop.advanceTo(80_100);
+    for (const key of ['recruit', 'morale', 'attack']) {
+      const execution = executions.find((row) => row.generalId === 1 && row.commandKey === key);
+      check(execution !== undefined, 'P 명령 실행 누락: ' + key);
+      const failures = await db.generalLog.findMany({
+        where: { worldId: p.id, generalId: 1, commandKey: key, kind: 'failure' },
+      });
+      check(failures.length === 0, `P ${key} 실패: ${failures.map((row) => row.text).join()}`);
+    }
+    const [{ processTacticalStep }, { loadWorld }] = await Promise.all([
+      import('../apps/engine/src/tacticalBattle'),
+      import('../apps/engine/src/worldLoader'),
+    ]);
+    // 실제 엔진의 예약 전투 창을 마감한다. 게임 tick은 80,100으로 유지한다.
+    for (let step = 0; step < 40; step++) {
+      const world = await db.world.findUniqueOrThrow({ where: { id: p.id } });
+      const state = await db.$transaction((tx) => loadWorld(tx, p.id));
+      const battle = state.campaign?.tactical?.battles.find((row) => !row.settled);
+      if (!battle) break;
+      await lease.renewLease(db, held);
+      await db.$transaction(
+        async (tx) => {
+          await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${p.id} FOR UPDATE`;
+          await processTacticalStep(tx, world, new Date(Math.max(Date.now(), battle.deadlineAt)));
+        },
+        { timeout: 30_000 },
+      );
+    }
     const alive = await db.nation.findUnique({ where: { worldId_id: { worldId: p.id, id: 2 } } });
     const removed = await db.removedNation.findUnique({
       where: { worldId_nationId: { worldId: p.id, nationId: 2 } },
     });
     check(alive === null, '출병 뒤에도 국가 2의 Nation 행이 남았습니다.');
     check(removed !== null, '국가 2의 RemovedNation 행이 없습니다.');
+    check(removed.removedTick === 80_100, 'P 전술 점령의 실제 정산 tick이 80,100이 아닙니다.');
+    const settlement = await db.inputEvent.findFirstOrThrow({
+      where: { worldId: p.id, kind: 'battle.step' },
+      orderBy: { sequence: 'desc' },
+    });
+    check(
+      settlement.status === 'APPLIED' && settlement.tick === removed.removedTick,
+      'P 전술 정산 기록 tick이 다릅니다.',
+    );
 
     await lease.renewLease(db, held);
-    await loop.advanceTo(20_000);
+    await loop.advanceTo(90_000);
     const second = await db.yearbookNation.findMany({
-      where: { worldId: p.id, tick: 20_000 },
+      where: { worldId: p.id, tick: 90_000 },
       select: { nationId: true },
     });
     check(second.map(({ nationId }) => nationId).join() === '1', '둘째 정산 저장 국가가 1뿐이 아닙니다.');
@@ -493,8 +621,14 @@ async function prepareWorlds(db: PrismaClient): Promise<PreparedWorlds> {
       orderBy: { tick: 'asc' },
       select: { tick: true, data: true },
     });
-    check(frames.map(({ tick }) => tick).join() === '10000,20000', 'P 프레임 tick이 다릅니다.');
-    const owners = (frames[1]!.data as { cities: Array<{ nationId: number | null }> }).cities.map((c) => c.nationId);
+    // 모병 60,100 → 사기 70,100 → 출병·전술 정산 80,100 → 멸망 후 첫 월간 90,000.
+    check(
+      frames.map(({ tick }) => tick).join() === '10000,20000,30000,40000,50000,60000,70000,80000,90000',
+      'P 프레임 tick이 다릅니다.',
+    );
+    const owners = (frames.at(-1)!.data as { cities: Array<{ nationId: number | null }> }).cities.map(
+      (c) => c.nationId,
+    );
     check(owners.includes(1) && owners.every((id) => id === null || id === 1), '둘째 프레임 소유가 다릅니다.');
     p.ticks.push(...frames.map(({ tick }) => tick));
     await controlClock(db, p.id, 'pause');

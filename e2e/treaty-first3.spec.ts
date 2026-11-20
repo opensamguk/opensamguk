@@ -13,9 +13,9 @@ import {
 } from './treatyWorld';
 
 // T2-07 · AC-M2-06 첫 세 조항(종전·불가침·기록만 남길 약속)의 외교실 브라우저 시험.
-// 사례와 기대는 E 전용 실행 계약(accepted-f1-contract.md 4절)의 B1~B11·B13~B15다. 양성 결과는 화면이나 실제 HTTP로 접수하고
+// 사례와 기대는 E 전용 실행 계약(accepted-f1-contract.md 4절)의 B1~B9, B13~B15다. 모든 규칙이 늘 켜져 B10, B11은 뺐다. 양성 결과는 화면이나 실제 HTTP로 접수하고
 // 실행 중인 감독이 띄운 엔진이 처리한 것만 쓴다. 저장 확인은 읽기만 한다. fixture 쓰기는 treatyWorld.ts에 모았다.
-// 두 월드를 함께 쓰고 P1(B1→B2)·P3(B4→B9)은 순서가 있는 흐름이라 직렬로 돈다. 제한 시간·재시도는 기본값 그대로다.
+// 한 월드를 함께 쓰고 P1(B1→B2)·P3(B4→B9)은 순서가 있는 흐름이라 직렬로 돈다. 제한 시간·재시도는 기본값 그대로다.
 
 test.describe.configure({ mode: 'serial' });
 
@@ -24,7 +24,6 @@ const NAP12: Clause[] = [{ kind: 'nonAggression', months: 12 }];
 const READ_ONLY = '이 직책은 외교 문서를 읽기만 합니다.';
 // 받은 제안 카드(TreatyCard)의 읽기 전용 안내. 조약서 쓰기 탭의 READ_ONLY와 문장이 다르다.
 const CARD_READ_ONLY = '외교 문서는 군주와 참모가 답합니다. 이 직책은 읽기만 합니다.';
-const UNSUPPORTED = '아직 지원하지 않는 조항입니다.';
 const RECENT = 'section[aria-label="최근 처리된 내 요청"]';
 const won = (value: number) => value.toLocaleString('ko-KR');
 
@@ -374,7 +373,7 @@ test.describe('첫 세 조항 외교실', () => {
     await expect(incoming.getByRole('region', { name: '기록만 남는 조항' })).toContainText(
       `기록만 남길 약속 (${text})`,
     );
-    await expect(incoming.getByRole('region', { name: '서버가 집행하는 조항' })).toHaveCount(0);
+    await expect(incoming.getByRole('region', { name: '집행되는 조항' })).toHaveCount(0);
     await incoming.getByRole('button', { name: '수락', exact: true }).click();
     const accepted = finished(b.page, 'applied', 'ACCEPTED');
     await expect(accepted).toContainText('조약을 맺었습니다');
@@ -390,7 +389,7 @@ test.describe('첫 세 조항 외교실', () => {
     await a.page.goto(`/w/${a.worldId}/diplomacy?tab=active`);
     const active = card(a.page, treatyId);
     await expect(active.getByRole('region', { name: '기록만 남는 조항' })).toContainText(text);
-    await expect(active.getByRole('region', { name: '서버가 집행하는 조항' })).toHaveCount(0);
+    await expect(active.getByRole('region', { name: '집행되는 조항' })).toHaveCount(0);
     await f.closeActors('p7a', 'p7b');
   });
 
@@ -426,47 +425,6 @@ test.describe('첫 세 조항 외교실', () => {
     await f.closeActors('p3a', 'p3b', 'p3chief');
   });
 
-  test('B10 뒤 네 조항은 고를 수 없고 지원하지 않는 조회를 부르지 않는다', async ({ browser }) => {
-    const s = await f.actor(browser, 'screen');
-    const calls = watchTrpc(s.page);
-    await s.page.goto(`/w/${s.worldId}/diplomacy?tab=write`);
-    const form = s.page.getByRole('form', { name: '조약서 쓰기' });
-    for (const label of ['통행 허용', '정기 원조', '교역 허용', '도시 이양']) {
-      await expect(form.getByLabel(label, { exact: true })).toBeDisabled();
-      await expect(form.locator(`[data-clause="${label}"][data-unsupported="true"]`)).toContainText(UNSUPPORTED);
-    }
-    // 지원하는 조항으로 견적을 한 번 받아 조약서가 쓰는 조회를 모두 거치게 한다. 보내지는 않는다.
-    await s.page.getByLabel('상대').selectOption(String(PAIRS.P1.a));
-    await form.getByLabel('불가침', { exact: true }).check();
-    await expect(s.page.getByTestId('treaty-cost')).toContainText('예상 비용 우리 금');
-    for (const tab of ['incoming', 'active']) await s.page.goto(`/w/${s.worldId}/diplomacy?tab=${tab}`);
-    await expect(s.page.getByRole('navigation', { name: '외교실 탭' })).toBeVisible();
-
-    expect(calls.some((c) => c.procedure === 'treaty.list')).toBe(true);
-    expect(calls.some((c) => c.procedure === 'treaty.quote')).toBe(true);
-    const unsupported = ['treaty.trust', 'treaty.tradeTargets', 'treaty.break'];
-    expect(calls.filter((c) => unsupported.includes(c.procedure)).map((c) => c.procedure)).toEqual([]);
-    expect(calls.filter((c) => c.method === 'POST' && c.procedure.startsWith('treaty.'))).toEqual([]);
-    await f.closeActors('screen');
-  });
-
-  test('B11 형식 1 대조 월드는 빈 목록 대신 서버의 PRECONDITION_FAILED 문장을 보인다', async ({ browser }) => {
-    const l = await f.actor(browser, 'legacy');
-    const response = await l.page.request.get(
-      `/trpc/treaty.list?input=${encodeURIComponent(JSON.stringify({ worldId: l.worldId }))}`,
-    );
-    expect(response.status()).toBe(412);
-    const body = (await response.json()) as { error?: { message?: string; data?: { code?: string } } };
-    expect(body.error?.data?.code).toBe('PRECONDITION_FAILED');
-    const message = body.error?.message ?? '';
-    expect(message).not.toBe('');
-
-    await l.page.goto(`/w/${l.worldId}/diplomacy`);
-    await expect(l.page.getByTestId('treaty-unavailable')).toHaveText(message);
-    await expect(l.page.getByText(/조약이 없습니다/)).toHaveCount(0);
-    await f.closeActors('legacy');
-  });
-
   test('B13 교전 상대와 종전만 맺으면 비용 0으로 수락되고 관계가 사라진다', async ({ browser }) => {
     const a = await f.actor(browser, 'p8a');
     const w = await f.actor(browser, 'p8b');
@@ -499,7 +457,7 @@ test.describe('첫 세 조항 외교실', () => {
     await w.page.goto(`/w/${w.worldId}/diplomacy?tab=active`);
     const active = card(w.page, treatyId);
     await expect(active).toContainText('진행 중');
-    await expect(active.getByRole('region', { name: '서버가 집행하는 조항' })).toContainText('종전');
+    await expect(active.getByRole('region', { name: '집행되는 조항' })).toContainText('종전');
     await openComposer(a, PAIRS.P8.b);
     await expect(a.page.getByTestId('target-relation')).toHaveText('관계 없음');
     await f.closeActors('p8a', 'p8b');

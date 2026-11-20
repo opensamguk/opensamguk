@@ -1,8 +1,11 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { WorldMap as WorldMapData } from '../game/types';
 import type { WorldUnitSet } from '../battleSim/unitChoices';
+import type { CampaignUnitChoice } from './args';
 import { levelName, isCapital } from '../main/siteMarkers';
+import { SchematicMap } from '../main/SchematicMap';
 import { WorldMap } from '../main/WorldMap';
+import { attackTargets, moveTargets } from '../main/schematicPaths';
 import { Portrait } from '../portrait/Portrait';
 import { NationBadge } from '../ui/NationBadge';
 import { Tag } from '../ui/Tag';
@@ -71,9 +74,18 @@ export interface ArgContext {
   relations?: ReadonlyMap<number, string> | undefined;
   // 등용 후보 (개인 예턴만). 없으면 등용 대상은 번호로 넣는다.
   recruits?: RecruitChoices | undefined;
+  // 내 부곡 (campaign.get). 모병, 훈련, 사기의 부곡 칸 선택지다. 없으면 모병은 새 부곡만 고를 수 있다.
+  campaignUnits?: readonly CampaignUnitChoice[] | undefined;
 }
 
 const num = (value: number) => value.toLocaleString('ko-KR');
+
+/** 인자 창의 한 단계. value는 이미 고른 값의 짧은 글이다. */
+export interface ArgStep {
+  key: string;
+  label: string;
+  value?: string | undefined;
+}
 
 export function CommandArgsScreen({
   title,
@@ -85,6 +97,9 @@ export function CommandArgsScreen({
   putButton,
   children,
   context,
+  steps,
+  step = 0,
+  onStep,
 }: {
   context: ArgContext;
   title: string;
@@ -95,6 +110,10 @@ export function CommandArgsScreen({
   summary: string;
   putButton: ReactNode;
   children: ReactNode;
+  // 단계식 인자 창 (D-100). 없으면 예전처럼 한 화면에 모두 보인다. 마지막 단계가 확인이다.
+  steps?: ReadonlyArray<ArgStep> | undefined;
+  step?: number;
+  onStep?: ((index: number) => void) | undefined;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const headingId = useId();
@@ -145,12 +164,45 @@ export function CommandArgsScreen({
         ) : null}
         {notes}
       </div>
-      <div className={styles.body}>{children}</div>
+      {steps && steps.length > 1 ? (
+        <ol className={styles.steps} aria-label="입력 단계">
+          {steps.map((entry, index) => (
+            <li
+              key={entry.key}
+              aria-current={index === step ? 'step' : undefined}
+              data-done={index < step || undefined}
+            >
+              <button type="button" className={styles.stepButton} onClick={() => onStep?.(index)}>
+                <span className={styles.stepNo}>{index + 1}</span>
+                <span>{entry.label}</span>
+                {entry.value ? <span className={styles.stepValue}>{entry.value}</span> : null}
+              </button>
+            </li>
+          ))}
+        </ol>
+      ) : null}
+      <div className={styles.body} data-step={steps ? steps[step]?.key : undefined}>
+        {children}
+      </div>
       <footer className={styles.foot}>
         <p className={styles.summary} aria-live="polite">
           {summary}
         </p>
-        {putButton}
+        {steps && steps.length > 1 ? (
+          <div className={styles.stepNav}>
+            <button type="button" className={styles.barButton} disabled={step === 0} onClick={() => onStep?.(step - 1)}>
+              이전
+            </button>
+            {step < steps.length - 1 ? (
+              <button type="button" className={styles.nextButton} onClick={() => onStep?.(step + 1)}>
+                다음: {steps[step + 1]!.label}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+        <div className={styles.put} data-final={!steps || step === steps.length - 1 ? 'true' : 'false'}>
+          {putButton}
+        </div>
       </footer>
     </dialog>
   );
@@ -183,6 +235,7 @@ export function CityTargetPicker({
   onChange,
   context,
   ownFirst = false,
+  pathMode = null,
 }: {
   context: ArgContext;
   label: string;
@@ -192,6 +245,8 @@ export function CityTargetPicker({
   onChange: (value: string) => void;
   // 발령·천도·백성동원처럼 내 국가 도시가 대상인 명령은 내 도시를 먼저 둔다.
   ownFirst?: boolean;
+  // 이동은 우리 땅 안 목적지, 출병은 붙은 적 거점과 부속 현 너머 큰 도시를 고른다 (D-103).
+  pathMode?: 'move' | 'attack' | null;
 }) {
   const [query, setQuery] = useState('');
   const listId = useId();
@@ -213,6 +268,16 @@ export function CityTargetPicker({
     [candidates, distances, ownNation, ownFirst],
   );
   const selected = cities.find((city) => String(city.key) === value) ?? null;
+  const pathTargets = useMemo(
+    () =>
+      !map || pathMode === null
+        ? null
+        : pathMode === 'move'
+          ? moveTargets(map.cities, here, ownNation)
+          : attackTargets(map.cities, here, ownNation),
+    [map, pathMode, here, ownNation],
+  );
+  const pathInfo = selected ? (pathTargets?.get(selected.key) ?? null) : null;
   const herCity = cities.find((city) => city.key === here) ?? null;
   const pick = (key: number) => {
     if (allowed.has(key)) onChange(String(key));
@@ -236,21 +301,32 @@ export function CityTargetPicker({
       <section className={styles.mapPane} aria-label={`${label} 지도`}>
         <div className={styles.map}>
           {map ? (
-            <WorldMap
-              fill
-              operationalMap={map.operationalMap}
+            // 대상 도시 고르기는 원작식 도식 축소 지도로 그린다 (D-101, D-102).
+            <SchematicMap
               cities={map.cities}
               nations={nations}
-              myCityKey={here}
-              selectedKey={selected?.key ?? null}
-              focusKey={here}
-              onSelect={pick}
+              candidates={
+                pathTargets ? new Set([...pathTargets.keys()].filter((key: number) => allowed.has(key))) : allowed
+              }
+              value={selected?.key ?? null}
+              here={here}
+              path={selected ? pathTargets?.get(selected.key)?.path : undefined}
+              onPick={pick}
+              label={`${label} 지도`}
             />
           ) : (
             <p className={styles.muted}>지도를 불러오는 중입니다</p>
           )}
         </div>
-        <p className={styles.muted}>지도에서 도시를 누르거나 목록에서 고릅니다.</p>
+        <p className={styles.muted}>
+          지도에서 도시를 누르거나 목록에서 고르세요. 거점 칸의 +숫자를 누르면 딸린 현이 펼쳐집니다.
+        </p>
+        {pathInfo ? (
+          <p className={styles.route} data-testid="args-path">
+            경로 {pathInfo.path.length - 1}칸, {pathInfo.turns}턴
+            {pathInfo.swept.length > 0 ? `, 지나며 휩쓸 현 ${pathInfo.swept.length}곳` : ''}
+          </p>
+        ) : null}
         <p className={styles.route}>
           <span className={styles.tagHere}>현재 도시</span>{' '}
           {herCity ? cityLabel(herCity.name, nationOf(herCity)?.name) : '—'} →{' '}
@@ -406,7 +482,7 @@ export function NationTargetPicker({
             <p className={styles.muted}>지도를 불러오는 중입니다</p>
           )}
         </div>
-        <p className={styles.muted}>지도에서 그 국가의 도시를 누르거나 목록에서 고릅니다.</p>
+        <p className={styles.muted}>지도에서 그 국가의 도시를 누르거나 목록에서 고르세요.</p>
         <p className={styles.route}>
           <span className={styles.tagPick}>선택 국가</span>{' '}
           {selectedNation ? <NationBadge name={selectedNation.name} color={selectedNation.color} /> : '고르지 않음'}

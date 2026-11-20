@@ -233,7 +233,7 @@ function NpcEntry({
                   </select>
                 </label>
                 <label>
-                  이름·국가·도시 검색{' '}
+                  이름, 국가, 도시 검색{' '}
                   <input
                     className={styles.input}
                     value={search}

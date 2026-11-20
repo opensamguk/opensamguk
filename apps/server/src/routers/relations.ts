@@ -1,3 +1,4 @@
+import { readTransactionOptions } from '../readTransaction';
 import { readStoredRelations, toGameDate } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { requireWorld } from '../game/queries';
@@ -10,7 +11,7 @@ export const relationsRouter = router({
       async (tx) => {
         const world = await requireWorld(tx, input.worldId);
         const relations = readStoredRelations(world, hashState);
-        if (!relations) return { enabled: false, items: [] };
+        if (!relations) return { items: [] };
 
         const { year } = toGameDate(world.startYear, world.monthlyTick);
         const end =
@@ -33,9 +34,9 @@ export const relationsRouter = router({
           const second = visible.get(b.id);
           return first && second ? [{ a: first, b: second, kind }] : [];
         });
-        return { enabled: true, items };
+        return { items };
       },
-      { isolationLevel: 'RepeatableRead' },
+      { ...readTransactionOptions },
     ),
   ),
 });

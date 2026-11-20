@@ -78,6 +78,7 @@ function makeInvestmentWithCollector(spec: Spec, collect: typeof collectModifier
     const city = view.cities[general.cityKey];
     if (!city || city.nationId !== general.nationId)
       return { code: 'NOT_OWN_CITY', message: '자기 국가 도시에서만 가능합니다.' };
+    if (city.kind === 'FIELD') return { code: 'BAD_TARGET', message: '전장에서는 내정을 할 수 없습니다.' };
     if (city.kind === 'PASS' && spec.field !== 'defence' && spec.field !== 'wall')
       return { code: 'BAD_TARGET', message: '관문에서는 수비와 성벽을 보강할 수 있습니다.' };
     if (!city.supplied) return { code: 'NO_SUPPLY', message: '보급이 끊긴 도시입니다.' };
@@ -86,7 +87,7 @@ function makeInvestmentWithCollector(spec: Spec, collect: typeof collectModifier
     const max =
       spec.field === 'tech' ? BALANCE.MAX_TECH : spec.field === 'trust' ? BALANCE.MAX_TRUST : city[`${spec.field}Max`];
     if (value >= max) return { code: 'AT_MAX', message: '이미 최대치입니다.' };
-    if (construction && view.ruleFeatures?.includes('logistics-v1')) {
+    if (construction) {
       if (!view.logistics) throw new Error('물류 판의 재고가 없습니다.');
       return checkCityGoods(view, city.cityKey, view.logistics.config.build[construction]);
     }
@@ -106,7 +107,7 @@ function makeInvestmentWithCollector(spec: Spec, collect: typeof collectModifier
       const general = view.generals[actor.generalId]!;
       const city = view.cities[general.cityKey]!;
       let material: Effect[] = [];
-      if (construction && view.ruleFeatures?.includes('logistics-v1')) {
+      if (construction) {
         if (!view.logistics) throw new Error('물류 판의 재고가 없습니다.');
         const spent = consumeCityGoods(view, city.cityKey, view.logistics.config.build[construction]);
         if (!spent.ok) throw new Error(spent.message);

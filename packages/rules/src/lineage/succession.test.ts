@@ -52,22 +52,22 @@ it('AC-P2-32 후계자가 이미 지휘하던 전임자 부곡은 위치 그대�
 
 it('AC-P2-32 사람 계승은 조작권 하나·직위·금·쌀·병력을 손실 없이 이전하고 원본을 바꾸지 않는다', () => {
   const { world, from, heir } = family();
-  Object.assign(world.generals[from]!, { crew: 80, train: 20, atmos: 30 });
+  world.campaign!.units = [unit(1, from, from, 80)];
+  world.campaign!.nextUnitId = 2;
   const before = structuredClone(world);
   const outcome = applySuccession(world, from, heir, 'HUMAN', 100);
   expect(outcome.ok).toBe(true);
   if (!outcome.ok) throw Error(outcome.message);
   expect(world).toEqual(before);
   expect(outcome.loss).toEqual({ gold: 0, rice: 0, troops: 0 });
+  expect(outcome.world.campaign!.units).toEqual([unit(1, heir, heir, 80)]);
   expect(outcome.world.generals[heir]).toMatchObject({
     userId: 'lineage-player',
     officerLevel: 12,
     gold: 140,
     rice: 250,
-    crew: 80,
+    crew: 0,
     cityKey: 1,
-    train: 20,
-    atmos: 30,
   });
   expect(outcome.world.generals[from]).toMatchObject({
     userId: null,
@@ -89,15 +89,19 @@ it('AC-P2-32 사람 계승은 조작권 하나·직위·금·쌀·병력을 손�
 
 it('AC-P2-32 사람 계승은 타 도시·병력 충돌·상한 초과를 거절하며 부분 재산 이전이 없다', () => {
   const { world, from, heir } = family();
-  world.generals[from]!.crew = 200;
+  world.campaign!.units = [unit(1, from, from, 200)];
+  world.campaign!.nextUnitId = 2;
   world.generals[heir]!.cityKey = 2;
   expect(applySuccession(world, from, heir, 'HUMAN', 0)).toMatchObject({ ok: false, code: 'HEIR_AWAY' });
   world.generals[heir]!.cityKey = 1;
-  world.generals[heir]!.crew = 1;
-  expect(applySuccession(world, from, heir, 'HUMAN', 0)).toMatchObject({ ok: false, code: 'HEIR_HAS_CREW' });
-  world.generals[heir]!.crew = 0;
+  world.campaign!.units.push(unit(2, heir, heir, 100));
+  world.campaign!.nextUnitId = 3;
+  world.generals[heir]!.leadership = 2;
+  expect(applySuccession(world, from, heir, 'HUMAN', 0)).toMatchObject({ ok: false, code: 'HEIR_CAPACITY' });
+  world.campaign!.units.pop();
   world.generals[heir]!.leadership = 1;
   expect(applySuccession(world, from, heir, 'HUMAN', 0)).toMatchObject({ ok: false, code: 'HEIR_CAPACITY' });
+  world.generals[heir]!.leadership = 100;
   world.generals[heir]!.gold = LINEAGE_MAX;
   expect(applySuccession(world, from, heir, 'HUMAN', 0)).toMatchObject({ ok: false, code: 'HOLDER_FULL' });
   expect(world.generals[from]!.gold).toBe(100);
@@ -155,7 +159,7 @@ it('AC-P2-32 NPC 사망의 다른 도시 부곡은 손실 처리하고 남의 �
   expect(outcome.ok).toBe(true);
   if (!outcome.ok) throw Error(outcome.message);
   expect(outcome.loss.troops).toBe(125);
-  expect(outcome.world.campaign!.units).toEqual([unit(2, other, other, 0), unit(3, heir, mother, 30)]);
+  expect(outcome.world.campaign!.units).toEqual([unit(3, heir, mother, 30)]);
   expect(outcome.world.generals[mother]!.cityKey).toBe(world.generals[mother]!.cityKey);
   expect(() => assertLineageFinal(outcome.world, 0)).not.toThrow();
 });

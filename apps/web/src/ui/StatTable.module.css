@@ -1,6 +1,8 @@
 .table {
   width: 100%;
-  border-collapse: collapse;
+  /* 키트 줄 그림을 칸마다 나눠 그린다(kitFrame.module.css). */
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: var(--text-sm);
 }
 .caption {
@@ -8,16 +10,12 @@
   font-weight: 600;
   padding-bottom: var(--space-1);
 }
-.table tr {
-  height: var(--row-height);
-  border-bottom: 1px solid var(--color-border);
-}
 .label {
   text-align: left;
-  font-weight: 500;
+  font-weight: 700;
   color: var(--color-text-muted);
   white-space: nowrap;
-  padding-right: var(--space-3);
+  padding: 0 var(--space-3) 0 var(--space-1);
 }
 .max {
   color: var(--color-text-muted);
@@ -27,18 +25,16 @@
 .barCell {
   width: 35%;
   padding-left: var(--space-3);
+  padding-right: var(--space-1);
 }
-/* 막대: 먹 테두리 안을 석록으로 채운다 (INT-20). */
+/* 막대: 키트 막대 바탕(.kit-gauge) 안을 키트 채움 그림으로 채운다. 그림이 없으면 금빛 대체 색. */
 .bar {
   display: block;
-  height: 8px;
-  background: var(--color-border);
-  border: 1px solid var(--color-ink);
-  border-radius: var(--radius);
   overflow: hidden;
 }
 .fill {
   display: block;
   height: 100%;
-  background: var(--color-success);
+  background: var(--kit-gauge-fill-0) 0 0 / auto 100%;
+  background-color: #c9902a;
 }

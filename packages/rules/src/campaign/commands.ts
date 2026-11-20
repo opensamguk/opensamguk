@@ -1,3 +1,6 @@
+import { moveStep } from '../commandPaths';
+import { applyMarchSupply, previewMarchSupply, marchForce } from './supply';
+import { cloneWorld } from '../model/clone';
 import type { Rng } from '@opensamguk/shared';
 import { applyEffects } from '../commands/effects';
 import type { CommandResolver } from '../commands/resolve';
@@ -16,7 +19,7 @@ import { readCampaignState, type CampaignState } from './state';
 import { hasCampaignOrderAuthority } from './orders';
 
 const preparation = ['recruit', 'conscript', 'train', 'morale', 'dismiss'] as const;
-const military = new Set<string>([...preparation, 'attack', 'move', 'return', 'form_unit']);
+const military = new Set<string>([...preparation, 'attack', 'move', 'return']);
 const allegiance = new Set(['join', 'join_random', 'found', 'uprising', 'resign', 'accept_invite']);
 const stratagems = new Set(['fire_attack', 'sabotage', 'incite']);
 
@@ -103,16 +106,96 @@ export function createCampaignCommandResolver(base: CommandResolver): CommandRes
     const original = base.get(key);
     if (!original) return undefined;
     const def = overrides.get(key) ?? original;
-    const check = (view: WorldView, actor: Actor, value: unknown) =>
-      gate(view, actor, key, value) ?? def.check(view, actor, value);
+    const check = (view: WorldView, actor: Actor, value: unknown) => {
+      const failure = gate(view, actor, key, value) ?? def.check(view, actor, value);
+      if (failure) return failure;
+      if ((key === 'move' || key === 'return') && view.campaign?.supplyLedger) {
+        const owner = view.generals[actor.generalId]!;
+        const units = view.campaign.units.filter(
+          (unit) =>
+            unit.ownerId === owner.id &&
+            unit.troops > 0 &&
+            unit.supply &&
+            view.generals[unit.commanderId]?.cityKey === owner.cityKey,
+        );
+        const destination =
+          key === 'return'
+            ? view.nations[owner.nationId!]?.capitalCityKey
+            : moveStep(view, actor.generalId, (value as { cityKey: number }).cityKey, actor.tick ?? 0)?.destination;
+        if (units.length && destination != null && destination !== owner.cityKey) {
+          try {
+            previewMarchSupply(
+              view,
+              marchForce(units),
+              destination,
+              key === 'move'
+                ? {
+                    cityPath: moveStep(view, actor.generalId, (value as { cityKey: number }).cityKey, actor.tick ?? 0)!
+                      .path,
+                  }
+                : {},
+            );
+          } catch {
+            return fail('BAD_TARGET', '행군 경로를 사용할 수 없습니다.');
+          }
+        }
+      }
+      return null;
+    };
     return {
       ...def,
       check,
-      precheck: (view, actor, value) => gate(view, actor, key, value) ?? def.precheck(view, actor, value),
+      precheck: (view, actor, value) =>
+        key === 'move' || key === 'return'
+          ? check(view, actor, value)
+          : (gate(view, actor, key, value) ?? def.precheck(view, actor, value)),
       execute(view, actor, value, rng): CommandResult {
         const failure = check(view, actor, value);
         if (failure) throw new Error(failure.message);
-        const result = def.execute(view, actor, value, rng);
+        let executionView = view;
+        if ((key === 'move' || key === 'return') && view.campaign?.supplyLedger) {
+          const owner = view.generals[actor.generalId]!;
+          const units = view.campaign.units.filter(
+            (unit) =>
+              unit.ownerId === owner.id &&
+              unit.troops > 0 &&
+              unit.supply &&
+              view.generals[unit.commanderId]?.cityKey === owner.cityKey,
+          );
+          const destination =
+            key === 'return'
+              ? view.nations[owner.nationId!]?.capitalCityKey
+              : moveStep(view, actor.generalId, (value as { cityKey: number }).cityKey, actor.tick ?? 0)?.destination;
+          if (units.length && destination != null && destination !== owner.cityKey) {
+            const supplied = cloneWorld(view);
+            if (
+              !applyMarchSupply(
+                supplied,
+                units,
+                destination,
+                key === 'move'
+                  ? {
+                      cityPath: moveStep(
+                        view,
+                        actor.generalId,
+                        (value as { cityKey: number }).cityKey,
+                        actor.tick ?? 0,
+                      )!.path,
+                    }
+                  : {},
+              )
+            )
+              return {
+                ...success('보급 고갈: 원정 병력을 해산하고 장수들이 복귀했습니다.'),
+                effects: [{ kind: 'world', state: supplied }],
+              };
+            if (key === 'return')
+              for (const unit of supplied.campaign!.units)
+                if (units.some((row) => row.id === unit.id)) delete unit.supply;
+            executionView = supplied;
+          }
+        }
+        const result = def.execute(executionView, actor, value, rng);
         // 계략의 같은 장수 부상 판정을 실제 지휘 부곡에 적용한다. RNG를 추가로 소비하지 않는다.
         const affected = new Set(
           stratagems.has(key)
@@ -122,7 +205,7 @@ export function createCampaignCommandResolver(base: CommandResolver): CommandRes
             : [],
         );
         let state = applyEffects(
-          view,
+          executionView,
           result.effects.filter(
             (effect) =>
               !(stratagems.has(key) && effect.kind === 'general' && ['crew', 'train', 'atmos'].includes(effect.field)),
@@ -156,6 +239,7 @@ export function createCampaignCommandResolver(base: CommandResolver): CommandRes
             }
           }
         }
+        if (state.campaign) state.campaign.units = state.campaign.units.filter((unit) => unit.troops > 0);
         state = followCampaignCommanders(view, state);
         return { ...result, effects: [{ kind: 'world', state }] };
       },

@@ -255,7 +255,7 @@ export function AdminResetActions({
       setError(
         seconds === null
           ? '요청이 많습니다. 결과를 조회하세요. 재접수 대기 시간을 확인하지 못했습니다.'
-          : '요청 한도로 접수하지 못했습니다. 남은 시간이 지난 뒤 같은 요청을 수동 접수할 수 있습니다.',
+          : '요청 한도로 접수하지 못했습니다. 남은 시간이 지난 뒤 같은 요청을 수동 접수하세요.',
       );
       return;
     }
@@ -266,7 +266,7 @@ export function AdminResetActions({
     }
     setError(
       !attempted
-        ? '계정·월드 상태를 확인하지 못해 보내지 않았습니다. 다시 확인하세요.'
+        ? '계정과 월드 상태를 확인하지 못해 보내지 않았습니다. 다시 확인하세요.'
         : '결과를 확인하지 못했습니다. 같은 요청 번호로 수동 조회하세요. 조회에 실패해도 미접수를 뜻하지 않습니다.',
     );
   }
@@ -342,7 +342,7 @@ export function AdminResetActions({
           return;
         }
         if (!ownResetReply(result, value)) {
-          setError('응답의 계정·월드·요청 번호가 다릅니다. 현재 요청의 결과를 다시 조회하세요.');
+          setError('응답의 계정, 월드, 요청 번호가 다릅니다. 현재 요청의 결과를 다시 조회하세요.');
           return;
         }
         setReply(result);
@@ -456,7 +456,7 @@ export function AdminResetActions({
                     tick {reply.tick} · sequence {reply.sequence} · 시계 revision {reply.result.after.revision}
                   </p>
                   <p>새 월드는 개장 전(PREOPEN) 상태로 만들었습니다. 시작 조치는 별도로 확인하세요.</p>
-                  <p>사람 장수·소속과 30칸 예약은 복사하지 않았습니다.</p>
+                  <p>사람 장수와 소속, 30칸 예약은 복사하지 않았습니다.</p>
                   <p>
                     확정 시드 <code>{reply.result.effectiveSeed}</code>
                   </p>
@@ -495,7 +495,7 @@ export function AdminResetActions({
               </p>
               <p>
                 초기화는 되돌릴 수 없습니다. 원본은 종료하고 원래 생성 자료로 새 개장 전 월드를 만듭니다. 원본 기록은
-                보존하며 사람 장수·소속과 30칸 예약은 복사하지 않습니다.
+                보존하며 사람 장수와 소속, 30칸 예약은 복사하지 않습니다.
               </p>
               {world.humanGenerals > 0 ? (
                 <p>
@@ -537,8 +537,8 @@ export function AdminResetActions({
                 }}
               />
               <p>
-                시드는 입력한 공백과 대소문자를 그대로 씁니다. 미확정·처리 대기 요청에서는 바꾸거나 새 번호로 접수하지
-                마세요.
+                시드는 입력한 공백과 대소문자를 그대로 씁니다. 미확정이거나 처리 대기인 요청에서는 바꾸거나 새 번호로
+                접수하지 마세요.
               </p>
               <label htmlFor="reset-confirm">
                 <input
@@ -548,7 +548,7 @@ export function AdminResetActions({
                   disabled={sending}
                   onChange={(event) => setChecked(event.target.checked)}
                 />
-                대상·상태·사유와 초기화의 영향을 확인했습니다.
+                대상, 상태, 사유와 초기화의 영향을 확인했습니다.
               </label>
               <button type="submit" disabled={sending || !resetConfirmation(world, name, reason, checked, seed)}>
                 월드 초기화 요청 확정
@@ -559,11 +559,11 @@ export function AdminResetActions({
             </form>
           ) : null
         ) : null}
-        {sending ? <p role="status">현재 계정·권한과 초기화 요청을 확인하고 있습니다…</p> : null}
-        {remaining > 0 ? <p role="status">{remaining}초 뒤 같은 요청을 수동 접수할 수 있습니다.</p> : null}
+        {sending ? <p role="status">현재 계정과 권한, 초기화 요청을 확인하고 있습니다…</p> : null}
+        {remaining > 0 ? <p role="status">{remaining}초 뒤에 같은 요청을 수동 접수하세요.</p> : null}
         {error && fresh ? <p role="alert">{error}</p> : null}
       </dialog>
-      {sending && !open ? <p role="status">현재 계정·권한과 월드를 확인하고 있습니다…</p> : null}
+      {sending && !open ? <p role="status">현재 계정과 권한, 월드를 확인하고 있습니다…</p> : null}
       {!open && error ? <p role="alert">{error}</p> : null}
     </section>
   );

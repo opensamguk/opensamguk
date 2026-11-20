@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
-import { RELATIONS_FEATURE, TICKS_PER_MONTH } from '../packages/rules/src/index';
+import { TICKS_PER_MONTH } from '../packages/rules/src/index';
 import { createWorldFromCli } from '../apps/engine/src/admin/creation';
 import { composeInitialWorld, readInitialResources } from '../apps/engine/src/world/resources';
 import { newSession } from '../apps/server/src/auth/session';
@@ -64,7 +64,7 @@ beforeAll(async () => {
   year = initial.startYear;
   nationCount = initial.nations.length;
   const options = { name: '관계 조회 검증', turnTermMinutes: 60, endYear: null, replayFormat: 3 } as const;
-  ({ worldId } = await createWorldFromCli(db, initial, { ...options, ruleFeatures: [RELATIONS_FEATURE] }, resources));
+  ({ worldId } = await createWorldFromCli(db, initial, { ...options }, resources));
   worldIds.push(worldId);
   ({ worldId: offWorldId } = await createWorldFromCli(db, initial, options, resources));
   worldIds.push(offWorldId);
@@ -100,17 +100,17 @@ const sworn = { a: { id: 47, name: '관우' }, b: { id: 281, name: '유비' }, k
 const future = { a: { id: 281, name: '유비' }, b: { id: 370, name: '제갈량' }, kind: 'lord' };
 
 it(
-  'AC-P2-20 관계를 켠 월드는 등장한 장수의 관계 종류만 반환하고 끈 월드는 빈 결과를 반환한다',
+  'AC-P2-20 모든 새 월드는 등장한 장수의 공개 관계 종류를 반환한다',
   authzCase(path, 'success', async () => {
     const result = await request({ worldId }, owner);
-    expect(result).toMatchObject({ status: 200, data: { enabled: true } });
+    expect(result).toMatchObject({ status: 200, data: { items: expect.any(Array) } });
     const { items } = result.data as { items: unknown[] };
     expect(items).toContainEqual(sworn);
     expect(items).not.toContainEqual(future);
     expect(JSON.stringify(items)).not.toContain('제갈량');
     expect(await request({ worldId: offWorldId }, owner)).toMatchObject({
       status: 200,
-      data: { enabled: false, items: [] },
+      data: { items: expect.arrayContaining([sworn]) },
     });
   }),
 );
@@ -147,9 +147,12 @@ it(
 
 it('AC-P2-20 진행·관리자 종료는 저장된 연도를 사용하고 정상 종료는 종료 연도까지만 표시한다', async () => {
   const boundary = 12 * TICKS_PER_MONTH;
-  await db.world.update({ where: { id: worldId }, data: { monthlyTick: boundary, status: 'RUNNING' } });
+  await db.world.update({
+    where: { id: worldId },
+    data: { clockTick: boundary, monthlyTick: boundary, status: 'RUNNING' },
+  });
   const running = await request({ worldId }, owner);
-  expect(running).toMatchObject({ status: 200, data: { enabled: true } });
+  expect(running).toMatchObject({ status: 200, data: { items: expect.any(Array) } });
   expect((running.data as { items: unknown[] }).items).toContainEqual(future);
 
   await db.world.update({ where: { id: worldId }, data: { status: 'ENDED' } });
@@ -174,7 +177,7 @@ it('AC-P2-20 진행·관리자 종료는 저장된 연도를 사용하고 정상
     },
   });
   const ended = await request({ worldId }, owner);
-  expect(ended).toMatchObject({ status: 200, data: { enabled: true } });
+  expect(ended).toMatchObject({ status: 200, data: { items: expect.any(Array) } });
   const { items } = ended.data as { items: unknown[] };
   expect(items.length).toBeGreaterThan(0);
   expect(JSON.stringify(items)).not.toMatch(/관우|제갈량/);

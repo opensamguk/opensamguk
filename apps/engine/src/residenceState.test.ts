@@ -161,3 +161,26 @@ describe('같은 트랜잭션의 물리 거주 앵커 저장', () => {
     expect(f.tx.general.updateMany).toHaveBeenCalledOnce();
   });
 });
+
+it('AC-INT-04 같은 잠금에서 읽은 장수 사본에서도 거주 앵커 경계를 검사한다', async () => {
+  const f = fixture();
+  const tx = f.tx as unknown as Prisma.TransactionClient;
+  expect(await loadResidenceAnchors(tx, 'world', f.rows)).toEqual({ 3: 5, 4: 10 });
+  expect(f.tx.general.findMany).not.toHaveBeenCalled();
+  await expect(loadResidenceAnchors(tx, 'world', [{ id: 1, userId: null, residenceTick: 1 }])).rejects.toThrow('NPC');
+  await expect(loadResidenceAnchors(tx, 'world', [{ id: 1, userId: 'human', residenceTick: null }])).rejects.toThrow(
+    '사람',
+  );
+});
+
+it('AC-INT-04 saves from the locked anchor snapshot with the same row comparison and CAS', async () => {
+  const f = fixture([{ id: 3, userId: 'human', residenceTick: 105 }]);
+  const tx = f.tx as unknown as Prisma.TransactionClient;
+  await persistResidenceAnchors(tx, 'world', { 3: 105 }, { 3: 102 }, f.rows);
+  expect(f.tx.general.findMany).not.toHaveBeenCalled();
+  expect(f.tx.general.updateMany).toHaveBeenCalledExactlyOnceWith({
+    where: { worldId: 'world', id: 3, userId: 'human', residenceTick: 105 },
+    data: { residenceTick: 102 },
+  });
+  await expect(persistResidenceAnchors(tx, 'world', { 3: 104 }, { 3: 102 }, f.rows)).rejects.toThrow();
+});

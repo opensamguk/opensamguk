@@ -43,8 +43,14 @@ function readSexLedger(path: (typeof SEX_LEDGER_FILES)[number]): SexLedger {
 export function loadSexLedgers(): SexLedger[] {
   return SEX_LEDGER_FILES.map(readSexLedger);
 }
-export function loadSexLedger(): SexLedger {
-  return readSexLedger(SEX_LEDGER_FILES.at(-1)!);
+export function loadSexLedger(): SexLedger;
+export function loadSexLedger(scenarioKey: string): SexLedger | undefined;
+export function loadSexLedger(scenarioKey?: string): SexLedger | undefined {
+  if (scenarioKey === undefined) return readSexLedger(SEX_LEDGER_FILES.at(-1)!);
+  const { name, version } = parseResourceKey(scenarioKey);
+  return loadSexLedgers().findLast(
+    (ledger) => ledger.scenarios.includes(name) || ledger.scenarios.includes(`${name}@${version}`),
+  );
 }
 
 export interface WorldResourceSelection {
@@ -73,17 +79,23 @@ export async function loadFeatureProfile(key: string, root: URL = resolveResourc
 }
 
 // 새 지도 기본값을 생성·CLI·재생 원본 추론이 함께 쓴다. 명시한 판 선택은 그대로 유지한다.
-export function resolveWorldResourceSelection(options: WorldResourceSelection): Required<WorldResourceSelection> {
+export function resolveWorldResourceSelection(
+  options: WorldResourceSelection,
+  scenario?: unknown,
+): Required<WorldResourceSelection> {
   const map = parseResourceKey(options.map);
+  const hasStats =
+    typeof scenario === 'object' &&
+    scenario !== null &&
+    'generalStats' in scenario &&
+    scenario.generalStats !== undefined;
   return {
     scenario: formatResourceKey(parseResourceKey(options.scenario)),
     map: formatResourceKey(map),
     unitSet: formatResourceKey(parseResourceKey(options.unitSet ?? 'basic')),
-    statRules: formatResourceKey(
-      parseResourceKey(options.statRules ?? (map.name === 'san10' ? 'five-stats' : 'default')),
-    ),
+    statRules: formatResourceKey(parseResourceKey(options.statRules ?? (hasStats ? 'five-stats' : 'default'))),
     portraitMap: formatResourceKey(
-      parseResourceKey(options.portraitMap ?? (map.name === 'san10' ? '191-map' : 'rtk14-map')),
+      parseResourceKey(options.portraitMap ?? (map.name === 'san10-expanded' ? 'san10-expanded-portraits' : '191-map')),
     ),
   };
 }
@@ -100,11 +112,11 @@ export async function readInitialResources(
   db: Parameters<typeof readPublishedResources>[0],
   options: WorldResourceSelection,
 ): Promise<InitialResources> {
-  const selected = resolveWorldResourceSelection(options);
   const { readPublishedResources } = await import('@opensamguk/db');
-  const [map, scenario, unitSet, statRules, portraitMap] = await readPublishedResources(db, [
+  const [scenario] = await readPublishedResources(db, [{ kind: 'SCENARIO', ...parseResourceKey(options.scenario) }]);
+  const selected = resolveWorldResourceSelection(options, scenario!.content);
+  const [map, unitSet, statRules, portraitMap] = await readPublishedResources(db, [
     { kind: 'MAP', ...parseResourceKey(selected.map) },
-    { kind: 'SCENARIO', ...parseResourceKey(selected.scenario) },
     { kind: 'UNIT_SET', ...parseResourceKey(selected.unitSet) },
     { kind: 'STAT_RULES', ...parseResourceKey(selected.statRules) },
     { kind: 'PORTRAIT_MAP', ...parseResourceKey(selected.portraitMap) },

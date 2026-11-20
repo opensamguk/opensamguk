@@ -1,3 +1,5 @@
+import { canExecuteCityUpgradeCommand } from '../cityUpgrade/upgrade';
+import { cityUpgradeCommands } from '../cityUpgrade/commands';
 import { z } from 'zod';
 import { commandRegistry } from '../commands/registry';
 import type { DeepReadonly } from '../model/world';
@@ -10,7 +12,6 @@ import { canExecuteCityNationCommand } from '../cityResources/commands';
 import { cityAllocationArgs } from '../cityResources/allocation';
 import { nationStrategyCommands } from '../nationStrategy/commands';
 import { canExecuteResearchNationCommand, nationResearchCommands } from '../nationResearch/commands';
-import { NATION_STRATEGY_FEATURE } from '../nationStrategy/state';
 import {
   clonePersonnel,
   PersonnelInvariantError,
@@ -60,7 +61,7 @@ const respondResult = z.strictObject({
 const commonCodes = ['WORLD_CLOSED', 'ACTOR_INACTIVE', 'NO_GENERAL', 'GENERAL_REMOVED'] as const;
 const appointCodes = [...commonCodes, 'NOT_NATION', 'NOT_RULER', 'BAD_ARGS', 'BAD_TARGET', 'BAD_STATE'] as const;
 const dismissCodes = [...commonCodes, 'NOT_NATION', 'NOT_RULER', 'BAD_TARGET'] as const;
-const respondCodes = [...commonCodes, 'OFFER_CLOSED'] as const;
+const respondCodes = [...commonCodes, 'OFFER_CLOSED', 'BATTLE_BUSY'] as const;
 export const PERSONNEL_INPUTS = Object.freeze({
   'personnel.appoint': Object.freeze({
     payloadSchema: appointPayload,
@@ -263,18 +264,21 @@ export function finishPersonnelStep(
   change: Readonly<{ state: OfficeView; closedOffers: readonly ClosedOffer[]; logs: readonly PersonnelLog[] }>,
   offices: DeepReadonly<OfficeRevisions>,
   tick: number,
+  ownedAfter?: OfficeState,
 ): PersonnelStepResult {
-  const synced = syncOffices(before, change.state, offices);
-  clearLostCityOffices(before, synced.state);
-  const cancelled = closeInvalidOffersInPlace(synced.state, tick);
-  const closedOffers = [...change.closedOffers, ...cancelled.closedOffers];
-  const remaining = new Set(Object.values(cancelled.state.assignmentOffers ?? {}).map((offer) => offer.id));
   // 국가 발령 뒤 개인 탈국이 실행되면 같은 턴에 새 제안이 생겼다가 취소될 수 있다.
+  // ownedAfter를 받으면 syncOffices가 change.state를 그대로 결과로 쓰고 아래 취소가 그 객체의 제안을 지우므로,
+  // 비교할 제안 id는 동기화 전에 떠 둔다.
   const pending = new Set(
     [...Object.values(before.assignmentOffers ?? {}), ...Object.values(change.state.assignmentOffers ?? {})].map(
       (offer) => offer.id,
     ),
   );
+  const synced = syncOffices(before, change.state, offices, ownedAfter);
+  clearLostCityOffices(before, synced.state);
+  const cancelled = closeInvalidOffersInPlace(synced.state, tick);
+  const closedOffers = [...change.closedOffers, ...cancelled.closedOffers];
+  const remaining = new Set(Object.values(cancelled.state.assignmentOffers ?? {}).map((offer) => offer.id));
   const removed = [...pending].filter((id) => !remaining.has(id)).sort();
   const closed = closedOffers.map((offer) => offer.id).sort();
   if (new Set(closed).size !== closed.length || JSON.stringify(removed) !== JSON.stringify(closed))
@@ -309,9 +313,8 @@ export function applyNationTurnsRecord(
     }
     const command =
       commandRegistry.get(turn.commandKey) ??
-      (view.ruleFeatures?.includes(NATION_STRATEGY_FEATURE)
-        ? nationStrategyCommands.find((definition) => definition.key === turn.commandKey)
-        : undefined) ??
+      cityUpgradeCommands.find((definition) => definition.key === turn.commandKey) ??
+      nationStrategyCommands.find((definition) => definition.key === turn.commandKey) ??
       (canExecuteResearchNationCommand(view, actor.officerLevel, turn.commandKey)
         ? nationResearchCommands.find((definition) => definition.key === turn.commandKey)
         : undefined);
@@ -320,6 +323,7 @@ export function applyNationTurnsRecord(
       command.target !== 'nation' ||
       !(
         canExecuteNationCommand(actor.officerLevel, turn.commandKey) ||
+        canExecuteCityUpgradeCommand(view, actor.officerLevel, turn.commandKey) ||
         canExecuteResearchNationCommand(view, actor.officerLevel, turn.commandKey)
       ) ||
       !command.args.safeParse(turn.args).success

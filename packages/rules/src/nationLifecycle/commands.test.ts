@@ -11,7 +11,6 @@ import { treatyClosures } from '../diplomacy/treaty';
 import { settleNationLifecycleMonthly } from './monthly';
 import { assertNationLifecycle, initialNationLifecycle, isWandering } from './state';
 
-const flags = ['nation-lifecycle-v1', 'personnel'];
 const noRng: Rng = {
   next() {
     throw new Error('국가 변천은 난수를 쓰지 않습니다.');
@@ -25,7 +24,6 @@ const noRng: Rng = {
 };
 function makeWorld() {
   const world = commandWorld();
-  world.ruleFeatures = [...flags];
   world.nationLifecycle = initialNationLifecycle();
   world.diplomacies = [];
   Object.assign(world.generals[1]!, { userId: 'ruler', experience: 101 });
@@ -89,7 +87,6 @@ describe('AC-P2-09 선양', () => {
 
   it('실제 재생 턴 후 두 직책12칸을 초기화하고 후계자의 개인30칸·revision은 보존한다', () => {
     const initial = commandInitial();
-    initial.ruleFeatures = [...flags];
     Object.assign(initial.generals[0]!, { userId: 'ruler', experience: 101 });
     Object.assign(initial.generals[2]!, { nationId: 1, officerLevel: 11, userId: 'successor' });
     initial.nations[0]!.isNpc = false;
@@ -126,7 +123,6 @@ describe('AC-P2-09 선양', () => {
 describe('AC-P2-08 방랑과 재정착', () => {
   it('자동 해산한 같은 월에 장기 ACTIVE·미만료 PROPOSED 조약도 닫는다', () => {
     const world = wandering();
-    world.ruleFeatures!.push('treaty');
     world.nationLifecycle!.nations['1'] = { sinceTick: 100 };
     world.treaties = [
       {
@@ -261,7 +257,7 @@ describe('수동·24개월 자동 해산과 통일', () => {
     expect(world).toEqual(before);
   });
 
-  it('새 기능에서만 방랑 국가를 통일 후보에서 빼고 기존 모든 도시 조건은 유지한다', () => {
+  it('방랑 국가를 통일 후보에서 빼고 모든 도시 조건은 유지한다', () => {
     const world = makeWorld();
     for (const city of Object.values(world.cities)) city.nationId = 1;
     world.nationLifecycle!.nations['2'] = { sinceTick: 0 };
@@ -269,8 +265,7 @@ describe('수동·24개월 자동 해산과 통일', () => {
     world.cities[3]!.nationId = null;
     expect(unifiedNation(world)).toBeNull();
     world.cities[3]!.nationId = 1;
-    delete world.ruleFeatures;
-    expect(unifiedNation(world)).toBeNull();
+    expect(unifiedNation(world)).toBe(1);
   });
 
   it('새 명령은 별도 선택이며 기존 내정 settle 명령은 그대로 남는다', () => {

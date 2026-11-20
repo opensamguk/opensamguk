@@ -1,3 +1,4 @@
+import { resolverForRuleFeatures } from '../ruleCommands';
 import { describe, expect, it } from 'vitest';
 import { rngFor } from '@opensamguk/shared';
 import { commandInitial, commandWorld, testUnits } from '../../test/commandFixture';
@@ -128,6 +129,7 @@ describe('T2-02 초반 보호', () => {
     ['uprising', 4, { name: '새나라', color: '#123456' }, 12, 'general'],
   ] as const)('%s는 마지막 보호 tick까지 사전 검사·실행에서 막힌다', (key, generalId, args, months, target) => {
     const world = commandWorld();
+    if (key === 'attack' || key === 'uprising') world.generals[generalId]!.crew = 10000;
     if (key === 'nation_declare') world.diplomacies = [];
     world.presetRules = rules();
     const before = JSON.stringify(world);
@@ -169,10 +171,23 @@ describe('T2-02 NPC 출병 후보 가중치', () => {
   });
   it('1.5배 출병이 훈련보다 앞서고 0.5배 선포는 포상과 동률이 된다', () => {
     const world = commandWorld();
-    world.generals[1]!.train = 59;
-    const regularChoice = chooseGeneralTurn(world, world.generals[1]!, rngFor('weights'), { unitSet: testUnits });
+    Object.assign(
+      world.campaign!.units.find((unit) => unit.ownerId === 1)!,
+      { train: 59, troops: 2000 },
+    );
+    Object.assign(world.generals[1]!, { leadership: 60, strength: 60 });
+    const resolver = resolverForRuleFeatures(world);
+    world.cityResources!.cities['1']!.rice = 100000;
+    world.cities[1]!.defence = world.cities[1]!.defenceMax;
+    const regularChoice = chooseGeneralTurn(world, world.generals[1]!, rngFor('weights'), {
+      unitSet: testUnits,
+      resolver,
+    });
     world.presetRules = presetRules(parsePreset(hardcore));
-    const hardcoreChoice = chooseGeneralTurn(world, world.generals[1]!, rngFor('weights'), { unitSet: testUnits });
+    const hardcoreChoice = chooseGeneralTurn(world, world.generals[1]!, rngFor('weights'), {
+      unitSet: testUnits,
+      resolver,
+    });
     expect(regularChoice.chosen?.key).toBe('train');
     expect(hardcoreChoice.chosen?.key).toBe('attack');
     world.presetRules.npc.aggression = 0.5;

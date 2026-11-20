@@ -1,21 +1,24 @@
+import { ciGreenDatabaseName } from './test-database';
 import { spawnSync } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { Writable } from 'node:stream';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import { buildServer } from '../apps/server/src/server';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { hashToken, newSession, SESSION_RENEW_MS, SESSION_SECONDS } from '../apps/server/src/auth/session';
 import { displaySlots } from '../apps/server/src/game/slots';
 import { readFixture } from '../apps/server/test/readFixture';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { pnpmCli } from './node-cli';
+import { initializeResources } from './init-resources';
 
 const sourceUrl = process.env.TEST_DATABASE_URL;
-if (!sourceUrl || !/^[a-z][a-z0-9_]*_test$/.test(new URL(sourceUrl).pathname.slice(1)))
+if (!sourceUrl || !/^[a-z][a-zA-Z0-9_]*_test$/.test(new URL(sourceUrl).pathname.slice(1)))
   throw new Error('전용 테스트 DB가 필요합니다.');
 // 장애 주입은 이 파일이 새로 만든 DB에만 적용한다. 원래 시험 DB의 테이블은 건드리지 않는다.
-const databaseName = `session_renewal_${randomUUID().replaceAll('-', '')}_test`;
+const databaseName = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
 const databaseUrl = new URL(sourceUrl);
 databaseUrl.pathname = `/${databaseName}`;
 const adminUrl = new URL(sourceUrl);
@@ -39,6 +42,7 @@ let user: { id: string; email: string };
 let worldId: string;
 let token: string;
 let sessionId: string;
+let baseRevision: number;
 let logText = '';
 const logStream = new Writable({
   write(chunk, _encoding, done) {
@@ -61,8 +65,10 @@ async function send(base: string, path = 'turns.set', body: unknown = mutation()
     body: await response.json(),
   };
 }
-const mutation = (revision = 0) => ({ 0: { worldId, revision, slots } });
-const success = (revision = 1) => [{ result: { data: { ok: true, revision, slots: displaySlots(slots) } } }];
+const mutation = (revision = baseRevision) => ({ 0: { worldId, revision, slots } });
+const success = (revision = baseRevision + 1) => [
+  { result: { data: { ok: true, revision, slots: displaySlots(slots) } } },
+];
 async function businessSnapshot() {
   return {
     general: await db.general.findUniqueOrThrow({ where: { worldId_userId: { worldId, userId: user.id } } }),
@@ -163,12 +169,18 @@ beforeAll(async () => {
     timeout: 60_000,
   });
   if (result.error || result.status !== 0) throw new Error('세션 갱신 시험 DB migration에 실패했습니다.');
+  await initializeResources(
+    db,
+    await readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8'),
+  );
   passwordHash = await hashPassword(randomUUID());
   console.log(
     'SESSION_RENEWAL_FAULT_SCOPE isolated file-owned PostgreSQL DB; real loopback HTTP; no mock/syscall fault',
   );
 }, 90_000);
 beforeEach(async () => {
+  vi.stubEnv('DATABASE_URL', databaseUrl.href);
+  vi.stubEnv('EMAIL_VERIFICATION_REQUIRED', undefined);
   logText = '';
   user = await db.user.create({
     data: { email: `${randomUUID()}@example.test`, passwordHash, emailVerifiedAt: new Date(now - 1) },
@@ -183,12 +195,15 @@ beforeEach(async () => {
   const state = await readFixture();
   state.generals[0]!.userId = user.id;
   ({ worldId } = await saveInitialWorld(db, state, { name: '세션 갱신 시험', turnTermMinutes: 60, endYear: null }));
+  baseRevision = (await db.general.findUniqueOrThrow({ where: { worldId_userId: { worldId, userId: user.id } } }))
+    .turnRevision;
   const session = newSession(now);
   token = session.token;
   sessionId = session.id;
   await db.session.create({ data: { id: sessionId, userId: user.id, expiresAt } });
 });
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await restoreFault();
   if (worldId) await db.world.deleteMany({ where: { id: worldId } });
   if (user) await db.user.deleteMany({ where: { id: user.id } });
@@ -216,7 +231,7 @@ describe('T3-04 세션 갱신 장애와 실제 HTTP·PostgreSQL 커밋', () => {
           expect(committed.events.at(-1)).toMatchObject({
             kind: 'turns.set',
             status: 'APPLIED',
-            result: { revision: 1 },
+            result: { revision: baseRevision + 1 },
           });
           expect(committed.turns.filter((turn) => turn.generalId === committed.general.id)).toEqual(
             slots.map((slot, index) => expect.objectContaining({ slot: index, ...slot })),
@@ -235,7 +250,9 @@ describe('T3-04 세션 갱신 장애와 실제 HTTP·PostgreSQL 커밋', () => {
           const retry = await send(base);
           expect(retry.status).toBe(200);
           expect(retry.body).toEqual([
-            { result: { data: { ok: false, reason: 'STALE', revision: 1, slots: displaySlots(slots) } } },
+            {
+              result: { data: { ok: false, reason: 'STALE', revision: baseRevision + 1, slots: displaySlots(slots) } },
+            },
           ]);
           expect(retry.cookie).toBeNull();
           expect(await businessSnapshot()).toEqual(committed);

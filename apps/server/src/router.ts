@@ -30,6 +30,8 @@ import { personnelRouter } from './routers/personnel';
 import { offersRouter } from './routers/offers';
 import { nationTurnsRouter } from './routers/nationTurns';
 import { nationCommandsRouter } from './routers/nationCommands';
+import { proposalsRouter } from './routers/proposals';
+import { battleRouter } from './routers/battle';
 import { campaignRouter } from './routers/campaign';
 import { cityResourcesRouter } from './routers/cityResources';
 import { logisticsRouter } from './routers/logistics';
@@ -73,6 +75,8 @@ export const appRouter = router({
   offers: offersRouter,
   nationTurns: nationTurnsRouter,
   nationCommands: nationCommandsRouter,
+  proposals: proposalsRouter,
+  battle: battleRouter,
   campaign: campaignRouter,
   cityResources: cityResourcesRouter,
   logistics: logisticsRouter,

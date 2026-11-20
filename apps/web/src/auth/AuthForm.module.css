@@ -76,6 +76,30 @@
   color: var(--color-accent-text);
   cursor: pointer;
 }
+/* 로그인과 가입 양식은 키트 입력칸과 단추(kit-input, kit-button)를 쓴다. 여기서는 크기만 정한다.
+   비밀번호 찾기 같은 다른 계정 화면은 위의 .input, .submit을 그대로 쓴다. */
+.kitInput {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  font-size: var(--text-lg);
+}
+.kitToggle {
+  flex: none;
+  min-width: 72px;
+  min-height: 48px;
+  font-size: var(--text-sm);
+}
+.kitSubmit {
+  align-self: flex-end;
+  min-width: 140px;
+  min-height: 48px;
+  font-size: var(--text-lg);
+}
+.kitSubmit:disabled {
+  cursor: progress;
+}
 .submit:disabled {
   border: 2px dashed var(--color-text-muted);
   box-shadow: none;

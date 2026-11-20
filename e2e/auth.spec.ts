@@ -130,7 +130,7 @@ test('다른 탭에서 로그아웃하면 이 탭의 다음 이동도 로그인�
 test('세션이 서버에서 없어지면 다음 이동은 로그인으로 간다', async ({ page }) => {
   await createAccount(page);
   // 초기 인사 조회가 인증된 채 끝나야 쿠키 삭제 뒤의 이동 가드만 검증한다.
-  // 인사 조회는 general.mine의 personnelEnabled가 true인 월드에서만 나가므로 그 응답부터 보고 필요할 때만 기다린다 (PR377).
+  // 인사 기능은 모든 월드에서 늘 켜져 있으므로 general.mine과 personnel.recent 응답을 모두 기다린다.
   const trpcGet = (procedure: string) => (response: { url(): string; request(): { method(): string } }) => {
     const url = new URL(response.url());
     return (
@@ -139,12 +139,14 @@ test('세션이 서버에서 없어지면 다음 이동은 로그인으로 간�
       url.pathname.slice('/trpc/'.length).split(',').includes(procedure)
     );
   };
-  const recentReady = page.waitForResponse(trpcGet('personnel.recent')).catch(() => null);
-  const [, mine] = await Promise.all([page.goto('/w/1'), page.waitForResponse(trpcGet('general.mine'))]);
-  const personnel = (await mine.text()).includes('"personnelEnabled":true');
-  for (const response of personnel ? [mine, await recentReady] : [mine]) {
-    expect(response?.ok()).toBe(true);
-    const finishedError = await response!.finished();
+  const [, mine, recent] = await Promise.all([
+    page.goto('/w/1'),
+    page.waitForResponse(trpcGet('general.mine')),
+    page.waitForResponse(trpcGet('personnel.recent')),
+  ]);
+  for (const response of [mine, recent]) {
+    expect(response.ok()).toBe(true);
+    const finishedError = await response.finished();
     if (finishedError) throw finishedError;
   }
   await expect(page.getByRole('heading', { level: 1, name: '군략도' })).toBeVisible();

@@ -8,18 +8,7 @@ export async function persistEquipmentState(
   before: WorldView,
   next: WorldView,
 ) {
-  if (!before.ruleFeatures?.includes('equipment-v1') && !next.ruleFeatures?.includes('equipment-v1')) {
-    if (before.equipment !== undefined || next.equipment !== undefined)
-      throw new Error('장비 기능을 끈 월드에 상태가 있습니다.');
-    return;
-  }
-  if (
-    !before.equipment ||
-    !next.equipment ||
-    !before.ruleFeatures?.includes('equipment-v1') ||
-    !next.ruleFeatures?.includes('equipment-v1')
-  )
-    throw new Error('진행 중 장비 기능을 바꿀 수 없습니다.');
+  if (!before.equipment || !next.equipment) throw new Error('진행 중 장비 기능을 바꿀 수 없습니다.');
   const original = readEquipmentState(before.equipment, before),
     final = readEquipmentState(next.equipment, next);
   if (JSON.stringify(original.config) !== JSON.stringify(final.config))

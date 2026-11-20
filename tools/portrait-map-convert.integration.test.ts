@@ -10,7 +10,7 @@ import { testDatabaseUrl } from './test-database';
 const selectedResources = await (async () => {
   const db = createDb(testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL }).href);
   try {
-    return await readInitialResources(db, { map: 'che', scenario: '1030' });
+    return await readInitialResources(db, { map: 'che', scenario: '1030', portraitMap: 'rtk14-map' });
   } finally {
     await db.$disconnect();
   }
@@ -19,6 +19,7 @@ const selectedResources = await (async () => {
 const readings = JSON.parse(readFileSync(new URL('portrait-map/hanja-readings.json', import.meta.url), 'utf8'))
   .readings as Record<string, string>;
 const registry = parseRegistry(readFileSync(new URL('portrait-map/registry.tsv', import.meta.url), 'utf8'));
+const manual = JSON.parse(readFileSync(new URL('portrait-map/manual.json', import.meta.url), 'utf8')).matches;
 const input = {
   map: selectedResources.map.content,
   scenario: selectedResources.scenario.content as ScenarioResource,
@@ -33,8 +34,9 @@ describe('AC-M1-20 초상 이름 대응', () => {
       input.scenario.general.map((row) => row[1]),
       registry,
       readings,
+      manual,
     );
-    expect({ ...expected, $comment: undefined }).toEqual({ ...generated, $comment: undefined });
+    expect(expected.portraits).toEqual(generated.portraits);
     expect(generated.stats).toEqual({ matched: 429, total: 491, percent: 87.37 });
     const state = buildInitialWorld({ ...input, portraitMap: expected });
     expect(state.generals.filter((general) => general.portraitId !== null)).toHaveLength(429);

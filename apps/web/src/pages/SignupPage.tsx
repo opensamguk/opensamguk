@@ -1,5 +1,6 @@
 import { getRouteApi, Link } from '@tanstack/react-router';
 import { AuthForm } from '../auth/AuthForm';
+import { AuthScreen } from '../auth/AuthScreen';
 import styles from '../auth/AuthPage.module.css';
 
 const route = getRouteApi('/signup');
@@ -8,9 +9,7 @@ const route = getRouteApi('/signup');
 export function SignupPage() {
   const { next } = route.useSearch();
   return (
-    <main className={styles.page}>
-      <span className={styles.plaque}>명부에 이름 올리기</span>
-      <h1>가입</h1>
+    <AuthScreen title="가입">
       <AuthForm mode="signup" next={next} />
       <p className={styles.switch}>
         이미 계정이 있으면{' '}
@@ -18,6 +17,6 @@ export function SignupPage() {
           로그인
         </Link>
       </p>
-    </main>
+    </AuthScreen>
   );
 }
