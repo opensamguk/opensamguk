@@ -36,18 +36,22 @@ const SLOT_MAX = 12;
 function ReceivedRow({
   item,
   nowTick,
+  ticksPerTurn,
   onApprove,
   onReject,
 }: {
   item: ProposalItem;
   nowTick: number;
+  ticksPerTurn: number;
   onApprove: (id: string, slot: number) => void;
   onReject: (id: string, reason: string) => void;
 }) {
   const [slot, setSlot] = useState(item.slot ?? 1);
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState('');
-  const left = Math.max(0, item.expiresTick - nowTick);
+  // 기한은 틱으로 온다. 한 턴(한 달)의 틱 수는 월드 요약에서 받고(gameDate.ts와 같은 식), 남은 일부 턴도 한 턴으로 센다.
+  // 턴 길이를 아직 모르면 남은 턴을 적지 않는다.
+  const left = ticksPerTurn > 0 ? Math.ceil(Math.max(0, item.expiresTick - nowTick) / ticksPerTurn) : null;
   return (
     <li className={styles.row} data-status={item.status}>
       <div className={styles.who}>
@@ -68,7 +72,13 @@ function ReceivedRow({
             사전 검사 경고: {item.precheck.message}
           </p>
         ) : null}
-        <p className={styles.meta}>{item.status === 'open' ? `${left}턴 뒤 만료` : STATUS_LABEL[item.status]}</p>
+        <p className={styles.meta}>
+          {item.status === 'open'
+            ? left === null
+              ? STATUS_LABEL.open
+              : `${left}턴 뒤 만료`
+            : STATUS_LABEL[item.status]}
+        </p>
       </div>
       {item.status === 'open' ? (
         <div className={styles.actions}>
@@ -93,8 +103,12 @@ function ReceivedRow({
                   type="number"
                   min={1}
                   max={SLOT_MAX}
+                  step={1}
                   value={slot}
-                  onChange={(event) => setSlot(Math.min(SLOT_MAX, Math.max(1, Number(event.target.value) || 1)))}
+                  // 칸은 1~12 정수다. 소수는 버리고 범위 밖은 끝 칸으로 맞춘다.
+                  onChange={(event) =>
+                    setSlot(Math.min(SLOT_MAX, Math.max(1, Math.trunc(Number(event.target.value)) || 1)))
+                  }
                 />
               </label>
               <button type="button" className={styles.primary} onClick={() => onApprove(item.id, slot)}>
@@ -141,6 +155,7 @@ export function ProposalList({
   box,
   items,
   nowTick,
+  ticksPerTurn,
   onApprove,
   onReject,
   onCancel,
@@ -148,6 +163,8 @@ export function ProposalList({
   box: 'received' | 'sent';
   items: readonly ProposalItem[];
   nowTick: number;
+  // 한 턴의 틱 수. 월드 요약의 turnTermMinutes와 msPerTick에서 나온다. 0이면 남은 턴을 적지 않는다.
+  ticksPerTurn: number;
   onApprove?: (id: string, slot: number) => void;
   onReject?: (id: string, reason: string) => void;
   onCancel?: (id: string) => void;
@@ -166,6 +183,7 @@ export function ProposalList({
                 key={item.id}
                 item={item}
                 nowTick={nowTick}
+                ticksPerTurn={ticksPerTurn}
                 onApprove={onApprove ?? (() => {})}
                 onReject={onReject ?? (() => {})}
               />

@@ -48,11 +48,15 @@ function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
 }
 
-// 인자 화면이 고를 수 있는 내 부곡(campaign.get의 units). 늘 켠 규칙에서 병력 정본은 부곡이다(결정 19).
+// 인자 화면이 고를 수 있는 부곡. 개인 칸은 내 부곡(campaign.get의 units), 국가 배속(국가 예턴과 상신)은 같은 국가
+// 부곡 전체(campaign.nationUnits)다. 늘 켠 규칙에서 병력 정본은 부곡이다(결정 19).
 export interface CampaignUnitChoice {
   id: number;
   troops: number;
   crewType: number;
+  // 국가 부곡만: 소유 장수 이름과 행군 보급 중인지. 행군 중이면 배속 검사가 귀환부터 하라고 거부한다.
+  ownerName?: string | undefined;
+  marching?: boolean | undefined;
 }
 
 // 부곡 칸의 선택지. 새 부곡('new')을 받는 명령(모병, 징병)이면 맨 앞에 둔다. 병종 이름은 월드 병종표에서 읽는다.
@@ -67,7 +71,10 @@ function campaignUnitOptions(
     ...(allowsNew ? [{ value: 'new', label: '새 부곡' }] : []),
     ...(ownUnits ?? []).map((unit) => ({
       value: String(unit.id),
-      label: `부곡 ${unit.id} · ${name(unit.crewType)} ${unit.troops.toLocaleString('ko-KR')}명`,
+      label:
+        `부곡 ${unit.id} · ${name(unit.crewType)} ${unit.troops.toLocaleString('ko-KR')}명` +
+        (unit.ownerName ? ` (${unit.ownerName})` : '') +
+        (unit.marching ? ', 행군 중' : ''),
     })),
   ];
 }

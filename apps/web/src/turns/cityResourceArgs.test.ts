@@ -104,3 +104,32 @@ it('모병의 도시 수비병 갈래는 unitId 없는 갈래이고, 부곡 갈�
   expect(cityPreparationNote('recruit', 'unit')).toContain('부곡');
   expect(cityPreparationNote('recruit', 'city')).toContain('도시 수비병');
 });
+
+it('국가 배속의 부곡 칸은 같은 국가의 다른 장수 부곡도 소유자와 행군 중인지와 함께 고른다', () => {
+  const allocate = {
+    type: 'object',
+    properties: {
+      cityKey: { type: 'integer', minimum: 1 },
+      crewType: { type: 'integer', minimum: 1 },
+      amount: { type: 'integer', minimum: 1 },
+      unitId: {
+        anyOf: [
+          { type: 'integer', minimum: 1, maximum: 2147483647 },
+          { type: 'string', const: 'new' },
+        ],
+      },
+      recipientId: { type: 'integer', minimum: 1 },
+    },
+    required: ['cityKey', 'crewType', 'amount', 'unitId'],
+  };
+  const fields = argFieldsOf(allocate, worldUnits(TEST_UNIT_SET).all, [
+    { id: 3, troops: 1200, crewType: 1100, ownerName: '관우' },
+    { id: 4, troops: 800, crewType: 1100, ownerName: '장비', marching: true },
+  ]);
+  const unitField = fields.find((field) => field.key === 'unitId');
+  expect(unitField?.kind === 'campaignUnit' ? unitField.options : []).toEqual([
+    { value: 'new', label: '새 부곡' },
+    { value: '3', label: '부곡 3 · 시험 보병 1,200명 (관우)' },
+    { value: '4', label: '부곡 4 · 시험 보병 800명 (장비), 행군 중' },
+  ]);
+});

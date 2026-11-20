@@ -122,7 +122,7 @@ beforeEach(() => {
   on('offers.mine', () => []);
   on('personnel.recent', () => []);
   on('proposals.list', () => []);
-  on('world.summary', () => ({ status: 'RUNNING', nowTick: 100 }));
+  on('world.summary', () => ({ status: 'RUNNING', nowTick: 100, msPerTick: 6, turnTermMinutes: 1 }));
   on('world.map', () => ({ cities: [{ key: 3, name: '북평' }], nations: [{ id: 2, name: '원소' }] }));
 });
 afterEach(cleanup);
@@ -211,6 +211,44 @@ describe('받은 제안함', () => {
     expect(within(sent).getByText('거절됨, 하후돈')).toBeTruthy();
     expect(within(sent).getByText('“아직 이르다”')).toBeTruthy();
     expect(screen.queryByText('받은 제안이 없습니다')).toBeNull();
+  });
+
+  it('D-100 보낸 명령 제안은 화면을 열어 둔 채 승인되면 다시 받아 승인 결과를 보인다', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      on('home.get', () => ({ nation: { id: 1 } }));
+      on('treaty.list', () => listPage([]));
+      let status = 'PENDING';
+      on('proposals.list', (input) =>
+        (input as { box: string }).box === 'received'
+          ? []
+          : [
+              {
+                id: 'p3',
+                proposer: { id: 1, name: '유비', portraitId: null, officerTitle: null },
+                commandKey: 'nation_capital',
+                commandName: '천도',
+                args: { cityKey: 3 },
+                slot: status === 'APPROVED' ? 4 : null,
+                note: null,
+                status,
+                createdTick: 100,
+                expiresTick: 120_100,
+                precheck: null,
+                response: status === 'APPROVED' ? { by: 2, at: 200, reason: null } : null,
+              },
+            ],
+      );
+      renderPage();
+      const sent = await screen.findByRole('region', { name: '보낸 명령 제안' });
+      expect(within(sent).getByRole('button', { name: '제안 거두기' })).toBeTruthy();
+      status = 'APPROVED';
+      await vi.advanceTimersByTimeAsync(31_000);
+      await waitFor(() => expect(within(sent).getByText('승인됨, 장수 2, 5번 칸')).toBeTruthy());
+      expect(within(sent).queryByRole('button', { name: '제안 거두기' })).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('조약을 볼 수 없는 월드는 오류 없이 빈 상태로 둔다', async () => {

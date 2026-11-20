@@ -6,6 +6,7 @@ import { controlClock } from '../apps/engine/src/world/clock';
 import { loadPreset } from '../apps/engine/src/world/resources';
 import { commandInitial } from '../packages/rules/test/commandFixture';
 import { hashState } from '../packages/shared/src/node/hashState';
+import { displayName } from '../apps/web/src/game/names';
 import { holdLease, releaseHold } from './game';
 import { argsScreen, bandCommand, findCommand, putFromArgsScreen, toLastStep } from './commandPicker';
 import { test, expect, apiQuery } from './t210-fixture';
@@ -283,6 +284,15 @@ test('D-100 일반 장수가 국가 명령을 제안하고 군주가 제안함�
     officerLevel: 1,
     nextTurnTick: 1_000_000,
   };
+  // 천도 대상: 수도 밖의 아군 도시 하나. 고정 월드의 군주 국가는 수도만 가질 수 있어 관문, 싸움터가 아닌 도시를 하나
+  // 넘긴다. 천도 검사(packages/rules/src/commands/nation.ts)를 통과하는 대상이다.
+  const nation = initial.nations.find((row) => row.id === lord.nationId)!;
+  // 다른 국가의 도시를 빼앗으면 그 국가의 수도와 소유 도시가 어긋나므로(nationLifecycle 검사) 주인 없는 도시를 쓴다.
+  expect(nation.capitalCityKey, '군주 국가는 수도가 있어야 한다').not.toBeNull();
+  const target = initial.cities.find(
+    (city) => city.nationId === null && city.kind !== 'PASS' && city.kind !== 'FIELD',
+  )!;
+  target.nationId = nation.id;
   const { worldId } = await saveFixtureWorld(world.hold.db, initial, {
     name: '명령 상신 인수',
     turnTermMinutes: 60,
@@ -305,7 +315,8 @@ test('D-100 일반 장수가 국가 명령을 제안하고 군주가 제안함�
     await box.locator('summary').click();
     const picker = box.getByRole('region', { name: '명령 고르기' });
     await findCommand(picker, '천도');
-    const capitalName = initial.cities.find((city) => city.cityKey === initial.nations[0]!.capitalCityKey)!.name;
+    // 지금 수도가 아닌 아군 도시로 옮기자고 한다. 사전 검사를 통과하는 실제 천도이고, 저장된 인자까지 본다.
+    const capitalName = target.name;
     await page
       .getByRole('radiogroup', { name: '대상 도시' })
       .getByRole('radio', { name: new RegExp(`^${capitalName}`) })
@@ -329,11 +340,13 @@ test('D-100 일반 장수가 국가 명령을 제안하고 군주가 제안함�
     const tabs = await apiQuery<Outputs['nationTurns']['get']>(ruler, 'nationTurns.get', { worldId });
     const own = tabs.tabs.find((tab) => tab.holder?.generalId === initial.generals[0]!.id);
     expect(own?.slots[4]?.commandKey).toBe('nation_capital');
+    expect(own?.slots[4]?.args).toEqual({ cityKey: target.cityKey });
 
     // 제안한 장수: 보낸 명령 제안에 승인한 군주와 칸이 보인다.
     await page.goto(`/w/${worldId}/inbox`);
     const sent = page.getByRole('region', { name: '보낸 명령 제안' });
-    await expect(sent).toContainText(`승인됨, `, { timeout: 15_000 });
+    // 답한 장수는 이름으로 보인다(proposals.list의 byName). 괄호 꼬리는 빼고 보인다.
+    await expect(sent).toContainText(`승인됨, ${displayName(lord.name)}`, { timeout: 15_000 });
     await expect(sent).toContainText('5번 칸');
   } finally {
     await releaseHold(hold);

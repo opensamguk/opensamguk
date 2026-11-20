@@ -20,7 +20,7 @@ import { useTRPC } from '../trpc';
 import { DisabledReason } from '../ui/DisabledReason';
 import { EmptyState, ErrorState, LoadingState } from '../ui/States';
 import { errorCode, retryUnlessClientError, serverMessage } from './apiError';
-import { describeArgs, withTargets, type ArgNames, type SlotTargets } from './args';
+import { describeArgs, withTargets, type ArgNames, type CampaignUnitChoice, type SlotTargets } from './args';
 import { useWorldRules, useWorldUnits } from '../game/queries';
 import { isDetailedCity, isDetailedGeneral, isMemberNation } from '../game/types';
 import type { ArgContext, ArgNeed, RecruitChoices } from './CommandArgsScreen';
@@ -311,10 +311,13 @@ function Editor<S extends DisplaySlot>({
     staleTime: 15_000,
     retry: false,
   });
-  const campaignUnits = useMemo(
+  // 국가 예턴의 배속은 같은 국가의 다른 장수 부곡도 고른다(campaign.nationUnits). 개인 칸은 내 부곡만 쓴다.
+  const nationUnits = useNationUnits(worldId, source.walletKind === 'nation' && myNationId !== null);
+  const ownUnits = useMemo(
     () => campaign.data?.units.map((unit) => ({ id: unit.id, troops: unit.troops, crewType: unit.crewType })),
     [campaign.data],
   );
+  const campaignUnits = source.walletKind === 'nation' ? nationUnits : ownUnits;
   const gameDate = summary.data?.gameDate;
 
   const recruits = useMemo((): RecruitChoices => {
@@ -855,7 +858,7 @@ function Editor<S extends DisplaySlot>({
       {source.timed && !ended && readOnly === null && myNationId !== null ? (
         <NationProposal
           worldId={worldId}
-          render={(commands, propose) => (
+          render={(commands, propose, proposalUnits) => (
             <CommandPicker
               commands={commands}
               cities={cities}
@@ -869,7 +872,7 @@ function Editor<S extends DisplaySlot>({
               targetLabel="국가 예턴"
               onPut={() => {}}
               cityChoicesFor={cityChoicesFor}
-              argContext={argContext}
+              argContext={{ ...argContext, campaignUnits: proposalUnits }}
               onNeed={onNeed}
               propose={propose}
             />
@@ -1105,12 +1108,15 @@ export function NationProposal({
   render: (
     commands: CommandInfo[],
     propose: { to: string; onPropose: (turn: Turn, note: string) => void },
+    // 국가 배속 상신의 대상 부곡. 펼쳤을 때만 받는다.
+    units: readonly CampaignUnitChoice[] | undefined,
   ) => ReactNode;
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [sent, setSent] = useState<string | null>(null);
+  const units = useNationUnits(worldId, open);
   const commands = useQuery({ ...trpc.proposals.commands.queryOptions({ worldId }), retry: false, staleTime: 60_000 });
   const create = useMutation({
     ...trpc.proposals.create.mutationOptions(),
@@ -1133,16 +1139,20 @@ export function NationProposal({
         들어갑니다.
       </p>
       {open
-        ? render(list, {
-            to: '군주와 수뇌',
-            onPropose: (turn, note) => {
-              setSent(null);
-              create.mutate(
-                { worldId, commandKey: turn.commandKey, args: turn.args, ...(note ? { note } : {}) },
-                { onSuccess: () => setSent(commands.data?.find((c) => c.key === turn.commandKey)?.name ?? '명령') },
-              );
+        ? render(
+            list,
+            {
+              to: '군주와 수뇌',
+              onPropose: (turn, note) => {
+                setSent(null);
+                create.mutate(
+                  { worldId, commandKey: turn.commandKey, args: turn.args, ...(note ? { note } : {}) },
+                  { onSuccess: () => setSent(commands.data?.find((c) => c.key === turn.commandKey)?.name ?? '명령') },
+                );
+              },
             },
-          })
+            units,
+          )
         : null}
       {create.isPending ? <p role="status">제안을 보내는 중입니다.</p> : null}
       {sent && !create.isPending ? (
@@ -1152,5 +1162,27 @@ export function NationProposal({
         <p role="alert">{serverMessage(create.error) ?? '제안을 보내지 못했습니다. 다시 시도하세요.'}</p>
       ) : null}
     </details>
+  );
+}
+
+// 같은 국가 부곡(campaign.nationUnits). 국가 배속 명령의 부곡 칸 선택지다. 소유 장수와 행군 중인지를 함께 보인다.
+function useNationUnits(worldId: string, enabled: boolean): CampaignUnitChoice[] | undefined {
+  const trpc = useTRPC();
+  const query = useQuery({
+    ...trpc.campaign.nationUnits.queryOptions({ worldId }),
+    enabled,
+    staleTime: 15_000,
+    retry: false,
+  });
+  return useMemo(
+    () =>
+      query.data?.map((unit) => ({
+        id: unit.id,
+        troops: unit.troops,
+        crewType: unit.crewType,
+        ownerName: unit.ownerName,
+        marching: unit.supply,
+      })),
+    [query.data],
   );
 }

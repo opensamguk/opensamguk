@@ -28,7 +28,13 @@ export function ProposalBox({
       { retry: false, refetchInterval: ended ? false : 30_000 },
     ),
   );
-  const sent = useQuery(trpc.proposals.list.queryOptions({ worldId, box: 'sent' }, { retry: false }));
+  // 보낸 제안도 화면을 연 채 승인, 거절, 만료로 바뀌므로 받은 목록과 같은 주기로 다시 받는다.
+  const sent = useQuery(
+    trpc.proposals.list.queryOptions(
+      { worldId, box: 'sent' },
+      { retry: false, refetchInterval: ended ? false : 30_000 },
+    ),
+  );
   // 승인은 승인자의 국가 예턴 칸을 고치므로 국가 예턴 조회도 다시 받는다.
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: trpc.proposals.pathKey() });
@@ -50,6 +56,11 @@ export function ProposalBox({
   const receivedItems = rows(received.data).map((row) => toProposalItem(row, names, generalName));
   const sentItems = rows(sent.data).map((row) => toProposalItem(row, names, generalName));
   const nowTick = summary.data?.nowTick ?? 0;
+  // 한 턴의 틱 수. gameDate.ts의 tickDate와 같은 식이다.
+  const ticksPerTurn =
+    summary.data && summary.data.msPerTick > 0
+      ? Math.round((summary.data.turnTermMinutes * 60_000) / summary.data.msPerTick)
+      : 0;
   const failure = respond.error ?? cancel.error;
 
   if (receivedItems.length === 0 && sentItems.length === 0 && !received.isError && !sent.isError) return null;
@@ -61,6 +72,7 @@ export function ProposalBox({
           box="received"
           items={receivedItems}
           nowTick={nowTick}
+          ticksPerTurn={ticksPerTurn}
           onApprove={(proposalId, slot) =>
             respond.mutate({ proposalId, decision: 'approve', slot: toServerSlot(slot) })
           }
@@ -75,6 +87,7 @@ export function ProposalBox({
           box="sent"
           items={sentItems}
           nowTick={nowTick}
+          ticksPerTurn={ticksPerTurn}
           onCancel={(proposalId) => cancel.mutate({ proposalId })}
         />
       ) : null}

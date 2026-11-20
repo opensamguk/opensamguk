@@ -1,5 +1,6 @@
 // 명령 제안(상신) 서버 응답을 목록 부품 형식으로 바꾼다 (D-100).
 // 서버 칸 번호는 국가 예턴 0~11이고 화면은 1~12로 보인다. 상태는 서버 열거를 화면 상태로 옮긴다.
+import { displayName } from '../game/names';
 import { describeArgs, type ArgNames } from '../turns/args';
 import type { ProposalItem, ProposalStatus } from './ProposalList';
 
@@ -18,7 +19,8 @@ export interface ServerProposal {
   createdTick: number;
   expiresTick: number;
   precheck: { ok: boolean; message: string | null } | null;
-  response: { by: number; at: number | null; reason: string | null } | null;
+  // byName은 답한 장수 이름이다. 그 장수가 사라졌으면 null이다.
+  response: { by: number; byName?: string | null; at: number | null; reason: string | null } | null;
 }
 
 const STATUS: Record<string, ProposalStatus | undefined> = {
@@ -32,7 +34,7 @@ const STATUS: Record<string, ProposalStatus | undefined> = {
 // 화면 칸 번호(1~12)와 서버 칸 번호(0~11).
 export const toServerSlot = (slot: number) => slot - 1;
 
-// 답한 장수는 서버가 번호(responseBy)로 준다. 이름을 모르면 번호로 적는다.
+// 답한 장수 이름은 서버의 byName을 먼저 쓰고, 없으면 화면이 아는 장수 목록에서 찾고, 그래도 없으면 번호로 적는다.
 export function toProposalItem(
   row: ServerProposal,
   names: ArgNames,
@@ -41,7 +43,8 @@ export function toProposalItem(
   const args = row.args !== null && typeof row.args === 'object' ? (row.args as Record<string, unknown>) : {};
   return {
     id: row.id,
-    proposer: row.proposer,
+    // 장수 이름은 괄호 꼬리 없이 보인다(조조(曹操)는 조조).
+    proposer: { ...row.proposer, name: displayName(row.proposer.name) },
     commandKey: row.commandKey,
     commandName: row.commandName,
     argsSummary: describeArgs(args, names),
@@ -54,7 +57,7 @@ export function toProposalItem(
     precheck: row.precheck ? { ok: row.precheck.ok, message: row.precheck.message ?? '' } : null,
     response: row.response
       ? {
-          by: generalName(row.response.by) ?? `장수 ${row.response.by}`,
+          by: displayName(row.response.byName ?? generalName(row.response.by) ?? `장수 ${row.response.by}`),
           at: row.response.at ?? 0,
           reason: row.response.reason,
         }
