@@ -17,6 +17,7 @@ const db = createDb(testDatabaseUrl(process.env).href);
 const origin = 'http://127.0.0.1:5173';
 const app = await buildServer({ db, publicOrigin: origin, logging: false });
 const paths = [
+  'campaign.nationUnits',
   'commands.moveTargets',
   'commands.attackTargets',
   'proposals.history',
@@ -53,7 +54,10 @@ beforeAll(async () => {
 });
 afterEach(async () => {
   await db.user.updateMany({ where: { id: { in: users.map((u) => u.id) } }, data: { status: 'ACTIVE' } });
-  if (worldId) await db.world.delete({ where: { id: worldId } });
+  if (worldId) {
+    await db.sanction.deleteMany({ where: { worldId } });
+    await db.world.delete({ where: { id: worldId } });
+  }
   worldId = undefined;
 });
 afterAll(async () => {
@@ -100,6 +104,14 @@ async function fixture(path: Path) {
   initial.generals[2]!.cityKey = 1;
   initial.generals[3]!.nationId = 2;
   initial.generals[3]!.cityKey = 2;
+  if (path === 'campaign.nationUnits') {
+    initial.generals[1]!.nationId = 1;
+    initial.generals[1]!.cityKey = 4;
+    initial.generals[2]!.nationId = 2;
+    initial.generals[2]!.cityKey = 2;
+    initial.generals[3]!.nationId = null;
+    initial.generals[3]!.cityKey = 3;
+  }
   ({ worldId } = await saveInitialWorld(db, initial, { name: 'INT-27 HTTP 권한', turnTermMinutes: 60, endYear: null }));
   await db.world.update({ where: { id: worldId }, data: { status: 'RUNNING' } });
   for (const [id, user] of [
@@ -108,6 +120,35 @@ async function fixture(path: Path) {
     [4, 2],
   ] as const)
     await db.general.update({ where: { worldId_id: { worldId, id } }, data: { userId: users[user]!.id } });
+
+  if (path === 'campaign.nationUnits') {
+    const stored = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+    await db.world.update({
+      where: { id: worldId },
+      data: {
+        fogOfWar: true,
+        campaignState: json({
+          ...(stored.campaignState as Prisma.JsonObject),
+          nextUnitId: 4,
+          links: [{ masterId: 1, personId: 2, relation: 'LIEUTENANT' }],
+          units: [
+            { id: 1, ownerId: 2, commanderId: 2, crewType: 1100, troops: 100, train: 60, atmos: 70 },
+            {
+              id: 2,
+              ownerId: 1,
+              commanderId: 2,
+              crewType: 1100,
+              troops: 200,
+              train: 50,
+              atmos: 80,
+              supply: { feature: 'march-supply-v1', unit: 'SP', loaded: 30, remaining: 20, originCityKey: 1 },
+            },
+            { id: 3, ownerId: 3, commanderId: 3, crewType: 1100, troops: 300, train: 40, atmos: 90 },
+          ],
+        }),
+      },
+    });
+  }
 
   if (path.startsWith('battle.')) {
     const { world, battle } = tacticalFixture();
@@ -218,7 +259,12 @@ for (const path of paths)
           await db.user.update({ where: { id: users[actor!]!.id }, data: { status: 'SANCTIONED' } });
         if (category === 'invalidInput') input = {};
         if (category === 'otherUser')
-          actor = path.startsWith('commands.') || ['proposals.commands', 'proposals.create'].includes(path) ? 3 : 2;
+          actor =
+            path === 'campaign.nationUnits' ||
+            path.startsWith('commands.') ||
+            ['proposals.commands', 'proposals.create'].includes(path)
+              ? 3
+              : 2;
         const result = await rpc(path, input, actor);
         if (category === 'success') {
           expect(result.status).toBe(200);
@@ -268,3 +314,68 @@ for (const path of paths)
       }),
     );
   }
+
+it('AC-INT-18B·28 국가 부곡: 일반 장수·군주·수뇌의 자국 조회와 타국·재야·월드 제재 차단', async () => {
+  await fixture('campaign.nationUnits');
+  const expected = [
+    {
+      id: 1,
+      ownerId: 2,
+      commanderId: 2,
+      crewType: 1100,
+      troops: 100,
+      train: 60,
+      atmos: 70,
+      ownerName: '장수2',
+      commanderName: '장수2',
+      ownerCityKey: 4,
+      commanderCityKey: 4,
+      supply: false,
+    },
+    {
+      id: 2,
+      ownerId: 1,
+      commanderId: 2,
+      crewType: 1100,
+      troops: 200,
+      train: 50,
+      atmos: 80,
+      ownerName: '장수1',
+      commanderName: '장수2',
+      ownerCityKey: 1,
+      commanderCityKey: 4,
+      supply: true,
+    },
+  ];
+  for (const officerLevel of [1, 5, 12]) {
+    await db.general.update({ where: { worldId_id: { worldId: worldId!, id: 1 } }, data: { officerLevel } });
+    expect(await rpc('campaign.nationUnits', { worldId }, 1)).toMatchObject({ status: 200, data: expected });
+  }
+  // 타국 장수도 자기 국가만 읽으며 국가/행위자 위조 입력은 거절한다.
+  const foreign = await rpc('campaign.nationUnits', { worldId }, 0);
+  expect(foreign.status).toBe(200);
+  expect(foreign.data).toEqual([expect.objectContaining({ id: 3, ownerId: 3 })]);
+  expect(await rpc('campaign.nationUnits', { worldId, nationId: 1 }, 0)).toMatchObject({ status: 400 });
+  expect(await rpc('campaign.nationUnits', { worldId }, 2)).toMatchObject({ status: 403, code: 'FORBIDDEN' });
+  await db.sanction.create({
+    data: { userId: users[1]!.id, worldId: worldId!, reason: 'units10', createdBy: users[1]!.id },
+  });
+  expect(await rpc('campaign.nationUnits', { worldId }, 1)).toMatchObject({ status: 403, code: 'FORBIDDEN' });
+});
+
+it('AC-M1-14 상신 응답 장수 이름과 사라진 장수의 null을 실제 HTTP로 읽는다', async () => {
+  const f = await fixture('proposals.list');
+  const listed = await rpc('proposals.list', f.input, 0);
+  const proposalId = (listed.data as { id: string }[])[0]!.id;
+  expect((listed.data as { response: unknown }[])[0]!.response).toBeNull();
+  expect(await rpc('proposals.respond', { proposalId, decision: 'reject', reason: '보류' }, 1)).toMatchObject({
+    status: 200,
+  });
+  expect((await rpc('proposals.list', f.input, 0)).data).toMatchObject([
+    { response: { by: 1, byName: '장수1', at: 0, reason: '보류' } },
+  ]);
+  await db.commandProposal.update({ where: { id: proposalId }, data: { responseBy: 999 } });
+  expect((await rpc('proposals.list', f.input, 0)).data).toMatchObject([
+    { response: { by: 999, byName: null, at: 0, reason: '보류' } },
+  ]);
+});

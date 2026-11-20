@@ -221,6 +221,21 @@ describe('AC-M1-14 상신 서버', () => {
     await respondProposal(f.db, 'proposer', { proposalId, decision: 'cancel' });
     expect(f.rows[0]!.status).toBe('CANCELLED');
   });
+  it('응답은 장수 이름을 포함하고 사라진 응답자는 null로 표시한다', async () => {
+    const f = fixture();
+    const { proposalId } = await f.create();
+    expect((await listProposals(f.db, 'proposer', { worldId: 'world', box: 'sent' }))[0]!.response).toBeNull();
+    await respondProposal(f.db, 'ruler', { proposalId, decision: 'reject' });
+    expect((await listProposals(f.db, 'proposer', { worldId: 'world', box: 'sent' }))[0]!.response).toMatchObject({
+      by: 2,
+      byName: '군주',
+    });
+    f.rows[0]!.responseBy = 999;
+    expect((await listProposals(f.db, 'proposer', { worldId: 'world', box: 'sent' }))[0]!.response).toMatchObject({
+      by: 999,
+      byName: null,
+    });
+  });
   it('만료·직위 변경·이탈 뒤 승인과 칸 없는 승인을 거부한다', async () => {
     const f = fixture();
     const { proposalId } = await f.create();

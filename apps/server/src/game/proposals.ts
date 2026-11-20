@@ -197,6 +197,13 @@ export async function listProposals(
             row.args,
           )
         : undefined;
+    const responder =
+      row.responseBy === null
+        ? null
+        : await tx.general.findUnique({
+            where: { worldId_id: { worldId: world.id, id: row.responseBy } },
+            select: { name: true },
+          });
     result.push({
       id: row.id,
       proposer: {
@@ -215,7 +222,10 @@ export async function listProposals(
       createdTick: row.createdTick,
       expiresTick: row.expiresTick,
       precheck: view && status === 'PENDING' ? { ok: !failure, message: failure?.message ?? null } : null,
-      response: row.responseBy === null ? null : { by: row.responseBy, at: row.responseTick, reason: row.reason },
+      response:
+        row.responseBy === null
+          ? null
+          : { by: row.responseBy, byName: responder?.name ?? null, at: row.responseTick, reason: row.reason },
     });
   }
   return result;

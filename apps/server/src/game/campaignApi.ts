@@ -24,6 +24,8 @@ import { requirePersonnelSession } from './personnelAdmission';
 import { readView, requireGeneral, requireWorld } from './queries';
 import { requireCampaignOrderAccess } from './campaignOrders';
 import { recruitmentAvailability } from './recruitment';
+import { withPersonnel } from './personnelApi';
+import { activeSanctionWhere } from '../auth/sanction';
 
 type ActorContext = Pick<
   Context,
@@ -195,6 +197,43 @@ export async function submitCampaignRequest(
       ON CONFLICT ("worldId","generalId") WHERE status='PENDING' AND kind='general.active' DO NOTHING`;
   });
   return readCampaignRequest(ctx, input.worldId, input.requestId);
+}
+
+export async function readNationUnits(ctx: ActorContext, worldId: string) {
+  return withPersonnel(ctx, worldId, async (tx) => {
+    if (
+      await tx.sanction.findFirst({
+        where: { userId: ctx.user.id, worldId, ...activeSanctionWhere(ctx.now) },
+        select: { id: true },
+      })
+    )
+      throw new TRPCError({ code: 'FORBIDDEN', message: '이 월드의 이용이 제한됐습니다.' });
+    const actor = await requireGeneral(tx, worldId, ctx.user.id);
+    if (actor.nationId === null || actor.removedAt !== null)
+      throw new TRPCError({ code: 'FORBIDDEN', message: '국가에 소속된 장수만 이용할 수 있습니다.' });
+    const view = await readView(tx, worldId);
+    return view.campaign!.units.flatMap((unit) => {
+      const owner = view.generals[unit.ownerId]!,
+        commander = view.generals[unit.commanderId]!;
+      if (owner.nationId !== actor.nationId || commander.nationId !== actor.nationId) return [];
+      return [
+        {
+          id: unit.id,
+          crewType: unit.crewType,
+          troops: unit.troops,
+          train: unit.train,
+          atmos: unit.atmos,
+          ownerId: owner.id,
+          ownerName: owner.name,
+          ownerCityKey: owner.cityKey,
+          commanderId: commander.id,
+          commanderName: commander.name,
+          commanderCityKey: commander.cityKey,
+          supply: unit.supply !== undefined,
+        },
+      ];
+    });
+  });
 }
 
 export async function readCampaignBoard(ctx: ActorContext, worldId: string) {
