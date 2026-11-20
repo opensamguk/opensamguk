@@ -5,8 +5,10 @@ import { canExecuteCityNationCommand } from '../cityResources/commands';
 import { canExecuteResearchNationCommand } from '../nationResearch/commands';
 import type { ReplayState, RecordedInput } from '../replay';
 import type { WorldView } from '../model/world';
+import { TICKS_PER_MONTH } from '../clock/constants';
 
-export const PROPOSAL_EXPIRY_TICKS = 12;
+export const PROPOSAL_EXPIRY_TURNS = 12;
+export const PROPOSAL_EXPIRY_TICKS = PROPOSAL_EXPIRY_TURNS * TICKS_PER_MONTH;
 export const PROPOSAL_OPEN_LIMIT = 3;
 export const PROPOSAL_DEDICATION = 10;
 export function invalidatedProposalProposers(before: WorldView, next: WorldView) {

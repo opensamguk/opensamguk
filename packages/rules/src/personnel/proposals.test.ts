@@ -7,6 +7,7 @@ import {
   invalidatedProposalProposers,
   proposalExpired,
   PROPOSAL_DEDICATION,
+  PROPOSAL_EXPIRY_TICKS,
 } from './proposals';
 import { personnelWorld } from './testFixture';
 import type { RecordedInput, ReplayState } from '../replay';
@@ -23,10 +24,11 @@ describe('AC-M1-14 국가 명령 상신 규칙', () => {
     expect(canApproveProposal({}, 5, 'nation_research_greatsword')).toBe(true);
   });
   it('12턴 경계·이탈·직위 변경·제거로 종료한다', () => {
-    const proposal = { nationId: 1, proposerLevel: 1, expiresTick: 112 };
+    const proposal = { nationId: 1, proposerLevel: 1, expiresTick: 100 + PROPOSAL_EXPIRY_TICKS };
     const actor = { nationId: 1, officerLevel: 1, removedAt: null };
-    expect(proposalExpired(proposal, actor, 111)).toBe(false);
-    expect(proposalExpired(proposal, actor, 112)).toBe(true);
+    expect(proposalExpired(proposal, actor, 5_100)).toBe(false);
+    expect(proposalExpired(proposal, actor, 120_099)).toBe(false);
+    expect(proposalExpired(proposal, actor, 120_100)).toBe(true);
     expect(proposalExpired(proposal, { ...actor, nationId: 2 }, 100)).toBe(true);
     expect(proposalExpired(proposal, { ...actor, officerLevel: 5 }, 100)).toBe(true);
     expect(proposalExpired(proposal, { ...actor, removedAt: 'removed' }, 100)).toBe(true);

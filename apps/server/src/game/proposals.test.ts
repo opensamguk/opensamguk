@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Prisma } from '@opensamguk/db';
+import { TICKS_PER_MONTH } from '@opensamguk/rules';
 import { readFileSync } from 'node:fs';
 import {
   createProposal,
@@ -105,6 +106,20 @@ function fixture() {
   return { world, proposer, ruler, foreign, tx, db, rows, input, create };
 }
 describe('AC-M1-14 상신 서버', () => {
+  it.each([
+    [5_000, 'PENDING'],
+    [119_999, 'PENDING'],
+    [120_000, 'EXPIRED'],
+    [120_001, 'EXPIRED'],
+  ])('생성 후 %i틱에서 받은 제안 상태는 %s다 (12턴 만료)', async (elapsed, status) => {
+    const f = fixture();
+    const createdTick = f.world.clockTick;
+    const { proposalId } = await f.create();
+    f.world.clockTick = createdTick + elapsed;
+    expect(await listProposals(f.db, 'ruler', { worldId: 'world', box: 'received' })).toEqual([
+      expect.objectContaining({ id: proposalId, status, createdTick, expiresTick: createdTick + 120_000 }),
+    ]);
+  });
   it('국가 상신 기록은 세션 장수의 국가로 한정해 조회한다', async () => {
     const f = fixture();
     await readProposalHistory(f.db, 'world', 'proposer');
@@ -132,7 +147,7 @@ describe('AC-M1-14 상신 서버', () => {
     expect(await listProposals(f.db, 'proposer', { worldId: 'world', box: 'received' })).toEqual([]);
     expect(await listProposals(f.db, 'foreign', { worldId: 'world', box: 'received' })).toEqual([]);
     expect(await listProposals(f.db, 'proposer', { worldId: 'world', box: 'sent' })).toHaveLength(1);
-    f.world.clockTick = 112;
+    f.world.clockTick = 100 + 12 * TICKS_PER_MONTH;
     expect(await listProposals(f.db, 'ruler', { worldId: 'world', box: 'received', status: 'PENDING' })).toEqual([]);
     expect(await listProposals(f.db, 'proposer', { worldId: 'world', box: 'sent' })).toEqual([
       expect.objectContaining({ status: 'EXPIRED' }),
@@ -155,13 +170,14 @@ describe('AC-M1-14 상신 서버', () => {
     await f.create({ args: { ...f.input.args, amount: 11 } });
     await f.create({ args: { ...f.input.args, amount: 12 } });
     await expect(f.create({ args: { ...f.input.args, amount: 13 } })).rejects.toThrow('3건');
-    f.world.clockTick = 112;
+    f.world.clockTick = 100 + 12 * TICKS_PER_MONTH;
     await expect(f.create()).resolves.toHaveProperty('proposalId');
     expect(f.rows.slice(0, 3).every((row) => row.status === 'EXPIRED')).toBe(true);
   });
   it('승인은 기존 저장 경로로 선택한 직책 칸을 채우고 한 번만 기록한다', async () => {
     const f = fixture();
     const { proposalId } = await f.create({ slot: 4 });
+    f.world.clockTick += 5_000;
     await expect(respondProposal(f.db, 'ruler', { proposalId, decision: 'approve', slot: 2 })).resolves.toMatchObject({
       status: 'APPROVED',
     });
@@ -209,7 +225,7 @@ describe('AC-M1-14 상신 서버', () => {
     const f = fixture();
     const { proposalId } = await f.create();
     await expect(respondProposal(f.db, 'ruler', { proposalId, decision: 'approve' })).rejects.toThrow('칸');
-    f.world.clockTick = 112;
+    f.world.clockTick = 100 + 12 * TICKS_PER_MONTH;
     await expect(respondProposal(f.db, 'ruler', { proposalId, decision: 'approve', slot: 0 })).rejects.toThrow(
       '종료된',
     );
