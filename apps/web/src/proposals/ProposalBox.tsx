@@ -54,8 +54,11 @@ export function ProposalBox({
   );
   // args는 재귀 JSON 타입이라 그대로 비교하면 타입 검사가 너무 깊어진다. 필요한 칸만 적은 ServerProposal로 읽는다.
   const rows = (data: unknown) => (data ?? []) as ServerProposal[];
-  const receivedItems = rows(received.data).map((row) => toProposalItem(row, names, generalName));
-  const sentItems = rows(sent.data).map((row) => toProposalItem(row, names, generalName));
+  // 끝난 월드의 대기 제안은 서버가 만료로 센다. 종료와 겹쳐 늦게 온 PENDING 응답도 만료로 보이고 답하기, 거두기를 열지 않는다.
+  const closeIfEnded = (item: ReturnType<typeof toProposalItem>) =>
+    ended && item.status === 'open' ? { ...item, status: 'expired' as const } : item;
+  const receivedItems = rows(received.data).map((row) => closeIfEnded(toProposalItem(row, names, generalName)));
+  const sentItems = rows(sent.data).map((row) => closeIfEnded(toProposalItem(row, names, generalName)));
   const nowTick = summary.data?.nowTick ?? 0;
   // 한 턴의 틱 수. gameDate.ts의 tickDate와 같은 식이다.
   const ticksPerTurn =

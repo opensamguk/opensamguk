@@ -294,6 +294,33 @@ describe('받은 제안함', () => {
     expect(within(sent).queryByRole('button', { name: '제안 거두기' })).toBeNull();
   });
 
+  it('D-100 끝난 월드에서 늦게 온 대기 제안은 만료로 보이고 답하기와 거두기를 열지 않는다', async () => {
+    on('home.get', () => ({ nation: { id: 1 } }));
+    on('treaty.list', () => listPage([]));
+    on('world.summary', () => ({ status: 'ENDED', nowTick: 100, msPerTick: 6, turnTermMinutes: 1 }));
+    const pending = {
+      id: 'p5',
+      proposer: { id: 1, name: '유비', portraitId: null, officerTitle: null },
+      commandKey: 'nation_capital',
+      commandName: '천도',
+      args: { cityKey: 3 },
+      slot: null,
+      note: null,
+      status: 'PENDING',
+      createdTick: 100,
+      expiresTick: 120_100,
+      precheck: null,
+      response: null,
+    };
+    on('proposals.list', () => [pending]);
+    renderPage();
+    const sent = await screen.findByRole('region', { name: '보낸 명령 제안' });
+    await waitFor(() => expect(within(sent).getByText('만료')).toBeTruthy());
+    expect(within(sent).queryByRole('button', { name: '제안 거두기' })).toBeNull();
+    const received = screen.getByRole('region', { name: '받은 명령 제안' });
+    expect(within(received).queryByRole('button', { name: /승인$/ })).toBeNull();
+  });
+
   it('조약을 볼 수 없는 월드는 오류 없이 빈 상태로 둔다', async () => {
     on('home.get', () => ({ nation: { id: 1 } }));
     on('treaty.list', () => {
@@ -348,6 +375,23 @@ describe('메뉴의 제안함 수', () => {
     open = [];
     const trpc = createTRPCOptionsProxy<AppRouter>({ client: trpcClient, queryClient: client });
     for (const queryKey of boardKeys(trpc, 'w1')) await client.invalidateQueries({ queryKey });
+    expect(await screen.findByText('제안 수 0')).toBeTruthy();
+  });
+  it('D-100 끝난 월드에서는 종료와 겹쳐 늦게 온 대기 상신을 메뉴 수에 세지 않는다', async () => {
+    on('general.mine', () => ({ general: { id: 1 }, creationRules: {} }));
+    on('world.summary', () => ({ status: 'ENDED', nowTick: 100, msPerTick: 6, turnTermMinutes: 1 }));
+    on('proposals.list', () => [{ id: 'proposal-1' }]);
+    render(
+      <QueryClientProvider client={client}>
+        <TRPCProvider trpcClient={trpcClient} queryClient={client}>
+          <Count />
+        </TRPCProvider>
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(wire.calls.some((call) => call.path === 'world.summary')).toBe(true));
+    await waitFor(() =>
+      expect(client.getQueryData([['world', 'summary'], { input: { worldId: 'w1' }, type: 'query' }])).toBeTruthy(),
+    );
     expect(await screen.findByText('제안 수 0')).toBeTruthy();
   });
   it('받은 대기 제안만 센다', () => {

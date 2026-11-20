@@ -11,6 +11,7 @@ import { NationNoticePopup } from '../messages/NationNotice';
 import { useWorldEvents } from '../realtime/useWorldEvents';
 import { AccountLinks } from './AccountLinks';
 import { boardKeys } from './boardKeys';
+import { useUnitsAfterTurn } from './unitsAfterTurn';
 import { GameNavigation } from './GameNavigation';
 import type { WorldSummary } from '../game/types';
 import { liveRefresh, topbarStatus } from '../game/worldWatch';
@@ -52,12 +53,11 @@ export function GameLayout() {
     void queryClient.invalidateQueries({ queryKey: trpc.home.get.queryKey({ worldId }) });
     void queryClient.invalidateQueries({ queryKey: trpc.world.summary.queryKey({ worldId }) });
     void queryClient.invalidateQueries({ queryKey: trpc.records.pathKey() });
-    // 턴 결과 알림(turn.result)이 다시 받는 부곡 목록. 실시간이 끊긴 동안에도 예턴의 부곡 칸이 새 부곡을 보인다.
-    void queryClient.invalidateQueries({ queryKey: trpc.campaign.get.queryKey({ worldId }) });
-    void queryClient.invalidateQueries({ queryKey: trpc.campaign.nationUnits.queryKey({ worldId }) });
   }, [queryClient, realtimeOpen, trpc, worldId]);
   const nextTurnAt = home.data?.nextTurnAt ?? null;
   const countdown = useTurnCountdown(nextTurnAt, refresh);
+  // 실시간이 끊겨도 내 턴이 실행된 것을 home.get으로 안 뒤에 부곡 목록을 다시 받는다.
+  useUnitsAfterTurn(worldId, nextTurnAt);
   const noGeneral = home.isError && errorCode(home.error) === 'NOT_FOUND';
 
   // world.summary를 새로 받을 때마다 상태·모드 전환과 가속 중 갱신을 판단한다 (worldWatch.ts).

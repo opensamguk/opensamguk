@@ -24,5 +24,6 @@ export function useInboxCount(worldId: string): number {
       board: client.getQueryData<CampaignBoard>(trpc.campaign.get.queryKey({ worldId })),
       treaties: client.getQueryData<InfiniteData<TreatyListPage>>(trpc.treaty.list.infiniteQueryKey({ worldId })),
     });
-  return useSyncExternalStore(subscribe, snapshot, snapshot) + (proposals.data?.length ?? 0);
+  // 끝난 월드의 대기 상신은 서버가 만료로 센다. 종료 전에 시작한 조회가 늦게 PENDING을 돌려줘도 세지 않는다.
+  return useSyncExternalStore(subscribe, snapshot, snapshot) + (ended ? 0 : (proposals.data?.length ?? 0));
 }
