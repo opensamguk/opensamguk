@@ -109,6 +109,8 @@ describe('SSE 알림 해석', () => {
       trpc.records.activity.queryKey({ worldId: WORLD }),
       trpc.city.get.queryKey({ worldId: WORLD }),
       trpc.personnel.officers.queryKey({ worldId: WORLD }),
+      trpc.campaign.get.queryKey({ worldId: WORLD }),
+      trpc.campaign.nationUnits.queryKey({ worldId: WORLD }),
     ]);
     expect(invalidationTargets({ kind: 'monthly.done' }, WORLD, trpc)).toEqual([
       trpc.city.get.queryKey({ worldId: WORLD }),
@@ -122,6 +124,8 @@ describe('SSE 알림 해석', () => {
       trpc.review.months.queryKey({ worldId: WORLD }),
       trpc.records.world.queryKey({ worldId: WORLD }),
       trpc.records.activity.queryKey({ worldId: WORLD }),
+      trpc.campaign.get.queryKey({ worldId: WORLD }),
+      trpc.campaign.nationUnits.queryKey({ worldId: WORLD }),
     ]);
     expect(invalidationTargets({ kind: 'notice.updated', scope: 'nation' }, WORLD, trpc)).toEqual([
       trpc.notice.nation.get.queryKey({ worldId: WORLD }),

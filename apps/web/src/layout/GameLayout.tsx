@@ -10,6 +10,7 @@ import { MessageButton, MessageDrawer, RealtimeStatusText } from '../messages/Me
 import { NationNoticePopup } from '../messages/NationNotice';
 import { useWorldEvents } from '../realtime/useWorldEvents';
 import { AccountLinks } from './AccountLinks';
+import { boardKeys } from './boardKeys';
 import { GameNavigation } from './GameNavigation';
 import type { WorldSummary } from '../game/types';
 import { liveRefresh, topbarStatus } from '../game/worldWatch';
@@ -51,6 +52,9 @@ export function GameLayout() {
     void queryClient.invalidateQueries({ queryKey: trpc.home.get.queryKey({ worldId }) });
     void queryClient.invalidateQueries({ queryKey: trpc.world.summary.queryKey({ worldId }) });
     void queryClient.invalidateQueries({ queryKey: trpc.records.pathKey() });
+    // 턴 결과 알림(turn.result)이 다시 받는 부곡 목록. 실시간이 끊긴 동안에도 예턴의 부곡 칸이 새 부곡을 보인다.
+    void queryClient.invalidateQueries({ queryKey: trpc.campaign.get.queryKey({ worldId }) });
+    void queryClient.invalidateQueries({ queryKey: trpc.campaign.nationUnits.queryKey({ worldId }) });
   }, [queryClient, realtimeOpen, trpc, worldId]);
   const nextTurnAt = home.data?.nextTurnAt ?? null;
   const countdown = useTurnCountdown(nextTurnAt, refresh);
@@ -70,9 +74,7 @@ export function GameLayout() {
     watched.current = next;
     if (plan.home) void queryClient.invalidateQueries({ queryKey: homeKey });
     if (plan.records) void queryClient.invalidateQueries({ queryKey: trpc.records.pathKey() });
-    if (plan.board)
-      for (const queryKey of [trpc.world.map.queryKey({ worldId }), trpc.city.pathKey(), trpc.nation.pathKey()])
-        void queryClient.invalidateQueries({ queryKey });
+    if (plan.board) for (const queryKey of boardKeys(trpc, worldId)) void queryClient.invalidateQueries({ queryKey });
   }, [data, summary.dataUpdatedAt, queryClient, trpc, worldId]);
 
   const worldName =

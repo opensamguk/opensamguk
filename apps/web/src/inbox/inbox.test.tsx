@@ -58,6 +58,8 @@ const { TRPCProvider, trpcClient } = await import('../trpc');
 const { InboxPage } = await import('./InboxPage');
 const { countInbox } = await import('./count');
 const { useInboxCount } = await import('./useInboxCount');
+const { boardKeys } = await import('../layout/boardKeys');
+const { createTRPCOptionsProxy } = await import('@trpc/tanstack-react-query');
 
 const ok = { ok: true } as const;
 const offer: AssignmentOfferView = {
@@ -251,7 +253,7 @@ describe('받은 제안함', () => {
     }
   });
 
-  it('D-100 월드가 끝난 것을 먼저 알면 제안 목록을 한 번 더 받아 끝나며 만료된 제안을 닫는다', async () => {
+  it('D-100 월드 상태가 바뀌면 레이아웃의 전환 갱신(boardKeys)이 제안 목록을 다시 받아 끝나며 만료된 제안을 닫는다', async () => {
     on('home.get', () => ({ nation: { id: 1 } }));
     on('treaty.list', () => listPage([]));
     let ended = false;
@@ -285,8 +287,9 @@ describe('받은 제안함', () => {
     const sent = await screen.findByRole('region', { name: '보낸 명령 제안' });
     expect(within(sent).getByRole('button', { name: '제안 거두기' })).toBeTruthy();
     ended = true;
-    // 다른 화면의 요약 조회가 끝을 먼저 알아챈 것과 같다. 목록 주기(30초)를 기다리지 않는다.
-    await client.invalidateQueries({ queryKey: [['world', 'summary']] });
+    // 게임 레이아웃이 요약에서 종료 전환을 보고 부르는 것과 같다. 목록 주기(30초)를 기다리지 않는다.
+    const trpc = createTRPCOptionsProxy<AppRouter>({ client: trpcClient, queryClient: client });
+    for (const queryKey of boardKeys(trpc, 'w1')) await client.invalidateQueries({ queryKey });
     await waitFor(() => expect(within(sent).getByText('만료')).toBeTruthy());
     expect(within(sent).queryByRole('button', { name: '제안 거두기' })).toBeNull();
   });
@@ -329,6 +332,23 @@ describe('메뉴의 제안함 수', () => {
       path: 'proposals.list',
       input: { worldId: 'w1', box: 'received', status: 'PENDING' },
     });
+  });
+  it('D-100 제안함을 열지 않은 화면에서도 월드 상태 전환 갱신(boardKeys) 뒤 끝나며 만료된 상신이 메뉴 수에서 빠진다', async () => {
+    on('general.mine', () => ({ general: { id: 1 }, creationRules: {} }));
+    let open = [{ id: 'proposal-1' }];
+    on('proposals.list', () => open);
+    render(
+      <QueryClientProvider client={client}>
+        <TRPCProvider trpcClient={trpcClient} queryClient={client}>
+          <Count />
+        </TRPCProvider>
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByText('제안 수 1')).toBeTruthy();
+    open = [];
+    const trpc = createTRPCOptionsProxy<AppRouter>({ client: trpcClient, queryClient: client });
+    for (const queryKey of boardKeys(trpc, 'w1')) await client.invalidateQueries({ queryKey });
+    expect(await screen.findByText('제안 수 0')).toBeTruthy();
   });
   it('받은 대기 제안만 센다', () => {
     expect(countInbox({ offers: undefined, board: undefined, treaties: undefined })).toBe(0);

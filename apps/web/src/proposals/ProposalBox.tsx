@@ -1,7 +1,7 @@
 // 제안함의 명령 제안(상신) 칸 (D-100). 받은 제안은 권한자가 국가 예턴 칸을 정해 승인하거나 사유를 적어 거절하고,
 // 보낸 제안은 상태와 답을 보며 기다리는 것만 거둔다. 받은 목록 조회는 메뉴 배지(useInboxCount)와 같은 키다.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useWorldMap, useWorldSummary } from '../game/queries';
 import { serverMessage } from '../turns/apiError';
 import type { ArgNames } from '../turns/args';
@@ -40,10 +40,7 @@ export function ProposalBox({
     void queryClient.invalidateQueries({ queryKey: trpc.proposals.pathKey() });
     void queryClient.invalidateQueries({ queryKey: trpc.nationTurns.pathKey() });
   };
-  // 월드가 끝나면 주기 조회를 멈추기 전에 두 목록을 한 번 더 받는다. 끝나며 만료된 제안이 대기와 거두기 단추로 남지 않는다.
-  useEffect(() => {
-    if (ended) void queryClient.invalidateQueries({ queryKey: trpc.proposals.pathKey() });
-  }, [ended, queryClient, trpc]);
+  // 월드가 끝나면 주기 조회가 멈춘다. 끝나며 만료된 제안의 마지막 상태는 게임 레이아웃의 상태 전환 갱신(boardKeys)이 받는다.
   const respond = useMutation({ ...trpc.proposals.respond.mutationOptions(), onSettled: refresh });
   const cancel = useMutation({ ...trpc.proposals.cancel.mutationOptions(), onSettled: refresh });
 
