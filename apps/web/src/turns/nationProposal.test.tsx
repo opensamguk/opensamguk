@@ -54,18 +54,21 @@ function renderBox() {
       <TRPCProvider trpcClient={trpcClient} queryClient={client}>
         <NationProposal
           worldId="w1"
-          render={(commands, propose) => (
-            <button
-              type="button"
-              onClick={() =>
-                propose.onPropose(
-                  { commandKey: commands[0]!.key, args: { nationId: 2 }, explicit: true },
-                  '먼저 칩시다',
-                )
-              }
-            >
-              {propose.to}에게 {commands[0]!.name} 제안
-            </button>
+          render={(commands, propose, units) => (
+            <>
+              <p>부곡 선택지 {(units ?? []).map((unit) => `${unit.id}:${unit.ownerName}`).join(',')}</p>
+              <button
+                type="button"
+                onClick={() =>
+                  propose.onPropose(
+                    { commandKey: commands[0]!.key, args: { nationId: 2 }, explicit: true },
+                    '먼저 칩시다',
+                  )
+                }
+              >
+                {propose.to}에게 {commands[0]!.name} 제안
+              </button>
+            </>
           )}
         />
       </TRPCProvider>
@@ -90,12 +93,31 @@ describe('D-100 국가 명령 제안 칸', () => {
   it('펼쳤을 때만 명령 고르기를 그리고, 제안하면 proposals.create로 보내고 올렸다고 알린다', async () => {
     wire.handlers.set('proposals.commands', () => [declare]);
     wire.handlers.set('proposals.create', () => ({ proposalId: '00000000-0000-4000-8000-000000000001' }));
+    // 같은 국가의 다른 장수 부곡. 펼친 뒤에만 받아 명령 고르기의 부곡 칸 선택지로 넘긴다.
+    wire.handlers.set('campaign.nationUnits', () => [
+      {
+        id: 7,
+        crewType: 1100,
+        troops: 500,
+        train: 60,
+        atmos: 70,
+        ownerId: 3,
+        ownerName: '관우',
+        ownerCityKey: 1,
+        commanderId: 3,
+        commanderName: '관우',
+        commanderCityKey: 1,
+        supply: false,
+      },
+    ]);
     renderBox();
     const box = await screen.findByTestId('nation-proposal');
     expect(box.textContent).toContain('국가 명령 제안 1');
     expect(screen.queryByRole('button', { name: /제안$/ })).toBeNull();
+    expect(wire.calls.some((call) => call.path === 'campaign.nationUnits')).toBe(false);
     (box as HTMLDetailsElement).open = true;
     fireEvent(box, new Event('toggle'));
+    expect(await screen.findByText('부곡 선택지 7:관우')).toBeTruthy();
     fireEvent.click(await screen.findByRole('button', { name: '군주와 수뇌에게 선전포고 제안' }));
     await waitFor(() =>
       expect(wire.calls).toContainEqual({

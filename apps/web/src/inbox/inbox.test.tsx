@@ -251,6 +251,46 @@ describe('받은 제안함', () => {
     }
   });
 
+  it('D-100 월드가 끝난 것을 먼저 알면 제안 목록을 한 번 더 받아 끝나며 만료된 제안을 닫는다', async () => {
+    on('home.get', () => ({ nation: { id: 1 } }));
+    on('treaty.list', () => listPage([]));
+    let ended = false;
+    on('world.summary', () => ({
+      status: ended ? 'ENDED' : 'RUNNING',
+      nowTick: 100,
+      msPerTick: 6,
+      turnTermMinutes: 1,
+    }));
+    on('proposals.list', (input) =>
+      (input as { box: string }).box === 'received'
+        ? []
+        : [
+            {
+              id: 'p4',
+              proposer: { id: 1, name: '유비', portraitId: null, officerTitle: null },
+              commandKey: 'nation_capital',
+              commandName: '천도',
+              args: { cityKey: 3 },
+              slot: null,
+              note: null,
+              status: ended ? 'EXPIRED' : 'PENDING',
+              createdTick: 100,
+              expiresTick: 120_100,
+              precheck: null,
+              response: null,
+            },
+          ],
+    );
+    renderPage();
+    const sent = await screen.findByRole('region', { name: '보낸 명령 제안' });
+    expect(within(sent).getByRole('button', { name: '제안 거두기' })).toBeTruthy();
+    ended = true;
+    // 다른 화면의 요약 조회가 끝을 먼저 알아챈 것과 같다. 목록 주기(30초)를 기다리지 않는다.
+    await client.invalidateQueries({ queryKey: [['world', 'summary']] });
+    await waitFor(() => expect(within(sent).getByText('만료')).toBeTruthy());
+    expect(within(sent).queryByRole('button', { name: '제안 거두기' })).toBeNull();
+  });
+
   it('조약을 볼 수 없는 월드는 오류 없이 빈 상태로 둔다', async () => {
     on('home.get', () => ({ nation: { id: 1 } }));
     on('treaty.list', () => {
