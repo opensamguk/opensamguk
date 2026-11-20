@@ -3,7 +3,8 @@ import { afterAll, beforeAll, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import { logPartsToText } from '../packages/shared/src/logParts';
 import { monthlyFixture } from '../apps/engine/test/monthlyFixture';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+// 늘 켠 규칙의 새 월드는 재생 형식 3과 원장이 필요하다. 시험 고정 월드는 e2e 고정물 저장으로 채운다.
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { appendNationHistory, persistCommandReports } from '../apps/engine/src/commandPersistence';
 import { storedLog } from '../apps/engine/src/logParts';
 import { buildServer } from '../apps/server/src/server';
@@ -55,7 +56,7 @@ beforeAll(async () => {
     name: '기록 조각 검증',
     turnTermMinutes: 60,
     endYear: null,
-    replayFormat: 'legacy',
+    replayFormat: 3,
   }));
   await app.listen({ host: '127.0.0.1', port: 0 });
   base = `http://127.0.0.1:${(app.server.address() as { port: number }).port}`;
@@ -97,7 +98,8 @@ it('개인 기록의 null·미지원 버전과 같은 tick 페이지를 보존�
         worldId,
         generalId: 1,
         tick: 700,
-        sequence: 1,
+        // 고정물 저장이 사람 장수의 소유 부착(general.possess) 기록을 sequence 1로 먼저 남긴다. 겹치지 않는 묶음을 쓴다.
+        sequence: 1_000_001,
         ordinal,
         commandKey: 'rest',
         kind: 'success',
@@ -119,13 +121,16 @@ it('개인 기록의 null·미지원 버전과 같은 tick 페이지를 보존�
       },
     ],
   });
-  const items: Page['items'] = [];
+  const pages: Page['items'] = [];
   let cursor: string | null = null;
   do {
     const page = await read('general', 0, cursor ?? undefined);
-    items.push(...page.items);
+    pages.push(...page.items);
     cursor = page.nextCursor;
   } while (cursor);
+  // 맨 끝(tick 0)은 고정물 저장이 남긴 소유 부착 기록이다. 이 시험이 넣은 67행만 본다.
+  expect(pages.at(-1)?.text).toBe('이 장수를 맡았습니다.');
+  const items = pages.slice(0, -1);
   expect(items).toHaveLength(67);
   expect(new Set(items.map((item) => item.id)).size).toBe(67);
   expect(items.slice(0, 65).map((item) => item.text)).toEqual(Array.from({ length: 65 }, (_, i) => `줄 ${i}`));
