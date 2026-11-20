@@ -247,15 +247,6 @@ export function openTacticalBattle(
     for (const u of unloaded) {
       u.sp = loaded;
       u.loadedSp = loaded;
-      const source = state.campaign!.units.find((row) => row.id === u.sourceId);
-      if (source && loaded > 0)
-        source.supply = {
-          feature: 'march-supply-v1',
-          unit: 'SP',
-          loaded,
-          remaining: loaded,
-          originCityKey: targetCityKey,
-        };
     }
   }
   if (b.units.length > 40 || b.units.length > map.path.length) throw Error('전장 배치 공간이 부족합니다.');
