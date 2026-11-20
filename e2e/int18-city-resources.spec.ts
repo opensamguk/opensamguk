@@ -1373,7 +1373,9 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
           .toBe(1);
         await legalStack.restart(null);
         await actor.page.reload();
-        await expect(resourcePanel(actor.page)).toContainText('배속 요청을 확인하는 중입니다.');
+        // 방금 다시 띄운 API의 첫 조회(신원, 도시 자원, 신원 재확인)라 바쁜 CI에서 기본 5초를 넘긴 적이 있다(PR #674 머지
+        // 대기열). 그때 판은 오류 없이 불러오는 중이었다. 재시작 직후의 이 확인에만 30초를 준다.
+        await expect(resourcePanel(actor.page)).toContainText('배속 요청을 확인하는 중입니다.', { timeout: 30_000 });
         expect(browserCalls.slice(start).filter((call) => call.path === 'cityResources.allocate')).toHaveLength(1);
         await drain(main);
         await expect(resourcePanel(actor.page)).toContainText('도시 병력을 부곡에 배속했습니다.');
