@@ -2,9 +2,10 @@ import type { AppRouter } from '../apps/server/src/router';
 import type { inferRouterOutputs } from '@trpc/server';
 import { TICKS_PER_MONTH } from '../packages/rules/src/index';
 import { monthlyFixture } from '../apps/engine/test/monthlyFixture';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
+import { renewLease } from '../apps/engine/src/lease';
 import { createAccount, withE2eDb } from './account';
 import { holdLease, query, releaseHold } from './game';
 import { apiMutate, apiQuery, expect, test } from './t210-fixture';
@@ -19,6 +20,28 @@ test('AC-M3-13 공지 지시를 우선 표시하고 조언을 누르면 첫 예�
   const ruler = await world.user('ruler');
   const member = await world.user('member');
   const { id: worldId } = world;
+  // 생성 시 비어 있는 도시 원장은 실제 7월 세수와 물자 구입으로 준비한다.
+  // 이 동안 사람 예턴은 실행하지 않아 아래 저장·충돌 검사의 판 번호를 보존한다.
+  const db = world.hold.db;
+  await db.general.updateMany({ where: { worldId }, data: { nextTurnTick: { increment: 60_000 } } });
+  const loop = new TurnLoop(db, world.hold.lease, { beforeCommit: (tx) => renewLease(tx, world.hold.lease) });
+  await loop.advanceTo(60_000);
+  const memberGeneral = await db.general.findUniqueOrThrow({
+    where: { worldId_id: { worldId, id: member.generalId } },
+  });
+  const goods = await db.inputEvent.create({
+    data: {
+      worldId,
+      userId: ruler.userId,
+      generalId: ruler.generalId,
+      kind: 'logistics.order',
+      idempotencyKey: 'advice-review-iron',
+      status: 'PENDING',
+      payload: { type: 'trade', cityKey: memberGeneral.cityKey, good: 'iron', side: 'buy', amount: 20 },
+    },
+  });
+  await loop.advanceTo(60_000);
+  expect((await db.inputEvent.findUniqueOrThrow({ where: { id: goods.id } })).status).toBe('APPLIED');
   const reason = '도시 농업을 보강합니다';
   await apiMutate(world, ruler, 'notice.nation.set', {
     worldId,
@@ -86,12 +109,13 @@ test('AC-M3-13 공지 지시를 우선 표시하고 조언을 누르면 첫 예�
 
   await editor.getByRole('button', { name: '선택 해제', exact: true }).click();
   await editor.locator('tr[data-slot="2"]').click();
-  await editor.getByLabel('명령 찾기').fill('훈련');
-  await editor.getByRole('radio', { name: '훈련', exact: true }).check();
+  // 저장하지 않은 편집 하나를 만든다. 훈련은 부곡을 고르는 인자가 있어(결정 19) 인자 없는 농지 개간을 넣는다.
+  await editor.getByLabel('명령 찾기').fill('농지 개간');
+  await editor.getByRole('radio', { name: '농지 개간', exact: true }).check();
   await editor.getByRole('button', { name: '2번 칸에 넣기', exact: true }).click();
   await expect(editor.getByTestId('draft-state')).toHaveText('저장하지 않은 편집 1건');
   await noticeRow.getByRole('button', { name: '1칸에 넣기 (사용 불가)', exact: true }).click();
-  await expect(noticeRow.getByRole('note')).toContainText('편집 중인 예턴을 저장하거나 취소하면 넣을 수 있습니다');
+  await expect(noticeRow.getByRole('note')).toContainText('편집 중인 예턴을 먼저 저장하거나 취소하세요');
   expect((await apiQuery<Output['turns']['get']>(member, 'turns.get', { worldId })).revision).toBe(current.revision);
 
   const updated = '농업을 계속 보강합니다';
@@ -107,14 +131,24 @@ test('AC-M3-13 공지 지시를 우선 표시하고 조언을 누르면 첫 예�
     where: { worldId_id: { worldId, id: member.generalId } },
   });
   const storedWorld = await world.hold.db.world.findUniqueOrThrow({ where: { id: worldId } });
+  const target = await db.city.findFirstOrThrow({ where: { worldId, nationId: { not: actor.nationId! } } });
   await apiMutate(world, ruler, 'operation.create', {
     worldId,
-    targetCityKey: actor.cityKey,
+    targetCityKey: target.cityKey,
     targetYear: storedWorld.startYear,
-    targetMonth: 6,
-    min: { crew: 1000, train: 70, atmos: 60 },
+    targetMonth: 9,
+    // 모병 한 칸과 출병 한 칸을 목표 전에 넣어 첫 조언이 실제 부곡 모병이 되게 한다.
+    min: { crew: 1000, train: 0, atmos: 0 },
     memberIds: [member.generalId],
   });
+  const operationAdvice = await apiQuery<Output['advice']['get']>(member, 'advice.get', { worldId });
+  expect(operationAdvice.skipped).toEqual([]);
+  expect(operationAdvice.items[0]).toMatchObject({
+    source: 'operation',
+    commandKey: 'recruit',
+    args: { unitId: 'new', amount: 1000 },
+  });
+  expect(operationAdvice.items[1]).toMatchObject({ source: 'notice', commandKey: 'farm' });
   await advice.getByRole('button', { name: '접기', exact: true }).click();
   await advice.getByRole('button', { name: '펼치기', exact: true }).click();
   await expect(rows.nth(0)).toHaveAttribute('data-advice-source', 'operation');
@@ -173,7 +207,11 @@ test('AC-M3-13 같은 예턴 판 번호에서도 계정이나 장수가 바뀌�
     isTurnEdit,
     async (route) => {
       await world.hold.db.$transaction(async (tx) => {
-        await tx.general.update({ where: { worldId_id: { worldId, id: member.generalId } }, data: { userId: null } });
+        // NPC가 된 장수에는 물리 거주 앵커가 없어야 한다(apps/engine/src/residenceState.ts).
+        await tx.general.update({
+          where: { worldId_id: { worldId, id: member.generalId } },
+          data: { userId: null, residenceTick: null },
+        });
         await tx.general.update({
           where: { worldId_id: { worldId, id: replacement.generalId } },
           data: { userId: member.userId },
@@ -197,6 +235,9 @@ test('AC-M3-15 실제 월간 정산이 기록 화면에 순위와 한 줄 평을
   const player = initial.generals[2]!;
   const city = initial.cities.find((row) => row.cityKey === 3)!;
   city.agriculture = city.agricultureMax - 1;
+  // 생성 검사는 도시 값과 운영 지도의 초깃값이 같아야 받는다(packages/rules/src/world/map/profile.ts).
+  const site = initial.operationalMap?.sites.find((row) => row.kind === 'CITY' && row.anchorKey === city.cityKey);
+  if (site && 'initial' in site && site.initial) site.initial.agriculture = city.agriculture;
   Object.assign(player, {
     userId: user.id,
     cityKey: city.cityKey,
@@ -205,11 +246,10 @@ test('AC-M3-15 실제 월간 정산이 기록 화면에 순위와 한 줄 평을
     gold: 100000,
   });
   const { worldId } = await withE2eDb((db) =>
-    saveInitialWorld(db, initial, {
+    saveFixtureWorld(db, initial, {
       name: '월단평 화면 검증',
       turnTermMinutes: 60,
       endYear: null,
-      ruleFeatures: ['policy', 'reputation-v1'],
     }),
   );
   const hold = await holdLease(worldId);
@@ -217,7 +257,7 @@ test('AC-M3-15 실제 월간 정산이 기록 화면에 순위와 한 줄 평을
     await controlClock(hold.db, worldId, 'start');
     const result = await page.request.post('/trpc/turns.edit', {
       headers: { Origin: t210Stack.webOrigin },
-      data: { worldId, revision: 0, op: { put: { from: 0, to: 0, commandKey: 'farm', args: {} } } },
+      data: { worldId, revision: 1, op: { put: { from: 0, to: 0, commandKey: 'farm', args: {} } } },
     });
     expect(result.ok()).toBe(true);
     expect(await result.json()).toMatchObject({ result: { data: { ok: true } } });

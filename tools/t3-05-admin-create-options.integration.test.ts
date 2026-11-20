@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { randomUUID } from 'node:crypto';
 import { readFile, readdir, mkdir, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -10,11 +11,11 @@ import { hashPassword } from '../apps/server/src/auth/password';
 import { newSession } from '../apps/server/src/auth/session';
 import { authzCase } from '../apps/server/src/authz/case';
 import { categories } from '../apps/server/src/authz/coverage';
-import { creationFeatures } from '../apps/server/src/admin/worldCreateOptions';
+
 import { integrationResourceRows } from './integration-resources';
 import { verifyInitializedResources } from './init-resources';
 import { validateWorldResources } from '../packages/rules/src/world/validate';
-import { testDatabaseUrl } from './test-database';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
 import {
   auditOwnedCreate,
   CreateOptionsBoundary,
@@ -28,13 +29,16 @@ if (!['localhost', '127.0.0.1'].includes(source.hostname)) throw new Error('loop
 for (const key of source.searchParams.keys())
   if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
     throw new Error('접속 대상 인자는 쓸 수 없습니다.');
-const suffix = randomUUID().replaceAll('-', '');
-const name = 't305_create_options_' + suffix + '_test',
+const suffix = randomUUID().replaceAll('-', '').slice(0, 20);
+const name = ciGreenDatabaseName('opensamguk_ci_green_' + suffix + '_test'),
   primaryApplicationName = 't305_create_options_admin_' + suffix;
 const target = new URL(source),
   adminUrl = new URL(source);
 target.pathname = '/' + name;
-testDatabaseUrl({ TEST_DATABASE_URL: target.href, DATABASE_URL: process.env.DATABASE_URL });
+testDatabaseUrl({
+  TEST_DATABASE_URL: target.href,
+  DATABASE_URL: process.env.CI_GREEN_DATABASE ? undefined : process.env.DATABASE_URL,
+});
 adminUrl.pathname = '/postgres';
 interface NativePg {
   connect(): Promise<void>;
@@ -348,12 +352,13 @@ for (const category of categories)
       if (category === 'success') {
         expect(result.body.result?.data).toMatchObject({ userId: owner.id });
         const data = result.body.result!.data as {
-          profiles: Array<{ available: boolean; code?: string; ruleFeatures?: string[] }>;
+          profiles: Array<{ available: boolean; code?: string }>;
         };
-        const cityRegistered = ruleRegistry.features.some((feature) => feature.key === 'city-resources-v1');
-        expect(data.profiles[0]!.available).toBe(cityRegistered);
-        if (cityRegistered) expect(data.profiles[0]!.ruleFeatures).toEqual([...creationFeatures]);
-        else expect(data.profiles[0]!.code).toBe('RULES_UNAVAILABLE');
+        const allRegistered = providedRuleKeys.every((key) =>
+          ruleRegistry.features.some((feature) => feature.key === key),
+        );
+        expect(data.profiles[0]!.available).toBe(allRegistered);
+        if (!allRegistered) expect(data.profiles[0]!.code).toBe('RULES_UNAVAILABLE');
         expect(JSON.stringify(data)).not.toMatch(/password|connectionString|portraitId|generalStats|DATABASE_URL/);
       }
       expect(await bounded(() => db.world.count())).toBe(before);
@@ -452,7 +457,7 @@ it('AC-M3-04 도시 규칙 통합 뒤 실제 게시 정식9기능을 검증한�
   const result = await call({ expectedUserId: owner.id }, owner.cookie);
   expect(result.body.result?.data).toMatchObject({
     profiles: [
-      { available: true, ruleFeatures: [...creationFeatures], counts: { nations: 21, generals: 491, anchors: 61 } },
+      { available: true, counts: { nations: 21, generals: 491, anchors: 61 } },
       { id: 'san10-191', available: false, code: 'RESOURCES_UNAVAILABLE' },
       { id: 'san10-empty', available: false, code: 'RESOURCES_UNAVAILABLE' },
     ],

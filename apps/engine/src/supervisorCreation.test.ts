@@ -53,7 +53,11 @@ it('생성의 일시 오류는 고정 사건만 내고 다음 발견 때 다시 
   f.controller.abort();
   await f.done;
   expect(processWorldCreateRequest).toHaveBeenCalledTimes(2);
-  expect(f.onEvent.mock.calls).toEqual([[{ kind: 'creation-error' }]]);
+  expect(f.onEvent).toHaveBeenCalledExactlyOnceWith({
+    kind: 'creation-error',
+    diagnostic: { name: 'Error', locations: expect.any(Array) },
+  });
+  expect(JSON.stringify(f.onEvent.mock.calls)).not.toContain('private failure');
 });
 it('종료 신호 뒤의 소비 거절은 오류 사건을 새로 내지 않는다', async () => {
   let reject!: (reason: Error) => void;

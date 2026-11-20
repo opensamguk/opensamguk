@@ -15,7 +15,7 @@ function world() {
     clockTick: 50_000,
     clockAnchorAt: new Date(at('10-24T22:00:00')),
     turnTermMinutes: 60,
-    ruleFeatures: [] as string[],
+
     preset: null,
     runtimeOptions: { truce },
   };

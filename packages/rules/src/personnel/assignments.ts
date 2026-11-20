@@ -1,4 +1,5 @@
 import { TICKS_PER_MONTH } from '../clock/constants';
+import { battleBusy } from '../tactical/world';
 import { canExecuteNationCommand } from './permissions';
 import {
   ASSIGNMENT_EXPIRY_MONTHS,
@@ -128,6 +129,7 @@ export function respondAssignment(
   assertTick(tick);
   if (typeof accept !== 'boolean' || typeof offerId !== 'string')
     return personnelFailure('BAD_ARGS', '발령 응답이 잘못됐습니다.');
+  if (accept && battleBusy(view, { generalIds: [actorId] })) return personnelFailure('BATTLE_BUSY', '전투 중');
   const target = view.generals[actorId];
   if (!target) return personnelFailure('NO_ACTOR', '장수가 없습니다.');
   const offer = view.assignmentOffers?.[actorId];
@@ -199,6 +201,7 @@ export function expireAssignments(view: PersonnelView, tick: number): PersonnelC
   const result = closeInvalidOffers(view, tick);
   for (const [generalId, offer] of pendingOffers(result.state)) {
     if (offer.expiresTick > tick) continue;
+    if (battleBusy(result.state, { generalIds: [generalId] })) continue;
     const target = result.state.generals[generalId]!;
     target.cityKey = offer.cityKey;
     removeOffer(result.state, generalId);

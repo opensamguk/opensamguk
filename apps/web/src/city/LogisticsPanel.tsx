@@ -167,7 +167,7 @@ function LogisticsBoardView({ worldId, cityKey }: { worldId: string; cityKey: nu
         }
         if (Date.now() >= deadline) {
           setNotice({
-            text: '아직 처리 중입니다. 자동 확인을 멈췄습니다. 다시 보내지 않고 같은 요청의 상태만 확인할 수 있습니다.',
+            text: '아직 처리 중입니다. 자동 확인을 멈췄습니다. 다시 보내지 말고 상태만 확인하세요.',
             tone: 'info',
           });
           return;
@@ -336,7 +336,7 @@ function LogisticsBoardView({ worldId, cityKey }: { worldId: string; cityKey: nu
             text:
               mode === 'submit'
                 ? '지금은 이 거점에 물류를 지시할 수 없습니다. 아래 안내를 확인하세요.'
-                : '지금은 이 거점에서 다시 접수할 수 없습니다. 같은 요청의 상태만 확인할 수 있습니다.',
+                : '지금은 이 거점에서 다시 접수할 수 없습니다. 상태만 확인하세요.',
             tone: 'error',
           });
           return;
@@ -619,14 +619,14 @@ function PendingStatus({
         {!unconfirmed
           ? '접수한 요청을 처리하고 있습니다. 결과가 나올 때까지 새 물류 요청은 기다려 주세요.'
           : oldActor
-            ? '이 요청의 접수 기록을 찾지 못했습니다. 장수가 이미 바뀌어, 이전 장수 명의 요청은 서버가 거부하므로 앞으로도 처리되지 않습니다. 기록 지우기를 누르면 지금 장수와 접수 기록을 한 번 더 확인한 뒤 이 탭의 기록만 지웁니다. 다시 보내지 않습니다.'
-            : '이 요청의 접수 기록을 아직 찾지 못했습니다. 보내던 요청이 늦게 접수될 수도 있습니다. 같은 요청을 그대로 다시 접수하면 서버가 같은 번호로 한 번만 받습니다. 결과를 받기 전에는 새 요청을 만들지 않습니다.'}
+            ? '이 요청의 접수 기록을 찾지 못했습니다. 장수가 이미 바뀌어 이전 장수 명의 요청은 앞으로도 처리되지 않습니다. 기록 지우기를 누르면 지금 장수와 접수 기록을 한 번 더 확인하고 이 탭의 기록만 지웁니다. 다시 보내지 않습니다.'
+            : '이 요청의 접수 기록을 아직 찾지 못했습니다. 보내던 요청이 늦게 접수될 수도 있습니다. 다시 접수해도 같은 요청은 한 번만 처리됩니다. 결과를 받기 전에는 새 요청을 만들지 않습니다.'}
       </p>
       {oldActor ? (
         <p className={styles.note}>이 요청은 이전 장수 명의로 보냈습니다. 같은 번호로 결과만 확인합니다.</p>
       ) : null}
       {unconfirmed && !oldActor && !canResubmit ? (
-        <p className={styles.note}>지금 이 거점에서는 다시 접수할 수 없어 같은 요청의 상태만 확인할 수 있습니다.</p>
+        <p className={styles.note}>지금은 이 거점에서 다시 접수할 수 없습니다. 상태만 확인하세요.</p>
       ) : null}
       <div className={styles.row}>
         <button type="button" className={styles.secondary} disabled={busy} onClick={recheck}>
@@ -653,7 +653,7 @@ function Specialty({ specialty }: { specialty: OwnLogisticsBoard['specialty'] })
       특산 {GOOD_LABEL[specialty.good]} · 기준 월 {formatCount(specialty.perMonth)}
       <span className={styles.note}>
         {' '}
-        실제 생산량은 월 정산에서 소유·보급·인구에 따라 달라집니다. 창고가 차면 넘친 양은 손실로 기록됩니다.
+        실제 생산량은 월 정산에서 소유, 보급, 인구에 따라 달라집니다. 창고가 차면 넘친 양은 손실로 기록됩니다.
       </span>
     </p>
   ) : (
@@ -733,7 +733,9 @@ function OwnBoard({
             </li>
           ))}
         </ul>
-        <p className={styles.note}>철·목재·말은 한 창고 용량을 함께 씁니다. 금·쌀은 위 금·쌀·수비병 칸에서 봅니다.</p>
+        <p className={styles.note}>
+          철, 목재, 말은 한 창고 용량을 함께 씁니다. 금과 쌀은 위 도시 금, 쌀, 수비병 칸에서 봅니다.
+        </p>
       </div>
       <Specialty specialty={board.specialty} />
       <LogisticsCosts board={board} />
@@ -863,8 +865,7 @@ function DispatchForm({
       ) : null}
       <Reasons reasons={check.reasons} />
       <p className={styles.note}>
-        보내면 이 거점 재고에서 바로 빠집니다. 경로가 끊기거나 도착지를 잃으면 서버 판정대로 반환·노획·손실로
-        처리됩니다.
+        보내면 이 거점 재고에서 바로 빠집니다. 경로가 끊기거나 도착지를 잃으면 반환, 노획, 손실 중 하나로 처리됩니다.
       </p>
       <button type="submit" className={styles.primary} disabled={locked || !check.payload}>
         보내기 요청
@@ -963,7 +964,7 @@ function Convoys({
                 ? `이 창고의 남은 칸이 ${formatCount(free)}이라 넘치는 양은 창고 초과 손실로 기록됩니다.`
                 : `이 창고의 남은 칸 ${formatCount(free)} 안에 들어갑니다.`
               : '출발지 창고가 차 있으면 넘친 양은 창고 초과 손실로 기록됩니다.'}{' '}
-            이미 도착 정산이 끝났거나 출발지를 잃었으면 서버가 거부합니다.
+            이미 도착 정산이 끝났거나 출발지를 잃었으면 취소되지 않습니다.
           </p>
           <div className={styles.row}>
             <button

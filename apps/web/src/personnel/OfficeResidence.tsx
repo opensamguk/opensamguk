@@ -15,19 +15,13 @@ export function cityOfficeHolder(members: PersonnelMember[], cityKey: number, of
   return members.find((member) => member.officerLevel === officerLevel && member.officerCityKey === cityKey);
 }
 
-export function CityOfficeResidences({
-  officers,
-  secretaryEnabled,
-}: {
-  officers: NonNullable<CityView['officers']>;
-  secretaryEnabled?: boolean;
-}) {
+export function CityOfficeResidences({ officers }: { officers: NonNullable<CityView['officers']> }) {
   const titleId = useId();
   return (
     <section className={styles.cityOffices} aria-labelledby={titleId}>
       <h3 id={titleId}>관직 주재</h3>
       <ul>
-        {LOCAL_OFFICES.filter(({ level }) => level !== 2 || secretaryEnabled).map(({ level, title }) => {
+        {LOCAL_OFFICES.map(({ level, title }) => {
           const holder = officers.find((officer) => officer.officerLevel === level);
           return (
             <li key={level}>
@@ -114,7 +108,7 @@ export function LocalOffices({ board, candidates, busyTarget, busyLabel, onAppoi
       {canManage && !city ? <DisabledReason reason="담당 도시를 고르세요.">지방 관직 임명</DisabledReason> : null}
       {city && canManage ? (
         <div className={styles.localOffices}>
-          {LOCAL_OFFICES.filter(({ level }) => level !== 2 || board.secretaryEnabled).map(({ level, title }) => {
+          {LOCAL_OFFICES.map(({ level, title }) => {
             const holder = cityOfficeHolder(board.members, city.cityKey, level);
             return (
               <LocalOfficeSlot

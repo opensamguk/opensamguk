@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { retryUnlessClientError } from '../game/errors';
 import { displayName } from '../game/names';
-import { useWorldMap } from '../game/queries';
+import { useWorldEnded, useWorldMap } from '../game/queries';
 import { Portrait } from '../portrait/Portrait';
 import { useTRPC } from '../trpc';
 import styles from './RelationList.module.css';
@@ -12,10 +12,11 @@ const kindNames = { kin: '혈연', sworn: '결의', lord: '군신' };
 // 번호로 찾는다. 안개로 지도 목록에 없는 인물은 실루엣이다.
 export function RelationList({ worldId, generalId }: { worldId: string; generalId: number }) {
   const trpc = useTRPC();
+  const ended = useWorldEnded(worldId);
   const { data } = useQuery({
     ...trpc.relations.list.queryOptions({ worldId }),
     retry: retryUnlessClientError,
-    refetchInterval: 30_000,
+    refetchInterval: ended ? false : 30_000,
   });
   const map = useWorldMap(worldId);
   const relations = data?.items.flatMap(({ a, b, kind }) => {

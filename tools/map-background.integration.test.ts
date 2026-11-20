@@ -1,3 +1,6 @@
+import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { commandInitial } from '../packages/rules/test/commandFixture';
+import { ciGreenDatabaseName } from './test-database';
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { readFile, readdir } from 'node:fs/promises';
@@ -12,7 +15,7 @@ import { confirmDisconnectedDatabase } from './test-db-close';
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw Error('전용 시험 DB가 필요합니다.');
 if (!['127.0.0.1', 'localhost'].includes(new URL(url).hostname)) throw Error('자기 loopback 시험 DB가 필요합니다.');
-const name = 'map_background_' + randomUUID().replaceAll('-', '') + '_test';
+const name = ciGreenDatabaseName('opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test');
 const target = new URL(url),
   adminUrl = new URL(url);
 target.pathname = '/' + name;
@@ -62,22 +65,14 @@ async function resource(
   return row;
 }
 async function world(mapKey: string, status: 'RUNNING' | 'PAUSED' | 'PREOPEN' | 'ENDED' = 'RUNNING') {
-  const row = await db.world.create({
-    data: {
-      name: '바탕 그림 조회',
-      scenarioKey: 'fixture',
-      mapKey,
-      unitSetKey: 'basic',
-      seed: 'background',
-      startYear: 191,
-      turnTermMinutes: 60,
-      status,
-      initialStateHash: 'fixture',
-      statRules: {},
-      unitSet: {},
-    },
+  const initial = { ...commandInitial(), mapKey };
+  const { worldId } = await saveInitialWorld(db, initial, {
+    name: '바탕 그림 조회',
+    turnTermMinutes: 60,
+    endYear: null,
   });
-  return row.id;
+  await db.world.update({ where: { id: worldId }, data: { status } });
+  return worldId;
 }
 async function rpc(path: string, input?: unknown, authenticated = false) {
   const encoded = input === undefined ? '' : '&input=' + encodeURIComponent(JSON.stringify({ 0: input }));
@@ -194,7 +189,9 @@ it('AC-P2-28 지도 권한·다른 판·메타데이터 공개 범위와 공개 
   expect((await rpc('world.map', { worldId: oldWorld }, true)).data.background).toBeNull();
   const privateMap = await rpc('world.map', { worldId: newWorld }, true);
   expect(privateMap.status).toBe(200);
-  expect(privateMap.data).toEqual({ cities: [], nations: [], generals: [], background: expected });
+  expect(privateMap.data.background).toEqual(expected);
+  expect(privateMap.data.cities).toHaveLength(commandInitial().cities.length);
+  expect(privateMap.data.nations).toHaveLength(commandInitial().nations.length);
   await db.publicMapSnapshot.create({
     data: {
       worldId: newWorld,

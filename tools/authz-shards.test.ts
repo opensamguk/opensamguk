@@ -116,7 +116,7 @@ describe('T3-04 AC-M3-03 권한 조각 합본', () => {
     expect(integrationShardArgs(undefined, undefined, undefined)).toEqual([]);
     expect(integrationShardArgs('engine', undefined, undefined)).toEqual([]);
     expect(integrationShardArgs('api', '1/3', join(root, 'report.json'))).toContain('--shard=1/3');
-    for (const shard of ['1/2', '2/2'])
+    for (const shard of ['1/4', '2/4', '3/4', '4/4'])
       expect(integrationShardArgs('engine', shard, join(root, 'report.json'))).toEqual([
         `--shard=${shard}`,
         '--reporter=default',
@@ -135,14 +135,17 @@ describe('T3-04 AC-M3-03 권한 조각 합본', () => {
       expect(() => integrationShardArgs('api', shard, report)).toThrow('shard-spec');
     for (const [shard, report] of [
       [undefined, root],
-      ['1/2', undefined],
-      ['1/2', 'relative'],
-      ['0/2', root],
-      ['3/2', root],
-      ['1/3', root],
-      ['1-2', root],
+      ['1/4', undefined],
+      ['1/4', 'relative'],
+      ['0/4', root],
+      ['5/4', root],
+      ['1/2', root],
+      ['1-4', root],
     ])
       expect(() => integrationShardArgs('engine', shard, report)).toThrow('shard-spec');
+    // 나눌 수 없는 긴 엔진 시험은 분할 인자를 받지 않는다.
+    expect(integrationShardArgs('engine-long', undefined, undefined)).toEqual([]);
+    expect(() => integrationShardArgs('engine-long', '1/4', root)).toThrow('suite');
   });
   it('자기 artifact 디렉터리 이름·파일 수·형식을 확인한다', () => {
     const prefix = join(tmpdir(), 'opensamguk-authz-');
@@ -173,10 +176,10 @@ describe('T3-04 AC-M3-03 권한 조각 합본', () => {
     expect(shard['timeout-minutes']).toBe(75);
     expect(shard.services).toEqual(jobs['database-engine'].services);
     const engine = jobs['database-engine'];
-    expect(engine.strategy).toEqual({ 'fail-fast': false, matrix: { shard: [1, 2] } });
+    expect(engine.strategy).toEqual({ 'fail-fast': false, matrix: { shard: [1, 2, 3, 4] } });
     expect(engine.strategy.matrix.shard).toHaveLength(ENGINE_SHARD_TOTAL);
     expect(engine['timeout-minutes']).toBe(30);
-    expect(engine.env.INTEGRATION_SHARD).toBe('${{ matrix.shard }}/2');
+    expect(engine.env.INTEGRATION_SHARD).toBe('${{ matrix.shard }}/4');
     expect(engine.env).not.toHaveProperty('INTEGRATION_REPORT');
     expect(engine.steps.find((step: { run?: string }) => step.run === 'pnpm test:int').env.INTEGRATION_REPORT).toBe(
       '${{ runner.temp }}/engine-${{ matrix.shard }}.json',
@@ -188,7 +191,19 @@ describe('T3-04 AC-M3-03 권한 조각 합본', () => {
     expect(merge.name).toBe('opensamguk-database-authz');
     expect(merge.needs).toEqual(['database-authz-shard']);
     expect(merge.if).toMatch(/^always\(\)/);
-    expect(jobs['database-browser'].needs).toEqual(['database-authz', 'database-engine', 'database-e2e']);
+    // 나눌 수 없는 긴 엔진 시험은 자기 job에서 돌고 필수 관문이 함께 기다린다.
+    const long = jobs['database-engine-long'];
+    expect(long.services).toEqual(engine.services);
+    expect(long.env.INTEGRATION_SUITE).toBe('engine-long');
+    expect(long.env).not.toHaveProperty('INTEGRATION_SHARD');
+    expect(long).not.toHaveProperty('strategy');
+    expect(jobs['database-browser'].needs).toEqual([
+      'database-authz',
+      'database-engine',
+      'database-engine-long',
+      'database-e2e',
+    ]);
+    expect(jobs['database-browser'].steps[0].run).toContain('test "$ENGINE_LONG" = success');
     expect(jobs['database-browser'].steps[0].run).toContain('test "$AUTHZ" = success');
     expect(jobs['database-browser'].steps[0].run).toContain('test "$ENGINE" = success');
   });

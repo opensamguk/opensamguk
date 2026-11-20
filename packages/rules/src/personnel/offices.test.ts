@@ -11,32 +11,21 @@ const reserved = () =>
     args: { generalId: 3, amount: slot + 1 },
   }));
 
-it.each([true, false])(
-  'AC-P2-32 같은 직책 장수의 조작자 전환은 lineage=%s에서만 칸과 임기를 새로 시작한다',
-  (enabled) => {
-    const { state, offices } = fixture();
-    state.ruleFeatures = (state.ruleFeatures ?? []).filter((feature) => feature !== 'lineage-v1');
-    if (enabled) state.ruleFeatures.push('lineage-v1');
-    const king = Object.values(state.generals).find(
-      (general) => general.nationId === 1 && general.officerLevel === 12,
-    )!;
-    king.userId = null;
-    const after = structuredClone(state);
-    after.generals[king.id]!.userId = 'lineage-new-controller';
-    const result = syncOffices(state, after, offices);
-    if (enabled) {
-      expect(result.state.officeTurns?.[1]?.[12]).toEqual(rest());
-      expect(result.offices[1]?.[12]).toEqual({ revision: 9, tenure: 4 });
-    } else {
-      expect(result.state.officeTurns?.[1]?.[12]).toEqual(state.officeTurns?.[1]?.[12]);
-      expect(result.offices[1]?.[12]).toEqual(offices[1]?.[12]);
-    }
-    expect(result.state.officeTurns?.[1]?.[5]).toEqual(state.officeTurns?.[1]?.[5]);
-    expect(syncOffices(result.state, result.state, result.offices)).toEqual(result);
-  },
-);
+it('AC-P2-32 같은 직책 장수의 조작자 전환은 칸과 임기를 새로 시작한다', () => {
+  const { state, offices } = fixture();
+  const king = Object.values(state.generals).find((general) => general.nationId === 1 && general.officerLevel === 12)!;
+  king.userId = null;
+  const after = structuredClone(state);
+  after.generals[king.id]!.userId = 'lineage-new-controller';
+  const result = syncOffices(state, after, offices);
+  expect(result.state.officeTurns?.[1]?.[12]).toEqual(rest());
+  expect(result.offices[1]?.[12]).toEqual({ revision: 9, tenure: 4 });
+  expect(result.state.officeTurns?.[1]?.[5]).toEqual(state.officeTurns?.[1]?.[5]);
+  expect(syncOffices(result.state, result.state, result.offices)).toEqual(result);
+});
 function fixture(): { state: OfficeState; offices: OfficeRevisions } {
   const state: OfficeState = personnelWorld();
+  state.nations[1]!.level = 7;
   state.officeTurns = { 1: { 5: reserved(), 12: reserved() }, 2: { 12: reserved() } };
   return {
     state,
@@ -160,6 +149,7 @@ describe('직책 칸 동기화', () => {
 
   it('직책자가 그대로인 초기 상태에 칸과 revision을 만들지 않는다', () => {
     const state = personnelWorld();
+    state.nations[1]!.level = 7;
     const result = syncOffices(state, state, {});
     expect(result).toEqual({ state, offices: {} });
     expect(Object.hasOwn(result.state, 'officeTurns')).toBe(false);

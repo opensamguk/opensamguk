@@ -66,7 +66,7 @@ it('T4-95 AC-P2-32 isHuman이 없으면 NPC로 짐작하지 않고 두 경우 �
   // 같은 국가 NPC는 지금처럼 즉시 판정 문구를 쓴다.
   const npc = { ...view, people: [own, { ...own, id: 12, name: '도겸', isHuman: false }] };
   expect(proposalRule(npc, 12)).toBe(
-    '도겸은(는) NPC입니다. 처리할 때 소속·친화 조건으로 바로 판정하고 맞으면 제안 없이 바로 혼인합니다.',
+    '도겸은(는) NPC입니다. 처리할 때 소속과 친화 조건으로 바로 판정하고 맞으면 제안 없이 바로 혼인합니다.',
   );
   const married = '도겸(NPC)과(와) 혼인했습니다. 혼인 탭에서 확인하세요.';
   expect(appliedMessage(npc, propose, 'marriage.propose')).toBe(married);

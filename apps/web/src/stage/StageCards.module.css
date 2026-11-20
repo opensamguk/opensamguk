@@ -1,0 +1,95 @@
+/* 성 화면의 늘 보이는 작은 판(완성 그림 04). 자리는 MapStage.module.css가 정한다. */
+.card {
+  width: 100%;
+  box-sizing: border-box;
+  display: grid;
+  gap: 4px;
+  padding: 2px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.card:focus-visible {
+  outline: 2px solid #ffd77a;
+  outline-offset: 2px;
+}
+.general {
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+}
+.face {
+  display: block;
+  width: 72px;
+}
+.body {
+  display: grid;
+  gap: 3px;
+  align-content: start;
+  min-width: 0;
+}
+.title {
+  font-size: 18px;
+  font-weight: 900;
+  color: #fff3d6;
+  text-shadow: 0 2px 0 #1a0a04;
+}
+.sub {
+  font-size: 12px;
+  color: #e9d7b0;
+}
+.row {
+  display: grid;
+  grid-template-columns: 20px auto 1fr;
+  gap: 6px;
+  align-items: center;
+  font-size: 13px;
+}
+.row b {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.rowIcon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+.city .title {
+  text-align: center;
+}
+.paperTitle {
+  font-size: 14px;
+}
+.turnList {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.turnList li {
+  display: flex;
+  gap: 8px;
+  min-height: 26px;
+  align-items: center;
+  padding: 0 6px;
+  font-size: 13px;
+}
+.turnList li[data-empty] {
+  color: #bfa98a;
+}
+.logs {
+  gap: 2px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.log {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+.log > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

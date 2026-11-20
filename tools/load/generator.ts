@@ -38,12 +38,21 @@ async function prepareUser(actor: LoadActor, recipientId: number, signal: AbortS
 
 export async function runNativeLoad(
   worlds: readonly FixtureWorld[],
-  options: { mode: 'formal' | 'smoke'; seed: string; signal: AbortSignal; onEvent?: GeneratorEventSink },
+  options: {
+    mode: 'formal' | 'smoke';
+    seed: string;
+    signal: AbortSignal;
+    onEvent?: GeneratorEventSink;
+    localRehearsal?: true;
+  },
 ) {
+  if (options.localRehearsal && options.mode !== 'smoke') throw new Error('LOAD_FORMAL_PROFILE_REQUIRED');
   if (worlds.length !== 2 || new Set(worlds.map((world) => world.worldId)).size !== 2)
     throw new Error('LOAD_TWO_WORLDS_REQUIRED');
   const perWorld = options.mode === 'formal' ? LOAD_CONTRACT.usersPerWorld : 5;
-  if (worlds.some((world) => world.users.length < perWorld || world.actors.length !== 109))
+  if (
+    worlds.some((world) => world.users.length < perWorld || world.actors.length !== (options.localRehearsal ? 5 : 109))
+  )
     throw new Error('LOAD_ACTORS_MISSING');
   const owned = new AbortController();
   const signal = AbortSignal.any([options.signal, owned.signal]);

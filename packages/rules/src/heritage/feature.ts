@@ -12,17 +12,11 @@ export const heritageFeature: RuleFeatureDefinition = {
     heritageFeatureDataSchema.parse(data);
   },
   checkArchive({ origin, inputs }) {
-    const five = origin.initial.ruleFeatures?.includes('five-stats') ?? false;
     for (const input of inputs) {
       if (input.kind !== 'general.create' || input.status !== 'APPLIED') continue;
-      const checked = validateGeneralCreation(
-        input.payload,
-        origin.initial.statRules,
-        origin.initial.ruleFeatures?.includes('lineage-v1'),
-        true,
-      );
+      const checked = validateGeneralCreation(input.payload, origin.initial.statRules, true, true);
       if (!checked.ok) throw new Error('유산 생성 입력의 능력치·배분을 확인하세요.');
-      assertHeritageCreationResult(checked.value, input.result, true, five);
+      assertHeritageCreationResult(checked.value, input.result, true, origin.initial.statRules.count === 5);
     }
   },
 };

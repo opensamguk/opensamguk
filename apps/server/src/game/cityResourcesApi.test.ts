@@ -45,10 +45,10 @@ function fixture() {
       ],
     },
   };
-  const initial = { ruleFeatures: ['city-resources-v1'], unitSet: { crewTypes: [{ id: 1100, name: '보병' }] } };
+  const initial = { unitSet: { crewTypes: [{ id: 1100, name: '보병' }] } };
   const world = {
     id: 'own-world',
-    ruleFeatures: ['city-resources-v1'],
+
     replayFormat: 3,
     replayOrigin: { version: 3, initial },
     unitSet: initial.unitSet,
@@ -297,11 +297,10 @@ describe('AC-INT-18B 도시 자원 API 접수', () => {
       result: { code: 'NO_CREW', message: '병력 부족' },
     });
   });
-  it('생성 기록의 기능 사본이 바뀐 월드는 읽지 않는다', async () => {
+  it('AC-INT-28 별도 기능 사본 없이 도시 원장을 읽는다', async () => {
     const f = fixture();
-    f.world.replayOrigin.initial.ruleFeatures = [];
-    await expect(readCityResourceBoard(f.ctx, 'own-world', 1)).rejects.toThrow('기능 사본');
-    expect(readView).not.toHaveBeenCalled();
+    expect(await readCityResourceBoard(f.ctx, 'own-world', 1)).toMatchObject({ visible: true });
+    expect(readView).toHaveBeenCalledOnce();
   });
 });
 describe('AC-INT-18B 도시 원장 가시성과 배속 대상', () => {

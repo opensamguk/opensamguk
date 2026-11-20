@@ -1,49 +1,58 @@
-import { publicImageUrl } from '@opensamguk/shared/public-images';
+import { hasPublicImage, publicImageUrl } from '@opensamguk/shared/public-images';
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef, type MouseEvent, type ReactNode } from 'react';
 import { OFFICER_MIN_LEVEL } from '../operations/contract';
-const mainIcon = publicImageUrl('apps/web/src/art/icons/main.png');
-const turnsIcon = publicImageUrl('apps/web/src/art/icons/turns.png');
-const mapIcon = publicImageUrl('apps/web/src/art/icons/map.png');
-const nationIcon = publicImageUrl('apps/web/src/art/icons/nation.png');
-const diplomacyIcon = publicImageUrl('apps/web/src/art/icons/diplomacy.png');
-const operationsIcon = publicImageUrl('apps/web/src/art/icons/operations.png');
-const recordsIcon = publicImageUrl('apps/web/src/art/icons/records.png');
-const rankingIcon = publicImageUrl('apps/web/src/art/icons/ranking.png');
-const battleIcon = publicImageUrl('apps/web/src/art/icons/battle.png');
-const personnelIcon = publicImageUrl('apps/web/src/art/icons/personnel.png');
-const helpIcon = publicImageUrl('apps/web/src/art/icons/help.png');
-const messagesIcon = publicImageUrl('apps/web/src/art/icons/messages.png');
+// 메뉴 아이콘은 키트 B 둥근 단추 아이콘(icon-nav-*)이다. 승인 목록에 없으면 단추 바탕만 보인다.
+const navIcon = (name: string) => {
+  const source = `apps/web/src/art/ui/kit-b/icon-nav-${name}.webp`;
+  return hasPublicImage(source) ? publicImageUrl(source) : undefined;
+};
+const mainIcon = navIcon('main');
+const turnsIcon = navIcon('turns');
+const mapIcon = navIcon('map');
+const nationIcon = navIcon('nation');
+const diplomacyIcon = navIcon('diplomacy');
+const inboxIcon = navIcon('inbox');
+const operationsIcon = navIcon('operations');
+const recordsIcon = navIcon('records');
+const rankingIcon = navIcon('ranking');
+const simulatorIcon = navIcon('simulator');
+const retinueIcon = navIcon('account');
+const helpIcon = navIcon('help');
+const menuIcon = navIcon('settings');
 import { useInboxCount } from '../inbox/useInboxCount';
 import styles from './GameNavigation.module.css';
 
 // 구조 참고: opensamguk-v1 bc053629의 GameFrame.tsx·nav31.ts (MIT).
 // Copyright (c) 2026 빼뽀네 (peppone-choi) and OpenSamguk contributors.
 // 현재 React 주소와 메인 지도·30칸 예약을 유지하고 연결된 화면만 안내한다.
-// 아이콘은 Codex 생성 도트 그림이다 (opensamguk-images의 public/art/sources.json, D-041).
+// 단추는 키트 A 둥근 단추 위에 키트 B 아이콘을 얹고 이름을 아래에 적는다 (INT-29 화면 개편 초안).
 const NAV = [
   { to: '/w/$worldId', label: '군략도', icon: mainIcon, exact: true },
   { to: '/w/$worldId', label: '예턴', icon: turnsIcon, area: 'main-commands' },
   { to: '/w/$worldId/map', label: '지도', icon: mapIcon },
   { to: '/w/$worldId/nation/personnel', label: '국가', icon: nationIcon },
   { to: '/w/$worldId/diplomacy', label: '외교', icon: diplomacyIcon },
-  { to: '/w/$worldId/inbox', label: '제안함', icon: messagesIcon },
+  { to: '/w/$worldId/inbox', label: '제안함', icon: inboxIcon },
   { to: '/w/$worldId/operations', label: '작전', icon: operationsIcon },
   { to: '/w/$worldId/records', label: '기록', icon: recordsIcon },
   { to: '/w/$worldId/ranking', label: '순위', icon: rankingIcon },
-  { to: '/w/$worldId/simulator', label: '전투 시뮬레이터', icon: battleIcon },
+  { to: '/w/$worldId/simulator', label: '전투 시뮬레이터', icon: simulatorIcon },
 ] as const;
 
-const Icon = ({ src }: { src: string }) => <img src={src} alt="" width={32} height={32} className={styles.icon} />;
+// 둥근 단추 그림 안의 아이콘. 이름 글자가 링크의 접근 이름이므로 그림은 비워 읽힌다.
+const Icon = ({ src }: { src: string | undefined }) => (
+  <span className={styles.round} aria-hidden="true">
+    {src ? <img src={src} alt="" width={24} height={24} className={styles.icon} /> : null}
+  </span>
+);
 
 export function GameNavigation({
   worldId,
-  campaignEnabled,
   officerLevel,
   accountLinks,
 }: {
   worldId: string;
-  campaignEnabled: boolean;
   officerLevel: number;
   // 좁은 화면에서만 넘긴다. 위 띠에서 빠진 관리자·내 계정·알림 설정을 `전체` 메뉴 끝에 둔다.
   accountLinks?: ((className: string | undefined) => ReactNode) | undefined;
@@ -137,12 +146,10 @@ export function GameNavigation({
   const links = (
     <>
       {NAV.map(navigationLink)}
-      {campaignEnabled ? (
-        <Link to="/w/$worldId/campaign" params={{ worldId }} className={styles.link} onClick={() => close()}>
-          <Icon src={personnelIcon} />
-          휘하·부곡
-        </Link>
-      ) : null}
+      <Link to="/w/$worldId/campaign" params={{ worldId }} className={styles.link} onClick={() => close()}>
+        <Icon src={retinueIcon} />
+        휘하·부곡
+      </Link>
       {officerLevel >= OFFICER_MIN_LEVEL ? (
         <Link to="/w/$worldId/nation/inspection" params={{ worldId }} className={styles.link} onClick={() => close()}>
           <Icon src={nationIcon} />
@@ -162,14 +169,20 @@ export function GameNavigation({
       <nav className={styles.rail} aria-label="게임 메뉴">
         {links}
       </nav>
-      <nav className={styles.mobile} aria-label="게임 메뉴">
+      <nav className={`${styles.mobile} kit-bar-bottom`} aria-label="게임 메뉴">
         {NAV.filter((item) => ['군략도', '예턴', '기록'].includes(item.label)).map(navigationLink)}
         <details ref={more} className={styles.more}>
           <summary ref={summary} className={styles.link}>
+            <Icon src={menuIcon} />
             전체
           </summary>
-          <div className={styles.menu}>
-            <button type="button" className={styles.close} onClick={() => close(true)}>
+          <div className={`${styles.menu} kit-tooltip`}>
+            <button
+              type="button"
+              className={`${styles.close} kit-button`}
+              data-kind="secondary"
+              onClick={() => close(true)}
+            >
               메뉴 닫기
             </button>
             {links}

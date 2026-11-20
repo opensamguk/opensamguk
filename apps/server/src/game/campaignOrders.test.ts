@@ -31,7 +31,6 @@ function fixture() {
       seed: 'order-api-boundary',
     }),
   );
-  view.ruleFeatures = ['campaign-v1', 'five-stats', 'operational-map', 'personnel', 'policy'];
   for (const general of Object.values(view.generals))
     Object.assign(general, { crew: 0, politics: 60, charm: 55, cityKey: 1, nationId: 1 });
   view.generals[1]!.userId = 'owner';
@@ -42,8 +41,8 @@ function fixture() {
     id: 'world',
     status: 'RUNNING',
     replayFormat: 3,
-    replayOrigin: { version: 3, initial: { ruleFeatures: view.ruleFeatures, unitSet: testUnits } },
-    ruleFeatures: view.ruleFeatures,
+    replayOrigin: { version: 3, initial: { unitSet: testUnits } },
+
     unitSet: testUnits,
     preset: null,
     clockTick: 0,

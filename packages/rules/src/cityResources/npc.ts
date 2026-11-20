@@ -62,8 +62,6 @@ export function cityNpcPreparation(view: WorldView, generalId: number, context: 
   if (!plan) return [];
   const { general, city, resources, army, type, row, limit, recruitable } = plan;
   const choices: NpcCandidate[] = [];
-  if (recruitable && !army && general.leadership > 0 && row?.troops)
-    choices.push(candidate('form_unit', { crewType: type.id }, 180, '도시 병력을 배속할 빈 부곡을 편성한다.'));
   if (row?.troops) {
     if (row.atmos < 70)
       choices.push(
@@ -76,7 +74,7 @@ export function cityNpcPreparation(view: WorldView, generalId: number, context: 
   }
   if (recruitable && (row?.troops ?? 0) < 2000) {
     let amount = affordableRecruits(view, { ...general, gold: resources.gold }, type.cost, limit);
-    if (view.ruleFeatures?.includes('logistics-v1')) {
+    {
       const logistics = view.logistics,
         cost = logistics?.config.recruitPer100[String(type.armType)],
         stock = logistics?.cities[String(city.cityKey)];
@@ -99,7 +97,26 @@ export function cityNpcAllocations(view: WorldView, nationId: number): NpcCandid
   const ledger = readCityResourcesState(view.cityResources, view),
     campaign = readCampaignState(view.campaign, view);
   const choices: NpcCandidate[] = [];
-  for (const unit of campaign.units) {
+  const targets = [
+    ...campaign.units,
+    ...Object.values(view.generals)
+      .filter(
+        (general) =>
+          general.nationId === nationId &&
+          general.userId === null &&
+          !campaign.units.some((unit) => unit.ownerId === general.id),
+      )
+      .flatMap((general) =>
+        (ledger.cities[String(general.cityKey)]?.garrison ?? []).map((row) => ({
+          id: 0,
+          ownerId: general.id,
+          commanderId: general.id,
+          troops: 0,
+          crewType: row.crewType,
+        })),
+      ),
+  ];
+  for (const unit of targets) {
     const owner = view.generals[unit.ownerId]!,
       commander = view.generals[unit.commanderId]!;
     if (owner.nationId !== nationId || commander.nationId !== nationId || owner.cityKey !== commander.cityKey) continue;
@@ -116,7 +133,13 @@ export function cityNpcAllocations(view: WorldView, nationId: number): NpcCandid
       choices.push(
         candidate(
           'nation_city_allocate',
-          { cityKey: city.cityKey, unitId: unit.id, crewType: unit.crewType, amount },
+          {
+            cityKey: city.cityKey,
+            unitId: unit.id || 'new',
+            ...(unit.id ? {} : { recipientId: owner.id }),
+            crewType: unit.crewType,
+            amount,
+          },
           180,
           '준비된 도시 병사를 집결한 부곡에 한 번 배속한다.',
         ),

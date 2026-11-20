@@ -60,6 +60,7 @@ export type GovernanceOffice = (typeof GOVERNANCE_OFFICES)[number];
 export function readGovernanceConfig(value: unknown, world: Pick<WorldView, 'cities'>): GovernanceConfig {
   const config = governanceConfigSchema.parse(value);
   const seat = world.cities[config.seatCityKey];
-  if (!seat || seat.kind === 'PASS') throw new Error('천자 소재지는 존재하는 도시 거점이어야 합니다.');
+  if (!seat || seat.kind === 'PASS' || seat.kind === 'FIELD')
+    throw new Error('천자 소재지는 존재하는 도시 거점이어야 합니다.');
   return config;
 }

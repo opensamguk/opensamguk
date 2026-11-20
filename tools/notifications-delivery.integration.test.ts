@@ -1,3 +1,6 @@
+import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { commandInitial } from '../packages/rules/test/commandFixture';
+import { ciGreenDatabaseName } from './test-database';
 import { randomUUID } from 'node:crypto';
 import { fork, type ChildProcess } from 'node:child_process';
 import { readdir, readFile } from 'node:fs/promises';
@@ -29,7 +32,7 @@ type Pg = {
 const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
 if (!['127.0.0.1', 'localhost'].includes(source.hostname) || source.search)
   throw Error('loopback 전용 시험 DB가 필요합니다.');
-const database = `notification_delivery_${randomUUID().replaceAll('-', '')}_test`;
+const database = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
 const targetUrl = new URL(source),
   adminUrl = new URL(source);
 targetUrl.pathname = '/' + database;
@@ -135,21 +138,11 @@ beforeAll(async () => {
   for (const name of (await readdir(directory)).filter((name) => /^\d{14}_/.test(name)).sort())
     await sql.query(await readFile(new URL(name + '/migration.sql', directory), 'utf8'));
   passwordHash = await hashPassword(password);
-  const world = await db.world.create({
-    data: {
-      name: '알림 시험',
-      scenarioKey: 'notification-test',
-      mapKey: 'notification-test',
-      unitSetKey: 'notification-test',
-      seed: 'notification-test',
-      startYear: 191,
-      turnTermMinutes: 60,
-      initialStateHash: '0'.repeat(64),
-      statRules: {},
-      unitSet: {},
-    },
-  });
-  worldId = world.id;
+  ({ worldId } = await saveInitialWorld(db, commandInitial(), {
+    name: 'Notification delivery fixture',
+    turnTermMinutes: 60,
+    endYear: null,
+  }));
   await listenLegalHttp(receiver);
   receiverOrigin = `http://127.0.0.1:${(receiver.address() as AddressInfo).port}`;
 });

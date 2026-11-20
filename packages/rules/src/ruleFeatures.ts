@@ -1,6 +1,7 @@
 import { z } from 'zod';
+import { applyProposalRecord } from './personnel/proposals';
 import { createdHeritageStat } from './heritage/creation';
-import { FIVE_STAT_KEYS, FIVE_STAT_RULES, checkStatProfile } from './general/fiveStats';
+import { FIVE_STAT_KEYS, checkStatProfile } from './general/fiveStats';
 import { validateGeneralCreation } from './general/create';
 import type { InputKindDefinition, RuleFeatureDefinition } from './ruleRegistry';
 import type { RecordedInput, ReplayState } from './replay';
@@ -25,6 +26,16 @@ export const operationalMapFeature: RuleFeatureDefinition = {
   conflicts: [],
   checkOrigin({ initial, data }) {
     if (data !== undefined) throw new Error('운영 지도는 생성 기록의 불변 원장을 사용합니다.');
+    checkOperationalProfile(initial);
+  },
+};
+
+export const capturableFieldFeature: RuleFeatureDefinition = {
+  key: 'capturable-field-v1',
+  requires: ['operational-map'],
+  conflicts: [],
+  checkOrigin({ initial, data }) {
+    if (data !== undefined) throw new Error('전장 점령은 새 지도 판의 생성 기록이 필요합니다.');
     checkOperationalProfile(initial);
   },
 };
@@ -57,19 +68,17 @@ export const fiveStatsFeature: RuleFeatureDefinition = {
     checkStatProfile(initial);
   },
   checkArchive({ origin, inputs }) {
+    const five = origin.initial.statRules.count === 5;
     for (const input of inputs) {
       if (input.kind !== 'general.create' || input.status !== 'APPLIED') continue;
-      const parsed = validateGeneralCreation(
-        input.payload,
-        FIVE_STAT_RULES,
-        origin.initial.ruleFeatures?.includes('lineage-v1'),
-        origin.initial.ruleFeatures?.includes('heritage-v1'),
-      );
+      const parsed = validateGeneralCreation(input.payload, origin.initial.statRules, true, true);
       const general = (input.result as { general?: Record<string, unknown> } | null)?.general;
       if (
         !parsed.ok ||
         !general ||
-        FIVE_STAT_KEYS.some((key) => general[key] !== createdHeritageStat(parsed.value, key))
+        (five ? FIVE_STAT_KEYS : FIVE_STAT_KEYS.slice(0, 3)).some(
+          (key) => general[key] !== createdHeritageStat(parsed.value, key),
+        )
       )
         throw new Error('5능력치 생성 입력과 결과가 다릅니다.');
     }
@@ -89,12 +98,7 @@ export const policyFeature: RuleFeatureDefinition = {
   checkArchive({ origin, inputs }) {
     for (const input of inputs)
       if (['turns.set', 'general.create', 'general.setPolicy', 'general.active'].includes(input.kind))
-        validatePolicyInput(
-          input,
-          origin.initial.ruleFeatures?.includes('five-stats'),
-          origin.initial.ruleFeatures?.includes('lineage-v1'),
-          origin.initial.ruleFeatures?.includes('heritage-v1'),
-        );
+        validatePolicyInput(input, origin.initial.statRules.count === 5, true, true);
   },
   initReplayState(replay, { data }) {
     const config = policyDataSchema.parse(data);
@@ -140,7 +144,7 @@ export const personnelFeature: RuleFeatureDefinition = {
   initReplayState(replay) {
     return { ...replay, offices: {}, residenceAnchors: {} };
   },
-  checkArchive({ origin, inputs, end }) {
+  checkArchive({ inputs, end }) {
     for (const input of inputs) {
       if (!['personnel.appoint', 'personnel.dismiss', 'offer.respond', 'nationTurns.set'].includes(input.kind))
         continue;
@@ -155,11 +159,7 @@ export const personnelFeature: RuleFeatureDefinition = {
       );
       if (validated.kind !== 'nationTurns.set' && validated.result.tick !== tick)
         throw new Error('인사 처리 tick이 기록과 다릅니다.');
-      if (
-        validated.kind === 'nationTurns.set' &&
-        validated.status === 'APPLIED' &&
-        origin.initial.ruleFeatures?.includes('policy')
-      ) {
+      if (validated.kind === 'nationTurns.set' && validated.status === 'APPLIED') {
         if (activeTick !== tick) throw new Error('직책 칸 저장 활동 tick이 다릅니다.');
       } else if (activeTick !== undefined) throw new Error('활동을 기록하지 않는 인사 입력입니다.');
     }
@@ -226,6 +226,7 @@ function applyPersonnel(replay: ReplayState, input: RecordedInput): ReplayState 
 }
 
 export const personnelInputKinds: readonly InputKindDefinition[] = [
+  { kind: 'proposal.record', feature: 'personnel', route: 'queued', apply: applyProposalRecord },
   ...['personnel.appoint', 'personnel.dismiss', 'offer.respond'].map((kind): InputKindDefinition => ({
     kind,
     feature: 'personnel',
@@ -242,14 +243,14 @@ export const treatyFeature: RuleFeatureDefinition = {
   checkOrigin({ data, initial }) {
     if (data !== undefined || Object.hasOwn(initial, 'treaties')) throw new Error('조약 초기 상태를 확인하세요.');
   },
-  checkArchive({ origin, inputs, end }) {
+  checkArchive({ inputs, end }) {
     for (const input of inputs) {
       if (!['treaty.propose', 'treaty.respond'].includes(input.kind)) continue;
       const { tick, ...record } = input;
       const validated = validateTreatyRecord(record, {
         treaty: { version: 1 },
-        ...(origin.initial.ruleFeatures?.includes('treaty-trade') ? { treatyTrade: { version: 1 } } : {}),
-        ...(origin.initial.ruleFeatures?.includes(EXPANDED_TREATY_FEATURE) ? { treatyExpanded: { version: 1 } } : {}),
+        ...{ treatyTrade: { version: 1 } },
+        ...{ treatyExpanded: { version: 1 } },
         monthlyTick: 0,
         ...(end && input.sequence > end.sequence ? { endTick: end.tick } : {}),
       });
@@ -270,15 +271,15 @@ export const treatyBreakFeature: RuleFeatureDefinition = {
     if (data !== undefined || Object.hasOwn(initial, 'nationTrust'))
       throw new Error('조약 파기 초기 상태를 확인하세요.');
   },
-  checkArchive({ origin, inputs, end }) {
+  checkArchive({ inputs, end }) {
     for (const input of inputs) {
       if (input.kind !== 'treaty.break') continue;
       const { tick, ...record } = input;
       const validated = validateTreatyRecord(record, {
         treaty: { version: 1 },
         treatyBreak: { version: 1 },
-        ...(origin.initial.ruleFeatures?.includes('treaty-trade') ? { treatyTrade: { version: 1 } } : {}),
-        ...(origin.initial.ruleFeatures?.includes(EXPANDED_TREATY_FEATURE) ? { treatyExpanded: { version: 1 } } : {}),
+        ...{ treatyTrade: { version: 1 } },
+        ...{ treatyExpanded: { version: 1 } },
         monthlyTick: 0,
         ...(end && input.sequence > end.sequence ? { endTick: end.tick } : {}),
       });
@@ -310,11 +311,9 @@ function applyTreaty(replay: ReplayState, input: RecordedInput): ReplayState {
   const { tick, ...record } = input;
   const context = {
     treaty: { version: 1 as const },
-    ...(replay.state.ruleFeatures?.includes('treaty-break') ? { treatyBreak: { version: 1 as const } } : {}),
-    ...(replay.state.ruleFeatures?.includes('treaty-trade') ? { treatyTrade: { version: 1 as const } } : {}),
-    ...(replay.state.ruleFeatures?.includes(EXPANDED_TREATY_FEATURE)
-      ? { treatyExpanded: { version: 1 as const } }
-      : {}),
+    ...{ treatyBreak: { version: 1 as const } },
+    ...{ treatyTrade: { version: 1 as const } },
+    ...{ treatyExpanded: { version: 1 as const } },
     monthlyTick: replay.monthlyTick,
   };
   const validated = validateTreatyRecord(record, context);
@@ -322,7 +321,7 @@ function applyTreaty(replay: ReplayState, input: RecordedInput): ReplayState {
   const result = applyTreatyInput(replay.state, validated, {
     tick: tickSchema.parse(tick),
     sequence: validated.sequence,
-    ...treatyOptions(replay.state.ruleFeatures ?? []),
+    ...treatyOptions(),
   });
   if (!result.ok) throw new Error('조약 적용 기록을 재현하지 못했습니다.');
   const recomputed = validateTreatyRecord({ ...validated, result: result.result }, context);

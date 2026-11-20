@@ -145,18 +145,10 @@ afterEach(() => {
   sessionStorage.clear();
 });
 
-it('T4-95 AC-P2-32 가문 기능을 끈 월드는 조회하지 않고 칸도 그리지 않는다', async () => {
-  mocks.enabled = false;
-  const client = mount();
-  await waitFor(() => expect(client.getQueryData(['summary'])).toBeDefined());
-  expect(mocks.get).not.toHaveBeenCalled();
-  expect(screen.queryByRole('region', { name: '가문' })).toBeNull();
-});
-
 it('T4-95 AC-P2-32 혼인 제안 확인창은 가주 문구를 보이고 Escape로 닫으면 보내지 않는다', async () => {
   mount();
   const dialog = await openProposal();
-  expect(dialog.textContent).toContain('자녀는 출생 때 가주(제안한 장수 서윤)의 국가·도시를 따르고');
+  expect(dialog.textContent).toContain('자녀는 출생 때 가주(제안한 장수 서윤)의 국가와 도시를 따르고');
   // 상대가 NPC면 사람 동의 문구 없이 즉시 판정만 적는다(people[].isHuman).
   expect(dialog.textContent).toContain('도겸은(는) NPC입니다.');
   expect(dialog.textContent).not.toContain('직접 수락해야');
@@ -189,7 +181,7 @@ it('T4-95 AC-P2-32 사람 여부·나이가 빠진 상대는 NPC로 짐작하지
   mount();
   const dialog = await openProposal();
   expect(dialog.textContent).toContain('처리할 때 도겸이(가) 사람 장수면 제안이 가고 직접 수락해야 혼인합니다.');
-  expect(dialog.textContent).toContain('NPC면 소속·친화 조건으로 바로 판정합니다.');
+  expect(dialog.textContent).toContain('NPC면 소속과 친화 조건으로 바로 판정합니다.');
   expect(dialog.textContent).not.toContain('도겸은(는) NPC입니다.');
   expect(dialog.textContent).not.toContain('도겸은(는) 사람 장수입니다.');
   fireEvent.keyDown(dialog, { key: 'Escape' });

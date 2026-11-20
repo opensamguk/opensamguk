@@ -46,7 +46,7 @@ const REJECTION_TEXT: Record<string, string> = {
   WORLD_CLOSED: '종료된 월드입니다.',
   ACTOR_INACTIVE: '활성 계정이 아닙니다.',
   NO_GENERAL: '내 장수가 아닙니다.',
-  BAD_POLICY: '활동·기본 방침 입력이 올바르지 않습니다.',
+  BAD_POLICY: '활동과 기본 방침 입력이 올바르지 않습니다.',
 };
 
 // 거절 안내 한 줄. 모르는 코드면 일반 실패 문장만 둔다.

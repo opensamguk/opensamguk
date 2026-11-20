@@ -9,7 +9,6 @@ import { stratagemCardsFeature, stratagemCardsInputKind } from './feature';
 const payload = { type: 'trap.set', nationId: 1, cityKey: 1 };
 function fixture() {
   const world = commandWorld();
-  world.ruleFeatures = ['five-stats', 'stratagem-basic', 'stratagem-cards-v1'];
   world.generals[1]!.userId = 'owner';
   world.stratagemCards = initialStratagemCards(TEST_STRATAGEM_CARDS_CONFIG, world, 'action-fixture');
   world.stratagemCards.nations[1]!.hand = ['trap'];
@@ -41,7 +40,9 @@ it('AC-P2-23 소속·군주·패·거점·중복 검사를 보존한다', () => 
 });
 
 it('AC-P2-23 꺼진 기능·등장 전·잘못된 월·변경 한도는 상태를 바꾸지 않는다', () => {
-  expect(decideStratagemCardsAction(commandWorld(), 1, payload, 0)).toMatchObject({ code: 'FEATURE_DISABLED' });
+  const empty = commandWorld();
+  empty.stratagemCards!.nations[1]!.hand = [];
+  expect(decideStratagemCardsAction(empty, 1, payload, 0)).toMatchObject({ code: 'NO_TRAP_CARD' });
   const world = fixture();
   world.generals[1]!.activeFromYear = 210;
   expect(decideStratagemCardsAction(world, 1, payload, 0)).toMatchObject({ code: 'NO_GENERAL' });
@@ -53,25 +54,23 @@ it('AC-P2-23 꺼진 기능·등장 전·잘못된 월·변경 한도는 상태�
   expect(world).toEqual(before);
 });
 
-it.each([
-  { consumeOnRollFailure: false },
-  { campaignLoss: 'eligibleFirst' },
-  { setter: 'chiefs' },
-  { deck: [{ kind: 'nation_raid', weight: 1 }] },
-])('AC-P2-23 아직 구현하지 않은 config %j는 원생성에서 거부한다', (change) => {
-  expect(() =>
-    stratagemCardsFeature.checkOrigin!({
-      initial: commandInitial(),
-      data: { version: 1, config: { ...TEST_STRATAGEM_CARDS_CONFIG, ...change } },
-    }),
-  ).toThrow();
-});
+it.each([{ consumeOnRollFailure: false }, { campaignLoss: 'eligibleFirst' }, { setter: 'chiefs' }])(
+  'AC-P2-23 아직 구현하지 않은 config %j는 원생성에서 거부한다',
+  (change) => {
+    expect(() =>
+      stratagemCardsFeature.checkOrigin!({
+        initial: commandInitial(),
+        data: { version: 1, config: { ...TEST_STRATAGEM_CARDS_CONFIG, ...change } },
+      }),
+    ).toThrow();
+  },
+);
 
 it('AC-P2-23 실제 월간 뽑기 뒤의 설치 기록은 같은 결과로 재현되고 변조는 거부된다', () => {
   const world = commandWorld(),
     initial = commandInitial();
-  world.ruleFeatures = ['five-stats', 'stratagem-basic', 'stratagem-cards-v1'];
   world.generals[1]!.userId = 'owner';
+  delete world.stratagemCards;
   const start: ReplayState = { state: world, turns: { 1: [] }, revisions: { 1: 0 }, monthlyTick: 0 },
     data = { version: 1, config: { ...TEST_STRATAGEM_CARDS_CONFIG, deck: [{ kind: 'trap', weight: 1 }] } };
   stratagemCardsFeature.checkOrigin!({ initial, data });

@@ -5,7 +5,7 @@ import { fail } from '../commands/support';
 import type { Actor, CommandDef, Failure } from '../commands/types';
 import type { WorldView } from '../model/world';
 import { governanceRealmIndex } from './realm';
-import { reconcileGovernance } from './reconcile';
+import { reconcileOwnedGovernance } from './reconcile';
 
 export const GOVERNANCE_HOSTILE_COMMANDS = [
   'nation_declare',
@@ -24,7 +24,7 @@ export function governanceHostilityFailure(
   key: string,
   value: unknown,
 ): Failure | null {
-  if (!world.ruleFeatures?.includes('governance-v1') || !hostile.has(key)) return null;
+  if (!hostile.has(key)) return null;
   if (!world.governance) throw new Error('황실 기능이 켜진 월드의 상태가 없습니다.');
   const nationId = world.generals[actor.generalId]?.nationId;
   if (nationId === null || nationId === undefined || !world.nations[nationId] || !value || typeof value !== 'object')
@@ -54,11 +54,10 @@ export function createGovernanceCommandResolver(base: CommandResolver): CommandR
       precheck: (world, actor, args) =>
         governanceHostilityFailure(world, actor, key, args) ?? original.precheck(world, actor, args),
       execute(world, actor, args, rng) {
-        if (!world.ruleFeatures?.includes('governance-v1')) return original.execute(world, actor, args, rng);
         const denied = governanceHostilityFailure(world, actor, key, args) ?? original.check(world, actor, args);
         if (denied) throw new Error(denied.message);
         const result = original.execute(world, actor, args, rng);
-        const state = reconcileGovernance(applyEffects(world, result.effects), actor.tick ?? 0);
+        const state = reconcileOwnedGovernance(applyEffects(world, result.effects), actor.tick ?? 0);
         return { ...result, effects: [{ kind: 'world', state }] };
       },
     };

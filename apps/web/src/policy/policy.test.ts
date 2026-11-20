@@ -87,7 +87,7 @@ describe('방침 문장', () => {
     expect(reject('WORLD_CLOSED')).toBe('훈련으로 바꾸지 못했습니다. 종료된 월드입니다.');
     expect(reject('ACTOR_INACTIVE')).toBe('훈련으로 바꾸지 못했습니다. 활성 계정이 아닙니다.');
     expect(reject('NO_GENERAL')).toBe('훈련으로 바꾸지 못했습니다. 내 장수가 아닙니다.');
-    expect(reject('BAD_POLICY')).toBe('훈련으로 바꾸지 못했습니다. 활동·기본 방침 입력이 올바르지 않습니다.');
+    expect(reject('BAD_POLICY')).toBe('훈련으로 바꾸지 못했습니다. 활동과 기본 방침 입력이 올바르지 않습니다.');
     expect(reject('SOMETHING_NEW')).toBe('방침을 바꾸지 못했습니다.');
     expect(reject('toString')).toBe('방침을 바꾸지 못했습니다.');
   });

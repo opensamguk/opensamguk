@@ -139,10 +139,10 @@ export function AdminHome() {
   return (
     <section>
       <h2>운영 조회</h2>
-      <p>월드·사용자·감사 기록을 조회하고 로비·월드 공지를 관리합니다.</p>
+      <p>월드, 사용자, 감사 기록을 조회하고 로비와 월드 공지를 관리합니다.</p>
       <p>
-        사용자 상세에서 참가 장수·제재 이력을 확인하고 제재를 등록·해제합니다. 월드 목록에서
-        생성·시작·일시정지·재개·종료를 요청합니다. 초기화와 로그인 자료 화면은 준비 중입니다.
+        사용자 상세에서 참가 장수와 제재 이력을 확인하고 제재를 등록하거나 해제합니다. 월드 목록에서 생성, 시작,
+        일시정지, 재개, 종료, 초기화를 요청합니다.
       </p>
     </section>
   );
@@ -218,8 +218,8 @@ export function AdminUsers() {
         <label>
           검색 방식
           <select name="kind" value={kind} disabled={actionLocked} onChange={(e) => setKind(e.target.value)}>
-            <option value="account">이메일 앞부분·사용자 UUID</option>
-            <option value="general">월드·장수 이름</option>
+            <option value="account">이메일 앞부분 또는 사용자 UUID</option>
+            <option value="general">월드와 장수 이름</option>
           </select>
         </label>
         {kind === 'general' ? (
@@ -243,7 +243,7 @@ export function AdminUsers() {
           찾기
         </button>
       </form>
-      <p>찾기 버튼을 누를 때만 조회하고 감사 기록을 남깁니다. 최대50명을 표시합니다.</p>
+      <p>찾을 때마다 감사 기록을 남깁니다. 최대50명을 표시합니다.</p>
       {error || query.error ? <ErrorState title={error ?? query.error!} /> : null}
       {query.pending ? <LoadingState /> : null}
       {query.data ? (
@@ -254,7 +254,7 @@ export function AdminUsers() {
             <thead>
               <tr>
                 <th scope="col">사용자</th>
-                <th scope="col">상태·역할</th>
+                <th scope="col">상태와 역할</th>
                 <th scope="col">가입 시각</th>
                 <th scope="col">유효 제재</th>
               </tr>
@@ -406,10 +406,10 @@ export function AdminAudit() {
             <caption>감사 조회 결과</caption>
             <thead>
               <tr>
-                <th scope="col">ID·시각</th>
+                <th scope="col">ID와 시각</th>
                 <th scope="col">행위</th>
-                <th scope="col">행위자·대상·월드</th>
-                <th scope="col">사유·기록</th>
+                <th scope="col">행위자, 대상, 월드</th>
+                <th scope="col">사유와 기록</th>
               </tr>
             </thead>
             <tbody>

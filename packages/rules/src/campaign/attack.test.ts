@@ -9,7 +9,6 @@ import { emptyCampaignState } from './state';
 
 function fixture() {
   const world = commandWorld();
-  world.ruleFeatures = ['five-stats'];
   for (const general of Object.values(world.generals)) Object.assign(general, { politics: 60, charm: 55, crew: 0 });
   world.generals[1]!.userId = 'owner';
   world.campaign = emptyCampaignState(world, 'attack-fixture', 'sourced-fixture');
@@ -32,7 +31,6 @@ describe('AC-P2-24 공성 부곡의 성벽선제', () => {
     const world = fixture();
     world.cities[2]!.wall = wall;
     world.generals[1]!.injury = 17;
-    world.ruleFeatures!.push('city-resources-v1');
     world.cityResources = emptyCityResourcesState(world);
     const garrison = [{ crewType: 1100, troops: 10, train: 100, atmos: 100 }];
     world.cityResources.cities['2']!.garrison = garrison;
@@ -84,20 +82,23 @@ describe('AC-INT-09 부곡 출병·점령', () => {
     expect(world).toEqual(before);
     expect(run(before)).toEqual({ state, result });
   });
-  it('부장 지휘로 관문을 점령해도 국가는 도시를 잃기 전까지 남고 사람 휘하는 이동하지 않는다', () => {
-    const world = fixture();
-    Object.assign(world.generals[4]!, { nationId: 1, cityKey: 1, officerLevel: 1 });
-    world.campaign!.links = [{ masterId: 1, personId: 4, relation: 'LIEUTENANT' }];
-    world.campaign!.units[0]!.commanderId = 4;
-    world.cities[2]!.kind = 'PASS';
-    world.cities[3]!.nationId = 2;
-    const { state } = run(world);
-    expect(state.cities[2]!.nationId).toBe(1);
-    expect(state.nations[2]!.capitalCityKey).toBe(3);
-    expect(state.generals[4]!.cityKey).toBe(2);
-    expect(state.generals[4]!.rice).toBe(world.generals[4]!.rice);
-    expect(state.generals[1]!.rice).toBeLessThan(world.generals[1]!.rice);
-  });
+  it.each(['PASS', 'FIELD'] as const)(
+    '부장 지휘로 %s를 점령해도 국가는 도시를 잃기 전까지 남고 사람 휘하는 이동하지 않는다',
+    (kind) => {
+      const world = fixture();
+      Object.assign(world.generals[4]!, { nationId: 1, cityKey: 1, officerLevel: 1 });
+      world.campaign!.links = [{ masterId: 1, personId: 4, relation: 'LIEUTENANT' }];
+      world.campaign!.units[0]!.commanderId = 4;
+      world.cities[2]!.kind = kind;
+      world.cities[3]!.nationId = 2;
+      const { state } = run(world);
+      expect(state.cities[2]!.nationId).toBe(1);
+      expect(state.nations[2]!.capitalCityKey).toBe(3);
+      expect(state.generals[4]!.cityKey).toBe(2);
+      expect(state.generals[4]!.rice).toBe(world.generals[4]!.rice);
+      expect(state.generals[1]!.rice).toBeLessThan(world.generals[1]!.rice);
+    },
+  );
   it('같은 거점의 자기 부곡만 출병하며 남의 병력·떨어진 지휘관을 끌어오지 않는다', () => {
     const world = fixture();
     Object.assign(world.generals[4]!, { nationId: 1, cityKey: 4, officerLevel: 1 });
@@ -129,7 +130,7 @@ describe('AC-INT-09 부곡 출병·점령', () => {
     world.campaign!.units.push({ ...world.campaign!.units[0]!, id: 4, commanderId: 4, troops: 9000 });
     world.campaign!.nextUnitId = 5;
     const { state, result } = run(world);
-    expect(state.campaign!.units[0]!.troops).toBe(0);
+    expect(state.campaign!.units.some((unit) => unit.id === 1)).toBe(false);
     expect(result.reports?.filter((row) => row.generalId === 2)).toHaveLength(1);
     expect(result.reports?.find((row) => row.generalId === 2)!.text).toContain('부곡1');
     expect(result.reports?.find((row) => row.generalId === 2)!.text).toContain('부곡4');

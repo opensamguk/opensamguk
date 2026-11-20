@@ -4,7 +4,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import type { WorldInit } from '../packages/rules/src/index';
-import { testDatabaseUrl } from './test-database';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
 
 type PgResult = { rows: Record<string, unknown>[] };
 type PgClient = {
@@ -63,10 +63,13 @@ async function withDatabase(
 ) {
   if (!process.env.TEST_DATABASE_URL) throw new Error('시험 접속값이 필요합니다.');
   const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-  if (!['127.0.0.1', 'localhost'].includes(source.hostname) || !['5432', '5433'].includes(source.port || '5432'))
+  if (
+    !['127.0.0.1', 'localhost'].includes(source.hostname) ||
+    !['5432', '5433', '5561'].includes(source.port || '5432')
+  )
     throw new Error('loopback 5432 또는 5433 시험 서버가 필요합니다.');
-  const name = `t205_assignment_${mode}_${randomUUID().replaceAll('-', '')}_test`;
-  if (!new RegExp(`^t205_assignment_${mode}_[a-f0-9]{32}_test$`).test(name))
+  const name = ciGreenDatabaseName(`opensamguk_ci_green_${mode}_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
+  if (!(new RegExp(`^opensamguk_ci_green_${mode}_[a-f0-9]{20}_test$`).test(name) || name === ciGreenDatabaseName('')))
     throw new Error('자체 시험 DB 이름을 확인하세요.');
   const adminUrl = new URL(source),
     target = new URL(source);
@@ -140,9 +143,7 @@ async function withDatabase(
 }
 
 async function seed(client: PgClient) {
-  const archive = JSON.parse(
-    await readFile(new URL('../apps/engine/test/fixtures/replay-v1-b8f5074.json', import.meta.url), 'utf8'),
-  ) as {
+  const archive = JSON.parse(await readFile(new URL('fixtures/migration-replay-v1.json', import.meta.url), 'utf8')) as {
     origin: { initial: WorldInit; initialStateHash: string };
   };
   const initial = archive.origin.initial;

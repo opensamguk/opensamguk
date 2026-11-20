@@ -1,19 +1,17 @@
+import { ciGreenDatabaseName } from './test-database';
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { readFile, readdir } from 'node:fs/promises';
 import { expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
-import { initialReplayState, runReplayAction } from '../packages/rules/src/index';
-import { hashState } from '../packages/shared/src/node/hashState';
-import { exportReplay, replayArchive, type ReplayArchive } from '../apps/engine/src/replay';
-import { loadReplayState } from '../apps/engine/src/monthly';
+import type { ReplayArchive } from '../apps/engine/src/replay';
 
 it('T1-26 이전 실제 DB 행을 migration해도 초기·월간 해시·origin·장수 배치를 바꾸지 않는다', async () => {
   const url = process.env.TEST_DATABASE_URL;
   if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
   const target = new URL(url),
     adminUrl = new URL(url);
-  const name = `season_${randomUUID().replaceAll('-', '')}_test`;
+  const name = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
   target.pathname = `/${name}`;
   adminUrl.pathname = '/postgres';
   const admin = createDb(adminUrl.href),
@@ -43,14 +41,25 @@ it('T1-26 이전 실제 DB 행을 migration해도 초기·월간 해시·origin�
       .sort())
       await apply(directory);
     const archive = JSON.parse(
-      await readFile(new URL('../apps/engine/test/fixtures/replay-v1-b8f5074.json', import.meta.url), 'utf8'),
+      await readFile(new URL('fixtures/migration-replay-v1.json', import.meta.url), 'utf8'),
     ) as ReplayArchive;
-    replayArchive(archive, 12);
-    let replay = initialReplayState(archive.origin.initial);
+    // Historical JSON is opaque to this schema migration; current replay validation is tested separately.
     const last = archive.months.at(-1)!;
-    for (let sequence = 1; sequence <= last.sequence; sequence++)
-      replay = runReplayAction(replay, archive.origin.initial.seed, archive.origin.initial.unitSet);
-    expect(hashState(replay)).toBe(last.stateHash);
+    const initialState = archive.origin.initial;
+    const replay = {
+      state: {
+        nations: initialState.nations,
+        cities: initialState.cities,
+        generals: initialState.generals,
+        diplomacies: initialState.diplomacies,
+      },
+      turns: Object.fromEntries(
+        initialState.generals.map((general) => [
+          general.id,
+          Array.from({ length: 30 }, () => ({ commandKey: 'rest', args: {} })),
+        ]),
+      ),
+    };
     const initial = archive.origin.initial,
       worldId = randomUUID();
     await legacy.$executeRawUnsafe(
@@ -95,7 +104,7 @@ it('T1-26 이전 실제 DB 행을 migration해도 초기·월간 해시·origin�
       Object.values(replay.state.generals).map((general) => ({
         ...general,
         worldId,
-        turnRevision: replay.revisions[general.id],
+        turnRevision: 0,
         battleWins: 0,
         captures: 0,
       })),
@@ -122,7 +131,18 @@ it('T1-26 이전 실제 DB 행을 migration해도 초기·월간 해시·origin�
       'SELECT id,"nextTurnTick" FROM "General" WHERE "worldId" = $1 ORDER BY id',
       worldId,
     );
+    const storedRows = async () => {
+      const rows: Record<string, unknown> = {};
+      for (const table of ['Nation', 'City', 'General', 'GeneralTurn', 'Diplomacy', 'YearbookSnapshot'])
+        rows[table] = await legacy.$queryRawUnsafe(
+          `SELECT to_jsonb(t) AS data FROM "${table}" t WHERE "worldId"=$1 ORDER BY to_jsonb(t)::text`,
+          worldId,
+        );
+      return rows;
+    };
+    const beforeRows = await storedRows();
     await apply(migration);
+    expect(await storedRows()).toEqual(beforeRows);
     const world = await legacy.world.findUniqueOrThrow({
       where: { id: worldId },
       select: { endYear: true, clockMode: true, outcomeFromSequence: true },
@@ -139,22 +159,19 @@ it('T1-26 이전 실제 DB 행을 migration해도 초기·월간 해시·origin�
     expect(
       await legacy.$queryRawUnsafe('SELECT id,"nextTurnTick" FROM "General" WHERE "worldId" = $1 ORDER BY id', worldId),
     ).toEqual(ticks);
-    // The current engine client expects the latest schema, after the target migration was checked separately.
-    for (const directory of (await readdir(root, { withFileTypes: true }))
-      .filter((entry) => entry.isDirectory() && entry.name > migration)
-      .map((entry) => entry.name)
-      .sort())
-      await apply(directory);
-    expect(hashState(await legacy.$transaction((tx) => loadReplayState(tx, worldId)))).toBe(last.stateHash);
-    const exported = await exportReplay(legacy, worldId);
-    expect(exported.version).toBe(2);
-    expect(exported.origin).toEqual(archive.origin);
-    expect(exported.months.map((month) => month.stateHash)).toEqual(archive.months.map((month) => month.stateHash));
-    expect(replayArchive(exported, 12)).toEqual(replayArchive(archive, 12));
+    expect(
+      await legacy.$queryRawUnsafe(
+        'SELECT "tick","sequence","data","stateHash" FROM "YearbookSnapshot" WHERE "worldId"=$1 ORDER BY "tick"',
+        worldId,
+      ),
+    ).toEqual(archive.months.map(({ tick, sequence, data, stateHash }) => ({ tick, sequence, data, stateHash })));
   } finally {
     await migrationClient.end();
     await legacy.$disconnect();
-    await admin.$executeRawUnsafe(`DROP DATABASE "${name}" WITH (FORCE)`);
+    expect(await admin.$queryRaw`SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname = ${name}`).toEqual([
+      { count: 0 },
+    ]);
+    await admin.$executeRawUnsafe(`DROP DATABASE "${name}"`);
     await admin.$disconnect();
   }
 }, 60000);

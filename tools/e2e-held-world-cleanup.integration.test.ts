@@ -1,3 +1,4 @@
+import { ciGreenDatabaseName } from './test-database';
 import { createHash, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { readdir, readFile } from 'node:fs/promises';
@@ -9,6 +10,8 @@ import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { acquireLease, LeaseLostError } from '../apps/engine/src/lease';
 import { cleanupHeldWorld } from '../e2e/heldWorldCleanup';
 import { testDatabaseUrl } from './test-database';
+import { initializeResources } from './init-resources';
+import { initializeIntegrationResources } from './integration-resources';
 
 type Client = {
   connect(): Promise<void>;
@@ -25,7 +28,7 @@ if (!['127.0.0.1', 'localhost'].includes(source.hostname)) throw new Error('loop
 for (const key of source.searchParams.keys())
   if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
     throw new Error('대상 변경 인자는 받지 않습니다.');
-const name = `held_cleanup_${randomUUID().replaceAll('-', '')}_test`,
+const name = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`),
   target = new URL(source),
   root = new URL(source);
 target.pathname = '/' + name;
@@ -74,6 +77,11 @@ beforeAll(() =>
     const directory = new URL('../packages/db/prisma/migrations/', import.meta.url);
     for (const migration of (await readdir(directory)).filter((value) => /^\d{14}_/.test(value)).sort())
       await blocker.query(await readFile(new URL(migration + '/migration.sql', directory), 'utf8'));
+    await initializeResources(
+      db,
+      await readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8'),
+    );
+    await initializeIntegrationResources(db);
   }),
 );
 afterAll(async () => {
@@ -138,16 +146,6 @@ async function world() {
   } finally {
     await resourceDb.$disconnect();
   }
-  initial.ruleFeatures = [
-    'campaign-assignment-v2',
-    'campaign-v1',
-    'five-stats',
-    'operational-map',
-    'personnel',
-    'policy',
-    'stratagem-basic',
-    'treaty',
-  ];
   expect(initial.nations).toHaveLength(21);
   expect(initial.generals).toHaveLength(491);
   return (await saveInitialWorld(db, initial, { name: '정리 시험 월드', turnTermMinutes: 60, endYear: 201 })).worldId;

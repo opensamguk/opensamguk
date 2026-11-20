@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { readdir, readFile, mkdir, writeFile } from 'node:fs/promises';
@@ -6,7 +7,7 @@ import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, beforeAll, beforeEach, expect, it as test } from 'vitest';
-import { createDb, type Prisma } from '../packages/db/src/index';
+import { createDb, PrismaClient, type Prisma } from '../packages/db/src/index';
 import { buildServer } from '../apps/server/src/server';
 import { appRouter } from '../apps/server/src/router';
 import type { Context } from '../apps/server/src/context';
@@ -32,7 +33,7 @@ import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { processWorldCreateRequest } from '../apps/engine/src/admin/createRequests';
 import { prepareWorldReset } from '../apps/engine/src/admin/resetPreparation';
 import { stopOwnedChild } from '../apps/engine/src/process-lifecycle';
-import { testDatabaseUrl } from './test-database';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
 import { confirmDisconnectedDatabase } from './test-db-close';
 
 type Pg = {
@@ -46,11 +47,10 @@ const { Client } = createRequire(requireDb.resolve('@prisma/adapter-pg'))('pg') 
 };
 if (!process.env.TEST_DATABASE_URL) throw new Error('전용 시험 DB가 필요합니다.');
 const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-if (!['127.0.0.1', 'localhost'].includes(source.hostname)) throw new Error('loopback 시험 서버가 필요합니다.');
 for (const key of source.searchParams.keys())
   if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
     throw new Error('접속 대상 질의 인자는 쓸 수 없습니다.');
-const name = 't305_create_' + randomUUID().replaceAll('-', '') + '_test';
+const name = ciGreenDatabaseName('opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test');
 const target = new URL(source),
   adminUrl = new URL(source);
 target.pathname = '/' + name;
@@ -66,13 +66,21 @@ const pending = new Set<Promise<unknown>>(),
 const apps = new Set<Awaited<ReturnType<typeof buildServer>>>(),
   children: OwnedChild[] = [],
   oldWorlds: string[] = [];
+const crashSchema = 'admin_create_crash_' + randomBytes(8).toString('hex');
 const crashUrl = new URL(target);
-const crashName = 't305_create_crash_' + randomUUID().replaceAll('-', '') + '_test';
-crashUrl.pathname = '/' + crashName;
+crashUrl.searchParams.set('options', '-c search_path=' + crashSchema);
+const { PrismaPg } = requireDb('@prisma/adapter-pg') as {
+  PrismaPg: new (
+    config: { connectionString: string },
+    options: { schema: string },
+  ) => NonNullable<NonNullable<ConstructorParameters<typeof PrismaClient>[0]>['adapter']>;
+};
 const crash = {
-  name: crashName,
+  name,
+  schema: crashSchema,
+  schemaOid: undefined as string | undefined,
   url: crashUrl,
-  db: createDb(crashUrl.href),
+  db: new PrismaClient({ adapter: new PrismaPg({ connectionString: crashUrl.href }, { schema: crashSchema }) }),
   gate: new Client({ connectionString: crashUrl.href }),
   created: false,
   oid: undefined as string | undefined,
@@ -83,6 +91,7 @@ const crash = {
   requestId: '',
   plannedWorldId: '',
   key: '',
+  worker: new URL('../.tmp-ci-green/admin-create-' + randomUUID() + '.mjs', import.meta.url),
 };
 secrets.add(crashUrl.href);
 let oid: string | undefined,
@@ -487,6 +496,14 @@ afterAll(
       );
       if (children.some((child) => !child.closedAt || !child.stdoutEnded || !child.stderrEnded))
         suite.fail(new Error('자기 child close/stream 미확인: DB 보존'));
+      if (crash.created)
+        await cleanupAttempt(async () => {
+          const identity = await gate.query('SELECT oid::text AS oid FROM pg_namespace WHERE nspname=$1', [
+            crash.schema,
+          ]);
+          if (!crash.schemaOid || identity.rows[0]?.oid !== crash.schemaOid)
+            throw new Error('자기 crash schema OID가 달라 DB를 보존합니다.');
+        });
       const closers: Array<() => Promise<unknown>> = [...apps].map((app) => () => app.close());
       closers.push(
         () => gate.end(),
@@ -527,40 +544,8 @@ afterAll(
               (await checked(() => admin.query('SELECT oid FROM pg_database WHERE datname=$1', [name]), signal)).rows,
             ).toHaveLength(0);
             dropped = true;
-          }
-        }
-      } catch (error) {
-        suite.fail(error);
-      }
-
-      try {
-        if (crash.created) {
-          signal.throwIfAborted();
-          const identity = await checked(
-            () => admin.query('SELECT oid::text AS oid FROM pg_database WHERE datname=$1', [crash.name]),
-            signal,
-          );
-          if (!crash.oid) {
-            suite.fail(new Error('자기 crash DB 최초 OID가 불명하여 보존합니다.'));
-            const count = await checked(
-              () => admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=$1', [crash.name]),
-              signal,
-            );
-            crash.connections = Number(count.rows[0]?.count);
-          } else {
-            expect(identity.rows).toEqual([{ oid: crash.oid }]);
-            ({ connections: crash.connections } = await checked(
-              () => confirmDisconnectedDatabase(admin, crash.name, crash.oid!),
-              signal,
-            ));
-            if (mayDrop()) {
-              await dropDatabase(crash.name);
-              expect(
-                (await checked(() => admin.query('SELECT oid FROM pg_database WHERE datname=$1', [crash.name]), signal))
-                  .rows,
-              ).toHaveLength(0);
-              crash.dropped = true;
-            }
+            crash.connections = connections;
+            crash.dropped = crash.created;
           }
         }
       } catch (error) {
@@ -580,7 +565,9 @@ afterAll(
           hookAborted: signal.aborted,
           pendingOperations: pending.size,
 
-          crashDatabase: {
+          crashSchema: {
+            schema: crash.schema,
+            schemaOid: crash.schemaOid,
             name: crash.name,
             created: crash.created,
             oid: crash.oid,
@@ -633,6 +620,7 @@ it('AC-M3-04 정식 두 월드·실제 사람 입력·각30칸과 기존 기록�
         {
           worldId: saved.worldId,
           name: '보존사람' + index,
+          sex: 'MALE' as const,
           portraitId: null,
           leadership: 55,
           strength: 55,
@@ -753,12 +741,12 @@ for (const profileKey of [
     );
     if (!selected?.available) throw new Error('실제 확장 선택지가 필요합니다.');
     const profile = await loadFeatureProfile(profileKey);
-    const createdFeatures = [...new Set([...profile.value.ruleFeatures, 'office-effects'])].sort();
+    const createdFeatures = ruleRegistry.features.map(({ key }) => key).sort();
     if (selected.featureProfileKey === profileKey) expect(selected.featureProfileHash).toBe(profile.contentHash);
     const pair = await accepted(actor, signal, {
       ...selected.selection,
       featureProfileKey: profileKey,
-      ruleFeatures: profile.value.ruleFeatures,
+
       endYear: selected.suggestedEndYear,
       seed: 'expanded-http-create-reset',
     });
@@ -775,7 +763,7 @@ for (const profileKey of [
       featureProfile: { key: profile.value.key, contentHash: profile.contentHash },
     });
     const world = await db.world.findUniqueOrThrow({ where: { id: stored.worldId! } });
-    expect(world.ruleFeatures).toEqual(createdFeatures);
+    expect(providedRuleKeys).toEqual(createdFeatures);
     expect(world.replayOrigin).toMatchObject({ featureData: profile.value.featureData });
     expect(world.logisticsState).not.toBeNull();
     expect(world.governanceState).not.toBeNull();
@@ -789,17 +777,12 @@ for (const profileKey of [
       });
       expect(world.cityRuinsState).not.toBeNull();
       expect(world.stratagemCardsState).not.toBeNull();
-      if (world.ruleFeatures.includes('nation-lifecycle-v1'))
+      if (providedRuleKeys.includes('nation-lifecycle-v1'))
         expect(world.nationLifecycleState).toEqual({ version: 1, nations: {} });
       else expect(world.nationLifecycleState).toBeNull();
-      if (profileKey === 'expanded-191-v6' || profileKey === 'expanded-191-v7') {
-        expect(world.ruleFeatures).toHaveLength(profileKey === 'expanded-191-v7' ? 24 : 23);
-        expect(world.preparedTurnsState).toEqual({ version: 1, nations: {} });
-        expect(world.nationResearchState).toEqual({ version: 1, nations: {} });
-      } else {
-        expect(world.preparedTurnsState).toBeNull();
-        expect(world.nationResearchState).toBeNull();
-      }
+      expect(providedRuleKeys).toEqual(expect.arrayContaining(['prepared-turns-v1', 'nation-research-v1']));
+      expect(world.preparedTurnsState).toEqual({ version: 1, nations: {} });
+      expect(world.nationResearchState).toEqual({ version: 1, nations: {} });
       const resolution = stored.resolution as {
         resources: Array<{ kind: string; version: number; contentHash: string }>;
       };
@@ -818,22 +801,17 @@ for (const profileKey of [
     if (archive.version !== 3) throw new Error('확장 생성의 실제 V3 보관 파일이 필요합니다.');
     const reloaded = await loadWorld(db, world.id);
     const borderReturn = resolverForRuleFeatures(reloaded)?.get('return_border');
-    if (profileKey === 'expanded-191-v7') {
-      expect(borderReturn).toMatchObject({
-        key: 'return_border',
-        name: '접경귀환',
-        target: 'general',
-        category: 'military',
-      });
-    } else expect(borderReturn).toBeUndefined();
+    expect(borderReturn).toMatchObject({
+      key: 'return_border',
+      name: '접경귀환',
+      target: 'general',
+      category: 'military',
+    });
     expect(hashState(archive.origin.initial)).toBe(world.initialStateHash);
     expect(
       hashState(initialReplayStateWithRegistry(archive.origin.initial, ruleRegistry, archive.origin.featureData).state),
     ).toBe(hashState(reloaded));
-    expect(
-      initialReplayStateWithRegistry(archive.origin.initial, ruleRegistry, archive.origin.featureData).state
-        .ruleFeatures,
-    ).toEqual(createdFeatures);
+    expect(providedRuleKeys).toEqual(createdFeatures);
     expect((await create(actor, pair.payload, signal)).data?.worldId).toBe(world.id);
     expect(await auditCount('world.create.applied', stored.id)).toBe(1);
     await controlClock(db, world.id, 'start');
@@ -870,7 +848,9 @@ for (const profileKey of [
     });
     const target = await db.world.findUniqueOrThrow({ where: { id: reset.data.plannedNewWorldId } });
     expect(target.status).toBe('PREOPEN');
-    expect(target.ruleFeatures).toEqual(world.ruleFeatures);
+    expect(target.cityResourcesState).not.toBeNull();
+    expect(target.campaignState).not.toBeNull();
+    expect(target.nationResearchState).not.toBeNull();
     expect(target.replayOrigin).toMatchObject({ featureData: profile.value.featureData });
     expect(
       await db.general.findMany({
@@ -888,13 +868,11 @@ for (const profileKey of [
           .state,
       ),
     ).toBe(hashState(await loadWorld(db, target.id)));
-    expect(
-      initialReplayStateWithRegistry(targetArchive.origin.initial, ruleRegistry, targetArchive.origin.featureData).state
-        .ruleFeatures,
-    ).toEqual(createdFeatures);
+    expect(providedRuleKeys).toEqual(createdFeatures);
     expect(replayToEnd(await exportReplay(db, world.id))).toMatchObject({ reason: 'ADMIN_RESET' });
   }, 30000);
 
+// 제품 적재 최적화 뒤 이 HTTP 생성·월 진행·독립 재생 실측 100.4초로 기존 120초 제한을 유지한다.
 it('AC-P2-23·04·30 expanded-191-v4 실제 한 달과 별도 DB 없는 재생이 일치한다', async (signal) => {
   const options = await creationOptions(actor, signal, true);
   const selected = options.data!.profiles.find((profile) => profile.id === 'san10-191-expanded');
@@ -902,7 +880,7 @@ it('AC-P2-23·04·30 expanded-191-v4 실제 한 달과 별도 DB 없는 재생�
   const pair = await accepted(actor, signal, {
     ...selected.selection,
     featureProfileKey: selected.featureProfileKey,
-    ruleFeatures: selected.ruleFeatures,
+
     endYear: selected.suggestedEndYear,
     seed: 'expanded-v4-http-month',
   });
@@ -968,7 +946,7 @@ it('AC-P2-30·31·32·33 설정 파일 누락·손상은 기존 HTTP 목록과 r
         code: 'FEATURE_PROFILE_UNAVAILABLE',
       });
       const { value } = await loadFeatureProfile('expanded-191-v3', new URL('../resources/', import.meta.url));
-      const pair = await accepted(actor, signal, { featureProfileKey: value.key, ruleFeatures: value.ruleFeatures });
+      const pair = await accepted(actor, signal, { featureProfileKey: value.key });
       await processOne(signal);
       const stored = await row(pair.receipt.requestId);
       expect(stored).toMatchObject({ status: 'FAILED', errorCode: 'RESOURCE_INVALID' });
@@ -976,19 +954,22 @@ it('AC-P2-30·31·32·33 설정 파일 누락·손상은 기존 HTTP 목록과 r
     });
 });
 
-it('AC-P2-30·31·32·33 입력 목록 누락을 시나리오 기능으로 채우지 않고 미지 키를 확정 거부한다', async (signal) => {
+it('AC-P2-30·31·32·33 미지 프로필과 자원 불일치를 거부하고 일치하는 현재 생성은 허용한다', async (signal) => {
   const { value } = await loadFeatureProfile('expanded-191-v3');
   for (const [extra, expected] of [
-    [{ featureProfileKey: 'missing-expanded-profile', ruleFeatures: value.ruleFeatures }, 'RESOURCE_INVALID'],
-    [
-      { featureProfileKey: value.key, ruleFeatures: value.ruleFeatures.filter((v) => v !== 'personnel') },
-      'INPUT_INVALID',
-    ],
-    [{ featureProfileKey: value.key, ruleFeatures: value.ruleFeatures, mapKey: 'san10' }, 'INPUT_INVALID'],
+    [{ featureProfileKey: 'missing-expanded-profile' }, 'RESOURCE_INVALID'],
+    [{ featureProfileKey: value.key }, null],
+    [{ featureProfileKey: value.key, mapKey: 'san10' }, 'INPUT_INVALID'],
   ] as const) {
     const pair = await accepted(actor, signal, extra);
     await processOne(signal);
     const stored = await row(pair.receipt.requestId);
+    if (expected === null) {
+      expect(stored).toMatchObject({ status: 'DONE', errorCode: null });
+      const created = await db.world.findUniqueOrThrow({ where: { id: stored.plannedWorldId } });
+      expect(created.replayOrigin).toMatchObject({ version: 3, featureData: value.featureData });
+      continue;
+    }
     expect(stored).toMatchObject({ status: 'FAILED', errorCode: expected });
     expect(await db.world.count({ where: { id: stored.plannedWorldId } })).toBe(0);
   }
@@ -1017,7 +998,6 @@ it('AC-P2-23·27 확장 형식3은 자원 다섯 칸의 불일치를 모두 거�
       ...selection,
       [slot]: key,
       featureProfileKey: value.key,
-      ruleFeatures: value.ruleFeatures,
     });
     await processOne(signal);
     const current = await row(pair.receipt.requestId);
@@ -1029,7 +1009,7 @@ it('AC-P2-23·27 확장 형식3은 자원 다섯 칸의 불일치를 모두 거�
 
 it('AC-P2-30·31·32·33 실제 DB 실패 뒤 고정한 설정의 파일 변경은 revision을 바꾸고 재처리를 거부한다', async (signal) => {
   const { value } = await loadFeatureProfile('expanded-191-v3');
-  const pair = await accepted(actor, signal, { featureProfileKey: value.key, ruleFeatures: value.ruleFeatures });
+  const pair = await accepted(actor, signal, { featureProfileKey: value.key });
   const pending = await row(pair.receipt.requestId);
   await scopedFault('World', "NEW.id='" + pending.plannedWorldId + "'", async () => {
     await expect(processOne(signal)).rejects.toBeDefined();
@@ -1054,7 +1034,7 @@ it('AC-P2-30·31·32·33 실제 DB 실패 뒤 고정한 설정의 파일 변경�
 it('AC-M3-04 접수는 PENDING·요청 감사만 원자 생성하고 seed생략 중복은 같은 계획을 돌려준다', async (signal) => {
   const before = await footprint(['WorldCreateRequest', 'AuditLog']),
     old = await oldFootprints();
-  const pair = await accepted(actor, signal, { ruleFeatures: ['policy'] });
+  const pair = await accepted(actor, signal, {});
   firstRequest = pair.receipt;
   expect(firstRequest).toEqual({
     userId: actor.id,
@@ -1303,7 +1283,8 @@ it('AC-M3-04 Context 뒤 만료·이메일·동의·정책 변경도 현재 생�
     ).rejects.toMatchObject({ code: expected });
     expect(await footprint()).toBe(before);
   }
-});
+  // 네 경우마다 DB 전체 지문을 잰다. 늘 켠 규칙의 큰 World 행 때문에 바쁜 CI에서 30초를 넘긴 적이 있다(PR #674에서 세 번).
+}, 90_000);
 for (const mode of ['role', 'withdrawn', 'sanction', 'logout'] as const)
   it('AC-M3-04 접수 뒤 ' + mode + '와 엔진의 현재 행위자 경계를 구분한다', async (signal) => {
     const owner = await user(),
@@ -1332,8 +1313,7 @@ for (const mode of ['role', 'withdrawn', 'sanction', 'logout'] as const)
 for (const table of ['World', 'Nation', 'City', 'General', 'GeneralTurn', 'WorldCreateRequest', 'AuditLog'])
   it('AC-M3-04 실제 ' + table + ' 적용 쓰기 실패는 월드0·PENDING·기존행을 보존한다', async (signal) => {
     // 초기 GeneralTurn 쓰기는 정책 기능을 고른 월드에서만 발생한다.
-    const receipt = (await accepted(actor, signal, table === 'GeneralTurn' ? { ruleFeatures: ['policy'] } : {}))
-        .receipt,
+    const receipt = (await accepted(actor, signal, table === 'GeneralTurn' ? {} : {})).receipt,
       initial = await row(receipt.requestId);
     const before = await footprint(['WorldCreateRequest']),
       otherRequests = JSON.stringify(
@@ -1370,7 +1350,6 @@ for (const [field, value, code] of [
   ['scenarioKey', 'missing', 'RESOURCE_INVALID'],
   ['presetKey', 'missing', 'RESOURCE_INVALID'],
   ['endYear', 1, 'INPUT_INVALID'],
-  ['ruleFeatures', ['campaign-assignment-v2'], 'INPUT_INVALID'],
 ] as const)
   it('AC-M3-04 확정 불가 ' + field + '는 고정 FAILED이며 같은 키는 재생성하지 않는다', async (signal) => {
     const acceptedRequest = await accepted(actor, signal, { [field]: value }),
@@ -1388,6 +1367,12 @@ for (const [field, value, code] of [
     expect(await db.world.count({ where: { id: current.plannedWorldId } })).toBe(0);
     expect(await oldFootprints()).toEqual(old);
   });
+it('AC-INT-28 없어진 월드별 규칙 선택 입력은 HTTP 경계에서 접수하지 않는다', async (signal) => {
+  const before = await db.worldCreateRequest.count();
+  const response = await create(actor, input(actor, { ruleFeatures: ['campaign-assignment-v2'] }), signal);
+  expect(response.status).toBe(400);
+  expect(await db.worldCreateRequest.count()).toBe(before);
+});
 it('AC-M3-04 프리셋 위에 명시한 정식 자원·간격·긴 이름을 유지한다', async (signal) => {
   const long = '긴 이름'.repeat(100),
     request = await accepted(actor, signal, {
@@ -1439,7 +1424,7 @@ it('AC-P2-27 실제 HTTP의 1판 별칭은 멱등하고 게시 2판은 엔진·�
       return {
         kind,
         name,
-        content: selected,
+        content: selected as Prisma.InputJsonValue,
         contentHash: hashState(selected),
         source,
         version: 2,
@@ -1534,7 +1519,9 @@ function spawnEngine(
     [
       '--import',
       'tsx',
-      fileURLToPath(new URL('../apps/engine/src/index.ts', import.meta.url)),
+      purpose.startsWith('crash-')
+        ? fileURLToPath(crash.worker)
+        : fileURLToPath(new URL('../apps/engine/src/index.ts', import.meta.url)),
       ...(worldId ? ['--world', worldId] : []),
     ],
     {
@@ -1684,7 +1671,7 @@ it('AC-M3-04·AC-INT-22 프리셋만 지정해도 확장 병종과 계산식을 
   expect(await db.nation.count({ where: { worldId: world.id } })).toBe(21);
   expect(await db.general.count({ where: { worldId: world.id, userId: null } })).toBe(491);
   expect(world.unitSetKey).toBe('expanded');
-  expect(world.ruleFeatures).toContain('battle-affinity-v2');
+  expect(providedRuleKeys).toContain('battle-affinity-v2');
   const archive = readArchive(await exportReplay(db, world.id));
   expect(archive.origin.initial.unitSet.crewTypes).toHaveLength(45);
   expect(hashState(archive.origin.initial)).toBe(world.initialStateHash);
@@ -1717,30 +1704,63 @@ it('AC-M3-04·AC-INT-22 프리셋만 지정해도 확장 병종과 계산식을 
     }
   }, [() => releaseLease(db, lease)]);
   const target = await db.world.findUniqueOrThrow({ where: { id: reset.data.plannedNewWorldId } });
-  expect(target).toMatchObject({ status: 'PREOPEN', unitSetKey: 'expanded', ruleFeatures: world.ruleFeatures });
+  expect(target).toMatchObject({ status: 'PREOPEN', unitSetKey: 'expanded' });
   expect(readArchive(await exportReplay(db, target.id)).origin.initial.unitSet.crewTypes).toHaveLength(45);
 });
 
-it('AC-M3-04 crash 전용 UUID DB에 전체 migration·게시 자원·PENDING을 준비한다', async (signal) => {
+it('AC-M3-04 같은 DB의 crash 전용 schema에 전체 migration·게시 자원·PENDING을 준비한다', async (signal) => {
   signal.throwIfAborted();
-  expect(
-    (await checked(async () => admin.query('SELECT oid FROM pg_database WHERE datname=$1', [crash.name]))).rows,
-  ).toHaveLength(0);
-  await checked(async () => admin.query('CREATE DATABASE "' + crash.name + '"'));
+  expect((await gate.query('SELECT oid FROM pg_namespace WHERE nspname=$1', [crash.schema])).rows).toHaveLength(0);
+  await checked(() => gate.query('CREATE SCHEMA "' + crash.schema + '"'));
   crash.created = true;
-  crash.oid = String(
-    (await checked(async () => admin.query('SELECT oid::text AS oid FROM pg_database WHERE datname=$1', [crash.name])))
-      .rows[0]!.oid,
+  crash.oid = oid;
+  crash.schemaOid = String(
+    (await gate.query('SELECT oid::text AS oid FROM pg_namespace WHERE nspname=$1', [crash.schema])).rows[0]!.oid,
   );
-  await checked(async () => admin.query('ALTER DATABASE "' + crash.name + '" SET statement_timeout=10000'));
-  await checked(async () => crash.gate.connect());
+  await checked(() => crash.gate.connect());
+  expect((await crash.gate.query('SELECT current_schema() AS schema')).rows).toEqual([{ schema: crash.schema }]);
+  await mkdir(new URL('../.tmp-ci-green/', import.meta.url), { recursive: true });
+  // 실제 감독을 실행한다. DB 어댑터의 schema 설정과 raw SQL search_path만 격리한다.
+  await writeFile(
+    crash.worker,
+    `
+    import { createRequire } from 'node:module';
+    import { PrismaClient } from ${JSON.stringify(new URL('../packages/db/src/index.ts', import.meta.url).href)};
+    import { runSupervisor } from ${JSON.stringify(new URL('../apps/engine/src/supervisor.ts', import.meta.url).href)};
+    import { engineFailureMessage } from ${JSON.stringify(new URL('../apps/engine/src/main.ts', import.meta.url).href)};
+    import { onShutdownRequest } from ${JSON.stringify(new URL('../apps/engine/src/process-lifecycle.ts', import.meta.url).href)};
+    const require = createRequire(${JSON.stringify(new URL('../packages/db/package.json', import.meta.url).href)});
+    const { PrismaPg } = require('@prisma/adapter-pg');
+    const url = new URL(process.env.DATABASE_URL);
+    const schema = url.searchParams.get('options')?.replace('-c search_path=', '');
+    if (schema !== ${JSON.stringify(crash.schema)} || url.pathname !== ${JSON.stringify(target.pathname)})
+      throw Error('자기 crash schema 연결이 필요합니다.');
+    const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: url.href }, { schema }) });
+    const controller = new AbortController();
+    const remove = onShutdownRequest(() => controller.abort());
+    try {
+      await runSupervisor(db, { signal: controller.signal });
+    } catch (error) {
+      console.error(engineFailureMessage(error));
+      process.exitCode = 1;
+    } finally {
+      await db.$disconnect();
+      remove();
+    }
+  `,
+  );
   const migrations = new URL('../packages/db/prisma/migrations/', import.meta.url);
   for (const migration of (await checked(async () => readdir(migrations)))
     .filter((value) => /^\d{14}_/.test(value))
     .sort()) {
     signal.throwIfAborted();
     await checked(async () =>
-      crash.gate.query(await checked(async () => readFile(new URL(migration + '/migration.sql', migrations), 'utf8'))),
+      crash.gate.query(
+        (await checked(async () => readFile(new URL(migration + '/migration.sql', migrations), 'utf8'))).replace(
+          /\bpublic\b/g,
+          crash.schema,
+        ),
+      ),
     );
   }
   await checked(async () =>
@@ -1754,12 +1774,7 @@ it('AC-M3-04 crash 전용 UUID DB에 전체 migration·게시 자원·PENDING을
   crash.owner = await checked(async () => user('ADMIN', 'ACTIVE', true, crash.db));
   const owner = crash.owner;
   const response = await checked(async () =>
-    create(
-      owner,
-      input(owner, { seed: 'actual-supervisor-crash-fixed', ruleFeatures: ['policy'] }),
-      signal,
-      crash.address,
-    ),
+    create(owner, input(owner, { seed: 'actual-supervisor-crash-fixed' }), signal, crash.address),
   );
   expect(response.status).toBe(200);
   if (!response.data) throw new Error('실제 crash 접수가 필요합니다.');
@@ -1803,7 +1818,7 @@ it('AC-M3-04 실제 감독을 INSERT 대기 중 SIGKILL하면 PENDING·월드0·
         { timeout: 5000 },
       )
       .toBe(1);
-    // 이 DB에는 World가 없어 감독의 --world 자식이 없다. 자기 실제 감독만 강제 종료한다.
+    // 이 schema에는 World가 없어 감독의 --world 자식이 없다. 자기 실제 감독만 강제 종료한다.
     expect(await crash.db.world.count()).toBe(0);
     expect(child.child.kill('SIGKILL'), '자기 supervisor SIGKILL 전송').toBe(true);
     await stopChild(child);

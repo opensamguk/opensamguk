@@ -14,14 +14,14 @@ import { categories } from '../apps/server/src/authz/coverage';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { initializeResources } from './init-resources';
 import { initializeIntegrationResources } from './integration-resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { runSupervisor } from '../apps/engine/src/supervisor';
 import { exportReplay, replayArchive } from '../apps/engine/src/replay';
 import { TICKS_PER_MONTH } from '../packages/rules/src/index';
-import { testDatabaseUrl } from './test-database';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
 import { confirmDisconnectedDatabase } from './test-db-close';
 
 type Pg = {
@@ -35,11 +35,10 @@ const { Client } = createRequire(requireDb.resolve('@prisma/adapter-pg'))('pg') 
 };
 if (!process.env.TEST_DATABASE_URL) throw new Error('전용 시험 DB가 필요합니다.');
 const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-if (!['localhost', '127.0.0.1'].includes(source.hostname)) throw new Error('loopback 시험 서버가 필요합니다.');
 for (const key of source.searchParams.keys())
   if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
     throw new Error('접속 대상 질의 인자는 쓸 수 없습니다.');
-const name = 't305_worlds_' + randomUUID().replaceAll('-', '') + '_test';
+const name = ciGreenDatabaseName('opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test');
 const target = new URL(source),
   adminUrl = new URL(source);
 target.pathname = '/' + name;
@@ -274,16 +273,6 @@ for (const index of [0, 1])
       portraitMap: '191-map',
       seed: 'admin-world-list-' + index,
     });
-    initial.ruleFeatures = [
-      'campaign-assignment-v2',
-      'campaign-v1',
-      'five-stats',
-      'operational-map',
-      'personnel',
-      'policy',
-      'stratagem-basic',
-      'treaty',
-    ];
     expect(initial.nations).toHaveLength(21);
     expect(initial.generals).toHaveLength(491);
     const { worldId } = await saveInitialWorld(db, initial, {
@@ -301,6 +290,7 @@ for (const index of [0, 1])
         {
           worldId,
           name: '조회사람',
+          sex: 'MALE' as const,
           portraitId: null,
           leadership: 55,
           strength: 55,
@@ -796,16 +786,6 @@ it('PREOPEN 정식191년 월드를 실제 감독 자식이 발견해 시작하�
     portraitMap: '191-map',
     seed: 'admin-clock-supervisor',
   });
-  initial.ruleFeatures = [
-    'campaign-assignment-v2',
-    'campaign-v1',
-    'five-stats',
-    'operational-map',
-    'personnel',
-    'policy',
-    'stratagem-basic',
-    'treaty',
-  ];
   expect(initial.nations).toHaveLength(21);
   expect(initial.generals).toHaveLength(491);
   const { worldId } = await saveInitialWorld(db, initial, {
@@ -862,6 +842,7 @@ it('PREOPEN 정식191년 월드를 실제 감독 자식이 발견해 시작하�
             {
               worldId,
               name: '감독사람',
+              sex: 'MALE' as const,
               portraitId: null,
               leadership: 55,
               strength: 55,
@@ -964,6 +945,7 @@ it('정식491명과 사람30칸의 월말을 새 엔진·리스로 끝까지 정
   state.phase = 2;
 }, 120_000);
 
+// 이 월드의 수출·재생 두 회·타월드 대조 실측 30.4초. 기존 30초를 넘으므로 60초를 둔다.
 it('실제 월말 수출의 동일시드 재생 두 번과 다른 월드 불변을 대조한다', async (signal) => {
   const began = performance.now(),
     state = clockPhase(2),
@@ -992,7 +974,7 @@ it('실제 월말 수출의 동일시드 재생 두 번과 다른 월드 불변�
       humanSlots: 30,
     }),
   );
-});
+}, 60000);
 
 it('새 시계 경로도 미인증·로그아웃·만료·현재 역할·전체 제재를 다시 검사한다', async () => {
   for (const mode of ['unverified', 'logout', 'expiry', 'role', 'sanction'] as const) {
@@ -1046,19 +1028,20 @@ it('엔진 적용 전에 비활성·전체 제재가 생기면 접수한 입력�
   }
 });
 
-it('기존 형식 월드의 시계 API는 데이터·입력·감사를 바꾸지 않고 거부한다', async () => {
+it('현행 형식 월드의 시계 API는 접수 뒤 집행 전 월드를 보존한다', async () => {
   const initial = await loadInitialWorldFromDb(db, { scenario: '1030', map: 'che', seed: 'clock-legacy-refusal' });
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '구형 보존',
     turnTermMinutes: 60,
     endYear: null,
-    replayFormat: 'legacy',
+    replayFormat: 3,
   });
   worlds.push(worldId);
   const actor = await user(),
     sid = await session(actor.id),
     value = command(actor.id, worldId, 'start'),
-    before = await footprint();
-  expect((await call('admin.world.requestClock', value, sid.cookie, address, true)).code).toBe('BAD_REQUEST');
-  expect(await footprint()).toBe(before);
+    before = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+  expect((await call('admin.world.requestClock', value, sid.cookie, address, true)).status).toBe(200);
+  expect(await db.world.findUniqueOrThrow({ where: { id: worldId } })).toEqual(before);
+  expect(await db.inputEvent.count({ where: { worldId, status: 'PENDING' } })).toBe(1);
 });

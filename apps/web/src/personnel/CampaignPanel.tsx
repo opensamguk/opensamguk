@@ -33,7 +33,8 @@ function recover(key: string): Pending | null {
       typeof value.requestId === 'string' &&
       ['campaign.relationship', 'campaign.unit'].includes(value.kind) &&
       value.payload &&
-      typeof value.payload === 'object'
+      typeof value.payload === 'object' &&
+      !(value.kind === 'campaign.unit' && value.payload.type !== 'command')
       ? value
       : null;
   } catch {
@@ -148,7 +149,7 @@ function CampaignBoard({
         queryKey: trpc.campaign.request.queryKey({ worldId, requestId: action.requestId }),
       });
     } catch (error) {
-      setNotice(serverMessage(error) ?? '접수 여부를 확인하지 못했습니다. 같은 요청을 다시 보낼 수 있습니다.');
+      setNotice(serverMessage(error) ?? '접수 여부를 확인하지 못했습니다. 같은 요청을 다시 보내도 됩니다.');
       if (['BAD_REQUEST', 'FORBIDDEN', 'CONFLICT', 'PRECONDITION_FAILED'].includes(errorCode(error) ?? '')) {
         remember(storageKey, null);
         setPending(null);
@@ -223,7 +224,7 @@ function CampaignBoard({
       {preparing && !pending ? <p role="status">제안할 현황을 확인하는 중입니다.</p> : null}
       {pending ? (
         <div role="status">
-          {request.data?.status === 'pending' ? '엔진이 요청을 처리하는 중입니다.' : '요청 접수를 확인하는 중입니다.'}
+          {request.data?.status === 'pending' ? '요청을 처리하는 중입니다.' : '요청 접수를 확인하는 중입니다.'}
           {request.isError && !relationship.isPending && !unit.isPending ? (
             <button type="button" onClick={() => void send(pending)}>
               같은 요청 다시 보내기
@@ -267,8 +268,6 @@ function CampaignControls({
   act: (action: Action) => void;
 }) {
   const [relation, setRelation] = useState<keyof typeof relations>('STAFF');
-  const [commander, setCommander] = useState(board.actorId);
-  const [crewType, setCrewType] = useState(board.armyTypes[0]?.id ?? 1100);
   // 장수 이름은 괄호를 뺀다 (D-085).
   const names = new Map(board.people.map((person) => [person.id, displayName(person.name)]));
   const face = (id: number) => (
@@ -288,7 +287,7 @@ function CampaignControls({
   return (
     <div className={styles.sections}>
       <p>
-        직속 명망 {board.renownUsed}/{board.renownCapacity}. 사람은 본인이 수락합니다. 개인 예턴은 각자30칸을
+        직속 명망 {board.renownUsed}/{board.renownCapacity}. 사람은 본인이 수락합니다. 개인 예턴은 각자 30칸을
         예약합니다.
       </p>
       <p>
@@ -353,9 +352,10 @@ function CampaignControls({
       <section>
         <h3>휘하 영입</h3>
         <p>
-          같은 거점의 동국·재야 장수에게 제안합니다. NPC 서약은 금{board.npcPledge.cost}, 호응 {board.npcPledge.chance}
-          %이며 거절에도 비용을 씁니다. 같은 대상은 장수별 게임 월1회, 다음 달에 다시 시도합니다. 사람 제안은
-          비용·확률을 적용하지 않습니다.
+          같은 거점의 동국이나 재야 장수에게 제안합니다. NPC 서약은 금{board.npcPledge.cost}, 호응{' '}
+          {board.npcPledge.chance}
+          %이며 거절에도 비용을 씁니다. 같은 대상은 장수별로 게임 월 1회만 시도합니다. 사람 장수에게는 비용과 확률을
+          적용하지 않습니다.
         </p>
         <label>
           제안할 관계{' '}
@@ -396,8 +396,8 @@ function CampaignControls({
                     {displayName(person.name)} · {person.isHuman ? '사람' : 'NPC'} · 명망{person.renownCost}
                   </span>
                   <small>
-                    통솔{person.leadership} 무력{person.strength} 지력{person.intel} 정치{person.politics} 매력
-                    {person.charm}
+                    통솔{person.leadership} 무력{person.strength} 지력{person.intel}
+                    {'politics' in person ? ` 정치${person.politics} 매력${person.charm}` : null}
                   </small>
                   <button
                     disabled={disabled || attempted || capacity || noGold}
@@ -419,39 +419,11 @@ function CampaignControls({
         {!board.candidates.length ? <p>현재 제안할 장수가 없습니다. 출사 후 같은 거점에서 확인하세요.</p> : null}
       </section>
       <section>
-        <h3>부곡 편성·지휘</h3>
+        <h3>부곡 편성과 지휘</h3>
         <p>
-          빈 부곡을 편성하고 기존 모병·징병·훈련·사기·소집해제 예턴을 사용합니다. 병력은 실제 지휘관의
+          모병, 징병, 도시 배속으로 새 부곡을 만듭니다. 병력이 0이 되면 부곡이 사라집니다. 병력은 실제 지휘관의
           통솔×100까지입니다. 여러 부곡을 합산합니다. 군량은 소유자의 쌀에서만 씁니다.
         </p>
-        <div className={styles.row}>
-          <label>
-            새 부곡 지휘관{' '}
-            <select value={commander} onChange={(event) => setCommander(Number(event.target.value))}>
-              {board.commanders.map((row) => (
-                <option key={row.id} value={row.id}>
-                  {names.get(row.id)} · {row.commanded}/{row.capacity}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            새 부곡 병종{' '}
-            <select value={crewType} onChange={(event) => setCrewType(Number(event.target.value))}>
-              {board.armyTypes.map((type) => (
-                <option key={type.id} value={type.id}>
-                  {type.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            disabled={disabled || !board.commanders.some((row) => row.id === commander)}
-            onClick={() => unit({ type: 'form', commanderId: commander, crewType, revision: board.revision })}
-          >
-            빈 부곡 편성
-          </button>
-        </div>
         {board.units.map((row) => (
           <article className={styles.unit} key={row.id}>
             <h4>
@@ -485,12 +457,6 @@ function CampaignControls({
                 ))}
               </select>
             </label>
-            <button
-              disabled={disabled || row.troops !== 0}
-              onClick={() => unit({ type: 'disband', unitId: row.id, revision: board.revision })}
-            >
-              {row.troops ? '소집해제 후 해산 가능' : '빈 부곡 해산'}
-            </button>
           </article>
         ))}
       </section>

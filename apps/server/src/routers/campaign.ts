@@ -2,11 +2,12 @@ import { z } from 'zod';
 import { campaignRelationshipInputSchema, campaignUnitInputSchema, campaignOrderInputSchema } from '@opensamguk/rules';
 import { protectedProcedure, router, worldVerifiedProcedure } from '../trpc';
 import { worldInput } from '../game/queries';
-import { readCampaignBoard, readCampaignRequest, submitCampaignRequest } from '../game/campaignApi';
+import { readCampaignBoard, readCampaignRequest, readNationUnits, submitCampaignRequest } from '../game/campaignApi';
 import { readCampaignOrders, submitCampaignOrder } from '../game/campaignOrders';
 
 const request = worldInput.extend({ requestId: z.uuid() });
 export const campaignRouter = router({
+  nationUnits: protectedProcedure.input(worldInput).query(({ ctx, input }) => readNationUnits(ctx, input.worldId)),
   get: protectedProcedure.input(worldInput).query(({ ctx, input }) => readCampaignBoard(ctx, input.worldId)),
   orders: protectedProcedure.input(worldInput).query(({ ctx, input }) => readCampaignOrders(ctx, input.worldId)),
   order: worldVerifiedProcedure

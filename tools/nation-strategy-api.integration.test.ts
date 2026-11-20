@@ -111,12 +111,6 @@ async function fixture(kind: 'nation_mobilize' | 'nation_rivalry' | 'nation_raid
   const initial = commandInitial();
   initial.seed = `nation-strategy-${randomUUID()}`;
   initial.statRules = { ...FIVE_STAT_RULES };
-  initial.ruleFeatures = [
-    'five-stats',
-    'personnel',
-    'policy',
-    ...(enabled ? ['nation-strategy-v1', 'stratagem-basic', 'stratagem-cards-v1'] : []),
-  ].sort();
   for (const general of initial.generals)
     Object.assign(general, {
       politics: 55,
@@ -224,7 +218,7 @@ async function expectReplay(worldId: string) {
   expect(archive.months.at(-1)!.stateHash).toBe(hashState(await snapshot(worldId)));
 }
 
-it('직책별 목록·사전 검사·저장은 세션과 기능을 검사하고 다른 직책·꺼진 월드의 전략을 거부한다', async () => {
+it('직책별 목록·사전 검사·저장은 세션과 직책을 검사하고 별도 설정 없이도 전략을 제공한다', async () => {
   const f = await fixture();
   expect((await rpc('nationCommands.list', { worldId: f.worldId })).status).toBe(401);
   const staff = (await rpc('nationCommands.list', { worldId: f.worldId }, f.staff)).data!;
@@ -248,12 +242,14 @@ it('직책별 목록·사전 검사·저장은 세션과 기능을 검사하고 
     ).data,
   ).toEqual({ ok: true });
   const old = await fixture('nation_mobilize', false);
-  expect(
-    (await rpc('nationCommands.list', { worldId: old.worldId }, old.ruler)).data!.map((row) => row.key),
-  ).not.toContain('nation_mobilize');
-  expect((await reserve(old, old.ruler, 12, 'nation_mobilize', { cityKey: 1 })).status).toBe(400);
-  expect((await db.world.findUniqueOrThrow({ where: { id: old.worldId } })).nationStrategyState).toBeNull();
-  expect((await snapshot(old.worldId)).state).not.toHaveProperty('nationStrategy');
+  expect((await rpc('nationCommands.list', { worldId: old.worldId }, old.ruler)).data!.map((row) => row.key)).toContain(
+    'nation_mobilize',
+  );
+  expect((await reserve(old, old.ruler, 12, 'nation_mobilize', { cityKey: 1 })).status).toBe(200);
+  expect((await db.world.findUniqueOrThrow({ where: { id: old.worldId } })).nationStrategyState).toMatchObject({
+    version: 1,
+  });
+  expect((await snapshot(old.worldId)).state).toHaveProperty('nationStrategy');
 });
 
 it('수뇌의 백성동원은 실제 차례에 패·수비·대기를 함께 저장하며 실패는 전부 되돌리고 재생도 일치한다', async () => {

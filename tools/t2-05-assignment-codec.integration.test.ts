@@ -11,7 +11,7 @@ import {
   type AssignmentSnapshot,
 } from '../apps/engine/src/assignmentState';
 import { loadOfficeState, persistOfficeState } from '../apps/engine/src/personnelState';
-import { testDatabaseUrl } from './test-database';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
 import { confirmDisconnectedDatabase } from './test-db-close';
 
 type PgClient = {
@@ -60,7 +60,7 @@ const requiredMigrations = [
 ] as const;
 
 function identifier(value: string): string {
-  if (!/^[a-z][a-z0-9_]*$/.test(value) || value.length > 63) throw new Error('시험 DB 식별자를 확인하세요.');
+  if (!/^[a-z][a-zA-Z0-9_]*$/.test(value) || value.length > 63) throw new Error('시험 DB 식별자를 확인하세요.');
   return `"${value}"`;
 }
 
@@ -78,9 +78,12 @@ type Context = { sql: PgClient; db: Db; initial: WorldInit; openSql(): Promise<P
 async function withDatabase(caseId: CaseId, run: (context: Context) => Promise<void>) {
   if (!process.env.TEST_DATABASE_URL) throw new Error('TEST_DATABASE_URL이 필요합니다.');
   const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-  const name = `t205_assignment_codec_${caseId}_${randomUUID().replaceAll('-', '')}_test`;
+  const name = ciGreenDatabaseName(
+    `opensamguk_ci_green_${caseId}_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`,
+  );
   identifier(name);
-  if (name === source.pathname.slice(1)) throw new Error('원본 URL의 DB 이름은 사용할 수 없습니다.');
+  if (!process.env.CI_GREEN_DATABASE && name === source.pathname.slice(1))
+    throw new Error('원본 URL의 DB 이름은 사용할 수 없습니다.');
   const adminUrl = new URL(source),
     target = new URL(source);
   adminUrl.pathname = '/postgres';
@@ -122,14 +125,14 @@ async function withDatabase(caseId: CaseId, run: (context: Context) => Promise<v
     const sql = await openSql();
     const migrations = new URL('../packages/db/prisma/migrations/', import.meta.url);
     const directories = (await readdir(migrations, { withFileTypes: true }))
-      .filter((entry) => entry.isDirectory())
+      .filter((entry) => entry.isDirectory() && entry.name < '20261223000000_always_on_rules')
       .map((entry) => entry.name)
       .sort();
     expect(directories.slice(0, requiredMigrations.length)).toEqual([...requiredMigrations]);
     for (const directory of directories)
       await sql.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));
     const archive = JSON.parse(
-      await readFile(new URL('../apps/engine/test/fixtures/replay-v1-b8f5074.json', import.meta.url), 'utf8'),
+      await readFile(new URL('fixtures/migration-replay-v1.json', import.meta.url), 'utf8'),
     ) as {
       origin: { initial: WorldInit; initialStateHash: string };
     };
@@ -331,11 +334,17 @@ it('G2 잘못된 교체 순서는 롤백되고 a·b·c 순서는 성공한다', 
     await seedOffer(db);
     await expect(
       action(db, async (tx) => {
-        await tx.world.update({ where: { id: worldId }, data: { actionSequence: 1 } });
+        await tx.world.update({
+          where: { id: worldId },
+          data: { actionSequence: 1 },
+          select: { actionSequence: true },
+        });
         await tx.assignmentOffer.create({ data: { worldId, targetGeneralId: 7, ...next, status: 'PENDING' } });
       }),
     ).rejects.toMatchObject({ code: 'P2002' });
-    expect((await db.world.findUniqueOrThrow({ where: { id: worldId } })).actionSequence).toBe(0);
+    expect(
+      (await db.world.findUniqueOrThrow({ where: { id: worldId }, select: { actionSequence: true } })).actionSequence,
+    ).toBe(0);
     expect(await loadAssignmentState(db, worldId)).toEqual(snapshot());
     const calls: string[] = [];
     await action(db, async (tx) => {
@@ -422,7 +431,11 @@ it('G4 종료 행은 그대로 두고 외부 결함 주입의 실제 count 0을 
     await expect(
       action(db, async (tx) => {
         const before = await loadAssignmentState(tx, worldId);
-        await tx.world.update({ where: { id: worldId }, data: { actionSequence: 1 } });
+        await tx.world.update({
+          where: { id: worldId },
+          data: { actionSequence: 1 },
+          select: { actionSequence: true },
+        });
         const traced = observe(tx, calls, async () => {
           expect(injected).toBe(false);
           injected = true;
@@ -442,7 +455,9 @@ it('G4 종료 행은 그대로 두고 외부 결함 주입의 실제 count 0을 
       }),
     ).rejects.toThrow('한 행');
     expect(calls).toEqual([`close:${faultOffer.id}:0`]);
-    expect((await db.world.findUniqueOrThrow({ where: { id: worldId } })).actionSequence).toBe(0);
+    expect(
+      (await db.world.findUniqueOrThrow({ where: { id: worldId }, select: { actionSequence: true } })).actionSequence,
+    ).toBe(0);
     expect(
       await db.assignmentOffer.findUniqueOrThrow({ where: { worldId_id: { worldId, id: faultOffer.id } } }),
     ).toMatchObject({ status: 'REJECTED', resolvedBy: 'RESPONSE', resolvedTick: 220 });
@@ -632,7 +647,11 @@ it('G8 종료된 id와 새 제안의 기본키 충돌을 전파한다', async ()
     const beforeRows = await db.assignmentOffer.findMany({ where: { worldId } });
     await expect(
       action(db, async (tx) => {
-        await tx.world.update({ where: { id: worldId }, data: { actionSequence: 1 } });
+        await tx.world.update({
+          where: { id: worldId },
+          data: { actionSequence: 1 },
+          select: { actionSequence: true },
+        });
         await persistAssignmentState(tx, worldId, {
           before: empty,
           beforeFinish: snapshot(),
@@ -642,7 +661,9 @@ it('G8 종료된 id와 새 제안의 기본키 충돌을 전파한다', async ()
       }),
     ).rejects.toMatchObject({ code: 'P2002' });
     expect(await db.assignmentOffer.findMany({ where: { worldId } })).toEqual(beforeRows);
-    expect((await db.world.findUniqueOrThrow({ where: { id: worldId } })).actionSequence).toBe(0);
+    expect(
+      (await db.world.findUniqueOrThrow({ where: { id: worldId }, select: { actionSequence: true } })).actionSequence,
+    ).toBe(0);
   }));
 
 it('G9 원본 증인을 잃으면 실제 DB 쓰기가 0이다', async () =>

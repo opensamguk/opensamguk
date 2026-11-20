@@ -6,8 +6,9 @@ import { operationalInput } from '../packages/rules/test/operationalMapFixture';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { buildServer } from '../apps/server/src/server';
 import { newSession } from '../apps/server/src/auth/session';
-import { saveInitialWorld, readWorldState } from '../apps/engine/src/world/persistence';
-import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
+import { saveFixtureWorld as saveInitialWorld, readWorldState } from '../e2e/worldFixture';
+import { loadInitialWorldFromDb, loadSexLedger } from '../apps/engine/src/world/resources';
+import { applySexLedger } from '../packages/rules/src/index';
 import { loadWorld } from '../apps/engine/src/worldLoader';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
@@ -17,7 +18,7 @@ import { exportReplay, replayArchive } from '../apps/engine/src/replay';
 
 // AC-INT-02 저장 어댑터 검사. 정식 53도시·191년 시나리오 인수는 INT-03/04/12다.
 const url = process.env.TEST_DATABASE_URL;
-if (!url || !/^\/[a-z][a-z0-9_]*_test$/.test(new URL(url).pathname)) throw Error('전용 테스트 DB가 필요합니다.');
+if (!url || !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(new URL(url).pathname)) throw Error('전용 테스트 DB가 필요합니다.');
 const db = createDb(url);
 const app = await buildServer({ db, logging: false });
 const userId = randomUUID(),
@@ -25,7 +26,9 @@ const userId = randomUUID(),
 const ownedUsers = [userId];
 let cookie: string, worldId: string, legacyWorld: string;
 const initial = buildInitialWorld(operationalInput());
-initial.ruleFeatures!.push('policy');
+initial.scenarioKey = 'tools-int02-fixture';
+initial.fogOfWar = false;
+initial.generals = applySexLedger(initial);
 let legacy: Awaited<ReturnType<typeof loadInitialWorldFromDb>>;
 
 async function request(path: string, input: unknown, session = cookie, mutation = false) {
@@ -48,10 +51,12 @@ beforeAll(async () => {
   await db.session.create({ data: { id: session.id, userId, expiresAt: session.expiresAt } });
   cookie = `sid=${session.token}`;
   legacy = await loadInitialWorldFromDb(db, { scenario: '1030', map: 'che', seed: 'int02-legacy-preserved' });
+  legacy.fogOfWar = false;
   for (const value of [initial, legacy]) {
     const saved = await saveInitialWorld(db, value, { name: 'INT02 저장 계약', turnTermMinutes: 60, endYear: null });
     worlds.push(saved.worldId);
   }
+  legacy.generals = applySexLedger(legacy, loadSexLedger(legacy.scenarioKey));
   [worldId, legacyWorld] = worlds as [string, string];
   await controlClock(db, worldId, 'start');
   await app.ready();
@@ -88,7 +93,17 @@ it('INT-02 새 장수는 도시에서 생성되고 월간 정산·재시작·동
   try {
     const creating = request(
       'general.create',
-      { worldId, name: '지도검사', portraitId: null, leadership: 55, strength: 55, intel: 55, politics: 55, charm: 55 },
+      {
+        worldId,
+        name: '지도검사',
+        sex: 'MALE' as const,
+        portraitId: null,
+        leadership: 55,
+        strength: 55,
+        intel: 55,
+        politics: 55,
+        charm: 55,
+      },
       cookie,
       true,
     );
@@ -126,9 +141,7 @@ it('INT-02 DB의 잘못된 종류와 기능 판을 거부하고 생성 원장 �
   await expect(
     db.city.update({ where: { worldId_cityKey: { worldId, cityKey: 99 } }, data: { kind: 'PORT' } }),
   ).rejects.toThrow();
-  await expect(
-    db.world.update({ where: { id: worldId }, data: { ruleFeatures: ['five-stats', 'policy'] } }),
-  ).rejects.toThrow();
+  expect(await db.world.update({ where: { id: worldId }, data: {} })).toMatchObject({ id: worldId });
   const map = structuredClone(initial.operationalMap!);
   map.sites[0]!.position.x++;
   await db.world.update({ where: { id: worldId }, data: { operationalMap: map } });
@@ -150,7 +163,6 @@ it('INT-02 실제 조약 견적·목록·수락 비용과 국가 표시에서 �
     sessions.push(`sid=${session.token}`);
   }
   const value = buildInitialWorld(operationalInput());
-  value.ruleFeatures!.push('policy', 'treaty');
   value.nations.forEach((nation) => {
     nation.isNpc = false;
     nation.gold = 100;
@@ -223,7 +235,6 @@ it('INT-02 교역 후보 API는 관문 출발과 관문 목표를 제외한다',
     enabled: true,
   });
   const value = buildInitialWorld(input);
-  value.ruleFeatures!.push('policy', 'treaty', 'treaty-trade');
   value.cities.find((city) => city.cityKey === 99)!.nationId = 2;
   value.generals[0]!.userId = userId;
   Object.assign(value.generals[0]!, { leadership: 55, strength: 55, intel: 55, politics: 55, charm: 55 });

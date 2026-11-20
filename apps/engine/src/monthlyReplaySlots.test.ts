@@ -1,5 +1,16 @@
+import { providedRuleKeys } from '@opensamguk/rules';
 import type { Prisma } from '@opensamguk/db';
-import { assertSlotSet, emptyTurns, isPolicyMode, toWorldState, type ReplayState } from '@opensamguk/rules';
+import {
+  assertSlotSet,
+  campaignArmyTypes,
+  emptyTurns,
+  isPolicyMode,
+  providedRuleData,
+  toWorldState,
+  type ReplayOriginV3,
+  type ReplayState,
+  type WorldInit,
+} from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { monthlyFixture } from '../test/monthlyFixture';
@@ -19,7 +30,9 @@ type General = {
 type Slot = { generalId: number; slot: number; commandKey: string; args: unknown; explicit: boolean };
 type World = {
   replayFormat: number;
-  ruleFeatures: string[];
+  replayOrigin: ReplayOriginV3;
+  unitSet: WorldInit['unitSet'];
+
   policyFromSequence: number | null;
   actionSequence: number;
   turnTermMinutes: number;
@@ -51,7 +64,15 @@ async function fixture(count?: number) {
   ).flat();
   const world: World = {
     replayFormat: 3,
-    ruleFeatures: ['policy'],
+    replayOrigin: {
+      version: 3,
+      initial,
+      initialStateHash: hashState(initial),
+      resourceHash: '',
+      featureData: providedRuleData(initial, 60),
+    },
+    unitSet: initial.unitSet,
+
     policyFromSequence: null,
     actionSequence: 10,
     turnTermMinutes: 60,
@@ -75,12 +96,28 @@ async function fixture(count?: number) {
 }
 type Fixture = Awaited<ReturnType<typeof fixture>>;
 
+it('AC-INT-22 전술의 쓰기 전 사본을 재사용해도 현재 슬롯 검증과 독립 재적재를 유지한다', async () => {
+  const f = await fixture();
+  const expected = await f.read();
+  vi.mocked(loadWorld).mockClear();
+  expect(await loadReplayState(f.tx as unknown as Prisma.TransactionClient, 'fixture-world', f.state)).toEqual(
+    expected,
+  );
+  expect(loadWorld).not.toHaveBeenCalled();
+  f.slots.pop();
+  await expect(
+    loadReplayState(f.tx as unknown as Prisma.TransactionClient, 'fixture-world', f.state),
+  ).rejects.toThrow();
+  await expect(f.read()).rejects.toThrow();
+  expect(loadWorld).toHaveBeenCalledOnce();
+});
+
 // Frozen pre-change filter algorithm is the behavioral oracle, not the new grouping algorithm.
 function previousProjection(f: Fixture): ReplayState {
   const { state, world, generals, slots } = f,
     modern =
       world.replayFormat === 3
-        ? world.ruleFeatures.includes('policy')
+        ? providedRuleKeys.includes('policy')
         : isPolicyMode({ fromSequence: world.policyFromSequence, actionSequence: world.actionSequence });
   const turns = Object.fromEntries(generals.map(({ id }) => [id, emptyTurns()]));
   for (const general of generals) if (modern) assertSlotSet(slots.filter((slot) => slot.generalId === general.id));
@@ -95,6 +132,12 @@ function previousProjection(f: Fixture): ReplayState {
     turns,
     revisions: Object.fromEntries(generals.map(({ id, turnRevision }) => [id, turnRevision])),
     monthlyTick: world.monthlyTick,
+    lineageResources: {
+      statRules: f.initial.statRules,
+      unitSet: { defaultCrewTypeId: f.initial.unitSet.defaultCrewTypeId },
+    },
+    campaignArmyTypes: campaignArmyTypes(f.initial),
+    campaignUnitSet: f.initial.unitSet,
     ...(modern
       ? {
           policy: {
@@ -138,7 +181,7 @@ describe('replay slot indexing preserves the complete original projection', () =
       const f = await fixture();
       Object.assign(f.world, {
         replayFormat: format,
-        ruleFeatures: [...features],
+
         policyFromSequence: fromSequence,
         actionSequence: sequence,
       });
@@ -207,7 +250,7 @@ describe('replay slot indexing preserves the complete original projection', () =
   });
   it('legacy sparse and duplicate queues retain empty defaults and the original last-row result', async () => {
     const f = await fixture();
-    Object.assign(f.world, { replayFormat: 1, ruleFeatures: [], policyFromSequence: null });
+    Object.assign(f.world, { replayFormat: 1, policyFromSequence: null });
     f.slots.splice(
       0,
       f.slots.length,

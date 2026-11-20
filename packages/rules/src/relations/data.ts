@@ -3,7 +3,7 @@ import type { RuleFeatureDefinition } from '../ruleRegistry';
 import type { WorldInit } from '../world/bootstrap';
 
 export const RELATIONS_FEATURE = 'relations-v1';
-const scenarioKey = '1030';
+
 const general = z.strictObject({ id: z.number().int().positive(), name: z.string().min(1) });
 const pair = z.strictObject({
   a: general,
@@ -11,7 +11,7 @@ const pair = z.strictObject({
   kind: z.enum(['kin', 'sworn', 'lord']),
   ref: z.string().regex(/^[HJK][1-9][0-9]?$/),
 });
-const relationsSchema = z.strictObject({ version: z.literal(1), pairs: z.array(pair).min(1).max(1000) });
+const relationsSchema = z.strictObject({ version: z.literal(1), pairs: z.array(pair).max(1000) });
 export type RelationsData = z.infer<typeof relationsSchema>;
 
 // 출처와 관계의 근거는 docs/plans/T4-42.md 4절의 같은 행 번호를 따른다.
@@ -37,7 +37,6 @@ const historicalPairs = [
 ] as const;
 
 export function readRelationsData(initial: Pick<WorldInit, 'scenarioKey' | 'generals'>, value: unknown): RelationsData {
-  if (initial.scenarioKey !== scenarioKey) throw new Error('관계 자료의 게시 시나리오 판이 다릅니다.');
   const data = relationsSchema.parse(value);
   const names = new Map(initial.generals.map(({ id, name }) => [id, name]));
   const refs = new Set<string>();
@@ -55,12 +54,21 @@ export function readRelationsData(initial: Pick<WorldInit, 'scenarioKey' | 'gene
 }
 
 export function createRelationsData(initial: Pick<WorldInit, 'scenarioKey' | 'generals'>): RelationsData {
-  const pairs = historicalPairs.map(([a, nameA, b, nameB, kind, ref]) => ({
-    a: { id: a, name: nameA },
-    b: { id: b, name: nameB },
-    kind,
-    ref,
-  }));
+  const counts = new Map<string, number>();
+  for (const general of initial.generals) counts.set(general.name, (counts.get(general.name) ?? 0) + 1);
+  const ids = new Map(
+    initial.generals.filter((general) => counts.get(general.name) === 1).map(({ id, name }) => [name, id]),
+  );
+  const pairs = historicalPairs
+    .flatMap(([, nameA, , nameB, kind, ref]) => {
+      const first = ids.get(nameA),
+        second = ids.get(nameB);
+      if (first === undefined || second === undefined) return [];
+      const a = first < second ? { id: first, name: nameA } : { id: second, name: nameB };
+      const b = first < second ? { id: second, name: nameB } : { id: first, name: nameA };
+      return [{ a, b, kind, ref }];
+    })
+    .sort((a, b) => a.a.id - b.a.id || a.b.id - b.b.id);
   return readRelationsData(initial, { version: 1, pairs });
 }
 

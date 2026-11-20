@@ -258,6 +258,22 @@ it('AC-INT-03 SAN10 GIS 해시·범위·도시 좌표가 다르면 다른 지도
   expect(matchesOperationalGeography(geography, changedCities)).toBe(false);
 });
 
+it('AC-INT-27 작은 현은 소유 앵커 수와 거점 선택 목록에 넣지 않는다', () => {
+  const geography = publicGeographySchema.parse(san10Resource);
+  const mapped: MapCity[] = geography.sites
+    .filter((site) => site.anchorKey !== undefined)
+    .map((site) => ({
+      ...makeCity(site.anchorKey!, site.name, site.kind as 'CITY' | 'PASS', site.position.x),
+      y: site.position.y,
+      links: [],
+    }));
+  geography.sites.push({ id: 'city:99999', name: '작은현', kind: 'CITY', siteLevel: 2, position: { x: 500, y: 500 } });
+  expect(matchesOperationalGeography(geography, mapped)).toBe(true);
+  render(<WorldMap cities={mapped} nations={nations} operationalMap={geography} onSelect={vi.fn()} />);
+  expect(screen.getByTestId('world-map')).toBeDefined();
+  expect(screen.queryByRole('option', { name: /작은현/ })).toBeNull();
+});
+
 it('휠 확대는 커서 아래 지도 점을 그 자리에 두고 가장 큰 표식이 화면을 채울 만큼 들어간다', () => {
   const view = { x: 100, y: 50, width: 400, height: 280 };
   const zoomed = zoomAround(view, 2, 300, 120, 1000, 0.7);
@@ -281,7 +297,7 @@ it('휠 방향과 줄·쪽 단위를 같은 비율로 바꾸고 한 번에 2배�
 it('도시 표식의 접근성 이름에 툴팁과 같은 규모를 넣고 관문은 그대로 둔다', () => {
   draw();
   // 허창은 규모 2(진). 툴팁(aria-hidden)에만 있는 정보가 없도록 이름에도 같은 규모를 둔다.
-  expect(screen.getByRole('button', { name: /^허창, 진 도시, / })).toBeTruthy();
+  expect(screen.getByRole('button', { name: /^허창, 현 도시, / })).toBeTruthy();
   expect(screen.getByRole('button', { name: '관문, 관문, 위' })).toBeTruthy();
 });
 
@@ -296,7 +312,7 @@ it('D-053 수도는 이름표 앞 별표와 접근성 이름 「수도」로 누
   );
   const plates = [...container.querySelectorAll('svg text')].map((text) => text.textContent);
   expect(plates).toEqual(expect.arrayContaining(['★허창', '관문']));
-  expect(screen.getByRole('button', { name: /^허창, 진 도시, 위, 수도$/ })).toBeTruthy();
+  expect(screen.getByRole('button', { name: /^허창, 현 도시, 위, 수도$/ })).toBeTruthy();
   expect(screen.getByRole('button', { name: '관문, 관문, 위' })).toBeTruthy();
   unmount();
   // 공개 지도 사본처럼 수도를 모르는 국가는 별표를 달지 않는다.
@@ -366,10 +382,10 @@ it('INT-26 거점 읽기 이름에 지역·장수 수를 넣고 풍선에 지역
       ]}
     />,
   );
-  const xuchang = screen.getByRole('button', { name: '허창, 진 도시, 예주, 위, 장수 2명' });
+  const xuchang = screen.getByRole('button', { name: '허창, 현 도시, 예주, 위, 장수 2명' });
   expect(screen.getByRole('button', { name: '관문, 관문, 위' })).toBeTruthy();
   fireEvent.pointerMove(xuchang, { pointerType: 'mouse', clientX: 20, clientY: 20 });
   const balloon = screen.getByTestId('map-tooltip');
-  expect(balloon.textContent).toContain('예주 · 진');
+  expect(balloon.textContent).toContain('예주 · 현');
   expect(screen.getByTestId('map-tooltip-generals').textContent).toBe('장수 2명조조전위NPC');
 });

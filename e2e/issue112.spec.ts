@@ -1,6 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { createAccount } from './account';
+import { argsScreen, putFromArgsScreen, toFieldStep } from './commandPicker';
 import { createGeneralByApi, e2eWorld, query, setTurns, waitTurnWindow } from './game';
 
 // GitHub #112 · T1-15 · AC-M1-19: 메인 오른쪽 좁은 명령 칸에서 바뀜 태그가 바/뀜 두 줄로 갈라지던 결함.
@@ -67,9 +68,14 @@ test('좁은 메인 명령 칸에서 긴 인자와 긴 대상 도시 이름에�
 
   await row(page, 1).click();
   await pick(page, '모병');
-  await editor(page).getByRole('spinbutton', { name: '수량' }).fill('1000000');
-  await page.getByRole('radiogroup', { name: '병종' }).locator('input[value="1100"]').check();
-  await editor(page).getByRole('button', { name: '1번 칸에 넣기', exact: true }).click();
+  // 인자 화면은 단계가 여럿인 dialog다(INT-29). 수량과 병종이 보이는 단계까지 가서 채운 뒤 끝 단계에서 넣는다.
+  const amount = argsScreen(page).getByRole('spinbutton', { name: '수량' });
+  await toFieldStep(page, amount);
+  await amount.fill('1000000');
+  const crewTypes = page.getByRole('radiogroup', { name: '병종' });
+  await toFieldStep(page, crewTypes);
+  await crewTypes.locator('input[value="1100"]').check();
+  await putFromArgsScreen(page, '1번 칸에 넣기');
   await editor(page).getByRole('button', { name: '선택 해제' }).click();
   await row(page, 2).click();
   await pick(page, '이동');
@@ -77,7 +83,7 @@ test('좁은 메인 명령 칸에서 긴 인자와 긴 대상 도시 이름에�
     .getByRole('radiogroup', { name: '대상 도시' })
     .getByRole('radio', { name: new RegExp(`^${longest.name}`) })
     .click();
-  await editor(page).getByRole('button', { name: '2번 칸에 넣기', exact: true }).click();
+  await putFromArgsScreen(page, '2번 칸에 넣기');
   await expect(row(page, 1)).toContainText('모병');
   await expect(row(page, 1)).toContainText('수량 1000000');
   await expect(row(page, 2)).toContainText(longest.name);

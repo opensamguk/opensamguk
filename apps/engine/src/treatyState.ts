@@ -12,24 +12,36 @@ import {
 export async function loadNationTrust(
   tx: Prisma.TransactionClient,
   worldId: string,
+  loadedRows?: readonly Prisma.NationTrustGetPayload<Record<string, never>>[],
 ): Promise<Pick<WorldState, 'nationTrust'>> {
-  const rows = await tx.nationTrust.findMany({
-    where: { worldId },
-    orderBy: { nationId: 'asc' },
-    select: { nationId: true, brokenTreaties: true, lastBrokenTick: true },
-  });
-  return rows.length ? { nationTrust: validateNationTrustState(rows) } : {};
+  const rows =
+    loadedRows ??
+    (await tx.nationTrust.findMany({
+      where: { worldId },
+      orderBy: { nationId: 'asc' },
+      select: { nationId: true, brokenTreaties: true, lastBrokenTick: true },
+    }));
+  return rows.length
+    ? {
+        nationTrust: validateNationTrustState(
+          rows.map(({ nationId, brokenTreaties, lastBrokenTick }) => ({ nationId, brokenTreaties, lastBrokenTick })),
+        ),
+      }
+    : {};
 }
 
 export async function loadTreaties(
   tx: Prisma.TransactionClient,
   worldId: string,
   options: TreatyOptions = {},
+  loadedRows?: readonly Omit<Prisma.TreatyGetPayload<Record<string, never>>, 'worldId'>[],
 ): Promise<Pick<WorldState, 'treaties'>> {
-  const rows = await tx.treaty.findMany({
-    where: { worldId, status: { in: ['PROPOSED', 'ACTIVE'] } },
-    orderBy: { id: 'asc' },
-  });
+  const rows =
+    loadedRows?.filter((row) => row.status === 'PROPOSED' || row.status === 'ACTIVE') ??
+    (await tx.treaty.findMany({
+      where: { worldId, status: { in: ['PROPOSED', 'ACTIVE'] } },
+      orderBy: { id: 'asc' },
+    }));
   const treaties = rows.map((row) => {
     if (row.closedSequence !== null) throw new Error('열린 조약에 마감 기록이 있습니다.');
     if (row.status === 'PROPOSED' && (row.costFrom !== null || row.costTo !== null))

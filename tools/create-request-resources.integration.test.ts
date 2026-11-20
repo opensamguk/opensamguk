@@ -27,9 +27,6 @@ function sexEditionRequest(frozen: 'old' | 'second' | 'latest' | 'missing' | nul
       Object.entries(selectedResources).map(([slot, row]) => [slot, { ...row, source: 'repository fixture' }]),
     ) as resources.InitialResources,
     initial = resources.composeInitialWorld(selected, 'sex-request-seed'),
-    ruleFeatures = [
-      ...new Set([...(initial.ruleFeatures ?? []), 'personnel', 'policy', ...(lineage ? ['lineage-v1'] : [])]),
-    ].sort(),
     intent = worldCreateIntent({
       expectedUserId: '00000000-0000-4000-8000-000000000001',
       idempotencyKey: '00000000-0000-4000-8000-000000000002',
@@ -41,14 +38,13 @@ function sexEditionRequest(frozen: 'old' | 'second' | 'latest' | 'missing' | nul
       seed: initial.seed,
       turnTermMinutes: 60,
       endYear: null,
-      ruleFeatures,
     }),
     realPrepare = persistence.prepareInitialWorld,
     options = {
       name: intent.name,
       turnTermMinutes: 60,
       endYear: null,
-      ruleFeatures,
+
       ...(lineage ? { featureData: { 'lineage-v1': lineageTestConfig } } : {}),
     },
     ledgers = resources.loadSexLedgers(),
@@ -107,6 +103,7 @@ function sexEditionRequest(frozen: 'old' | 'second' | 'latest' | 'missing' | nul
       }),
     },
     publicMapSnapshot: { create: vi.fn(async () => ({})) },
+    worldExtSlice: { create: vi.fn(async () => ({})) },
     nation: { createMany, update: vi.fn(async () => ({})) },
     city: { createMany },
     general: { createMany },
@@ -169,12 +166,15 @@ it.each(['missing', 'tampered'] as const)('AC-P2-32 생성의 %s 고정 해시�
   expect(f.tx.world.create).not.toHaveBeenCalled();
 });
 
-it.each([null, 'latest'] as const)('AC-P2-32 가문을 끈 %s 생성은 성별 판을 읽지 않는다', async (frozen) => {
+it.each([null, 'latest'] as const)('AC-INT-28 별도 가문 설정이 없는 %s 생성도 성별 판을 고정한다', async (frozen) => {
   const f = sexEditionRequest(frozen, false),
     all = vi.spyOn(resources, 'loadSexLedgers'),
     latest = vi.spyOn(resources, 'loadSexLedger');
   await processWorldCreateRequest(f.db, new AbortController().signal);
   expect(f.request.status).toBe('DONE');
-  expect(all).not.toHaveBeenCalled();
-  expect(latest).not.toHaveBeenCalled();
+  if (frozen === null) expect(latest).toHaveBeenCalledWith('1030');
+  else expect(all).toHaveBeenCalledOnce();
+  expect(f.stored()!.lineageState).toBeDefined();
+  const origin = f.stored()!.replayOrigin as { initialStateHash: string };
+  expect(origin.initialStateHash).toBe(f.latestHash);
 });

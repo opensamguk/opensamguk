@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
 import type { Prisma } from '@opensamguk/db';
-import { assertSlotSet, isPolicyMode, type Effect, type WorldState } from '@opensamguk/rules';
+import { assertSlotSet, isPolicyMode, shiftCityLandTurns, type Effect, type WorldState } from '@opensamguk/rules';
 import { persistCommandState } from './commandPersistence';
 import type { ActionAt } from './nationArchive';
 
@@ -15,7 +15,7 @@ export async function persistEffects(
   cityArmyTypes?: readonly number[],
 ) {
   // 규칙에서 보정한 최종값만 저장한다. 같은 필드의 효과가 여럿이어도 한 번 쓴다.
-  if (effects.some((effect) => effect.kind === 'world')) {
+  if (state.campaign?.land || effects.some((effect) => effect.kind === 'world')) {
     await persistCommandState(tx, worldId, state, at, previous, beforeNationRemoval, cityArmyTypes);
     return;
   }
@@ -50,7 +50,7 @@ export async function shiftTurns(
   generalId: number,
   lockedWorld?: Pick<
     Prisma.WorldGetPayload<Record<string, never>>,
-    'replayFormat' | 'ruleFeatures' | 'policyFromSequence' | 'actionSequence'
+    'replayFormat' | 'policyFromSequence' | 'actionSequence'
   >,
   lockedSlots?: readonly Prisma.GeneralTurnGetPayload<Record<string, never>>[],
 ) {
@@ -63,11 +63,11 @@ export async function shiftTurns(
     lockedWorld ??
     (await tx.world.findUniqueOrThrow({
       where: { id: worldId },
-      select: { replayFormat: true, ruleFeatures: true, policyFromSequence: true, actionSequence: true },
+      select: { replayFormat: true, policyFromSequence: true, actionSequence: true },
     }));
   const modern =
     world.replayFormat === 3
-      ? world.ruleFeatures.includes('policy')
+      ? true
       : isPolicyMode({ fromSequence: world.policyFromSequence ?? null, actionSequence: world.actionSequence });
   if (modern) assertSlotSet(slots);
   const next = Array.from({ length: 30 }, (_, slot) => {
@@ -85,4 +85,37 @@ export async function shiftTurns(
   if (slots.length === next.length && slots.every((slot, index) => isDeepStrictEqual(slot, next[index]))) return;
   await tx.generalTurn.deleteMany({ where: { worldId, generalId } });
   await tx.generalTurn.createMany({ data: next });
+}
+
+// 국가 명령의 등급 변경과 예턴 좌표 저장은 같은 World 잠금 안에서 끝낸다.
+export async function persistCityLandTurns(
+  tx: Prisma.TransactionClient,
+  worldId: string,
+  before: WorldState,
+  resize: NonNullable<import('@opensamguk/rules').CommandResult['cityResize']>,
+  actor: { id: number; turnRevision: number },
+  actorSlots: Prisma.GeneralTurnGetPayload<Record<string, never>>[],
+) {
+  for (const general of Object.values(before.generals)) {
+    if (general.cityKey !== resize.cityKey) continue;
+    const slots =
+      general.id === actor.id
+        ? actorSlots
+        : await tx.generalTurn.findMany({
+            where: { worldId, generalId: general.id },
+            orderBy: { slot: 'asc' },
+          });
+    if (!shiftCityLandTurns(slots, resize)) continue;
+    const updated = await tx.general.updateMany({
+      where: { worldId, id: general.id, turnRevision: { lt: 2_147_483_647 } },
+      data: { turnRevision: { increment: 1 } },
+    });
+    if (updated.count !== 1) throw new Error('증축·감축 예턴 변경 번호를 갱신하지 못했습니다.');
+    for (const slot of slots)
+      await tx.generalTurn.update({
+        where: { worldId_generalId_slot: { worldId, generalId: general.id, slot: slot.slot } },
+        data: { args: slot.args as Prisma.InputJsonValue },
+      });
+    if (general.id === actor.id) actor.turnRevision++;
+  }
 }

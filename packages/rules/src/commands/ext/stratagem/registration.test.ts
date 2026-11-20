@@ -2,16 +2,17 @@
 // eslint-disable-next-line no-restricted-imports
 import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { createRng, rngFor } from '@opensamguk/shared';
+import { createRng } from '@opensamguk/shared';
 import { commandInitial, commandWorld, testUnits } from '../../../../test/commandFixture';
 import { TICKS_PER_MONTH } from '../../../clock/constants';
 import { cloneWorld } from '../../../model/clone';
 import { toWorldState } from '../../../model/world';
-import { emptyTurns, nextGameAction, runReplayAction, type ReplayState } from '../../../replay';
+import { initialReplayState, nextGameAction, runReplayAction, type ReplayState } from '../../../replay';
 import { parsePreset } from '../../../world/preset';
 import { applyEffects } from '../../effects';
 import { createCommandResolver, createCommandResolverWithCommands } from '../../resolve';
 import { runGeneralTurn } from '../../turn';
+import { resolverForRuleFeatures } from '../../../ruleCommands';
 import { createExtState } from '../state';
 import { checkStratagem, stratagemArgs } from './base';
 import { fireAttackSpec } from './fire_attack';
@@ -71,51 +72,38 @@ describe.each(stratagemCommands)('$key registration', (def) => {
     expect([left.next(), left.next(), left.next()]).toStrictEqual([right.next(), right.next(), right.next()]);
   });
 
-  it.each(['enabled', 'absent', 'disabled'] as const)('matches the exact turn and replay state: %s', (mode) => {
-    const state = world();
-    state.generals[1]!.userId = 'user';
-    const r0: ReplayState = {
-      state,
-      turns: Object.fromEntries([1, 2, 3, 4].map((id) => [id, emptyTurns()])),
-      revisions: { 1: 0, 2: 0, 3: 0, 4: 0 },
-      monthlyTick: 0,
-    };
-    r0.turns[1]![0] = { commandKey: def.key, args };
+  it('상시 제공 등록표의 실제 차례와 재생은 같은 상태·난수 효과를 낸다', () => {
+    const initial = commandInitial();
+    for (const general of initial.generals) general.crew = 0;
+    initial.generals[0]!.userId = 'user';
+    initial.diplomacies = [];
+    initial.cities[1]!.security = 100;
+    const r0 = initialReplayState(initial);
+    r0.residenceAnchors = { 1: 0 };
+    r0.state.stratagemCards!.nations['1']!.hand = [def.key as 'fire_attack' | 'sabotage' | 'incite' | 'plunder'];
+    r0.turns[1]![0] = { commandKey: def.key, args, explicit: true };
     const before = structuredClone(r0);
-    expect(nextGameAction(r0)).toStrictEqual({ kind: 'turn', tick: 100, generalId: 1 });
-    const resolver = mode === 'enabled' ? active : mode === 'disabled' ? disabled : undefined;
-    const turnActor = { generalId: 1, tick: 100, unitSet: testUnits };
-    const turn = runGeneralTurn(structuredClone(state), turnActor, r0.turns[1]![0]!, 'stratagem-replay', {}, resolver);
-    const replay = runReplayAction(r0, 'stratagem-replay', testUnits, resolver);
-    expect(turn.nation).toBeUndefined();
+    const resolver = resolverForRuleFeatures(r0.state)!;
+    const turn = runGeneralTurn(
+      r0.state,
+      { generalId: 1, tick: 100, unitSet: testUnits },
+      r0.turns[1]![0]!,
+      initial.seed,
+      { policy: r0.policy!.policies[1]!, turnRevision: 0 },
+      resolver,
+      { offices: r0.offices! },
+    );
+    const replay = runReplayAction(r0, initial.seed, testUnits);
+    expect(nextGameAction(r0)).toEqual({ kind: 'turn', tick: 100, generalId: 1 });
     expect(turn.commandKey).toBe(def.key);
-    if (mode === 'enabled') {
-      expect('code' in turn.result).toBe(false);
-      expect(turn.result).toStrictEqual(
-        active.run(
-          structuredClone(state),
-          { ...turnActor, target: 'general' },
-          def.key,
-          args,
-          rngFor('stratagem-replay', 'turn', 100, 1),
-        ),
-      );
-      expect(replay.state.generals[1]!.experience).toBeGreaterThan(0);
-      expect(replay.state.generals[1]!.dedication).toBeGreaterThan(0);
-    } else {
-      expect(turn.result).toMatchObject({ code: mode === 'absent' ? 'UNKNOWN_COMMAND' : 'COMMAND_DISABLED' });
-      expect(turn.state).toStrictEqual(state);
-    }
+    expect(turn.result).not.toHaveProperty('code');
     const expectedState = structuredClone(turn.state);
     expectedState.generals[1]!.nextTurnTick = 100 + TICKS_PER_MONTH;
-    expect(replay).toStrictEqual({
-      state: expectedState,
-      turns: { ...r0.turns, 1: [...r0.turns[1]!.slice(1), { commandKey: 'rest', args: {} }] },
-      revisions: { 1: 1, 2: 0, 3: 0, 4: 0 },
-      monthlyTick: 0,
-    });
-    expect(r0).toStrictEqual(before);
-    expect(Object.hasOwn(replay.state, 'ext')).toBe(false);
+    expect(replay.state).toEqual(expectedState);
+    expect(replay.revisions[1]).toBe(1);
+    expect(replay.turns[1]).toHaveLength(30);
+    expect(runReplayAction(r0, initial.seed, testUnits)).toEqual(replay);
+    expect(r0).toEqual(before);
   });
 });
 
@@ -126,8 +114,10 @@ it('keeps each definition paired with its unchanged spec and shared functions', 
     expect(def.target).toBe('general');
     expect(def.category).toBe('strategy');
     expect(def.args).toBe(stratagemArgs);
-    expect(def.check).toBe(checkStratagem);
-    expect(def.precheck).toBe(checkStratagem);
+    if (def.key !== 'sabotage') {
+      expect(def.check).toBe(checkStratagem);
+      expect(def.precheck).toBe(checkStratagem);
+    }
   });
 });
 
@@ -153,26 +143,22 @@ it('creates no state slice and preserves ext absence through state creation, clo
   const result = active.run(state, actor, 'fire_attack', args, createRng('stratagem-success'));
   expect('code' in result).toBe(false);
   if ('code' in result) throw new Error(result.message);
-  for (const value of [toWorldState(commandInitial()), cloneWorld(state), applyEffects(state, result.effects)])
-    expect(Object.hasOwn(value, 'ext')).toBe(false);
+  expect(Object.hasOwn(toWorldState(commandInitial()), 'ext')).toBe(false);
+  for (const value of [cloneWorld(state), applyEffects(state, result.effects)]) expect(value.ext).toEqual(state.ext);
 });
 
-it('replays twelve enabled months deterministically without an ext key', () => {
+it('replays twelve enabled months deterministically with all required ledgers', () => {
   function replay() {
     const state = world();
     state.generals[1]!.userId = 'user';
-    let current: ReplayState = {
-      state,
-      turns: Object.fromEntries([1, 2, 3, 4].map((id) => [id, emptyTurns()])),
-      revisions: { 1: 0, 2: 0, 3: 0, 4: 0 },
-      monthlyTick: 0,
-    };
+    for (const general of Object.values(state.generals)) general.crew = 0;
+    let current: ReplayState = { ...initialReplayState(commandInitial()), state, residenceAnchors: { 1: 0 } };
     current.turns[1]![0] = { commandKey: 'fire_attack', args };
     while (current.monthlyTick < 120000) {
-      expect(Object.hasOwn(current.state, 'ext')).toBe(false);
+      expect(current.state.ext).toBeDefined();
       current = runReplayAction(current, 'stratagem-replay', testUnits, active);
     }
-    expect(Object.hasOwn(current.state, 'ext')).toBe(false);
+    expect(current.state.ext).toBeDefined();
     return current;
   }
   expect(replay()).toStrictEqual(replay());

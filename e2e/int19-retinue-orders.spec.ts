@@ -3,7 +3,7 @@ import type { inferRouterOutputs } from '@trpc/server';
 import { test, expect, apiMutate, apiQuery } from './t210-fixture';
 import { rngFor } from '../packages/shared/src/index';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { holdLease, releaseHold } from './game';
@@ -41,18 +41,9 @@ test('AC-INT-19C 정식491명 장수 지시 발송·수락 실행·거절·NPC �
     portraitMap: '191-map',
     seed,
   });
-  initial.ruleFeatures = [
-    'campaign-v1',
-    'five-stats',
-    'operational-map',
-    'personnel',
-    'policy',
-    'stratagem-basic',
-    'treaty',
-  ];
   expect(initial.generals).toHaveLength(491);
   expect(initial.nations).toHaveLength(21);
-  const { worldId } = await saveInitialWorld(db, initial, {
+  const { worldId } = await saveFixtureWorld(db, initial, {
     name: 'INT19 정식 지시 화면',
     turnTermMinutes: 60,
     endYear: 201,
@@ -88,6 +79,7 @@ test('AC-INT-19C 정식491명 장수 지시 발송·수락 실행·거절·NPC �
         worldId,
         name: `지시장수${index}`,
         portraitId: null,
+        sex: 'MALE',
         leadership: 55,
         strength: 55,
         intel: 55,

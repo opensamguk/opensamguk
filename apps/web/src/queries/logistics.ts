@@ -63,7 +63,7 @@ export function dispatchCheck(board: OwnLogisticsBoard, draft: DispatchDraft) {
   if (total > board.costs.transport.maxPerOrder)
     reasons.push(`한 번에 ${formatCount(board.costs.transport.maxPerOrder)}까지 보낼 수 있습니다.`);
   if (board.convoys.length >= board.costs.transport.maxActivePerNation)
-    reasons.push('국가의 수송대 수가 한도에 찼습니다. 도착하거나 취소된 뒤에 보낼 수 있습니다.');
+    reasons.push('국가의 수송대 수가 한도에 찼습니다. 수송대가 도착하거나 취소된 뒤에 보내세요.');
   // 도착지 남은 칸은 조회 시점 값이라 막지 않고 손실 가능성만 알린다.
   const overflowRisk = destination !== null && total > destination.freeCapacity;
   const payload: LogisticsPayload | null =
@@ -117,7 +117,6 @@ export function tradeCheck(board: OwnLogisticsBoard, draft: TradeDraft) {
 export function readOnlyReason(board: OwnLogisticsBoard): string | null {
   if (board.canManage) return null;
   if (board.status !== 'RUNNING') return '진행 중인 월드가 아니라 물류는 볼 수만 있습니다.';
-  if (board.settling)
-    return '월 정산을 처리하는 중이라 지금은 볼 수만 있습니다. 정산이 끝나면 다시 지시할 수 있습니다.';
+  if (board.settling) return '월 정산 중이라 지금은 볼 수만 있습니다. 정산이 끝나면 다시 지시하세요.';
   return '물류 지시는 국가 수뇌 직책만 할 수 있습니다. 보급이 끊긴 거점이거나 이용이 제한된 동안에는 볼 수만 있습니다.';
 }

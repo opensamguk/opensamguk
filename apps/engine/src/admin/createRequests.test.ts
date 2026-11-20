@@ -13,8 +13,6 @@ it.each([
       scenario: 'san10-191',
       map: 'san10',
       unitSet: 'expanded',
-      statRules: 'five-stats',
-      portraitMap: '191-map',
     },
   },
   {
@@ -24,8 +22,6 @@ it.each([
       scenario: 'san10-empty',
       map: 'san10',
       unitSet: 'expanded',
-      statRules: 'five-stats',
-      portraitMap: '191-map',
     },
   },
   {
@@ -46,8 +42,6 @@ it.each([
       scenario: 'integration191',
       map: 'integration',
       unitSet: 'basic',
-      statRules: 'default',
-      portraitMap: 'rtk14-map',
     },
   },
 ])('AC-M3-04 $name 생성은 공통 추론 결과로 자원을 읽고 접속 오류를 보존한다', async ({ input, expected }) => {

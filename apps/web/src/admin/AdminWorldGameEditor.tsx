@@ -359,7 +359,8 @@ export function AdminWorldGameEditor({
                     </strong>
                     {'player' in item ? (
                       <span>
-                        {item.player ? '사람' : 'NPC'} · {item.nation?.name ?? '재야'} · {item.city.name}
+                        {item.player ? '사람' : 'NPC'} · {item.nation?.name ?? '재야'} ·{' '}
+                        {item.city?.name ?? '위치 미지정'}
                       </span>
                     ) : null}
                     {'ruler' in item ? <span>군주 {item.ruler?.name ?? '없음'}</span> : null}

@@ -1,3 +1,4 @@
+import { assertInt27Database } from './int27Database';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
@@ -121,7 +122,7 @@ async function staticBridge(apiOrigin: () => string) {
     if (jobErrors.length) throw new AggregateError(jobErrors, '자기 정적 서버 종료 또는 요청 정착 실패');
   };
   try {
-    await listenLegalHttp(server);
+    await listenLegalHttp(server, process.env.INT27_EXISTING_DB === '1' ? { nextPort: () => 5173 } : undefined);
     const address = server.address();
     assert(address !== null && typeof address !== 'string');
     return { origin: `http://127.0.0.1:${address.port}`, close };
@@ -143,12 +144,17 @@ export const test = base.extend<Record<never, never>, { legalStack: LegalStack }
     async ({}, use) => {
       const original = e2eDatabaseUrl(),
         suffix = randomBytes(6).toString('hex');
-      const database = `e2e_legal_${suffix}_test`;
-      assert(/^e2e_legal_[a-f0-9]{12}_test$/.test(database));
+      const reuse = process.env.INT27_EXISTING_DB === '1';
+      if (reuse) {
+        const target = new URL(original);
+        assertInt27Database(target);
+      }
+      const database = reuse ? 'opensamguk_int27_test' : `e2e_legal_${suffix}_test`;
+      assert(reuse || /^e2e_legal_[a-f0-9]{12}_test$/.test(database));
       const url = new URL(original);
       url.pathname = '/' + database;
       const adminUrl = new URL(original);
-      adminUrl.pathname = '/postgres';
+      if (!reuse) adminUrl.pathname = '/postgres';
       const admin = createDb(adminUrl.href);
       const saved = { DATABASE_URL: process.env.DATABASE_URL, TEST_DATABASE_URL: process.env.TEST_DATABASE_URL };
       const errors: unknown[] = [],
@@ -183,38 +189,41 @@ export const test = base.extend<Record<never, never>, { legalStack: LegalStack }
       const receipt: Record<string, unknown> = { database, actualPostgres: true, actualApi: true, publicBuild: true };
       let stack: LegalStack | undefined;
       try {
-        assert.equal(
-          (
-            await admin.$queryRawUnsafe<Array<{ oid: string }>>(
-              'SELECT oid::text AS oid FROM pg_database WHERE datname=$1',
-              database,
-            )
-          ).length,
-          0,
-        );
-        await admin.$executeRawUnsafe(`CREATE DATABASE "${database}"`);
-        created = true;
-        const [identity] = await admin.$queryRawUnsafe<Array<{ oid: string }>>(
-          'SELECT oid::text AS oid FROM pg_database WHERE datname=$1',
-          database,
-        );
-        oid = identity!.oid;
-        const prisma = dirname(createRequire(join(root, 'packages/db/package.json')).resolve('prisma/package.json'));
-        try {
-          await run(process.execPath, [join(prisma, 'build/index.js'), 'migrate', 'deploy'], {
-            cwd: join(root, 'packages/db'),
-            env: { ...process.env, DATABASE_URL: url.href },
-          });
-        } catch {
-          throw new Error('동의 화면 전용 DB migration 실패');
+        if (!reuse) {
+          assert.equal(
+            (
+              await admin.$queryRawUnsafe<Array<{ oid: string }>>(
+                'SELECT oid::text AS oid FROM pg_database WHERE datname=$1',
+                database,
+              )
+            ).length,
+            0,
+          );
+          await admin.$executeRawUnsafe(`CREATE DATABASE "${database}"`);
+          created = true;
+          const [identity] = await admin.$queryRawUnsafe<Array<{ oid: string }>>(
+            'SELECT oid::text AS oid FROM pg_database WHERE datname=$1',
+            database,
+          );
+          oid = identity!.oid;
+          const prisma = dirname(createRequire(join(root, 'packages/db/package.json')).resolve('prisma/package.json'));
+          try {
+            await run(process.execPath, [join(prisma, 'build/index.js'), 'migrate', 'deploy'], {
+              cwd: join(root, 'packages/db'),
+              env: { ...process.env, DATABASE_URL: url.href },
+            });
+          } catch {
+            throw new Error('동의 화면 전용 DB migration 실패');
+          }
         }
         process.env.DATABASE_URL = url.href;
         process.env.TEST_DATABASE_URL = url.href;
         db = createDb(url.href);
-        await initializeResources(db, await readFile(join(root, 'packages/db/sql/resources-init.sql'), 'utf8'));
+        if (!reuse)
+          await initializeResources(db, await readFile(join(root, 'packages/db/sql/resources-init.sql'), 'utf8'));
         // loadInitialWorldFromDb(integration191 등)를 쓰는 시험이 DB에서 읽는 통합판 공식 게시 4행만 더 준비한다.
         const { initializeIntegrationResources } = await import('../tools/integration-resources');
-        await initializeIntegrationResources(db);
+        if (!reuse) await initializeIntegrationResources(db);
         const bridge = await staticBridge(() => apiOrigin);
         closeWeb = bridge.close;
         const origin = bridge.origin;
@@ -242,6 +251,7 @@ export const test = base.extend<Record<never, never>, { legalStack: LegalStack }
           await listenLegalLoopback(
             (port) => api!.listen({ host: '127.0.0.1', port }),
             () => api!.server.listening,
+            reuse ? { nextPort: () => 3001 } : undefined,
           );
           apiOrigin = `http://127.0.0.1:${(api.server.address() as AddressInfo).port}`;
         };

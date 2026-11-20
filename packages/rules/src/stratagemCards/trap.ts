@@ -28,8 +28,7 @@ export function triggerStratagemTrap(view: WorldView, actor: Actor, cityKey: num
   if (trap.setTick > tick) return null;
   if (cards.config.trapExpiryMonths !== null && tick >= trap.setTick + cards.config.trapExpiryMonths * TICKS_PER_MONTH)
     return null;
-  if (view.ruleFeatures?.includes('campaign-v1') && cards.config.campaignLoss !== 'eligibleAll')
-    throw Error('첫 부곡만 피해를 입는 규칙은 아직 지원하지 않습니다.');
+  if (cards.config.campaignLoss !== 'eligibleAll') throw Error('첫 부곡만 피해를 입는 규칙은 아직 지원하지 않습니다.');
   const state = cloneWorld(view);
   cards.nations[defenderNation]!.traps.splice(index, 1);
   incrementCardsRevision(cards);
@@ -44,7 +43,7 @@ export function triggerStratagemTrap(view: WorldView, actor: Actor, cityKey: num
     atmosLoss += atmos - morale;
     return { remaining, morale };
   };
-  if (state.ruleFeatures?.includes('campaign-v1')) {
+  {
     const ids = new Set(campaignAttackingUnits(view, actor).map((unit) => unit.id)),
       campaign = readCampaignState(state.campaign, state);
     for (const unit of campaign.units)
@@ -57,14 +56,9 @@ export function triggerStratagemTrap(view: WorldView, actor: Actor, cityKey: num
       if (campaign.revision === 2_147_483_647) throw Error('휘하 변경 번호 한도를 넘었습니다.');
       campaign.revision++;
     }
+    campaign.units = campaign.units.filter((unit) => unit.troops > 0);
     state.campaign = readCampaignState(campaign, state);
     cancelled = campaignAttackingUnits(state, actor).length === 0;
-  } else {
-    const general = state.generals[actor.generalId]!,
-      { remaining, morale } = damage(general.crew, general.atmos);
-    general.crew = remaining;
-    general.atmos = morale;
-    cancelled = remaining === 0 || morale === 0;
   }
   return {
     state,

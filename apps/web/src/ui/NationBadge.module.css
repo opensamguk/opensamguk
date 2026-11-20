@@ -4,49 +4,82 @@
   align-items: center;
   gap: var(--space-1);
   max-width: 100%;
-  vertical-align: middle;
+  /* 24px 이름패: 한글 가운데에 맞추고 줄 높이를 늘리지 않는다(tokens.css 규칙). */
+  vertical-align: calc(var(--glyph-mid) - 12px);
+  margin-block: min(0px, calc((1em - 24px) / 2));
 }
-/* 깃대·테두리 그림 위에 국가색으로 칠한 깃천을 깐다. 깃천 모양은 마스크 그림에서 온다. */
+/* 군기: 깃폭 그림(무채색)에 국가색을 곱하고 깃대와 술 그림을 얹는다. 64×96 그림을 16×24로 같은 비율로 줄인다. */
 .flag {
-  position: relative;
   flex: none;
   display: inline-block;
   width: 16px;
-  height: 16px;
+  height: 24px;
+  background-image: var(--flag-rim), var(--flag-field);
+  background-size: 100% 100%;
+  background-color: var(--nation);
+  background-blend-mode: normal, multiply;
+  -webkit-mask-image: var(--flag-rim), var(--flag-field);
+  mask-image: var(--flag-rim), var(--flag-field);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
 }
-.flag::before,
-.flag::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  image-rendering: pixelated;
+/* 이름패: 왼 끝, 가운데(가로로 이어 붙임), 오른 끝 세 조각. 조각마다 놋쇠 테두리(그대로) 아래에
+   무채색 판(국가색과 곱하기)을 깔고, 두 그림을 합친 모양으로 오린다. 그림은 64px 높이를 24px로 같은 비율로 줄인다. */
+.chip {
+  display: inline-flex;
+  min-width: 0;
+  height: 24px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 24px;
 }
-.flag::before {
-  background: currentColor;
-  -webkit-mask: url('https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6/public/art/flag/square-cloth.png')
-    0 0 / 100% 100% no-repeat;
-  mask: url('https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6/public/art/flag/square-cloth.png')
-    0 0 / 100% 100% no-repeat;
+.left,
+.name,
+.right {
+  flex: none;
+  height: 100%;
+  background-color: var(--nation);
+  background-blend-mode: normal, multiply;
+  -webkit-mask-composite: source-over;
+  mask-composite: add;
 }
-.flag::after {
-  background: url('https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6/public/art/flag/square.png')
-    0 0 / 100% 100% no-repeat;
+.left {
+  width: 12px;
+  background-image: var(--chip-rim-left), var(--chip-field-left);
+  background-size: 100% 100%;
+  -webkit-mask-image: var(--chip-rim-left), var(--chip-field-left);
+  mask-image: var(--chip-rim-left), var(--chip-field-left);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}
+.right {
+  width: 12px;
+  background-image: var(--chip-rim-right), var(--chip-field-right);
+  background-size: 100% 100%;
+  -webkit-mask-image: var(--chip-rim-right), var(--chip-field-right);
+  mask-image: var(--chip-rim-right), var(--chip-field-right);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
 }
 .name {
-  display: inline-block;
+  flex: 0 1 auto;
   min-width: 0;
-  padding: 0 var(--space-2);
-  border: 1px solid var(--color-ink);
-  border-radius: var(--radius);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  line-height: 18px;
+  padding: 0 2px;
+  background-image: var(--chip-rim-mid), var(--chip-field-mid);
+  background-size: 24px 100%;
+  background-repeat: repeat-x;
+  -webkit-mask-image: var(--chip-rim-mid), var(--chip-field-mid);
+  mask-image: var(--chip-rim-mid), var(--chip-field-mid);
+  -webkit-mask-size: 24px 100%;
+  mask-size: 24px 100%;
+  -webkit-mask-repeat: repeat-x;
+  mask-repeat: repeat-x;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-shadow: 0 0 2px color-mix(in srgb, var(--nation) 70%, transparent);
 }
-.none {
-  background: var(--color-surface-raised);
-  color: var(--color-text-muted);
-  border-style: dashed;
+.chip[data-none='true'] .name {
+  opacity: 0.85;
+  font-weight: 600;
 }

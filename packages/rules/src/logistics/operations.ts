@@ -46,6 +46,7 @@ export function findLogisticsPath(
   maxHops: number,
 ): number[] | null {
   const usable = (key: number) => world.cities[key]?.nationId === nationId && world.cities[key]!.supplied;
+  if (world.cities[from]?.kind === 'FIELD' || world.cities[to]?.kind === 'FIELD') return null;
   if (from === to || !usable(from) || !usable(to)) return null;
   const queue = [[from]],
     visited = new Set([from]);
@@ -122,8 +123,6 @@ export function applyLogisticsInput(
   actorId: number,
   context: { tick: number; userId: string; userActive: boolean },
 ) {
-  if (!world.ruleFeatures?.includes('logistics-v1'))
-    return deny('FEATURE_DISABLED', '이 월드는 물류 기능을 쓰지 않습니다.');
   logisticsQuantity.parse(context.tick);
   const actor = world.generals[actorId];
   if (
@@ -212,6 +211,7 @@ export function runLogisticsAction(
     return { ok: true as const, extra: { convoyId: convoy.id } };
   }
   if (!owned(args.cityKey)) return deny('NOT_OWN_CITY', '보급이 이어진 자기 국가 거점만 관리할 수 있습니다.');
+  if (state.cities[args.cityKey]!.kind === 'FIELD') return deny('BAD_TARGET', '전장에는 창고와 교역소가 없습니다.');
   state.cityResources = readCityResourcesState(state.cityResources, state);
   const city = original.cities[String(args.cityKey)]!,
     funds = state.cityResources.cities[String(args.cityKey)]!;
@@ -288,6 +288,7 @@ export function settleLogisticsMonthly(world: WorldView, tick: number) {
       !world.nations[city.nationId] ||
       !city.supplied ||
       city.kind === 'PASS' ||
+      city.kind === 'FIELD' ||
       city.populationMax <= 0
     )
       continue;

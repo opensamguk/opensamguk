@@ -1,5 +1,5 @@
 import { createDb, readPublishedResources } from '@opensamguk/db';
-import { buildInitialWorld } from '@opensamguk/rules';
+import { buildInitialWorld, FIVE_STAT_RULES } from '@opensamguk/rules';
 
 export async function readFixture() {
   const connectionString = process.env.DATABASE_URL;
@@ -20,6 +20,9 @@ export async function readFixture() {
   }
   const [map, scenario, unitSet, statRules] = contents;
   const state = buildInitialWorld({ map, scenario, unitSet, statRules, seed: 'T1-12-visibility' });
+  // 장수 ID·구성을 바꾸는 합성 월드는 실제 1030 성별 원장의 대상이 아니다.
+  state.scenarioKey = 'test-visibility';
+  state.statRules = FIVE_STAT_RULES;
   state.nations = state.nations
     .slice(0, 2)
     .map((nation, index) => ({ ...nation, id: index + 1, capitalCityKey: state.cities[index]!.cityKey }));
@@ -31,12 +34,17 @@ export async function readFixture() {
   state.generals = state.generals.slice(0, 4).map((general, index) => ({
     ...general,
     id: index + 1,
+    birthYear: 170,
+    deathYear: 290,
+    activeFromYear: state.startYear,
     nationId: index < 2 ? 1 : index === 2 ? 2 : null,
     cityKey: state.cities[0]!.cityKey,
     nextTurnTick: 500,
     gold: 11001 + index,
     rice: 12001 + index,
-    crew: 13001 + index,
+    politics: 50,
+    charm: 50,
+    crew: 0,
     train: 41 + index,
     atmos: 51 + index,
   }));

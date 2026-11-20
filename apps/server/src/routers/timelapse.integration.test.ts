@@ -1,3 +1,6 @@
+// Integration fixture uses the approved engine persistence path.
+// eslint-disable-next-line opensamguk/no-cross-package-relative
+import { saveFixtureWorld as saveInitialWorld } from '../../../engine/test/worldFixture';
 import { createHash, randomUUID } from 'node:crypto';
 import type { inferRouterOutputs } from '@trpc/server';
 import { createDb, type Prisma } from '@opensamguk/db';
@@ -68,35 +71,16 @@ function savedDisplay(label: string, index: number, id: number) {
 }
 
 async function fixtureWorld(label: string, count: number, withGenerals = false) {
-  const world = await db.world.create({
-    data: {
-      name: label,
-      scenarioKey: state.scenarioKey,
-      mapKey: state.mapKey,
-      unitSetKey: state.unitSetKey,
-      seed: state.seed,
-      startYear: state.startYear,
-      turnTermMinutes: 1,
-      status: 'RUNNING',
-      initialStateHash: 'private-initial-hash',
-      statRules: {},
-      unitSet: {},
-    },
-  });
-  worldIds.push(world.id);
-  await db.nation.createMany({
-    data: state.nations.map((nation) => ({ ...nation, worldId: world.id, capitalCityKey: null })),
-  });
-  await db.city.createMany({ data: state.cities.map((city) => ({ ...city, worldId: world.id })) });
-  if (withGenerals) {
-    await db.general.createMany({
-      data: state.generals.map((general, index) => ({
+  const initial = structuredClone(state);
+  initial.generals = withGenerals
+    ? initial.generals.map((general, index) => ({
         ...general,
-        worldId: world.id,
         userId: index === 0 ? users[0]!.id : index === 2 ? users[1]!.id : index === 3 ? users[2]!.id : null,
-      })),
-    });
-  }
+      }))
+    : [];
+  const { worldId: id } = await saveInitialWorld(db, initial, { name: label, turnTermMinutes: 1, endYear: null });
+  const world = await db.world.update({ where: { id }, data: { status: 'RUNNING' } });
+  worldIds.push(id);
   if (count > 0)
     await db.yearbookSnapshot.createMany({
       data: Array.from({ length: count }, (_, index) => ({

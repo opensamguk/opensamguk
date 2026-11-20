@@ -1,9 +1,11 @@
+import { settleDisaster, expireCityStates } from './disaster';
 import type { GameDate, Rng } from '@opensamguk/shared';
 import { BALANCE } from '../balance';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import type { WorldState, WorldView } from '../model/world';
 import { refreshSupply } from '../supply';
 import { readCampaignState } from '../campaign/state';
+import { restoreReservedMilitary } from '../tactical/world';
 import { residentOfficeBonuses, type OfficeBonuses } from '../personnel/residentOffice';
 import { applyCityResourceIncome } from '../cityResourceIncome';
 
@@ -65,7 +67,9 @@ export function settleIncome(
   const resource = [1, 7].includes(date.month) ? 'gold' : [4, 10].includes(date.month) ? 'rice' : null;
   if (!resource) return next;
   for (const nation of nationsById(next)) {
-    const cities = citiesById(next).filter((city) => city.nationId === nation.id && city.kind !== 'PASS');
+    const cities = citiesById(next).filter(
+      (city) => city.nationId === nation.id && city.kind !== 'PASS' && city.kind !== 'FIELD',
+    );
     const members = generalsById(next).filter(
       (general) => general.nationId === nation.id && general.activeFromYear <= date.year,
     );
@@ -79,7 +83,7 @@ export function settleIncome(
 export function settlePopulation(state: WorldView, taxRate: number = BALANCE.MONTHLY_TAX_RATE): WorldState {
   const next = structuredClone(state) as WorldState;
   for (const city of citiesById(next)) {
-    if (city.kind === 'PASS') continue;
+    if (city.kind === 'PASS' || city.kind === 'FIELD') continue;
     const target = next.cities[city.cityKey]!;
     target.population = Math.max(
       0,
@@ -101,7 +105,7 @@ export function settlePopulation(state: WorldView, taxRate: number = BALANCE.MON
 
 export function settleSupply(state: WorldView, bonuses: OfficeBonuses = new Map()): WorldState {
   const next = structuredClone(state) as WorldState;
-  const campaign = state.ruleFeatures?.includes('campaign-v1') ? readCampaignState(next.campaign, next) : undefined;
+  const campaign = readCampaignState(next.campaign, next);
   if (campaign) next.campaign = campaign;
   refreshSupply(next);
   for (const city of citiesById(next)) {
@@ -151,10 +155,12 @@ export function settleDiplomacy(state: WorldView, tick: number): WorldState {
 }
 
 export function buildYearbook(state: WorldView, year: number): Yearbook {
-  const campaign = state.ruleFeatures?.includes('campaign-v1') ? readCampaignState(state.campaign, state) : undefined;
+  const campaign = readCampaignState(state.campaign, state);
   return {
     nations: nationsById(state).map((nation) => {
-      const cities = citiesById(state).filter((city) => city.nationId === nation.id && city.kind !== 'PASS');
+      const cities = citiesById(state).filter(
+        (city) => city.nationId === nation.id && city.kind !== 'PASS' && city.kind !== 'FIELD',
+      );
       const generals = generalsById(state).filter(
         (general) => general.nationId === nation.id && general.activeFromYear <= year,
       );
@@ -184,16 +190,17 @@ export function buildYearbook(state: WorldView, year: number): Yearbook {
   };
 }
 
-export function runMonthly(state: WorldView, tick: number, rng: Rng) {
+export function runMonthly(state: WorldView, tick: number, rng: Rng, disasterRng: Rng = rng) {
   const date = monthlyDate(state.startYear, tick);
-  // 현 단계는 난수를 소비하지 않는다. 재해·사건을 붙일 때 이 스트림만 쓴다.
-  void rng;
+  // 운영·재생 호출자는 월 정산과 분리한 city-disaster 스트림을 전달한다.
   const bonuses = residentOfficeBonuses(state, date.year);
   let next = settleIncome(state, date, bonuses);
-  if (state.ruleFeatures?.includes('city-resources-v1')) next = applyCityResourceIncome(state, next, date, bonuses);
+  next = applyCityResourceIncome(state, next, date, bonuses);
   next = settlePopulation(next);
   next = settleSupply(next, bonuses);
   next = settleDiplomacy(next, tick);
+  expireCityStates(next);
+  const disasterLogs = disasterRng ? settleDisaster(next, date, disasterRng) : [];
   // 미등장 장수는 턴을 쌓지 않는다. 등장 연도 1월에는 원래 offset부터 실행한다.
   for (const general of generalsById(next)) {
     if (general.activeFromYear > date.year) {
@@ -204,6 +211,7 @@ export function runMonthly(state: WorldView, tick: number, rng: Rng) {
     }
   }
   const officeTaxLogs: { generalId: number; text: string }[] = [];
+  restoreReservedMilitary(state, next);
   const field = [1, 7].includes(date.month) ? 'commerce' : [4, 10].includes(date.month) ? 'agriculture' : null;
   if (field) {
     for (const [cityKey, { tax }] of bonuses) {
@@ -213,5 +221,12 @@ export function runMonthly(state: WorldView, tick: number, rng: Rng) {
         officeTaxLogs.push({ generalId: tax.generalId, text: `${city.name} 주재로 세수 ${tax.percent}% 보정` });
     }
   }
-  return { state: next, date, officeTaxLogs, stages: [...MONTHLY_STAGES], yearbook: buildYearbook(next, date.year) };
+  return {
+    state: next,
+    date,
+    disasterLogs,
+    officeTaxLogs,
+    stages: [...MONTHLY_STAGES],
+    yearbook: buildYearbook(next, date.year),
+  };
 }

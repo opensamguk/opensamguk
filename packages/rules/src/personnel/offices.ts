@@ -32,13 +32,16 @@ function increment(value: number): number {
 
 // before는 step 시작 상태다. 다음 step의 재검사는 직전 결과를 before와 after에 넣는다.
 export function syncOffices(
-  before: Pick<WorldView, 'nations' | 'generals' | 'ruleFeatures'>,
+  before: Pick<WorldView, 'nations' | 'generals'>,
   after: OfficeView,
   offices: DeepReadonly<OfficeRevisions>,
+  ownedAfter?: OfficeState,
 ): { state: OfficeState; offices: OfficeRevisions } {
+  if (ownedAfter !== undefined && (ownedAfter !== after || ownedAfter === before))
+    throw new PersonnelInvariantError('Owned personnel state must be the detached result.');
   const previous = occupants(before);
   const current = occupants(after);
-  const next = structuredClone(after) as OfficeState;
+  const next = ownedAfter ?? (structuredClone(after) as OfficeState);
   const revisions = structuredClone(offices) as OfficeRevisions;
 
   for (const nationId of Object.keys(revisions).map(Number)) {
@@ -55,10 +58,7 @@ export function syncOffices(
     ]);
     for (const level of levels) {
       const id = current[nationId]?.[level];
-      const controllerChanged =
-        after.ruleFeatures?.includes('lineage-v1') &&
-        id !== undefined &&
-        before.generals[id]?.userId !== after.generals[id]?.userId;
+      const controllerChanged = id !== undefined && before.generals[id]?.userId !== after.generals[id]?.userId;
       if (previous[nationId]?.[level] === id && !controllerChanged) continue;
       const old = revisions[nationId]?.[level] ?? { revision: 0, tenure: 0 };
       const updated = { revision: increment(old.revision), tenure: increment(old.tenure) };

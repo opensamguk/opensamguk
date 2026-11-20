@@ -1,8 +1,20 @@
+import { logisticsConfigSchema, providedRuleData } from '@opensamguk/rules';
+// 통합 시험은 실제 엔진의 생성·소유자 입력·모집 경로를 사용한다.
+// eslint-disable-next-line opensamguk/no-cross-package-relative
+import { saveFixtureWorld } from '../../../engine/test/worldFixture';
+// eslint-disable-next-line opensamguk/no-cross-package-relative
+import { recordTestTurns } from '../../../engine/test/seasonFixture';
+// eslint-disable-next-line opensamguk/no-cross-package-relative
+import { acquireLease, releaseLease } from '../../../engine/src/lease';
+// eslint-disable-next-line opensamguk/no-cross-package-relative
+import { TurnLoop } from '../../../engine/src/turnLoop';
+// eslint-disable-next-line opensamguk/no-cross-package-relative
+import { controlClock } from '../../../engine/src/world/clock';
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { inferRouterOutputs } from '@trpc/server';
-import { createDb, type Prisma } from '@opensamguk/db';
+import { createDb } from '@opensamguk/db';
 import { hashState } from '@opensamguk/shared/node';
 import { readFixture } from '../../test/readFixture';
 import { authzCase } from '../authz/case';
@@ -66,39 +78,12 @@ async function user(sanctioned = false) {
   await db.session.create({ data: { id: session.id, userId: row.id, expiresAt: session.expiresAt } });
   return { id: row.id, cookie: `sid=${session.token}` };
 }
-async function fixture() {
+async function fixture(ready = 0) {
   const alice = await user(),
     bob = await user(),
     outsider = await user(),
     eve = await user(),
     sanctioned = await user(true);
-  const world = await db.world.create({
-    data: {
-      name: '작전 API 전용',
-      scenarioKey: initial.scenarioKey,
-      mapKey: initial.mapKey,
-      unitSetKey: initial.unitSetKey,
-      seed: initial.seed,
-      startYear: initial.startYear,
-      turnTermMinutes: 30,
-      status: 'RUNNING',
-      clockTick: 0,
-      clockAnchorAt: new Date(now),
-      policyFromSequence: 0,
-      initialStateHash: hashState(initial),
-      statRules: initial.statRules as unknown as Prisma.InputJsonValue,
-      unitSet: initial.unitSet as unknown as Prisma.InputJsonValue,
-    },
-  });
-  const worldId = world.id;
-  worldIds.push(worldId);
-  await db.nation.createMany({ data: initial.nations.map((nation) => ({ ...nation, worldId, capitalCityKey: null })) });
-  await db.city.createMany({ data: initial.cities.map((city) => ({ ...city, worldId })) });
-  for (const nation of initial.nations)
-    await db.nation.update({
-      where: { worldId_id: { worldId, id: nation.id } },
-      data: { capitalCityKey: nation.capitalCityKey },
-    });
   const generals = [
     { ...initial.generals[0]!, id: 1, userId: alice.id, nationId: 1, officerLevel: 5 },
     { ...initial.generals[1]!, id: 2, userId: bob.id, nationId: 1, officerLevel: 1 },
@@ -106,35 +91,72 @@ async function fixture() {
     { ...initial.generals[3]!, id: 4, userId: outsider.id, nationId: 1, officerLevel: 1 },
     { ...initial.generals[0]!, id: 5, userId: null, nationId: 1, officerLevel: 0 },
   ];
-  await db.general.createMany({
-    data: generals.map((general) => ({
-      ...general,
-      worldId,
-      crew: 100,
-      train: 100,
-      atmos: 100,
-      defaultPolicy: 'none',
-      lastActiveTick: general.userId === null ? null : 0,
-    })),
+  const source = structuredClone(initial);
+  source.nations = source.nations.map((nation) => ({ ...nation, isNpc: false }));
+  source.generals = generals.map((general) => ({
+    ...general,
+    crew: 0,
+    nextTurnTick: (ready ? general.id === ready : general.id <= 4) ? 500 + general.id : 1_000_000_000,
+  }));
+  if (ready) {
+    for (const city of source.cities) {
+      city.commerce = city.commerceMax = 2_000_000;
+      city.agriculture = city.agricultureMax = 2_000_000;
+    }
+  }
+  const logistics = logisticsConfigSchema.parse(providedRuleData(source, 30)['logistics-v1']);
+  for (const cost of Object.values(logistics.recruitPer100)) cost.iron = cost.wood = cost.horses = 0;
+  const { worldId } = await saveFixtureWorld(db, source, {
+    name: '작전 API 전용',
+    turnTermMinutes: 30,
+    endYear: null,
+    featureData: { 'logistics-v1': logistics },
   });
-  await db.generalTurn.createMany({
-    data: generals.flatMap(({ id }) =>
-      Array.from({ length: 30 }, (_, slot) => ({
-        worldId,
-        generalId: id,
-        slot,
-        commandKey: 'rest',
-        args: {},
-        explicit: true,
-      })),
-    ),
-  });
+  worldIds.push(worldId);
+  await controlClock(db, worldId, 'start', now);
+  if (ready) {
+    const lease = (await acquireLease(db, worldId, undefined, 120000))!;
+    try {
+      const loop = new TurnLoop(db, lease);
+      await loop.advanceTo(10000);
+      for (let step = 0; step < 31; step++) {
+        let last = 0;
+        for (const id of [ready]) {
+          const view = await db.$transaction((tx) => readView(tx, worldId));
+          const unit = view.campaign!.units.find((unit) => unit.ownerId === id);
+          const key = !unit ? 'recruit' : unit.train < 90 ? 'train' : unit.atmos < 90 ? 'morale' : 'rest';
+          const general = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id } } });
+          await recordTestTurns(
+            db,
+            worldId,
+            id,
+            key,
+            key === 'recruit' ? { amount: 100, crewType: 1100, unitId: 'new' } : {},
+          );
+          last = Math.max(last, general.nextTurnTick);
+        }
+        await loop.advanceTo(last);
+        const view = await db.$transaction((tx) => readView(tx, worldId));
+        if (
+          [ready].every((id) =>
+            view.campaign!.units.some((unit) => unit.ownerId === id && unit.train >= 90 && unit.atmos >= 90),
+          )
+        )
+          break;
+      }
+    } finally {
+      await releaseLease(db, lease);
+    }
+  }
+  await db.world.update({ where: { id: worldId }, data: { clockAnchorAt: new Date(now) } });
+  const actor = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
+  const targetTick = ready ? actor.nextTurnTick + 120000 : 120000;
   const operation = await db.operation.create({
     data: {
       worldId,
       nationId: 1,
       targetCityKey: initial.cities[1]!.cityKey,
-      targetTick: 120000n,
+      targetTick: BigInt(targetTick),
       minCrew: 100,
       minTrain: 90,
       minAtmos: 90,
@@ -250,7 +272,7 @@ it('같은 작전의 참여자는 30칸 인자와 explicit을 보고 다른 국�
   const f = await fixture();
   await db.generalTurn.update({
     where: { worldId_generalId_slot: { worldId: f.worldId, generalId: 2, slot: 29 } },
-    data: { commandKey: 'recruit', args: { crewType: 1100, amount: 37 } },
+    data: { commandKey: 'recruit', args: { crewType: 1100, amount: 37 }, explicit: true },
   });
   const response = await rpc('operation.get', { worldId: f.worldId, id: f.operationId }, f.bob.cookie);
   expect(response.data!.timeline).toHaveLength(2);
@@ -271,10 +293,10 @@ it('같은 작전의 참여자는 30칸 인자와 explicit을 보고 다른 국�
 });
 
 it('국가를 떠난 참여자는 timeline과 집계에서 빠지고 저장 행은 남는다', async () => {
-  const f = await fixture();
+  const f = await fixture(2);
   await db.generalTurn.update({
     where: { worldId_generalId_slot: { worldId: f.worldId, generalId: 2, slot: 0 } },
-    data: { commandKey: 'attack', args: { cityKey: initial.cities[1]!.cityKey } },
+    data: { commandKey: 'attack', args: { cityKey: initial.cities[1]!.cityKey }, explicit: true },
   });
   expect((await rpc('operation.list', { worldId: f.worldId }, f.alice.cookie)).data!.items[0]).toMatchObject({
     members: 2,
@@ -325,7 +347,7 @@ it('지난달·잘못된 월·중복·다른 국가 참여자를 거부하고 �
   expect(current.status).toBe(200);
   await db.generalTurn.update({
     where: { worldId_generalId_slot: { worldId: f.worldId, generalId: 1, slot: 0 } },
-    data: { commandKey: 'attack', args: { cityKey: initial.cities[1]!.cityKey } },
+    data: { commandKey: 'attack', args: { cityKey: initial.cities[1]!.cityKey }, explicit: true },
   });
   expect(
     (await rpc('operation.get', { worldId: f.worldId, id: current.data!.id }, f.alice.cookie)).data!.timeline.every(
@@ -398,7 +420,7 @@ it('감찰은 legacy null과 NPC를 판정하지 않고 숫자 활동은 14일 �
 });
 
 it('제안은 explicit을 보존하고 저장된 30칸과 revision·활동·게임 상태를 바꾸지 않는다', async () => {
-  const f = await fixture();
+  const f = await fixture(1);
   await db.general.update({
     where: { worldId_id: { worldId: f.worldId, id: 1 } },
     data: { defaultPolicy: 'drill', train: 95, atmos: 90 },
@@ -407,7 +429,7 @@ it('제안은 explicit을 보존하고 저장된 30칸과 revision·활동·게�
   const before = await gameSnapshot(f.worldId);
   const result = await rpc('operation.suggest', { worldId: f.worldId, id: f.operationId }, f.alice.cookie);
   expect(result.status).toBe(200);
-  expect(result.data!.revision).toBe(0);
+  expect(result.data!.revision).toBe(before.generals.find((general) => general.id === 1)!.turnRevision);
   expect(result.data!.current.every((slot) => !slot.explicit)).toBe(true);
   expect(result.data!.slots[0]!.explicit).toBe(false);
   expect(result.data!.slots.filter((slot) => slot.commandKey === 'attack')).toHaveLength(1);

@@ -141,7 +141,7 @@ export function AdminClockActions({
     if (code === 'TOO_MANY_REQUESTS' && seconds !== null) setRetryAt(Date.now() + seconds * 1000);
     setError(
       code === 'NOT_FOUND'
-        ? '접수 기록을 찾지 못했습니다. 같은 요청 접수 확인으로 이어갈 수 있습니다.'
+        ? '접수 기록을 찾지 못했습니다. 같은 요청 접수 확인을 눌러 주세요.'
         : code === 'TOO_MANY_REQUESTS'
           ? '요청이 많습니다. 표시한 시간이 지난 뒤 다시 확인하세요.'
           : '결과를 확인하지 못했습니다. 결과 조회 또는 같은 요청 접수 확인을 눌러 주세요.',
@@ -226,7 +226,7 @@ export function AdminClockActions({
       <h3>월드 시계 조치</h3>
       {!fresh ? (
         <>
-          <p>현재 계정과 권한을 확인한 뒤 조치를 이어갈 수 있습니다.</p>
+          <p>현재 계정과 권한을 확인한 뒤 조치를 이어가세요.</p>
           <button type="button" disabled={sending} onClick={() => void recheckIdentity()}>
             계정과 권한 다시 확인
           </button>
@@ -330,7 +330,7 @@ export function AdminClockActions({
               disabled={sending || !action || world?.replayFormat !== 3}
               onChange={(event) => setConfirmed(event.target.checked)}
             />
-            대상·현재 상태·사유와 시계 조치를 확인했습니다.
+            대상, 현재 상태, 사유와 시계 조치를 확인했습니다.
           </label>
           <button
             type="submit"
@@ -340,8 +340,8 @@ export function AdminClockActions({
           </button>
         </form>
       )}
-      {sending ? <p role="status">계정·권한과 요청을 확인하고 있습니다…</p> : null}
-      {remaining > 0 ? <p role="status">{remaining}초 뒤 다시 확인할 수 있습니다.</p> : null}
+      {sending ? <p role="status">계정과 권한, 요청을 확인하고 있습니다…</p> : null}
+      {remaining > 0 ? <p role="status">{remaining}초 뒤에 다시 확인하세요.</p> : null}
       {error ? <p role="alert">{error}</p> : null}
     </section>
   );

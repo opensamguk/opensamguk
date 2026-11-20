@@ -1,5 +1,6 @@
-import { useInfiniteQuery, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useRouterState } from '@tanstack/react-router';
+import { createPortal } from 'react-dom';
 import {
   useCallback,
   useEffect,
@@ -18,11 +19,12 @@ import { useTradeCityChoices } from '../diplomacy/tradeTargets';
 import { useTRPC } from '../trpc';
 import { DisabledReason } from '../ui/DisabledReason';
 import { EmptyState, ErrorState, LoadingState } from '../ui/States';
-import { errorCode, retryUnlessClientError } from './apiError';
-import { describeArgs, withTargets, type ArgNames, type SlotTargets } from './args';
+import { errorCode, retryUnlessClientError, serverMessage } from './apiError';
+import { describeArgs, withTargets, type ArgNames, type CampaignUnitChoice, type SlotTargets } from './args';
 import { useWorldRules, useWorldUnits } from '../game/queries';
 import { isDetailedCity, isDetailedGeneral, isMemberNation } from '../game/types';
 import type { ArgContext, ArgNeed, RecruitChoices } from './CommandArgsScreen';
+import { bandRole } from './commandBand';
 import { CommandPicker, equipmentName, type CommandInfo } from './CommandPicker';
 import { useEquipment } from '../equipment/useEquipment';
 import {
@@ -65,6 +67,9 @@ export interface TurnEditorProps<S extends DisplaySlot = DisplaySlot> {
   // 바깥 띠(메인 바로가기)에 저장 상태를 알린다 (T4-97 U2). 상태 값이 바뀔 때만 부르고, 편집기가 사라지면 null을 넘긴다.
   // 정본은 이 편집기의 초안·revision이며 바깥은 표시만 한다. 같은 함수를 넘겨야 불필요한 재통지가 없다.
   onStatus?: ((status: TurnEditorStatus | null) => void) | undefined;
+  // 명령 띠를 편집기 밖(게임 화면 맨 아래)에 그린다(D-106 성 화면). undefined면 편집기 안에 그린다.
+  // null이면 띠를 그리지 않는다(자리가 아직 없거나, 전체 지도처럼 명령을 넣지 않는 화면).
+  pickerTarget?: HTMLElement | null | undefined;
 }
 
 // 최초 조회·조회 실패·로그인 풀림·읽기 전용·끝난 판은 '저장된 목록'과 따로 둔다. selection은 고른 칸 수다.
@@ -102,6 +107,7 @@ function SourceEditor<S extends DisplaySlot>({
   source,
   renderTop,
   onStatus,
+  pickerTarget,
 }: Omit<TurnEditorProps<S>, 'source'> & { source: TurnSourceFactory<S> }) {
   const trpc = useTRPC();
   const me = useQuery({ ...trpc.auth.me.queryOptions(), retry: retryUnlessClientError });
@@ -135,6 +141,7 @@ function SourceEditor<S extends DisplaySlot>({
       source={made}
       renderTop={renderTop}
       report={onStatus ? setInner : undefined}
+      pickerTarget={pickerTarget}
     />
   );
 }
@@ -143,12 +150,18 @@ function AuthLost() {
   const href = useRouterState({ select: (state) => state.location.href });
   return (
     <div className={styles.alert} role="alert">
-      <p>로그인이 풀렸습니다. 같은 계정으로 다시 로그인하면 저장하지 않은 편집을 이어서 저장할 수 있습니다.</p>
+      <p>로그인이 풀렸습니다. 같은 계정으로 다시 로그인한 뒤 저장하지 않은 편집을 이어서 저장하세요.</p>
       <Link to="/login" search={{ next: href }}>
         다시 로그인
       </Link>
     </div>
   );
+}
+
+// 명령 띠 자리: 바깥 자리가 있으면 거기에 띄우고(D-106 성 화면 맨 아래), null이면 그리지 않는다.
+function placePicker(picker: ReactNode, target: HTMLElement | null | undefined): ReactNode {
+  if (target === undefined) return picker;
+  return target ? createPortal(picker, target) : null;
 }
 
 type PrecheckResult = Check | { ok: 'error'; message: string } | undefined;
@@ -160,6 +173,7 @@ function Editor<S extends DisplaySlot>({
   source,
   renderTop,
   report,
+  pickerTarget,
 }: {
   worldId: string;
   // 최근 넣은 명령을 두는 localStorage 키(계정·월드).
@@ -169,6 +183,7 @@ function Editor<S extends DisplaySlot>({
   renderTop?: TurnEditorProps['renderTop'];
   // SourceEditor의 상태 칸(setState)이다. 바깥 통지와 중복 판정은 SourceEditor가 한다.
   report?: ((status: TurnEditorStatus | undefined) => void) | undefined;
+  pickerTarget?: HTMLElement | null | undefined;
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -207,7 +222,7 @@ function Editor<S extends DisplaySlot>({
   const [shiftBy, setShiftBy] = useState('1');
   const [times, setTimes] = useState('1');
   const rowRefs = useRef<Array<HTMLTableRowElement | null>>([]);
-  const searchRef = useRef<HTMLInputElement | null>(null);
+  const focusRef = useRef<HTMLButtonElement | null>(null);
   const helpId = useId();
   const [recent, rememberRecent] = useRecentCommands(recentKey);
 
@@ -221,8 +236,8 @@ function Editor<S extends DisplaySlot>({
   const commandList: CommandInfo[] = useMemo(() => commands.data ?? [], [commands.data]);
   const equipment = useEquipment(
     worldId,
-    commandList.some((command) => command.key === 'equipment_trade'),
     home.data?.general.id,
+    commandList.some((command) => command.key === 'equipment_trade'),
   );
   // 교역 명령의 대상 도시는 교역 조약이 있는 이웃 도시만 후보로 둔다 (T2-08). 저장은 이 편집기의 같은 경로로 한다.
   const cityChoicesFor = useTradeCityChoices(
@@ -260,6 +275,11 @@ function Editor<S extends DisplaySlot>({
     staleTime: 15_000,
     retry: retryUnlessClientError,
   });
+  // 국가 명령 제안(D-100)의 대상 장수. 개인 칸에는 넘겨받은 장수 목록이 없어 같은 국가 장수 조회에서 고른다.
+  const nationGenerals = useMemo(
+    () => nationView.data?.generals.map((general) => ({ id: general.id, name: general.name })),
+    [nationView.data],
+  );
   // 국가별 국력·도시·장수. 순위 화면과 같은 조회다.
   const ranking = useQuery({
     ...trpc.ranking.nations.queryOptions({ worldId, by: 'power' }),
@@ -284,6 +304,20 @@ function Editor<S extends DisplaySlot>({
     staleTime: 15_000,
     retry: retryUnlessClientError,
   });
+  // 내 부곡 (늘 켠 규칙의 병력 정본, 결정 19). 개인 예턴의 모병, 훈련, 사기 인자 화면에서 부곡을 고른다.
+  const campaign = useQuery({
+    ...trpc.campaign.get.queryOptions({ worldId }),
+    enabled: source.walletKind === 'general',
+    staleTime: 15_000,
+    retry: false,
+  });
+  // 국가 예턴의 배속은 같은 국가의 다른 장수 부곡도 고른다(campaign.nationUnits). 개인 칸은 내 부곡만 쓴다.
+  const nationUnits = useNationUnits(worldId, source.walletKind === 'nation' && myNationId !== null);
+  const ownUnits = useMemo(
+    () => campaign.data?.units.map((unit) => ({ id: unit.id, troops: unit.troops, crewType: unit.crewType })),
+    [campaign.data],
+  );
+  const campaignUnits = source.walletKind === 'nation' ? nationUnits : ownUnits;
   const gameDate = summary.data?.gameDate;
 
   const recruits = useMemo((): RecruitChoices => {
@@ -350,6 +384,7 @@ function Editor<S extends DisplaySlot>({
       tech: nation && isMemberNation(nation) ? nation.tech : undefined,
       security: city && isDetailedCity(city) ? city.security : undefined,
       members,
+      campaignUnits,
       nationFacts: ranking.data
         ? new Map(
             ranking.data.items.map((row) => [
@@ -380,6 +415,7 @@ function Editor<S extends DisplaySlot>({
     treatyTargets,
     gameDate,
     recruits,
+    campaignUnits,
   ]);
   const names: ArgNames = useMemo(
     () => ({
@@ -479,7 +515,7 @@ function Editor<S extends DisplaySlot>({
     } else if (key === 'Enter') {
       event.preventDefault();
       if (selected.size === 0) setSelected(new Set([focus]));
-      searchRef.current?.focus();
+      focusRef.current?.focus();
     } else if (key === 'Escape') {
       setSelected(new Set());
     }
@@ -492,7 +528,7 @@ function Editor<S extends DisplaySlot>({
       : pending
         ? '먼저 위 충돌 안내에서 다시 적용할지 고르세요.'
         : !server.data
-          ? '예턴을 불러온 뒤에 고칠 수 있습니다.'
+          ? '예턴을 불러온 뒤에 고치세요.'
           : null;
   const putBlocked = busyReason ?? (selected.size === 0 ? '칸을 먼저 고르세요.' : null);
   const shiftN = Number(shiftBy);
@@ -728,7 +764,7 @@ function Editor<S extends DisplaySlot>({
                   </td>
                   <td role="gridcell">
                     {isEmpty ? (
-                      <span className={styles.emptySlot} title="비워 둔 칸입니다. 기본 방침대로 실행합니다.">
+                      <span className={styles.emptySlot} title="빈 칸은 기본 방침대로 실행합니다.">
                         ({emptyLabel.tag}) {emptyLabel.command}
                       </span>
                     ) : (
@@ -765,7 +801,7 @@ function Editor<S extends DisplaySlot>({
       </div>
       <p id={helpId} className={styles.help}>
         칸을 누르면 고르거나 풉니다. Shift를 누른 채 누르면 범위를 고릅니다. 키보드는 위아래 화살표로 옮기고 Space로
-        고르며 Enter로 명령 찾기에 갑니다. 경고가 있어도 저장되며 실행할 때 다시 검사합니다.
+        고르며 Enter로 명령 띠의 첫 패에 갑니다. 경고가 있어도 저장되며 실행할 때 다시 검사합니다.
       </p>
 
       {/* 바꿀 수 있는 개인 30칸에서만 보인다. 끝난 판·읽기 전용 칸의 사유 안내와 겹치지 않는다. */}
@@ -773,48 +809,76 @@ function Editor<S extends DisplaySlot>({
         <RoninNote commands={commandList} />
       ) : null}
 
-      {commands.isError ? (
-        <ErrorState title="명령 목록을 불러오지 못했습니다" onRetry={() => void commands.refetch()} />
-      ) : (
-        <CommandPicker
-          equipment={equipment}
-          commands={commandList}
-          cities={cities}
-          nations={nations}
-          selectedCityKey={selectedCityKey}
-          generals={generals}
-          defaultCrewType={home.data?.general.crewType}
-          units={units}
-          unitNote={unitNote}
-          recruitment={
-            recruitment?.cityKey != null
-              ? {
-                  city: cities.find(({ key }) => key === (city?.key ?? recruitment.cityKey))?.name ?? '현재 도시',
-                }
-              : undefined
-          }
-          cityResources={summary.data?.cityResourcesEnabled === true}
-          blockedReason={putBlocked}
-          targetLabel={targetLabel}
-          searchRef={searchRef}
-          onPut={onPut}
-          onSave={(turn) => onPut(turn, true)}
-          cityChoicesFor={cityChoicesFor}
-          precheck={source.precheck}
-          argContext={argContext}
-          onNeed={onNeed}
-          recent={
-            <RecentRow
-              recent={recent}
-              commands={commandList}
-              commandName={commandName}
-              names={names}
-              blockedReason={putBlocked}
-              onPut={onPut}
-            />
-          }
-        />
+      {placePicker(
+        commands.isError ? (
+          <ErrorState title="명령 목록을 불러오지 못했습니다" onRetry={() => void commands.refetch()} />
+        ) : (
+          <CommandPicker
+            equipment={equipment}
+            role={bandRole(home.data?.general)}
+            commands={commandList}
+            cities={cities}
+            nations={nations}
+            selectedCityKey={selectedCityKey}
+            generals={generals}
+            defaultCrewType={home.data?.general.crewType}
+            units={units}
+            unitNote={unitNote}
+            recruitment={
+              recruitment?.cityKey != null
+                ? {
+                    city: cities.find(({ key }) => key === (city?.key ?? recruitment.cityKey))?.name ?? '현재 도시',
+                  }
+                : undefined
+            }
+            blockedReason={putBlocked}
+            targetLabel={targetLabel}
+            focusRef={focusRef}
+            onPut={onPut}
+            onSave={(turn) => onPut(turn, true)}
+            cityChoicesFor={cityChoicesFor}
+            precheck={source.precheck}
+            argContext={argContext}
+            onNeed={onNeed}
+            recent={
+              <RecentRow
+                recent={recent}
+                commands={commandList}
+                commandName={commandName}
+                names={names}
+                blockedReason={putBlocked}
+                onPut={onPut}
+              />
+            }
+          />
+        ),
+        pickerTarget,
       )}
+
+      {source.timed && !ended && readOnly === null && myNationId !== null ? (
+        <NationProposal
+          worldId={worldId}
+          render={(commands, propose, proposalUnits) => (
+            <CommandPicker
+              commands={commands}
+              cities={cities}
+              nations={nations}
+              selectedCityKey={selectedCityKey}
+              generals={nationGenerals}
+              defaultCrewType={home.data?.general.crewType}
+              units={units}
+              unitNote={unitNote}
+              blockedReason={null}
+              targetLabel="국가 예턴"
+              onPut={() => {}}
+              cityChoicesFor={cityChoicesFor}
+              argContext={{ ...argContext, campaignUnits: proposalUnits }}
+              onNeed={onNeed}
+              propose={propose}
+            />
+          )}
+        />
+      ) : null}
 
       <div className={styles.editBar} role="group" aria-label="칸 옮기기와 반복">
         {putBlocked ? (
@@ -1026,9 +1090,99 @@ function RoninNote({ commands }: { commands: readonly CommandInfo[] }) {
   if (!join?.length && !rise?.length) return null;
   return (
     <p className={styles.help}>
-      재야 장수입니다. 명령을 고르면 지금 실행할 수 있는지 먼저 알려 줍니다.
+      재야 장수입니다.
       {join?.length ? ` 국가에 들어가기: ${join.join(', ')}.` : ''}
       {rise?.length ? ` 세력 일으키기: ${rise.join(', ')}.` : ''}
     </p>
+  );
+}
+
+// 국가 명령 제안(상신, D-100). 직위로 직접 넣을 수 없는 국가 명령을 같은 국가의 군주와 수뇌에게 올린다.
+// 받은 쪽이 제안함에서 국가 예턴 칸을 정해 승인하면 그 칸에 들어간다. 제안할 명령이 없으면 그리지 않는다.
+// 펼쳤을 때만 명령 고르기를 그린다. 접힌 동안 명령 고르기 영역이 둘로 보이지 않게 한다.
+export function NationProposal({
+  worldId,
+  render,
+}: {
+  worldId: string;
+  render: (
+    commands: CommandInfo[],
+    propose: { to: string; onPropose: (turn: Turn, note: string) => void },
+    // 국가 배속 상신의 대상 부곡. 펼쳤을 때만 받는다.
+    units: readonly CampaignUnitChoice[] | undefined,
+  ) => ReactNode;
+}) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [sent, setSent] = useState<string | null>(null);
+  const units = useNationUnits(worldId, open);
+  const commands = useQuery({ ...trpc.proposals.commands.queryOptions({ worldId }), retry: false, staleTime: 60_000 });
+  const create = useMutation({
+    ...trpc.proposals.create.mutationOptions(),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: trpc.proposals.pathKey() }),
+  });
+  const list: CommandInfo[] = useMemo(() => commands.data ?? [], [commands.data]);
+  if (list.length === 0) return null;
+  return (
+    <details
+      className={styles.proposal}
+      data-testid="nation-proposal"
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <summary>
+        국가 명령 제안 <span className="num">{list.length}</span>
+      </summary>
+      <p className={styles.help}>
+        직위로 직접 넣을 수 없는 국가 명령을 군주와 수뇌에게 올립니다. 받은 쪽이 제안함에서 승인하면 국가 예턴에
+        들어갑니다.
+      </p>
+      {open
+        ? render(
+            list,
+            {
+              to: '군주와 수뇌',
+              onPropose: (turn, note) => {
+                setSent(null);
+                create.mutate(
+                  { worldId, commandKey: turn.commandKey, args: turn.args, ...(note ? { note } : {}) },
+                  { onSuccess: () => setSent(commands.data?.find((c) => c.key === turn.commandKey)?.name ?? '명령') },
+                );
+              },
+            },
+            units,
+          )
+        : null}
+      {create.isPending ? <p role="status">제안을 보내는 중입니다.</p> : null}
+      {sent && !create.isPending ? (
+        <p role="status">{sent} 제안을 올렸습니다. 제안함에서 진행을 볼 수 있습니다.</p>
+      ) : null}
+      {create.isError ? (
+        <p role="alert">{serverMessage(create.error) ?? '제안을 보내지 못했습니다. 다시 시도하세요.'}</p>
+      ) : null}
+    </details>
+  );
+}
+
+// 같은 국가 부곡(campaign.nationUnits). 국가 배속 명령의 부곡 칸 선택지다. 소유 장수와 행군 중인지를 함께 보인다.
+function useNationUnits(worldId: string, enabled: boolean): CampaignUnitChoice[] | undefined {
+  const trpc = useTRPC();
+  const query = useQuery({
+    ...trpc.campaign.nationUnits.queryOptions({ worldId }),
+    enabled,
+    staleTime: 15_000,
+    retry: false,
+  });
+  return useMemo(
+    () =>
+      query.data?.map((unit) => ({
+        id: unit.id,
+        troops: unit.troops,
+        crewType: unit.crewType,
+        ownerName: unit.ownerName,
+        marching: unit.supply,
+      })),
+    [query.data],
   );
 }

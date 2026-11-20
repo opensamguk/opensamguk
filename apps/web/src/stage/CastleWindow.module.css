@@ -1,0 +1,115 @@
+/* 성 안 창(D-106): 성 화면 가운데 위에 뜨는 큰 창. */
+.window {
+  position: absolute;
+  z-index: 8;
+  top: calc(var(--hud) + 10px);
+  left: 50%;
+  width: min(900px, calc(100vw - 24px));
+  max-height: calc(100dvh - var(--hud) - var(--foot) - 30px);
+  overflow: auto;
+  transform: translateX(-50%);
+  padding: 4px;
+}
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.title {
+  flex: 1;
+  margin: 0;
+  font-size: 20px;
+}
+.body {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+.slots {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+}
+.note {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+.cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.card {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 2px;
+  text-align: center;
+}
+.card[data-blocked='true'] {
+  opacity: 0.5;
+}
+.icon {
+  height: 40px;
+  object-fit: contain;
+}
+.effect {
+  font-size: 11px;
+  line-height: 1.35;
+}
+.blocked {
+  font-size: 11px;
+  font-weight: 700;
+  color: #8a1a0c;
+}
+.limit {
+  font-size: 11px;
+  color: #6f5b45;
+}
+/* 성 키우기(INT-30): 성 안 창 맨 위 띠. */
+.upgrade {
+  display: grid;
+  gap: 6px;
+  margin-top: var(--space-2);
+  padding: 8px 10px;
+  border: 1px solid #c9a25a;
+  border-radius: 4px;
+  background: rgba(201, 162, 90, 0.12);
+}
+.upgradeHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.upgradeList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 2px 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+.upgradeList li span {
+  font-weight: 700;
+}
+.upgradeList li[data-met='true'] span {
+  color: #2f6b2a;
+}
+.upgradeList li[data-met='false'] span {
+  color: #8a1a0c;
+}
+@media (max-width: 760px) {
+  .body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

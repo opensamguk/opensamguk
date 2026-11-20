@@ -57,10 +57,6 @@ function currentOffer(
 
 export function assertGovernanceFinal(world: WorldView, tick: number): void {
   const state = world.governance;
-  if (!world.ruleFeatures?.includes('governance-v1')) {
-    if (state !== undefined) throw new Error('꺼진 황실 기능의 상태가 있습니다.');
-    return;
-  }
   if (!state) throw new Error('황실 상태가 없습니다.');
   readGovernanceConfig(state.config, world);
   const index = governanceRealmIndex(world, state, tick);
@@ -123,11 +119,12 @@ export function assertGovernanceFinal(world: WorldView, tick: number): void {
 }
 
 export function reconcileGovernance(world: WorldView, tick: number): WorldState {
-  const next = cloneWorld(world);
-  if (!world.ruleFeatures?.includes('governance-v1')) {
-    assertGovernanceFinal(world, tick);
-    return next;
-  }
+  return reconcileOwnedGovernance(cloneWorld(world), tick);
+}
+
+// The caller owns this copy; all governance validation and reconciliation still run.
+export function reconcileOwnedGovernance(next: WorldState, tick: number): WorldState {
+  const world: WorldView = next;
   const state = readGovernanceState(world.governance),
     original = JSON.stringify(state);
   next.governance = state;

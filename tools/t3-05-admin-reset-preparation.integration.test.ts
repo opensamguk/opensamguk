@@ -20,7 +20,7 @@ import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { exportReplay, replayArchive } from '../apps/engine/src/replay';
-import { testDatabaseUrl } from './test-database';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
 import { confirmDisconnectedDatabase } from './test-db-close';
 import { OwnedChildScope } from './test-support/owned-child-scope';
 import { stopOwnedChild } from '../apps/engine/src/process-lifecycle';
@@ -41,7 +41,7 @@ if (!['localhost', '127.0.0.1'].includes(source.hostname)) throw new Error('loop
 for (const key of source.searchParams.keys())
   if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
     throw new Error('접속 대상 질의 인자는 쓸 수 없습니다.');
-const name = 't305_reset_preparation_' + randomUUID().replaceAll('-', '') + '_test',
+const name = ciGreenDatabaseName('opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test'),
   target = new URL(source),
   adminUrl = new URL(source);
 target.pathname = '/' + name;
@@ -70,17 +70,6 @@ let failed = false,
 const oldWorlds: string[] = [],
   newWorlds: string[] = [],
   monthHashes: string[] = [];
-const features = [
-  'campaign-v1',
-  'five-stats',
-  'operational-map',
-  'personnel',
-  'policy',
-  'stratagem-basic',
-  'treaty',
-  'treaty-break',
-  'treaty-trade',
-].sort();
 const origin = 'http://127.0.0.1:5173';
 function fail(error: unknown) {
   failed = true;
@@ -167,7 +156,10 @@ async function cleanupWithReservedClose(
   return closed;
 }
 async function dropExactOwnedDatabase(client: Pg, expectedName: string, expectedOid: string, signal: AbortSignal) {
-  if (!/^t305_reset_preparation_[a-f0-9]{32}_test$/.test(expectedName) || !/^[1-9]\d*$/.test(expectedOid))
+  if (
+    !(/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(expectedName) || expectedName === ciGreenDatabaseName('')) ||
+    !/^[1-9]\d*$/.test(expectedOid)
+  )
     throw new Error('자기 시험 DB 식별자를 확인하세요.');
   const identity = (
     await checked(
@@ -210,8 +202,6 @@ async function publishedCli(signal: AbortSignal) {
       'five-stats',
       '--portrait-map',
       '191-map',
-      '--rule-features',
-      features.join(','),
       '--seed',
       'reset-original-cli',
       '--name',
@@ -529,7 +519,7 @@ it('AC-M3-04 B 생성 소비자의 DONE manifest를 가진 정식 두 번째 원
     mapKey: 'integration',
     statRulesKey: 'five-stats',
     portraitMapKey: '191-map',
-    ruleFeatures: features,
+
     seed: 'reset-original-b',
     turnTermMinutes: 30,
     endYear: 200,
@@ -568,6 +558,7 @@ it('AC-M3-04 실제 API와 엔진으로 기존 사람 장수·30예약·입력 �
       body: JSON.stringify({
         worldId,
         name: '보존사람',
+        sex: 'MALE' as const,
         portraitId: null,
         leadership: 55,
         strength: 55,

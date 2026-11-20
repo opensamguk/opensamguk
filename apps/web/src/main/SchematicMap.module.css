@@ -1,0 +1,202 @@
+/* 도식 축소 지도 (D-101, D-102, D-103). UI 키트 그림이 오면 판과 칸을 그림으로 바꾼다. */
+.wrap {
+  position: relative;
+  display: grid;
+  gap: var(--space-1);
+}
+.map {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 60vh;
+  background: #2a3a44;
+  border: 2px solid #8a6a34;
+}
+.edge {
+  stroke-linecap: round;
+  opacity: 0.85;
+}
+.path {
+  fill: none;
+  stroke: #ffd65a;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.node {
+  cursor: pointer;
+}
+.node[data-live='false'] {
+  opacity: 0.3;
+  cursor: default;
+}
+.cell {
+  stroke: #120c08;
+  stroke-width: 0.6;
+}
+.node[data-selected='true'] .cell {
+  stroke: #ffe07a;
+  stroke-width: 1.6;
+}
+.node[data-here='true'] .cell {
+  stroke: #ffffff;
+  stroke-width: 1.4;
+}
+.node:focus-visible .cell {
+  stroke: #ffe07a;
+  stroke-width: 2;
+}
+.capital {
+  fill: #ffd34d;
+  stroke: #3a2a10;
+  stroke-width: 0.4;
+}
+.badge {
+  fill: #ffe9b0;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: #120c08;
+  stroke-width: 0.6;
+}
+.name {
+  fill: #fff6e0;
+  text-anchor: middle;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: #120c08;
+  stroke-width: 0.8;
+  pointer-events: none;
+}
+.legend {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+.legend span {
+  display: inline-block;
+  width: 14px;
+  height: 4px;
+  margin: 0 4px 0 10px;
+  vertical-align: calc(var(--glyph-mid) - 2px);
+}
+.legend .legendCounty {
+  width: 8px;
+  height: 8px;
+  background: #8a857c;
+  outline: 1px solid #120c08;
+}
+.panel {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  z-index: 1;
+  min-width: 180px;
+  max-height: 70%;
+  overflow: auto;
+  background: #f3e8cf;
+  color: #2a1a0c;
+  border: 3px solid #7a2a1a;
+}
+.panelHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: #7a2a1a;
+  color: #fff4dc;
+}
+.panelHead button {
+  min-height: 36px;
+  border: 1px solid #f3e8cf;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+}
+.panelList {
+  margin: 0;
+  padding: var(--space-1);
+  list-style: none;
+  display: grid;
+  gap: 2px;
+}
+.panelList button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  border: 1px solid #c9b48a;
+  border-radius: 0;
+  background: #fffaf0;
+  color: inherit;
+  text-align: left;
+}
+.panelList button[aria-pressed='true'] {
+  outline: 3px solid #b84a2c;
+  outline-offset: -3px;
+}
+.panelList button:disabled {
+  opacity: 0.45;
+}
+.panelList small {
+  margin-left: auto;
+  color: #6a4a2a;
+}
+.swatch {
+  width: 12px;
+  height: 12px;
+  outline: 1px solid #120c08;
+}
+.info {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.zoom {
+  justify-self: start;
+  min-height: 36px;
+  padding: 0 var(--space-2);
+  border: 1px solid #8a6a34;
+  border-radius: 0;
+  background: rgb(20 14 8 / 85%);
+  color: #f1e4c8;
+}
+.homeRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+.homeRow span {
+  font-weight: 700;
+  color: #ffd27a;
+}
+.homeRow button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 2px solid #3a2416;
+  border-radius: 0;
+  background: linear-gradient(180deg, #8a6a48, #5c4430);
+  color: #fff4dc;
+  font-weight: 700;
+}
+.homeRow button[aria-pressed='true'] {
+  outline: 3px solid #ffd65a;
+  outline-offset: -3px;
+}
+.homeRow button:disabled {
+  opacity: 0.45;
+}
+
+/* 게임 화면 왼쪽 위 축소 지도(D-106): 틀을 꽉 채우고 테두리는 바깥 틀이 맡는다. */
+.wrap[data-compact] {
+  height: 100%;
+}
+.wrap[data-compact] .map {
+  height: 100%;
+  max-height: none;
+  border: 0;
+  background: #1c3550;
+}

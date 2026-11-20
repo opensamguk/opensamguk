@@ -51,7 +51,9 @@ describe('장수 생성 입력 검사', () => {
   it('이름은 1~6글자 한글·한자·영문·숫자다', () => {
     expect(checkCreation('', stats('55', '55', '55')).problems).toEqual(['이름을 입력하세요.']);
     expect(checkCreation('일곱글자이름임', stats('55', '55', '55')).problems).toEqual(['이름은 6글자까지입니다.']);
-    expect(checkCreation('조 운', stats('55', '55', '55')).problems).toEqual(['이름은 한글·한자·영문·숫자만 씁니다.']);
+    expect(checkCreation('조 운', stats('55', '55', '55')).problems).toEqual([
+      '이름은 한글, 한자, 영문, 숫자만 씁니다.',
+    ]);
     expect(checkCreation('趙雲Z1', stats('55', '55', '55')).problems).toEqual([]);
   });
 });

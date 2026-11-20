@@ -17,8 +17,6 @@ import {
 } from './adminResetSetup';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { changeAdminRole } from '../apps/server/src/admin/roleStore';
-import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { TEST_PASSWORD } from './account';
 
 const releases: Array<() => Promise<unknown>> = [],
@@ -245,7 +243,7 @@ test('RESET01 AC-M3-04 정식 두 월드·사람30칸의 실제 초기화·감�
     await expect(page.getByLabel('초기화할 월드', { exact: true })).toBeFocused();
   }));
 
-test('RESET02 AC-M3-04 정확 이름·사유·긴 이름과 지원 상태·구형식 거부', ({ page, legalStack: stack }) =>
+test('RESET02 AC-M3-04 정확 이름·사유·긴 이름과 지원 상태 거부', ({ page, legalStack: stack }) =>
   track(bodies, async () => {
     const { admin, target } = await prepared(page, stack),
       longName = ' 긴 이름 é '.repeat(40);
@@ -274,16 +272,7 @@ test('RESET02 AC-M3-04 정확 이름·사유·긴 이름과 지원 상태·구�
     const preopen = await clockWorld(stack, releases, false),
       running = await clockWorld(stack, releases, false);
     await resetClock(page, stack, running, admin.id, 'start');
-    const initial = await loadInitialWorldFromDb(stack.db, { scenario: '1030', map: 'che', seed: 'reset-ui-legacy' });
-    const legacy = await saveInitialWorld(stack.db, initial, {
-      name: '구형식 초기화 화면',
-      turnTermMinutes: 60,
-      endYear: null,
-      replayFormat: 'legacy',
-    });
-    await controlClock(stack.db, legacy.worldId, 'start');
-    await controlClock(stack.db, legacy.worldId, 'pause');
-    for (const id of [preopen.id, running.id, legacy.worldId]) {
+    for (const id of [preopen.id, running.id]) {
       await page.getByRole('button', { name: '월드 조회', exact: true }).click();
       await page.getByLabel('초기화할 월드', { exact: true }).selectOption(id);
       await expect(page.getByRole('button', { name: '월드 초기화 확인', exact: true })).toBeDisabled();

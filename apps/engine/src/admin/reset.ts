@@ -1,5 +1,6 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { nextActionSequence, type Prisma, type PrismaClient } from '@opensamguk/db';
+import { cancelTacticalBattles } from '../tacticalBattle';
 import { PgHeritageRepository } from '../heritage/repository';
 import { refundHeritageCreations } from '../heritage/service';
 import { readCreationWorld } from './settingsHistory';
@@ -264,6 +265,7 @@ export async function processAdminReset(
   let result: Prisma.InputJsonValue;
   if (code) result = { code, message: adminResetRejectMessages[code] };
   else {
+    if (world.campaignState) await cancelTacticalBattles(tx, world, now, '관리자 월드 초기화');
     const candidate = preparation!.candidate!,
       finalStateHash = hashState(await loadReplayState(tx, world.id));
     signal?.throwIfAborted();
@@ -306,11 +308,10 @@ export async function processAdminReset(
       data: { status: 'ENDED', endedAt: now, clockRevision: { increment: 1 } },
     });
     if (source.count !== 1) throw new Error('원본 월드 상태가 바뀌어 초기화를 취소했습니다.');
-    if (world.ruleFeatures.includes('heritage-v1'))
-      await refundHeritageCreations(new PgHeritageRepository(tx), world.id, 'ADMIN_RESET', {
-        requestId: String(event.id),
-        newWorldId: payload.plannedNewWorldId,
-      });
+    await refundHeritageCreations(new PgHeritageRepository(tx), world.id, 'ADMIN_RESET', {
+      requestId: String(event.id),
+      newWorldId: payload.plannedNewWorldId,
+    });
   }
   const sequence = await nextActionSequence(tx, world.id),
     status = code ? ('REJECTED' as const) : ('APPLIED' as const);

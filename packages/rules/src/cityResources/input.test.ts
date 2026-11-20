@@ -11,7 +11,6 @@ import { emptyCityResourcesState } from './state';
 
 function fixture() {
   const world = commandWorld();
-  world.ruleFeatures = ['five-stats', 'city-resources-v1'];
   for (const general of Object.values(world.generals)) Object.assign(general, { politics: 60, charm: 55, crew: 0 });
   Object.assign(world.generals[1]!, { userId: 'city-owner', officerLevel: 12, cityKey: 1, nationId: 1 });
   world.campaign = emptyCampaignState(world, 'city-input', 'source-fixture');

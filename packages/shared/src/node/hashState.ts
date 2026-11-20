@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+export { errorDiagnostic } from './errorDiagnostic';
 
 function canonicalJson(value: unknown): string {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return JSON.stringify(value);

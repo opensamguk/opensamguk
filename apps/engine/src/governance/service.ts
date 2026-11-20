@@ -21,9 +21,11 @@ export async function reconcileGovernanceOrder(
   repository: GovernanceRepository,
   worldId: string,
   at: { tick: number; sequence: number },
+  loadedState?: Awaited<ReturnType<GovernanceRepository['load']>>,
 ) {
-  const before = await repository.load(worldId),
+  const before = loadedState ?? (await repository.load(worldId)),
     next = reconcileGovernance(before, at.tick);
   if (JSON.stringify(before.governance) !== JSON.stringify(next.governance))
     await repository.save(worldId, before, next, at);
+  return next;
 }

@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, describe, expect, it } from 'vitest';
+import { saveInitialWorld } from './world/persistence';
+import { loadInitialWorldFromDb } from './world/resources';
 import { createDb } from '@opensamguk/db';
-import { acquireLease, assertLease, LeaseLostError, releaseLease, renewLease } from './lease';
+import { acquireLease, assertLease, lockLease, LeaseLostError, releaseLease, renewLease } from './lease';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
@@ -13,20 +15,13 @@ afterAll(async () => {
 });
 
 async function create(ownerId = randomUUID()) {
-  const world = await db.world.create({
-    data: {
-      name: '리스 정밀도 회귀',
-      scenarioKey: '1030',
-      mapKey: 'che',
-      unitSetKey: 'test',
-      seed: 'lease-precision',
-      startYear: 200,
-      turnTermMinutes: 10,
-      initialStateHash: 'lease-test',
-      statRules: {},
-      unitSet: {},
-    },
+  const initial = await loadInitialWorldFromDb(db, { scenario: '1030', map: 'che', seed: 'lease-precision' });
+  const { worldId } = await saveInitialWorld(db, initial, {
+    name: '리스 정밀도 회귀',
+    turnTermMinutes: 10,
+    endYear: null,
   });
+  const world = { id: worldId };
   worldIds.push(world.id);
   const lease = await acquireLease(db, world.id, ownerId);
   if (!lease) throw new Error('테스트 리스 획득 실패');
@@ -74,8 +69,10 @@ describe('AC-M1-11 리스 해제 정밀도, 실제 PostgreSQL', () => {
       await releaseLease(db, lease);
       await expect(renewLease(db, lease)).rejects.toBeInstanceOf(LeaseLostError);
       await expect(assertLease(db, lease)).rejects.toBeInstanceOf(LeaseLostError);
+      await expect(db.$transaction((tx) => lockLease(tx, lease))).rejects.toBeInstanceOf(LeaseLostError);
       expect(await db.engineLease.findUniqueOrThrow({ where: { worldId: lease.worldId } })).toEqual(before);
       await assertLease(db, next);
+      await db.$transaction((tx) => lockLease(tx, next));
       lease = next;
     }
   });

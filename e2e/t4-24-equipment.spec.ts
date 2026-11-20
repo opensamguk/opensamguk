@@ -11,7 +11,7 @@ import { TEST_EQUIPMENT_LOGISTICS_CONFIG } from '../packages/rules/src/equipment
 import { newSession } from '../apps/server/src/auth/session';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { test, expect, type LegalStack } from './legalFixture';
 
@@ -88,6 +88,7 @@ test('T4-24 장비 카드 예약·실제 매매·100 초과 표시와 세 화면
   const initial = buildInitialWorld(input),
     payload = {
       name: '장비화면',
+      sex: 'MALE' as const,
       leadership: 40,
       strength: 90,
       intel: 40,
@@ -117,27 +118,14 @@ test('T4-24 장비 카드 예약·실제 매매·100 초과 표시와 세 화면
     }
   }
   expect(selected).toBe(true);
-  const features = [
-    'campaign-assignment-v2',
-    'campaign-v1',
-    'city-resources-v1',
-    'equipment-v1',
-    'five-stats',
-    'logistics-v1',
-    'operational-map',
-    'personnel',
-    'policy',
-  ].sort();
-  initial.ruleFeatures = features;
   const logistics = structuredClone(TEST_EQUIPMENT_LOGISTICS_CONFIG);
   logistics.capacity.base = 10000;
   logistics.specialties = [{ cityKey: 3, good: 'iron', perMonth: 500 }];
-  const { worldId } = await saveInitialWorld(stack.db, initial, {
+  const { worldId } = await saveFixtureWorld(stack.db, initial, {
     name: '장비 화면 검증',
     turnTermMinutes: 60,
     endYear: null,
     replayFormat: 3,
-    ruleFeatures: features,
     featureData: { 'logistics-v1': logistics, 'equipment-v1': STANDARD_EQUIPMENT_CONFIG },
   });
   const advance = async (tick: number) => {
@@ -202,6 +190,18 @@ test('T4-24 장비 카드 예약·실제 매매·100 초과 표시와 세 화면
     await editor.locator('tr[data-slot="1"]').click();
     await editor.getByRole('searchbox').fill('장비');
     await editor.getByRole('radio', { name: '장비매매', exact: true }).check();
+    // 장비매매 인자 화면은 '품목'과 '확인' 두 단계다. 장비 칸과 품목은 첫 단계에, 넣기 단추는 마지막 단계에만 보인다
+    // (CommandArgsScreen의 data-final). 넣기 단추를 쓰기 전에 확인 단계로 간다.
+    const argsScreen = page.getByTestId('command-args-screen');
+    const put = argsScreen.getByRole('button', { name: '1번 칸에 넣기', exact: true });
+    const toConfirm = async () => {
+      const next = argsScreen.getByRole('button', { name: '다음: 확인', exact: true });
+      if ((await next.count()) > 0) await next.click();
+    };
+    const toItems = async () => {
+      const back = argsScreen.getByRole('button', { name: '이전', exact: true });
+      if ((await back.count()) > 0 && (await back.isEnabled())) await back.click();
+    };
     const slot = picker.getByRole('combobox', { name: '장비 칸', exact: true }),
       item = picker.getByRole('combobox', { name: '매매할 장비', exact: true });
     await slot.selectOption('weapon');
@@ -215,16 +215,22 @@ test('T4-24 장비 카드 예약·실제 매매·100 초과 표시와 세 화면
       for (const width of [375, 768, 1440]) {
         await page.emulateMedia({ colorScheme });
         await page.setViewportSize({ width, height: 900 });
-        for (const control of [slot, item, picker.getByRole('button', { name: '1번 칸에 넣기', exact: true })]) {
+        const measure = async (control: typeof slot) => {
           const box = (await control.boundingBox())!;
           expect(box.height).toBeGreaterThanOrEqual(44);
           expect(box.x).toBeGreaterThanOrEqual(0);
           expect(box.x + box.width).toBeLessThanOrEqual(width + 1);
-        }
+        };
+        await measure(slot);
+        await measure(item);
+        await toConfirm();
+        await measure(put);
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-        await picker.screenshot({ path: info.outputPath(`t4-24-trade-${colorScheme}-${width}.png`) });
+        await argsScreen.screenshot({ path: info.outputPath(`t4-24-trade-${colorScheme}-${width}.png`) });
+        await toItems();
       }
-    await picker.getByRole('button', { name: '1번 칸에 넣기', exact: true }).click();
+    await toConfirm();
+    await put.click();
     await editor.getByRole('button', { name: '저장', exact: true }).click();
     await expect(editor.getByText('저장했습니다.', { exact: true })).toBeVisible();
     expect(
@@ -272,7 +278,9 @@ test('T4-24 장비 카드 예약·실제 매매·100 초과 표시와 세 화면
     const replacement = picker.getByRole('note').filter({ hasText: '교체하면 기존 장비 금액은 돌려받지 않습니다.' });
     await expect(condition).toBeVisible();
     await expect(replacement).toBeVisible();
-    await expect(picker.getByRole('button', { name: '1번 칸에 넣기', exact: true })).toBeEnabled();
+    await toConfirm();
+    await expect(put).toBeEnabled();
+    await toItems();
     for (const colorScheme of ['light', 'dark'] as const) {
       await page.emulateMedia({ colorScheme });
       await page.setViewportSize({ width: 375, height: 900 });
@@ -293,7 +301,8 @@ test('T4-24 장비 카드 예약·실제 매매·100 초과 표시와 세 화면
     await slot.selectOption('weapon');
     await item.selectOption('none');
     await expect(picker.getByText('현재 장착품 기준 판매 금액: 금 500', { exact: true })).toBeVisible();
-    await picker.getByRole('button', { name: '1번 칸에 넣기', exact: true }).click();
+    await toConfirm();
+    await put.click();
     await editor.getByRole('button', { name: '저장', exact: true }).click();
     await expect(editor.getByText('저장했습니다.', { exact: true })).toBeVisible();
     await advance(bought.nextTurnTick - 1);
@@ -333,7 +342,7 @@ test('T4-24 장비 카드 예약·실제 매매·100 초과 표시와 세 화면
     await editor.getByRole('radio', { name: '장비매매', exact: true }).check();
     const pickerAlert = picker.getByRole('alert').filter({ hasText: '장비 정보를 불러오지 못했습니다.' });
     await expect(pickerAlert).toBeVisible();
-    await expect(picker.getByRole('button', { name: '1번 칸에 넣기 (사용 불가)', exact: true })).toBeVisible();
+    // 오류 상자와 다시 시도는 품목 단계에 있고, 막힌 넣기 단추는 확인 단계에 있다.
     for (const colorScheme of ['light', 'dark'] as const) {
       await page.emulateMedia({ colorScheme });
       const box = (await pickerAlert.getByRole('button', { name: '다시 시도', exact: true }).boundingBox())!;
@@ -343,6 +352,9 @@ test('T4-24 장비 카드 예약·실제 매매·100 초과 표시와 세 화면
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       await picker.screenshot({ path: info.outputPath(`t4-24-retry-trade-${colorScheme}-375.png`) });
     }
+    await toConfirm();
+    await expect(argsScreen.getByRole('button', { name: '1번 칸에 넣기 (사용 불가)', exact: true })).toBeVisible();
+    await toItems();
     await page.unroute('**/trpc/**');
     await pickerAlert.getByRole('button', { name: '다시 시도', exact: true }).click();
     await expect(slot).toBeVisible();

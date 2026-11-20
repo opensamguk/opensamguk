@@ -190,17 +190,11 @@ export function PersonnelBoardView({
   const candidates = useMemo(() => appointCandidates(board, details, labels), [board, details, labels]);
   // 후보 목록은 한 번에 한 직책만 펼친다.
   const [openLevel, setOpenLevel] = useState<number | null>(null);
-  // 관직 주재 효과 월드는 도시 칸에서 주재 도시를 고친다 (T3-09).
-  const officeEffects = board.officeEffectsEnabled === true;
+  // 도시 칸에서 주재 도시를 고친다 (T3-09).
   const officeCities = board.officeCities;
   const columns = useMemo(
-    () =>
-      memberColumns(
-        labels,
-        details,
-        officeEffects ? (m) => <MemberResidence member={m} cities={officeCities ?? []} /> : undefined,
-      ),
-    [labels, details, officeEffects, officeCities],
+    () => memberColumns(labels, details, (m) => <MemberResidence member={m} cities={officeCities ?? []} />),
+    [labels, details, officeCities],
   );
   return (
     <>
@@ -236,16 +230,14 @@ export function PersonnelBoardView({
           </tbody>
         </table>
       </section>
-      {board.officeEffectsEnabled ? (
-        <LocalOffices
-          board={board}
-          candidates={candidates.filter(({ state }) => state.kind === 'free').map(({ member }) => member)}
-          busyTarget={busyTarget}
-          busyLabel={busyLabel}
-          onAppoint={onAppoint}
-          onDismiss={onDismiss}
-        />
-      ) : null}
+      <LocalOffices
+        board={board}
+        candidates={candidates.filter(({ state }) => state.kind === 'free').map(({ member }) => member)}
+        busyTarget={busyTarget}
+        busyLabel={busyLabel}
+        onAppoint={onAppoint}
+        onDismiss={onDismiss}
+      />
       <section className={styles.section} aria-labelledby="members-title">
         <h2 id="members-title">소속 장수</h2>
         {board.members.length === 0 ? (

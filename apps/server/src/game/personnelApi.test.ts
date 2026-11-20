@@ -30,7 +30,7 @@ function fixture() {
   };
   const tx = {
     session: { findFirst: vi.fn(async (): Promise<object | null> => ({ id: 'session' })) },
-    world: { findUnique: vi.fn(async () => ({ id: 'world', replayFormat: 3, ruleFeatures: ['personnel'] })) },
+    world: { findUnique: vi.fn(async () => ({ id: 'world', replayFormat: 3 })) },
     inputEvent: {
       findUnique: vi.fn(
         async () => pending as { kind: string; status: string; result: unknown; idempotencyKey: string },

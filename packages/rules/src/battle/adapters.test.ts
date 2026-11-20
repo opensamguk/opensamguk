@@ -13,7 +13,6 @@ const paths = ['general', 'wall', 'campaign', 'campaignWall', 'garrison'] as con
 for (const enabled of [false, true]) {
   it.each(paths)(`AC-INT-22 %s는 기능 ${enabled}의 공통 계산식·효과·난수 순서를 쓴다`, (path) => {
     const world = commandWorld();
-    world.ruleFeatures = ['five-stats', ...(enabled ? ['battle-affinity-v2'] : [])];
     for (const general of Object.values(world.generals))
       Object.assign(general, {
         crew: 0,
@@ -49,8 +48,8 @@ for (const enabled of [false, true]) {
     const random = () => rngFor('int22-adapter', Number(enabled), path);
     const reference = random(),
       actual = random();
-    const expected = simulateBattle({ ...input, coefMode: enabled ? 'multiply' : 'divide' }, reference);
-    expect(expected).not.toEqual(simulateBattle({ ...input, coefMode: enabled ? 'divide' : 'multiply' }, random()));
+    const expected = simulateBattle({ ...input, coefMode: 'multiply' }, reference);
+    expect(expected).not.toEqual(simulateBattle({ ...input, coefMode: 'divide' }, random()));
     if (path === 'general' || path === 'wall') {
       Object.assign(world.generals[1]!, attacker);
       if (!wall) Object.assign(world.generals[2]!, defender);
@@ -86,7 +85,6 @@ for (const enabled of [false, true]) {
         });
       world.campaign.nextUnitId = world.campaign.units.length + 1;
       if (path === 'garrison') {
-        world.ruleFeatures.push('city-resources-v1');
         world.cityResources = emptyCityResourcesState(world);
         Object.assign(world.cityResources.cities['2']!, {
           rice: 10000,

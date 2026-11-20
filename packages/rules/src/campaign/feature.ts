@@ -1,3 +1,4 @@
+import { buildSupplyLedger, supplyLedgerSchema } from './supply';
 import { z } from 'zod';
 import type { RuleFeatureDefinition, InputKindDefinition } from '../ruleRegistry';
 import type { WorldInit } from '../world/bootstrap';
@@ -54,14 +55,14 @@ export const campaignFeature: RuleFeatureDefinition = {
   key: 'campaign-v1',
   requires: ['five-stats', 'operational-map', 'personnel', 'policy'],
   conflicts: ['ext'],
-  checkOrigin({ initial, data }) {
+  checkOrigin({ initial, data, initialWorld }) {
     if (
       data !== undefined ||
       initial.generals.some((general) => general.crew !== 0) ||
       Object.hasOwn(initial, 'campaign')
     )
       throw new Error('새 휘하 프로필은 병력이 없는 생성 기록에서 시작합니다.');
-    const state = toWorldState(initial);
+    const state = initialWorld ?? toWorldState(initial);
     emptyCampaignState(state, initial.seed, initial.scenarioKey);
     campaignArmyTypes(initial);
   },
@@ -74,15 +75,10 @@ export const campaignFeature: RuleFeatureDefinition = {
     };
   },
   checkArchive({ origin, inputs }) {
-    const types = campaignArmyTypes(origin.initial);
+    campaignArmyTypes(origin.initial);
     for (const input of inputs)
       if (['campaign.relationship', 'campaign.unit', 'campaign.order'].includes(input.kind)) {
         validateCampaignRecord(input);
-        if (input.kind === 'campaign.unit' && input.status === 'APPLIED') {
-          const payload = campaignUnitInputSchema.parse(input.payload);
-          if (payload.type === 'form' && !types.includes(payload.crewType))
-            throw new Error('생성 기록에 없는 부곡 병종입니다.');
-        }
       }
   },
   afterAppliedInput(before, after, input) {
@@ -144,3 +140,29 @@ export const campaignInputKinds: readonly InputKindDefinition[] = [
   route: 'queued',
   apply: applyCampaign,
 }));
+
+export const marchSupplyFeature: RuleFeatureDefinition = {
+  key: 'march-supply-v1',
+  requires: ['campaign-v1', 'city-resources-v1', 'operational-map'],
+  conflicts: [],
+  checkOrigin({ initial, data }) {
+    if (!initial.operationalMap) {
+      if (supplyLedgerSchema.parse(data).routes.length !== 0)
+        throw new Error('운영 지도 없는 행군 보급의 경로 자료는 비어 있어야 합니다.');
+      return;
+    }
+    if (data !== undefined) throw new Error('행군 보급은 생성 기록의 지도 원장을 사용합니다.');
+    if (initial.operationalMap) buildSupplyLedger(initial.operationalMap);
+  },
+  initReplayState(replay, { initial }) {
+    if (!initial.operationalMap) return replay;
+    if (!replay.state.campaign) throw new Error('행군 경로 원장의 선행 자료가 없습니다.');
+    return {
+      ...replay,
+      state: {
+        ...replay.state,
+        campaign: { ...replay.state.campaign, supplyLedger: buildSupplyLedger(initial.operationalMap) },
+      },
+    };
+  },
+};

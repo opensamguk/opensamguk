@@ -3,7 +3,7 @@ import { rngFor } from '@opensamguk/shared';
 import { commandWorld, testUnits } from '../../test/commandFixture';
 import { deepFreeze } from '../personnel/testFixture';
 import { simulateBattle } from '../battle/simulate';
-import { fiveStatsBattleModifiers } from '../general/fiveStatsBattle';
+import { commanderBattleModifiers } from '../general/fiveStatsBattle';
 import { STANDARD_EQUIPMENT_CONFIG } from '../equipment/catalog';
 import { initialEquipment } from '../equipment/state';
 import { emptyCampaignState } from './state';
@@ -11,7 +11,6 @@ import { fightCampaignUnits, fightCampaignWall } from './skirmish';
 
 function fixture() {
   const world = commandWorld();
-  world.ruleFeatures = ['five-stats'];
   for (const general of Object.values(world.generals))
     Object.assign(general, { politics: 60, charm: 55, crew: 0, rice: 5000 });
   Object.assign(world.generals[1]!, { nationId: 1, cityKey: 1, userId: 'owner', leadership: 0, strength: 0 });
@@ -37,7 +36,6 @@ const rng = () => rngFor('battle-test', 'skirmish', 1);
 describe('AC-INT-09 부곡별 실제 교전·군량', () => {
   it('AC-P2-12 장비는 소유자가 아닌 실제 지휘관에게 적용하고 기본 능력치를 보존한다', () => {
     const world = fixture();
-    world.ruleFeatures!.push('equipment-v1');
     world.equipment = initialEquipment(STANDARD_EQUIPMENT_CONFIG);
     Object.assign(world.generals[2]!, { leadership: 100, strength: 100 });
     const plain = fightCampaignUnits(world, 1, 2, testUnits, rng());
@@ -57,7 +55,6 @@ describe('AC-INT-09 부곡별 실제 교전·군량', () => {
       equipped = structuredClone(plain),
       firstRng = rng(),
       secondRng = rng();
-    equipped.ruleFeatures!.push('equipment-v1');
     equipped.equipment = initialEquipment(STANDARD_EQUIPMENT_CONFIG);
     const baseline = fightCampaignUnits(plain, 1, 2, testUnits, firstRng);
     const result = fightCampaignUnits(equipped, 1, 2, testUnits, secondRng);
@@ -65,7 +62,7 @@ describe('AC-INT-09 부곡별 실제 교전·군량', () => {
     expect(result.defender).toEqual(baseline.defender);
     expect(secondRng.next()).toBe(firstRng.next());
     delete result.state.equipment;
-    result.state.ruleFeatures = plain.ruleFeatures!;
+    delete baseline.state.equipment;
     expect(result.state).toEqual(baseline.state);
   });
   it('동일 시드로 같은 피해를 재현하며 소유자 쌀만 한 번 차감하고 장수 병력을 만들지 않는다', () => {
@@ -116,17 +113,16 @@ describe('AC-INT-09 부곡별 실제 교전·군량', () => {
     const expected = simulateBattle(
       {
         attacker: { crew: 1000, crewType: 1100, train: 80, atmos: 80 },
+        siege: true,
+        coefMode: 'multiply',
         defender: { crew: 1000, crewType: 1000, train: 100, atmos: 100 },
         attackerTech: world.nations[1]!.tech,
         defenderTech: 0,
         defence: city.defence,
         unitSet: testUnits,
-        attackerModifiers: fiveStatsBattleModifiers({
+        attackerModifiers: commanderBattleModifiers({
           leadership: 80,
           strength: 90,
-          intel: world.generals[2]!.intel,
-          politics: 60,
-          charm: 55,
         }),
       },
       rng(),

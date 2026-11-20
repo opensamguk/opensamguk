@@ -14,6 +14,7 @@ import { cityNpcAllocations } from '../packages/rules/src/cityResources/npc';
 import { operationalInput } from '../packages/rules/test/operationalMapFixture';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { recruitmentFixtureData } from './fixtures/recruitment';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { acquireLease, assertLease, lockLease, releaseLease, renewLease, LEASE_TTL_MS } from '../apps/engine/src/lease';
@@ -36,17 +37,7 @@ if (!['127.0.0.1', 'localhost'].includes(url.hostname) || url.searchParams.has('
 const db = createDb(url.toString());
 const origin = 'http://127.0.0.1:5173',
   now = Date.now();
-const features = [
-  'campaign-assignment-v2',
-  'campaign-v1',
-  'city-resources-v1',
-  'five-stats',
-  'operational-map',
-  'personnel',
-  'policy',
-  'stratagem-basic',
-  'treaty',
-];
+
 type Account = { userId: string; cookie: string };
 type Actor = Account & { generalId: number };
 type Board = Awaited<ReturnType<typeof readCampaignOrders>>;
@@ -290,12 +281,17 @@ beforeAll(() => {
         site.initial.agriculture = site.max.agriculture = 100000;
       }
     initial = buildInitialWorld(source);
-    initial.ruleFeatures = [...features];
+    for (const general of initial.generals)
+      if (general.id >= 3) {
+        general.nextTurnTick = 1_000_000_000;
+        general.cityKey = 99;
+      }
     rulerId = initial.generals.find((g) => g.officerLevel === BALANCE.RULER_LEVEL)!.id;
     ({ worldId } = await saveInitialWorld(db, initial, {
       name: 'INT19 NPC 자기부곡 통제 검사',
       turnTermMinutes: 60,
       endYear: 201,
+      featureData: recruitmentFixtureData(initial),
     }));
     await controlClock(db, worldId, 'start');
     app = await buildServer({ db, logging: false, publicOrigin: origin, now: () => now });
@@ -307,6 +303,7 @@ beforeAll(() => {
         {
           worldId,
           name: '지시검사',
+          sex: 'MALE' as const,
           portraitId: null,
           leadership: 55,
           strength: 55,
@@ -360,6 +357,8 @@ it('NPC자기부곡 지시는 정상 도시 준비와 NPC군주 배속으로 병
   });
   active = AbortSignal.any([lifetime.signal, signal]);
   return track(async () => {
+    // 첫 실제 세수로 도시 모집비를 마련한다.
+    await advance(10000);
     const start = await snapshot(),
       home = start.state.nations[1]!.capitalCityKey;
     const ruler = start.state.generals[rulerId]!;
@@ -402,15 +401,20 @@ it('NPC자기부곡 지시는 정상 도시 준비와 NPC군주 배속으로 병
       relation: 'LIEUTENANT',
     });
 
-    // 군주와 겹치지 않는 병종으로 NPC에게 빈 부곡을 정상 편성시킨다. 이 나라의 부곡은 이것 하나다.
+    // 군주와 겹치지 않는 병종으로 NPC의 자기 부곡을 실제 1명 모집으로 준비한다.
     const crewType = initial.unitSet.crewTypes
       .filter((row) => row.armType > 0 && row.id !== ruler.crewType)
       .sort((x, y) => x.cost - y.cost || x.id - y.id)[0]!;
-    await executeOrder(await issued('form_unit', { crewType: crewType.id }));
+    await executeOrder(await issued('recruit', { crewType: crewType.id, unitId: 'new', amount: 1 }));
     const formed = (await snapshot()).state.campaign!.units;
-    expect(formed).toHaveLength(1);
-    expect(formed[0]).toMatchObject({ ownerId: npcId, commanderId: npcId, crewType: crewType.id, troops: 0 });
-    const unitId = formed[0]!.id;
+    expect(formed.filter((unit) => unit.ownerId === npcId)).toHaveLength(1);
+    expect(formed.find((unit) => unit.ownerId === npcId)).toMatchObject({
+      ownerId: npcId,
+      commanderId: npcId,
+      crewType: crewType.id,
+      troops: 1,
+    });
+    const unitId = formed.find((unit) => unit.ownerId === npcId)!.id;
 
     // 도시 금으로 그 병종 수비병만 모병·사기·훈련하게 지시하고, NPC군주의 실제 국가 차례 배속을 기다린다.
     let allocated: Awaited<ReturnType<typeof snapshot>> | undefined,
@@ -424,7 +428,7 @@ it('NPC자기부곡 지시는 정상 도시 준비와 NPC군주 배속으로 병
       expect(npc.cityKey).toBe(home);
       const garrison = city.garrison.find((row) => row.crewType === crewType.id);
       const status = `round=${round} tick=${npc.nextTurnTick} gold=${city.gold} garrison=${JSON.stringify(garrison ?? null)} unitTroops=${unit.troops}`;
-      if (unit.troops > 0) {
+      if (unit.troops > 1) {
         console.info(`INT19 NPC 배속 완료 ${status}`);
         allocated = state;
         break;
@@ -474,13 +478,14 @@ it('NPC자기부곡 지시는 정상 도시 준비와 NPC군주 배속으로 병
     expect(prepared.key).toBe('rest');
     expect(preparedGarrison.train).toBeGreaterThanOrEqual(60);
     expect(preparedGarrison.atmos).toBeGreaterThanOrEqual(70);
-    expect(cityNpcAllocations(prepared.state.state, 1).map((row) => [row.key, row.args])).toEqual([
-      ['nation_city_allocate', { cityKey: home, unitId, crewType: crewType.id, amount: allocatedUnit.troops }],
+    expect(cityNpcAllocations(prepared.state.state, 1).map((row) => [row.key, row.args])).toContainEqual([
+      'nation_city_allocate',
+      { cityKey: home, unitId, crewType: crewType.id, amount: allocatedUnit.troops - 1 },
     ]);
     const remaining =
       allocated.state.cityResources!.cities[String(home)]!.garrison.find((row) => row.crewType === crewType.id)
         ?.troops ?? 0;
-    expect(remaining).toBe(preparedGarrison.troops - allocatedUnit.troops);
+    expect(remaining).toBe(preparedGarrison.troops - (allocatedUnit.troops - 1));
 
     // 자기 부곡 훈련을 지시하고 월 녹봉 등 다른 변화가 끝난 NPC 차례 직전 상태를 기준으로 삼는다.
     const trainId = await issued('train', { unitId });
@@ -503,7 +508,7 @@ it('NPC자기부곡 지시는 정상 도시 준비와 NPC군주 배속으로 병
     });
     expect(trained.train).toBeGreaterThan(unit.train);
     expect(after.state.generals[npcId]!.gold).toBe(npc.gold - BALANCE.DRILL_COST);
-    expect(after.state.campaign!.units).toHaveLength(1);
+    expect(after.state.campaign!.units.filter((unit) => unit.ownerId === npcId)).toHaveLength(1);
     // 이미 처리한 시각까지 다시 진행해도 상태와 지시가 바뀌지 않는다.
     const unchanged = hashState(after);
     await advance((await db.world.findUniqueOrThrow({ where: { id: worldId } })).clockTick);

@@ -6,7 +6,6 @@ import {
   resolverForRuleFeatures,
   restoreExtState,
   selectWorldCapabilities,
-  type EnabledCommands,
   type WorldState,
 } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
@@ -15,7 +14,6 @@ type ResolverWorld = {
   preset: unknown;
   replayOrigin?: unknown;
   replayFormat?: number;
-  ruleFeatures?: readonly string[];
 } & Partial<Parameters<typeof selectWorldCapabilities>[0]>;
 
 export function engineResolver(world: ResolverWorld) {
@@ -43,21 +41,13 @@ export function engineResolver(world: ResolverWorld) {
   return {
     preset,
     commands,
-    resolver:
-      (world.replayFormat === 3
-        ? resolverForRuleFeatures(world.ruleFeatures ? { ruleFeatures: world.ruleFeatures } : {})
-        : undefined) ?? resolverForPreset(preset),
+    resolver: (world.replayFormat === 3 ? resolverForRuleFeatures({}) : undefined) ?? resolverForPreset(preset),
   };
 }
 
-export async function loadExt(
-  tx: Prisma.TransactionClient,
-  worldId: string,
-  commands: EnabledCommands | null,
-  ruleFeatures?: readonly string[],
-) {
+export async function loadExt(tx: Prisma.TransactionClient, worldId: string) {
   // 호출자는 engineResolver로 저장된 선택과 프리셋을 먼저 대조한다.
-  return restoreExtState(commands, await readWorldExtRows(tx, worldId), ruleFeatures);
+  return restoreExtState(await readWorldExtRows(tx, worldId));
 }
 
 export async function persistExt(
@@ -70,6 +60,6 @@ export async function persistExt(
 }
 
 export async function verifyWorldExt(tx: Prisma.TransactionClient, world: ResolverWorld & { id: string }) {
-  const { commands } = engineResolver(world);
-  await loadExt(tx, world.id, commands, world.ruleFeatures);
+  engineResolver(world);
+  await loadExt(tx, world.id);
 }

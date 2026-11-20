@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { appOrigin, createAccount } from './account';
 import { e2eWorld, setTurns, turns, waitNextTurn, waitTurnWindow } from './game';
+import { putPicked } from './commandPicker';
 import { bindGeneral, query } from './world';
 
 // T1-16 · AC-M1-19: 실제 PostgreSQL·서버·엔진·Chromium으로 메인 작업 화면을 검증한다.
@@ -258,7 +259,7 @@ test.describe('장수가 있는 계정', () => {
       page.getByRole('radiogroup', { name: '대상 도시' }).getByRole('radio', { name: new RegExp(`^${enemy.name}`) }),
     ).toHaveAttribute('aria-checked', 'true');
     await expect(row(page, 4)).toContainText('휴식');
-    await editor(page).getByRole('button', { name: '4번 칸에 넣기', exact: true }).click();
+    await putPicked(page, editor(page), '4번 칸에 넣기');
     await expect(row(page, 4)).toContainText(enemy.name);
     await expect(draftState(page)).toHaveText('저장하지 않은 편집 2건');
     await shot(page, '10-main-turn-draft.png');
@@ -393,13 +394,15 @@ test.describe('장수가 있는 계정', () => {
       .map((d) => d.name);
     expect(expectedNames).toHaveLength(owned.length);
     await expect(cityTable.locator('tbody tr td:first-child')).toHaveText(expectedNames);
-    await nation.getByRole('button', { name: /^병력/ }).click();
-    await expect(nation.getByRole('columnheader', { name: /^병력/ })).toHaveAttribute('aria-sort', 'descending');
+    // 병력 열은 장수가 지휘하는 부곡 병력의 합이다(늘 켠 규칙, 결정 19).
+    await nation.getByRole('button', { name: /^지휘 병력/ }).click();
+    await expect(nation.getByRole('columnheader', { name: /^지휘 병력/ })).toHaveAttribute('aria-sort', 'descending');
     await shot(page, '03-main-nation-tables.png');
   });
 
   test('다음 턴 0초가 되면 다시 조회해 새 시각과 엔진이 쓴 내 기록을 보여 준다', async ({ page }) => {
-    test.setTimeout(150_000);
+    // 공용 월드는 2분 턴이다. 미래 시각을 기다린 뒤 0초까지 최대 2분, 그 뒤 새 시각과 기록을 받는다.
+    test.setTimeout(300_000);
     await openMain(page);
     const nextTurn = page.getByTestId('next-turn');
     // 이미 지난 시각을 받은 직후라면 첫 재조회를 놓칠 수 있다. 미래 시각이 보일 때부터 잰다.
@@ -505,8 +508,8 @@ test.describe('장수가 있는 계정', () => {
         await expect(nav.locator('details')).not.toHaveAttribute('open');
         await summary.click();
       }
-      // 구형 월드에는 없는 휘하 앵커를 표시하지 않는다.
-      await expect(nav.getByRole('link', { name: '휘하·부곡', exact: true })).toHaveCount(0);
+      // 늘 켠 규칙에서 모든 월드가 휘하 원장(campaign)을 가지므로 휘하·부곡 앵커가 늘 있다(결정 19).
+      await expect(nav.getByRole('link', { name: '휘하·부곡', exact: true })).toHaveCount(1);
       const targets = await nav.locator('a:visible,summary:visible,button:visible').evaluateAll((nodes) =>
         nodes.map((node) => {
           const { width, height } = node.getBoundingClientRect();
@@ -585,7 +588,7 @@ test('장수 생성 API로 만든 재야 장수는 메인에서 바로 재야 �
   const name = `E${String(Date.now() % 100_000).padStart(5, '0')}`;
   // 서버는 /trpc POST에 화면과 같은 출처의 Origin을 요구한다 (T3-04). page.request는 Origin을 붙이지 않는다.
   const created = await page.request.post('/trpc/general.create', {
-    data: { worldId: ctx.worldId, name, leadership: 55, strength: 55, intel: 55, portraitId: null },
+    data: { worldId: ctx.worldId, name, sex: 'MALE', leadership: 55, strength: 55, intel: 55, portraitId: null },
     headers: { Origin: appOrigin() },
   });
   expect(created.ok()).toBe(true);

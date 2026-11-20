@@ -4,7 +4,7 @@ import type { CDPSession, Route, TestInfo } from '@playwright/test';
 import { test, expect, apiMutate, apiQuery, type T210World } from './t210-fixture';
 import { TEST_PASSWORD } from './account';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { holdLease, releaseHold } from './game';
@@ -95,18 +95,9 @@ async function prepare(world: T210World) {
         portraitMap: '191-map',
         seed: `sanction-notice-${index}`,
       });
-      initial.ruleFeatures = [
-        'campaign-v1',
-        'five-stats',
-        'operational-map',
-        'personnel',
-        'policy',
-        'stratagem-basic',
-        'treaty',
-      ];
       expect(initial.nations).toHaveLength(21);
       expect(initial.generals).toHaveLength(491);
-      const { worldId } = await saveInitialWorld(db, initial, {
+      const { worldId } = await saveFixtureWorld(db, initial, {
         name: `제재 안내 정식191 ${index}`,
         turnTermMinutes: 60,
         endYear: 201,
@@ -120,6 +111,7 @@ async function prepare(world: T210World) {
           worldId,
           name: `안내장수${human}`,
           portraitId: null,
+          sex: 'MALE',
           leadership: 55,
           strength: 55,
           intel: 55,
@@ -148,7 +140,9 @@ async function prepare(world: T210World) {
 }
 
 scenario('T3-06 AC-M3-04 정식 두 월드 제재·403·30칸 초안·해제·6개 폭·조회 실패·만료', async ({ world }, info) => {
-  test.setTimeout(120_000);
+  // 정식 491명 월드 둘을 준비하는 데 늘 켠 규칙에서 시간이 더 든다. CI에서 120초 안에 30칸 초안 단계에 닿지
+  // 못해 넣기 눌림이 시험 종료로 끊겼다(PR #674, 네 번).
+  test.setTimeout(300_000);
   const fixture = await prepare(world);
   const {
     db,
@@ -164,7 +158,11 @@ scenario('T3-06 AC-M3-04 정식 두 월드 제재·403·30칸 초안·해제·6�
     await page.goto(`/w/${worldId}`);
     const editor = page.getByTestId('turn-editor');
     await expect(editor.locator('tr[data-slot]')).toHaveCount(30);
+    // 칸 누르기는 선택을 뒤집는다. 다른 시험 도우미처럼 먼저 선택을 풀고 30번 칸만 고른 것을 확인한다.
+    // CI 기록에서 '선택: 없음'으로 넣기 단추가 막혀 있었다(PR #674).
+    await editor.getByRole('button', { name: '선택 해제', exact: true }).click();
     await editor.locator('tr[data-slot="30"]').click();
+    await expect(editor.getByTestId('selection')).toContainText('30');
     await editor.getByLabel('명령 찾기').fill('농지 개간');
     await editor.getByRole('radio', { name: '농지 개간', exact: true }).check();
     await editor.getByRole('button', { name: '30번 칸에 넣기', exact: true }).click();

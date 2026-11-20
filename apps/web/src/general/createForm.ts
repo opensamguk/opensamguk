@@ -41,7 +41,7 @@ export function checkCreation(rawName: string, values: StatValues, rules: Creati
   const length = [...name].length;
   if (length === 0) problems.push('이름을 입력하세요.');
   else if (length > 6) problems.push('이름은 6글자까지입니다.');
-  else if (!NAME_PATTERN.test(name)) problems.push('이름은 한글·한자·영문·숫자만 씁니다.');
+  else if (!NAME_PATTERN.test(name)) problems.push('이름은 한글, 한자, 영문, 숫자만 씁니다.');
 
   const fields = rules.count === 5 ? FIVE_STATS : STATS;
   const numbers = fields.map((stat) => Number(values[stat.key]));

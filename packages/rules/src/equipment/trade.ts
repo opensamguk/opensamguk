@@ -18,9 +18,6 @@ export const equipmentTrade = defineCommand({
   category: 'personal',
   args: argsSchema,
   check(view, actor, args) {
-    if (!view.ruleFeatures?.includes('equipment-v1')) return fail('COMMAND_DISABLED', '장비 판이 아닙니다.');
-    if (!view.ruleFeatures.includes('logistics-v1'))
-      return fail('COMMAND_DISABLED', '장비매매에 물류 판이 필요합니다.');
     const location = ownCity(view, actor);
     if (location) return location;
     const general = view.generals[actor.generalId]!,

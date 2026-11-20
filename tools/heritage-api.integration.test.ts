@@ -1,3 +1,4 @@
+import { ciGreenDatabaseName } from './test-database';
 import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -13,7 +14,7 @@ import { TICKS_PER_MONTH, type LineageInput } from '../packages/rules/src/index'
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { initializeIntegrationResources } from './integration-resources';
 import { hashState } from '../packages/shared/src/node/hashState';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease, lockLease, assertLease } from '../apps/engine/src/lease';
 import { processAdminReset } from '../apps/engine/src/admin/reset';
@@ -34,14 +35,10 @@ import { confirmDisconnectedDatabase } from './test-db-close';
 // 불변 원장은 지우지 않는다. 이 파일이 새로 만든 UUID DB에서만 실제 PG/HTTP/엔진을 검증한다.
 if (!process.env.TEST_DATABASE_URL) throw Error('전용 유산 테스트 DB가 필요합니다.');
 const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-if (
-  !['localhost', '127.0.0.1'].includes(source.hostname) ||
-  source.searchParams.has('host') ||
-  source.searchParams.has('port')
-)
-  throw Error('loopback 전용 유산 테스트 DB를 확인하세요.');
-const name = `heritage_${randomUUID().replaceAll('-', '')}_test`;
-if (!/^heritage_[a-f0-9]{32}_test$/.test(name)) throw Error('유산 시험 DB 이름을 확인하세요.');
+if (source.searchParams.has('host') || source.searchParams.has('port'))
+  throw Error('전용 유산 테스트 DB를 확인하세요.');
+const name = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
+if (!/^opensamguk_ci_green_[a-zA-Z0-9]+_test$/.test(name)) throw Error('유산 시험 DB 이름을 확인하세요.');
 const target = new URL(source),
   adminUrl = new URL(source);
 target.pathname = `/${name}`;
@@ -165,12 +162,7 @@ async function world(
     turnTermMinutes: 60,
     replayFormat: 3,
     endYear: options.endYear ?? null,
-    ruleFeatures: [
-      ...(enabled ? ['heritage-v1'] : []),
-      'policy',
-      ...(options.personnel || withLineage ? ['personnel'] : []),
-      ...(withLineage ? ['lineage-v1'] : []),
-    ].sort(),
+
     featureData,
   });
   await controlClock(db, saved.worldId, 'start');
@@ -208,6 +200,9 @@ const payload = (worldId: string, name = '유산장수') => ({
   leadership: 70,
   strength: 70,
   intel: 60,
+  sex: 'MALE' as const,
+  politics: 38,
+  charm: 37,
   portraitId: null,
   heritage: { leadership: 3, intel: 3 },
 });
@@ -268,10 +263,14 @@ async function crashBeforeCommit(worldId: string) {
     {
       cwd: fileURLToPath(new URL('../', import.meta.url)),
       env: { ...process.env, TEST_DATABASE_URL: target.href, HERITAGE_CRASH_WORLD: worldId },
-      stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
+      stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
       windowsHide: true,
     },
   );
+  let workerError = '';
+  child.stderr?.on('data', (chunk: Buffer) => {
+    workerError += chunk.toString('utf8');
+  });
   const closed = new Promise<void>((resolve) => {
     child.once('close', () => resolve());
     child.once('error', () => resolve());
@@ -280,7 +279,13 @@ async function crashBeforeCommit(worldId: string) {
   const ready = new Promise<void>((resolve, reject) => {
     timeout = setTimeout(() => reject(new Error('중단 시험의 커밋 직전 신호가 없습니다.')), 15000);
     child.once('error', reject);
-    child.once('exit', () => reject(new Error('커밋 직전 신호 전에 시험 프로세스가 끝났습니다.')));
+    child.once('exit', () =>
+      reject(
+        new Error(
+          `커밋 직전 신호 전에 시험 프로세스가 끝났습니다. ${workerError.replace(/postgres(?:ql)?:\/\/[^\s"'<>]+/g, '[DB 생략]')}`,
+        ),
+      ),
+    );
     child.once('message', (message) => {
       if (typeof message === 'object' && message !== null && 'phase' in message && message.phase === 'BEFORE_COMMIT')
         resolve();
@@ -374,6 +379,8 @@ it('AC-P2-33 계승 전후 36개월 활동을 합산하고 다음 허용 기수�
       leadership: 70,
       strength: 70,
       intel: 60,
+      politics: 38,
+      charm: 37,
       portraitId: null,
     });
     await advance(id);
@@ -409,7 +416,11 @@ it('AC-P2-33 계승 전후 36개월 활동을 합산하고 다음 허용 기수�
   await send(mother, mom, { type: 'marriage.respond', offerId: offered.offerId!, accept: true });
   await advance(id, TICKS_PER_MONTH);
   const birth = await db.$transaction((tx) => loadReplayState(tx, id)),
-    heir = Number(Object.entries(birth.state.lineage!.persons).find(([, person]) => person.parents.includes(from))![0]);
+    heir = Number(
+      Object.entries(birth.state.lineage!.persons).find(([, person]) =>
+        person.parents.some((parent) => parent === from),
+      )![0],
+    );
   for (let month = 1; month < 12; month++) {
     await send(father, from, { type: 'heir.designate', heirGeneralId: null });
     await advance(id, (month + 1) * TICKS_PER_MONTH);
@@ -439,8 +450,12 @@ it('AC-P2-33 계승 전후 36개월 활동을 합산하고 다음 허용 기수�
 
   const disabled = await world({ enabled: false });
   const bonus = { leadership: 3 };
-  expect((await rpc('general.mine', { worldId: disabled }, father)).data!.creationRules).not.toHaveProperty('heritage');
-  expect((await rpc('general.create', { ...payload(disabled), heritage: bonus }, father)).status).toBe(400);
+  expect((await rpc('general.mine', { worldId: disabled }, father)).data!.creationRules.heritage).toMatchObject({
+    balance: 3,
+    perStat: 3,
+    perGeneral: 6,
+  });
+  expect((await rpc('general.create', { ...payload(disabled), heritage: { leadership: 4 } }, father)).status).toBe(400);
   expect(await db.inputEvent.count({ where: { worldId: disabled, kind: 'general.create' } })).toBe(0);
   expect((await invariant(father)).balance).toBe(3);
 
@@ -700,13 +715,11 @@ it.each(['end', 'reset'] as const)(
       portraitMap: '191-map',
       seed: randomUUID(),
     });
-    initial.ruleFeatures = [...new Set([...(initial.ruleFeatures ?? []), 'policy'])].sort();
     const { worldId: id } = await saveInitialWorld(db, initial, {
       name: '비유산 종료 초기화 검증',
       turnTermMinutes: 60,
       endYear: 200,
       replayFormat: 3,
-      ruleFeatures: [...new Set([...(initial.ruleFeatures ?? []), 'policy'])].sort(),
     });
     await controlClock(db, id, 'start');
     const request = await admit(id, player, {
@@ -717,6 +730,7 @@ it.each(['end', 'reset'] as const)(
       intel: 55,
       politics: 55,
       charm: 55,
+      sex: 'MALE' as const,
       portraitId: null,
     });
     await advance(id);
@@ -808,6 +822,7 @@ it('AC-P2-33 규모 측정: 합성 활동 10만 행이 있는 실제 PG 월드�
     id = await world({ actor: player, endYear: 191 }),
     count = 100000,
     slots = Array.from({ length: 30 }, () => null);
+  const baseSequence = (await db.world.findUniqueOrThrow({ where: { id } })).actionSequence;
   // 쿼리 부하용 합성 자료다. 이 행들의 명령 적용·재생 성공 증거로 세지 않는다.
   for (let offset = 0; offset < count; offset += 2000)
     await db.inputEvent.createMany({
@@ -820,14 +835,14 @@ it('AC-P2-33 규모 측정: 합성 활동 10만 행이 있는 실제 PG 월드�
           kind: 'turns.set',
           idempotencyKey: `load:${index}`,
           status: 'APPLIED' as const,
-          sequence: index + 1,
+          sequence: baseSequence + index + 1,
           tick: Math.floor((index * 12) / count) * TICKS_PER_MONTH,
           payload: { revision: index, slots },
           result: { activeTick: Math.floor((index * 12) / count) * TICKS_PER_MONTH, revision: index + 1 },
         };
       }),
     });
-  await db.world.update({ where: { id }, data: { actionSequence: count } });
+  await db.world.update({ where: { id }, data: { actionSequence: baseSequence + count } });
   expect(await db.inputEvent.count({ where: { worldId: id, kind: 'turns.set' } })).toBe(count);
   const started = performance.now();
   await advance(id, 12 * TICKS_PER_MONTH);
@@ -907,7 +922,13 @@ it('AC-P2-33 실제 서로 다른 12개월 직접 명령은 정상 종료 때 �
   for (let month = 0; month < 12; month++) {
     const saved = await rpc(
       'turns.set',
-      { worldId: id, revision: month, slots: Array.from({ length: 30 }, () => null) },
+      {
+        worldId: id,
+        revision: (
+          await db.general.findUniqueOrThrow({ where: { worldId_userId: { worldId: id, userId: player.id } } })
+        ).turnRevision,
+        slots: Array.from({ length: 30 }, () => null),
+      },
       player,
     );
     expect(saved.data).toMatchObject({ ok: true });
@@ -948,13 +969,12 @@ it('AC-P2-33 실제 491명 시나리오 초기화는 원본 사용만 반환하�
     seed: randomUUID(),
   });
   expect(initial.generals).toHaveLength(491);
-  initial.ruleFeatures = [...new Set([...(initial.ruleFeatures ?? []), 'policy', 'heritage-v1'])].sort();
   const { worldId: id } = await saveInitialWorld(db, initial, {
     name: '491명 유산 초기화',
     turnTermMinutes: 60,
     endYear: 200,
     replayFormat: 3,
-    ruleFeatures: initial.ruleFeatures,
+
     featureData: { 'heritage-v1': { version: 1 } },
   });
   await controlClock(db, id, 'start');
@@ -967,6 +987,7 @@ it('AC-P2-33 실제 491명 시나리오 초기화는 원본 사용만 반환하�
     intel: 55,
     politics: 55,
     charm: 55,
+    sex: 'MALE' as const,
     portraitId: null,
     heritage: { leadership: 3, intel: 3 },
   });
@@ -1018,6 +1039,7 @@ it('AC-P2-33 실제 491명 시나리오 초기화는 원본 사용만 반환하�
     intel: 55,
     politics: 55,
     charm: 55,
+    sex: 'MALE' as const,
     portraitId: null,
     heritage: { leadership: 3, intel: 3 },
   });
@@ -1215,8 +1237,15 @@ it('AC-P2-33 끈 월드·잘못된 배분은 차감하지 않고 원장의 수�
   await earnWins(player, 1);
   const id = await world({ enabled: false }),
     on = await world();
-  expect((await rpc('general.mine', { worldId: id }, player)).data!.creationRules).not.toHaveProperty('heritage');
-  expect((await rpc('general.create', payload(id), player)).status).toBe(400);
+  expect((await rpc('general.mine', { worldId: id }, player)).data!.creationRules.heritage).toMatchObject({
+    balance: 2,
+    perStat: 3,
+    perGeneral: 6,
+  });
+  expect(
+    (await rpc('general.create', { ...payload(id), heritage: { leadership: 3, strength: 3, intel: 1 } }, player))
+      .status,
+  ).toBe(400);
   expect((await rpc('general.create', { ...payload(on), expectedUserId: (await user()).id }, player)).status).toBe(409);
   expect((await rpc('general.create', { ...payload(on), heritage: { leadership: 4 } }, player)).error?.message).toBe(
     '유산 배분을 확인하세요.',
@@ -1340,7 +1369,7 @@ it('AC-P2-33 기본 방침만 직접 바꾼 12개월도 활동으로 세고 형�
   });
   await expect(
     sql.query('UPDATE "World" SET "ruleFeatures"=ARRAY[\'heritage-v1\']::text[] WHERE id=$1', [id]),
-  ).rejects.toMatchObject({ code: '23514' });
+  ).rejects.toMatchObject({ code: '42703' });
 }, 120000);
 
 it.each(Array.from({ length: 20 }, (_, index) => index + 1))(

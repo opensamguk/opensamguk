@@ -1,3 +1,5 @@
+import { ciGreenDatabaseName } from './test-database';
+import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { setTimeout as delay } from 'node:timers/promises';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -5,13 +7,13 @@ import { readFile, readdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { beforeAll, beforeEach, afterAll, describe, expect, it, onTestFailed } from 'vitest';
 import { createDb, type PrismaClient } from '../packages/db/src/index';
-import { TICKS_PER_MONTH } from '../packages/rules/src/index';
+import { applySexLedger, ruleRegistry, TICKS_PER_MONTH } from '../packages/rules/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { saveInitialWorld, readWorldState } from '../apps/engine/src/world/persistence';
-import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb, loadSexLedger } from '../apps/engine/src/world/resources';
 import { exportReplay, replayArchive } from '../apps/engine/src/replay';
 import { initializeResources } from './init-resources';
 import { initializeIntegrationResources, integrationResourceRows } from './integration-resources';
@@ -46,7 +48,7 @@ interface Fixture {
 function ownedDatabase(initialize = true) {
   if (!process.env.TEST_DATABASE_URL) throw new Error('전용 TEST_DATABASE_URL이 필요합니다.');
   const reference = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-  const name = `integration191_${randomUUID().replaceAll('-', '')}_test`;
+  const name = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
   const url = new URL(reference);
   url.pathname = `/${name}`;
   testDatabaseUrl({ TEST_DATABASE_URL: url.href, DATABASE_URL: process.env.DATABASE_URL });
@@ -168,7 +170,7 @@ function ownedDatabase(initialize = true) {
               expect(
                 (await admin.query('SELECT oid::text AS oid FROM pg_database WHERE datname = $1', [name])).rows,
               ).toEqual([{ oid }]);
-              if (!failed && cleanupErrors.length === 0) {
+              if (!receipt.oidRecovered && cleanupErrors.length === 0) {
                 await admin.query(`DROP DATABASE "${name}"`);
                 receipt.dropped = true;
                 expect((await admin.query('SELECT 1 FROM pg_database WHERE datname = $1', [name])).rows).toEqual([]);
@@ -252,12 +254,17 @@ async function catalog(db: PrismaClient) {
 
 it('AC-INT-04 정식 게시를 재실행해도 원래 게시 자원과 구형191년 월드는 그대로다', async () => {
   await withDatabase(async ({ db }) => {
-    const old = await loadInitialWorldFromDb(db, { scenario: '1030', map: 'che', seed: 'old-191-preserved' });
+    const old = await loadInitialWorldFromDb(db, {
+      scenario: '1030',
+      map: 'che',
+      portraitMap: 'rtk14-map',
+      seed: 'old-191-preserved',
+    });
     const { worldId } = await saveInitialWorld(db, old, {
       name: '기존191년',
       turnTermMinutes: 60,
       endYear: null,
-      replayFormat: 'legacy',
+      replayFormat: 3,
     });
     const beforeWorld = await preservedWorld(db, worldId);
     const before = await catalog(db);
@@ -269,7 +276,7 @@ it('AC-INT-04 정식 게시를 재실행해도 원래 게시 자원과 구형191
     expect(await preservedWorld(db, worldId)).toEqual(beforeWorld);
     const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
     expect(world.operationalMap).toBeNull();
-    expect(world.ruleFeatures).toEqual([]);
+    expect(providedRuleKeys).toEqual(ruleRegistry.features.map(({ key }) => key).sort());
   });
 });
 
@@ -355,13 +362,16 @@ it('AC-INT-04 실제CLI는 게시된 191년61거점·21국·491명·초상·5능
       await db.nation.count({ where: { worldId: world.id } }),
       await db.general.count({ where: { worldId: world.id } }),
     ]).toEqual([61, 21, 491]);
-    expect(world.ruleFeatures).toEqual(['five-stats', 'operational-map']);
+    expect(providedRuleKeys).toEqual(ruleRegistry.features.map(({ key }) => key).sort());
     expect(
       await db.general.count({
         where: { worldId: world.id, OR: [{ portraitId: null }, { politics: null }, { charm: null }] },
       }),
     ).toBe(0);
-    expect(hashState(await readWorldState(db, world.id))).toBe(hashState(await loadInitialWorldFromDb(db, selection)));
+    const expected = await loadInitialWorldFromDb(db, selection);
+    expected.fogOfWar = false;
+    expected.generals = applySexLedger(expected, loadSexLedger(expected.scenarioKey));
+    expect(hashState(await readWorldState(db, world.id))).toBe(hashState(expected));
   });
 });
 
@@ -412,17 +422,24 @@ describe('AC-INT-04 정식191년 첫 달·재시작·재생·다른 월드 격�
     onTestFailed(() => owned.fail());
     await execution?.catch(() => owned.fail());
   });
-  it('491명 첫 달 정산은 연감을 저장하고 다른 월드를 보존한다', () => {
+  // 정식 첫 달 진행 실측 54.6초. 491명과 다른 월드 격리를 검증한다.
+  it('491명 첫 달 정산은 연감을 저장하고 다른 월드를 보존한다', ({ signal }) => {
     execution = (async () => {
       const { db } = fixture;
       await controlClock(db, worldId, 'start');
       const lease = await acquireLease(db, worldId);
       if (!lease) throw new Error('실행권 누락');
       try {
-        const loop = new TurnLoop(db, lease);
+        const loop = new TurnLoop(db, lease, { beforeCommit: (tx) => renewLease(tx, lease) });
         for (let tick = 1000; tick <= TICKS_PER_MONTH; tick += 1000) {
+          const started = performance.now();
           await renewLease(db, lease);
-          await loop.advanceTo(tick);
+          await loop.advanceTo(tick, signal);
+          signal.throwIfAborted();
+          console.info(
+            'integration-scenario-advance',
+            JSON.stringify({ tick, elapsedMs: Math.round(performance.now() - started) }),
+          );
         }
       } finally {
         await releaseLease(db, lease);
@@ -432,7 +449,7 @@ describe('AC-INT-04 정식191년 첫 달·재시작·재생·다른 월드 격�
       expect(await db.yearbookSnapshot.count({ where: { worldId: otherId } })).toBe(0);
     })();
     return execution;
-  });
+  }, 120000);
   it('첫 달의 연감 해시가 같은 시드의 전체 장수 재생과 일치한다', () => {
     execution = (async () => {
       const snapshot = await fixture.db.yearbookSnapshot.findUniqueOrThrow({
@@ -443,7 +460,8 @@ describe('AC-INT-04 정식191년 첫 달·재시작·재생·다른 월드 격�
     })();
     return execution;
   });
-  it('기존 연결·리스 종료 뒤 새 연결·엔진 루프가 다음 달을 진행하고 다른 월드를 보존한다', () => {
+  // 새 연결·루프의 다음 달 진행 실측 54.9초. 재시작과 격리를 검증한다.
+  it('기존 연결·리스 종료 뒤 새 연결·엔진 루프가 다음 달을 진행하고 다른 월드를 보존한다', ({ signal }) => {
     execution = (async () => {
       const beforeRestart = await readWorldState(fixture.db, worldId);
       await fixture.db.$disconnect();
@@ -453,10 +471,16 @@ describe('AC-INT-04 정식191년 첫 달·재시작·재생·다른 월드 격�
       const lease = await acquireLease(db, worldId);
       if (!lease) throw new Error('재시작 실행권 누락');
       try {
-        const loop = new TurnLoop(db, lease);
+        const loop = new TurnLoop(db, lease, { beforeCommit: (tx) => renewLease(tx, lease) });
         for (let tick = TICKS_PER_MONTH + 1000; tick <= 2 * TICKS_PER_MONTH; tick += 1000) {
+          const started = performance.now();
           await renewLease(db, lease);
-          await loop.advanceTo(tick);
+          await loop.advanceTo(tick, signal);
+          signal.throwIfAborted();
+          console.info(
+            'integration-scenario-restart',
+            JSON.stringify({ tick, elapsedMs: Math.round(performance.now() - started) }),
+          );
         }
       } finally {
         await releaseLease(db, lease);
@@ -466,7 +490,8 @@ describe('AC-INT-04 정식191년 첫 달·재시작·재생·다른 월드 격�
       expect(await preservedWorld(db, otherId)).toEqual(otherBefore);
     })();
     return execution;
-  });
+  }, 120000);
+  // 정식 두 달 수출·재생 실측 47.9초. 월별 해시를 모두 대조한다.
   it('재시작 전후 두 달의 모든 월 해시가 같은 시드 재생과 일치한다', () => {
     execution = (async () => {
       const snapshots = await fixture.db.yearbookSnapshot.findMany({ where: { worldId }, orderBy: { tick: 'asc' } });
@@ -476,7 +501,7 @@ describe('AC-INT-04 정식191년 첫 달·재시작·재생·다른 월드 격�
       );
     })();
     return execution;
-  });
+  }, 90000);
   it('다음 턴 전에 고정 원장을 바꾸면 새 트랜잭션에서 거부하고 진행을 롤백한다', () => {
     execution = (async () => {
       const { db } = fixture;

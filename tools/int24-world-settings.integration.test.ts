@@ -1,3 +1,4 @@
+import { ciGreenDatabaseName } from './test-database';
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -37,6 +38,7 @@ import {
   type Truce,
 } from '../packages/rules/src/index';
 import { commandInitial } from '../packages/rules/test/commandFixture';
+import { operationalInput } from '../packages/rules/test/operationalMapFixture';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { testDatabaseUrl } from './test-database';
 import { confirmDisconnectedDatabase } from './test-db-close';
@@ -51,8 +53,7 @@ const { Client } = createRequire(requireDb.resolve('@prisma/adapter-pg'))('pg') 
   Client: new (options: { connectionString: string }) => Pg;
 };
 const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-if (!['127.0.0.1', 'localhost'].includes(source.hostname)) throw Error('자기 loopback 시험 DB가 필요합니다.');
-const name = 'int24_settings_' + randomUUID().replaceAll('-', '') + '_test';
+const name = ciGreenDatabaseName('opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test');
 const target = new URL(source),
   adminUrl = new URL(source);
 target.pathname = '/' + name;
@@ -124,8 +125,7 @@ async function world(withPreset = true, published = false, truce?: Truce) {
       })
     : commandInitial();
   // 소형 fixture도 실제 로비에서 제목을 읽을 수 있는 시나리오 키를 쓴다.
-  if (!published) initial.scenarioKey = 'integration191';
-  initial.ruleFeatures = [...new Set([...(initial.ruleFeatures ?? []), 'personnel', 'policy'])].sort();
+  if (!published) initial.scenarioKey = 'tools-int24-fixture';
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '생성 이름',
     turnTermMinutes: 60,
@@ -221,6 +221,19 @@ beforeAll(async () => {
     await readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8'),
   );
   await initializeIntegrationResources(db);
+  const content = { ...operationalInput().scenario, id: 'tools-int24-fixture', title: '설정 검증 고정물' };
+  await db.gameResource.create({
+    data: {
+      kind: 'SCENARIO',
+      name: content.id,
+      version: 1,
+      content,
+      contentHash: hashState(content),
+      status: 'PUBLISHED',
+      publishedAt: new Date(now),
+      source: '합성 설정 시험',
+    },
+  });
   actor = await user('ADMIN');
   otherAdmin = await user('ADMIN');
   ordinary = await user('USER');
@@ -413,7 +426,8 @@ it('AC-INT-24 변경 불가 키·값·월드 상태·옛 형식과 지난 종료
     data: { canChangeRules: false, rules: null },
   });
   await expectReplayedState(worldId);
-  for (const data of [{ status: 'PREOPEN' as const }, { replayFormat: 1 }]) {
+  await expect(db.world.update({ where: { id: worldId }, data: { replayFormat: 1 } })).rejects.toThrow();
+  for (const data of [{ status: 'PREOPEN' as const }]) {
     await db.world.update({ where: { id: worldId }, data });
     expect(
       (
@@ -423,7 +437,7 @@ it('AC-INT-24 변경 불가 키·값·월드 상태·옛 형식과 지난 종료
           actor.cookie,
         )
       ).status,
-    ).toBe(data.replayFormat === 1 ? 400 : 409);
+    ).toBe(409);
   }
 });
 
@@ -577,8 +591,8 @@ it('AC-INT-22 도시별 모집을 운영 중 바꿔도 기존 설정 원본과 �
 
 it('AC-INT-24 월말과 같은 tick의 장수 턴은 정산 체크포인트 뒤에 따로 진행한다', async () => {
   const initial = commandInitial();
+  initial.scenarioKey = 'tools-int24-fixture';
   initial.generals[0]!.nextTurnTick = 0;
-  initial.ruleFeatures = ['personnel', 'policy'];
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '월경계 비교',
     turnTermMinutes: 60,
@@ -909,7 +923,17 @@ it('AC-P2-19 HTTP 상태·첫 칸·30칸은 같은 휴전 시계를 쓰고 기�
   await controlClock(db, worldId, 'resume');
   const creating = call(
     'general.create',
-    { worldId, name: '휴전장', leadership: 70, strength: 70, intel: 60, portraitId: null },
+    {
+      worldId,
+      name: '휴전장',
+      leadership: 70,
+      strength: 70,
+      intel: 60,
+      sex: 'MALE' as const,
+      politics: 38,
+      charm: 37,
+      portraitId: null,
+    },
     ordinary.cookie,
   );
   await expect
@@ -973,6 +997,7 @@ it('AC-P2-19 HTTP 상태·첫 칸·30칸은 같은 휴전 시계를 쓰고 기�
     {},
     ordinary.cookie,
   );
+  expect(lobby.status, lobby.code).toBe(200);
   expect(lobby.data?.find((row) => row.id === worldId)?.gameDate).toEqual({ year: 191, month: 2 });
   await db.world.update({ where: { id: worldId }, data: { runtimeOptions: { truce: null } } });
   const plain = await call<{ nextTurnAt: string; turnSchedule: string[] }>('home.get', { worldId }, ordinary.cookie);

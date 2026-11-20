@@ -1,3 +1,4 @@
+import { providedRuleData } from '../providedRuleData';
 import { describe, expect, it } from 'vitest';
 import type { Rng } from '@opensamguk/shared';
 import { commandInitial, commandWorld } from '../../test/commandFixture';
@@ -11,7 +12,6 @@ import { initialNationResearch, readNationResearch } from './state';
 import { readStoredNationResearch } from './origin';
 import { canExecuteResearchNationCommand } from './commands';
 
-const features = ['nation-research-v1', 'personnel', 'prepared-turns-v1'];
 const actor = { generalId: 1, target: 'nation' as const, authority: 'office' as const, tick: 0 };
 const noRng: Rng = {
   next() {
@@ -26,7 +26,6 @@ const noRng: Rng = {
 };
 function world() {
   const state = commandWorld();
-  state.ruleFeatures = [...features];
   state.preparedTurns = initialPreparedTurns();
   state.nationResearch = initialNationResearch();
   return state;
@@ -120,19 +119,24 @@ describe('AC-P2-06 D-077 특수 병종 연구 7종', () => {
 
   it('생성·저장·복제는 새 두 상태를 보존하며 옛 월드와 잘못된 판에는 켜지지 않는다', () => {
     const initial = commandInitial();
-    expect(initialReplayState(initial).state).not.toHaveProperty('nationResearch');
-    expect(initialReplayState(initial).state).not.toHaveProperty('preparedTurns');
-    initial.ruleFeatures = [...features];
+    for (const general of initial.generals) general.crew = 0;
+    expect(initialReplayState(initial).state.nationResearch).toEqual(initialNationResearch());
+    expect(initialReplayState(initial).state.preparedTurns).toEqual(initialPreparedTurns());
     for (const general of initial.generals) general.userId = null;
-    const origin = { version: 3 as const, initial, initialStateHash: 'checked', resourceHash: 'checked' };
-    expect(() => checkReplayOrigin(origin)).toThrow('연구 조건');
+    const origin = {
+      version: 3 as const,
+      initial,
+      initialStateHash: 'checked',
+      resourceHash: 'checked',
+      featureData: providedRuleData(initial, 60),
+    };
+    expect(() => checkReplayOrigin(origin)).not.toThrow();
     initial.unitSet.crewTypes[1]!.requirements = [{ kind: 'research', name: 'greatsword' }];
     expect(() => checkReplayOrigin(origin)).not.toThrow();
     const replay = initialReplayState(initial);
     expect(replay.state.preparedTurns).toEqual(initialPreparedTurns());
     expect(replay.state.nationResearch).toEqual(initialNationResearch());
     const stored = {
-      ruleFeatures: features,
       replayFormat: 3,
       replayOrigin: origin,
       nationResearchState: initialNationResearch(),
@@ -141,13 +145,14 @@ describe('AC-P2-06 D-077 특수 병종 연구 7종', () => {
     expect(() => readStoredNationResearch({ ...stored, nationResearchState: null })).toThrow();
     expect(() => readStoredNationResearch({ ...stored, replayFormat: 1 })).toThrow();
     expect(() => checkRuleFeatures(['nation-research-v1', 'personnel'])).toThrow();
-    expect(() => readNationResearch({ version: 1, nations: { 999: ['repeater', 'greatsword'] } }, world())).toThrow();
-    expect(
-      readNationResearch({ version: 1, nations: { 999: ['greatsword', 'repeater'] } }, world())?.nations[999],
-    ).toEqual(['greatsword', 'repeater']);
+    expect(() => readNationResearch({ version: 1, nations: { 999: ['repeater', 'greatsword'] } })).toThrow();
+    expect(readNationResearch({ version: 1, nations: { 999: ['greatsword', 'repeater'] } })?.nations[999]).toEqual([
+      'greatsword',
+      'repeater',
+    ]);
     const old = commandWorld();
-    expect(canExecuteResearchNationCommand(old, 12, 'nation_research_greatsword')).toBe(false);
-    expect(readNationResearch(null, old)).toBeUndefined();
-    expect(() => readNationResearch(initialNationResearch(), old)).toThrow();
+    expect(canExecuteResearchNationCommand(old, 12, 'nation_research_greatsword')).toBe(true);
+    expect(() => readNationResearch(null)).toThrow();
+    expect(readNationResearch(initialNationResearch())).toEqual(initialNationResearch());
   });
 });

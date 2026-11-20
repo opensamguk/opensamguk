@@ -1,3 +1,4 @@
+import { readTransactionOptions } from '../readTransaction';
 import { setTimeout as delay } from 'node:timers/promises';
 import { z } from 'zod';
 import type { Context } from '../context';
@@ -38,7 +39,7 @@ async function submitAndWait(
   while (true) {
     const result = await ctx.db.$transaction(
       (tx) => readTreatyRequest(tx, { worldId: input.worldId, requestId: input.requestId, ...identity(ctx, started) }),
-      { isolationLevel: 'RepeatableRead' },
+      readTransactionOptions,
     );
     const remaining = deadline - performance.now();
     if (result.status !== 'pending' || remaining <= 0) return result;
@@ -50,7 +51,7 @@ export const treatyRouter = router({
   relations: protectedProcedure
     .input(strictWorldInput)
     .query(({ ctx, input }) =>
-      ctx.db.$transaction((tx) => listRelations(tx, input.worldId, ctx.user.id), { isolationLevel: 'RepeatableRead' }),
+      ctx.db.$transaction((tx) => listRelations(tx, input.worldId, ctx.user.id), { ...readTransactionOptions }),
     ),
   tradeTargets: protectedProcedure.input(worldInput).query(({ ctx, input }) => {
     const started = performance.now();
@@ -59,7 +60,7 @@ export const treatyRouter = router({
         await requireLiveSession(tx, identity(ctx, started));
         return listTradeTargets(tx, { ...input, userId: ctx.user.id });
       },
-      { isolationLevel: 'RepeatableRead' },
+      { ...readTransactionOptions },
     );
   }),
   list: protectedProcedure.input(listInput).query(({ ctx, input }) => {
@@ -69,7 +70,7 @@ export const treatyRouter = router({
         await requireLiveSession(tx, identity(ctx, started));
         return listTreaties(tx, { ...input, cursor: input.cursor, userId: ctx.user.id });
       },
-      { isolationLevel: 'RepeatableRead' },
+      { ...readTransactionOptions },
     );
   }),
   quote: protectedProcedure.input(quoteInput).query(({ ctx, input }) => {
@@ -83,7 +84,7 @@ export const treatyRouter = router({
           payload: { toNationId: input.toNationId, clauses: input.clauses },
         });
       },
-      { isolationLevel: 'RepeatableRead' },
+      { ...readTransactionOptions },
     );
   }),
   propose: worldVerifiedProcedure.input(proposeInput).mutation(({ ctx, input }) =>
@@ -104,9 +105,10 @@ export const treatyRouter = router({
   ),
   request: protectedProcedure.input(requestInput).query(({ ctx, input }) => {
     const started = performance.now();
-    return ctx.db.$transaction((tx) => readTreatyRequest(tx, { ...input, ...identity(ctx, started) }), {
-      isolationLevel: 'RepeatableRead',
-    });
+    return ctx.db.$transaction(
+      (tx) => readTreatyRequest(tx, { ...input, ...identity(ctx, started) }),
+      readTransactionOptions,
+    );
   }),
   break: worldVerifiedProcedure.input(breakInput).mutation(({ ctx, input }) =>
     submitAndWait(ctx, {
@@ -123,7 +125,7 @@ export const treatyRouter = router({
         await requireLiveSession(tx, identity(ctx, started));
         return listTrust(tx, { worldId: input.worldId, userId: ctx.user.id });
       },
-      { isolationLevel: 'RepeatableRead' },
+      { ...readTransactionOptions },
     );
   }),
 });

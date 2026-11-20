@@ -7,8 +7,8 @@ export async function persistNationStrategy(
   before: WorldView,
   next: WorldView,
 ) {
-  const original = readNationStrategy(before.nationStrategy, before),
-    final = readNationStrategy(next.nationStrategy, next);
+  const original = readNationStrategy(before.nationStrategy),
+    final = readNationStrategy(next.nationStrategy);
   if (!original && !final) return;
   if (!original || !final) throw new Error('진행 중 전략 기능을 바꿀 수 없습니다.');
   if (JSON.stringify(original) === JSON.stringify(final)) return;

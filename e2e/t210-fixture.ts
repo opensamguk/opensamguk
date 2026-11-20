@@ -1,3 +1,4 @@
+import { assertInt27Database } from './int27Database';
 import { execFile } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -160,9 +161,9 @@ async function createSessionAccount(stack: T210Stack, tag: string, index: number
 }
 
 async function createWorld(stack: T210Stack, tag: string) {
-  const [{ readFixture }, { saveInitialWorld }, { controlClock }] = await Promise.all([
+  const [{ readFixture }, { saveFixtureWorld }, { controlClock }] = await Promise.all([
     import('../apps/server/test/readFixture'),
-    import('../apps/engine/src/world/persistence'),
+    import('./worldFixture'),
     import('../apps/engine/src/world/clock'),
   ]);
   const accounts: Array<Awaited<ReturnType<typeof createSessionAccount>>> = [];
@@ -180,7 +181,7 @@ async function createWorld(stack: T210Stack, tag: string) {
   }));
   assertOwnDb(stack);
   const { worldId } = await withE2eDb((db) =>
-    saveInitialWorld(db, initial, { name: `T2-10 메시지 ${tag}`, turnTermMinutes: 60, endYear: null }),
+    saveFixtureWorld(db, initial, { name: `T2-10 메시지 ${tag}`, turnTermMinutes: 60, endYear: null }),
   );
   // 감독이 없는 자기 DB지만 TurnLoop가 쓸 실행권을 월드를 열기 전에 잡는다.
   const hold = await holdLease(worldId);
@@ -348,15 +349,21 @@ export const test = base.extend<{ world: T210World }, { t210Stack: T210Stack }>(
       // 원래 주소가 _test 전용 DB인지 먼저 확인하고 같은 서버·계정에 새 이름의 _test DB를 만든다. 있는 DB는 지우거나 비우지 않는다.
       const original = e2eDatabaseUrl();
       const hex = randomBytes(6).toString('hex');
-      const database = `e2e_t210_${hex}_test`;
-      if (!/^e2e_t210_[a-f0-9]{12}_test$/.test(database)) throw new Error('T2-10 E2E DB 이름이 잘못되었습니다.');
+      const reuse = process.env.INT27_EXISTING_DB === '1';
+      if (reuse) {
+        const target = new URL(original);
+        assertInt27Database(target);
+      }
+      const database = reuse ? 'opensamguk_int27_test' : `e2e_t210_${hex}_test`;
+      if (!reuse && !/^e2e_t210_[a-f0-9]{12}_test$/.test(database))
+        throw new Error('T2-10 E2E DB 이름이 잘못되었습니다.');
       const applicationName = `t210-${hex}`;
       const setupFile = `t2-10-fixture-setup-${database}.json`;
       const cleanupFile = `t2-10-fixture-cleanup-${database}.json`;
       const own = new URL(original);
       own.pathname = `/${database}`;
       const adminUrl = new URL(original);
-      adminUrl.pathname = '/postgres';
+      if (!reuse) adminUrl.pathname = '/postgres';
       const databaseUrl = own.href;
 
       const { createDb } = await import('../packages/db/src/index');
@@ -384,8 +391,8 @@ export const test = base.extend<{ world: T210World }, { t210Stack: T210Stack }>(
       let failure: unknown;
       const errors: unknown[] = [];
       try {
-        await admin.$executeRawUnsafe(`CREATE DATABASE "${database}"`);
-        created = true;
+        if (!reuse) await admin.$executeRawUnsafe(`CREATE DATABASE "${database}"`);
+        created = !reuse;
         const migrated = await migrate(databaseUrl);
 
         // withE2eDb·holdLease는 DATABASE_URL을 읽는다. 이 worker 안에서만 자기 DB로 바꾸고 끝나면 되돌린다.
@@ -395,24 +402,25 @@ export const test = base.extend<{ world: T210World }, { t210Stack: T210Stack }>(
 
         // 서버는 평소처럼 Date.now로 세션과 시각을 판정한다. 브라우저 POST의 Origin은 자기 웹 출처와 같아야 받는다.
         // 실시간 LISTEN 연결에는 이 묶음만의 applicationName을 붙인다.
-        const webPort = await freePort();
+        const webPort = reuse ? 5173 : await freePort();
         const webOrigin = `http://127.0.0.1:${webPort}`;
         db = createDb(databaseUrl);
         const { initializeResources } = await import('../tools/init-resources');
-        await initializeResources(
-          db,
-          await readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8'),
-        );
+        if (!reuse)
+          await initializeResources(
+            db,
+            await readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8'),
+          );
         // loadInitialWorldFromDb(integration191 등)를 쓰는 시험과 lobby 시나리오 제목이 읽는 통합판 공식 게시 4행만 더 준비한다.
         const { initializeIntegrationResources } = await import('../tools/integration-resources');
-        await initializeIntegrationResources(db);
+        if (!reuse) await initializeIntegrationResources(db);
         api = await buildServer({
           db,
           logging: false,
           publicOrigin: webOrigin,
           realtime: { connectionString: databaseUrl, applicationName },
         });
-        await api.listen({ host: '127.0.0.1', port: 0 });
+        await api.listen({ host: '127.0.0.1', port: reuse ? 3001 : 0 });
         const apiOrigin = `http://127.0.0.1:${(api.server.address() as AddressInfo).port}`;
         cacheDir = await mkdtemp(join(tmpdir(), vitePrefix));
         vite = await startWeb(webPort, apiOrigin, cacheDir);

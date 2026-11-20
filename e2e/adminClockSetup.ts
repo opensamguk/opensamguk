@@ -4,7 +4,7 @@ import { expect, type LegalStack } from './legalFixture';
 import { holdLease, type LeaseHold } from './game';
 import { releaseLease } from '../apps/engine/src/lease';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 
@@ -17,19 +17,9 @@ export async function clockWorld(stack: LegalStack, releases: Array<() => Promis
     portraitMap: '191-map',
     seed: 'clock-ui-' + randomUUID(),
   });
-  initial.ruleFeatures = [
-    'campaign-assignment-v2',
-    'campaign-v1',
-    'five-stats',
-    'operational-map',
-    'personnel',
-    'policy',
-    'stratagem-basic',
-    'treaty',
-  ];
   expect(initial.nations).toHaveLength(21);
   expect(initial.generals).toHaveLength(491);
-  const { worldId: id } = await saveInitialWorld(stack.db, initial, {
+  const { worldId: id } = await saveFixtureWorld(stack.db, initial, {
     name: '시계 정식191 ' + randomUUID(),
     turnTermMinutes: 60,
     endYear: 201,
@@ -75,6 +65,7 @@ export async function clockHuman(page: Page, stack: LegalStack, world: ClockWorl
       worldId: world.id,
       name: '시계사람',
       portraitId: null,
+      sex: 'MALE',
       leadership: 55,
       strength: 55,
       intel: 55,

@@ -10,17 +10,16 @@ import { decideLineageAction } from './actions';
 
 function initial() {
   const value = commandInitial();
-  value.ruleFeatures = ['personnel', 'lineage-v1'];
   for (const general of value.generals) {
     general.sex = general.id === 4 ? 'FEMALE' : 'MALE';
     general.crew = 0;
   }
   return value;
 }
-it('AC-P2-32 원생성 자료는 켠 판에서만 보관하고 성별 없는 원생성은 거부한다', () => {
+it('AC-P2-32 원생성 자료는 항상 보관하고 성별 없는 원생성은 거부한다', () => {
   const old = initialReplayState(commandInitial());
-  expect(Object.hasOwn(old, 'lineageResources')).toBe(false);
-  expect(Object.hasOwn(old.state, 'lineage')).toBe(false);
+  expect(Object.hasOwn(old, 'lineageResources')).toBe(true);
+  expect(Object.hasOwn(old.state, 'lineage')).toBe(true);
   const value = initial(),
     replay = initialReplayState(value, { 'lineage-v1': lineageTestConfig });
   expect(replay.lineageResources).toEqual({
@@ -41,7 +40,6 @@ it('AC-P2-32 정식 입력 재생은 동의한 자산·개인 칸·거주와 국
   replay.offices = { 1: { 12: { revision: 8, tenure: 3 } } };
   replay.residenceAnchors = { 1: 5 };
   replay = enableReplayPolicy(replay, 60, 5);
-  replay.state.ruleFeatures!.push('policy');
   replay.revisions[1] = 10;
   replay.revisions[3] = 5;
   const preview = successionPreview(replay.state, 1, 3, 100);
@@ -82,10 +80,9 @@ it('AC-P2-32 월 정산 재생은 출생 행의 개인 칸·방침을 인사 정
   replay.state.lineage!.marriages = [{ id: 1, a: 1, b: 4, householdGeneralId: 1, sinceTick: 0 }];
   replay.state.lineage!.nextMarriageId = 2;
   replay = enableReplayPolicy(replay, 60, null);
-  replay.state.ruleFeatures!.push('policy');
   const before = structuredClone(replay),
     tick = 10_000;
-  const settled = settleMonthlyFeatures(replay, { ...replay, monthlyTick: tick }, tick);
+  const settled = settleMonthlyFeatures(replay, { ...replay, monthlyTick: tick }, tick, undefined, initial().seed);
   const newborn = settled.replay.state.generals[5]!;
   expect(newborn).toMatchObject({ id: 5, userId: null, crew: 0, gold: 0, rice: 0 });
   expect(settled.replay.turns[5]).toHaveLength(30);

@@ -1,17 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createDb, nextActionSequence, type Prisma } from '@opensamguk/db';
-import { selectWorldCapabilities, settleTreaties } from '@opensamguk/rules';
+import { settleTreaties } from '@opensamguk/rules';
 import { readFixture } from '../../test/readFixture';
 import { submitTreatyRequest, readTreatyRequest, type TreatyRequestKind } from './treatyRequests';
 // 승인된 실제 생성 경로를 통합 fixture에서만 부른다. production 의존 방향은 바꾸지 않는다.
 // eslint-disable-next-line opensamguk/no-cross-package-relative
-import { saveInitialWorld } from '../../../engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../../../engine/test/worldFixture';
 // eslint-disable-next-line opensamguk/no-cross-package-relative
 import { controlClock } from '../../../engine/src/world/clock';
 // 완료 행 준비용 component다. 중앙 consumer·리스·loop의 증거는 아니다.
 // eslint-disable-next-line opensamguk/no-cross-package-relative
-import { processTreatyInput } from '../../../engine/src/treatyInput';
+import { processInputs } from '../../../engine/src/inputs';
 // eslint-disable-next-line opensamguk/no-cross-package-relative
 import { loadWorld } from '../../../engine/src/worldLoader';
 // eslint-disable-next-line opensamguk/no-cross-package-relative
@@ -86,8 +86,6 @@ async function fixture(
     name: '조약 서버 저장 경계',
     turnTermMinutes: 30,
     endYear: null,
-    ...(options.policy ? {} : { replayFormat: 'legacy' as const }),
-    ...(options.off ? {} : { treatyFormat: 1 as const }),
   });
   worlds.add(worldId);
   await controlClock(db, worldId, 'start', at.getTime());
@@ -107,7 +105,8 @@ const submit = (identity: Identity, value: unknown = payload, kind: TreatyReques
   });
 const read = (identity: Identity) =>
   db.$transaction((tx) => readTreatyRequest(tx, identity), { isolationLevel: 'RepeatableRead' });
-const events = (worldId: string) => db.inputEvent.findMany({ where: { worldId }, orderBy: { id: 'asc' } });
+const events = (worldId: string) =>
+  db.inputEvent.findMany({ where: { worldId, kind: { startsWith: 'treaty.' } }, orderBy: { id: 'asc' } });
 
 async function snapshot(worldId: string) {
   return {
@@ -140,7 +139,7 @@ async function complete(identity: Identity, tick = 1500) {
         },
       },
     });
-    await processTreatyInput(tx, world, event, tick);
+    await processInputs(tx, world, tick);
     return tx.inputEvent.findUniqueOrThrow({ where: { id: event.id } });
   });
 }
@@ -158,14 +157,7 @@ async function completeResponse(identity: Identity, treatyId: string, accept: bo
   return db.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${identity.worldId} FOR UPDATE`;
     const world = await tx.world.findUniqueOrThrow({ where: { id: identity.worldId } });
-    const event = await tx.inputEvent.findFirstOrThrow({
-      where: {
-        worldId: identity.worldId,
-        userId: identity.userId,
-        idempotencyKey: `treaty.respond:${identity.requestId}`,
-      },
-    });
-    await processTreatyInput(tx, world, event, 1501);
+    await processInputs(tx, world, 1501);
   });
 }
 
@@ -184,10 +176,10 @@ describe('T2-07 / AC-M2-06 서버 조약 leaf 실제 PostgreSQL 경계', () => {
   it.each([false, true])('실제 factory의 origin6와 policy 선택을 확인한다 (F0 %s)', async (policy) => {
     const f = await fixture({ policy });
     const world = await db.world.findUniqueOrThrow({ where: { id: f.worldId } });
-    expect(world.treatyFormat).toBe(1);
-    expect(world.replayOrigin).toMatchObject({ version: 6, capabilities: { version: 1, treaty: { version: 1 } } });
-    expect(selectWorldCapabilities(world).kind).toBe('caps');
-    expect(world.policyFromSequence).toBe(policy ? 0 : null);
+    expect(world.treatyFormat).toBeNull();
+    expect(world.replayOrigin).toMatchObject({ version: 3 });
+    expect(world.replayFormat).toBe(3);
+    expect(world.policyFromSequence).toBeNull();
     expect(await db.treaty.count({ where: { worldId: f.worldId } })).toBe(0);
     const identity = f.identity();
     expect(await submit(identity)).toEqual({ created: true });
@@ -547,7 +539,7 @@ describe('T2-07 / AC-M2-06 서버 조약 leaf 실제 PostgreSQL 경계', () => {
       // 양수 2는 DB 제약을 지나지만 제안 결과의 treatyId 1과 맞지 않는다.
       const data: Prisma.InputEventUpdateInput =
         field === 'sequence'
-          ? { sequence: 2 }
+          ? { sequence: event.sequence! + 1 }
           : field === 'outcome'
             ? { result: { outcome: 'ACCEPTED', private: '노출 금지' } }
             : field === 'payload'
@@ -561,25 +553,20 @@ describe('T2-07 / AC-M2-06 서버 조약 leaf 실제 PostgreSQL 경계', () => {
     },
   );
 
-  it('실제 off factory는 기능 전제 오류로 닫는다', async () => {
+  it('형식 3은 옛 off 생성 옵션과 관계없이 조약을 제공한다', async () => {
     const f = await fixture({ off: true });
-    await expect(submit(f.identity())).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
-    await expect(read(f.identity())).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
-    expect(await events(f.worldId)).toEqual([]);
+    const identity = f.identity();
+    await submit(identity);
+    await expect(read(identity)).resolves.toBeDefined();
+    expect(await events(f.worldId)).toHaveLength(1);
   });
 
-  it('실제 생성 뒤 저장 flag를 파손하면 접수와 회수를 고정 내부 오류로 닫는다', async () => {
+  it('형식 3 조약은 옛 저장 flag가 NULL이어도 접수와 회수를 지원한다', async () => {
     const f = await fixture();
     const identity = f.identity();
     await submit(identity);
     await db.world.update({ where: { id: f.worldId }, data: { treatyFormat: null } });
-    await expect(submit(identity)).rejects.toMatchObject({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: '저장된 조약을 확인하지 못했습니다.',
-    });
-    await expect(read(identity)).rejects.toMatchObject({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: '저장된 조약을 확인하지 못했습니다.',
-    });
+    await expect(submit(identity)).resolves.toBeDefined();
+    await expect(read(identity)).resolves.toBeDefined();
   });
 });

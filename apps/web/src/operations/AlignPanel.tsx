@@ -96,9 +96,9 @@ export function AlignPanel({ worldId, operationId, draft, names }: Props) {
     : draft.pending
       ? '먼저 편집기의 충돌 안내에서 다시 적용할지 고르세요.'
       : !draft.server.data
-        ? '예턴을 불러온 뒤에 맞출 수 있습니다.'
+        ? '예턴을 불러온 뒤에 맞추세요.'
         : data && refreshing
-          ? '최신 예턴 기준 제안을 다시 받는 중입니다. 받은 뒤에 넣을 수 있습니다.'
+          ? '최신 예턴 기준 제안을 다시 받는 중입니다. 받은 뒤에 넣으세요.'
           : data && suggest.isError
             ? '제안을 다시 받지 못해 넣을 수 없습니다. 미리보기를 닫고 다시 여세요.'
             : null;
@@ -106,7 +106,7 @@ export function AlignPanel({ worldId, operationId, draft, names }: Props) {
   const putBlocked =
     blocked ??
     (!data
-      ? '제안을 받은 뒤에 넣을 수 있습니다.'
+      ? '제안을 받은 뒤에 넣으세요.'
       : data.noop !== null
         ? data.noop.reason
         : rows.length === 0

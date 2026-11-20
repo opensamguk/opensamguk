@@ -1,4 +1,5 @@
 import { governanceFixture } from '../governance/testFixture';
+import { emptyCampaignState } from '../campaign/state';
 import type { LineageConfig } from './config';
 import { initialLineageState } from './state';
 
@@ -29,7 +30,7 @@ export const lineageTestConfig: LineageConfig = {
 };
 export function lineageFixture() {
   const world = governanceFixture();
-  world.ruleFeatures!.push('lineage-v1');
+  world.campaign = emptyCampaignState(world, 'lineage-fixture', 'lineage-fixture');
   for (const [index, general] of Object.values(world.generals).entries())
     general.sex = index % 2 === 0 ? 'MALE' : 'FEMALE';
   world.lineage = initialLineageState(lineageTestConfig, world, 'lineage-fixture');

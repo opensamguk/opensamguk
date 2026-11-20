@@ -58,4 +58,4 @@ export const cities = [
   { key: 30, name: '업', nationId: 1 },
 ];
 
-export const enabled = (items: IntelRecordView[]): IntelRecordsResponse => ({ enabled: true, items, alerts: [] });
+export const enabled = (items: IntelRecordView[]): IntelRecordsResponse => ({ items, alerts: [] });

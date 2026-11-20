@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { hashState } from '@opensamguk/shared/node';
+import { providedRuleData } from '@opensamguk/rules';
 import { monthlyFixture } from '../test/monthlyFixture';
 import { readArchive, resourceHashV3, type ReplayArchiveV3 } from './replay';
 
-async function archive(features: string[]): Promise<ReplayArchiveV3> {
+async function archive(): Promise<ReplayArchiveV3> {
   const initial = await monthlyFixture();
-  initial.ruleFeatures = features;
   const origin: ReplayArchiveV3['origin'] = {
     version: 3,
     initial,
     initialStateHash: hashState(initial),
     resourceHash: '',
-    ...(features.includes('policy') ? { featureData: { policy: { version: 1, turnTermMinutes: 60 } } } : {}),
+    featureData: providedRuleData(initial, 60),
   };
   origin.resourceHash = resourceHashV3(origin);
   return {
@@ -40,7 +40,7 @@ function finish(value: ReplayArchiveV3) {
 
 describe('형식 3 운영 등록표의 입력 보관 검사', () => {
   it('개인 칸 tick은 null이고 직책 칸 tick은 잠근 시계 값이다', async () => {
-    const value = finish(await archive(['personnel']));
+    const value = finish(await archive());
     value.inputs = [
       {
         sequence: 1,
@@ -53,7 +53,7 @@ describe('형식 3 운영 등록표의 입력 보관 검사', () => {
           revision: 0,
           turns: Array.from({ length: 12 }, () => ({ commandKey: 'nation_rest', args: {} })),
         },
-        result: { revision: 1 },
+        result: { revision: 1, activeTick: 100 },
       },
     ];
     expect(() => readArchive(value)).not.toThrow();
@@ -62,7 +62,7 @@ describe('형식 3 운영 등록표의 입력 보관 검사', () => {
   });
 
   it('정책 활동과 조약 결과의 tick이 운반 tick과 다르면 거부한다', async () => {
-    const policy = finish(await archive(['policy']));
+    const policy = finish(await archive());
     policy.inputs = [
       {
         sequence: 1,
@@ -75,7 +75,7 @@ describe('형식 3 운영 등록표의 입력 보관 검사', () => {
       },
     ];
     expect(() => readArchive(policy)).toThrow('활동 tick');
-    const treaty = finish(await archive(['treaty', 'treaty-break']));
+    const treaty = finish(await archive());
     treaty.inputs = [
       {
         sequence: 1,
@@ -91,7 +91,7 @@ describe('형식 3 운영 등록표의 입력 보관 검사', () => {
   });
 
   it('종료 뒤 켜진 기능은 WORLD_CLOSED만 허용하고 종료 tick을 검사한다', async () => {
-    const value = finish(await archive(['treaty', 'treaty-break']));
+    const value = finish(await archive());
     value.afterEnd = [
       {
         sequence: 11,
@@ -111,8 +111,8 @@ describe('형식 3 운영 등록표의 입력 보관 검사', () => {
     expect(() => readArchive(value)).toThrow('종료');
   });
 
-  it('조약만 켠 월드의 파기는 FEATURE_DISABLED 거절만 허용한다', async () => {
-    const value = finish(await archive(['treaty']));
+  it('AC-INT-28 상시 제공 조약 파기는 처리 tick이 있는 거절 기록을 요구한다', async () => {
+    const value = finish(await archive());
     value.inputs = [
       {
         sequence: 1,
@@ -124,11 +124,10 @@ describe('형식 3 운영 등록표의 입력 보관 검사', () => {
         result: { code: 'FEATURE_DISABLED', message: '꺼진 기능' },
       },
     ];
+    expect(() => readArchive(value)).toThrow();
+    value.inputs[0]!.result = { tick: 100, code: 'NO_PERMISSION', message: '권한 없음' };
     expect(() => readArchive(value)).not.toThrow();
-    value.inputs[0]!.status = 'APPLIED';
-    expect(() => readArchive(value)).toThrow('켜지 않은');
-    value.inputs[0]!.status = 'REJECTED';
-    value.inputs[0]!.result = { tick: 100, code: 'WORLD_CLOSED', message: '종료됨' };
-    expect(() => readArchive(value)).toThrow('거절 기록');
+    value.inputs[0]!.result = { tick: 99, code: 'WORLD_CLOSED', message: '종료됨' };
+    expect(() => readArchive(value)).toThrow();
   });
 });

@@ -1,7 +1,12 @@
 import { test, expect, apiMutate, apiQuery } from './t210-fixture';
 import { commandInitial } from '../packages/rules/test/commandFixture';
-import { FIVE_STAT_RULES, TICKS_PER_MONTH } from '../packages/rules/src/index';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import {
+  FIVE_STAT_RULES,
+  TICKS_PER_MONTH,
+  providedRuleData,
+  readStratagemCardsConfig,
+} from '../packages/rules/src/index';
+import { saveFixtureWorld } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { holdLease, releaseHold } from './game';
@@ -10,8 +15,8 @@ test('INT-17 네 계략이 실제 명령 목록·30칸·출사한 장수의 엔�
   const user = await world.user('member');
   const db = world.hold.db;
   const initial = commandInitial();
+  initial.seed = 'int17-current-4';
   initial.statRules = { ...FIVE_STAT_RULES };
-  initial.ruleFeatures = ['five-stats', 'personnel', 'policy', 'stratagem-basic', 'treaty'];
   initial.nations = initial.nations.map((nation) => ({ ...nation, isNpc: false }));
   initial.generals = initial.generals.map((general) => ({
     ...general,
@@ -19,10 +24,15 @@ test('INT-17 네 계략이 실제 명령 목록·30칸·출사한 장수의 엔�
     charm: 50,
     nextTurnTick: 1000000,
   }));
-  const { worldId } = await saveInitialWorld(db, initial, {
+  // INT-17 HTTP 통합 시험과 같은 공식 seeded 초기 패로 네 기본 계략을 준비한다.
+  const cards = readStratagemCardsConfig(providedRuleData(initial, 60)['stratagem-cards-v1']);
+  cards.startHand = 3;
+  cards.deck = (['fire_attack', 'sabotage', 'incite', 'plunder'] as const).map((kind) => ({ kind, weight: 1 }));
+  const { worldId } = await saveFixtureWorld(db, initial, {
     name: 'INT17 계략 화면',
     turnTermMinutes: 60,
     endYear: null,
+    featureData: { 'stratagem-cards-v1': { version: 1, config: cards } },
   });
   const hold = await holdLease(worldId);
   try {
@@ -31,6 +41,7 @@ test('INT-17 네 계략이 실제 명령 목록·30칸·출사한 장수의 엔�
       worldId,
       name: '계략화면',
       portraitId: null,
+      sex: 'MALE',
       leadership: 55,
       strength: 70,
       intel: 80,

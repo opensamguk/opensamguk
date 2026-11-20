@@ -62,9 +62,7 @@ export function AdminUserDetail({
           상세 조회
         </button>
       </form>
-      <p>
-        버튼을 누를 때만 조회하고 결과가 없어도 감사 기록을 남깁니다. 참가 장수와 제재는 각각 최대50건을 표시합니다.
-      </p>
+      <p>조회할 때마다 결과가 없어도 감사 기록을 남깁니다. 참가 장수와 제재는 각각 최대50건을 표시합니다.</p>
       {pending ? <LoadingState>사용자 상세 조회 중</LoadingState> : null}
       {error ? <ErrorState title={error} /> : null}
       {data ? (
@@ -76,7 +74,7 @@ export function AdminUserDetail({
               <br />
               <code>{data.userId}</code>
             </dd>
-            <dt>상태·역할</dt>
+            <dt>상태와 역할</dt>
             <dd>
               {data.status} · {data.role}
             </dd>
@@ -140,7 +138,7 @@ export function AdminUserDetail({
           )}
           <h4>최근 로그인 기록</h4>
           <p>
-            최근90일 중 최대50건을 최근 시각순으로 표시합니다. 가입·로그인 시도 기록이며 보존 정책의 승인을 뜻하지
+            최근90일 중 최대50건을 최근 시각순으로 표시합니다. 가입과 로그인 시도 기록이며 보존 정책의 승인을 뜻하지
             않습니다.
           </p>
           {Array.isArray(data.recentLogins) &&

@@ -71,9 +71,7 @@ function ActionButton({
   if (allowed === null) return null;
   if (!allowed.ok && allowed.code === 'NO_PERMISSION') return null;
   if (busy !== null)
-    return (
-      <DisabledReason reason="처리 중인 요청이 있습니다. 결과가 나오면 다시 고를 수 있습니다.">{label}</DisabledReason>
-    );
+    return <DisabledReason reason="처리 중인 요청이 있습니다. 결과가 나온 뒤에 고르세요.">{label}</DisabledReason>;
   if (!allowed.ok) return <DisabledReason reason={allowed.reason}>{label}</DisabledReason>;
   return (
     <button type="button" className={styles.primary} onClick={onClick}>
@@ -172,8 +170,8 @@ export function TreatyCard({ treaty, cityLabel = (key) => `도시 ${key}`, busy,
       </dl>
 
       {enforced.length > 0 ? (
-        <section aria-label="서버가 집행하는 조항">
-          <h4 className={styles.clauseHead}>서버가 집행하는 조항</h4>
+        <section aria-label="집행되는 조항">
+          <h4 className={styles.clauseHead}>집행되는 조항</h4>
           <ul className={styles.clauses}>
             {enforced.map((clause, i) => (
               <li key={i}>{describeClause(clause, labels)}</li>

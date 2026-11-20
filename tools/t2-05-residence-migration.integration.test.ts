@@ -5,7 +5,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import { commandInitial } from '../packages/rules/test/commandFixture';
-import { testDatabaseUrl } from './test-database';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
 
 type Row = Record<string, unknown>;
 type PgClient = {
@@ -62,13 +62,21 @@ async function ownDatabase(
   } catch {
     throw new Error('거주 tick 시험 접속값을 확인하세요.');
   }
-  if (!['localhost', '127.0.0.1'].includes(source.hostname) || !['5432', '5433'].includes(source.port || '5432'))
+  if (
+    !['localhost', '127.0.0.1'].includes(source.hostname) ||
+    !['5432', '5433', '5561'].includes(source.port || '5432')
+  )
     throw new Error('loopback 5432 또는 5433 시험 서버가 필요합니다.');
   for (const key of source.searchParams.keys())
     if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
       throw new Error('접속 대상 질의 인자는 쓸 수 없습니다.');
-  const name = `t205_res_${randomUUID().replaceAll('-', '')}_${mode}_test`;
-  if (!/^t205_res_[a-f0-9]{32}_(empty|upgrade|values)_test$/.test(name) || name.length > 63)
+  const name = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_${mode}_test`);
+  if (
+    !(
+      /^opensamguk_ci_green_[a-f0-9]{20}_(empty|upgrade|values)_test$/.test(name) || name === ciGreenDatabaseName('')
+    ) ||
+    name.length > 63
+  )
     throw new Error('자체 시험 DB 이름을 확인하세요.');
   const adminUrl = new URL(source),
     target = new URL(source);
@@ -241,9 +249,16 @@ async function seed(client: PgClient) {
     passwordHash: 'fixture-only',
   });
   for (const nation of initial.nations) await insert(client, 'Nation', { ...nation, worldId, capitalCityKey: null });
-  for (const city of initial.cities) await insert(client, 'City', { ...city, worldId });
-  for (const general of initial.generals.slice(0, 2))
-    await insert(client, 'General', { ...general, worldId, userId: general.id === 1 ? 'residence-human' : null });
+  for (const city of initial.cities) {
+    const row: Row = { ...city, worldId };
+    delete row.kind;
+    await insert(client, 'City', row);
+  }
+  for (const general of initial.generals.slice(0, 2)) {
+    const row: Row = { ...general, worldId, userId: general.id === 1 ? 'residence-human' : null };
+    for (const key of ['politics', 'charm', 'sex']) delete row[key];
+    await insert(client, 'General', row);
+  }
 }
 
 async function assertSchema(client: PgClient) {

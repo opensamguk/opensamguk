@@ -4,7 +4,7 @@ import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { controlClock } from '../apps/engine/src/world/clock';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { newSession } from '../apps/server/src/auth/session';
 import { buildServer } from '../apps/server/src/server';
 import { createDb } from '../packages/db/src/index';
@@ -55,11 +55,11 @@ async function fixture() {
   initial.cities[3]!.connections = [1, 3];
   Object.assign(initial.generals[2]!, { nationId: 1, cityKey: 1, dedication: 100 });
   for (const general of initial.generals) general.nextTurnTick = 1_000_000;
+  syncFixtureMap(initial);
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '발령 응답과 NPC 인사 검증',
     turnTermMinutes: 60,
     endYear: null,
-    ruleFeatures: ['personnel', 'policy'],
   });
   worlds.push(worldId);
   const userId = randomUUID();
@@ -177,3 +177,35 @@ it('AC-M2-16 NPC 군주는 정기 발령·포상과 사유를 기록하고 만�
   ).toMatchObject([{ tick: expiresTick, text: '도시4 발령 기한이 지나 수락했습니다.' }]);
   expect(await db.inputEvent.count({ where: { worldId: f.worldId, kind: 'offer.respond' } })).toBe(0);
 }, 60_000);
+
+// 합성 지도의 생성 원본에도 변경한 도시 값과 연결을 기록한다.
+function syncFixtureMap(initial: Parameters<typeof saveInitialWorld>[1]) {
+  const map = initial.operationalMap;
+  if (!map) return;
+  for (const city of initial.cities) city.connections.sort((a, b) => a - b);
+  for (const site of map.sites) {
+    if (site.kind !== 'CITY') continue;
+    const city = initial.cities.find((row) => row.cityKey === site.anchorKey);
+    if (!city) continue;
+    site.name = city.name;
+    site.level = city.level;
+    site.region = city.region;
+    site.position = { x: city.x, y: city.y };
+    for (const field of ['population', 'agriculture', 'commerce', 'security', 'defence', 'wall'] as const) {
+      site.initial![field] = city[field];
+      site.max![field] = city[`${field}Max`];
+    }
+  }
+  map.routes = initial.cities.flatMap((city) =>
+    city.connections
+      .filter((key) => city.cityKey < key)
+      .map((key) => ({
+        id: `route:${city.cityKey}:${key}`,
+        from: `city:${city.cityKey}`,
+        to: `city:${key}`,
+        mode: 'LAND' as const,
+        direction: 'BOTH' as const,
+        enabled: true,
+      })),
+  );
+}

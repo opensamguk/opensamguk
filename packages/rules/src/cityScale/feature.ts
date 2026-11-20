@@ -1,3 +1,4 @@
+import { landPopulationBonus } from '../construction/catalog';
 import type { RuleFeatureDefinition } from '../ruleRegistry';
 import { cloneWorld } from '../model/clone';
 import { CITY_SCALE_FEATURE, CITY_SCALE_FIELDS, ruinMaximum } from '../world/map/cityScale';
@@ -36,7 +37,16 @@ export const cityScaleFeature: RuleFeatureDefinition = {
       }
       const nextStage = row.stage + 1;
       const max = nextStage === 3 ? row.baseMax : ruinMaximum(row.baseMax, RUIN_PERCENT[nextStage as 1 | 2]);
-      for (const field of CITY_SCALE_FIELDS) city[`${field}Max`] = max[field];
+      for (const field of CITY_SCALE_FIELDS) {
+        if (
+          state.campaign?.land?.managed[String(row.cityKey)]?.includes(
+            field as 'agriculture' | 'commerce' | 'security' | 'defence',
+          )
+        )
+          continue;
+        const housing = field === 'population' ? landPopulationBonus(state, row.cityKey) : 0;
+        city[`${field}Max`] = max[field] + housing;
+      }
       if (row.stage !== 2) state.cityRuins.cities.push({ ...row, stage: nextStage as 1 | 2 });
       effects.push({
         cityKey: row.cityKey,

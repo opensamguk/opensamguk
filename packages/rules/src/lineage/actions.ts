@@ -46,8 +46,6 @@ export function decideLineageAction(
   payload: unknown,
   tick: number,
 ): LineageDecision {
-  if (!world.ruleFeatures?.includes('lineage-v1'))
-    return lineageFail('FEATURE_DISABLED', '가문 기능을 켜지 않은 월드입니다.');
   if (!world.lineage) throw new Error('가문 상태가 없습니다.');
   const parsed = lineageInputSchema.safeParse(payload);
   if (!parsed.success) return lineageFail('BAD_ARGS', '가문 행동 인자가 잘못되었습니다.');
@@ -145,7 +143,9 @@ export function decideLineageAction(
       if (actor!.nationId !== nationId) return lineageFail('NOT_MEMBER', '소속 국가의 공석에만 청구할 수 있습니다.');
       if (
         !next.nations[nationId] ||
-        !Object.values(next.cities).some((city) => city.nationId === nationId && city.kind !== 'PASS')
+        !Object.values(next.cities).some(
+          (city) => city.nationId === nationId && city.kind !== 'PASS' && city.kind !== 'FIELD',
+        )
       )
         return lineageFail('BAD_TARGET', '살아 있는 국가를 고르세요.');
       if (

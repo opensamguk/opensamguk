@@ -1,4 +1,5 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { hasPublicImage, publicImageUrl } from '@opensamguk/shared/public-images';
+import { useQueryClient } from '@tanstack/react-query';
 import { Link, Outlet, useLocation, useParams } from '@tanstack/react-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { LogoutButton } from '../auth/LogoutButton';
@@ -9,6 +10,8 @@ import { MessageButton, MessageDrawer, RealtimeStatusText } from '../messages/Me
 import { NationNoticePopup } from '../messages/NationNotice';
 import { useWorldEvents } from '../realtime/useWorldEvents';
 import { AccountLinks } from './AccountLinks';
+import { boardKeys } from './boardKeys';
+import { useUnitsAfterTurn } from './unitsAfterTurn';
 import { GameNavigation } from './GameNavigation';
 import type { WorldSummary } from '../game/types';
 import { liveRefresh, topbarStatus } from '../game/worldWatch';
@@ -18,8 +21,13 @@ import { SanctionNotice } from '../sanction/SanctionNotice';
 import { FirstTurnGuide } from '../onboarding/FirstTurnGuide';
 import { useNarrowTable } from '../ui/useNarrowTable';
 
+// 전용 화면 뒤에 까는 게임 바탕(성 화면 바닥). 그림이 승인 목록에 없으면 바탕색만 남는다.
+const backdropSource = 'apps/web/src/art/city/scene/ground/luoyang.webp';
+const backdropImage = hasPublicImage(backdropSource) ? `url("${publicImageUrl(backdropSource)}")` : undefined;
+
 // 핵심 조작은 메인 한 화면에서 한다 (소유자 UI 정정 2026-10-21). 메뉴의 다른 주소는 넓게 보는 보조 화면이다.
-// 위쪽 띠에는 월드 이름·현재 연월·다음 턴까지 남은 시간·메뉴·로그아웃. 본문은 화면 폭을 다 쓴다.
+// 위쪽 띠에는 월드 이름, 현재 연월, 다음 턴까지 남은 시간, 메뉴, 로그아웃. 메인 본문은 화면 폭을 다 쓰고,
+// 전용 화면은 게임 바탕 위 키트 창 하나에 담는다.
 export function GameLayout() {
   const { worldId } = useParams({ from: '/w/$worldId' });
   const { pathname } = useLocation();
@@ -27,7 +35,6 @@ export function GameLayout() {
   const summary = useWorldSummary(worldId, true);
   const home = useHome(worldId);
   const trpc = useTRPC();
-  const mine = useQuery(trpc.general.mine.queryOptions({ worldId }));
   const queryClient = useQueryClient();
   // 월드 SSE(T2-10). 알림마다 해당 query만 다시 받고, 이어질 때마다(ready) 화면 전체를 한 번 다시 받는다.
   const realtime = useWorldEvents(worldId);
@@ -49,6 +56,8 @@ export function GameLayout() {
   }, [queryClient, realtimeOpen, trpc, worldId]);
   const nextTurnAt = home.data?.nextTurnAt ?? null;
   const countdown = useTurnCountdown(nextTurnAt, refresh);
+  // 실시간이 끊겨도 내 턴이 실행된 것을 home.get으로 안 뒤에 부곡 목록을 다시 받는다.
+  useUnitsAfterTurn(worldId, nextTurnAt);
   const noGeneral = home.isError && errorCode(home.error) === 'NOT_FOUND';
 
   // world.summary를 새로 받을 때마다 상태·모드 전환과 가속 중 갱신을 판단한다 (worldWatch.ts).
@@ -65,9 +74,7 @@ export function GameLayout() {
     watched.current = next;
     if (plan.home) void queryClient.invalidateQueries({ queryKey: homeKey });
     if (plan.records) void queryClient.invalidateQueries({ queryKey: trpc.records.pathKey() });
-    if (plan.board)
-      for (const queryKey of [trpc.world.map.queryKey({ worldId }), trpc.city.pathKey(), trpc.nation.pathKey()])
-        void queryClient.invalidateQueries({ queryKey });
+    if (plan.board) for (const queryKey of boardKeys(trpc, worldId)) void queryClient.invalidateQueries({ queryKey });
   }, [data, summary.dataUpdatedAt, queryClient, trpc, worldId]);
 
   const worldName =
@@ -83,11 +90,17 @@ export function GameLayout() {
   const accountInMenu = narrow && !entry;
   const onMain = pathname.replace(/\/$/, '') === `/w/${worldId}`;
   const accountLinks = (className: string | undefined) => <AccountLinks className={className} logout={accountInMenu} />;
+  // 전용 화면(메인과 장수 생성 밖의 모든 주소)은 게임 바탕 위의 큰 창 하나로 연다 (INT-29 화면 개편 초안).
+  // 아래 약 150px은 나중에 들어올 명령 띠 자리로 비워 둔다.
+  const windowed = !entry && !onMain;
 
   return (
-    <div className={styles.shell} data-has-navigation={!entry}>
-      <header className={styles.topbar}>
-        <Link to="/lobby" className={styles.navLink}>
+    <div className={styles.shell} data-has-navigation={!entry} data-windowed={windowed ? 'true' : undefined}>
+      {windowed ? (
+        <div className={styles.backdrop} aria-hidden="true" style={{ backgroundImage: backdropImage }} />
+      ) : null}
+      <header className={`${styles.topbar} kit-bar-top`}>
+        <Link to="/lobby" className={`${styles.navLink} kit-button`} data-kind="secondary">
           로비
         </Link>
         <span className={styles.world}>{worldName}</span>
@@ -111,19 +124,27 @@ export function GameLayout() {
           onToggle={() => (messagesOpen ? closeMessages() : setMessagesOpen(true))}
         />
         {accountInMenu ? null : accountLinks(styles.account)}
-        {accountInMenu ? null : <LogoutButton className={styles.logout} />}
+        {accountInMenu ? null : <LogoutButton className={`${styles.logout} kit-button`} />}
       </header>
       {!entry ? (
         <GameNavigation
           worldId={worldId}
-          campaignEnabled={mine.data?.creationRules.campaignEnabled ?? false}
           officerLevel={home.data?.general.officerLevel ?? 0}
           accountLinks={accountInMenu && !onMain ? accountLinks : undefined}
         />
       ) : null}
       <main className={styles.content}>
-        <SanctionNotice worldId={worldId} />
-        <Outlet />
+        {windowed ? (
+          <div className={`${styles.window} kit-window`}>
+            <SanctionNotice worldId={worldId} />
+            <Outlet />
+          </div>
+        ) : (
+          <>
+            <SanctionNotice worldId={worldId} />
+            <Outlet />
+          </>
+        )}
       </main>
       {messagesOpen ? <MessageDrawer worldId={worldId} onClose={closeMessages} /> : null}
       <NationNoticePopup worldId={worldId} />

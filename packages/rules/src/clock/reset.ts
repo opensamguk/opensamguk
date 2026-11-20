@@ -78,6 +78,7 @@ export const adminResetResourcesSchema = z
   });
 export const adminResetSettingsSchema = z
   .strictObject({
+    fogOfWar: z.boolean(),
     name,
     scenarioKey: resourceKeySchema,
     mapKey: resourceKeySchema,
@@ -86,9 +87,7 @@ export const adminResetSettingsSchema = z
     presetHash: hash.nullable(),
     turnTermMinutes: z.number().int().min(1).max(2147483647),
     endYear: z.number().int().min(1).max(10000).nullable(),
-    ruleFeatures: z
-      .array(z.string().regex(/^[a-z][a-z0-9-]{0,31}$/))
-      .refine((values) => values.every((value, index) => index === 0 || values[index - 1]! < value)),
+
     featureDataHash: hash,
   })
   .refine((value) => (value.presetKey === null) === (value.presetHash === null));

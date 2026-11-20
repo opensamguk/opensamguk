@@ -4,14 +4,16 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import { buildServer } from '../apps/server/src/server';
 import { newSession } from '../apps/server/src/auth/session';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { acquireLease, releaseLease, type Lease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { exportReplay, replayToEnd } from '../apps/engine/src/replay';
-import { prepareSeasonWorld, seasonInitial } from '../apps/engine/test/seasonFixture';
+import { prepareSeasonWorld } from '../apps/engine/test/seasonFixture';
 import { monthlyFixture } from '../apps/engine/test/monthlyFixture';
 import { CREATION_ERRORS } from '../packages/rules/src/index';
+import { prepareBattleFixture, BATTLE_PREPARATION_TICK } from '../apps/engine/test/battleFixture';
+import { settleFixtureBattles, tacticalCommandInitial } from './fixtures/tactical';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
@@ -26,7 +28,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await app.close();
   await db.world.deleteMany({ where: { id: { in: worlds } } });
-  await db.user.deleteMany({ where: { id: { in: users } } });
+  await db.user.deleteMany({ where: { id: { in: users }, heritageAccount: { is: null } } });
   await db.$disconnect();
 });
 async function identity() {
@@ -50,10 +52,19 @@ async function request(path: string, input: unknown, cookie?: string) {
       ...(mutation ? { body: JSON.stringify({ 0: input }) } : {}),
     },
   );
-  const [body] = await response.json();
+  const [body] = JSON.parse(await response.text());
   return { data: body.result?.data, code: body.error?.data.code, message: body.error?.message };
 }
-const creation = { name: '기수시험장수', leadership: 55, strength: 55, intel: 55, portraitId: 10001 };
+const creation = {
+  name: '기수시험장수',
+  leadership: 55,
+  strength: 55,
+  intel: 55,
+  sex: 'MALE' as const,
+  politics: 55,
+  charm: 55,
+  portraitId: 10001,
+};
 const turns = () => Array.from({ length: 30 }, () => null as null | { commandKey: string; args: object });
 async function state(worldId: string) {
   return {
@@ -137,16 +148,36 @@ it('같은 사람 판에서 realtime 턴·가속·예턴 편집·충돌·정지�
   const queue = turns();
   queue[0] = { commandKey: 'farm', args: {} };
   queue[1] = { commandKey: 'commerce', args: {} };
-  expect((await request('turns.set', { worldId, revision: 0, slots: queue }, a.cookie)).data.ok).toBe(true);
+  expect(
+    (
+      await request(
+        'turns.set',
+        {
+          worldId,
+          revision: (await db.general.findUniqueOrThrow({ where: { worldId_userId: { worldId, userId: a.id } } }))
+            .turnRevision,
+          slots: queue,
+        },
+        a.cookie,
+      )
+    ).data.ok,
+  ).toBe(true);
   const lease = (await acquireLease(db, worldId))!;
   try {
     const loop = new TurnLoop(db, lease);
     await loop.advanceTo(100);
-    expect((await db.generalLog.findFirstOrThrow({ where: { worldId } })).commandKey).toBe('farm');
+    expect(
+      (await db.generalLog.findFirstOrThrow({ where: { worldId, commandKey: { not: 'general.possess' } } })).commandKey,
+    ).toBe('farm');
     await loop.advanceTo(10100);
     await loop.advanceTo(20100);
     expect(
-      (await db.generalLog.findMany({ where: { worldId }, orderBy: { tick: 'asc' } })).map((log) => log.commandKey),
+      (
+        await db.generalLog.findMany({
+          where: { worldId, commandKey: { not: 'general.possess' } },
+          orderBy: { tick: 'asc' },
+        })
+      ).map((log) => log.commandKey),
     ).toEqual(['farm', 'commerce', 'rest']);
     await controlClock(db, worldId, 'accelerate');
     expect((await request('home.get', { worldId }, a.cookie)).data.nextTurnAt).toBeNull();
@@ -190,7 +221,20 @@ it('가속 턴 commit과 겹친 API edit는 STALE이며 재시도한 편집은 �
   await controlClock(db, worldId, 'accelerate');
   const slots = turns();
   slots[0] = { commandKey: 'farm', args: {} };
-  expect((await request('turns.set', { worldId, revision: 0, slots }, a.cookie)).data.ok).toBe(true);
+  expect(
+    (
+      await request(
+        'turns.set',
+        {
+          worldId,
+          revision: (await db.general.findUniqueOrThrow({ where: { worldId_userId: { worldId, userId: a.id } } }))
+            .turnRevision,
+          slots,
+        },
+        a.cookie,
+      )
+    ).data.ok,
+  ).toBe(true);
   const lease = (await acquireLease(db, worldId))!;
   let reached!: () => void, release!: () => void;
   const barrier = new Promise<void>((resolve) => {
@@ -255,7 +299,7 @@ it('가속 턴 commit과 겹친 API edit는 STALE이며 재시도한 편집은 �
     expect((await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } })).turnRevision).toBe(
       saved.data.revision + 1,
     );
-    expect(await db.inputEvent.count({ where: { worldId } })).toBe(2);
+    expect(await db.inputEvent.count({ where: { worldId, kind: { not: 'general.possess' } } })).toBe(2);
   } finally {
     release();
     await releaseLease(db, lease);
@@ -265,41 +309,73 @@ it('가속 턴 commit과 겹친 API edit는 STALE이며 재시도한 편집은 �
 it('마지막 정산 뒤 API 예턴·장수 생성을 포함해 장수 턴 통일을 재생하고 종료 뒤 입력은 기록 없이 거부한다', async () => {
   const a = await identity(),
     b = await identity();
-  const initial = await seasonInitial('UNIFIED');
+  const initial = tacticalCommandInitial();
+  initial.cities[1]!.wall = 0;
+  // 마지막 적국의 도시를 얻는 순간 모든 경제 도시가 같은 국가 소유가 된다.
+  initial.cities[2]!.nationId = 1;
+  // 실제 모집 준비가 쓰는 세수 설정을 원생성 지도 사본에도 함께 기록한다.
+  for (const city of initial.cities) {
+    city.commerce = city.commerceMax = city.agriculture = city.agricultureMax = 2_000_000;
+    const site = initial.operationalMap!.sites.find((site) => site.kind === 'CITY' && site.anchorKey === city.cityKey)!;
+    if (site.kind !== 'CITY') throw Error('기수 전투 준비 도시가 없습니다.');
+    site.initial.commerce = site.max.commerce = city.commerce;
+    site.initial.agriculture = site.max.agriculture = city.agriculture;
+    site.initial.wall = city.wall;
+  }
   initial.generals[0]!.userId = a.id;
-  const { worldId } = await saveInitialWorld(db, initial, {
-    name: '종료 입력 재생',
-    turnTermMinutes: 60,
-    endYear: initial.startYear,
-  });
+  const prepared = await prepareBattleFixture(db, initial, [
+    { generalId: 1, troops: 2000, crewType: 1100 },
+    { generalId: 2, troops: 20, crewType: 1100 },
+    { generalId: 3, troops: 10, crewType: 1100 },
+  ]);
+  const { worldId } = prepared;
+  users.push(...prepared.users);
   worlds.push(worldId);
-  await controlClock(db, worldId, 'start');
-  const lease = (await acquireLease(db, worldId))!;
+  let lease = prepared.lease;
   try {
     const loop = new TurnLoop(db, lease);
-    await loop.advanceTo(10000);
+    expect(await db.nation.count({ where: { worldId } })).toBe(2);
+    const checkpointSequence = (await db.world.findUniqueOrThrow({ where: { id: worldId } })).actionSequence;
     const mine = (await request('turns.get', { worldId }, a.cookie)).data;
     const queue = turns();
     queue[0] = { commandKey: 'attack', args: { cityKey: 2 } };
     expect((await request('turns.set', { worldId, revision: mine.revision, slots: queue }, a.cookie)).data.ok).toBe(
       true,
     );
-    const creating = request('general.create', { worldId, ...creation }, b.cookie);
+    const creating = request('general.create', { worldId, ...creation, portraitId: null }, b.cookie);
     const deadline = performance.now() + 5000;
     while (!(await db.inputEvent.count({ where: { worldId, status: 'PENDING' } }))) {
       if (performance.now() > deadline) throw new Error('장수 생성 접수 대기 시간 초과');
       await delay(10);
     }
-    await loop.advanceTo(10001);
+    await loop.advanceTo(BATTLE_PREPARATION_TICK + 1);
     expect((await creating).code).toBeUndefined();
-    await loop.advanceTo(20000);
+    const attacker = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
+    await loop.advanceTo(attacker.nextTurnTick);
+    await releaseLease(db, lease);
+    await settleFixtureBattles(db, worldId);
+    lease = (await acquireLease(db, worldId))!;
+    const nextGeneral = await db.general.findFirstOrThrow({
+      where: { worldId, removedAt: null, activeFromYear: { lte: initial.startYear } },
+      orderBy: [{ nextTurnTick: 'asc' }, { id: 'asc' }],
+    });
+    await new TurnLoop(db, lease).advanceTo(nextGeneral.nextTurnTick);
     const archive = await exportReplay(db, worldId);
-    expect(archive.months).toHaveLength(1);
-    expect(archive.inputs.map((i) => i.kind)).toEqual(['turns.set', 'general.create']);
+    expect(archive.months).toHaveLength(BATTLE_PREPARATION_TICK / 10000);
+    const settled = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+    const battles = (settled.campaignState as { tactical?: { battles: unknown[] } }).tactical?.battles;
+    const attackLogs = await db.generalLog.findMany({
+      where: { worldId, generalId: 1, commandKey: 'attack' },
+      select: { tick: true, kind: true, text: true },
+    });
+    expect(archive.end?.reason, JSON.stringify({ battles, attackLogs })).toBe('UNIFIED');
+    expect(
+      archive.inputs.filter((i) => i.sequence > checkpointSequence && i.kind !== 'battle.step').map((i) => i.kind),
+    ).toEqual(['turns.set', 'general.create']);
     expect(replayToEnd(JSON.parse(JSON.stringify(archive)))).toEqual(archive.end);
     for (const kind of ['turns.set', 'general.create']) {
       const missing = structuredClone(archive);
-      missing.inputs = missing.inputs.filter((i) => i.kind !== kind);
+      missing.inputs = missing.inputs.filter((i) => i.kind !== kind || i.sequence <= checkpointSequence);
       expect(() => replayToEnd(missing)).toThrow();
     }
     const before = await state(worldId);

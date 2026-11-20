@@ -1,10 +1,14 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { Prisma, PrismaClient } from '@opensamguk/db';
 import type { Lease } from './lease';
-import { processPendingInput } from './inputs';
+import { processInputs } from './inputs';
+import { storedFixture } from '../test/storedFixture';
+import initialJson from '../test/fixtures/monthly-initial.json';
+import type { WorldInit } from '@opensamguk/rules';
 import { TurnLoop } from './turnLoop';
 
-vi.mock('./inputs', () => ({ processPendingInput: vi.fn().mockResolvedValue(null) }));
+vi.mock('./inputs', () => ({ processInputs: vi.fn().mockResolvedValue(null) }));
+vi.mock('./admin/executor', () => ({ processAdminInputs: vi.fn().mockResolvedValue(null) }));
 vi.mock('./worldLoader', () => ({ loadWorld: vi.fn().mockResolvedValue({}) }));
 vi.mock('./lease', async (original) => ({
   ...(await original<typeof import('./lease')>()),
@@ -19,13 +23,13 @@ beforeEach(() => vi.clearAllMocks());
 function fixture(status: 'PAUSED' | 'RUNNING', human: boolean, modern = false) {
   const world = {
     id: 'binding-world',
-    replayFormat: 1,
-    ruleFeatures: [],
+    ...storedFixture(initialJson.initial as unknown as WorldInit, 30).world,
+
     status,
     preset: null,
     treatyFormat: null,
     personnelFormat: null,
-    replayOrigin: null,
+
     endYear: null,
     outcomeFromSequence: 0,
     policyFromSequence: modern ? 0 : null,
@@ -39,14 +43,16 @@ function fixture(status: 'PAUSED' | 'RUNNING', human: boolean, modern = false) {
   };
   let locked = false;
   const tx = {
+    logisticsMovement: { groupBy: async () => [] },
     $queryRaw: vi.fn(async (strings: TemplateStringsArray, ...values: unknown[]) => {
       const sql = strings.join('?').trim().replace(/\s+/g, ' ');
       if (values.length !== 1 || values[0] !== world.id) throw new Error(`예상하지 않은 원시 조회 인자: ${sql}`);
-      if (sql === 'SELECT id FROM "World" WHERE id = ? FOR UPDATE') {
+      if (sql === 'SELECT * FROM "World" WHERE id = ? FOR UPDATE') {
         locked = true;
-        return undefined;
+        return [world];
       }
-      if (locked && sql === 'SELECT "key", "value" FROM "WorldExtSlice" WHERE "worldId" = ? ORDER BY "key"') return [];
+      if (locked && sql === 'SELECT "key", "value" FROM "WorldExtSlice" WHERE "worldId" = ? ORDER BY "key"')
+        return [{ key: 'intel', value: {} }];
       throw new Error(`예상하지 않은 원시 조회: ${sql}`);
     }),
     world: { findUniqueOrThrow: vi.fn().mockResolvedValue(world) },
@@ -57,6 +63,7 @@ function fixture(status: 'PAUSED' | 'RUNNING', human: boolean, modern = false) {
       }),
     },
     general: { findFirst: vi.fn().mockResolvedValue(human ? { id: 1 } : null) },
+    city: { findMany: async () => initialJson.initial.cities },
   };
   const db = { $transaction: vi.fn(async (run: (value: typeof tx) => unknown) => run(tx)) };
   const loop = new TurnLoop(db as unknown as PrismaClient, { worldId: world.id } as Lease);
@@ -66,32 +73,37 @@ function fixture(status: 'PAUSED' | 'RUNNING', human: boolean, modern = false) {
 it.each(['PAUSED', 'RUNNING'] as const)('%s 정상 사람 호출은 지평과 구분한 잠근 T를 넘긴다', async (status) => {
   const f = fixture(status, true);
   await f.run();
-  expect(processPendingInput).toHaveBeenCalledExactlyOnceWith(f.tx, f.world, status === 'PAUSED' ? 600 : 999, 600);
-  expect(f.tx.general.findFirst).toHaveBeenCalledExactlyOnceWith({
-    where: { worldId: f.world.id, userId: { not: null } },
-    select: { id: true },
-  });
+  expect(processInputs).toHaveBeenCalledExactlyOnceWith(
+    f.tx,
+    f.world,
+    status === 'PAUSED' ? 600 : 999,
+    undefined,
+    expect.any(Function),
+  );
+  expect(f.tx.general.findFirst).not.toHaveBeenCalled();
 });
 
 it.each(['PAUSED', 'RUNNING'] as const)('%s 정상 NPC 호출에는 사람 기준을 넣지 않는다', async (status) => {
   const f = fixture(status, false);
   await f.run();
-  expect(processPendingInput).toHaveBeenCalledExactlyOnceWith(
+  expect(processInputs).toHaveBeenCalledExactlyOnceWith(
     f.tx,
     f.world,
     status === 'PAUSED' ? 600 : 999,
     undefined,
+    expect.any(Function),
   );
 });
 
 it.each(['PAUSED', 'RUNNING'] as const)('%s 방침 모드는 사람 기준 조회를 더하지 않는다', async (status) => {
   const f = fixture(status, true, true);
   await f.run();
-  expect(processPendingInput).toHaveBeenCalledExactlyOnceWith(
+  expect(processInputs).toHaveBeenCalledExactlyOnceWith(
     f.tx,
     f.world,
     status === 'PAUSED' ? 600 : 999,
     undefined,
+    expect.any(Function),
   );
   expect(f.tx.general.findFirst).not.toHaveBeenCalled();
 });

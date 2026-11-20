@@ -16,35 +16,26 @@ type World = Prisma.WorldGetPayload<Record<string, never>>;
 
 export { readLogisticsOriginConfig } from '@opensamguk/rules';
 
-export function readStoredLogistics(
-  value: unknown,
-  state: Pick<WorldView, 'cities' | 'ruleFeatures'>,
-  config?: LogisticsConfig,
-) {
-  if (!state.ruleFeatures?.includes('logistics-v1')) {
-    if (value !== null && value !== undefined) throw new Error('물류 기능을 끈 월드에 저장 상태가 있습니다.');
-    return undefined;
-  }
-  if (!state.ruleFeatures.includes('city-resources-v1') || !config)
-    throw new Error('물류의 의존 기능·생성 설정이 없습니다.');
+export function readStoredLogistics(value: unknown, state: Pick<WorldView, 'cities'>, config?: LogisticsConfig) {
+  if (!config) throw new Error('물류의 의존 기능·생성 설정이 없습니다.');
   const stored = readLogisticsState(value, state);
   if (JSON.stringify(stored.config) !== JSON.stringify(config)) throw new Error('물류 설정이 원생성과 다릅니다.');
   return stored;
 }
 
-export async function assertStoredLogistics(tx: Prisma.TransactionClient, world: World): Promise<void> {
-  if (!world.ruleFeatures.includes('logistics-v1')) {
-    readStoredLogistics(world.logisticsState, { cities: {}, ruleFeatures: world.ruleFeatures });
-    return;
-  }
-  const cities = await tx.city.findMany({ where: { worldId: world.id } });
+export async function assertStoredLogistics(
+  tx: Prisma.TransactionClient,
+  world: World,
+  loadedCities?: Prisma.CityGetPayload<Record<string, never>>[],
+): Promise<void> {
+  const cities = loadedCities ?? (await tx.city.findMany({ where: { worldId: world.id } }));
   const attached = attachOperationalKinds(
     cities,
-    readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin),
+    readOperationalMap(world.operationalMap, world.replayOrigin),
+    world.campaignState,
   );
   const state = {
     cities: Object.fromEntries(attached.map((city) => [city.cityKey, city])),
-    ruleFeatures: world.ruleFeatures,
   };
   const stored = readStoredLogistics(world.logisticsState, state, readLogisticsOriginConfig(world, state));
   if (stored!.monthlyTick !== world.monthlyTick) throw new Error('저장된 물류와 월 정산 tick이 다릅니다.');
@@ -81,13 +72,7 @@ export async function persistLogisticsState(
   next: WorldView,
 ) {
   if (!before.logistics && !next.logistics) return;
-  if (
-    !before.logistics ||
-    !next.logistics ||
-    !before.ruleFeatures?.includes('logistics-v1') ||
-    !next.ruleFeatures?.includes('logistics-v1')
-  )
-    throw new Error('진행 중 물류 기능을 바꿀 수 없습니다.');
+  if (!before.logistics || !next.logistics) throw new Error('진행 중 물류 기능을 바꿀 수 없습니다.');
   const original = readLogisticsState(before.logistics, before),
     final = readLogisticsState(next.logistics, next);
   if (JSON.stringify(original.config) !== JSON.stringify(final.config))

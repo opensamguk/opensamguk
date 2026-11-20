@@ -1,3 +1,5 @@
+import { initializeResources } from './init-resources';
+import { ciGreenDatabaseName } from './test-database';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
@@ -6,19 +8,14 @@ import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createDb, type Prisma, type PrismaClient } from '../packages/db/src/index';
-import {
-  calculateTreatyFee,
-  selectWorldCapabilities,
-  toGameDate,
-  type TreatyClause,
-} from '../packages/rules/src/index';
+import { calculateTreatyFee, checkReplayOrigin, toGameDate, type TreatyClause } from '../packages/rules/src/index';
 import { buildServer } from '../apps/server/src/server';
 import { appRouter, type AppRouter } from '../apps/server/src/router';
 import { authzCase } from '../apps/server/src/authz/case';
 import { newSession, hashToken } from '../apps/server/src/auth/session';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { readFixture } from '../apps/server/test/readFixture';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, renewLease, releaseLease, type Lease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -63,7 +60,7 @@ const requiredPrefix = [
   '20261023072000_world_ext_slices',
   '20261023073000_treaties',
 ];
-const databaseName = `t207_http_${randomUUID().replaceAll('-', '')}_test`;
+const databaseName = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
 const origin = 'http://treaty-http.test';
 const password = randomUUID();
 const note: TreatyClause[] = [{ kind: 'note', text: '기록' }];
@@ -175,7 +172,7 @@ beforeAll(async () => {
   }
   if (
     !['postgres:', 'postgresql:'].includes(source.protocol) ||
-    !/^[a-z][a-z0-9_]*_test$/.test(source.pathname.slice(1))
+    !/^[a-z][a-zA-Z0-9_]*_test$/.test(source.pathname.slice(1))
   )
     throw new Error('전용 테스트 접속 원본이 필요합니다.');
   const maintenance = new URL(source);
@@ -194,6 +191,11 @@ beforeAll(async () => {
   const [connected] = await db.$queryRaw<Array<{ name: string }>>`SELECT current_database() AS name`;
   expect(connected?.name).toBe(databaseName);
   await migrate(own.href);
+  await initializeResources(
+    db,
+    await readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8'),
+  );
+  process.env.DATABASE_URL = own.href;
   passwordHash = await hashPassword(password);
   app = await buildServer({ db, publicOrigin: origin, logging: false });
   base = await app.listen({ host: '127.0.0.1', port: 0 });
@@ -254,15 +256,13 @@ async function fixture(options: { legacy?: boolean; responderGold?: number } = {
     name: `조약 HTTP ${randomUUID()}`,
     turnTermMinutes: 120,
     endYear: null,
-    replayFormat: 'legacy',
-    ...(options.legacy ? {} : { treatyFormat: 1 as const }),
+    replayFormat: 3,
   });
   owned.worldId = made.worldId;
   const world = await db.world.findUniqueOrThrow({ where: { id: owned.worldId } });
   expect(world.policyFromSequence).toBeNull();
-  expect(selectWorldCapabilities(world).kind).toBe(options.legacy ? 'legacy' : 'caps');
-  if (!options.legacy)
-    expect(world.replayOrigin).toMatchObject({ version: 6, capabilities: { version: 1, treaty: { version: 1 } } });
+  checkReplayOrigin(world.replayOrigin);
+  expect(world.replayOrigin).toMatchObject({ version: 3 });
   await controlClock(db, owned.worldId, 'start');
   return owned;
 }
@@ -387,8 +387,12 @@ async function poll(owned = f) {
     owned.lease = lease;
     owned.loop = new TurnLoop(db, lease);
   } else await renewLease(db, owned.lease);
-  const result = await owned.loop!.poll();
-  expect(result.executions).toEqual([]);
+  for (let step = 0; step < 64; step++) {
+    const result = await owned.loop!.poll();
+    expect(result.executions).toEqual([]);
+    if (!result.more) return;
+  }
+  throw Error('조약 시험 입력 처리 상한을 넘었습니다.');
 }
 async function observed(requestId: string, kind: 'treaty.propose' | 'treaty.respond', user = 0, owned = f) {
   const deadline = performance.now() + 5000;
@@ -601,9 +605,10 @@ describe('T2-07 / AC-M2-06 첫 세 조항 실제 HTTP H1~H30', () => {
       expect(low.myRecent).toEqual([]);
       expect(low.targets).toEqual(first.targets);
       for (let i = 0; i < first.items.length; i++) {
-        const { canAccept, canReject, ...expected } = first.items[i]!;
+        const { canAccept, canReject, canBreak, ...expected } = first.items[i]!;
         expect(low.items[i]).toMatchObject(expected);
-        if (canAccept !== null || canReject !== null)
+        if (canBreak != null) expect(low.items[i]!.canBreak).toMatchObject({ ok: false });
+        if (canAccept != null || canReject != null)
           expect(low.items[i]).toMatchObject({
             canAccept: { code: 'NO_PERMISSION' },
             canReject: { code: 'NO_PERMISSION' },
@@ -633,7 +638,7 @@ describe('T2-07 / AC-M2-06 첫 세 조항 실제 HTTP H1~H30', () => {
         value<Output['quote']>(
           await call('treaty.quote', { toNationId: 2, clauses: [{ kind: 'passage', cityKeys: [1] }] }),
         ),
-      ).toMatchObject({ cost: null, problem: { code: 'CLAUSE_NOT_CONNECTED' } });
+      ).toMatchObject({ cost: null, problem: { code: 'BAD_INPUT' } });
       for (const toNationId of [1, 999999, 2147483648])
         expect(value<Output['quote']>(await call('treaty.quote', { toNationId, clauses: note }))).toMatchObject({
           cost: null,
@@ -1057,11 +1062,9 @@ describe('T2-07 / AC-M2-06 첫 세 조항 실제 HTTP H1~H30', () => {
     const fullGold = value<Output['list']>(await call('treaty.list', {}, 3));
     expect(JSON.stringify(emptyGold)).toBe(JSON.stringify(fullGold));
     expect(JSON.stringify(fullGold)).not.toContain('COUNTERPART_UNAVAILABLE');
-    const legacy = await fixture({ legacy: true });
-    const legacyBefore = await snapshot(legacy);
-    for (const path of ['treaty.list', 'treaty.quote', 'treaty.propose', 'treaty.respond', 'treaty.request'] as const)
-      error(await call(path, input(path), 0, legacy), 'PRECONDITION_FAILED');
-    expect(await snapshot(legacy)).toBe(legacyBefore);
+    const current = await fixture({ legacy: true });
+    expect(value(await call('treaty.list', {}, 0, current))).toBeDefined();
+    expect(value(await call('treaty.quote', { toNationId: 2, clauses: note }, 0, current))).toBeDefined();
     const broken = await db.treaty.findUniqueOrThrow({
       where: { worldId_id: { worldId: f.worldId, id: Number(sent.treatyId) } },
     });

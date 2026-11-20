@@ -69,7 +69,7 @@ export async function resetControls(page: Page, stack: LegalStack, worldId: stri
 export async function confirmReset(dialog: Locator, name: string, reason = '실제 초기화 화면 인수') {
   await dialog.getByLabel('현재 월드 이름 그대로 입력', { exact: true }).fill(name);
   await dialog.getByLabel('초기화 사유 (1~200자)', { exact: true }).fill(reason);
-  await dialog.getByRole('checkbox', { name: '대상·상태·사유와 초기화의 영향을 확인했습니다.', exact: true }).check();
+  await dialog.getByRole('checkbox', { name: '대상, 상태, 사유와 초기화의 영향을 확인했습니다.', exact: true }).check();
 }
 export const resetSubmit = (dialog: Locator) =>
   dialog.getByRole('button', { name: '월드 초기화 요청 확정', exact: true });

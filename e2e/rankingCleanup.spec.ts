@@ -116,24 +116,23 @@ test.describe('실제 PostgreSQL', () => {
 
   // PREOPEN 월드는 감독이 찾지 않으므로 이 시험 말고는 아무도 이 월드의 행을 잠그지 않는다.
   async function createWorld(): Promise<string> {
-    const world = await db.world.create({
-      data: {
-        name: 'E2E 순위 정리',
-        scenarioKey: 'e2e-cleanup',
-        mapKey: 'e2e-cleanup',
-        unitSetKey: 'e2e-cleanup',
-        seed: randomUUID(),
-        startYear: 190,
-        turnTermMinutes: 60,
-        initialStateHash: 'e2e-cleanup',
-        statRules: {},
-        unitSet: {},
-        engineHeartbeat: { create: { at: new Date(), lastTick: 0, lagMs: 0 } },
-      },
-      select: { id: true },
+    // 늘 켠 규칙의 필수 원장(World_campaignState_rules_check)이 있어야 하므로 빈 World 대신 공식 생성 경로로 만든다.
+    const [{ monthlyFixture }, { saveFixtureWorld }] = await Promise.all([
+      import('../apps/engine/test/monthlyFixture'),
+      import('./worldFixture'),
+    ]);
+    const { worldId } = await saveFixtureWorld(db, await monthlyFixture(), {
+      name: 'E2E 순위 정리',
+      turnTermMinutes: 60,
+      endYear: null,
     });
-    made.push(world.id);
-    return world.id;
+    made.push(worldId);
+    await db.engineHeartbeat.upsert({
+      where: { worldId },
+      create: { worldId, at: new Date(), lastTick: 0, lagMs: 0 },
+      update: {},
+    });
+    return worldId;
   }
 
   // worldId를 가진 모든 표에서 이 ID들의 행 수. World 자신도 더한다.

@@ -1,16 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
-import { rngFor } from '@opensamguk/shared';
 import { hashState } from '@opensamguk/shared/node';
 import {
   buildYearbook,
+  settleReplayMonth,
   monthlyDate,
-  runMonthly,
   settleDiplomacy,
   settleIncome,
   settlePopulation,
   settleSupply,
-  toWorldState,
   initialReplayState,
   runReplayAction,
   applyRecordedInput,
@@ -20,45 +18,19 @@ import { monthlyFixture } from '../test/monthlyFixture';
 import { replayArchive, resourceHash, type ReplayArchive } from './replay';
 
 describe('AC-M1-12 월간 정산 규칙', () => {
-  it('고정 시드 1개월 골든과 단계별 합성이 같다', async () => {
+  it('AC-INT-28 모든 규칙의 1개월 정산을 골든과 비교한다', async () => {
     const initial = await monthlyFixture();
-    const before = toWorldState(initial);
+    const before = initialReplayState(initial);
     const original = hashState(before);
-    const date = { year: initial.startYear, month: 1 };
-    const result = runMonthly(before, 10000, rngFor(initial.seed, 'monthly', date.year, date.month));
-    expect(result.stages).toEqual(['income', 'population', 'supply', 'diplomacy', 'yearbook']);
-    const composed = settleDiplomacy(settleSupply(settlePopulation(settleIncome(before, date))), 10000);
-    composed.generals[3]!.nextTurnTick = 10500;
-    expect(result.state).toEqual(composed);
-    expect(result.yearbook).toEqual(buildYearbook(composed, initial.startYear));
+    const replay = settleReplayMonth(before, initial.seed, 10000).replay;
     expect(hashState(before)).toBe(original);
-    expect({
-      date: result.date,
-      yearbook: result.yearbook,
-      cities: Object.values(result.state.cities).map(
-        ({ cityKey, population, agriculture, commerce, trust, supplied }) => ({
-          cityKey,
-          population,
-          agriculture,
-          commerce,
-          trust,
-          supplied,
-        }),
-      ),
-      generals: Object.values(result.state.generals).map(({ id, gold, rice, train, atmos, nextTurnTick }) => ({
-        id,
-        gold,
-        rice,
-        train,
-        atmos,
-        nextTurnTick,
-      })),
-      diplomacies: result.state.diplomacies,
-    }).toEqual(JSON.parse(await readFile(new URL('../test/fixtures/monthly-golden.json', import.meta.url), 'utf8')));
+    expect({ stateHash: hashState(replay), replay }).toEqual(
+      JSON.parse(await readFile(new URL('../test/fixtures/monthly-golden.json', import.meta.url), 'utf8')),
+    );
   });
 
   it.each([1, 7, 4, 10, 2, 12])('반기 세입 %i월, 수입은 인구 증가 전에 계산한다', async (month) => {
-    const before = toWorldState(await monthlyFixture());
+    const before = initialReplayState(await monthlyFixture()).state;
     const next = settleIncome(before, { year: before.startYear, month });
     expect(next.nations[1]!.gold).toBe([1, 7].includes(month) ? 120 : 100);
     expect(next.nations[1]!.rice).toBe([4, 10].includes(month) ? 240 : 200);
@@ -67,10 +39,10 @@ describe('AC-M1-12 월간 정산 규칙', () => {
   });
 
   it('장수가 없는 국가는 세입 전액을 보관하고 봉급 나머지도 보존한다', async () => {
-    const before = toWorldState(await monthlyFixture());
+    const before = initialReplayState(await monthlyFixture()).state;
     before.generals = {};
     expect(settleIncome(before, { year: before.startYear, month: 1 }).nations[1]!.gold).toBe(140);
-    before.generals = toWorldState(await monthlyFixture()).generals;
+    before.generals = initialReplayState(await monthlyFixture()).state.generals;
     before.generals[3]!.activeFromYear = before.startYear;
     before.cities[1]!.commerce = 105;
     const next = settleIncome(before, { year: before.startYear, month: 1 });
@@ -78,7 +50,7 @@ describe('AC-M1-12 월간 정산 규칙', () => {
   });
 
   it('인구·민심 반올림과 상하한, 높은 세율과 낮은 세율', async () => {
-    const before = toWorldState(await monthlyFixture());
+    const before = initialReplayState(await monthlyFixture()).state;
     expect(settlePopulation(before, 0.05).cities[1]).toMatchObject({ population: 1020, trust: 82 });
     expect(settlePopulation(before, 0.3).cities[1]!.trust).toBe(79);
     before.cities[1]!.population = 3000;
@@ -87,7 +59,7 @@ describe('AC-M1-12 월간 정산 규칙', () => {
   });
 
   it('수도-A-B 단절·우회·회복과 재야 도시, 수도 상실', async () => {
-    const before = toWorldState(await monthlyFixture());
+    const before = initialReplayState(await monthlyFixture()).state;
     expect(settleSupply(before).cities[3]!.supplied).toBe(false);
     before.cities[1]!.connections.push(3);
     before.cities[3]!.connections.push(1);
@@ -99,7 +71,7 @@ describe('AC-M1-12 월간 정산 규칙', () => {
   });
 
   it('외교는 경계에서 선포를 교전으로, 불가침을 중립으로 바꾸고 전쟁은 유지한다', async () => {
-    const before = toWorldState(await monthlyFixture());
+    const before = initialReplayState(await monthlyFixture()).state;
     expect(settleDiplomacy(before, 9999).diplomacies[0]!.state).toBe('DECLARED');
     expect(settleDiplomacy(before, 10000).diplomacies[0]!.state).toBe('WAR');
     before.diplomacies[0]!.state = 'NON_AGGRESSION';
@@ -119,7 +91,7 @@ describe('AC-M1-12 월간 정산 규칙', () => {
 describe('AC-M1-13 재생 기록 검사', () => {
   it('같은 시드 12개월을 비교하고 변조·누락·순서·revision 오류를 거부한다', async () => {
     const initial = await monthlyFixture();
-    let replay = initialReplayState(initial);
+    let replay = initialReplayState(initial, {});
     const archive: ReplayArchive = {
       version: 1,
       origin: { version: 1, initial, initialStateHash: hashState(initial), resourceHash: resourceHash(initial) },
@@ -157,8 +129,8 @@ describe('AC-M1-13 재생 기록 검사', () => {
         generalId: 1,
         kind: 'turns.set',
         status: 'APPLIED',
-        payload: { revision: 0, turns: emptyTurns() },
-        result: { revision: 1 },
+        payload: { revision: 0, turns: emptyTurns().map((turn) => ({ ...turn, explicit: false })) },
+        result: { revision: 1, activeTick: 0 },
       }),
     ).toThrow('revision');
   });

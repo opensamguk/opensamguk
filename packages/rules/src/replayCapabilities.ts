@@ -232,7 +232,7 @@ export function startCapsReplay(origin: CapsOrigin, selection: CapabilitySelecti
   const selected = selectionSchema.parse(selection);
   const { policy, ...base } = selected;
   if (!sameCanonical(supported, base)) throw new Error('생성 기록과 기능 선택이 다릅니다.');
-  const replay = initialReplayState(parsed.initial);
+  const replay = initialReplayState(parsed.initial, {});
   return policy?.fromSequence === 0 ? enableReplayPolicy(replay, policy.turnTermMinutes, 0) : replay;
 }
 

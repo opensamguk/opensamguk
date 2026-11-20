@@ -1,3 +1,4 @@
+import { ciGreenDatabaseName } from './test-database';
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { readFile, readdir } from 'node:fs/promises';
@@ -29,8 +30,8 @@ async function ownDatabase(run: (client: PgClient) => Promise<void>) {
     target.searchParams.has('port')
   )
     throw Error('loopback 전용 DB를 확인하세요.');
-  const name = `cards_upgrade_${randomUUID().replaceAll('-', '')}_test`;
-  if (!/^cards_upgrade_[a-f0-9]{32}_test$/.test(name)) throw Error('생성할 DB 이름을 확인하세요.');
+  const name = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
+  if (!/^opensamguk_ci_green_[a-zA-Z0-9]+_test$/.test(name)) throw Error('생성할 DB 이름을 확인하세요.');
   target.pathname = `/${name}`;
   adminUrl.pathname = '/postgres';
   const admin = new Client({ connectionString: adminUrl.href }),
@@ -133,7 +134,7 @@ it.each(['empty', 'upgrade'] as const)(
           )
         ).rows,
       ).toEqual([{ data_type: 'jsonb', is_nullable: 'YES', column_default: null }]);
-      for (const name of names.slice(markerIndex + 1))
+      for (const name of names.slice(markerIndex + 1).filter((name) => name < '20261223000000_always_on_rules'))
         await client.query(await readFile(new URL(`${name}/migration.sql`, directory), 'utf8'));
       expect(
         (await client.query('SELECT * FROM "World" ORDER BY id')).rows.map(

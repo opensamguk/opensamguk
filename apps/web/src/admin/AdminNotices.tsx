@@ -56,7 +56,7 @@ export function AdminNotices() {
     enableBeforeUnload: command !== null,
     shouldBlockFn: ({ next }) => {
       if (['/login', '/verify-email', '/legal/agree'].includes(next.pathname)) return false;
-      setError('공지를 처리한 결과를 먼저 확인하세요. 같은 요청 다시 확인으로 이어갈 수 있습니다.');
+      setError('공지를 처리한 결과를 먼저 확인하세요. 같은 요청 다시 확인을 눌러 주세요.');
       return true;
     },
   });
@@ -218,7 +218,9 @@ export function AdminNotices() {
   return (
     <section>
       <h2>공지 관리</h2>
-      <p>로비 또는 월드 공지를 발행·수정·숨깁니다. 숨긴 공지와 감사 기록은 보존됩니다. 시각은 한국 시각입니다.</p>
+      <p>
+        로비나 월드 공지를 발행하고 수정하거나 숨깁니다. 숨긴 공지와 감사 기록은 보존됩니다. 시각은 한국 시각입니다.
+      </p>
       <form className={styles.form} onSubmit={chooseFilter}>
         <label>
           공지 범위
@@ -297,7 +299,7 @@ export function AdminNotices() {
                         setMessage(null);
                       }}
                     >
-                      수정·숨김 선택
+                      수정 또는 숨김
                     </button>
                   )}
                 </li>
@@ -378,7 +380,7 @@ export function AdminNotices() {
           ) : null}
         </>
       ) : (
-        <p>공지 범위를 조회한 뒤 작성할 수 있습니다.</p>
+        <p>공지 범위를 먼저 조회하세요.</p>
       )}
     </section>
   );

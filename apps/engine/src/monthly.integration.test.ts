@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import { saveFixtureWorld as saveInitialWorld } from '../test/worldFixture';
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
@@ -5,13 +7,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb, nextActionSequence, type Prisma } from '@opensamguk/db';
-import { emptyTurns, type WorldInit } from '@opensamguk/rules';
-import { hashState } from '@opensamguk/shared/node';
+import { emptyQueue, type WorldInit } from '@opensamguk/rules';
 import { monthlyFixture } from '../test/monthlyFixture';
 import { TurnLoop } from './turnLoop';
 import { acquireLease, LeaseLostError, releaseLease, renewLease } from './lease';
 import { controlClock } from './world/clock';
-import { saveInitialWorld, readWorldState } from './world/persistence';
+import { readWorldState } from './world/persistence';
 import { exportReplay, replayArchive } from './replay';
 import { appendNationHistory } from './commandPersistence';
 
@@ -19,19 +20,24 @@ const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
 const db = createDb(url);
 let template: WorldInit;
+const users: string[] = [];
 beforeAll(async () => {
   template = await monthlyFixture();
 });
 afterAll(async () => {
   await db.world.deleteMany();
-  await db.user.deleteMany({ where: { id: { startsWith: 'monthly-rest-human-' } } });
+  await db.user.deleteMany({ where: { id: { in: users } } });
   await db.$disconnect();
 });
 async function create(human = false) {
   const initial = structuredClone(template);
+  initial.generals[0]!.deathYear = initial.startYear + 100;
   if (human) {
     for (const general of initial.generals) {
-      general.userId = `monthly-rest-human-${general.id}`;
+      if (general.activeFromYear > initial.startYear) continue;
+      general.userId = randomUUID();
+      users.push(general.userId);
+      general.deathYear = initial.startYear + 100;
       await db.user.upsert({
         where: { id: general.userId },
         update: {},
@@ -40,7 +46,7 @@ async function create(human = false) {
     }
   }
   const { worldId } = await saveInitialWorld(db, initial, {
-    replayFormat: 'legacy',
+    replayFormat: 3,
     name: '월간 통합',
     turnTermMinutes: 60,
     endYear: null,
@@ -53,13 +59,12 @@ async function setTurns(worldId: string, commandKey: string, idempotencyKey: str
   return db.$transaction(async (tx) => {
     const sequence = await nextActionSequence(tx, worldId);
     const actor = await tx.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
-    const turns = emptyTurns();
-    turns[0] = { commandKey, args: {} };
+    const turns = emptyQueue();
+    turns[0] = { commandKey, args: {}, explicit: true };
     await tx.generalTurn.deleteMany({ where: { worldId, generalId: 1 } });
     await tx.generalTurn.createMany({
       data: turns.map((turn, slot) => ({
         ...turn,
-        explicit: true,
         args: turn.args as Prisma.InputJsonValue,
         slot,
         worldId,
@@ -77,7 +82,10 @@ async function setTurns(worldId: string, commandKey: string, idempotencyKey: str
         payload: { revision: actor.turnRevision, turns } as unknown as Prisma.InputJsonValue,
         status: 'APPLIED',
         sequence,
-        result: { revision: actor.turnRevision + 1 },
+        result: {
+          revision: actor.turnRevision + 1,
+          activeTick: (await tx.world.findUniqueOrThrow({ where: { id: worldId } })).clockTick,
+        },
       },
     });
   });
@@ -91,16 +99,16 @@ describe('AC-M1-12 실제 PostgreSQL 월 경계', () => {
       { generalId: 2, tick: 10000, commandKey: 'rest' },
     ]);
     const snapshot = await db.yearbookSnapshot.findFirstOrThrow({ where: { worldId } });
-    expect(snapshot).toMatchObject({ tick: 10000, year: 191, month: 1, sequence: 2 });
-    expect(await db.nationHistory.count({ where: { worldId } })).toBe(2);
+    expect(snapshot).toMatchObject({ tick: 10000, year: 191, month: 1, sequence: 4 });
+    expect(await db.nationHistory.count({ where: { worldId, tick: 10000 } })).toBe(2);
     expect(await db.world.findUniqueOrThrow({ where: { id: worldId } })).toMatchObject({
       monthlyTick: 10000,
-      actionSequence: 3,
+      actionSequence: 5,
     });
     expect(replayArchive(await exportReplay(db, worldId), 1)[0]!.stateHash).toBe(snapshot.stateHash);
     await loop.advanceTo(10000);
     expect(await db.yearbookSnapshot.count({ where: { worldId } })).toBe(1);
-    expect(await db.generalLog.count({ where: { worldId } })).toBe(2);
+    expect(await db.generalLog.count({ where: { worldId, tick: { gte: 100 } } })).toBe(2);
   });
 
   it('경계 tick에 먼저 저장한 사건과 월간 요약을 합치고 이후 사건도 보존한다', async () => {
@@ -222,35 +230,32 @@ describe('AC-M1-13 실제 DB 입력과 12개월 재생', () => {
     await setTurns(worldId, 'farm', 'first');
     await loop.advanceTo(100);
     await setTurns(worldId, 'commerce', 'second');
-    await db.$transaction(async (tx) => {
-      await tx.inputEvent.create({
-        data: {
-          worldId,
-          userId: 'test-actor',
-          kind: 'general.create',
-          idempotencyKey: 'rejected',
-          payload: {},
-          status: 'REJECTED',
-          sequence: await nextActionSequence(tx, worldId),
-          result: { code: 'INVALID' },
-        },
-      });
-      const general = { ...template.generals[0]!, id: 4, nationId: null, nextTurnTick: 500 };
-      await tx.general.create({ data: { ...general, worldId } });
-      await tx.inputEvent.create({
-        data: {
-          worldId,
-          userId: 'test-new-actor',
-          generalId: 4,
-          kind: 'general.create',
-          idempotencyKey: 'created',
-          payload: {},
-          status: 'APPLIED',
-          sequence: await nextActionSequence(tx, worldId),
-          result: { general },
-        },
-      });
+    const userId = randomUUID();
+    users.push(userId);
+    await db.user.upsert({
+      where: { id: userId },
+      update: {},
+      create: { id: userId, email: userId + '@example.invalid', passwordHash: 'test-only' },
     });
+    for (const [key, payload] of [
+      ['rejected', {}],
+      [
+        'created',
+        {
+          name: 'Input fixture',
+          leadership: 55,
+          strength: 55,
+          intel: 55,
+          politics: 55,
+          charm: 55,
+          sex: 'MALE',
+          portraitId: null,
+        },
+      ],
+    ] as const) {
+      await db.inputEvent.create({ data: { worldId, userId, kind: 'general.create', idempotencyKey: key, payload } });
+    }
+    await loop.advanceTo(100);
     for (let month = 1; month <= 12; month++) {
       await renewLease(db, lease);
       await loop.advanceTo(month * 10000);
@@ -324,6 +329,6 @@ describe('AC-M1-13 실제 DB 입력과 12개월 재생', () => {
     const { worldId } = await create();
     await db.$executeRaw`UPDATE "World" SET "replayOrigin" = NULL WHERE id = ${worldId}`;
     await expect(exportReplay(db, worldId)).rejects.toThrow('생성 기록');
-    expect(hashState(await readWorldState(db, worldId))).toBe(hashState(template));
+    await expect(readWorldState(db, worldId)).rejects.toThrow('생성 기록');
   });
 });

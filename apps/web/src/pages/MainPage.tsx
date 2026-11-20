@@ -125,7 +125,7 @@ export function MainPage() {
     generalCreationEnabled: mine.data?.creationRules.generalCreationEnabled,
     npcPlayEnabled: mine.data?.creationRules.npcPlayEnabled,
   });
-  const equipment = useEquipment(worldId, summary.data?.equipmentEnabled === true, home.data?.general.id);
+  const equipment = useEquipment(worldId, home.data?.general.id);
   const map = useWorldMap(worldId);
   const [turnStatus, setTurnStatus] = useState<TurnEditorStatus | null>(null);
   const turnStatusId = useId();
@@ -154,7 +154,7 @@ export function MainPage() {
   );
 
   // 지도에서 고른 도시는 이미 명령의 대상 도시 기본값이다. 여기서는 명령 칸으로 옮기기만 하고 바로 넣지 않는다.
-  // 고른 칸이 있으면 명령 찾기로, 없으면 칸 목록으로 간다 (칸에서 Enter를 누르면 명령 찾기로 간다).
+  // 고른 칸이 있으면 명령 띠의 첫 패로, 없으면 칸 목록으로 간다 (칸에서 Enter를 누르면 명령 띠로 간다).
   const editable = turnStatus?.kind === 'saved' || turnStatus?.kind === 'unsaved';
   const focusCommandTarget = () => {
     const area = page.current?.querySelector('[data-main-area="commands"]');
@@ -320,12 +320,7 @@ export function MainPage() {
           'menu',
           // 두 메뉴를 한 칸(격자 menu)에 쌓는다. 따로 두면 같은 격자 칸에 겹친다.
           <div className={styles.menuStack}>
-            <MainMenu
-              worldId={worldId}
-              nationId={homeData?.nation?.id ?? null}
-              campaignEnabled={mine.data?.creationRules.campaignEnabled === true}
-              cityKey={myCityKey}
-            />
+            <MainMenu worldId={worldId} nationId={homeData?.nation?.id ?? null} cityKey={myCityKey} />
             {/* 좁은 메인에는 게임 메뉴 막대가 없으므로 그 막대의 나머지 화면과 계정 조작을 여기에 둔다. */}
             {narrow ? <MobileMoreMenu worldId={worldId} city={selected} /> : null}
           </div>,
@@ -346,14 +341,7 @@ export function MainPage() {
             }
           >
             {cityKey !== null ? (
-              <CityInfo
-                worldId={worldId}
-                cityKey={cityKey}
-                nations={nations}
-                onSelectCity={selectCity}
-                logisticsEnabled={summary.data?.logisticsEnabled === true}
-                summary
-              />
+              <CityInfo worldId={worldId} cityKey={cityKey} nations={nations} onSelectCity={selectCity} summary />
             ) : home.isPending ? (
               <LoadingState />
             ) : (
@@ -401,7 +389,6 @@ export function MainPage() {
                 equipment={equipment}
                 worldId={worldId}
                 home={data}
-                campaignEnabled={mine.data?.creationRules.campaignEnabled ?? false}
                 cityName={cityName(data.general.cityKey)}
                 nation={data.general.nationId === null ? undefined : nationById.get(data.general.nationId)}
                 onSelectCity={selectCity}
@@ -466,15 +453,13 @@ export function MainPage() {
 }
 
 // 국가·내 장수 메뉴 (INT-25, 원작 국가 메뉴 2줄). 메인에서 옮긴 전용 화면과 기존 화면으로 한 번에 간다.
-function MainMenu({
+export function MainMenu({
   worldId,
   nationId,
-  campaignEnabled,
   cityKey,
 }: {
   worldId: string;
   nationId: number | null;
-  campaignEnabled: boolean;
   cityKey: number | null;
 }) {
   return (
@@ -530,16 +515,12 @@ function MainMenu({
             현재 도시
           </Link>
         ) : null}
-        {campaignEnabled ? (
-          <Link to="/w/$worldId/campaign" params={{ worldId }} className={styles.menuItem}>
-            휘하·부곡
-          </Link>
-        ) : null}
-        {campaignEnabled ? (
-          <Link to="/w/$worldId/campaign" params={{ worldId }} hash="retinue-orders" className={styles.menuItem}>
-            장수 지시
-          </Link>
-        ) : null}
+        <Link to="/w/$worldId/campaign" params={{ worldId }} className={styles.menuItem}>
+          휘하·부곡
+        </Link>
+        <Link to="/w/$worldId/campaign" params={{ worldId }} hash="retinue-orders" className={styles.menuItem}>
+          장수 지시
+        </Link>
         <Link to="/w/$worldId/inbox" params={{ worldId }} className={styles.menuItem}>
           제안함
         </Link>

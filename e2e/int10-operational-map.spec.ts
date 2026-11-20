@@ -1,7 +1,7 @@
 import { test, expect, apiMutate, apiQuery } from './t210-fixture';
 import { initializeIntegrationResources } from '../tools/integration-resources';
 import { loadInitialWorldFromDb, readInitialResources } from '../apps/engine/src/world/resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { loadWorld } from '../apps/engine/src/worldLoader';
@@ -32,7 +32,7 @@ test('AC-INT-21 폐허 복구 상태를 도시와 지연 공개 지도에서 확
   });
   initial.generals[0]!.userId = user.userId;
   const name = '폐허 복구 확인 월드';
-  const { worldId } = await saveInitialWorld(db, initial, { name, turnTermMinutes: 60, endYear: null });
+  const { worldId } = await saveFixtureWorld(db, initial, { name, turnTermMinutes: 60, endYear: null });
   const hold = await holdLease(worldId);
   const anonymous = await browser.newContext({ baseURL: world.stack.webOrigin });
   try {
@@ -83,7 +83,7 @@ test('AC-INT-10 정식191년 실제 API·80표식·375px·키보드·지연 공�
   expect(initial.generals).toHaveLength(491);
   expect(initial.nations).toHaveLength(21);
   const name = 'INT10 정식191년';
-  const { worldId } = await saveInitialWorld(db, initial, { name, turnTermMinutes: 60, endYear: 201 });
+  const { worldId } = await saveFixtureWorld(db, initial, { name, turnTermMinutes: 60, endYear: 201 });
   const hold = await holdLease(worldId);
   const anonymous = await browser.newContext({ baseURL: world.stack.webOrigin });
   try {
@@ -92,6 +92,7 @@ test('AC-INT-10 정식191년 실제 API·80표식·375px·키보드·지연 공�
       worldId,
       name: '지도검수장수',
       portraitId: null,
+      sex: 'MALE',
       leadership: 55,
       strength: 55,
       intel: 55,

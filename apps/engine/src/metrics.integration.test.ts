@@ -1,14 +1,15 @@
+import { saveFixtureWorld as saveInitialWorld } from '../test/worldFixture';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { afterAll, describe, expect, it, type TestContext } from 'vitest';
 import { createDb } from '@opensamguk/db';
 import { hashState } from '@opensamguk/shared/node';
-import type { WorldInit } from '@opensamguk/rules';
+import { initialReplayState, nextGameAction, runReplayAction, type WorldInit } from '@opensamguk/rules';
 import { monthlyFixture } from '../test/monthlyFixture';
 import { acquireLease, releaseLease, type Lease } from './lease';
 import { TurnLoop } from './turnLoop';
 import type { CommitMetric, CommitMetricSink } from './metrics';
 import { controlClock } from './world/clock';
-import { readWorldState, saveInitialWorld } from './world/persistence';
+import { readWorldState } from './world/persistence';
 import { exportReplay, replayArchive } from './replay';
 
 // 측정 어댑터의 실제 TX 경계 검사다. 정식 시나리오·600장수 부하 인수는 별도로 실행한다.
@@ -120,12 +121,24 @@ function metricInitialState(source: WorldInit): WorldInit {
   return initial;
 }
 
+async function expectedActions(tick = 10_000) {
+  const initial = metricInitialState(await monthlyFixture());
+  let replay = initialReplayState(initial);
+  const actions: Array<[number, 'turn' | 'monthly']> = [];
+  while (nextGameAction(replay).tick <= tick) {
+    const action = nextGameAction(replay);
+    actions.push([action.tick, action.kind]);
+    replay = runReplayAction(replay, initial.seed, initial.unitSet);
+  }
+  return actions;
+}
+
 async function fixture() {
   const initial = metricInitialState(await monthlyFixture());
   activeSignal.getStore()?.throwIfAborted();
   const { worldId } = await query(async () => {
     const result = await saveInitialWorld(db, initial, {
-      replayFormat: 'legacy',
+      replayFormat: 3,
       name: 'AC-M3-07 commit 지연 계약',
       turnTermMinutes: 60,
       endYear: null,
@@ -192,12 +205,10 @@ describe('AC-M3-07 실제 PostgreSQL commit 관측 계약', () => {
       };
       const loop = new TurnLoop(db, lease, { commitMetricSink: sink });
       await drain(loop);
-      expect(samples.map(({ tick, kind }) => [tick, kind])).toEqual([
-        [100, 'turn'],
-        [500, 'turn'],
-        [10_000, 'monthly'],
-        [10_000, 'turn'],
-      ]);
+      expect(
+        samples.map(({ tick, kind }) => [tick, kind]),
+        JSON.stringify(samples.map(({ tick, kind, sequence }) => ({ tick, kind, sequence }))),
+      ).toEqual(await expectedActions());
       expect(new Set(samples.map((sample) => sample.sequence)).size).toBe(samples.length);
       const turns = await query(() =>
         db.generalLog.findMany({ where: { worldId, sequence: { not: null } }, select: { sequence: true, tick: true } }),
@@ -206,7 +217,9 @@ describe('AC-M3-07 실제 PostgreSQL commit 관측 계약', () => {
         db.yearbookSnapshot.findMany({ where: { worldId }, select: { sequence: true, tick: true } }),
       );
       const witnesses = [
-        ...turns.map((row) => ({ ...row, kind: 'turn' })),
+        ...turns
+          .filter((row) => !months.some((month) => month.sequence === row.sequence))
+          .map((row) => ({ ...row, kind: 'turn' })),
         ...months.map((row) => ({ ...row, kind: 'monthly' })),
       ].sort((a, b) => a.sequence! - b.sequence!);
       expect(witnesses).toEqual(
@@ -232,7 +245,7 @@ describe('AC-M3-07 실제 PostgreSQL commit 관측 계약', () => {
       const samples: CommitMetric[] = [];
       await drain(new TurnLoop(db, off.lease));
       await drain(new TurnLoop(db, on.lease, { commitMetricSink: async (sample) => void samples.push(sample) }));
-      expect(samples).toHaveLength(4);
+      expect(samples).toHaveLength((await expectedActions()).length);
       expect(hashState(await query(() => readWorldState(db, off.worldId)))).toBe(
         hashState(await query(() => readWorldState(db, on.worldId))),
       );
@@ -259,7 +272,7 @@ describe('AC-M3-07 실제 PostgreSQL commit 관측 계약', () => {
       expect(samples).toEqual([]);
       expect(hashState(await query(() => readWorldState(db, worldId)))).toBe(before);
       await drain(new TurnLoop(db, lease, { commitMetricSink: sink }));
-      expect(samples).toHaveLength(4);
+      expect(samples).toHaveLength((await expectedActions()).length);
       expect(samples.every((sample) => sample.valid)).toBe(true);
     }),
   );
@@ -275,7 +288,7 @@ describe('AC-M3-07 실제 PostgreSQL commit 관측 계약', () => {
           activeSignal.getStore(),
         ),
       );
-      expect(samples).toHaveLength(2);
+      expect(samples).toHaveLength((await expectedActions(500)).length);
       expect(samples.every((sample) => !sample.valid && sample.invalidReason === 'clock')).toBe(true);
     }),
   );

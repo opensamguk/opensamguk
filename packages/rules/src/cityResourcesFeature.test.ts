@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { commandWorld } from '../test/commandFixture';
 import { cityResourcesFeature } from './cityResourcesFeature';
 import { emptyCityResourcesState } from './cityResources/state';
+import { extRegistryForRuleFeatures } from './commands/ext/state';
 import { cloneWorld, cloneWorldWithRegistry } from './model/clone';
 import type { ReplayState } from './replay';
 import { ruleRegistry } from './ruleRegistry';
@@ -9,15 +10,16 @@ import type { WorldInit } from './world/bootstrap';
 
 it('INT-18A 기존 월드 복제는 도시 자원 필드나 초기 자원을 추가하지 않는다', () => {
   const old = commandWorld();
-  const before = JSON.stringify(old);
+  const before = structuredClone(old);
   const cloned = cloneWorld(old);
-  expect(JSON.stringify(cloned)).toBe(before);
-  expect(Object.hasOwn(cloned, 'cityResources')).toBe(false);
+  expect(cloned).toEqual(before);
+  expect(cloned.cityResources).toEqual(emptyCityResourcesState(old));
   expect(ruleRegistry.features.find((feature) => feature.key === 'city-resources-v1')).toBe(cityResourcesFeature);
 });
 
 it('INT-18A 새 원장은 도시별 0에서 시작하고 기존 국고·개인 잔액을 복사하지 않는다', () => {
   const world = commandWorld();
+  delete world.cityResources;
   const before = structuredClone(world);
   const replay: ReplayState = { state: world, turns: {}, revisions: {}, monthlyTick: 0 };
   const result = cityResourcesFeature.initReplayState!(replay, { initial: {} as WorldInit, data: undefined });
@@ -32,7 +34,7 @@ it('INT-18A 새 원장은 도시별 0에서 시작하고 기존 국고·개인 �
 
 it.each([
   cloneWorld,
-  (world: ReturnType<typeof commandWorld>) => cloneWorldWithRegistry(world, { slices: [], bindings: [] }),
+  (world: ReturnType<typeof commandWorld>) => cloneWorldWithRegistry(world, extRegistryForRuleFeatures()),
 ])('INT-18A 도시 원장의 금·쌀·병종 배열은 복제 뒤 원본과 참조를 공유하지 않는다', (clone) => {
   const world = commandWorld();
   world.cityResources = emptyCityResourcesState(world);

@@ -10,7 +10,7 @@ import {
 import { writeFile } from 'node:fs/promises';
 import { setTimeout as delay } from 'node:timers/promises';
 import { controlClock } from '../apps/engine/src/world/clock';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld } from './worldFixture';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { createAccount, withE2eDb } from './account';
@@ -50,13 +50,12 @@ async function personnelWorld(): Promise<string> {
       map: 'che',
       seed: `e2e-personnel-${Date.now()}`,
     });
-    return saveInitialWorld(db, initial, {
+    return saveFixtureWorld(db, initial, {
       name: 'E2E 인사 대기 월드',
       // 인사 접수 시험에 실시간 월간 캐치업이 끼지 않게 한다. 실행권만 쥐어도 시계는 흐른다.
       turnTermMinutes: 60,
       endYear: 300,
       replayFormat: 3,
-      ruleFeatures: ['personnel', 'policy'],
     });
   });
   hold = await holdLease(worldId);
@@ -159,6 +158,8 @@ const offerBox = (page: Page) => page.getByRole('region', { name: '발령 제안
 const notice = (page: Page) => page.getByTestId('personnel-notice');
 
 test.beforeAll(async ({ browser }) => {
+  // 1030 491명 월드 생성과 두 계정, 장수 준비가 바쁜 CI에서 30초를 넘긴 적이 있다(PR #674).
+  test.setTimeout(120_000);
   const first = await seat(browser);
   world = await personnelWorld();
   const second = await seat(browser);
@@ -179,7 +180,8 @@ test('권한: 일반 장수는 인사 칸이 잠기고 서버가 준 이유를 �
   const board = await query<{ appoint: { ok: false; reason: string } }>(page, 'personnel.officers', { worldId: world });
   expect(board.appoint).toEqual({ ok: false, reason: '군주만 임명·해임할 수 있습니다.' });
   await page.goto(`/w/${world}/nation/personnel`);
-  await expect(page.getByRole('heading', { level: 1, name: '인사부' })).toBeVisible();
+  // dev 서버는 처음 여는 화면의 모듈을 그때 변환한다. CI에서 첫 인사부 화면이 5초를 넘긴 적이 있다(PR #674).
+  await expect(page.getByRole('heading', { level: 1, name: '인사부' })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole('combobox')).toHaveCount(0);
   await page
     .getByRole('button', { name: /임명|해임/ })
@@ -333,9 +335,12 @@ test('국가 칸 저장: 고친 뒤 해임·재임명되면 저장이 거부되�
     const reply = (await response.json()) as Reply | Reply[];
     expect((Array.isArray(reply) ? reply[held!.index] : reply)?.error?.data?.code).toBe('PRECONDITION_FAILED');
     await expect(page.getByTestId('office-changed')).toBeVisible();
-    await expect(page.getByTestId('draft-state')).toHaveText('저장된 목록');
+    // 거부 뒤 국가 예턴을 다시 받아 편집기를 새로 그린다. 해임과 재임명 사이에 편집기의 10초 재조회가 걸리면 잠깐
+    // 권한 오류 화면이 되고, 무효화한 재조회가 돌아와야 편집기가 돌아온다. CI에서 응답이 4초를 넘겨 15초를 기다린다.
+    await expect(page.getByTestId('draft-state')).toHaveText('저장된 목록', { timeout: 15_000 });
     await page.reload();
-    await expect(page.getByTestId('draft-state')).toHaveText('저장된 목록');
+    // 새로 연 국가 예턴 화면도 탭, 직책, 감찰 자료를 다시 받아야 편집기를 그린다. 위와 같은 까닭으로 15초를 기다린다.
+    await expect(page.getByTestId('draft-state')).toHaveText('저장된 목록', { timeout: 15_000 });
     await expect(editor.locator('tr[data-slot]')).toHaveCount(12);
     const fresh = await query<{
       tabs: Array<{
@@ -417,7 +422,7 @@ test('재접속: 처리 중에 새로 고치면 다시 처리 중이고 결과 �
 });
 
 // 아래 사례(탭을 닫은 사이 끝난 접수)의 CI 간헐 실패 진단 (T4-77 AC-P2-26 B). 실패할 때만 고정 구조 JSON을 남긴다.
-// 화이트리스트만 적는다: 세 조회의 절차 이름·HTTP status·tRPC 오류 code·상대 시각, mine의 인사 플래그,
+// 화이트리스트만 적는다: 세 조회의 절차 이름·HTTP status·tRPC 오류 code·상대 시각,
 // recent의 kind/status 개수와 이번 접수 포함 여부, 이번 접수의 InputEvent 상태·안내 이력 포함 여부(boolean).
 // URL·본문·헤더·쿠키·계정·requestId 원문은 적지 않는다. DOM은 Playwright error-context가 맡는다.
 const RECOVERY_RPCS = ['auth.me', 'general.mine', 'personnel.recent'] as const;
@@ -429,7 +434,6 @@ interface RecoveryCall {
   httpStatus: number | null;
   networkFailed: boolean;
   errorCode: string | null;
-  personnelEnabled?: boolean | null;
   recent?: { count: number; byKindStatus: Record<string, number>; includesCurrent: boolean } | null;
 }
 const RECOVERY_KINDS = ['personnel.appoint', 'personnel.dismiss', 'offer.respond'];
@@ -512,12 +516,6 @@ function recoveryDiagnostic(context: BrowserContext, currentRequestId: () => str
             entry.errorCode =
               typeof code === 'string' && /^[A-Z_]{1,40}$/.test(code) ? code : item?.error ? 'other' : null;
             const data = item?.result?.data;
-            if (entry.procedure === 'general.mine')
-              entry.personnelEnabled =
-                data && typeof data === 'object'
-                  ? (data as { creationRules?: { personnelEnabled?: unknown } }).creationRules?.personnelEnabled ===
-                    true
-                  : null;
             if (entry.procedure === 'personnel.recent') {
               if (!Array.isArray(data)) {
                 entry.recent = null;

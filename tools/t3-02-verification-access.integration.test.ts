@@ -9,7 +9,7 @@ import type { MailMessage } from '../apps/server/src/mail/transport';
 import { newSession } from '../apps/server/src/auth/session';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -18,7 +18,7 @@ const url = process.env.TEST_DATABASE_URL;
 if (
   !url ||
   !['localhost', '127.0.0.1'].includes(new URL(url).hostname) ||
-  !/^\/[a-z][a-z0-9_]*_test$/.test(new URL(url).pathname)
+  !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(new URL(url).pathname)
 )
   throw new Error('loopback 전용 테스트 DB가 필요합니다.');
 const db = createDb(url);
@@ -182,8 +182,8 @@ describe('T3-02 AC-M3-01 실제 PostgreSQL·HTTP 이메일 인증 차단', () =>
     });
   });
 
-  it('47개 변경 API가 미인증·위조·무인증·제재를 거부하고 운영 권한 거절 감사 두 행만 남긴다', async () => {
-    expect(paths).toHaveLength(47);
+  it('54개 변경 API가 미인증·위조·무인증·제재를 거부하고 운영 권한 거절 감사 두 행만 남긴다', async () => {
+    expect(paths).toHaveLength(54);
     expect(paths).toContain('account.setPortrait');
     expect(paths).toContain('entry.possess');
     expect(paths).toContain('admin.game.request');
@@ -291,15 +291,6 @@ describe('T3-02 AC-M3-01 실제 PostgreSQL·HTTP 이메일 인증 차단', () =>
       portraitMap: '191-map',
       seed: 'public-verification-http-191',
     });
-    initial.ruleFeatures = [
-      'campaign-v1',
-      'five-stats',
-      'operational-map',
-      'personnel',
-      'policy',
-      'stratagem-basic',
-      'treaty',
-    ];
     expect(initial.generals).toHaveLength(491);
     expect(initial.nations).toHaveLength(21);
     const saved = await saveInitialWorld(db, initial, { name: '공개 인증 정식191', turnTermMinutes: 60, endYear: 201 });
@@ -312,6 +303,7 @@ describe('T3-02 AC-M3-01 실제 PostgreSQL·HTTP 이메일 인증 차단', () =>
         {
           worldId,
           name: '인증장수',
+          sex: 'MALE' as const,
           portraitId: null,
           leadership: 55,
           strength: 55,

@@ -227,7 +227,9 @@ describe('T2-07 / AC-M2-06 A1a R13 신의 상태 보존', () => {
     (clone) => {
       const world = trustWorld();
       const before = structuredClone(world);
-      const next = clone(world);
+      const source = structuredClone(world);
+      if (clone !== cloneWorld) delete source.ext;
+      const next = clone(source);
       expectSeparateTrust(next, world);
       next.nationTrust![0]!.brokenTreaties += 1;
       expect(world).toEqual(before);
@@ -240,8 +242,8 @@ describe('T2-07 / AC-M2-06 A1a R13 신의 상태 보존', () => {
     for (const source of [world, { ...world, nationTrust: [] }]) {
       const next = cloneWorld(source);
       expect(Object.hasOwn(next, 'nationTrust')).toBe(false);
-      expect(Object.keys(next)).toEqual(Object.keys(world));
-      expect(JSON.stringify(next)).toBe(JSON.stringify(world));
+      expect(Object.keys(next).sort()).toEqual(Object.keys(world).sort());
+      expect(next).toEqual(world);
     }
   });
 

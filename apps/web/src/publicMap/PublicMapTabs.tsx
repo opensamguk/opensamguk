@@ -13,7 +13,17 @@ import styles from './PublicMapTabs.module.css';
 const REFRESH_MS = 60_000;
 
 // 로그인 화면과 로비의 지연 공개 지도 (T2-25, D-026). 진행 중인 월드를 탭으로 고르고 지도는 하나만 그린다.
-export function PublicMapTabs({ backdrop = false }: { backdrop?: boolean } = {}) {
+export function PublicMapTabs({
+  backdrop = false,
+  selectedId,
+  onSelect,
+}: {
+  backdrop?: boolean;
+  /** 바깥(로비 서버 선택 판)이 고른 월드. 주면 탭이 그 월드를 따른다(INT-29 로비). */
+  selectedId?: string | null | undefined;
+  /** 탭을 고르거나 마우스를 올리면 알린다. devsam 로비처럼 마우스를 올려도 바뀐다. */
+  onSelect?: ((worldId: string) => void) | undefined;
+} = {}) {
   const trpc = useTRPC();
   const maps = useQuery(
     trpc.world.publicMaps.queryOptions(undefined, {
@@ -22,7 +32,15 @@ export function PublicMapTabs({ backdrop = false }: { backdrop?: boolean } = {})
       refetchInterval: REFRESH_MS,
     }),
   );
-  return <PublicMapView data={maps.data} failed={maps.isError && !maps.data} backdrop={backdrop} />;
+  return (
+    <PublicMapView
+      data={maps.data}
+      failed={maps.isError && !maps.data}
+      backdrop={backdrop}
+      selectedId={selectedId}
+      onSelect={onSelect}
+    />
+  );
 }
 
 // 공개할 월드가 없거나 아직 받는 중이면 문구 없이 자리만 둔다 (2026-10-23 소유자 지시).
@@ -31,15 +49,24 @@ export function PublicMapView({
   failed = false,
   now = new Date(),
   backdrop = false,
+  selectedId,
+  onSelect,
 }: {
   data: PublicMaps | undefined;
   failed?: boolean;
   now?: Date;
   /** 로그인 화면 배경. 지도가 상자를 가득 채우고, 월드가 없으면 바탕 그림만 깐다. */
   backdrop?: boolean;
+  selectedId?: string | null | undefined;
+  onSelect?: ((worldId: string) => void) | undefined;
 }) {
   const baseId = useId();
-  const [chosenId, setChosenId] = useState<string | null>(null);
+  const [ownChosenId, setOwnChosenId] = useState<string | null>(null);
+  const chosenId = selectedId === undefined ? ownChosenId : selectedId;
+  const setChosenId = (id: string) => {
+    setOwnChosenId(id);
+    onSelect?.(id);
+  };
   const tabRefs = useRef(new Map<string, HTMLButtonElement>());
 
   const worlds = data?.worlds ?? [];
@@ -105,6 +132,7 @@ export function PublicMapView({
               aria-controls={panelId}
               tabIndex={selected ? 0 : -1}
               onClick={() => setChosenId(world.id)}
+              onMouseEnter={onSelect ? () => setChosenId(world.id) : undefined}
             >
               {world.name}
               {world.status === 'PAUSED' ? <Tag tone="muted">멈춤</Tag> : null}

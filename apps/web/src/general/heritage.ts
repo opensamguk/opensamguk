@@ -45,7 +45,7 @@ export function checkHeritage(
     const base = Number.isInteger(n) ? n : null;
     const final = base === null ? null : base + b;
     let why: string | null = null;
-    if (base === null) why = `기본 ${label}에 정수를 넣으면 유산을 붙일 수 있습니다.`;
+    if (base === null) why = `기본 ${label}에 정수를 먼저 넣으세요.`;
     else if (b >= heritage.perStat) why = `능력치 하나에는 +${heritage.perStat}까지입니다.`;
     else if (final! >= rules.max) why = `최종값이 최대 ${rules.max}에 닿아 더 올릴 수 없습니다.`;
     else if (spent >= heritage.perGeneral) why = `한 장수에는 합계 +${heritage.perGeneral}까지입니다.`;

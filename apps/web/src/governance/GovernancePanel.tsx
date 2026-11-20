@@ -39,11 +39,8 @@ import { useGovernanceBoard } from './useGovernanceBoard';
 
 // 국가 정보 칸 아래의 황실 칸 (T4-94, AC-P2-31). 황위·조정·봉신·제안·기록을 governance.get 값으로만 보인다.
 // 모든 행동은 확인 대화상자를 거쳐 명시 요청 한 건으로 보낸다. 명령 카드·예턴에는 넣지 않는다.
-// world.summary에 governanceEnabled가 있을 때만 조회한다. 없으면 아무것도 그리지 않고 요청도 하지 않는다.
 export function GovernancePanel({ worldId }: { worldId: string }) {
-  const data = useWorldSummary(worldId).data;
-  const enabled = data !== undefined && 'governanceEnabled' in data && data.governanceEnabled === true;
-  return enabled ? <GovernanceBoardView key={worldId} worldId={worldId} /> : null;
+  return <GovernanceBoardView key={worldId} worldId={worldId} />;
 }
 
 type When = (tick: number) => string;
@@ -81,8 +78,7 @@ type Tab = (typeof TABS)[number][0];
 
 function readOnlyReason(board: GovernanceBoard): string {
   if (board.status !== 'RUNNING') return '진행 중인 월드가 아니라 황실 정보는 볼 수만 있습니다.';
-  if (board.settling)
-    return '월 정산을 처리하는 중이라 지금은 볼 수만 있습니다. 정산이 끝나면 다시 요청할 수 있습니다.';
+  if (board.settling) return '월 정산 중이라 지금은 볼 수만 있습니다. 정산이 끝나면 다시 요청하세요.';
   if (board.view.enabled && board.view.viewerGeneralId === null) return '장수가 있어야 황실 요청을 보낼 수 있습니다.';
   return '이 월드의 이용이 제한된 동안에는 볼 수만 있습니다.';
 }
@@ -199,8 +195,8 @@ function GovernanceBoardView({ worldId }: { worldId: string }) {
                 {!board.unconfirmed
                   ? '접수한 요청을 처리하고 있습니다. 결과가 나올 때까지 다른 황실 요청은 기다려 주세요.'
                   : board.oldActor
-                    ? '이 요청의 접수 기록을 찾지 못했습니다. 장수가 이미 바뀌어, 이전 장수 명의 요청은 서버가 거부하므로 앞으로도 처리되지 않습니다. 기록 지우기를 누르면 지금 장수와 접수 기록을 한 번 더 확인한 뒤 이 탭의 기록만 지웁니다. 다시 보내지 않습니다.'
-                    : '이 요청의 접수 기록을 아직 찾지 못했습니다. 보내던 요청이 늦게 접수될 수도 있습니다. 같은 요청을 그대로 다시 접수하면 서버가 같은 번호로 한 번만 받습니다. 결과를 받기 전에는 새 요청을 만들지 않습니다.'}
+                    ? '이 요청의 접수 기록을 찾지 못했습니다. 장수가 이미 바뀌어 이전 장수 명의 요청은 앞으로도 처리되지 않습니다. 기록 지우기를 누르면 지금 장수와 접수 기록을 한 번 더 확인하고 이 탭의 기록만 지웁니다. 다시 보내지 않습니다.'
+                    : '이 요청의 접수 기록을 아직 찾지 못했습니다. 보내던 요청이 늦게 접수될 수도 있습니다. 다시 접수해도 같은 요청은 한 번만 처리됩니다. 결과를 받기 전에는 새 요청을 만들지 않습니다.'}
               </p>
               {board.oldActor && state.pending.generalId !== undefined ? (
                 <p className={styles.note}>
@@ -209,7 +205,7 @@ function GovernanceBoardView({ worldId }: { worldId: string }) {
                 </p>
               ) : null}
               {board.unconfirmed && !board.oldActor && !board.canSubmit ? (
-                <p className={styles.note}>지금은 다시 접수할 수 없어 같은 요청의 상태만 확인할 수 있습니다.</p>
+                <p className={styles.note}>지금은 다시 접수할 수 없습니다. 상태만 확인하세요.</p>
               ) : null}
               <div className={styles.row}>
                 <button type="button" className={styles.secondary} disabled={board.busy} onClick={board.recheck}>
@@ -472,11 +468,11 @@ function CrownTab({ ctx }: { ctx: Ctx }) {
             </dl>
           )}
           <details className={styles.disc}>
-            <summary>폐위·정리 조건</summary>
+            <summary>폐위와 정리 조건</summary>
             <ul>
               <li>황제 장수가 없어지거나 군주가 아니게 됨</li>
               <li>황제국 멸망, 거점 {seat} 상실, 황제국의 봉신화</li>
-              <li>폐위·퇴위 때 세 직위와 조정 제안, 황실 명의 제안도 함께 정리</li>
+              <li>폐위나 퇴위 때 세 직위와 조정 제안, 황실 명의 제안도 함께 정리</li>
             </ul>
           </details>
           {view.roles.emperor ? (
@@ -596,15 +592,15 @@ function CourtTab({ ctx }: { ctx: Ctx }) {
       <details className={styles.disc}>
         <summary>직위별 권한</summary>
         <ul>
-          <li>황제: 직위 제안·해임, 황실 명의 봉신 요구, 공납 면제, 견책을 직접 합니다.</li>
+          <li>황제: 직위 제안과 해임, 황실 명의 봉신 요구, 공납 면제, 견책을 직접 합니다.</li>
           {(['chancellor', 'grandMarshal', 'minister'] as const).map((office) => (
             <li key={office}>
               {OFFICE_LABEL[office]}: {OFFICE_POWER[office]}
             </li>
           ))}
           <li>
-            직위는 황제 권한을 나눠 대행합니다. 다른 봉신 영주 아래 관계는 건드리지 않습니다. 승상·사도는 자국이
-            하위국이거나 그 아래 계열인 관계를 해제·면제할 수 없습니다. 황제가 바뀌면 세 직위가 비워집니다.
+            직위는 황제 권한을 나눠 대행합니다. 다른 봉신 영주 아래 관계는 건드리지 않습니다. 승상과 사도는 자국이
+            하위국이거나 그 아래 계열인 관계를 해제하거나 면제할 수 없습니다. 황제가 바뀌면 세 직위가 비워집니다.
           </li>
         </ul>
       </details>
@@ -746,7 +742,7 @@ function RealmTab({ ctx }: { ctx: Ctx }) {
         </ul>
       )}
       <p className={styles.note}>
-        같은 계열 국가끼리는 선전포고·공격·공격 계략을 할 수 없습니다. 깊이는 최상위 0에서 최대 {view.limits.maxDepth}
+        같은 계열 국가끼리는 선전포고, 공격, 공격 계략을 할 수 없습니다. 깊이는 최상위 0에서 최대 {view.limits.maxDepth}
         단계입니다.
       </p>
       <h4>내 관계 · {formatCount(scope.mine.length)}건</h4>
@@ -783,8 +779,8 @@ function RealmTab({ ctx }: { ctx: Ctx }) {
       <details className={styles.disc}>
         <summary>공개 범위</summary>
         <ul>
-          <li>누구나: 황제, 거점, 직위 명단, 정통성, 관계의 존재(상위·하위·시작 연월)</li>
-          <li>공납 비율·면제 기한: 두 나라 군주와 황제. 황제국이 직접 상위인 관계는 승상·사도도</li>
+          <li>누구나: 황제, 거점, 직위 명단, 정통성, 관계의 존재(상위, 하위, 시작 연월)</li>
+          <li>공납 비율과 면제 기한: 두 나라 군주와 황제. 황제국이 직접 상위인 관계는 승상과 사도도</li>
           <li>제안 내용: 보낸 쪽과 받는 쪽 당사자만</li>
           <li>공납 기록: 두 나라 군주만. 봉록 기록: 지급하는 거점 소유국 군주와, 받은 장수 본인의 입금만</li>
         </ul>
@@ -834,8 +830,8 @@ function RelationCard({ ctx, row }: { ctx: Ctx; row: GovernanceVassalRow }) {
         </dl>
       ) : (
         <p className={styles.note}>
-          <Tag tone="muted">비공개</Tag> 비율·면제 기한은 두 나라 군주와 황제
-          {can.direct ? ', 승상·사도' : ''}만 봅니다.
+          <Tag tone="muted">비공개</Tag> 비율과 면제 기한은 두 나라 군주와 황제
+          {can.direct ? ', 승상, 사도' : ''}만 봅니다.
         </p>
       )}
       {can.remit ? (
@@ -917,7 +913,7 @@ function OfferComposer({ ctx }: { ctx: Ctx }) {
     [
       'EMPIRE',
       `황실 명의 · ${nationName(view, view.throne.emperorNationId)}`,
-      `${view.roles.emperor ? '황제 본인' : '승상 대행'}. 요구만 가능하며 황위·승상직이 바뀌면 무효가 됩니다.`,
+      `${view.roles.emperor ? '황제 본인' : '승상 대행'}. 요구만 가능하며 황위나 승상직이 바뀌면 무효가 됩니다.`,
     ],
   ] as const;
   return (
@@ -1033,7 +1029,7 @@ function OfferComposer({ ctx }: { ctx: Ctx }) {
             </ul>
           ) : null}
           <p className={styles.note}>
-            전쟁 중인 계열끼리는 합칠 수 없고 미결 제안 수에도 한도가 있습니다. 처리할 때 서버가 다시 판정합니다.
+            전쟁 중인 계열끼리는 합칠 수 없고 미결 제안 수에도 한도가 있습니다. 처리할 때 다시 판정합니다.
           </p>
         </div>
         <div className={styles.row}>
@@ -1215,7 +1211,7 @@ function HistoryTab({ ctx }: { ctx: Ctx }) {
         mobileDetails={['holder', 'resource']}
       />
       <p className={styles.note}>
-        이체 한 건은 출금·입금 두 줄입니다. 공납은 정해진 달, 봉록은 매월 월 정산에서만 생깁니다. 잔액과 다른 사람
+        이체 한 건은 출금과 입금 두 줄입니다. 공납은 정해진 달, 봉록은 매월 월 정산에서만 생깁니다. 잔액과 다른 사람
         지갑은 보이지 않습니다.
       </p>
     </>
@@ -1239,7 +1235,7 @@ function confirmText(
         danger: false,
         lines: [
           `처리되면 ${nationName(view, view.ownNationId)}이 황제국이 됩니다. 사람 군주는 자동으로 즉위하지 않습니다.`,
-          '황제는 조정 세 직위를 제안·해임하고 공납 면제와 견책을 직접 할 수 있습니다.',
+          '황제는 조정 세 직위를 제안하거나 해임하고 공납 면제와 견책을 직접 할 수 있습니다.',
           `거점 ${seat}을 잃거나 군주가 아니게 되거나 황제국이 봉신이 되면 폐위되고 세 직위도 비워집니다.`,
           recheck,
         ],
@@ -1293,7 +1289,7 @@ function confirmText(
           `수락하면: ${pair(upper, lower)}`,
           `공납: 금 ${percent(offer.goldBp)} · 쌀 ${percent(offer.riceBp)}. 하위국 수도 창고에서 걷습니다.`,
           '수락 때 양쪽 군주가 기록됩니다. 어느 쪽 군주가 바뀌어도 관계가 해제됩니다.',
-          '같은 계열 국가끼리는 선전포고·공격·공격 계략을 할 수 없습니다.',
+          '같은 계열 국가끼리는 선전포고, 공격, 공격 계략을 할 수 없습니다.',
           recheck,
         ],
       };

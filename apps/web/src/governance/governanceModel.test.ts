@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import {
+  bureauName,
   censureTargets,
   offerCheck,
   readBp,
@@ -145,4 +146,20 @@ it('T4-94 AC-P2-31 받은 제안은 당사자 몫만, 견책 대상은 황제국
   expect(censureTargets(testView({ throne: { emperorGeneralId: null, emperorNationId: null, sinceTick: 0 } }))).toEqual(
     [],
   );
+});
+
+it('휘하 판 이름: 조정 직위·장군·삼공은 그 부, 그 밖은 휘하', () => {
+  const marshal = testView({
+    viewerGeneralId: 40,
+    court: [
+      { office: 'chancellor', appointment: null, stipendGold: 100 },
+      { office: 'grandMarshal', appointment: { generalId: 40, appointedTick: 1 }, stipendGold: 100 },
+      { office: 'minister', appointment: null, stipendGold: 100 },
+    ],
+  });
+  expect(bureauName({ view: marshal } as never)).toBe('대장군부');
+  expect(bureauName({ view: testView({ viewerGeneralId: 99 }) } as never, '표기장군')).toBe('표기장군부');
+  expect(bureauName(undefined, '사공')).toBe('사공부');
+  expect(bureauName(undefined, '상서령')).toBe('휘하');
+  expect(bureauName(undefined)).toBe('휘하');
 });

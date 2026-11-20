@@ -34,8 +34,6 @@ const deny = (code: string, message: string) => ({ ok: false as const, code, mes
 
 // 세션·제재 검사는 호출 경계에서 한다. 이 함수는 사람과 NPC에 같은 현재 권한을 적용한다.
 export function decideGovernanceAction(world: WorldView, actorId: number, payload: unknown, tick: number) {
-  if (!world.ruleFeatures?.includes('governance-v1'))
-    return deny('FEATURE_DISABLED', '황실 기능을 켜지 않은 월드입니다.');
   if (!world.governance) throw new Error('황실 상태가 없습니다.');
   const parsed = governanceInputSchema.safeParse(payload);
   if (!parsed.success) return deny('BAD_ARGS', '황실 행동 인자가 잘못되었습니다.');

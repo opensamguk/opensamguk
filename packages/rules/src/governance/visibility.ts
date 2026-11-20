@@ -25,7 +25,6 @@ function viewerContext(world: WorldView, viewerId: number | null, tick: number) 
 }
 
 export function governanceView(world: WorldView, viewerId: number | null, tick: number) {
-  if (!world.ruleFeatures?.includes('governance-v1')) return { enabled: false as const };
   const { state, gov, index, nationId, roles } = viewerContext(world, viewerId, tick);
   const party = (first: number, second: number) => roles.monarch && (nationId === first || nationId === second);
   const rateReader = (first: number, second: number) =>
@@ -130,7 +129,6 @@ export function visibleGovernanceMovements<T extends GovernanceMovement>(
   tick: number,
   rows: readonly T[],
 ): T[] {
-  if (!world.ruleFeatures?.includes('governance-v1')) return [];
   const { nationId, roles } = viewerContext(world, viewerId, tick);
   return rows
     .filter(

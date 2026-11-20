@@ -10,7 +10,7 @@ import { statRulesSchema, TICKS_PER_MONTH, validateGeneralCreation } from '../pa
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { controlClock } from '../apps/engine/src/world/clock';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld } from './worldFixture';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { removeWorlds } from './rankingCleanup';
 
@@ -21,7 +21,7 @@ const [command, ...args] = process.argv.slice(2);
 
 async function fresh() {
   const initial = await loadInitialWorldFromDb(db, { scenario: '1030', map: 'che', seed: 'e2e-ranking-fresh' });
-  const { worldId } = await saveInitialWorld(db, initial, {
+  const { worldId } = await saveFixtureWorld(db, initial, {
     name: 'E2E 순위 정산 전',
     turnTermMinutes: 60,
     endYear: null,
@@ -41,7 +41,13 @@ async function settled(emails: string[]) {
   // 시나리오의 공헌·경험은 모두 0이라 기준마다 순서가 달라지도록 지력·통솔에서 값을 준다.
   const ids = initial.generals.map((g) => g.id).sort((a, b) => a - b);
   const [firstId, lastId] = [ids[0]!, ids.at(-1)!];
-  const appearing = new Set([...ids.slice(0, 129), lastId]);
+  // 숨긴 군주가 있으면 가문 월간 처리가 다른 NPC를 군주로 세워 기존 군주와 중복된다.
+  const appearing = new Set(initial.generals.filter((g) => g.officerLevel === 12).map((g) => g.id));
+  appearing.add(lastId);
+  for (const id of ids) {
+    if (appearing.size >= 130) break;
+    appearing.add(id);
+  }
   initial.generals = initial.generals.map((g) => ({
     ...g,
     activeFromYear: appearing.has(g.id) ? initial.startYear : initial.startYear + 50,
@@ -52,7 +58,7 @@ async function settled(emails: string[]) {
     // 같은 값이면 ID 순이라 가장 큰 ID에 0을 주면 꼴찌다.
     ...(g.id === lastId ? { userId: outside.id, dedication: 0, experience: 0 } : {}),
   }));
-  const { worldId } = await saveInitialWorld(db, initial, { name: 'E2E 순위', turnTermMinutes: 60, endYear: null });
+  const { worldId } = await saveFixtureWorld(db, initial, { name: 'E2E 순위', turnTermMinutes: 60, endYear: null });
   // 리스를 먼저 잡아 dev 엔진이 이 월드를 가져가지 못하게 한다.
   const lease = await acquireLease(db, worldId);
   if (!lease) throw new Error('엔진 리스를 얻지 못했습니다.');
@@ -62,11 +68,20 @@ async function settled(emails: string[]) {
     await loop.advanceTo(TICKS_PER_MONTH);
     // 정산 뒤에 생긴 장수. 장수 생성 API가 넣는 입력과 같은 모양을 넣고 엔진이 처리한다.
     const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
-    const { total } = statRulesSchema.parse({ stat: world.statRules }).stat;
-    const third = Math.floor(total / 3);
+    const { total, count = 3 } = statRulesSchema.parse({ stat: world.statRules }).stat;
+    const share = Math.floor(total / count);
     const checked = validateGeneralCreation(
-      { name: '새장수', leadership: total - 2 * third, strength: third, intel: third, portraitId: null },
+      {
+        name: '새장수',
+        leadership: total - (count - 1) * share,
+        strength: share,
+        intel: share,
+        ...(count === 5 ? { politics: share, charm: share } : {}),
+        sex: 'MALE',
+        portraitId: null,
+      },
       world.statRules,
+      true,
     );
     if (!checked.ok) throw new Error(checked.message);
     const event = await db.inputEvent.create({

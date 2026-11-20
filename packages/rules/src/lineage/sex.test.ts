@@ -34,7 +34,6 @@ it('AC-P2-32 부모는 가주·다른 부모 순서를 보존하며 성별은 �
 it('AC-P2-32 기존 판 복제에는 성별·가문 필드를 새로 넣지 않는다', () => {
   const world = lineageFixture();
   delete world.lineage;
-  world.ruleFeatures = world.ruleFeatures!.filter((feature) => feature !== 'lineage-v1');
   for (const general of Object.values(world.generals)) delete general.sex;
   const copy = cloneWorld(world);
   expect(copy).toEqual(world);

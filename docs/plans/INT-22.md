@@ -187,7 +187,7 @@ region 숫자의 뜻은 지도 내용에 적는다. 운영 지도 최상위에 �
 | --- | --- | --- |
 | 모병·징병 | `commands/military.ts:19` | 예약 검사와 실행 때 다시 |
 | 부곡 모병 | `campaign/preparation.ts:53` | 예약·실행 |
-| 빈 부곡 편성 | `cityResources/commands.ts:19`(`form_unit`) | 예약·실행 |
+| 새 부곡 모집 | `cityResources/preparation.ts`의 `applyCityUnitRecruitment` | 예약·실행 |
 | 도시 수비병 모집 | `cityResources/preparation.ts:32` | 예약·실행 |
 | 미리보기 | `commands/statPreview.ts:59` | 미리보기 |
 | NPC 병종 고르기 | `npc/index.ts:143`, `cityResources/npc.ts:22` | 고르기 전 거르기 |

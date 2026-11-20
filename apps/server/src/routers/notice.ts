@@ -1,3 +1,4 @@
+import { readTransactionOptions } from '../readTransaction';
 import { assertStorableJson, type Prisma } from '@opensamguk/db';
 import { noticeDirectiveSchema } from '@opensamguk/rules';
 import { TRPCError } from '@trpc/server';
@@ -33,7 +34,7 @@ export const noticeRouter = router({
     get: protectedProcedure
       .input(worldInput)
       .query(({ ctx, input }) =>
-        ctx.db.$transaction((tx) => nationNotice(tx, ctx, input.worldId), { isolationLevel: 'RepeatableRead' }),
+        ctx.db.$transaction((tx) => nationNotice(tx, ctx, input.worldId), { ...readTransactionOptions }),
       ),
     set: worldVerifiedProcedure
       .input(worldInput.extend({ body: bodyLimit, directive: noticeDirectiveSchema.nullable().optional() }).strict())

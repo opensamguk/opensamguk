@@ -8,7 +8,6 @@ import { applyCampaignPreparation } from './preparation';
 
 function fixture() {
   const world = commandWorld();
-  world.ruleFeatures = ['five-stats'];
   for (const general of Object.values(world.generals))
     Object.assign(general, { politics: 60, charm: 55, crew: 0, cityKey: 1 });
   Object.assign(world.generals[1]!, { userId: 'owner', nationId: 1, gold: 1_000_000, rice: 1234, leadership: 1 });
@@ -99,7 +98,7 @@ describe('AC-INT-09 부곡 병력 정본의 기존 준비 명령', () => {
   it('소집해제는 선택 부곡 병력만 기존 인구 상한 안에서 돌려주며 군량을 복제하지 않는다', () => {
     const world = fixture();
     const result = applied(applyCampaignPreparation(deepFreeze(world), actor, 'dismiss', { unitId: 1 }));
-    expect(result.state.campaign!.units[0]).toMatchObject({ troops: 0, train: 0, atmos: 0 });
+    expect(result.state.campaign!.units).toEqual([]);
     expect(result.state.cities[1]!.population).toBe(
       Math.min(world.cities[1]!.populationMax, world.cities[1]!.population + 1000),
     );

@@ -32,7 +32,8 @@ async function integrationFiles() {
 }
 
 function partition(files: string[]) {
-  const engine = integrationPartition('engine');
+  // 엔진 쪽은 나누는 engine과 따로 도는 engine-long을 합친 것이다.
+  const engine = [...integrationPartition('engine'), ...integrationPartition('engine-long')];
   const excluded = new Set(engine);
   return { engine, api: files.filter((file) => !excluded.has(file)) };
 }

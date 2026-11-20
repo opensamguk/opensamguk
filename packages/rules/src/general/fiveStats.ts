@@ -42,12 +42,38 @@ export function assertGeneralStatProfile(general: object, five: boolean): void {
 
 export function checkStatProfile(initial: {
   statRules: { count?: number | undefined; total: number; min: number; max: number };
-  ruleFeatures?: readonly string[];
+
   generals: readonly object[];
 }): void {
-  const five = initial.ruleFeatures?.includes('five-stats') ?? false;
-  if (five !== (initial.statRules.count === 5)) throw new Error('능력치 규칙과 기능 판이 다릅니다.');
-  if (five && (initial.statRules.total !== 275 || initial.statRules.min !== 15 || initial.statRules.max !== 90))
+  if (initial.statRules.count === undefined || initial.statRules.count === 3) {
+    for (const general of initial.generals) assertGeneralStatProfile(general, false);
+    return;
+  }
+  if (initial.statRules.count !== 5) throw new Error('능력치 규칙과 기능 판이 다릅니다.');
+  if (initial.statRules.total !== 275 || initial.statRules.min !== 15 || initial.statRules.max !== 90)
     throw new Error('5능력치 생성 규칙을 확인하세요.');
-  for (const general of initial.generals) assertGeneralStatProfile(general, five);
+  for (const general of initial.generals) assertGeneralStatProfile(general, true);
+}
+
+// DB의 nullable 열은 세 능력 월드의 규칙 상태에 포함하지 않는다.
+export function storedGeneralStats<T extends object>(row: T, five: boolean) {
+  const { politics, charm, ...base } = row as T & { politics?: number | null; charm?: number | null };
+  if (!five && (politics != null || charm != null)) throw new Error('기존 월드에 새 능력치가 저장됐습니다.');
+  const general = { ...base, ...(five ? { politics: politics!, charm: charm! } : {}) };
+  assertGeneralStatProfile(general, five);
+  return general;
+}
+export function generalStats(general: {
+  leadership: number;
+  strength: number;
+  intel: number;
+  politics?: number;
+  charm?: number;
+}) {
+  return Object.hasOwn(general, 'politics') || Object.hasOwn(general, 'charm')
+    ? readGeneralFiveStats(general)
+    : { leadership: general.leadership, strength: general.strength, intel: general.intel };
+}
+export function pledgeChance(general: { charm?: number; leadership: number }): number {
+  return 25 + Math.floor((general.charm ?? general.leadership) / 2);
 }

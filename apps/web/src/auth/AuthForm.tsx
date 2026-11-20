@@ -92,7 +92,7 @@ export function AuthForm({ mode, next }: { mode: Mode; next?: string | undefined
         <label htmlFor={`${id}-email`}>이메일</label>
         <input
           id={`${id}-email`}
-          className={styles.input}
+          className={`kit-input ${styles.kitInput}`}
           type="email"
           name="email"
           autoComplete="email"
@@ -112,7 +112,7 @@ export function AuthForm({ mode, next }: { mode: Mode; next?: string | undefined
         <div className={styles.passwordRow}>
           <input
             id={`${id}-password`}
-            className={styles.input}
+            className={`kit-input ${styles.kitInput}`}
             type={showPassword ? 'text' : 'password'}
             name="password"
             autoComplete={text.password}
@@ -121,7 +121,8 @@ export function AuthForm({ mode, next }: { mode: Mode; next?: string | undefined
           />
           <button
             type="button"
-            className={styles.toggle}
+            className={`kit-button ${styles.kitToggle}`}
+            data-kind="secondary"
             aria-pressed={showPassword}
             aria-controls={`${id}-password`}
             onClick={() => setShowPassword((shown) => !shown)}
@@ -153,7 +154,12 @@ export function AuthForm({ mode, next }: { mode: Mode; next?: string | undefined
         />
       ) : null}
 
-      <button type="submit" className={styles.submit} disabled={busy || (mode === 'signup' && !consent.ready)}>
+      <button
+        type="submit"
+        className={`kit-button ${styles.kitSubmit}`}
+        data-kind="accent"
+        disabled={busy || (mode === 'signup' && !consent.ready)}
+      >
         {busy ? text.pending : text.submit}
       </button>
     </form>

@@ -121,6 +121,7 @@ describe('월간 인사의 만료·NPC·마무리 조합', () => {
     const before = world();
     before.nations[1]!.gold = 10_000;
     before.generals[5] = { ...before.generals[3]!, id: 5, userId: 'person5', name: '장수5' };
+    before.campaign!.sources['5'] = 'fixture:5';
     const monthly = runMonthly(before, 40_000, rngFor('month-step', 'monthly', before.startYear, 4));
     const result = runPersonnelMonth({
       before,

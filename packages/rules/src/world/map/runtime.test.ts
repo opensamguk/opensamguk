@@ -1,3 +1,6 @@
+import { providedRuleKeys } from './../../providedRules';
+import { providedRuleData } from '../../providedRuleData';
+import { initialLogisticsState, readLogisticsConfig } from '../../logistics/state';
 import { describe, expect, it } from 'vitest';
 import { operationalInput } from '../../../test/operationalMapFixture';
 import { buildInitialWorld } from '../bootstrap';
@@ -20,7 +23,7 @@ describe('AC-INT-02 운영 지도 생성·경제 경계', () => {
     expect(validateWorldResources(input).status).toBe('pass');
     const initial = buildInitialWorld(input);
     expect(() => checkOperationalProfile(initial)).not.toThrow();
-    expect(initial.ruleFeatures).toEqual(['five-stats', 'operational-map']);
+    expect(providedRuleKeys).toEqual(expect.arrayContaining(['five-stats', 'operational-map']));
     expect(initial.cities.map(({ cityKey, kind, connections }) => ({ cityKey, kind, connections }))).toEqual([
       { cityKey: 1, kind: 'CITY', connections: [99] },
       { cityKey: 2, kind: 'CITY', connections: [99] },
@@ -137,17 +140,17 @@ describe('AC-INT-02 운영 지도 생성·경제 경계', () => {
         value.nations[0]!.capitalCityKey = 99;
       },
       (value: typeof initial) => {
-        value.ruleFeatures = ['five-stats'];
+        (value.operationalMap as { version: number }).version = 2;
       },
     ]) {
       const invalid = structuredClone(initial);
       change(invalid);
       expect(() => checkOperationalProfile(invalid)).toThrow();
     }
-    const map = readOperationalMap(initial.operationalMap, initial.ruleFeatures!, { initial })!;
+    const map = readOperationalMap(initial.operationalMap, { initial })!;
     const altered = structuredClone(map);
     altered.sites[0]!.position.x++;
-    expect(() => readOperationalMap(altered, initial.ruleFeatures!, { initial })).toThrow('생성 기록');
+    expect(() => readOperationalMap(altered, { initial })).toThrow('생성 기록');
     expect(() =>
       attachOperationalKinds(
         initial.cities.map((city) => ({ ...city, kind: null })),
@@ -159,7 +162,13 @@ describe('AC-INT-02 운영 지도 생성·경제 경계', () => {
   });
 
   it('관문의 경제·수도·건국·도시 승리 집계를 막고 기존 수비 보강·주둔은 유지한다', () => {
-    const state = toWorldState(buildInitialWorld(operationalInput()));
+    const initial = buildInitialWorld(operationalInput());
+    const state = toWorldState(initial);
+    state.logistics = initialLogisticsState(
+      readLogisticsConfig(providedRuleData(initial, 60)['logistics-v1'], state),
+      state,
+    );
+    Object.assign(state.logistics.cities['99']!, { iron: 100, wood: 100, horses: 0 });
     const pass = state.cities[99]!;
     const before = structuredClone(pass);
     expect(settlePopulation(state).cities[99]).toEqual(before);

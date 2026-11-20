@@ -1,11 +1,5 @@
-/* 기록 세 칸 (INT-25, D-085). 메인 격자의 records 칸 배치(MainPage .records: 두 칸, 중원 정세 한 줄 차지)를
-   넓은 화면에서 원작처럼 장수 동향 | 개인 기록 | 중원 정세 세 칸으로 바꾼다. 1100px 이하는 메인 규칙대로 한 칸씩 쌓는다.
-   div를 붙여 메인 규칙보다 앞서게 한다. */
-@media (min-width: 1101px) {
-  div.strip {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  div.strip > [data-main-area='world-records'] {
-    grid-column: auto;
-  }
+/* 기록 칸 (INT-25, D-085, INT-29 devsam 동등성). 원작 메인은 장수 동향 | 개인 기록 두 칸 아래에 중원 정세가 전체 폭이다.
+   배치는 메인 격자(MainPage .records)가 정한다. 예전 넓은 화면 세 칸 덮어쓰기는 원작과 달라 뺐다(LOG-DIFF.md). */
+.strip {
+  min-width: 0;
 }

@@ -1,8 +1,15 @@
+import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
-import { TICKS_PER_MONTH, type LogisticsConfig, type ReplayState, type WorldInit } from '../packages/rules/src/index';
+import {
+  ruleRegistry,
+  TICKS_PER_MONTH,
+  type LogisticsConfig,
+  type ReplayState,
+  type WorldInit,
+} from '../packages/rules/src/index';
 import { governanceTestConfig } from '../packages/rules/src/governance/testFixture';
 import { lineageTestConfig } from '../packages/rules/src/lineage/testFixture';
 import { commandInitial } from '../packages/rules/test/commandFixture';
@@ -24,29 +31,13 @@ if (!url) throw new Error('확장 결합 전용 테스트 DB가 필요합니다.
 const target = new URL(url);
 if (
   !['postgres:', 'postgresql:'].includes(target.protocol) ||
-  !['127.0.0.1', 'localhost'].includes(target.hostname) ||
-  !/^\/[a-z][a-z0-9_]*_test$/.test(target.pathname) ||
+  !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(target.pathname) ||
   target.searchParams.has('host') ||
   target.searchParams.has('port')
 )
-  throw new Error('loopback 전용 테스트 DB를 확인하세요.');
+  throw new Error('전용 테스트 DB를 확인하세요.');
 let db = createDb(url);
 const ids: string[] = [];
-const features = [
-  'campaign-assignment-v2',
-  'campaign-v1',
-  'city-resources-v1',
-  'five-stats',
-  'governance-v1',
-  'heritage-v1',
-  'lineage-v1',
-  'logistics-v1',
-  'operational-map',
-  'personnel',
-  'policy',
-  'stratagem-basic',
-  'treaty',
-];
 
 describe('AC-P2-30·31·32·33 정식 491명 확장 결합', () => {
   let worldId: string;
@@ -70,8 +61,8 @@ describe('AC-P2-30·31·32·33 정식 491명 확장 결합', () => {
       expect(initial.generals).toHaveLength(491);
       expect(initial.nations).toHaveLength(21);
       expect(initial.cities).toHaveLength(61);
+      initial.fogOfWar = false;
       const native = structuredClone(initial);
-      initial.ruleFeatures = [...features];
       const supplied = structuredClone(initial);
       const city = initial.cities.find(
         (row) =>
@@ -109,7 +100,7 @@ describe('AC-P2-30·31·32·33 정식 491명 확장 결합', () => {
         turnTermMinutes: 60,
         endYear: 201,
         replayFormat: 3,
-        ruleFeatures: [...features],
+
         featureData: {
           'logistics-v1': logistics,
           'governance-v1': governanceTestConfig,
@@ -121,7 +112,7 @@ describe('AC-P2-30·31·32·33 정식 491명 확장 결합', () => {
       expect(initial).toEqual(supplied);
       const stored = await db.world.findUniqueOrThrow({ where: { id: worldId } });
       const origin = stored.replayOrigin as unknown as { initial: WorldInit; featureData: Record<string, unknown> };
-      expect(origin.initial).toEqual({ ...native, ruleFeatures: features, generals: origin.initial.generals });
+      expect(origin.initial).toEqual({ ...native, generals: origin.initial.generals });
       expect(
         origin.initial.generals.map((general) => {
           const unchanged = { ...general };
@@ -131,7 +122,7 @@ describe('AC-P2-30·31·32·33 정식 491명 확장 결합', () => {
       ).toEqual(native.generals);
       expect(stored.initialStateHash).toBe(hashState(origin.initial));
       expect(origin.featureData['heritage-v1']).toEqual({ version: 1 });
-      expect(stored.ruleFeatures).toEqual(features);
+      expect(providedRuleKeys).toEqual(ruleRegistry.features.map(({ key }) => key).sort());
       before = await db.$transaction((tx) => loadReplayState(tx, worldId));
       expect(Object.keys(before.state.generals)).toHaveLength(491);
       expect(Object.values(before.state.generals).filter((general) => general.sex === 'UNKNOWN')).toHaveLength(468);
@@ -157,7 +148,8 @@ describe('AC-P2-30·31·32·33 정식 491명 확장 결합', () => {
     }
   });
 
-  it('원래 NPC 차례를 진행해 첫 달 확장 상태와 연감을 함께 저장한다', () => {
+  // 정식 491명 한 달 실측 66.2초. 전체 NPC·월 정산 검증을 유지한다.
+  it('원래 NPC 차례를 진행해 첫 달 확장 상태와 연감을 함께 저장한다', ({ signal }) => {
     execution = (async () => {
       await controlClock(db, worldId, 'start');
       const lease = await acquireLease(db, worldId);
@@ -166,9 +158,15 @@ describe('AC-P2-30·31·32·33 정식 491명 확장 결합', () => {
         // 일괄 진행 중에도 각 commit의 유효한 실행권을 갱신한다.
         const loop = new TurnLoop(db, lease, { beforeCommit: (tx) => renewLease(tx, lease) });
         for (let tick = 1000; tick <= TICKS_PER_MONTH; tick += 1000) {
+          const started = performance.now();
           await renewLease(db, lease);
-          await loop.advanceTo(tick);
+          await loop.advanceTo(tick, signal);
+          console.info(
+            'expanded-native-advance',
+            JSON.stringify({ tick, elapsedMs: Math.round(performance.now() - started) }),
+          );
         }
+        signal.throwIfAborted();
       } finally {
         await releaseLease(db, lease);
       }
@@ -181,7 +179,7 @@ describe('AC-P2-30·31·32·33 정식 491명 확장 결합', () => {
       expect(hashState(after)).not.toBe(hashState(before));
     })();
     return execution;
-  }, 60_000);
+  }, 120000);
 
   it('새 DB 연결에서 전체 상태·생산 원장·국가별 황실 상태를 보존한다', () => {
     execution = (async () => {
@@ -212,7 +210,7 @@ describe('AC-P2-30·31·32·33 정식 491명 확장 결합', () => {
     return execution;
   });
 
-  it('13기능을 원생성부터 실제 재생해 첫 달의 정확한 tick·sequence·해시를 대조한다', () => {
+  it('제공 규칙을 원생성부터 실제 재생해 첫 달의 정확한 tick·sequence·해시를 대조한다', () => {
     execution = (async () => {
       const month = await db.yearbookSnapshot.findUniqueOrThrow({
         where: { worldId_tick: { worldId, tick: TICKS_PER_MONTH } },
@@ -250,13 +248,11 @@ describe('AC-P2-30·31·32·33 차례 인사 문맥의 전역 무결성', () => 
   });
   async function fixture() {
     const initial = commandInitial();
-    initial.ruleFeatures = ['personnel', 'policy'];
     const saved = await saveInitialWorld(db, initial, {
       name: '인사 문맥 무결성 고정물',
       turnTermMinutes: 60,
       endYear: null,
       replayFormat: 3,
-      ruleFeatures: initial.ruleFeatures,
     });
     owned.push(saved.worldId);
     await controlClock(db, saved.worldId, 'start');

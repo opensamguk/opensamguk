@@ -13,7 +13,8 @@ function npcContext(world: WorldView, tick: number) {
   const index = governanceRealmIndex(world, world.governance, tick);
   const cities = new Map<number, number>();
   for (const city of Object.values(world.cities))
-    if (city.nationId !== null && city.kind !== 'PASS') cities.set(city.nationId, (cities.get(city.nationId) ?? 0) + 1);
+    if (city.nationId !== null && city.kind !== 'PASS' && city.kind !== 'FIELD')
+      cities.set(city.nationId, (cities.get(city.nationId) ?? 0) + 1);
   const isNpc = (generalId: number | null | undefined) =>
     generalId !== null && generalId !== undefined && world.generals[generalId]?.userId === null;
   const stronger = (upper: number, lower: number) =>

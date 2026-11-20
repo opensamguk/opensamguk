@@ -9,6 +9,8 @@ import { controlClock } from './world/clock';
 import { exportReplay, replayArchive } from './replay';
 import { prepareSeasonWorld } from '../test/seasonFixture';
 import { runSupervisor, type SupervisorEvent } from './supervisor';
+import { acquireLease, releaseLease } from './lease';
+import { TurnLoop } from './turnLoop';
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
 const db = createDb(url),
@@ -47,14 +49,31 @@ it('실제 가속 자식은 배치·리스 갱신·2초 정지·재개·SIGKILL 
   const user = await db.user.create({ data: { email: 'accelerated-worker@test.invalid', passwordHash: 'test-only' } });
   users.push(user.id);
   const initial = await monthlyFixture();
-  initial.generals = [{ ...initial.generals[0]!, userId: user.id }];
+  initial.scenarioKey = 'engine-accelerated-fixture';
+  initial.generals = [{ ...initial.generals[0]!, userId: null }];
   const { worldId } = await saveInitialWorld(db, initial, {
-    replayFormat: 'legacy',
     name: '끝없는 가속 시험',
     turnTermMinutes: 60,
     endYear: null,
   });
   worlds.push(worldId);
+  await db.world.update({ where: { id: worldId }, data: { runtimeOptions: { entry: { npcPlay: 'on' } } } });
+  const possession = await db.inputEvent.create({
+    data: {
+      worldId,
+      userId: user.id,
+      kind: 'general.possess',
+      idempotencyKey: 'accelerated-possess',
+      payload: { generalId: 1, userId: user.id },
+    },
+  });
+  const setupLease = (await acquireLease(db, worldId))!;
+  try {
+    await new TurnLoop(db, setupLease).advanceTo(0);
+  } finally {
+    await releaseLease(db, setupLease);
+  }
+  expect((await db.inputEvent.findUniqueOrThrow({ where: { id: possession.id } })).status).toBe('APPLIED');
   await controlClock(db, worldId, 'start');
   await controlClock(db, worldId, 'accelerate');
   const first = worker(worldId);
@@ -86,10 +105,10 @@ it('실제 가속 자식은 배치·리스 갱신·2초 정지·재개·SIGKILL 
       await until(async () => (await db.world.findUniqueOrThrow({ where: { id: worldId } })).clockTick > stopped);
       await controlClock(db, worldId, 'pause');
       expect(
-        await db.$queryRaw`SELECT "generalId",tick,COUNT(*) FROM "GeneralLog" WHERE "worldId" = ${worldId} GROUP BY "generalId",tick HAVING COUNT(*) > 1`,
+        await db.$queryRaw`SELECT "generalId",tick,COUNT(*) FROM "GeneralLog" WHERE "worldId" = ${worldId} AND "commandKey" = 'rest' GROUP BY "generalId",tick HAVING COUNT(*) > 1`,
       ).toEqual([]);
       expect(
-        await db.$queryRaw`SELECT tick FROM (SELECT tick,lag(tick) OVER (ORDER BY tick) AS previous FROM "GeneralLog" WHERE "worldId" = ${worldId}) q WHERE previous IS NOT NULL AND tick - previous <> 10000`,
+        await db.$queryRaw`SELECT tick FROM (SELECT tick,lag(tick) OVER (ORDER BY tick) AS previous FROM "GeneralLog" WHERE "worldId" = ${worldId} AND "commandKey" = 'rest') q WHERE previous IS NOT NULL AND tick - previous <> 10000`,
       ).toEqual([]);
       const archive = await exportReplay(db, worldId);
       expect(replayArchive(archive, 3)).toHaveLength(3);

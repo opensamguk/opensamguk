@@ -7,7 +7,7 @@ import { newSession } from '../apps/server/src/auth/session';
 import { newAccountToken } from '../apps/server/src/auth/accountToken';
 import type { LegalPolicy } from '../apps/server/src/legal/policy';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { holdLease } from './game';
@@ -601,19 +601,9 @@ test('T3-03 AC-M3-02 정식191 두 월드·사람30칸을 UI로 만든 뒤 실�
           portraitMap: '191-map',
           seed: 'withdrawal-ui-formal-191-' + index,
         });
-        initial.ruleFeatures = [
-          'campaign-assignment-v2',
-          'campaign-v1',
-          'five-stats',
-          'operational-map',
-          'personnel',
-          'policy',
-          'stratagem-basic',
-          'treaty',
-        ];
         expect(initial.generals).toHaveLength(491);
         expect(initial.nations).toHaveLength(21);
-        const { worldId } = await saveInitialWorld(stack.db, initial, {
+        const { worldId } = await saveFixtureWorld(stack.db, initial, {
           name: '탈퇴 화면 정식191-' + index,
           turnTermMinutes: 60,
           endYear: 201,
@@ -624,6 +614,8 @@ test('T3-03 AC-M3-02 정식191 두 월드·사람30칸을 UI로 만든 뒤 실�
         await page.goto(stack.origin + '/w/' + worldId + '/create');
         await expect(page.getByRole('spinbutton')).toHaveCount(5);
         await page.getByLabel('이름', { exact: true }).fill('탈퇴장수' + index);
+        // 성별은 늘 필수다(가문 규칙 상시, D-104).
+        await page.getByRole('radio', { name: '남', exact: true }).check();
         await page.getByRole('button', { name: '장수 만들기', exact: true }).click();
         await expect
           .poll(() => stack.db.inputEvent.count({ where: { worldId, kind: 'general.create', status: 'PENDING' } }))
@@ -635,6 +627,7 @@ test('T3-03 AC-M3-02 정식191 두 월드·사람30칸을 UI로 만든 뒤 실�
           data: {
             worldId,
             name: '보존장수' + index,
+            sex: 'MALE',
             leadership: 55,
             strength: 55,
             intel: 55,

@@ -1,3 +1,4 @@
+import { readTransactionOptions } from '../readTransaction';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { Prisma } from '@opensamguk/db';
 import type { PersonnelInputKind } from '@opensamguk/rules';
@@ -29,7 +30,7 @@ export async function withPersonnel<T>(
       const ready = requirePersonnelWorld(await requireWorld(tx, worldId));
       return read(tx, ready);
     },
-    { isolationLevel: 'RepeatableRead' },
+    { ...readTransactionOptions },
   );
 }
 type Submission = { worldId: string; requestId: string; payload: unknown };

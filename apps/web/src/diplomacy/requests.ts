@@ -187,7 +187,7 @@ export function phaseText(phase: Phase): string {
       return '보내는 중';
     case 'pending':
     case 'checking':
-      return '처리 중. 엔진이 처리하면 결과가 나옵니다.';
+      return '처리 중. 처리가 끝나면 결과가 나옵니다.';
     case 'unknown':
       return '응답을 받지 못했습니다. 같은 요청으로 다시 보내면 처리 결과를 되찾습니다.';
     case 'auth':

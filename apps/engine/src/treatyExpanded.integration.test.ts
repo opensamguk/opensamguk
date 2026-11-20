@@ -1,9 +1,10 @@
+import { saveFixtureWorld as saveInitialWorld } from '../test/worldFixture';
 import { createRequire } from 'node:module';
 import { afterAll, expect, it } from 'vitest';
 import { createDb, worldChannel, type Prisma, type RealtimeSignal } from '@opensamguk/db';
 import type { TreatyInput } from '@opensamguk/rules';
 import { monthlyFixture } from '../test/monthlyFixture';
-import { saveInitialWorld } from './world/persistence';
+
 import { controlClock } from './world/clock';
 import { acquireLease, releaseLease } from './lease';
 import { TurnLoop } from './turnLoop';
@@ -54,13 +55,11 @@ it.each(['만료', '파기'] as const)(
     });
     users.push(rulerA.id, rulerB.id);
     const initial = await monthlyFixture();
-    initial.ruleFeatures = [
-      ...(personnel ? ['personnel'] : []),
-      'treaty',
-      'treaty-break',
-      'treaty-expanded',
-      'treaty-trade',
-    ];
+    // 연결망과 도시 경제를 직접 정하는 합성 조약 판이다.
+    delete initial.operationalMap;
+    initial.cities.forEach((city) => {
+      delete city.kind;
+    });
     initial.nations.forEach((nation) => {
       nation.isNpc = false;
     });

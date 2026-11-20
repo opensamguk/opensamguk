@@ -1,6 +1,16 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { createAccount, withE2eDb } from './account';
-import { createGeneralByApi, e2eFeatureWorld, mutate, query, stubPortraits, turns, waitTurnWindow } from './game';
+import { putPicked } from './commandPicker';
+import {
+  createGeneralByApi,
+  e2eFeatureWorld,
+  mutate,
+  placeGeneral,
+  query,
+  stubPortraits,
+  turns,
+  waitTurnWindow,
+} from './game';
 
 // T2-08 · AC-M2-06, AC-M2-14 화면: 외교실 조약서와 예턴 편집의 교역 대상.
 // T2-07이 main에 병합됐으므로 실제 API·엔진으로 실행한다.
@@ -10,7 +20,9 @@ test.describe.configure({ timeout: 180_000 });
 
 const ownedWorlds = new Set<string>();
 async function diplomacyWorld() {
-  const id = await e2eFeatureWorld(['policy', 'treaty', 'treaty-break', 'treaty-trade'], { npcNations: false });
+  // 외교 입력(제안, 수락, 파기)은 엔진이 바로 처리하고 이 시험들은 월 진행을 기다리지 않는다. 1030 한 달 처리는
+  // 36~43초(실측)라 1분 턴 월드가 여럿 돌면 CI의 공용 월드 엔진까지 밀린다. 60분 턴으로 만든다.
+  const id = await e2eFeatureWorld({ npcNations: false, turnTermMinutes: 60 });
   ownedWorlds.add(id);
   return id;
 }
@@ -37,13 +49,10 @@ async function officer(browser: Browser, world: string, nationId: number, office
   await stubPortraits(page);
   await createAccount(page);
   const general = await createGeneralByApi(page, world);
-  await withE2eDb(async (db) => {
-    const city = await db.city.findFirstOrThrow({ where: { worldId: world, nationId }, select: { cityKey: true } });
-    await db.general.update({
-      where: { worldId_id: { worldId: world, id: general.id } },
-      data: { nationId, officerLevel, cityKey: city.cityKey },
-    });
-  });
+  const city = await withE2eDb((db) =>
+    db.city.findFirstOrThrow({ where: { worldId: world, nationId }, select: { cityKey: true } }),
+  );
+  await placeGeneral(world, general.id, { nationId, officerLevel, cityKey: city.cityKey });
   return { page, generalId: general.id, nationId };
 }
 
@@ -306,14 +315,14 @@ test.describe('예턴 편집의 교역 대상', () => {
     await proposeByApi(a.page, world, away.nationId!, [{ kind: 'trade', months: 12 }]);
     await acceptByApi(b.page, world);
 
-    // 1분 턴이 시험 도중에 실행되면 예턴이 한 칸 당겨져 5번 칸과 저장 revision이 어긋난다. 여유가 있을 때 시작한다.
+    // 턴이 시험 도중에 실행되면 예턴이 한 칸 당겨져 5번 칸과 저장 revision이 어긋난다. 여유가 있을 때 시작한다.
     await waitTurnWindow(a.page, world, 45_000);
     const editor = a.page.getByTestId('turn-editor');
     await a.page.goto(`/w/${world}`);
     await editor.locator('tr[data-slot="3"]').click();
     await editor.getByLabel('명령 찾기').fill('훈련');
     await editor.getByRole('radio', { name: '훈련' }).check();
-    await editor.getByRole('button', { name: /3번 칸에 넣기/ }).click();
+    await putPicked(a.page, editor, '3번 칸에 넣기');
     await editor.locator('tr[data-slot="5"]').click();
     await editor.getByLabel('명령 찾기').fill('교역');
     await editor.getByRole('radio', { name: '교역' }).check();
@@ -337,7 +346,7 @@ test.describe('예턴 편집의 교역 대상', () => {
     const city = target.locator(`[data-value="${away.key}"]`);
     await city.click();
     await expect(city).toHaveAttribute('aria-checked', 'true');
-    await editor.getByRole('button', { name: '5번 칸에 넣기', exact: true }).click();
+    await putPicked(a.page, editor, '5번 칸에 넣기');
     await expect(editor.locator('tr[data-slot="5"]')).toContainText('교역');
     await expect(editor.locator('tr[data-slot="5"]')).toContainText(away.name);
     const before = await turns(a.page, world);

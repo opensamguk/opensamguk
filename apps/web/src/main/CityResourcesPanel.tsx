@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useTRPC, useTRPCClient } from '../trpc';
 import { errorCode, serverMessage } from '../turns/apiError';
@@ -15,6 +15,7 @@ import {
   type VisibleCityResources,
 } from './cityResourceRequest';
 import styles from './CityResourcesPanel.module.css';
+import { useWorldEnded } from '../game/queries';
 
 type View = { userId: string; board: CityResourceBoard; pending: AllocationRequest | null };
 const number = (value: number) => value.toLocaleString('ko-KR');
@@ -28,17 +29,14 @@ const admissionRejected = (error: unknown) =>
   ['BAD_REQUEST', 'FORBIDDEN', 'CONFLICT', 'PRECONDITION_FAILED', 'TOO_MANY_REQUESTS'].includes(errorCode(error) ?? '');
 
 export function CityResourcesPanel({ worldId, cityKey }: { worldId: string; cityKey: number }) {
-  const trpc = useTRPC();
-  const summary = useQuery(trpc.world.summary.queryOptions({ worldId }));
-  return summary.data?.cityResourcesEnabled === true ? (
-    <ResourceBoard key={`${worldId}:${cityKey}`} worldId={worldId} cityKey={cityKey} />
-  ) : null;
+  return <ResourceBoard key={`${worldId}:${cityKey}`} worldId={worldId} cityKey={cityKey} />;
 }
 
 function ResourceBoard({ worldId, cityKey }: { worldId: string; cityKey: number }) {
   const api = useTRPCClient(),
     trpc = useTRPC(),
     queries = useQueryClient();
+  const ended = useWorldEnded(worldId);
   const [view, setView] = useState<View | null>(null);
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
@@ -102,7 +100,7 @@ function ResourceBoard({ worldId, cityKey }: { worldId: string; cityKey: number 
           return;
         }
         if (Date.now() >= deadline) {
-          setNotice('아직 처리 중입니다. 같은 요청의 상태를 다시 확인할 수 있습니다.');
+          setNotice('아직 처리 중입니다. 같은 요청의 상태를 다시 확인하세요.');
           return;
         }
         await new Promise<void>((resolve) => {
@@ -183,7 +181,7 @@ function ResourceBoard({ worldId, cityKey }: { worldId: string; cityKey: number 
 
   // 원장은 공용 캐시에 넣지 않고 같은 신원/세대에서 새로 읽는다. 입력 중인 폼은 다시 만들지 않는다.
   useEffect(() => {
-    if (!view || view.pending || busy || (view.board.visible && view.board.status !== 'RUNNING')) return;
+    if (ended || !view || view.pending || busy || (view.board.visible && view.board.status !== 'RUNNING')) return;
     const timer = setInterval(() => {
       if (sending.current || document.hidden) return;
       const signal = controller.current?.signal,
@@ -200,7 +198,7 @@ function ResourceBoard({ worldId, cityKey }: { worldId: string; cityKey: number 
         });
     }, 15_000);
     return () => clearInterval(timer);
-  }, [view, busy, snapshot]);
+  }, [ended, view, busy, snapshot]);
 
   // actorId: 새 배속이면 양식을 그린 화면의 장수. 다시 읽은 장수가 다르면(계승) 보내지 않는다.
   async function act(request: AllocationRequest, submit: boolean, actorId?: number) {
@@ -222,9 +220,10 @@ function ResourceBoard({ worldId, cityKey }: { worldId: string; cityKey: number 
         if (
           !fresh.board.visible ||
           !fresh.board.canAllocate ||
-          request.payload.amount > allocationLimit(fresh.board, request.payload.unitId, request.payload.crewType)
+          request.payload.amount >
+            allocationLimit(fresh.board, Number(request.payload.unitId), request.payload.crewType)
         )
-          throw new Error('수량·병종·지휘 상한을 다시 확인하세요.');
+          throw new Error('수량, 병종, 지휘 상한을 다시 확인하세요.');
         const me = await api.auth.me.query(undefined, {
           signal: AbortSignal.any([run.signal, AbortSignal.timeout(10_000)]),
         });
@@ -277,8 +276,8 @@ function ResourceBoard({ worldId, cityKey }: { worldId: string; cityKey: number 
     }
   }
   return (
-    <section className={styles.panel} aria-label="도시 금·쌀·수비병">
-      <h3>도시 금·쌀·수비병</h3>
+    <section className={styles.panel} aria-label="도시 금, 쌀, 수비병">
+      <h3>도시 금, 쌀, 수비병</h3>
       {notice ? (
         <p className={styles.error} role="status">
           {notice}
@@ -295,13 +294,13 @@ function ResourceBoard({ worldId, cityKey }: { worldId: string; cityKey: number 
           </button>
         </>
       ) : !view.board.visible ? (
-        <p className={styles.note}>금·쌀·수비병은 자기 국가 도시나 내 장수가 있는 도시에서만 보입니다.</p>
+        <p className={styles.note}>금, 쌀, 수비병은 자기 국가 도시나 내 장수가 있는 도시에서만 보입니다.</p>
       ) : (
         <>
           <ResourceSummary board={view.board} />
           {view.pending ? (
             <>
-              <p role="status">배속 요청을 확인하는 중입니다. 새 배속은 처리 결과 뒤에 할 수 있습니다.</p>
+              <p role="status">배속 요청을 확인하는 중입니다. 새 배속은 처리 결과가 나온 뒤에 보내세요.</p>
               <button type="button" disabled={busy} onClick={() => void act(view.pending!, false)}>
                 같은 요청 상태 확인
               </button>
@@ -314,7 +313,7 @@ function ResourceBoard({ worldId, cityKey }: { worldId: string; cityKey: number 
               allocate={(payload) => void act({ requestId: crypto.randomUUID(), payload }, true, view.board.actorId)}
             />
           ) : (
-            <p className={styles.note}>자국 도시의 병력 배속은 군주·참모·수뇌가 맡습니다.</p>
+            <p className={styles.note}>자국 도시의 병력 배속은 군주, 참모, 수뇌가 맡습니다.</p>
           )}
         </>
       )}
@@ -352,7 +351,7 @@ function ResourceSummary({ board }: { board: VisibleCityResources }) {
           rowKey={(row) => row.crewType}
         />
       ) : (
-        <p>도시 수비병이 없습니다. 모병·징병은 개인 예턴에서 예약합니다.</p>
+        <p>도시 수비병이 없습니다. 모병과 징병은 개인 예턴에서 예약합니다.</p>
       )}
       <p className={styles.note}>수비병은 도시 방어에 참전합니다. 부곡에 배속한 인원은 도시 수비병에서 빠집니다.</p>
     </>
@@ -422,7 +421,7 @@ function AllocationForm({
       </button>
       {!board.targets.length ? <p>소유자와 지휘관이 이 도시에 모인 자국 부곡이 없습니다.</p> : null}
       <p className={styles.note}>
-        금·쌀·인구와 장수의 예약30칸은 바꾸지 않습니다. 병종과 지휘 상한은 처리할 때 다시 확인합니다.
+        금, 쌀, 인구와 장수의 예약30칸은 바꾸지 않습니다. 병종과 지휘 상한은 처리할 때 다시 확인합니다.
       </p>
     </form>
   );

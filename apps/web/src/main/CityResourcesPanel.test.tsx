@@ -106,13 +106,6 @@ afterEach(() => {
   clients.length = 0;
   sessionStorage.clear();
 });
-it('INT-18C AC-INT-18C 구판은 도시 자원 조회를 추가하지 않는다', async () => {
-  mocks.enabled = false;
-  const client = mount();
-  await waitFor(() => expect(client.getQueryData(['summary'])).toEqual({}));
-  expect(mocks.get).not.toHaveBeenCalled();
-  expect(screen.queryByRole('region', { name: '도시 금·쌀·수비병' })).toBeNull();
-});
 it('INT-18C AC-INT-18C focus 신원 교체 뒤 늦은 이전 도시 자료를 표시하지 않는다', async () => {
   let release!: (value: ReturnType<typeof board>) => void;
   mocks.get
@@ -184,7 +177,7 @@ it('INT-18C AC-INT-18C 같은 UUID를 가진 다른 계정의 terminal 응답은
 it('INT-18C AC-INT-18C 비공개 도시는 자원과 배속 대상을 표시하지 않는다', async () => {
   mocks.get.mockResolvedValue({ userId: mocks.user, cityKey: 2, visible: false });
   mount();
-  await screen.findByText('금·쌀·수비병은 자기 국가 도시나 내 장수가 있는 도시에서만 보입니다.');
+  await screen.findByText('금, 쌀, 수비병은 자기 국가 도시나 내 장수가 있는 도시에서만 보입니다.');
   expect(screen.queryByText('금 123')).toBeNull();
   expect(screen.queryByRole('combobox', { name: '배속할 부곡' })).toBeNull();
 });

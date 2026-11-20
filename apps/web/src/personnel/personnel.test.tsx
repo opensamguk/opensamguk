@@ -434,7 +434,6 @@ describe('인사부', () => {
 
   const officeBoard: PersonnelBoard = {
     ...board,
-    officeEffectsEnabled: true,
     officeCities: [{ cityKey: 1, name: '신야' }],
     members: [
       ...board.members.map((member) => ({ ...member, resident: member.generalId === 2 })),
@@ -496,7 +495,6 @@ describe('인사부', () => {
           { generalId: 1, name: '장비', officerLevel: 4, resident: false, isHuman: true, portraitId: null },
           { generalId: 2, name: '제갈량', officerLevel: 11, resident: true, isHuman: false, portraitId: null },
         ]}
-        secretaryEnabled
       />,
     );
     const panel = within(screen.getByRole('region', { name: '관직 주재' }));
@@ -575,16 +573,20 @@ describe('인사부', () => {
         onDismiss={vi.fn()}
       />,
     );
-    expect(screen.queryByRole('combobox')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: /임명/ }));
-    expect(screen.getByRole('note').textContent).toBe('군주만 임명할 수 있습니다');
+    // 지방 관직 칸에도 임명 단추와 도시 고르기가 있어 직책 표 안에서만 본다.
+    const levels = within(screen.getByRole('region', { name: '직책 바꾸기' }));
+    expect(levels.queryByRole('combobox')).toBeNull();
+    fireEvent.click(levels.getByRole('button', { name: /임명/ }));
+    expect(levels.getByRole('note').textContent).toBe('군주만 임명할 수 있습니다');
     expect(onAppoint).not.toHaveBeenCalled();
   });
 
   it('처리 중이면 모든 직책 버튼을 막고 그 직책에만 처리 중을 보인다', () => {
     render(<PersonnelBoardView board={board} busyTarget="level-10" onAppoint={vi.fn()} onDismiss={vi.fn()} />);
-    expect(screen.queryByRole('combobox')).toBeNull();
-    expect(screen.getAllByRole('status').map((s) => s.closest('tr')?.getAttribute('data-level'))).toEqual(['10']);
+    // 지방 관직 칸에도 임명 단추와 도시 고르기가 있어 직책 표 안에서만 본다.
+    const levels = within(screen.getByRole('region', { name: '직책 바꾸기' }));
+    expect(levels.queryByRole('combobox')).toBeNull();
+    expect(levels.getAllByRole('status').map((s) => s.closest('tr')?.getAttribute('data-level'))).toEqual(['10']);
   });
 
   it('인사 접수 전에는 모든 직책을 막고 보낸 직책에만 보내는 중을 보인다', () => {
@@ -599,11 +601,13 @@ describe('인사부', () => {
         onDismiss={onDismiss}
       />,
     );
-    expect(screen.queryByRole('combobox')).toBeNull();
-    expect(screen.getByRole('status').textContent).toBe('보내는 중');
-    fireEvent.click(screen.getByRole('button', { name: /임명/ }));
+    // 지방 관직 칸에도 임명 단추와 도시 고르기가 있어 직책 표 안에서만 본다.
+    const levels = within(screen.getByRole('region', { name: '직책 바꾸기' }));
+    expect(levels.queryByRole('combobox')).toBeNull();
+    expect(levels.getByRole('status').textContent).toBe('보내는 중');
+    fireEvent.click(levels.getByRole('button', { name: /임명/ }));
     expect(onAppoint).not.toHaveBeenCalled();
     expect(onDismiss).not.toHaveBeenCalled();
-    expect(screen.getByRole('note').textContent).toBe('요청을 보내는 중입니다.');
+    expect(levels.getByRole('note').textContent).toBe('요청을 보내는 중입니다.');
   });
 });

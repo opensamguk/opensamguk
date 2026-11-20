@@ -61,7 +61,13 @@ export async function assertLease(tx: Prisma.TransactionClient, lease: Lease): P
 }
 
 export async function lockLease(tx: Prisma.TransactionClient, lease: Lease): Promise<void> {
-  await tx.$queryRaw`SELECT "worldId" FROM "EngineLease" WHERE "worldId" = ${lease.worldId} FOR UPDATE`;
-  // 잠금 대기가 끝난 뒤 현재 DB 시각으로 검사한다.
-  await assertLease(tx, lease);
+  // MATERIALIZED의 행 잠금이 끝난 뒤 토큰과 현재 DB 시각을 대조한다.
+  const rows = await tx.$queryRaw<unknown[]>`
+    WITH locked AS MATERIALIZED (
+      SELECT * FROM "EngineLease" WHERE "worldId" = ${lease.worldId} FOR UPDATE
+    )
+    SELECT 1 FROM locked
+    WHERE "ownerId" = ${lease.ownerId} AND "fencingToken" = ${lease.fencingToken}
+      AND "expiresAt" > (clock_timestamp() AT TIME ZONE 'UTC')`;
+  if (rows.length !== 1) throw new LeaseLostError();
 }

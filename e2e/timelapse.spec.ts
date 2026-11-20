@@ -80,23 +80,15 @@ const recordTab = (page: Page, name: string) => recordTabs(page).getByRole('link
 const button = (page: Page, name: string) => panel(page).getByRole('button', { name, exact: true });
 const position = (text: string | null) => Number(/\((\d+)\/\d+\)/.exec(text ?? '')?.[1] ?? Number.NaN);
 
-// 저장된 색 문자열을 브라우저가 계산한 rgb 값으로 바꾼다. 점 채움의 계산값과 견준다.
-const cssColor = (page: Page, color: string) =>
-  page.evaluate((value) => {
-    const probe = document.createElement('i');
-    probe.style.color = value;
-    document.body.append(probe);
-    const computed = getComputedStyle(probe).color;
-    probe.remove();
-    return computed;
-  }, color);
 const city = (page: Page, cityKey: number) =>
   panel(page).locator(`[data-testid="timelapse-map"] [data-city-key="${cityKey}"]`);
-async function fillOf(page: Page, cityKey: number) {
-  const dot = city(page, cityKey).locator('circle');
-  return dot.evaluate((node) => getComputedStyle(node).fill);
-}
 const legend = (page: Page) => panel(page).getByLabel('이 달의 국가별 도시 수');
+// P는 전술 전투를 위해 운영 지도가 있어 재생 지도도 운영 지도로 그린다(OperationalWorldMap). 도시 이름과 국가는
+// 거점의 읽기 이름(이름, 등급, 지역, 국가 순)에, 국가 색은 이름판 바탕에 있다.
+const siteLabel = (cityName: string, nationName: string) => new RegExp(`^${cityName}, (.+, )?${nationName}(, |$)`);
+async function plateColor(page: Page, cityKey: number) {
+  return (await city(page, cityKey).locator('rect[rx="1"]').getAttribute('fill'))?.toLowerCase();
+}
 
 test('E1 위쪽 메뉴 기록에서 영토 재생 탭으로 가고 새로고침 뒤에도 같은 탭이며 다른 기록 탭 3종은 그대로 열린다', async ({
   page,
@@ -183,11 +175,19 @@ test('E2 장수 없는 새 계정으로 A를 열면 첫 페이지와 cursor 3000
     db.general.findFirstOrThrow({
       where: { worldId: a.id, userId: null, nationId: null },
       orderBy: { id: 'asc' },
-      select: { id: true, userId: true },
+      select: { id: true, userId: true, lastActiveTick: true, residenceTick: true },
     }),
   );
   const where = { worldId_id: { worldId: a.id, id: general.id } };
-  await withE2eDb((db) => db.general.update({ where, data: { userId: user.id } }));
+  // 사람 장수에는 활동 tick과 물리 거주 앵커가 있어야 엔진이 월드를 읽는다(apps/engine/src/ruleFeatures.ts, residenceState.ts).
+  // 붙이는 동안 지금 시각을 넣고, 끝나면 원래 값(NPC는 앵커 없음)으로 되돌린다.
+  // 거주 앵커는 앞으로 처리할 tick보다 늦으면 안 되므로 마지막 월 정산 tick을 쓴다(packages/rules/src/personnel/npcMonth.ts).
+  const { clockTick, monthlyTick } = await withE2eDb((db) =>
+    db.world.findUniqueOrThrow({ where: { id: a.id }, select: { clockTick: true, monthlyTick: true } }),
+  );
+  await withE2eDb((db) =>
+    db.general.update({ where, data: { userId: user.id, lastActiveTick: clockTick, residenceTick: monthlyTick } }),
+  );
   try {
     // useWorldEvents는 서버가 닫은 연결을 1·2·5·10·30초 간격으로 다시 연다. 다음 시도가 맡긴 장수를 보고 이어진다.
     await expect(page.getByTestId('realtime-status')).toHaveAttribute('data-realtime', 'open', { timeout: 45_000 });
@@ -199,7 +199,16 @@ test('E2 장수 없는 새 계정으로 A를 열면 첫 페이지와 cursor 3000
     expect(await shown.evaluate((node) => node.isConnected)).toBe(true);
     await expect(panel(page).getByText('35개월 불러옴')).toBeVisible();
   } finally {
-    await withE2eDb((db) => db.general.update({ where, data: { userId: general.userId } }));
+    await withE2eDb((db) =>
+      db.general.update({
+        where,
+        data: {
+          userId: general.userId,
+          lastActiveTick: general.lastActiveTick,
+          residenceTick: general.residenceTick,
+        },
+      }),
+    );
   }
 });
 
@@ -251,7 +260,7 @@ test('E3 첫 화면은 가장 오래된 달이고 재생하면 날짜가 오름�
   await expect(dateLine(page)).toHaveText(`${await dateOf(a, a.ticks[33]!)} (34/35)`);
 });
 
-test('E4 실제 출병으로 멸망한 국가 2는 첫 달에 저장된 이름·색으로 그려지고 둘째 달에는 지도·범례에 없다', async ({
+test('E4 실제 출병으로 멸망한 국가 2는 첫 달에 저장된 이름·색으로 그려지고 마지막 달에는 지도·범례에 없다', async ({
   page,
   timelapseStack,
 }) => {
@@ -263,19 +272,22 @@ test('E4 실제 출병으로 멸망한 국가 2는 첫 달에 저장된 이름·
     ]),
   );
   expect(alive).toBeNull();
-  expect(removed).not.toBeNull();
+  // 실제 모병 60,100 → 사기 70,100 → 전술 점령 80,100 뒤 첫 월간이 90,000이다.
+  expect(removed).toMatchObject({ removedTick: 80_100 });
+  expect(p.ticks).toHaveLength(9);
+  expect(p.ticks.at(-1)).toBe(90_000);
 
   await login(page);
   await page.goto(tabUrl(p));
-  await expect(panel(page).locator('[data-frame-tick="10000"]')).toBeVisible();
+  await expect(panel(page).locator(`[data-frame-tick="${p.ticks[0]}"]`)).toBeVisible();
   await expect(dateLine(page)).not.toContainText('국가 기록 없음');
   await expect(city(page, 2)).toHaveAttribute('data-nation-id', '2');
-  await expect(city(page, 2).locator('title')).toHaveText(`도시2, ${pSaved.removed.name}`);
-  expect(await fillOf(page, 2)).toBe(await cssColor(page, pSaved.removed.color));
+  await expect(city(page, 2)).toHaveAttribute('aria-label', siteLabel('도시2', pSaved.removed.name));
+  expect(await plateColor(page, 2)).toBe(pSaved.removed.color.toLowerCase());
   await expect(legend(page).locator('[data-nation-id="2"]')).toContainText(pSaved.removed.name);
 
-  await button(page, '다음').click();
-  await expect(panel(page).locator('[data-frame-tick="20000"]')).toBeVisible();
+  for (let frame = 1; frame < p.ticks.length; frame++) await button(page, '다음').click();
+  await expect(panel(page).locator(`[data-frame-tick="${p.ticks.at(-1)}"]`)).toBeVisible();
   await expect(dateLine(page)).not.toContainText('국가 기록 없음');
   await expect(panel(page).getByTestId('timelapse-map')).toBeVisible();
   await expect(city(page, 2)).toHaveAttribute('data-nation-id', '1');
@@ -283,7 +295,7 @@ test('E4 실제 출병으로 멸망한 국가 2는 첫 달에 저장된 이름·
   await expect(legend(page).locator('[data-nation-id="2"]')).toHaveCount(0);
 });
 
-test('E5 국가 1의 지금 이름·색을 바꾸면 응답의 currentNations만 바뀌고 화면은 두 달 모두 저장값이다', async ({
+test('E5 국가 1의 지금 이름·색을 바꾸면 응답의 currentNations만 바뀌고 화면은 모든 달에 저장값이다', async ({
   page,
   timelapseStack,
 }) => {
@@ -300,15 +312,16 @@ test('E5 국가 1의 지금 이름·색을 바꾸면 응답의 currentNations만
     await page.goto(tabUrl(p));
     const body = (await framesEntry(await response))?.result?.data;
     expect(body?.currentNations.find(({ id }) => id === 1)).toEqual({ id: 1, ...now });
-    expect(body?.items.map(({ nations }) => nations.find(({ id }) => id === 1))).toEqual([pSaved.first, pSaved.first]);
+    expect(body?.items.map(({ nations }) => nations.find(({ id }) => id === 1))).toEqual(
+      p.ticks.map(() => pSaved.first),
+    );
 
     await page.reload();
-    const savedColor = await cssColor(page, pSaved.first.color);
     for (const tick of p.ticks) {
       await expect(panel(page).locator(`[data-frame-tick="${tick}"]`)).toBeVisible();
       await expect(city(page, 1)).toHaveAttribute('data-nation-id', '1');
-      await expect(city(page, 1).locator('title')).toHaveText(`도시1, ${pSaved.first.name}`);
-      expect(await fillOf(page, 1)).toBe(savedColor);
+      await expect(city(page, 1)).toHaveAttribute('aria-label', siteLabel('도시1', pSaved.first.name));
+      expect(await plateColor(page, 1)).toBe(pSaved.first.color.toLowerCase());
       await expect(legend(page).locator('[data-nation-id="1"]')).toContainText(pSaved.first.name);
       await expect(panel(page)).not.toContainText(now.name);
       if (tick !== p.ticks.at(-1)) await button(page, '다음').click();

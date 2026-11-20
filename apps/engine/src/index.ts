@@ -16,7 +16,7 @@ async function main() {
   const shutdown = () => controller.abort();
   const removeShutdown = onShutdownRequest(shutdown);
   try {
-    console.log('[engine] 시작');
+    console.log(`[engine] 시작 world=${values.world ?? 'supervisor'}`);
     if (values.world) {
       await runEngine(db, {
         worldId: values.world,
@@ -26,7 +26,7 @@ async function main() {
     } else {
       await runSupervisor(db, {
         signal: controller.signal,
-        onEvent: (event) => console.log(`[supervisor] ${event.kind}`),
+        onEvent: (event) => console.log(`[supervisor] ${JSON.stringify(event)}`),
       });
     }
   } finally {

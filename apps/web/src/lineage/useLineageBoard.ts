@@ -167,7 +167,7 @@ export function useLineageBoard(worldId: string) {
         }
         if (Date.now() >= deadline) {
           setNotice({
-            text: '아직 처리 중입니다. 자동 확인을 멈췄습니다. 다시 보내지 않고 같은 요청의 상태만 확인할 수 있습니다.',
+            text: '아직 처리 중입니다. 자동 확인을 멈췄습니다. 다시 보내지 말고 상태만 확인하세요.',
             tone: 'info',
           });
           return;
@@ -328,7 +328,7 @@ export function useLineageBoard(worldId: string) {
             text:
               mode === 'submit'
                 ? '지금은 가문 요청을 보낼 수 없습니다. 위 안내를 확인하세요.'
-                : '지금은 다시 접수할 수 없습니다. 같은 요청의 상태만 확인할 수 있습니다.',
+                : '지금은 다시 접수할 수 없습니다. 상태만 확인하세요.',
             tone: 'error',
           });
           return;

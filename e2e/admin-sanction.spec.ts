@@ -59,7 +59,7 @@ async function settleRoutes(page: Page, jobs: Set<Promise<void>>, routeErrors: u
 }
 async function confirm(actions: Locator, reason: string) {
   await actions.getByLabel('사유 (1~200자)', { exact: true }).fill(reason);
-  await actions.getByRole('checkbox', { name: '대상·범위·사유와 조치를 확인했습니다.', exact: true }).check();
+  await actions.getByRole('checkbox', { name: '대상, 범위, 사유와 조치를 확인했습니다.', exact: true }).check();
 }
 const frames = (page: Page) =>
   page.evaluate(
@@ -99,7 +99,7 @@ test('T3-06 AC-M3-04 새 제재의 관리자·본인 거부와 만료·월드·�
       await expect(actions.getByRole('alert')).toHaveText('월드 UUID를 확인하세요.');
       await confirm(actions, '   ');
       await actions.getByRole('button', { name: '제재 등록 확정', exact: true }).click();
-      await expect(actions.getByRole('alert')).toContainText('대상·범위와 사유를 확인');
+      await expect(actions.getByRole('alert')).toContainText('대상, 범위, 사유를 확인');
       expect(writes).toBe(0);
       expect(await stack.db.adminSanctionRequest.count({ where: { actorUserId: admin.id } })).toBe(0);
     }, [() => context.close()]);

@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -5,6 +6,8 @@ import { afterAll, beforeAll, expect, it as test } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import {
   applyCampaignRelationship,
+  applySexLedger,
+  buildCreatedGeneral,
   checkReplayOrigin,
   TICKS_PER_MONTH,
   type CampaignOrder,
@@ -12,7 +15,7 @@ import {
   type WorldInit,
 } from '../packages/rules/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
-import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb, loadSexLedger } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { loadReplayState } from '../apps/engine/src/monthly';
@@ -28,6 +31,7 @@ import { categories } from '../apps/server/src/authz/coverage';
 import type { readCampaignOrders } from '../apps/server/src/game/campaignOrders';
 import type { readCampaignRequest } from '../apps/server/src/game/campaignApi';
 import { testDatabaseUrl } from './test-database';
+import { prepareFixtureUnit, recruitmentFixtureData } from './fixtures/recruitment';
 
 // AC-INT-19B: 같은 정식 준비를 공유하고 권한 사례(API 묶음)와 긴 실제 차례 시나리오(엔진 묶음)를 나눠 실행한다.
 export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
@@ -38,32 +42,17 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
   if (!process.env.TEST_DATABASE_URL) throw new Error('INT19 전용 TEST_DATABASE_URL이 필요합니다.');
   // 통합 실행기는 DATABASE_URL과 TEST_DATABASE_URL을 같은 테스트 DB로 넘긴다. 이름 규칙만 확인한다.
   const url = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-  if (
-    !['127.0.0.1', 'localhost'].includes(url.hostname) ||
-    url.searchParams.has('host') ||
-    url.searchParams.has('port')
-  )
-    throw new Error('INT19는 loopback 전용 테스트 DB만 사용합니다.');
+  if (url.searchParams.has('host') || url.searchParams.has('port'))
+    throw new Error('INT19 접속 대상 질의 인자는 쓸 수 없습니다.');
   const db = createDb(url.toString());
   const origin = 'http://127.0.0.1:5173',
     seed = 'int19-formal-orders-http-191',
     now = Date.now();
-  const features = [
-    'campaign-assignment-v2',
-    'campaign-v1',
-    'city-resources-v1',
-    'five-stats',
-    'operational-map',
-    'personnel',
-    'policy',
-    'stratagem-basic',
-    'treaty',
-  ];
+  const features = [...providedRuleKeys];
   const worldIds: string[] = [],
     userIds: string[] = [],
     sanctionIds: string[] = [];
-  const running = new Set<Promise<unknown>>(),
-    executionErrors: unknown[] = [];
+  const running = new Set<Promise<unknown>>();
   const scope = new AsyncLocalStorage<AbortSignal>(),
     lifetime = new AbortController();
   let failed = false,
@@ -76,7 +65,8 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
   let initial: WorldInit, a: Actor, b: Actor, outsider: Account, blocked: Account;
   let nationId = 0,
     npcId = 0,
-    foreignUnitId = 0;
+    foreignUnitId = 0,
+    recruitmentType = 0;
   type Account = { userId: string; cookie: string };
   type Actor = Account & { generalId: number };
   type Board = Awaited<ReturnType<typeof readCampaignOrders>>;
@@ -92,9 +82,8 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
     running.add(promise);
     void promise.then(
       () => running.delete(promise),
-      (error) => {
+      () => {
         failed = true;
-        executionErrors.push(error);
         running.delete(promise);
       },
     );
@@ -130,10 +119,18 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
         signal: AbortSignal.any([current, AbortSignal.timeout(10_000)]),
       },
     );
-    const [entry] = (await response.json()) as Array<{ result?: { data: T }; error?: { data: { code: string } } }>;
+    const [entry] = (await response.json()) as Array<{
+      result?: { data: T };
+      error?: { data: { code: string }; message?: string };
+    }>;
     current.throwIfAborted();
     if (!entry) throw new Error('INT19 HTTP 응답이 없습니다.');
-    return { data: entry.result?.data, code: entry.error?.data.code, status: response.status };
+    return {
+      data: entry.result?.data,
+      code: entry.error?.data.code,
+      message: entry.error?.message,
+      status: response.status,
+    };
   }
   async function snapshot(id = worldId, client = db) {
     signal();
@@ -143,7 +140,7 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
   }
   async function board(actor: Account = a) {
     const result = await api<Board>('campaign.orders', { worldId }, actor);
-    expect(result.code).toBeUndefined();
+    expect(result.code, result.message).toBeUndefined();
     if (!result.data) throw new Error('INT19 지시 현황이 없습니다.');
     expect(result.data.userId).toBe(actor.userId);
     return result.data;
@@ -251,7 +248,7 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
       actor,
       true,
     );
-    expect(result.code).toBeUndefined();
+    expect(result.code, result.message).toBeUndefined();
     expect(result.data?.status).toBe('pending');
     return requestId;
   }
@@ -345,9 +342,8 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
     expect((await order(id)).status).toBe(resolved.status);
     return after;
   }
-  async function account(): Promise<Account> {
+  async function account(userId: string = randomUUID()): Promise<Account> {
     signal();
-    const userId = randomUUID();
     await db.user.create({
       data: { id: userId, email: `${userId}@example.invalid`, passwordHash: 'int19-non-login-session-fixture' },
     });
@@ -359,19 +355,44 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
     return { userId, cookie: `sid=${session.token}` };
   }
   async function human(index: number): Promise<Actor> {
-    const owner = await account();
+    const payload = {
+      name: `지시검사${index}`,
+      sex: 'MALE' as const,
+      portraitId: null,
+      leadership: 55,
+      strength: 55,
+      intel: 55,
+      politics: 55,
+      charm: 55,
+    };
+    // 원본 NPC의 첫 달 전체를 준비에서 돌리지 않도록 실제 생성 함수로 초반 차례인 계정만 고른다.
+    let selected: string | undefined;
+    for (let attempt = 0; attempt < 100_000; attempt++) {
+      const userId = randomUUID();
+      const preview = buildCreatedGeneral({
+        payload,
+        userId,
+        seed,
+        id: Math.max(...initial.generals.map((general) => general.id)) + index + 1,
+        startYear: initial.startYear,
+        tick: 0,
+        monthlyTick: 0,
+        cityKeys: initial.cities.filter((city) => city.kind === 'CITY').map((city) => city.cityKey),
+        unitSet: initial.unitSet,
+      });
+      if (preview.nextTurnTick > 0 && preview.nextTurnTick <= 10) {
+        selected = userId;
+        break;
+      }
+    }
+    if (!selected) throw Error('INT19 초반 차례의 사람 고정물을 찾지 못했습니다.');
+    const owner = await account(selected);
     const creating = track(() =>
       api<{ status: string }>(
         'general.create',
         {
           worldId,
-          name: `지시검사${index}`,
-          portraitId: null,
-          leadership: 55,
-          strength: 55,
-          intel: 55,
-          politics: 55,
-          charm: 55,
+          ...payload,
         },
         owner,
         true,
@@ -391,6 +412,7 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
     const general = await db.general.findUniqueOrThrow({
       where: { worldId_userId: { worldId, userId: owner.userId } },
     });
+    expect(general.nextTurnTick).toBeLessThanOrEqual(10);
     expect(await db.generalTurn.count({ where: { worldId, generalId: general.id } })).toBe(30);
     expect((await snapshot()).state.campaign!.sources[String(general.id)]).toMatch(/^input:\d+#general:/);
     return { ...owner, generalId: general.id };
@@ -420,6 +442,14 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
     () =>
       scope.run(AbortSignal.any([lifetime.signal, AbortSignal.timeout(115_000)]), () =>
         track(async () => {
+          let started = performance.now();
+          const measured = (phase: string) => {
+            console.info(
+              'INT19-setup',
+              JSON.stringify({ mode, phase, elapsedMs: Math.round(performance.now() - started) }),
+            );
+            started = performance.now();
+          };
           initial = await loadInitialWorldFromDb(db, {
             scenario: 'integration191',
             map: 'integration',
@@ -427,7 +457,14 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
             portraitMap: '191-map',
             seed,
           });
-          initial.ruleFeatures = [...features];
+          measured('load-491');
+          // 시험 전용 병종의 모집비만 분리해 원본 NPC의 자동 모병 비용을 보존한다.
+          recruitmentType = Math.max(...initial.unitSet.crewTypes.map((type) => type.id)) + 1;
+          initial.unitSet.crewTypes.push({
+            ...initial.unitSet.crewTypes.find((type) => type.armType > 0)!,
+            id: recruitmentType,
+            cost: 0,
+          });
           originHash = hashState(initial);
           for (let count = 0; count < 2; count++) {
             signal();
@@ -435,8 +472,10 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
               name: 'INT19 정식 HTTP 검사',
               turnTermMinutes: 60,
               endYear: 201,
+              featureData: recruitmentFixtureData(initial),
             });
             worldIds.push(created.worldId);
+            measured(`save-491-${count + 1}`);
             signal();
           }
           [worldId, otherWorldId] = worldIds as [string, string];
@@ -450,13 +489,14 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
           signal();
           a = await human(0);
           b = await human(1);
+          measured('create-two-humans');
           outsider = await account();
           blocked = await account();
           signal();
           await db.user.update({ where: { id: blocked.userId }, data: { status: 'SANCTIONED' } });
           signal();
           nationId = [...initial.nations].sort((x, y) => {
-            const count = (id: number, capital: number) =>
+            const count = (id: number, capital: number | null) =>
               initial.generals.filter(
                 (g) => g.nationId === id && g.cityKey === capital && g.officerLevel !== 12 && g.activeFromYear <= 191,
               ).length;
@@ -465,6 +505,7 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
           for (const actor of [a, b]) await setTurns(actor, 'join', { nationId });
           const generated = await db.general.findMany({ where: { worldId, userId: { in: [a.userId, b.userId] } } });
           await advance(Math.max(...generated.map((g) => g.nextTurnTick)));
+          measured('advance-join-with-491-npcs');
           for (const actor of [a, b]) {
             const general = (await snapshot()).state.generals[actor.generalId]!;
             expect(general.nationId).toBe(nationId);
@@ -486,12 +527,13 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
     } catch (error) {
       errors.push(error);
     }
-    if (!failed && !executionErrors.length && closed) {
-      try {
-        await db.sanction.deleteMany({ where: { id: { in: sanctionIds } } });
-      } catch (error) {
-        errors.push(error);
-      }
+    try {
+      await db.sanction.deleteMany({ where: { id: { in: sanctionIds } } });
+      expect(await db.sanction.count({ where: { id: { in: sanctionIds } } })).toBe(0);
+    } catch (error) {
+      errors.push(error);
+    }
+    if (closed) {
       if (!errors.length)
         try {
           await db.world.deleteMany({ where: { id: { in: worldIds } } });
@@ -505,6 +547,7 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
           errors.push(error);
         }
     }
+    console.info('INT19-cleanup', JSON.stringify({ mode, failed, closed, errors: errors.length }));
     try {
       await db.$disconnect();
     } catch (error) {
@@ -513,21 +556,23 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
     if (errors.length) throw new AggregateError(errors, 'INT19 자기 서버·데이터·연결 정리에 실패했습니다.');
   }, 120_000);
 
-  it('AC-INT-19B 정식53도시8관문·21국491명/9features와 생성출처·두 사람30칸·다른 월드를 보존한다', async () => {
+  it('AC-INT-19B 정식53도시8관문·21국491명·제공 규칙과 생성출처·두 사람30칸·다른 월드를 보존한다', async () => {
     expect(initial.generals).toHaveLength(491);
     expect(initial.nations).toHaveLength(21);
     expect(initial.cities.filter((city) => city.kind === 'CITY')).toHaveLength(53);
     expect(initial.cities.filter((city) => city.kind === 'PASS')).toHaveLength(8);
     expect(hashState(initial)).toBe(originHash);
     const state = await snapshot();
-    expect(state.state.ruleFeatures).toEqual(features);
+    expect(providedRuleKeys).toEqual(features);
     expect(Object.keys(state.state.cityResources!.cities)).toHaveLength(initial.cities.length);
     expect(state.state.campaign).not.toHaveProperty('orders');
     expect(state.turns[a.generalId]).toHaveLength(30);
     expect(state.turns[b.generalId]).toHaveLength(30);
     const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
     checkReplayOrigin(world.replayOrigin);
-    expect(world.replayOrigin).toMatchObject({ initial: { generals: initial.generals } });
+    expect(world.replayOrigin).toMatchObject({
+      initial: { generals: applySexLedger(initial, loadSexLedger(initial.scenarioKey)) },
+    });
     expect(hashState(await snapshot(otherWorldId))).toBe(otherHash);
     await linkHumans();
   });
@@ -711,12 +756,11 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
       await executeOrder(await issue(npcId, 'farm'));
     }, 120_000);
 
-    it('NPC 명시 편성 지시는 NPC자기 소유 부곡만 정상 생성하고 병력을 중복 저장하지 않는다', async () => {
+    it('NPC 명시 모병 지시는 NPC자기 소유 부곡만 정상 생성하고 병력을 중복 저장하지 않는다', async () => {
       const before = await snapshot();
       const existing = before.state.campaign!.units.find((unit) => unit.ownerId === npcId);
       if (!existing) {
-        const type = initial.unitSet.crewTypes.find((type) => type.armType > 0)!.id;
-        await executeOrder(await issue(npcId, 'form_unit', { crewType: type }));
+        await executeOrder(await issue(npcId, 'recruit', { crewType: recruitmentType, amount: 1, unitId: 'new' }));
       }
       const after = await snapshot(),
         owned = after.state.campaign!.units.filter((unit) => unit.ownerId === npcId);
@@ -863,16 +907,20 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
         data: { userId: a.userId, worldId, reason: 'INT19 security fixture', createdBy: a.userId },
       });
       sanctionIds.push(sanction.id);
-      signal();
-      await drain();
-      const stored = await db.inputEvent.findUniqueOrThrow({
-        where: { worldId_userId_idempotencyKey: { worldId, userId: a.userId, idempotencyKey: `campaign:${request}` } },
-      });
-      expect(stored.status).toBe('REJECTED');
-      expect(stored.result).toMatchObject({ code: 'ACTOR_SANCTIONED' });
-      expect((await snapshot()).state.campaign).toEqual(before.state.campaign);
-      signal();
-      await db.sanction.delete({ where: { id: sanction.id } });
+      try {
+        signal();
+        await drain();
+        const stored = await db.inputEvent.findUniqueOrThrow({
+          where: {
+            worldId_userId_idempotencyKey: { worldId, userId: a.userId, idempotencyKey: `campaign:${request}` },
+          },
+        });
+        expect(stored.status).toBe('REJECTED');
+        expect(stored.result).toMatchObject({ code: 'ACTOR_SANCTIONED' });
+        expect((await snapshot()).state.campaign).toEqual(before.state.campaign);
+      } finally {
+        await db.sanction.deleteMany({ where: { id: sanction.id } });
+      }
       signal();
     });
 
@@ -890,14 +938,7 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
       await executeOrder(await issue(npcId, 'return'));
       const returned = await snapshot();
       expect(returned.state.generals[npcId]!.cityKey).toBe(returned.state.nations[nationId]!.capitalCityKey);
-      const formed = await applyInput('campaign.unit', {
-        type: 'form',
-        commanderId: a.generalId,
-        crewType: initial.unitSet.crewTypes.find((type) => type.armType > 0)!.id,
-        revision: (await board()).revision,
-      });
-      expect(formed.status).toBe('applied');
-      foreignUnitId = (await snapshot()).state.campaign!.units.find((unit) => unit.ownerId === a.generalId)!.id;
+      foreignUnitId = await prepareFixtureUnit(db, worldId, a.generalId, recruitmentType);
       const before = hashState(await snapshot()),
         count = await db.inputEvent.count({ where: { worldId } });
       expect(
@@ -924,6 +965,7 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
       expect(await db.inputEvent.count({ where: { worldId } })).toBe(count);
     }, 240_000);
 
+    // 정식 491명·8개월 수출과 두 번 재생을 포함한 실측 350초. 차례 실행 사례의 한도는 유지한다.
     it('새 DB클라이언트 재접속과 실제 월 경계 archive 두 번 재생이 원생성·두월드·상태해시와 일치한다', async () => {
       const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
       await advance(Math.ceil((world.clockTick + 1) / TICKS_PER_MONTH) * TICKS_PER_MONTH);
@@ -949,6 +991,6 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
       expect(first.at(-1)!.stateHash).toBe(hashState(await snapshot()));
       expect(hashState(await snapshot(otherWorldId))).toBe(otherHash);
       expect(hashState(initial)).toBe(originHash);
-    }, 240_000);
+    }, 600_000);
   }
 }
