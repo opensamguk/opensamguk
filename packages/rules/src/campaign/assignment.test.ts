@@ -1,14 +1,15 @@
+import { providedRuleKeys } from './../providedRules';
 import { describe, expect, it } from 'vitest';
 import { commandWorld, commandInitial } from '../../test/commandFixture';
 import { deepFreeze } from '../personnel/testFixture';
 import { respondAssignment } from '../personnel/assignments';
-import { emptyTurns, type ReplayState } from '../replay';
+import { emptyTurns, initialReplayState, type ReplayState } from '../replay';
 import { checkRuleFeatures, settleMonthlyFeatures } from '../ruleRegistry';
 import { emptyCampaignState } from './state';
 import { campaignFeature } from './feature';
 import { campaignAssignmentFeature } from './assignment';
 
-function fixture(corrected = true): ReplayState {
+function fixture(): ReplayState {
   const state = commandWorld();
   for (const general of Object.values(state.generals))
     Object.assign(general, { politics: 60, charm: 55, crew: 0, cityKey: 1, nationId: 1, officerLevel: 1 });
@@ -17,14 +18,6 @@ function fixture(corrected = true): ReplayState {
   state.generals[4]!.officerLevel = 12;
   state.cities[2]!.nationId = 1;
   state.nations[1]!.isNpc = false;
-  state.ruleFeatures = [
-    ...(corrected ? ['campaign-assignment-v2'] : []),
-    'campaign-v1',
-    'five-stats',
-    'operational-map',
-    'personnel',
-    'policy',
-  ];
   state.campaign = emptyCampaignState(state, 'assignment-seed', 'sourced-test');
   state.campaign.links = [
     { masterId: 1, personId: 2, relation: 'LIEUTENANT' },
@@ -32,10 +25,15 @@ function fixture(corrected = true): ReplayState {
   ];
   state.campaign.units = [{ id: 1, ownerId: 1, commanderId: 2, troops: 100, crewType: 1100, train: 50, atmos: 50 }];
   state.campaign.nextUnitId = 2;
+  state.lineage!.monthlyTick = 20000;
+  state.logistics!.monthlyTick = 20000;
+  state.governance!.monthlyTick = 20000;
+  state.stratagemCards!.monthlyTick = 20000;
   state.assignmentOffers = {
     1: { id: '10000-4-1', nationId: 1, issuerGeneralId: 4, cityKey: 2, createdTick: 10000, expiresTick: 30000 },
   };
   return {
+    ...initialReplayState(commandInitial()),
     state,
     turns: Object.fromEntries(Object.values(state.generals).map(({ id }) => [id, emptyTurns()])),
     revisions: { 1: 0, 2: 0, 3: 0, 4: 0 },
@@ -50,17 +48,19 @@ function expire(before: ReplayState) {
     deepFreeze(before),
     deepFreeze({ ...structuredClone(before), monthlyTick: 30000 }),
     30000,
+    undefined,
+    'assignment-seed',
   ).replay;
 }
 
 describe('AC-INT-09 발령 기한 수락과 부곡 동행의 원생성별 규칙 판', () => {
-  it('기존 campaign-v1의 월간 결과는 바꾸지 않는다', () => {
-    const before = fixture(false),
+  it('상시 제공하는 발령 보완 규칙은 기한 수락에 동행을 적용한다', () => {
+    const before = fixture(),
       after = expire(before);
     expect(after.state.generals[1]!.cityKey).toBe(2);
-    expect(after.state.generals[2]!.cityKey).toBe(1);
+    expect(after.state.generals[2]!.cityKey).toBe(2);
     expect(after.state.assignmentOffers).toBeUndefined();
-    expect(after.state.ruleFeatures).toEqual(before.state.ruleFeatures);
+    expect(providedRuleKeys).toEqual(providedRuleKeys);
   });
 
   it('보완판의 명시 수락과 기한 수락은 집결한 NPC 부장만 같은 목적지로 보낸다', () => {
@@ -102,15 +102,21 @@ describe('AC-INT-09 발령 기한 수락과 부곡 동행의 원생성별 규칙
     const settled = structuredClone(before);
     settled.monthlyTick = 30000;
     if (kind === 'already-moved') settled.state.generals[2]!.cityKey = 4;
-    const after = settleMonthlyFeatures(deepFreeze(before), deepFreeze(settled), 30000).replay;
+    const after = settleMonthlyFeatures(
+      deepFreeze(before),
+      deepFreeze(settled),
+      30000,
+      undefined,
+      'assignment-seed',
+    ).replay;
     expect(after.state.generals[1]!.cityKey).toBe(2);
     expect(after.state.generals[2]!.cityKey).toBe(settled.state.generals[2]!.cityKey);
     expect(after.state.campaign).toEqual(before.state.campaign);
   });
 
   it('새 판은 campaign-v1 의존성과 원생성의 명시 선택을 검사한다', () => {
-    const before = fixture();
-    expect(checkRuleFeatures(before.state.ruleFeatures)).toEqual(before.state.ruleFeatures);
+    fixture();
+    expect(checkRuleFeatures(providedRuleKeys)).toEqual(providedRuleKeys);
     expect(() => checkRuleFeatures(['campaign-assignment-v2'])).toThrow('의존');
     expect(() => campaignAssignmentFeature.checkOrigin!({ initial: commandInitial(), data: {} })).toThrow('초기 자료');
   });

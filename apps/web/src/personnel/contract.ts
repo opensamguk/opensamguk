@@ -13,8 +13,6 @@ export interface PersonnelBoard {
   // 이 조회를 받은 계정의 지금 장수. 계승으로 바뀌면 화면이 예전 장수의 입력으로 보내지 않는다 (T4-95).
   actorId: number;
   appoint: Allowed;
-  officeEffectsEnabled?: boolean;
-  secretaryEnabled?: boolean;
   officeCities?: CityRef[];
   levels: Array<{ officerLevel: number; title: string; holderId: number | null }>;
   members: PersonnelMember[];

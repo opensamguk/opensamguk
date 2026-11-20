@@ -40,7 +40,7 @@ export function ErrorState({ title, onRetry }: { title: string; onRetry?: () => 
       {icons ? <img className={`${styles.icon} pixel-art`} src={errorIcon} alt="" width={32} height={32} /> : null}
       <p className={styles.title}>{title}</p>
       {onRetry ? (
-        <button type="button" className={styles.retry} onClick={onRetry}>
+        <button type="button" className={`${styles.retry} kit-button`} data-kind="secondary" onClick={onRetry}>
           다시 시도
         </button>
       ) : null}

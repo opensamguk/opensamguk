@@ -23,7 +23,7 @@ export function WithdrawalActions({
     <form onSubmit={submit} className={styles.withdrawal}>
       <p>탈퇴하면 로그인과 계정 복구를 할 수 없습니다. 처리방침에 따라 게임 기록 등 일부 자료를 보존합니다.</p>
       <p>
-        <Link to="/legal/privacy">개인정보처리방침의 처리·보존 기준 확인</Link>
+        <Link to="/legal/privacy">개인정보처리방침의 처리와 보존 기준 확인</Link>
       </p>
       <label htmlFor="withdraw-password">현재 비밀번호</label>
       <input

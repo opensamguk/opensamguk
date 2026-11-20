@@ -9,10 +9,9 @@ import { categories } from '../apps/server/src/authz/coverage';
 import { newSession } from '../apps/server/src/auth/session';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { readFixture } from '../apps/server/test/readFixture';
-import { readWorldState, saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { persistSeasonArchive } from '../apps/engine/src/seasonArchive';
 import { commandInitial } from '../packages/rules/test/commandFixture';
-import { INTEL_FEATURE } from '../packages/rules/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -29,6 +28,7 @@ const password = randomUUID();
 let base: string;
 let worldId: string;
 let endedWorldId: string;
+let startingRevision: number;
 let users: Array<{ id: string; email: string }>;
 let state: Awaited<ReturnType<typeof readFixture>>;
 const paths = [
@@ -39,6 +39,7 @@ const paths = [
   'auth.me',
   'world.list',
   'world.publicMaps',
+  'lobby.headlines',
   'world.summary',
   'world.map',
   'resources.worldRules',
@@ -75,9 +76,20 @@ function input(path: Path): unknown {
   if (path === 'auth.login') return { email: users[0]!.email, password };
   if (path === 'timelapse.publicFrames' || path === 'records.season') return { worldId: endedWorldId };
   if (path === 'general.create')
-    return { worldId, name: '보안장수', leadership: 55, strength: 55, intel: 55, portraitId: 10001 };
-  if (path === 'turns.set') return { worldId, revision: 0, slots: Array.from({ length: 30 }, () => null) };
-  if (path === 'turns.edit') return { worldId, revision: 1, op: { shift: 1 } };
+    return {
+      worldId,
+      name: '보안장수',
+      leadership: 55,
+      strength: 55,
+      intel: 55,
+      sex: 'MALE' as const,
+      politics: 55,
+      charm: 55,
+      portraitId: 10001,
+    };
+  if (path === 'turns.set')
+    return { worldId, revision: startingRevision, slots: Array.from({ length: 30 }, () => null) };
+  if (path === 'turns.edit') return { worldId, revision: startingRevision + 1, op: { shift: 1 } };
   if (path === 'turns.precheck') return { worldId, commandKey: 'rest', args: {} };
   if (path === 'city.get') return { worldId, cityKey: state.cities[0]!.cityKey };
   if (path === 'nation.get') return { worldId, nationId: 2 };
@@ -162,6 +174,9 @@ beforeAll(async () => {
   state.generals[0]!.userId = users[0]!.id;
   state.generals[2]!.userId = users[1]!.id;
   ({ worldId } = await saveInitialWorld(db, state, { name: '권한 대조', turnTermMinutes: 60, endYear: null }));
+  startingRevision = (
+    await db.general.findUniqueOrThrow({ where: { worldId_userId: { worldId, userId: users[0]!.id } } })
+  ).turnRevision;
   await db.world.update({ where: { id: worldId }, data: { status: 'RUNNING', clockAnchorAt: new Date(now) } });
   ({ worldId: endedWorldId } = await saveInitialWorld(db, state, {
     name: '종료 월드 권한 대조',
@@ -223,6 +238,7 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
             path.startsWith('auth.') ||
             path === 'health' ||
             path === 'world.publicMaps' ||
+            path === 'lobby.headlines' ||
             path === 'timelapse.publicFrames';
           const cookie =
             category === 'unauthenticated'
@@ -268,7 +284,7 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
                   expect.objectContaining({ key: 'invite', available: null, reason: expect.any(String) }),
                 ]),
               );
-            } else if (path === 'treaty.relations' || path === 'records.activity') {
+            } else if (path === 'treaty.relations' || path === 'records.activity' || path === 'lobby.headlines') {
               const owner = await request(path, data, ownerCookie);
               expect(owner.status).toBe(200);
               expect(result).toEqual(owner);
@@ -404,21 +420,21 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
   });
   it('AC-P2-07 첩보 예턴은 같은 국가에만 저장 보고서를 열고 병력을 구간으로 표시한다', async () => {
     const initial = commandInitial();
-    initial.ruleFeatures = [INTEL_FEATURE, 'policy'];
     initial.generals[0]!.userId = users[0]!.id;
     initial.generals[1]!.userId = users[1]!.id;
     Object.assign(initial.generals[2]!, { userId: users[4]!.id, nationId: 1 });
     Object.assign(initial.generals[3]!, { userId: users[3]!.id, cityKey: 2 });
     for (const general of initial.generals) general.nextTurnTick = general.id === 1 ? 100 : 20_000;
-    const { worldId: intelWorld, stateHash } = await saveInitialWorld(db, initial, {
+    const { worldId: intelWorld } = await saveInitialWorld(db, initial, {
       name: '첩보 권한과 재생 검증',
+      fogOfWar: true,
       turnTermMinutes: 60,
       endYear: null,
       replayFormat: 3,
     });
-    const snapshot = await readWorldState(db, intelWorld);
-    expect(snapshot).not.toHaveProperty('ext');
-    expect(hashState(snapshot)).toBe(stateHash);
+    const snapshot = await loadReplayState(db, intelWorld);
+    expect(snapshot.state.ext).toHaveProperty('intel');
+    expect(snapshot.state.generals[1]!.userId).toBe(users[0]!.id);
     await db.world.update({
       where: { id: intelWorld },
       data: { status: 'RUNNING', clockMode: 'ACCELERATED', clockAnchorAt: new Date(now) },
@@ -436,7 +452,7 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
       fog: { intel: null, garrisonHidden: true },
       generals: [],
     });
-    expect((await request('intel.records', input, actor)).data).toEqual({ enabled: true, items: [], alerts: [] });
+    expect((await request('intel.records', input, actor)).data).toEqual({ items: [], alerts: [] });
     expect(await request('turns.precheck', { ...input, commandKey: 'spy', args: { cityKey: 2 } }, actor)).toMatchObject(
       { status: 200, data: { ok: true } },
     );
@@ -449,7 +465,7 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
           'turns.set',
           {
             ...input,
-            revision: 0,
+            revision: snapshot.revisions[1]!,
             slots: [{ commandKey: 'spy', args: { cityKey: 2 } }, ...Array.from({ length: 29 }, () => null)],
           },
           actor,
@@ -466,11 +482,10 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
         gold: initial.generals[0]!.gold - 60,
         rice: initial.generals[0]!.rice - 60,
       });
-      expect(after.state.ext).toMatchObject({ intel: { 1: { 2: { tick: 100, crew: 20 } } } });
+      expect(after.state.ext).toMatchObject({ intel: { 1: { 2: { tick: 100, crew: 0 } } } });
       const report = (await request('intel.records', input, actor)).data as { items: Record<string, unknown>[] };
       expect(report).toMatchObject({
-        enabled: true,
-        items: [{ cityKey: 2, tick: 100, year: 191, month: 1, ageMonths: 0, crew: { min: 1, max: 999 }, tech: 'even' }],
+        items: [{ cityKey: 2, tick: 100, year: 191, month: 1, ageMonths: 0, crew: { min: 0, max: 0 }, tech: 'even' }],
       });
       expect((await request('intel.records', input, ally)).data).toEqual(report);
       const remoteCity = (await request('city.get', enemyCity, actor)).data;
@@ -530,11 +545,10 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
         await db.sanction.delete({ where: { id: sanction.id } });
       }
       expect((await request('intel.records', input, enemy)).data).toEqual({
-        enabled: true,
         items: [],
         alerts: [{ tick: 100, text: '도시2: 누군가 이 도시를 살폈습니다' }],
       });
-      expect((await request('intel.records', input, neutral)).data).toEqual({ enabled: true, items: [], alerts: [] });
+      expect((await request('intel.records', input, neutral)).data).toEqual({ items: [], alerts: [] });
       expect((await request('intel.records', { ...input, nationId: 1 }, enemy)).code).toBe('BAD_REQUEST');
       await engine.advanceTo(10_000);
       expect((await request('intel.records', input, ally)).data).toMatchObject({

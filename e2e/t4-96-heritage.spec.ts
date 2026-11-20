@@ -5,7 +5,7 @@ import { FIVE_STAT_RULES } from '../packages/rules/src/index';
 import { newSession } from '../apps/server/src/auth/session';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { test, expect, type LegalStack } from './legalFixture';
 import { endActor, endControls, confirmEnd, endSubmit, endQuery } from './adminEndSetup';
@@ -27,7 +27,7 @@ async function actor(stack: LegalStack, browser: Browser) {
   await context.addCookies([{ name: 'sid', value: session.token, url: stack.origin, httpOnly: true, sameSite: 'Lax' }]);
   return { id, context, page: await context.newPage() };
 }
-async function world(stack: LegalStack, options: { winner?: string; five?: boolean; off?: boolean } = {}) {
+async function world(stack: LegalStack, options: { winner?: string; five?: boolean } = {}) {
   const initial = commandInitial();
   initial.seed = `heritage-browser-${randomUUID()}`;
   for (const general of initial.generals) general.nextTurnTick = 1_000_000;
@@ -44,13 +44,12 @@ async function world(stack: LegalStack, options: { winner?: string; five?: boole
     initial.statRules = FIVE_STAT_RULES;
     initial.generals = initial.generals.map((general) => ({ ...general, politics: 50, charm: 50 }));
   }
-  const { worldId } = await saveInitialWorld(stack.db, initial, {
+  const { worldId } = await saveFixtureWorld(stack.db, initial, {
     name: '유산 화면 검증',
     turnTermMinutes: 60,
     endYear: null,
     replayFormat: 3,
-    ruleFeatures: [...(options.five ? ['five-stats'] : []), ...(options.off ? [] : ['heritage-v1']), 'policy'],
-    ...(options.off ? {} : { featureData: { 'heritage-v1': { version: 1 } } }),
+    featureData: { 'heritage-v1': { version: 1 } },
   });
   await controlClock(stack.db, worldId, 'start');
   return worldId;
@@ -122,6 +121,8 @@ test('AC-P2-33 실제 보상·5능력치 유산 생성·계정 기록과 키보�
           fullPage: true,
         });
       }
+    // 성별은 늘 필수다(가문 규칙 상시, D-104).
+    await player.page.getByRole('radio', { name: '남', exact: true }).check();
     await player.page.getByRole('button', { name: '장수 만들기 (유산 6점 사용)', exact: true }).click();
     await pending(stack, id, player.id);
     await advance(stack, id);
@@ -183,11 +184,6 @@ test('AC-P2-33 실제 보상·5능력치 유산 생성·계정 기록과 키보�
     });
     expect(refunds).toHaveLength(1);
     expect(refunds[0]!.delta).toBe(6);
-    const old = await world(stack, { off: true });
-    await player.page.goto(`/w/${old}/create`);
-    await expect(player.page.getByRole('heading', { name: '장수 생성', exact: true })).toBeVisible();
-    await expect(player.page.getByLabel('이름', { exact: true })).toBeVisible();
-    await expect(allocation(player.page)).toBeHidden();
     expect(errors).toEqual([]);
   } finally {
     await player.context.close();
@@ -218,6 +214,7 @@ test('AC-P2-33 실제 다른 월드 사용 뒤 수동 잔액 확인과 계정 �
           worldId: elsewhere,
           expectedUserId: player.id,
           name: '먼저사용',
+          sex: 'MALE',
           portraitId: null,
           leadership: 55,
           strength: 55,
@@ -231,6 +228,8 @@ test('AC-P2-33 실제 다른 월드 사용 뒤 수동 잔액 확인과 계정 �
     await pending(stack, elsewhere, player.id);
     await advance(stack, elsewhere);
     expect((await elsewhereRequest).status()).toBe(200);
+    // 성별은 늘 필수다(가문 규칙 상시, D-104).
+    await player.page.getByRole('radio', { name: '남', exact: true }).check();
     await player.page.getByRole('button', { name: '장수 만들기 (유산 6점 사용)', exact: true }).click();
     await pending(stack, id, player.id);
     await advance(stack, id);
@@ -247,6 +246,8 @@ test('AC-P2-33 실제 다른 월드 사용 뒤 수동 잔액 확인과 계정 �
     // 다른 탭의 로그인 변경과 같은 실제 서버 세션 교체다. 오래된 화면의 기대 계정은 A로 남아야 한다.
     await player.context.clearCookies();
     await player.context.addCookies(await other.context.cookies());
+    // 성별은 늘 필수다(가문 규칙 상시, D-104).
+    await player.page.getByRole('radio', { name: '남', exact: true }).check();
     await player.page.getByRole('button', { name: '장수 만들기 (유산 6점 사용)', exact: true }).click();
     await expect(player.page.getByRole('alert').filter({ hasText: /계정이 바뀌/ })).toBeVisible();
     await expect(player.page.getByLabel('이름', { exact: true })).toHaveValue('');

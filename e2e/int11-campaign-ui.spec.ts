@@ -5,7 +5,7 @@ import { test, expect, apiMutate, apiQuery } from './t210-fixture';
 import { rngFor } from '../packages/shared/src/index';
 import { applyCampaignRelationship } from '../packages/rules/src/index';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -43,18 +43,9 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
     portraitMap: '191-map',
     seed,
   });
-  initial.ruleFeatures = [
-    'campaign-v1',
-    'five-stats',
-    'operational-map',
-    'personnel',
-    'policy',
-    'stratagem-basic',
-    'treaty',
-  ];
   expect(initial.generals).toHaveLength(491);
   expect(initial.nations).toHaveLength(21);
-  const { worldId } = await saveInitialWorld(db, initial, {
+  const { worldId } = await saveFixtureWorld(db, initial, {
     name: 'INT11 정식 조작',
     turnTermMinutes: 60,
     endYear: 201,
@@ -111,6 +102,8 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
         user.page.on('requestfailed', onFailed);
       }
       try {
+        // 성별은 늘 필수다(가문 규칙 상시, D-104).
+        await user.page.getByRole('radio', { name: '남', exact: true }).check();
         await user.page.getByRole('button', { name: '장수 만들기', exact: true }).click();
         await pending('general.create');
         await advance();
@@ -235,26 +228,6 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
     await pending('campaign.relationship');
     await advance();
     await expect(panel(owner)).toContainText(`화면장수0 → ${npc!.name} (부장)`);
-    await panel(owner).getByLabel('새 부곡 지휘관').selectOption(String(npc!.id));
-    await panel(owner).getByRole('button', { name: '빈 부곡 편성' }).click();
-    await pending('campaign.unit');
-    const input = await db.inputEvent.findFirstOrThrow({
-      where: { worldId, kind: 'campaign.unit', status: 'PENDING' },
-    });
-    await owner.page.reload();
-    await expect(panel(owner)).toContainText('요청을 처리하는 중');
-    await advance();
-    await expect(panel(owner)).toContainText('소유 부곡 1개');
-    const after = await apiQuery<Board>(owner, 'campaign.get', { worldId });
-    expect(after.units).toHaveLength(1);
-    expect(after.units[0]).toMatchObject({ ownerId, commanderId: npc!.id, troops: 0 });
-    expect(await db.inputEvent.count({ where: { worldId, idempotencyKey: input.idempotencyKey } })).toBe(1);
-    await panel(owner).getByLabel(`부곡 ${after.units[0]!.id} 지휘관`).selectOption(String(ownerId));
-    await pending('campaign.unit');
-    await advance();
-    await expect
-      .poll(async () => (await apiQuery<Board>(owner, 'campaign.get', { worldId })).units[0]!.commanderId)
-      .toBe(ownerId);
     const actor = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: ownerId } } });
     const turns = await db.general.findUniqueOrThrow({
       where: { worldId_id: { worldId, id: ownerId } },
@@ -264,12 +237,15 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
       worldId,
       revision: turns.turnRevision,
       slots: [
-        { commandKey: 'recruit', args: { amount: 10, crewType: 1100, unitId: after.units[0]!.id } },
+        { commandKey: 'recruit', args: { amount: 10, crewType: 1100, unitId: 'new' } },
         ...Array.from({ length: 29 }, () => null),
       ],
     });
     tick = actor.nextTurnTick;
     await advance();
+    const after = await apiQuery<Board>(owner, 'campaign.get', { worldId });
+    expect(after.units).toHaveLength(1);
+    expect(after.units[0]).toMatchObject({ ownerId, commanderId: ownerId, troops: 10 });
     // 주둔 장수 표는 도시 화면에 있다 (INT-25).
     const ownerCity = (await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: ownerId } } })).cityKey;
     await owner.page.goto(`/w/${worldId}/city/${ownerCity}`);
@@ -286,7 +262,7 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
     expect(
       await db.generalTurn.findMany({ where: { worldId, generalId: targetId }, orderBy: { slot: 'asc' } }),
     ).toEqual(targetTurns);
-    // NPC 지휘 병력은 원래 일정 결과를 저장 상태에서 비교한다. 반납한 사람 부곡의 실제 귀속도 확인한다.
+    // NPC 지휘 병력은 원래 일정 결과를 저장 상태에서 비교한다. 새 사람 부곡의 실제 귀속도 확인한다.
     const persisted = await db.$transaction((tx) => loadReplayState(tx, worldId));
     expect(persisted.state.campaign!.units.find((unit) => unit.id === after.units[0]!.id)).toMatchObject({
       ownerId,
@@ -300,7 +276,6 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
       worldId,
       nationId: 1,
     });
-    expect(nation).toMatchObject({ campaignEnabled: true, fiveStats: true });
     expect(nation.generals.find((general) => general.id === ownerId)).toMatchObject({
       crew: 0,
       politics: 55,
@@ -341,17 +316,18 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
     await owner.page.goto(`/w/${worldId}/campaign`);
     await expect(panel(owner)).toBeVisible();
     await owner.page.setViewportSize({ width: 1440, height: 900 });
-    await expect(panel(owner).getByRole('button', { name: '빈 부곡 편성', exact: true })).toBeVisible();
+    await expect(panel(owner).getByRole('button', { name: '빈 부곡 편성', exact: true })).toBeHidden();
+    // 패널 틀은 자료보다 먼저 그려진다. 휘하 자료가 들어와 조작 칸이 생긴 뒤에 잰다.
+    await expect(panel(owner).getByLabel('제안할 관계')).toBeVisible();
     const controls = panel(owner).locator('button, select');
     const desktopFonts = await controls.evaluateAll((elements) =>
       elements.map((element) => getComputedStyle(element).fontSize),
     );
     expect(desktopFonts.length).toBeGreaterThan(0);
     await panel(owner).getByLabel('제안할 관계').selectOption('GUEST');
-    await panel(owner).getByLabel('새 부곡 지휘관').selectOption(String(npc!.id));
     const selections = await panel(owner)
       .locator('select')
-      .evaluateAll((elements) => elements.map((element) => element.value));
+      .evaluateAll((elements) => elements.map((element) => (element as HTMLSelectElement).value));
     expect(selections.length).toBeGreaterThan(0);
     const localState = () =>
       owner.page.evaluate(() => Object.entries(sessionStorage).sort(([a], [b]) => a.localeCompare(b)));
@@ -391,7 +367,7 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
       expect(
         await panel(owner)
           .locator('select')
-          .evaluateAll((elements) => elements.map((element) => element.value)),
+          .evaluateAll((elements) => elements.map((element) => (element as HTMLSelectElement).value)),
       ).toEqual(selections);
       expect(await localState()).toEqual(draftBeforeResize);
     }

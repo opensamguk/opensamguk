@@ -23,8 +23,7 @@ export interface GovernancePayment {
 }
 
 export function settleGovernanceMonthly(world: WorldView, tick: number) {
-  if (!world.ruleFeatures?.includes('governance-v1') || !world.governance)
-    throw new Error('황실 정산 상태가 없습니다.');
+  if (!world.governance) throw new Error('황실 정산 상태가 없습니다.');
   if (tick !== world.governance.monthlyTick + TICKS_PER_MONTH)
     throw new Error('황실 월 정산이 중복되거나 달을 건너뛰었습니다.');
   const date = monthlyDate(world.startYear, tick);

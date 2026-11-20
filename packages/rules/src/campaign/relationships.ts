@@ -1,3 +1,4 @@
+import { pledgeChance } from '../general/fiveStats';
 // Eligibility and direct renown reuse the v1-derived hierarchy. See NOTICE.
 import { rngFor } from '@opensamguk/shared';
 import { z } from 'zod';
@@ -150,7 +151,7 @@ export function applyCampaignRelationship(
         return deny('ALREADY_ATTEMPTED', '같은 NPC에게는 장수별 게임 월 1회만 서약할 수 있습니다.');
       if (actor.gold < 500) return deny('NO_GOLD', 'NPC 서약에 금500이 필요합니다.');
       cost = 500;
-      chance = 25 + Math.floor(actor.charm! / 2);
+      chance = pledgeChance(actor);
       roll = rngFor(campaign.seed, 'campaign.pledge', month, actorId, target.id).int(1, 100);
       accepted = roll <= chance;
       state.generals[actorId]!.gold -= cost;

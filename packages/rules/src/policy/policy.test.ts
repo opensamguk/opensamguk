@@ -69,16 +69,56 @@ describe('AC-M2-17 기본 방침 순수 규칙', () => {
     expect(choosePolicyCommand(world, 999, 'farm')).toBeNull();
   });
 
-  it('수비와 훈련은 선행 수치가 최대일 때만 다음 명령을 고른다', () => {
+  it('수비는 부곡과 무관하게 도시 방어가 최대일 때만 성벽을 고른다', () => {
     const world = commandWorld();
     world.generals[1]!.userId = 'human';
     expect(choosePolicyCommand(world, 1, 'defend')?.commandKey).toBe('defence');
     world.cities[1]!.defence = world.cities[1]!.defenceMax;
     expect(choosePolicyCommand(world, 1, 'defend')?.commandKey).toBe('wall');
-    world.generals[1]!.train = 99;
-    expect(choosePolicyCommand(world, 1, 'drill')?.commandKey).toBe('train');
-    world.generals[1]!.train = 100;
-    expect(choosePolicyCommand(world, 1, 'drill')?.commandKey).toBe('morale');
+    world.campaign!.units = [];
+    expect(choosePolicyCommand(world, 1, 'defend')).toEqual({ commandKey: 'wall', args: {} });
+  });
+
+  it.each([99, 100])('훈련은 개인 수치 대신 자기 부곡 훈련도 %i를 쓴다', (train) => {
+    const world = commandWorld();
+    world.generals[1]!.userId = 'human';
+    world.generals[1]!.train = train === 100 ? 0 : 100;
+    world.campaign!.units = [{ ...world.campaign!.units[0]!, train }];
+    expect(choosePolicyCommand(world, 1, 'drill')).toEqual({
+      commandKey: train === 100 ? 'morale' : 'train',
+      args: { unitId: 1 },
+    });
+  });
+
+  it('여러 부곡은 명령 권한에 맞게 소유자로 거르고 가장 작은 ID를 고른다', () => {
+    const world = commandWorld();
+    world.generals[1]!.userId = 'human';
+    const unit = world.campaign!.units[0]!;
+    world.campaign!.units = [
+      { ...unit, id: 10, train: 0, troops: 20000 },
+      { ...unit, id: 2, ownerId: 2 },
+      { ...unit, id: 3, commanderId: 2, train: 100 },
+    ];
+    const original = structuredClone(world);
+    expect(choosePolicyCommand(world, 1, 'drill')).toEqual({ commandKey: 'morale', args: { unitId: 3 } });
+    expect(world).toEqual(original);
+    world.campaign!.units.reverse();
+    expect(choosePolicyCommand(world, 1, 'drill')).toEqual({ commandKey: 'morale', args: { unitId: 3 } });
+  });
+
+  it('자기 부곡이 없으면 대상 없는 훈련을 시도하고 나머지 방침은 그대로 고른다', () => {
+    const world = commandWorld();
+    world.generals[1]!.userId = 'human';
+    world.campaign!.units = world.campaign!.units.filter((unit) => unit.ownerId !== 1);
+    expect(choosePolicyCommand(world, 1, 'drill')).toEqual({ commandKey: 'train', args: {} });
+    for (const [policy, commandKey] of [
+      ['farm', 'farm'],
+      ['commerce', 'commerce'],
+      ['security', 'security'],
+      ['defend', 'defence'],
+      ['none', 'rest'],
+    ] as const)
+      expect(choosePolicyCommand(world, 1, policy)).toEqual({ commandKey, args: {} });
   });
 
   it('빈칸과 직접 휴식을 구분하고 옛 휴식은 직접 휴식으로 보존한다', () => {

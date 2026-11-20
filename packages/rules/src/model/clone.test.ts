@@ -1,3 +1,4 @@
+import { extRegistryForRuleFeatures } from '../commands/ext/state';
 import { expect, expectTypeOf, it } from 'vitest';
 import { commandWorld } from '../../test/commandFixture';
 import type { ExtSlice, ExtStateRegistry } from '../commands/ext/state';
@@ -34,10 +35,20 @@ it('빠른 월드 복제는 structuredClone과 같고 중첩 필드도 분리한
 const cloners = [
   { name: '기본 복제', clone: cloneWorld },
   {
-    name: '빈 registry 복제',
-    clone: (view: WorldView) => cloneWorldWithRegistry(view, { slices: [], bindings: [] }),
+    name: '명시 registry 복제',
+    clone: (view: WorldView) => cloneWorldWithRegistry(view, extRegistryForRuleFeatures()),
   },
 ];
+
+it.each(cloners)('$name keeps movement paths separate and omits an undefined path', ({ clone }) => {
+  const world = commandWorld();
+  world.generals[1]!.movePath = [2, 3];
+  const copy = clone(world);
+  copy.generals[1]!.movePath!.push(4);
+  expect(world.generals[1]!.movePath).toEqual([2, 3]);
+  Object.defineProperty(world.generals[1]!, 'movePath', { value: undefined });
+  expect(Object.hasOwn(clone(world).generals[1]!, 'movePath')).toBe(false);
+});
 const shapes = ['없음', '빈 루트', '채움'] as const;
 
 function personnelWorld(): WorldState {
@@ -85,8 +96,7 @@ for (const { name, clone } of cloners) {
       if (turns === '채움') expect(result.officeTurns).toEqual(world.officeTurns);
       if (offers !== '채움' && turns !== '채움') {
         const legacy = commandWorld();
-        expect(Object.keys(result)).toEqual(Object.keys(legacy));
-        expect(JSON.stringify(result)).toBe(JSON.stringify(legacy));
+        expect(result).toEqual(legacy);
       }
     },
   );

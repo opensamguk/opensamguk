@@ -16,7 +16,7 @@ import { hashPassword, verifyPassword } from '../apps/server/src/auth/password';
 import { createMailTransport } from '../apps/server/src/mail/transport';
 import type { MailTransport } from '../apps/server/src/mail/transport';
 import { commandInitial } from '../packages/rules/test/commandFixture';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');

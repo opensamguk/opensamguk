@@ -4,7 +4,7 @@ import { test as base, expect, apiMutate, type T210World } from './t210-fixture'
 import { adminRole } from './adminSetup';
 import { TEST_PASSWORD } from './account';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { holdLease, releaseHold } from './game';
@@ -102,19 +102,9 @@ test('T3-06 AC-M3-04 정식191 장수 검색·감사·자동 조회 금지·오�
       portraitMap: '191-map',
       seed: `admin-read-${tag}`,
     });
-    initial.ruleFeatures = [
-      'campaign-assignment-v2',
-      'campaign-v1',
-      'five-stats',
-      'operational-map',
-      'personnel',
-      'policy',
-      'stratagem-basic',
-      'treaty',
-    ];
     expect(initial.nations).toHaveLength(21);
     expect(initial.generals).toHaveLength(491);
-    const { worldId } = await saveInitialWorld(db, initial, {
+    const { worldId } = await saveFixtureWorld(db, initial, {
       name: '관리자 조회 정식191',
       turnTermMinutes: 60,
       endYear: 201,
@@ -133,6 +123,7 @@ test('T3-06 AC-M3-04 정식191 장수 검색·감사·자동 조회 금지·오�
         worldId,
         name: '조회장수',
         portraitId: null,
+        sex: 'MALE',
         leadership: 55,
         strength: 55,
         intel: 55,
@@ -143,7 +134,7 @@ test('T3-06 AC-M3-04 정식191 장수 검색·감사·자동 조회 금지·오�
       expect(await db.general.count({ where: { worldId } })).toBe(492);
       expect(await db.generalTurn.count({ where: { worldId } })).toBe(492 * 30);
       const formal = await db.world.findUniqueOrThrow({ where: { id: worldId } });
-      expect(formal.ruleFeatures).toEqual(initial.ruleFeatures);
+      expect(formal.fogOfWar).toBe(false);
       await page.goto('/admin');
       await expect(page.getByRole('heading', { name: '운영 조회', exact: true })).toBeVisible();
       await page.screenshot({ path: test.info().outputPath('admin-home.png'), fullPage: true });

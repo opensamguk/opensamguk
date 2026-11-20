@@ -4,7 +4,6 @@ import type { DeepReadonly, WorldState } from '../model/world';
 import { canExecuteNationCommand } from '../personnel/permissions';
 import {
   executeCityTransfer,
-  EXPANDED_TREATY_FEATURE,
   isExpandedTreatyClause,
   payMonthlyTribute,
   returnExpiredVisitors,
@@ -30,10 +29,10 @@ import type {
 
 export type TreatyOptions = Readonly<{ tradeEnabled?: boolean; expandedEnabled?: boolean }>;
 
-export function treatyOptions(features: readonly string[]): TreatyOptions {
+export function treatyOptions(): TreatyOptions {
   return {
-    tradeEnabled: features.includes('treaty-trade'),
-    expandedEnabled: features.includes(EXPANDED_TREATY_FEATURE),
+    tradeEnabled: true,
+    expandedEnabled: true,
   };
 }
 
@@ -692,7 +691,7 @@ export function applyTreatyInput(
   context: { tick: number; sequence: number } & TreatyOptions,
 ): TreatyApplyResult<TreatyWorldState> {
   const { tick, sequence } = context;
-  const options = { ...treatyOptions(state.ruleFeatures ?? []), ...context };
+  const options = { ...treatyOptions(), ...context };
   tickSchema.max(MAX_ENGINE_TICK).parse(tick);
   positive.max(MAX_STORED_INT).parse(sequence);
   positive.parse(input.generalId);
@@ -815,7 +814,7 @@ export function applyTreatyInput(
     };
   }
   const months = longestMonths(treaty.clauses);
-  const cities = Object.values(state.cities).filter((city) => city.kind !== 'PASS');
+  const cities = Object.values(state.cities).filter((city) => city.kind !== 'PASS' && city.kind !== 'FIELD');
   const cost = {
     from: calculateTreatyFee(cities.filter((c) => c.nationId === treaty.fromNationId).length, months),
     to: calculateTreatyFee(cities.filter((c) => c.nationId === treaty.toNationId).length, months),
@@ -893,8 +892,7 @@ function settleTreatyState(
   if (!Number.isSafeInteger(tick) || tick <= 0 || tick % TICKS_PER_MONTH !== 0)
     throw new RangeError('월 경계 tick이 필요합니다.');
   const next = structuredClone(state) as TreatyWorldState;
-  const expanded = state.ruleFeatures?.includes(EXPANDED_TREATY_FEATURE);
-  const aidFailures = expanded && payTribute ? payMonthlyTribute(next, tick) : [];
+  const aidFailures = payTribute ? payMonthlyTribute(next, tick) : [];
   putTreaties(
     next,
     (next.treaties ?? []).filter(
@@ -904,7 +902,7 @@ function settleTreatyState(
         (entry.status === 'PROPOSED' ? entry.respondByTick > tick : entry.endTick === null || entry.endTick > tick),
     ),
   );
-  if (expanded) returnExpiredVisitors(state, next, tick);
+  returnExpiredVisitors(state, next, tick);
   return { state: next, aidFailures };
 }
 

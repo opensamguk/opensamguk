@@ -3,22 +3,6 @@
   "key": "expanded-191-v2",
   "scenarioKey": "integration191",
   "mapKey": "integration",
-  "ruleFeatures": [
-    "campaign-assignment-v2",
-    "campaign-v1",
-    "city-resources-v1",
-    "equipment-v1",
-    "five-stats",
-    "governance-v1",
-    "heritage-v1",
-    "lineage-v1",
-    "logistics-v1",
-    "operational-map",
-    "personnel",
-    "policy",
-    "stratagem-basic",
-    "treaty"
-  ],
   "featureData": {
     "logistics-v1": {
       "version": 1,

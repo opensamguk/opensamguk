@@ -8,7 +8,8 @@ import {
   officeEffectsSchema,
   residentOfficeBonuses,
   runMonthly,
-  toWorldState,
+  initialReplayState,
+  emptyCampaignState,
   type WorldState,
 } from '@opensamguk/rules';
 
@@ -18,13 +19,16 @@ function settle(state: WorldState, month: number) {
 function ownedGold(state: WorldState, nationId: number) {
   return (
     state.nations[nationId]!.gold +
+    Object.values(state.cities)
+      .filter((city) => city.nationId === nationId)
+      .reduce((total, city) => total + state.cityResources!.cities[city.cityKey]!.gold, 0) +
     Object.values(state.generals)
       .filter((general) => general.nationId === nationId)
       .reduce((total, general) => total + general.gold, 0)
   );
 }
 async function source() {
-  const before = toWorldState(await monthlyFixture());
+  const before = initialReplayState(await monthlyFixture()).state;
   before.officeEffects = structuredClone(defaultOfficeEffects);
   const city = before.cities[1]!;
   city.commerce = 1000;
@@ -39,6 +43,7 @@ async function source() {
   const central = { ...military, id: 5, officerLevel: 11 };
   before.generals[4] = governor;
   before.generals[5] = central;
+  before.campaign = emptyCampaignState(before, 'office-residency', 'office-fixture');
   return before;
 }
 function appoint(state: WorldState, generalId: number, officerLevel: number, cityKey: number) {
@@ -59,8 +64,7 @@ describe('AC-M3-12 1030 고정 시드 관직 주재 골든', () => {
       residentOfficeBonuses(before, before.startYear),
     );
     const { version, minimumAbility, tax, supplyLoss } = before.officeEffects!;
-    before.officeEffects = { version, minimumAbility, tax, supplyLoss };
-    expect(appointOfficer(before, 1, 3, 2, 1, null)).toMatchObject({ ok: false, code: 'BAD_ARGS' });
+    expect(() => officeEffectsSchema.parse({ version, minimumAbility, tax, supplyLoss })).toThrow();
   });
   it('태수와 군사 보정은 각각 10%이고 참모가 함께 있어도 가장 큰 한 번만 붙는다', async () => {
     const before = await source();
@@ -106,7 +110,11 @@ describe('AC-M3-12 1030 고정 시드 관직 주재 골든', () => {
     const previous = settle(disabled, 2).state;
     expect([settled.cities[1]!.commerce, previous.cities[1]!.commerce]).toEqual([910, 900]);
     expect([settled.cities[1]!.security, previous.cities[1]!.security]).toEqual([910, 900]);
-    expect([settled.generals[5]!.train, previous.generals[5]!.train]).toEqual([91, 90]);
+    // D-104: 보급 병력 손실은 부곡에 적용하며 병력이 없는 장수 능력은 보존한다.
+    expect([settled.generals[5]!.train, previous.generals[5]!.train]).toEqual([
+      before.generals[5]!.train,
+      before.generals[5]!.train,
+    ]);
     const assigned = appoint(before, 4, 4, 1);
     const lost = structuredClone(assigned);
     lost.cities[1]!.nationId = 2;

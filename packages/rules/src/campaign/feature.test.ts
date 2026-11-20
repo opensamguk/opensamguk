@@ -1,3 +1,4 @@
+import { providedRuleData } from '../providedRuleData';
 import { describe, expect, it } from 'vitest';
 import { operationalInput } from '../../test/operationalMapFixture';
 import { commandInitial } from '../../test/commandFixture';
@@ -22,12 +23,13 @@ const registry = ruleRegistry;
 const data = { policy: { version: 1, turnTermMinutes: 60 } };
 function fixture() {
   const initial = buildInitialWorld(operationalInput());
-  initial.ruleFeatures = ['campaign-v1', 'five-stats', 'operational-map', 'personnel', 'policy'];
+  for (const general of initial.generals) general.sex = 'UNKNOWN';
   Object.assign(initial.generals[0]!, { nationId: null, officerLevel: 0 });
   const replay = initialReplayStateWithRegistry(initial, registry, data);
   const payload = {
     name: '사람장수',
     portraitId: null,
+    sex: 'MALE' as const,
     leadership: 55,
     strength: 55,
     intel: 55,
@@ -69,7 +71,17 @@ describe('AC-INT-06 휘하 프로필 생성·입력 재생 계약', () => {
   });
   it('실제 편성 입력 결과를 재계산하고 결과·tick·미등록 병종 위조를 거부한다', () => {
     const f = fixture(),
-      payload = { type: 'form', commanderId: 3, crewType: 1100, revision: 1 };
+      payload = { type: 'command', unitId: 1, commanderId: 3, revision: 1 };
+    f.created.state.campaign!.units.push({
+      id: 1,
+      ownerId: 3,
+      commanderId: 3,
+      troops: 1,
+      crewType: 1100,
+      train: 0,
+      atmos: 0,
+    });
+    f.created.state.campaign!.nextUnitId = 2;
     const applied = applyCampaignUnitInput(f.created.state, payload, 3, f.created.state.campaign, {
       tick: 1,
       userId: 'owner',
@@ -126,24 +138,24 @@ describe('AC-INT-06 휘하 프로필 생성·입력 재생 계약', () => {
       applyRecordedInput(f.created, { ...record, result: { ...applied.result, cost: 0, tick: 1 } }, registry),
     ).toThrow();
   });
-  it('의존 기능·General 병력 중복·별도 가짜 초기 상태를 거부하며 구형 상태에는 키를 더하지 않는다', () => {
+  it('의존 기능·General 병력 중복·별도 가짜 초기 상태를 거부하며 선택 없이 초기 상태를 제공한다', () => {
     const f = fixture();
     const origin = {
       version: 3,
       initial: f.initial,
       initialStateHash: 'hash',
       resourceHash: 'hash',
-      featureData: data,
+      featureData: providedRuleData(f.initial, 60),
     };
     expect(() => checkReplayOrigin(origin, registry)).not.toThrow();
     const bad = structuredClone(origin);
-    bad.initial.ruleFeatures = bad.initial.ruleFeatures!.filter((key) => key !== 'personnel');
+    delete bad.featureData['lineage-v1'];
     expect(() => checkReplayOrigin(bad, registry)).toThrow();
     const duplicate = structuredClone(origin);
     duplicate.initial.generals[0]!.crew = 100;
     expect(() => checkReplayOrigin(duplicate, registry)).toThrow();
-    expect(Object.hasOwn(initialReplayState(commandInitial()), 'campaignArmyTypes')).toBe(false);
-    expect(Object.hasOwn(initialReplayState(commandInitial()).state, 'campaign')).toBe(false);
+    expect(Object.hasOwn(initialReplayState(commandInitial()), 'campaignArmyTypes')).toBe(true);
+    expect(Object.hasOwn(initialReplayState(commandInitial()).state, 'campaign')).toBe(true);
   });
 });
 

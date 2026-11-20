@@ -6,7 +6,7 @@ import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { loadWorld } from '../apps/engine/src/worldLoader';
 import { controlClock } from '../apps/engine/src/world/clock';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld, attachFixtureOwners } from './worldFixture';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { initializeIntegrationResources } from '../tools/integration-resources';
 import { test as legalTest, expect, type LegalStack } from './legalFixture';
@@ -73,24 +73,11 @@ async function fixture(stack: LegalStack, browser: Browser) {
     limits: { sentOffers: 3, receivedOffers: 3, worldOffers: 100 },
   };
   initial.generals = initial.generals.map((general) => ({ ...general, crew: 0, nextTurnTick: 1_000_000 }));
-  const features = [
-    'campaign-assignment-v2',
-    'campaign-v1',
-    'city-resources-v1',
-    'five-stats',
-    'governance-v1',
-    'operational-map',
-    'personnel',
-    'policy',
-    'treaty',
-  ];
-  initial.ruleFeatures = features;
-  const { worldId } = await saveInitialWorld(stack.db, initial, {
+  const { worldId } = await saveFixtureWorld(stack.db, initial, {
     name: '황실 화면 검증',
     turnTermMinutes: 60,
     endYear: initial.startYear + 10,
     replayFormat: 3,
-    ruleFeatures: features,
     featureData: { 'governance-v1': config },
   });
   const context = await browser.newContext({ baseURL: stack.origin, viewport: { width: 1440, height: 1000 } });
@@ -112,11 +99,7 @@ async function fixture(stack: LegalStack, browser: Browser) {
           sessions: { create: { id: session.id, expiresAt: session.expiresAt } },
         },
       });
-      const tick = (await stack.db.world.findUniqueOrThrow({ where: { id: worldId } })).clockTick;
-      await stack.db.general.update({
-        where: { worldId_id: { worldId, id: generalId } },
-        data: { userId: id, lastActiveTick: tick, lastActiveAt: new Date(), residenceTick: tick },
-      });
+      await attachFixtureOwners(stack.db, worldId, [{ id: generalId, userId: id }]);
       token = session.token;
       accounts.set(generalId, token);
     }

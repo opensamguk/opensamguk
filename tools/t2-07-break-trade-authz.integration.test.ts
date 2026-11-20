@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { readFile, readdir } from 'node:fs/promises';
@@ -12,13 +13,13 @@ import { newSession } from '../apps/server/src/auth/session';
 import { hashPassword } from '../apps/server/src/auth/password';
 import type { AppRouter } from '../apps/server/src/router';
 import { monthlyFixture } from '../apps/engine/test/monthlyFixture';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, databaseNow, releaseLease, renewLease, type Lease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { pnpmCli } from './node-cli';
-import { testDatabaseUrl } from './test-database';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
 import { expectSeparateProcessReplay, runTurnWorkerAndKill } from './test-turn-worker';
 
 // AC-M2-06·14: 실제 Fastify 주입, 세션, PostgreSQL, 중앙 엔진을 함께 지난다.
@@ -38,7 +39,7 @@ type Fixture = {
 };
 const root = fileURLToPath(new URL('../', import.meta.url));
 const migrationRoot = new URL('../packages/db/prisma/migrations/', import.meta.url);
-const databaseName = `t207_authz_${randomUUID().replaceAll('-', '')}_test`;
+const databaseName = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
 const now = Date.now();
 const origin = 'http://t207-authz.test';
 const features = ['treaty', 'treaty-break', 'treaty-trade'];
@@ -125,7 +126,10 @@ beforeAll(async () => {
   maintenance.pathname = '/postgres';
   const own = new URL(reference);
   own.pathname = `/${databaseName}`;
-  testDatabaseUrl({ TEST_DATABASE_URL: own.href, DATABASE_URL: process.env.DATABASE_URL });
+  testDatabaseUrl({
+    TEST_DATABASE_URL: own.href,
+    DATABASE_URL: process.env.CI_GREEN_DATABASE ? undefined : process.env.DATABASE_URL,
+  });
   admin = createDb(maintenance.href);
   catalogBefore = await catalog();
   if ((await identity()) !== undefined) throw Error('새 시험 DB 이름이 이미 있습니다.');
@@ -149,11 +153,11 @@ async function fixture(atWar = false, tradeTick?: number): Promise<Fixture> {
   const owned: Fixture = { worldId: '', users, cookies: [], treatyId: '' };
   fixtures.push(owned);
   await db.user.createMany({
-    data: users.map((id, index) => ({
+    data: users.map((id) => ({
       id,
       email: `${id}@example.invalid`,
       passwordHash,
-      status: index === 2 ? 'SANCTIONED' : 'ACTIVE',
+      status: 'ACTIVE',
     })),
   });
   for (const userId of users) {
@@ -186,7 +190,7 @@ async function fixture(atWar = false, tradeTick?: number): Promise<Fixture> {
     userId: users[role.user]!,
     nationId: role.nation,
     cityKey: role.nation,
-    officerLevel: role.user === 3 ? 1 : 12,
+    officerLevel: [0, 1, 5].includes(role.user) ? 12 : 1,
     nextTurnTick: tradeTick === undefined ? TICKS_PER_MONTH + 1 : role.user === 0 ? tradeTick : 3 * TICKS_PER_MONTH,
   }));
   state.diplomacies = atWar ? [{ nationA: 1, nationB: 2, state: 'WAR', untilTick: 0 }] : [];
@@ -195,12 +199,12 @@ async function fixture(atWar = false, tradeTick?: number): Promise<Fixture> {
     turnTermMinutes: 120,
     endYear: null,
     replayFormat: 3,
-    ruleFeatures: features,
   });
   owned.worldId = made.worldId;
+  await db.user.update({ where: { id: users[2]! }, data: { status: 'SANCTIONED' } });
   const stored = await db.world.findUniqueOrThrow({ where: { id: made.worldId } });
   expect(stored.replayFormat).toBe(3);
-  expect(stored.ruleFeatures).toEqual(features);
+  expect(providedRuleKeys).toEqual(expect.arrayContaining(features));
   await controlClock(db, made.worldId, 'start');
   return owned;
 }
@@ -487,19 +491,21 @@ it.each([false, true])(
         inputs: await tx.inputEvent.findMany({ where: { worldId }, orderBy: { sequence: 'asc' } }),
         logs: await tx.generalLog.findMany({ where: { worldId }, orderBy: [{ sequence: 'asc' }, { id: 'asc' }] }),
       }));
-    expect(value(await call('turns.precheck', command))).toMatchObject({ ok: true });
+    expect(value(await call('turns.precheck', command))).toMatchObject(
+      atWar ? { ok: false, code: 'BAD_STATE' } : { ok: true },
+    );
     expect(value<Output['tradeTargets']>(await call('treaty.tradeTargets')).items.map((item) => item.cityKey)).toEqual(
       atWar ? [] : [2],
     );
     if (!atWar) {
       await unchanged(async () => {
-        const input = { revision: 0, slots };
+        const input = { revision: 1, slots };
         error(await call('turns.set', input, 2), 401, 'UNAUTHORIZED');
         error(await call('turns.set', input, 4), 404, 'NOT_FOUND');
         error(await call('turns.set', { ...input, generalId: 5 }), 400, 'BAD_REQUEST');
       });
     }
-    expect(value(await call('turns.set', { revision: 0, slots }))).toMatchObject({ ok: true, revision: 1 });
+    expect(value(await call('turns.set', { revision: 1, slots }))).toMatchObject({ ok: true, revision: 2 });
     const before = await read();
     expect(before.replay.turns[1]!.slice(0, 2)).toMatchObject(slots.slice(0, 2));
     await releaseLease(db, f.lease!);
@@ -559,7 +565,7 @@ it.each([false, true])(
         nextTurnTick: tick + TICKS_PER_MONTH,
       },
     });
-    expect(after.replay.revisions[1]).toBe(2);
+    expect(after.replay.revisions[1]).toBe(3);
 
     const restarted = await acquireLease(db, worldId);
     if (!restarted) throw Error('교역 검증을 재시작할 리스가 없습니다.');
@@ -889,7 +895,9 @@ describe('T2-07 / AC-M1-14·AC-M2-06 종전·불가침 조약 복구', () => {
       expect(proposed.before.relations).toEqual(
         atWar ? [{ worldId, nationA: 1, nationB: 2, state: 'WAR', untilTick: 0 }] : [],
       );
-      expect(proposed.committed.inputs).toEqual([proposed.stored]);
+      expect(proposed.committed.inputs).toEqual(
+        proposed.before.inputs.map((input) => (input.id === proposed.stored.id ? proposed.stored : input)),
+      );
       expect(proposed.committed.treaties).toEqual([
         expect.objectContaining({
           id: Number(treatyId),
@@ -911,7 +919,9 @@ describe('T2-07 / AC-M1-14·AC-M2-06 종전·불가침 조약 복구', () => {
       const accepted = await recoverTreatyInput('treaty.respond', { treatyId, accept: true }, 5, acceptedTick, read);
       const endTick = months === null ? null : acceptedTick + months * TICKS_PER_MONTH;
       expect(accepted.retry).toMatchObject({ outcome: 'ACCEPTED', treatyId, treaty: { status: 'ACTIVE', cost } });
-      expect(accepted.committed.inputs).toEqual([proposed.stored, accepted.stored]);
+      expect(accepted.committed.inputs).toEqual(
+        accepted.before.inputs.map((input) => (input.id === accepted.stored.id ? accepted.stored : input)),
+      );
       expect(accepted.committed.treaties).toEqual([
         {
           ...proposed.committed.treaties[0],

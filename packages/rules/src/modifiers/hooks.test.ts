@@ -1,12 +1,13 @@
 import { createRng, rngFor } from '@opensamguk/shared';
 import { describe, expect, it } from 'vitest';
-import { commandWorld, testUnits } from '../../test/commandFixture';
+import { commandWorld, testUnits } from '../../test/builtinCommandFixture';
 import { simulateBattle, type BattleInput } from '../battle/simulate';
 import { attack, createAttackWithProviders } from '../commands/attack';
 import { applyEffects } from '../commands/effects';
 import { DOMESTIC_SPECS, makeInvestment, makeInvestmentWithProviders } from '../commands/domestic/investment';
 import type { DeepReadonly } from '../model/world';
 import { cloneWorld } from '../model/clone';
+import { domesticStatScore } from '../commands/statScores';
 import type { Modifier, ModifierContext, ModifierProvider } from './index';
 
 function freeze<T>(value: T): DeepReadonly<T> {
@@ -42,7 +43,9 @@ describe('T4-18 내정 삽입', () => {
     ['H3 하한', [add('test:a', -100)], 0, 0],
     ['H4 덧셈 뒤 곱셈', [mul('test:b', 1.5), add('test:a', 2)], 45, 31],
   ] as const)('%s는 전선·치명 뒤 점수에 적용돼 도시·경험·공헌을 함께 바꾼다', (_, modifiers, points, experience) => {
-    const view = freeze(commandWorld());
+    const world = commandWorld();
+    Object.assign(world.logistics!.cities['1']!, { iron: 3000, wood: 3000, horses: 3000 });
+    const view = freeze(world);
     const before = structuredClone(view);
     const rng = countedRng('fixed', 0.5);
     const contexts: ModifierContext[] = [];
@@ -66,7 +69,9 @@ describe('T4-18 내정 삽입', () => {
   });
 
   it.each(['t4-18-investment-2', 't4-18-investment-24'])('H5 치명 시드 %s의 RNG 소비와 다음값은 같다', (seed) => {
-    const view = freeze(commandWorld());
+    const world = commandWorld();
+    Object.assign(world.logistics!.cities['1']!, { iron: 3000, wood: 3000, horses: 3000 });
+    const view = freeze(world);
     const a = countedRng(seed);
     const b = countedRng(seed);
     const original = makeInvestment(farm).execute(view, { generalId: 1 }, {}, a.rng);
@@ -83,7 +88,9 @@ describe('T4-18 내정 삽입', () => {
   });
 
   it('민심은 소수를 보존하고 도시·기술 상한과 반올림은 기존 효과 적용에서 처리한다', () => {
-    const view = freeze(commandWorld());
+    const world = commandWorld();
+    Object.assign(world.logistics!.cities['1']!, { iron: 3000, wood: 3000, horses: 3000 });
+    const view = freeze(world);
     const goodwill = DOMESTIC_SPECS.find((spec) => spec.key === 'goodwill')!;
     const result = makeInvestmentWithProviders(goodwill, [() => [add('test:a', 0.1)]]).execute(
       view,
@@ -91,7 +98,14 @@ describe('T4-18 내정 삽입', () => {
       {},
       countedRng('fixed', 0.5).rng,
     );
-    expect(result.effects[0]).toEqual({ kind: 'city', id: 1, field: 'trust', op: 'add', value: 4.010000000000001 });
+    expect(result.effects[0]).toEqual({
+      kind: 'city',
+      id: 1,
+      field: 'trust',
+      op: 'add',
+      value:
+        ((domesticStatScore(view, view.generals[1]!, 'goodwill', 'intel') * 0.8) / 2 + 0.1) * goodwill.effectFactor!,
+    });
     for (const spec of [farm, DOMESTIC_SPECS.find((value) => value.key === 'research')!]) {
       const value = makeInvestmentWithProviders(spec, [() => [mul('test:a', 1e6)]]).execute(
         view,
@@ -107,7 +121,9 @@ describe('T4-18 내정 삽입', () => {
   });
 
   it('V5 빈 제공자는 투자 8종·일반과 두 치명 구간의 결과와 RNG를 보존한다', () => {
-    const view = freeze(commandWorld());
+    const world = commandWorld();
+    Object.assign(world.logistics!.cities['1']!, { iron: 3000, wood: 3000, horses: 3000 });
+    const view = freeze(world);
     const before = structuredClone(view);
     let providerCalls = 0;
     const provider: ModifierProvider = () => {
@@ -255,7 +271,9 @@ describe('T4-18 출병 전달', () => {
   });
 
   it('V5·H10 빈 제공자 경로는 출병 결과·RNG·입력 상태를 보존한다', () => {
-    const view = freeze(commandWorld());
+    const world = commandWorld();
+    Object.assign(world.logistics!.cities['1']!, { iron: 3000, wood: 3000, horses: 3000 });
+    const view = freeze(world);
     const before = structuredClone(view);
     const a = countedRng('empty-provider');
     const b = countedRng('empty-provider');

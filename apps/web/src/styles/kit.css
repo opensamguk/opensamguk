@@ -1,0 +1,328 @@
+/*
+ * 쇼케이스 UI 키트 클래스(INT-29). 그림 주소는 ui/kit.ts가 :root에 올린 --kit-* 변수다.
+ * 그림은 두 배 크기로 그렸으므로 테두리 폭은 잘라 낸 조각의 절반이다.
+ * 변수가 없으면(그림 승인 전, 시험 환경) border-image가 빠지고 대체 색만 남는다.
+ */
+
+/* 창과 판 틀: 아홉 조각 늘려 깔기 */
+.kit-window,
+.kit-list-general,
+.kit-list-city,
+.kit-list-nation,
+.kit-paper,
+.kit-card,
+.kit-notice,
+.kit-tooltip,
+.kit-speech,
+.kit-drawer {
+  border-style: solid;
+  border-color: transparent;
+  border-image-repeat: stretch;
+  box-sizing: border-box;
+}
+.kit-window {
+  border-width: 32px;
+  border-image: var(--kit-frame-window) 64 fill / 32px stretch;
+  background-color: #3a0d08;
+  color: #f5e6c8;
+}
+.kit-list-general,
+.kit-list-city,
+.kit-list-nation {
+  border-width: 28px;
+  color: #f5e6c8;
+}
+.kit-list-general {
+  border-image: var(--kit-frame-list-general) 56 fill / 28px stretch;
+  background-color: #4a120c;
+}
+.kit-list-city {
+  border-image: var(--kit-frame-list-city) 56 fill / 28px stretch;
+  background-color: #123a24;
+}
+.kit-list-nation {
+  border-image: var(--kit-frame-list-nation) 56 fill / 28px stretch;
+  background-color: #2c1a3a;
+}
+.kit-paper {
+  border-width: 24px;
+  border-image: var(--kit-frame-list-paper) 48 fill / 24px stretch;
+  background-color: #efe0bf;
+  color: #2a1d14;
+}
+.kit-card {
+  border-width: 16px;
+  border-image: var(--kit-frame-card) 32 fill / 16px stretch;
+  background-color: #efe0bf;
+  color: #2a1d14;
+}
+.kit-notice {
+  border-width: 20px;
+  border-image: var(--kit-frame-notice) 40 fill / 20px stretch;
+  background-color: #efe0bf;
+  color: #2a1d14;
+}
+.kit-tooltip {
+  border-width: 12px;
+  border-image: var(--kit-frame-tooltip) 24 fill / 12px stretch;
+  background-color: #2a1208;
+  color: #f5e6c8;
+}
+.kit-speech {
+  border-width: 32px 32px 48px 48px;
+  border-image: var(--kit-frame-speech) 64 64 96 96 fill / 32px 32px 48px 48px stretch;
+  background-color: #efe0bf;
+  color: #2a1d14;
+}
+.kit-drawer {
+  border-width: 32px 48px 32px 32px;
+  border-image: var(--kit-drawer) 64 96 64 64 fill / 32px 48px 32px 32px stretch;
+  background-color: #3a0d08;
+  color: #f5e6c8;
+}
+
+/* 위아래 띠: 양 끝 장식을 살리고 가운데만 늘린다 */
+.kit-bar-top,
+.kit-bar-bottom {
+  border-style: solid;
+  border-color: transparent;
+  border-width: 0 24px;
+  box-sizing: border-box;
+}
+.kit-bar-top {
+  border-image: var(--kit-bar-top) 0 48 fill / 0 24px stretch;
+  background-color: #4a120c;
+  color: #f5e6c8;
+}
+.kit-bar-bottom {
+  border-image: var(--kit-bar-bottom) 0 48 fill / 0 24px stretch;
+  background-color: #2a1208;
+  color: #e9d7b0;
+}
+
+/* 제목 장식: 제목 양옆에 붙는다 */
+.kit-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 900;
+  color: #fff3d6;
+  text-shadow: 0 2px 0 #1a0a04;
+  letter-spacing: 0.06em;
+}
+.kit-title::before,
+.kit-title::after {
+  content: '';
+  flex: 0 1 96px;
+  min-width: 24px;
+  height: 24px;
+  background: var(--kit-title-ornament-0) center / contain no-repeat;
+}
+.kit-title::after {
+  transform: scaleX(-1);
+}
+
+/* 단추: 기본, 올림, 누름, 불가 */
+.kit-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 10px solid transparent;
+  border-image: var(--kit-button-primary-0) 20 fill / 10px stretch;
+  background-color: #7a1e12;
+  color: #fff3d6;
+  font: inherit;
+  font-weight: 700;
+  white-space: nowrap;
+  text-shadow: 0 1px 0 #1a0a04;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.kit-button:hover {
+  border-image-source: var(--kit-button-primary-1);
+}
+.kit-button:active,
+.kit-button[aria-pressed='true'] {
+  border-image-source: var(--kit-button-primary-2);
+}
+.kit-button:disabled,
+.kit-button[aria-disabled='true'] {
+  border-image-source: var(--kit-button-primary-3);
+  color: #b9a88c;
+  cursor: not-allowed;
+}
+.kit-button[data-kind='secondary'] {
+  border-image-source: var(--kit-button-secondary-0);
+}
+.kit-button[data-kind='secondary']:hover {
+  border-image-source: var(--kit-button-secondary-1);
+}
+.kit-button[data-kind='secondary']:active,
+.kit-button[data-kind='secondary'][aria-pressed='true'] {
+  border-image-source: var(--kit-button-secondary-2);
+}
+.kit-button[data-kind='secondary']:disabled {
+  border-image-source: var(--kit-button-secondary-3);
+}
+.kit-button[data-kind='accent'] {
+  border-image-source: var(--kit-button-accent-0);
+}
+.kit-button[data-kind='accent']:hover {
+  border-image-source: var(--kit-button-accent-1);
+}
+.kit-button[data-kind='accent']:active {
+  border-image-source: var(--kit-button-accent-2);
+}
+.kit-button[data-kind='accent']:disabled {
+  border-image-source: var(--kit-button-accent-3);
+}
+.kit-button[data-kind='danger'] {
+  border-image-source: var(--kit-button-danger-0);
+}
+.kit-button[data-kind='danger']:hover {
+  border-image-source: var(--kit-button-danger-1);
+}
+.kit-button[data-kind='danger']:active {
+  border-image-source: var(--kit-button-danger-2);
+}
+.kit-button[data-kind='danger']:disabled {
+  border-image-source: var(--kit-button-danger-3);
+}
+.kit-button:focus-visible {
+  outline: 2px solid #ffd77a;
+  outline-offset: 2px;
+}
+
+/* 둥근 단추: 그림 한 장(늘리지 않음) */
+.kit-round {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--kit-button-round-0, #7a1e12) center / contain no-repeat;
+  color: #f5e6c8;
+  cursor: pointer;
+}
+.kit-round:hover {
+  background-image: var(--kit-button-round-1);
+}
+.kit-round:active,
+.kit-round[aria-pressed='true'] {
+  background-image: var(--kit-button-round-2);
+}
+.kit-round:disabled {
+  background-image: var(--kit-button-round-3);
+}
+
+/* 표: 머리와 줄 */
+.kit-thead,
+.kit-row {
+  border-style: solid;
+  border-color: transparent;
+  border-width: 0 10px;
+  box-sizing: border-box;
+}
+.kit-thead {
+  border-image: var(--kit-table-head) 0 20 fill / 0 10px stretch;
+  background-color: #5a1a10;
+  color: #f5e6c8;
+  font-weight: 700;
+}
+.kit-row {
+  border-image: var(--kit-table-row-0) 0 20 fill / 0 10px stretch;
+  background-color: #4a120c;
+  color: #f5e6c8;
+}
+.kit-row:nth-child(even) {
+  border-image-source: var(--kit-table-row-1);
+}
+.kit-row[aria-selected='true'],
+.kit-row[aria-current='true'],
+.kit-row[data-selected='true'] {
+  border-image-source: var(--kit-table-row-2);
+  color: #2a1208;
+}
+
+/* 탭: 고름, 안 고름 */
+.kit-tab-h,
+.kit-tab-v {
+  border: 8px solid transparent;
+  background-color: #4a120c;
+  color: #e9d7b0;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.kit-tab-h {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border-image: var(--kit-tab-horizontal-1) 16 fill / 8px stretch;
+}
+.kit-tab-h[aria-selected='true'],
+.kit-tab-h[aria-current='page'],
+.kit-tab-h[aria-pressed='true'] {
+  border-image-source: var(--kit-tab-horizontal-0);
+  color: #fff3d6;
+}
+.kit-tab-v {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  padding: 10px 0;
+  writing-mode: vertical-rl;
+  border-image: var(--kit-tab-vertical-1) 16 fill / 8px stretch;
+  color: #4a2c18;
+}
+.kit-tab-v[aria-selected='true'],
+.kit-tab-v[aria-current='page'],
+.kit-tab-v[aria-pressed='true'] {
+  border-image-source: var(--kit-tab-vertical-0);
+  color: #8a1a0c;
+}
+
+/* 입력칸: 기본, 초점, 오류, 불가 */
+.kit-input {
+  min-height: 40px;
+  padding: 0 12px 0 16px;
+  border: 8px solid transparent;
+  border-image: var(--kit-input-text-0) 16 fill / 8px stretch;
+  background-color: #efe0bf;
+  color: #2a1d14;
+  font: inherit;
+  box-sizing: border-box;
+}
+.kit-input:focus,
+.kit-input:focus-visible {
+  border-image-source: var(--kit-input-text-1);
+  outline: none;
+}
+.kit-input[aria-invalid='true'] {
+  border-image-source: var(--kit-input-text-2);
+}
+.kit-input:disabled {
+  border-image-source: var(--kit-input-text-3);
+}
+
+/* 막대: 바탕과 채움 */
+.kit-gauge {
+  position: relative;
+  height: 16px;
+  border: 5px solid transparent;
+  border-image: var(--kit-gauge-track) 10 fill / 5px stretch;
+  background-color: #2a1208;
+  box-sizing: border-box;
+}
+.kit-gauge > i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--kit-gauge-fill-0, #c9902a) 0 0 / auto 100%;
+}

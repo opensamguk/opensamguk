@@ -1,16 +1,68 @@
 import { expect, it } from 'vitest';
 import { rngFor } from '@opensamguk/shared';
-import { commandInitial, commandWorld, testUnits } from '../../test/commandFixture';
+import { commandInitial, commandWorld, testUnits } from '../../test/builtinCommandFixture';
 import { BALANCE } from '../balance';
 import { DOMESTIC_SPECS } from '../commands/domestic/investment';
 import { applyEffects } from '../commands/effects';
 import { runCommand } from '../commands/registry';
 import type { WorldState } from '../model/world';
 import { initialReplayState, runReplayAction, settleReplayMonth, type RecordedInput } from '../replay';
-import { reputationTurnEvents, reputationInputEvents } from './events';
+import { reputationBattleEvents, reputationTurnEvents, reputationInputEvents } from './events';
+import { tacticalFixture } from '../../test/tacticalFixture';
+import { settleTacticalBattle } from '../tactical/world';
+import { applyBattleStep } from '../tactical/input';
 import { reputationFeature } from './feature';
 import { campaignAttack } from '../campaign/attack';
 import { emptyCampaignState } from '../campaign/state';
+
+it.each(['attack', 'defend'] as const)(
+  'AC-M3-15 전술 %s 승패·점령은 정산 시각과 정산 전 공개 정보를 쓴다',
+  (winner) => {
+    const { world, battle } = tacticalFixture();
+    const before = structuredClone(world);
+    battle.phase = 'ended';
+    battle.result = winner;
+    settleTacticalBattle(world, battle, 20000);
+    const events = reputationBattleEvents(before, world, 20000);
+    expect(events.map((event) => [event.generalId, event.kind])).toEqual(
+      winner === 'attack'
+        ? [
+            [1, 'victory'],
+            [2, 'defeat'],
+            [1, 'conquest'],
+          ]
+        : [
+            [2, 'victory'],
+            [1, 'defeat'],
+          ],
+    );
+    expect(events.every((event) => event.tick === 20000 && event.month === 3)).toBe(true);
+    expect(events.find((event) => event.generalId === 2)?.data.nation).toEqual({
+      id: 2,
+      name: before.nations[2]!.name,
+      color: before.nations[2]!.color,
+    });
+    expect(reputationBattleEvents(world, world, 20000)).toEqual([]);
+  },
+);
+
+it('AC-M3-15 전술 취소와 미정산에는 승패 평판이 없다', () => {
+  const { world, battle } = tacticalFixture();
+  const payload = { battleId: battle.id, now: 1, turnTermMinutes: 60, present: false, orders: [], cancel: '월드 종료' };
+  const input: RecordedInput = {
+    kind: 'battle.step',
+    status: 'APPLIED',
+    tick: 20000,
+    sequence: 1,
+    generalId: null,
+    payload,
+    result: {},
+  };
+  expect(reputationBattleEvents(world, world, 20000)).toEqual([]);
+  const after = applyBattleStep(world, payload, testUnits, 20000);
+  expect(after.campaign!.tactical!.battles[0]!.settled).toBe(true);
+  expect(reputationInputEvents({ before: world, after, input })).toEqual([]);
+});
 
 function execute(before: WorldState, commandKey: string, generalId = 1, args: unknown = {}, unitSet = testUnits) {
   const rng = rngFor('reputation-event', commandKey);
@@ -20,8 +72,9 @@ function execute(before: WorldState, commandKey: string, generalId = 1, args: un
 }
 
 it.each(DOMESTIC_SPECS)('T3-07 AC-M3-15 실제 $key가 최대치에 닿은 경우만 내정 평판이다', (spec) => {
-  const before = commandWorld(),
-    city = before.cities[1]!;
+  const before = commandWorld();
+  Object.assign(before.logistics!.cities['1']!, { iron: 3000, wood: 3000, horses: 3000 });
+  const city = before.cities[1]!;
   if (spec.field === 'tech') before.nations[1]!.tech = BALANCE.MAX_TECH - 1;
   else city[spec.field] = (spec.field === 'trust' ? BALANCE.MAX_TRUST : city[`${spec.field}Max`]) - 1;
   const done = execute(before, spec.key);
@@ -34,23 +87,20 @@ it.each(DOMESTIC_SPECS)('T3-07 AC-M3-15 실제 $key가 최대치에 닿은 경�
 
 it('T3-07 AC-M3-15 실제 교전의 승패와 점령만 세며 기존 전투·난수는 같다', () => {
   const before = commandWorld();
-  before.ruleFeatures = ['reputation-v1'];
   Object.assign(before.generals[1]!, { crew: 10000, rice: 100000, train: 100, atmos: 100 });
   Object.assign(before.generals[2]!, { crew: 1, rice: 10000, train: 100, atmos: 100 });
   before.generals[3]!.crew = 0;
   before.cities[2]!.wall = 0;
   const legacy = structuredClone(before);
-  delete legacy.ruleFeatures;
   const done = execute(before, 'attack', 1, { cityKey: 2 });
   const old = execute(legacy, 'attack', 1, { cityKey: 2 });
   if ('code' in done.result || 'code' in old.result) throw Error('출병 고정물 실패');
   expect(done.result.battleOutcomes).toEqual([{ winnerId: 1, loserId: 2 }]);
-  expect(old.result).not.toHaveProperty('battleOutcomes');
+  expect(old.result.battleOutcomes).toEqual(done.result.battleOutcomes);
   expect(done.result.battleAwards).toEqual(old.result.battleAwards);
   expect(done.result.logs).toEqual(old.result.logs);
   expect(done.rng.next()).toBe(old.rng.next());
   const same = { ...done.after };
-  delete same.ruleFeatures;
   expect(same).toEqual(old.after);
   const events = reputationTurnEvents(done);
   expect(events.map((row) => [row.generalId, row.kind])).toEqual([
@@ -63,7 +113,6 @@ it('T3-07 AC-M3-15 실제 교전의 승패와 점령만 세며 기존 전투·�
 
 it('T3-07 AC-M3-15 공격 패배는 수비 승전과 공격 패전이다', () => {
   const before = commandWorld();
-  before.ruleFeatures = ['reputation-v1'];
   Object.assign(before.generals[1]!, { crew: 1, rice: 100000, train: 100, atmos: 100 });
   Object.assign(before.generals[2]!, { crew: 10000, rice: 100000, train: 100, atmos: 100 });
   before.generals[3]!.crew = 0;
@@ -76,7 +125,6 @@ it('T3-07 AC-M3-15 공격 패배는 수비 승전과 공격 패전이다', () =>
 
 it('T3-07 AC-M3-15 수비 없는 도시 점령에 가짜 장수 승패를 더하지 않는다', () => {
   const before = commandWorld();
-  before.ruleFeatures = ['reputation-v1'];
   before.generals[2]!.crew = 0;
   before.generals[3]!.crew = 0;
   before.cities[2]!.wall = 0;
@@ -104,7 +152,6 @@ it('T3-07 AC-M3-15 하야와 검증된 파기만 배신이며 거절·다른 입
 
 it('T3-07 AC-M3-15 중립 도시 점령과 동시 전멸에는 장수 승패가 없다', () => {
   const neutral = commandWorld();
-  neutral.ruleFeatures = ['reputation-v1'];
   neutral.cities[2]!.nationId = null;
   neutral.cities[2]!.wall = 0;
   neutral.cities[3]!.nationId = 2;
@@ -115,7 +162,6 @@ it('T3-07 AC-M3-15 중립 도시 점령과 동시 전멸에는 장수 승패가 
   ]);
   const draw = commandWorld(),
     units = structuredClone(testUnits);
-  draw.ruleFeatures = ['reputation-v1'];
   draw.generals[1]!.crew = 1;
   draw.generals[2]!.crew = 1;
   draw.generals[3]!.crew = 0;
@@ -128,7 +174,6 @@ it('T3-07 AC-M3-15 중립 도시 점령과 동시 전멸에는 장수 승패가 
 
 it('T3-07 AC-M3-15 실제 부곡 교전은 싸운 지휘관에게만 승패를 준다', () => {
   const before = commandWorld();
-  before.ruleFeatures = ['five-stats', 'reputation-v1'];
   for (const general of Object.values(before.generals)) Object.assign(general, { politics: 60, charm: 55, crew: 0 });
   before.cities[2]!.wall = 0;
   before.campaign = emptyCampaignState(before, 'reputation-campaign', 'sourced-fixture');
@@ -159,7 +204,7 @@ it('T3-07 AC-M3-15 순수 재생에서 사건과 월단평을 같은 달에 남�
   initial.nations[0]!.tech = BALANCE.MAX_TECH - 1;
   for (const general of initial.generals) general.nextTurnTick = general.id === 1 ? 0 : 10000;
   const old = initialReplayState(initial),
-    enabled = initialReplayState({ ...initial, ruleFeatures: ['reputation-v1'] });
+    enabled = initialReplayState({ ...initial });
   old.turns[1]![0] = { commandKey: 'research', args: {} };
   enabled.turns[1]![0] = { commandKey: 'research', args: {} };
   const afterOld = runReplayAction(old, initial.seed, testUnits);
@@ -169,11 +214,10 @@ it('T3-07 AC-M3-15 순수 재생에서 사건과 월단평을 같은 달에 남�
   const settledNew = runReplayAction(afterNew, initial.seed, testUnits);
   expect(settledNew.reputation?.reviews[0]?.entries[0]).toMatchObject({ generalId: 1, score: 2 });
   const same = { ...settledNew.state };
-  delete same.ruleFeatures;
   expect(same).toEqual(settledOld.state);
-  expect(settledOld).not.toHaveProperty('reputation');
+  expect(settledOld.reputation).toBeDefined();
   expect(settledNew.turns).toEqual(settledOld.turns);
   expect(settledNew.revisions).toEqual(settledOld.revisions);
-  expect(() => settleReplayMonth(settledNew, initial.seed, 10000)).toThrow('같은 달');
+  expect(() => settleReplayMonth(settledNew, initial.seed, 10000)).toThrow('월 정산');
   expect(() => reputationFeature.checkOrigin!({ initial, data: {} })).toThrow('빈 원장');
 });

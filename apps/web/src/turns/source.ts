@@ -93,6 +93,8 @@ export const personalSource: TurnSourceFactory<PersonalSlot> = ({ trpc, userId, 
     slotCount: SLOT_COUNT,
     storageKey: draftStorageKey(userId, worldId),
     gridLabel: `예턴 ${SLOT_COUNT}칸`,
+    // 개인 칸은 장수 지갑이다. 편집기는 이 값으로 내 부곡(campaign.get)을 받아 모병, 훈련, 사기의 부곡 칸을 채운다.
+    walletKind: 'general',
     list: {
       queryKey: get.queryKey,
       queryFn: get.queryFn as QueryFunction<unknown>,

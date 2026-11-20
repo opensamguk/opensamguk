@@ -1,3 +1,4 @@
+import { providedRuleData } from '../providedRuleData';
 import { describe, expect, it } from 'vitest';
 import type { Rng } from '@opensamguk/shared';
 import { commandInitial, commandWorld } from '../../test/commandFixture';
@@ -28,8 +29,8 @@ const noRng: Rng = {
 };
 function world() {
   const state = commandWorld();
-  state.ruleFeatures = ['nation-strategy-v1', 'personnel'];
   state.nationStrategy = initialNationStrategy();
+  state.stratagemCards!.nations[1]!.hand = ['nation_mobilize', 'nation_rivalry', 'nation_raid'];
   return state;
 }
 function run(key: string, args: unknown, state = world(), tick = 0) {
@@ -44,14 +45,19 @@ function execute(key: string, args: unknown, state = world(), tick = 0) {
 describe('AC-P2-04 D-074 전략 3종', () => {
   it('최초 상태는 비어 있고 기능을 끈 생성과 clone에는 새 키가 없다', () => {
     const initial = commandInitial();
-    expect(initialReplayState(initial).state).not.toHaveProperty('nationStrategy');
-    initial.ruleFeatures = ['nation-strategy-v1', 'personnel'];
+    for (const general of initial.generals) general.crew = 0;
+    expect(initialReplayState(initial).state.nationStrategy).toEqual(initialNationStrategy());
     for (const general of initial.generals) general.userId = null;
-    const origin = { version: 3 as const, initial, initialStateHash: 'checked', resourceHash: 'checked' };
+    const origin = {
+      version: 3 as const,
+      initial,
+      initialStateHash: 'checked',
+      resourceHash: 'checked',
+      featureData: providedRuleData(initial, 60),
+    };
     expect(() => checkReplayOrigin(origin)).not.toThrow();
     expect(initialReplayState(initial).state.nationStrategy).toEqual(initialNationStrategy());
     const stored = {
-      ruleFeatures: initial.ruleFeatures,
       replayFormat: 3,
       replayOrigin: origin,
       nationStrategyState: initialNationStrategy(),
@@ -59,11 +65,8 @@ describe('AC-P2-04 D-074 전략 3종', () => {
     expect(readStoredNationStrategy(stored)).toEqual(initialNationStrategy());
     expect(() => readStoredNationStrategy({ ...stored, nationStrategyState: null })).toThrow();
     expect(() => readStoredNationStrategy({ ...stored, replayFormat: 1 })).toThrow();
-    expect(() => readStoredNationStrategy({ ...stored, ruleFeatures: ['personnel'] })).toThrow();
-    expect(readNationStrategy(null, {})).toBeUndefined();
-    expect(() =>
-      readNationStrategy({ version: 1, nations: { '01': { strategicUntil: 1, commands: {} } } }, world()),
-    ).toThrow();
+    expect(() => readNationStrategy(null)).toThrow();
+    expect(() => readNationStrategy({ version: 1, nations: { '01': { strategicUntil: 1, commands: {} } } })).toThrow();
     expect(() =>
       checkReplayOrigin({ ...origin, initial: { ...initial, nationStrategy: initialNationStrategy() } }),
     ).toThrow();
@@ -103,6 +106,7 @@ describe('AC-P2-04 D-074 전략 3종', () => {
 
   it('공통 9개월과 개별 63개월 대기를 각각 검사하고 만료 시점부터 허용한다', () => {
     const state = execute('nation_mobilize', { cityKey: 1 }).state;
+    state.stratagemCards!.nations[1]!.hand = ['nation_mobilize', 'nation_rivalry', 'nation_raid'];
     expect(state.nationStrategy!.nations[1]).toEqual({ strategicUntil: 9, commands: { nation_mobilize: 63 } });
     expect(run('nation_rivalry', { nationId: 2 }, state, 9 * TICKS_PER_MONTH - 1)).toMatchObject({
       code: 'BAD_STATE',
@@ -118,8 +122,10 @@ describe('AC-P2-04 D-074 전략 3종', () => {
 
   it('등장 전·퇴장·타국 장수는 대기에 세지 않고 등장한 40명은 126개월을 적용한다', () => {
     const state = world();
-    for (let id = 10; id < 50; id++)
+    for (let id = 10; id < 50; id++) {
       state.generals[id] = { ...state.generals[1]!, id, activeFromYear: state.startYear + 1 };
+      state.campaign!.sources[String(id)] = `fixture:${id}`;
+    }
     expect(
       execute('nation_mobilize', { cityKey: 1 }, state).state.nationStrategy!.nations[1]!.commands.nation_mobilize,
     ).toBe(63);
@@ -162,20 +168,17 @@ describe('AC-P2-04 D-074 전략 3종', () => {
     expect(run('nation_raid', { nationId: 999 })).toMatchObject({ code: 'BAD_TARGET' });
     expect(run('nation_mobilize', { cityKey: 1, other: true })).toMatchObject({ code: 'BAD_ARGS' });
     const state = world();
-    state.ruleFeatures = ['personnel'];
     delete state.nationStrategy;
-    expect(resolverForRuleFeatures(world())!.run(state, actor, 'nation_mobilize', { cityKey: 1 }, noRng)).toMatchObject(
-      { code: 'COMMAND_DISABLED' },
-    );
-    expect(resolverForRuleFeatures(state)?.get('nation_mobilize')).toBeUndefined();
+    expect(() =>
+      resolverForRuleFeatures(world())!.run(state, actor, 'nation_mobilize', { cityKey: 1 }, noRng),
+    ).toThrow();
+    expect(resolverForRuleFeatures(state)?.get('nation_mobilize')).toBeDefined();
   });
 
   it('전략 기능 없는 덱은 거부하고 예약은 패 없이 허용하되 성공한 국가 전략은 한 장만 쓴다', () => {
     const state = world();
-    state.ruleFeatures = ['five-stats', 'nation-strategy-v1', 'personnel', 'stratagem-basic', 'stratagem-cards-v1'];
     const config = { ...TEST_STRATAGEM_CARDS_CONFIG, deck: [{ kind: 'nation_mobilize' as const, weight: 1 }] };
-    expect(() => readStratagemCardsConfig({ version: 1, config })).toThrow('전략 기능');
-    expect(readStratagemCardsConfig({ version: 1, config }, state.ruleFeatures)).toEqual(config);
+    expect(readStratagemCardsConfig({ version: 1, config })).toEqual(config);
     state.stratagemCards = initialStratagemCards(config, state, 'strategy-cards');
     const resolver = resolverForRuleFeatures(state)!;
     expect(resolver.precheck(state, actor, 'nation_mobilize', { cityKey: 1 })).toBeNull();

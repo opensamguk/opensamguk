@@ -1,0 +1,116 @@
+/* 성 밖 자리 창(D-107): 성 화면 오른쪽 위에 뜨는 작은 창. */
+.window {
+  position: absolute;
+  z-index: 8;
+  top: calc(var(--hud) + 10px);
+  right: 12px;
+  width: min(380px, calc(100vw - 24px));
+  max-height: calc(100dvh - var(--hud) - var(--foot) - 30px);
+  overflow: auto;
+  padding: 4px;
+}
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 18px;
+  white-space: nowrap;
+}
+.picker,
+.built {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.builtHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.list[data-layout='cards'] {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.item[data-blocked='true'] {
+  opacity: 0.5;
+}
+.pick {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--space-2);
+  width: 100%;
+  padding: 4px 6px;
+  text-align: left;
+  cursor: pointer;
+}
+.pick > :not(img) {
+  grid-column: 2;
+}
+.list[data-layout='cards'] .pick {
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  text-align: center;
+}
+.list[data-layout='cards'] .pick > :not(img) {
+  grid-column: 1;
+}
+.pick:disabled {
+  cursor: not-allowed;
+}
+.pick[aria-pressed='true'] {
+  outline: 3px solid #e8c060;
+  outline-offset: -3px;
+}
+.icon {
+  height: 36px;
+  object-fit: contain;
+}
+.pick > .icon {
+  grid-row: span 3;
+}
+.list[data-layout='cards'] .pick > .icon {
+  grid-row: auto;
+}
+.meta {
+  word-break: keep-all;
+  font-size: 11px;
+  color: #6f5b45;
+}
+.blocked {
+  font-size: 11px;
+  font-weight: 700;
+  color: #8a1a0c;
+}
+.foot {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+}
+.note,
+.status {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.status[data-ok='false'] {
+  color: #8a1a0c;
+}
+@media (max-width: 760px) {
+  .list[data-layout='cards'] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

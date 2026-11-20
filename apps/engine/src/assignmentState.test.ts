@@ -109,6 +109,15 @@ function seed(before: AssignmentSnapshot) {
   );
 }
 
+it('AC-INT-04 reuses the locked offer snapshot and still rejects a mismatched before state', async () => {
+  const before = snapshot([7, offer]);
+  await persistAssignmentState(h.db, worldId, delta(before), before);
+  expect(h.find).not.toHaveBeenCalled();
+  noWrites();
+  await expect(persistAssignmentState(h.db, worldId, delta(before), empty)).rejects.toThrow();
+  noWrites();
+});
+
 describe('발령 제안 적재', () => {
   it('행이 없으면 선택 키를 생략하고 PENDING만 조회한다', async () => {
     expect(await loadAssignmentState(h.db, worldId)).toEqual({});

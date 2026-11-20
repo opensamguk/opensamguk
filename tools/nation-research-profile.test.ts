@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 import { rngFor } from '../packages/shared/src/index';
@@ -21,10 +22,9 @@ it('AC-P2-06 새22기능 판은 기존20기능 판을 보존하고 정식491명�
   expect(source).toEqual({
     ...old,
     key: 'expanded-191-v6',
-    ruleFeatures: [...old.ruleFeatures, 'prepared-turns-v1', 'nation-research-v1'].sort(),
   });
   const profile = featureProfileSchema.parse(source);
-  expect(profile.ruleFeatures).toHaveLength(22);
+  expect(providedRuleKeys).toEqual(ruleRegistry.features.map((feature) => feature.key).sort());
   const initial = buildInitialWorld({
     seed: 'nation-research-public-profile',
     map: read('map/san10.json'),
@@ -33,7 +33,6 @@ it('AC-P2-06 새22기능 판은 기존20기능 판을 보존하고 정식491명�
     statRules: read('scenario/five-stats.json'),
     portraitMap: read('portraits/191-map.json'),
   });
-  initial.ruleFeatures = profile.ruleFeatures;
   initial.scenarioKey = profile.scenarioKey;
   initial.generals = applySexLedger(initial, loadSexLedger());
   let state = initialReplayStateWithRegistry(initial, ruleRegistry, {

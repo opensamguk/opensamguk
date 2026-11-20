@@ -54,8 +54,8 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it.each([false, true])('CLI는 --treaty 선택=%s를 실제 factory 인자로 전달한다 (의존 단위)', async (treaty) => {
-  process.argv = [process.execPath, 'createWorld.ts', ...args, ...(treaty ? ['--treaty'] : [])];
+it.each([false, true])('AC-INT-28 CLI는 fog=%s를 실제 factory 인자로 전달한다 (의존 단위)', async (fog) => {
+  process.argv = [process.execPath, 'createWorld.ts', ...args, ...(fog ? ['--fog'] : [])];
   await import('./createWorld');
   await vi.waitFor(() => expect(mocks.disconnect).toHaveBeenCalledOnce());
   expect(mocks.createDb).toHaveBeenCalledExactlyOnceWith('unit-only-not-a-connection');
@@ -66,7 +66,7 @@ it.each([false, true])('CLI는 --treaty 선택=%s를 실제 factory 인자로 �
       name: '생성 단위',
       turnTermMinutes: 30,
       endYear: 300,
-      ...(treaty ? { treatyFormat: 1 } : {}),
+      fogOfWar: fog,
     },
     publishedResources,
   );
@@ -81,15 +81,15 @@ it.each([false, true])('CLI는 --treaty 선택=%s를 실제 factory 인자로 �
 });
 
 it('CLI boolean에 문자열 값을 넣으면 DB를 열기 전에 거부한다 (의존 단위)', async () => {
-  process.argv = [process.execPath, 'createWorld.ts', ...args, '--treaty=1'];
+  process.argv = [process.execPath, 'createWorld.ts', ...args, '--fog=1'];
   await import('./createWorld');
   await vi.waitFor(() => expect(process.exitCode).toBe(1));
-  expect(console.error).toHaveBeenCalledWith(expect.stringContaining('treaty'));
+  expect(console.error).toHaveBeenCalledWith(expect.stringContaining('fog'));
   expect(mocks.createDb).not.toHaveBeenCalled();
   expect(mocks.createWorldFromCli).not.toHaveBeenCalled();
 });
 
-it.each([false, true])('확장 프리셋은 원작식 기능을 한 번만 합성한다 (명시=%s)', async (explicit) => {
+it('AC-INT-28 확장 프리셋의 생성 인자를 전달한다', async () => {
   mocks.loadPreset.mockResolvedValue({
     scenario: 'san10-191',
     map: 'san10',
@@ -100,7 +100,6 @@ it.each([false, true])('확장 프리셋은 원작식 기능을 한 번만 합�
     seed: 'cli-unit',
     unitSetKey: 'expanded',
     unitSet: { coefMode: 'multiply' },
-    ruleFeatures: ['five-stats', 'operational-map'],
   });
   process.argv = [
     process.execPath,
@@ -113,7 +112,6 @@ it.each([false, true])('확장 프리셋은 원작식 기능을 한 번만 합�
     '231',
     '--name',
     '확장 생성',
-    ...(explicit ? ['--rule-features', 'battle-affinity-v2'] : []),
   ];
   await import('./createWorld');
   await vi.waitFor(() => expect(mocks.disconnect).toHaveBeenCalledOnce());
@@ -123,48 +121,24 @@ it.each([false, true])('확장 프리셋은 원작식 기능을 한 번만 합�
     seed: 'cli-unit',
     unitSet: 'expanded',
   });
-  const features = ['battle-affinity-v2', 'five-stats', 'operational-map'];
+
   expect(mocks.createWorldFromCli).toHaveBeenCalledWith(
     expect.anything(),
-    { seed: 'cli-unit', unitSetKey: 'expanded', unitSet: { coefMode: 'multiply' }, ruleFeatures: features },
-    expect.objectContaining({ ruleFeatures: features, preset: expect.objectContaining({ key: 'regular' }) }),
+    { seed: 'cli-unit', unitSetKey: 'expanded', unitSet: { coefMode: 'multiply' } },
+    expect.objectContaining({ preset: expect.objectContaining({ key: 'regular' }) }),
     publishedResources,
   );
   expect(console.error).not.toHaveBeenCalled();
 });
 
-it('자원 프로필과 요청 기능을 합칠 때 정렬한 뒤 의존 관계를 검사한다', async () => {
-  mocks.composeInitialWorld.mockReturnValue({ seed: 'cli-unit', ruleFeatures: ['five-stats', 'operational-map'] });
-  process.argv = [
-    process.execPath,
-    'createWorld.ts',
-    ...args,
-    '--rule-features',
-    'treaty,campaign-v1,policy,personnel,stratagem-basic',
-  ];
+it.each(['--treaty', '--rule-features'])('AC-INT-28 삭제된 선택 %s는 DB 접근 전에 거부한다', async (flag) => {
+  process.argv = [process.execPath, 'createWorld.ts', ...args, flag];
   await import('./createWorld');
-  await vi.waitFor(() => expect(mocks.disconnect).toHaveBeenCalledOnce());
-  const features = ['campaign-v1', 'five-stats', 'operational-map', 'personnel', 'policy', 'stratagem-basic', 'treaty'];
-  expect(mocks.createWorldFromCli).toHaveBeenCalledExactlyOnceWith(
-    expect.anything(),
-    { seed: 'cli-unit', ruleFeatures: features },
-    expect.objectContaining({ ruleFeatures: features }),
-    publishedResources,
-  );
-  expect(console.error).not.toHaveBeenCalled();
+  await vi.waitFor(() => expect(process.exitCode).toBe(1));
+  expect(mocks.createDb).not.toHaveBeenCalled();
+  expect(mocks.createWorldFromCli).not.toHaveBeenCalled();
+  expect(console.error).toHaveBeenCalledWith(expect.stringContaining(flag));
 });
-
-it.each(['campaign-v1,personnel', 'policy,policy', 'unknown-feature'])(
-  '잘못된 기능 %s는 생성하지 않고 연결을 닫는다',
-  async (features) => {
-    process.argv = [process.execPath, 'createWorld.ts', ...args, '--rule-features', features];
-    await import('./createWorld');
-    await vi.waitFor(() => expect(mocks.disconnect).toHaveBeenCalledOnce());
-    expect(process.exitCode).toBe(1);
-    expect(mocks.createWorldFromCli).not.toHaveBeenCalled();
-    expect(console.error).toHaveBeenCalledOnce();
-  },
-);
 
 it('실제 CLI 자식 프로세스의 도움말은 --treaty를 안내한다 (DB 생성 증거 아님)', () => {
   const env = { ...process.env };
@@ -181,7 +155,8 @@ it('실제 CLI 자식 프로세스의 도움말은 --treaty를 안내한다 (DB 
       timeout: 10000,
     },
   );
-  expect(output).toContain('[--treaty]');
+  expect(output).toContain('[--fog]');
+  expect(output).not.toMatch(/--treaty|--rule-features/);
   expect(output).toContain('pnpm world:create');
 });
 

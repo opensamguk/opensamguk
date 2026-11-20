@@ -22,7 +22,7 @@ export const SEX_LABEL: Record<LineageSex, string> = { MALE: '남', FEMALE: '여
 // 혼인 후보의 막힘 코드를 짧게 묶어 센다. 자세한 문구는 서버 message를 그대로 보인다.
 export const FAILURE_LABEL: Record<string, string> = {
   SELF: '자기 자신',
-  BAD_TARGET: '미등장·퇴장',
+  BAD_TARGET: '미등장 또는 퇴장',
   SEX_UNKNOWN: '성별 미상',
   SEX_PAIR: '같은 성별',
   AGE: '나이 조건',
@@ -103,7 +103,7 @@ export function nextAction(view: LineageView): NextAction {
   if (mine.claim) {
     const nation = nationOf(view, mine.claim.nationId)?.name ?? `국가 ${mine.claim.nationId}`;
     return {
-      text: `${nation} 군주 자리가 비어 있습니다. 원하면 직접 청구할 수 있습니다.`,
+      text: `${nation} 군주 자리가 비어 있습니다. 원하면 직접 청구하세요.`,
       tab: 'succession',
       target: 'claim',
       label: '군주 청구 보기',
@@ -126,7 +126,7 @@ export function nextAction(view: LineageView): NextAction {
     };
   if (mine.heirCandidates.some((row) => row.failure === null))
     return {
-      text: '후계자를 지정해 둘 수 있습니다. 지정만으로는 계승되지 않습니다.',
+      text: '후계자를 아직 지정하지 않았습니다. 지정만으로는 계승되지 않습니다.',
       tab: 'succession',
       target: 'heir',
       label: '후계자 고르기',
@@ -174,7 +174,7 @@ export function previewRows(view: LineageView, preview: SuccessionPreview): Arra
   return [
     ['조작', [`이 계정이 ${name(preview.heirId)}을(를) 조작합니다. 지금 장수는 은퇴하고 되돌릴 수 없습니다.`]],
     ['직책', [`${name(preview.heirId)}: ${officerName(preview.officerLevel)}`]],
-    ['금·쌀', [`금 ${formatCount(preview.gold)} · 쌀 ${formatCount(preview.rice)} (계승 뒤 후계자 보유량)`]],
+    ['금과 쌀', [`금 ${formatCount(preview.gold)} · 쌀 ${formatCount(preview.rice)} (계승 뒤 후계자 보유량)`]],
     ...equipment,
     ['병력', [`${formatCount(preview.crew)}명 (본대와 소유 부곡 합계)`]],
     ['부곡', list(preview.unitIds, (id) => `부곡 ${id}`)],
@@ -217,10 +217,10 @@ export function describeAction(view: LineageView, payload: LineageInput): string
 export function proposalRule(view: LineageView, targetId: number): string {
   const target = personOf(view, targetId);
   if (!target || typeof target.isHuman !== 'boolean')
-    return `처리할 때 ${target ? `${displayName(target.name)}이(가) ` : '상대가 '}사람 장수면 제안이 가고 직접 수락해야 혼인합니다. NPC면 소속·친화 조건으로 바로 판정합니다.`;
+    return `처리할 때 ${target ? `${displayName(target.name)}이(가) ` : '상대가 '}사람 장수면 제안이 가고 직접 수락해야 혼인합니다. NPC면 소속과 친화 조건으로 바로 판정합니다.`;
   return target.isHuman
     ? `${displayName(target.name)}은(는) 사람 장수입니다. 제안이 가고 상대가 기한 안에 직접 수락해야 혼인합니다. 자동으로 수락되지 않습니다.`
-    : `${displayName(target.name)}은(는) NPC입니다. 처리할 때 소속·친화 조건으로 바로 판정하고 맞으면 제안 없이 바로 혼인합니다.`;
+    : `${displayName(target.name)}은(는) NPC입니다. 처리할 때 소속과 친화 조건으로 바로 판정하고 맞으면 제안 없이 바로 혼인합니다.`;
 }
 
 // 미등장 인물의 등장 연도. 퇴장했거나 이미 등장했거나, 서버가 정수 연도를 주지 않았으면 null이다.
@@ -237,7 +237,7 @@ export function appliedMessage(view: LineageView, payload: LineageInput, action:
 
 export const APPLIED_MESSAGE: Record<LineageInput['type'], string> = {
   'marriage.propose':
-    '혼인 요청을 처리했습니다. 사람 장수에게는 제안이 갔고 NPC와는 혼인했습니다. 혼인·제안 탭에서 확인하세요.',
+    '혼인 요청을 처리했습니다. 사람 장수에게는 제안이 갔고 NPC와는 혼인했습니다. 혼인 탭과 제안 탭에서 확인하세요.',
   'marriage.respond': '혼인 제안에 응답했습니다.',
   'heir.designate': '후계 지정을 바꿨습니다. 지정만으로는 계승되지 않습니다.',
   'succession.confirm': '계승했습니다. 이제 이 계정은 후계자를 조작합니다. 다른 칸에 열어 둔 양식은 다시 확인하세요.',

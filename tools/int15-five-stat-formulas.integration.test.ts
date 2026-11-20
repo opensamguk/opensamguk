@@ -6,16 +6,18 @@ import { commandInitial } from '../packages/rules/test/commandFixture';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { buildServer } from '../apps/server/src/server';
 import { newSession } from '../apps/server/src/auth/session';
-import { saveInitialWorld, readWorldState } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld, readWorldState } from '../e2e/worldFixture';
+import { recruitmentFixtureData } from './fixtures/recruitment';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
+import { recordTestTurns } from '../apps/engine/test/seasonFixture';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { exportReplay, replayArchive } from '../apps/engine/src/replay';
 
 // AC-INT-15 산식 연결 검사. 정식 491명 한 기수 인수는 INT-12에서 별도로 한다.
 const url = process.env.TEST_DATABASE_URL;
-if (!url || !/^\/[a-z][a-z0-9_]*_test$/.test(new URL(url).pathname)) throw Error('전용 테스트 DB가 필요합니다.');
+if (!url || !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(new URL(url).pathname)) throw Error('전용 테스트 DB가 필요합니다.');
 const db = createDb(url);
 const app = await buildServer({ db, logging: false });
 const users = Array.from({ length: 5 }, () => randomUUID());
@@ -23,7 +25,6 @@ const worlds: string[] = [];
 let worldId: string, otherWorld: string, legacyWorld: string, cookie: string, outsider: string;
 const initial = commandInitial();
 initial.statRules = { ...FIVE_STAT_RULES };
-initial.ruleFeatures = ['five-stats', 'policy'];
 initial.nations = initial.nations.map((row) => ({ ...row, isNpc: false }));
 initial.generals = initial.generals.map((row, index) => ({
   ...row,
@@ -33,7 +34,7 @@ initial.generals = initial.generals.map((row, index) => ({
   intel: 50,
   politics: 90,
   charm: 45,
-  crew: 1000,
+  crew: 0,
   train: 20,
   atmos: 20,
   injury: 0,
@@ -54,7 +55,12 @@ const commands = [
   'morale',
 ].map((commandKey) => ({
   commandKey,
-  args: commandKey === 'recruit' || commandKey === 'conscript' ? { amount: 10, crewType: 1100 } : {},
+  args:
+    commandKey === 'recruit' || commandKey === 'conscript'
+      ? { amount: 10, crewType: 1100 }
+      : ['train', 'morale'].includes(commandKey)
+        ? { target: 'city', crewType: 1100 }
+        : {},
 }));
 
 async function request(path: string, input: unknown, session = cookie, mutation = false) {
@@ -90,7 +96,14 @@ beforeAll(async () => {
       generals: commandInitial().generals.map((row, index) => ({ ...row, userId: users[index]! })),
     },
   ]) {
-    const saved = await saveInitialWorld(db, value, { name: 'INT15 산식 연결', turnTermMinutes: 60, endYear: null });
+    const data = recruitmentFixtureData(value);
+    data['logistics-v1'].build = { wall: { iron: 0, wood: 0, horses: 0 }, defence: { iron: 0, wood: 0, horses: 0 } };
+    const saved = await saveInitialWorld(db, value, {
+      name: 'INT15 산식 연결',
+      turnTermMinutes: 60,
+      endYear: null,
+      featureData: data,
+    });
     worlds.push(saved.worldId);
   }
   [worldId, otherWorld, legacyWorld] = worlds as [string, string, string];
@@ -113,8 +126,11 @@ it('INT-15 실제 세션 미리보기는 읽기 전용이고 타인·위조 행�
   for (let i = 0; i < 2; i++)
     expect((await request('turns.precheck', input)).data).toMatchObject({ ok: true, preview: { statScore: 90 } });
   expect(await readWorldState(db, worldId)).toEqual(before);
-  expect(await db.inputEvent.count({ where: { worldId } })).toBe(0);
-  expect((await request('turns.precheck', { ...input, worldId: legacyWorld })).data).toEqual({ ok: true });
+  expect(await db.inputEvent.count({ where: { worldId, kind: { not: 'general.possess' } } })).toBe(0);
+  expect((await request('turns.precheck', { ...input, worldId: legacyWorld })).data).toMatchObject({
+    ok: true,
+    preview: { statScore: 70 },
+  });
 });
 
 it('INT-15 12종 실행·빈칸 방침·명시적 휴식·재접속·동일 시드 재생이 일치한다', async () => {
@@ -123,7 +139,10 @@ it('INT-15 12종 실행·빈칸 방침·명시적 휴식·재접속·동일 시�
     { commandKey: 'rest', args: {} },
     ...Array.from({ length: 29 - commands.length }, () => null),
   ];
-  expect((await request('turns.set', { worldId, revision: 0, slots }, cookie, true)).data).toMatchObject({ ok: true });
+  const actor = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
+  expect(
+    (await request('turns.set', { worldId, revision: actor.turnRevision, slots }, cookie, true)).data,
+  ).toMatchObject({ ok: true });
   const lease = await acquireLease(db, worldId);
   if (!lease) throw Error('시험 엔진 리스가 없습니다.');
   try {
@@ -133,13 +152,26 @@ it('INT-15 12종 실행·빈칸 방침·명시적 휴식·재접속·동일 시�
       const tick = 100 + index * TICKS_PER_MONTH;
       await loop.advanceTo(tick - 1);
       const before = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
+      const resourcesBefore = (await db.$transaction((tx) => loadReplayState(tx, worldId))).state.cityResources!.cities[
+        String(before.cityKey)
+      ]!;
       const preview = (await request('turns.precheck', { worldId, ...command })).data;
       expect(preview.ok).toBe(true);
+      expect(preview.preview, command.commandKey).toMatchObject({ goldCost: expect.any(Number) });
       await loop.advanceTo(tick);
       const after = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
-      expect(before.gold - after.gold).toBe(preview.preview.goldCost);
-      if (command.commandKey === 'train') expect(after.train - before.train).toBe(preview.preview.gain);
-      if (command.commandKey === 'morale') expect(after.atmos - before.atmos).toBe(preview.preview.gain);
+      if (['recruit', 'conscript', 'train', 'morale'].includes(command.commandKey)) {
+        const resourcesAfter = (await db.$transaction((tx) => loadReplayState(tx, worldId))).state.cityResources!
+          .cities[String(after.cityKey)]!;
+        expect(resourcesBefore.gold - resourcesAfter.gold).toBe(preview.preview.goldCost);
+        expect(before.gold - after.gold).toBe(0);
+        if (command.commandKey === 'train' || command.commandKey === 'morale') {
+          const field = command.commandKey === 'train' ? 'train' : 'atmos';
+          const from = resourcesBefore.garrison.find((row) => row.crewType === 1100)!;
+          const to = resourcesAfter.garrison.find((row) => row.crewType === 1100)!;
+          expect(to[field] - from[field]).toBe(preview.preview.gain);
+        }
+      } else expect(before.gold - after.gold).toBe(preview.preview.goldCost);
       expect(after.turnRevision).toBe(before.turnRevision + 1);
     }
     await loop.advanceTo(12 * TICKS_PER_MONTH);
@@ -162,21 +194,26 @@ it('INT-15 12종 실행·빈칸 방침·명시적 휴식·재접속·동일 시�
     expect(farmPreview.statScore).toBe(90);
     expect(await loop.advanceTo(130100)).toEqual([{ generalId: 1, tick: 130100, commandKey: 'farm' }]);
     expect(farming.gold - (await general()).gold).toBe(farmPreview.goldCost);
-    await policy('drill', 130100);
-    await loop.advanceTo(140099);
-    const training = await general();
+    // 방침 훈련도 실제 자기 부곡을 대상으로 한다.
+    await recordTestTurns(db, worldId, 1, 'recruit', { amount: 1, crewType: 1100, unitId: 'new' });
+    await loop.advanceTo(140100);
+    await policy('drill', 140100);
+    await loop.advanceTo(150099);
+    const training = (await db.$transaction((tx) => loadReplayState(tx, worldId))).state.campaign!.units[0]!;
     const drillPreview = (await request('turns.precheck', { worldId, commandKey: 'train', args: {} })).data.preview;
-    expect(await loop.advanceTo(140100)).toEqual([{ generalId: 1, tick: 140100, commandKey: 'train' }]);
-    expect((await general()).train - training.train).toBe(drillPreview.gain);
-    await loop.advanceTo(15 * TICKS_PER_MONTH);
+    expect(await loop.advanceTo(150100)).toEqual([{ generalId: 1, tick: 150100, commandKey: 'train' }]);
+    expect(
+      (await db.$transaction((tx) => loadReplayState(tx, worldId))).state.campaign!.units[0]!.train - training.train,
+    ).toBe(drillPreview.gain);
+    await loop.advanceTo(16 * TICKS_PER_MONTH);
   } finally {
     await releaseLease(db, lease);
   }
   const reopened = createDb(url!);
   try {
     const archive = await exportReplay(reopened, worldId);
-    const first = replayArchive(archive, 15);
-    expect(replayArchive(archive, 15)).toEqual(first);
+    const first = replayArchive(archive, 16);
+    expect(replayArchive(archive, 16)).toEqual(first);
     expect(first.at(-1)!.stateHash).toBe(hashState(await reopened.$transaction((tx) => loadReplayState(tx, worldId))));
   } finally {
     await reopened.$disconnect();

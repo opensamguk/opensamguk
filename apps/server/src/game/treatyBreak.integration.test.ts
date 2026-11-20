@@ -55,7 +55,7 @@ function fixture() {
     policyFromSequence: null,
     personnelFormat: null,
     replayFormat: 3,
-    ruleFeatures: ['treaty', 'treaty-break'],
+
     replayOrigin: null,
   } as World;
   const actor = { id: 1, userId: identity.userId, nationId: 1 as number | null, officerLevel: 12 };
@@ -217,14 +217,6 @@ describe('T2-07 / AC-M2-06 파기 접수 보조 단위', () => {
     expect(await g.submit()).toEqual({ created: true });
   });
 
-  it('파기 기능을 끈 월드에서는 접수하지 않는다', async () => {
-    const f = fixture();
-    f.world.ruleFeatures = ['treaty'];
-    await expect(f.submit()).rejects.toHaveProperty('code', 'PRECONDITION_FAILED');
-    expect(f.tx.treaty.findUnique).not.toHaveBeenCalled();
-    expect(f.tx.inputEvent.create).not.toHaveBeenCalled();
-  });
-
   it('소속을 바꿔도 자기 완료 결과는 찾되 현재 비당사국에는 상세를 주지 않는다', async () => {
     const f = fixture();
     f.actor.nationId = 3;
@@ -287,13 +279,9 @@ describe('T2-07 / AC-M2-06 공개 신의 표 보조 단위', () => {
     await expect(f.trust()).rejects.toHaveProperty('code', 'INTERNAL_SERVER_ERROR');
   });
 
-  it('파손된 0회 신의와 기능 없는 월드를 거부한다', async () => {
+  it('파손된 0회 신의를 거부한다', async () => {
     const f = fixture();
     f.trustEntries.push({ nationId: 1, brokenTreaties: 0, lastBrokenTick: 100 });
     await expect(f.trust()).rejects.toHaveProperty('code', 'INTERNAL_SERVER_ERROR');
-    const g = fixture();
-    g.world.ruleFeatures = ['treaty'];
-    await expect(g.trust()).rejects.toHaveProperty('code', 'PRECONDITION_FAILED');
-    expect(g.tx.nationTrust.findMany).not.toHaveBeenCalled();
   });
 });

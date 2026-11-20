@@ -1,3 +1,4 @@
+import { CITY_UPGRADE_RULES } from '../cityUpgrade/upgrade';
 import { BALANCE } from '../balance';
 import { STRATAGEM } from './ext/stratagem/base';
 import { INTEL } from './ext/intel/base';
@@ -30,6 +31,26 @@ const domesticSummary: Readonly<Record<string, string>> = {
 
 // 화면 설명은 명령 키에 붙인다. 카탈로그가 등록부와 설명의 누락·잔여를 함께 검사한다.
 export const commandPlayerDocs: Readonly<Record<string, PlayerDoc>> = {
+  nation_expand: {
+    summary: '자기 국가 도시를 한 등급 증축합니다.',
+    requires: ['수뇌', ownCity, '경 미만 도시', '같은 도시와 명령으로 국가 예턴 다섯 칸 연속 예약'],
+    cost: `실행 때 국고 금 ${CITY_UPGRADE_RULES.cost}, 지금 도시 수치는 유지`,
+  },
+  nation_shrink: {
+    summary: '증축한 도시를 지도 원래 규모까지 한 등급 감축합니다.',
+    requires: ['수뇌', ownCity, '지도 원래 규모보다 큰 도시', '같은 도시와 명령으로 국가 예턴 다섯 칸 연속 예약'],
+    cost: `실행 때 국고 금 ${CITY_UPGRADE_RULES.refund} 환급, 사라지는 칸의 건물과 공사는 환급 없이 철거`,
+  },
+  build: {
+    summary: '빈 자리에 건물을 짓습니다.',
+    requires: [ownCity, '건물의 자리·등급·지형 조건 충족'],
+    cost: '건물표의 금·도시 목재, 1~2회 월 정산',
+  },
+  demolish: {
+    summary: '건물이나 진행 중인 공사를 철거합니다.',
+    requires: [ownCity, '선택한 자리에 건물 또는 공사'],
+    cost: '자원 환급 없음',
+  },
   ...Object.fromEntries(
     DOMESTIC_SPECS.map((spec) => {
       const summary = domesticSummary[spec.key];
@@ -46,7 +67,11 @@ export const commandPlayerDocs: Readonly<Record<string, PlayerDoc>> = {
     }),
   ),
   rest: { summary: '이번 장수 턴에 쉽니다.', requires: [], cost: null },
-  recruit: { summary: '병사를 모집합니다.', requires: recruit, cost: recruitCost },
+  recruit: {
+    summary: '도시 수비병 또는 선택한 기존·새 부곡의 병사를 모집합니다.',
+    requires: recruit,
+    cost: recruitCost,
+  },
   conscript: {
     summary: '민심을 낮추는 대신 병사를 더 적은 금으로 모집합니다.',
     requires: recruit,
@@ -227,13 +252,9 @@ export const commandPlayerDocs: Readonly<Record<string, PlayerDoc>> = {
     ],
     cost: null,
   },
-  form_unit: {
-    summary: '선택한 병종으로 병력이 없는 새 부곡을 편성합니다.',
-    requires: ['도시 자원 기능을 켠 월드', ownCity, '편성할 수 있는 병종과 같은 병종의 빈 부곡 없음'],
-    cost: null,
-  },
+
   nation_city_allocate: {
-    summary: '도시 수비병을 같은 병종의 부곡으로 옮깁니다.',
+    summary: '도시 수비병을 같은 병종의 기존 부곡이나 수령 장수의 새 부곡으로 옮깁니다.',
     requires: [
       '도시 자원 기능을 켠 월드',
       '군주·참모·수뇌',

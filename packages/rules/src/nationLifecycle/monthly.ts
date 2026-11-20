@@ -20,7 +20,7 @@ export function settleNationLifecycleMonthly(world: WorldView, tick: number) {
   }
   const final = effects.history.length ? reconcileNationLifecycle(state, tick) : state;
   return {
-    state: effects.history.length && world.ruleFeatures?.includes('treaty') ? settleTreaties(final, tick) : final,
+    state: effects.history.length ? settleTreaties(final, tick) : final,
     effects,
   };
 }

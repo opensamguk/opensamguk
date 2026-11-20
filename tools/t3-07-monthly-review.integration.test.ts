@@ -4,9 +4,10 @@ import type { inferRouterOutputs } from '@trpc/server';
 import { createDb } from '../packages/db/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { monthlyFixture } from '../apps/engine/test/monthlyFixture';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
+import { settlePendingBattle } from '../apps/engine/test/tacticalSettlement';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { loadReplayState, persistMonthly } from '../apps/engine/src/monthly';
 import { appendReputationEvents, loadReputationLedger } from '../apps/engine/src/reputationState';
@@ -16,6 +17,9 @@ import type { AppRouter } from '../apps/server/src/router';
 import { newSession } from '../apps/server/src/auth/session';
 import { authzCase } from '../apps/server/src/authz/case';
 import { categories } from '../apps/server/src/authz/coverage';
+import { recruitmentFixtureData } from './fixtures/recruitment';
+import { recordTestTurns } from '../apps/engine/test/seasonFixture';
+import type { WorldInit } from '../packages/rules/src/index';
 import { testDatabaseUrl } from './test-database';
 
 const url = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
@@ -71,11 +75,80 @@ async function user(sanctioned = false): Promise<Player> {
   await db.session.create({ data: { id: session.id, userId: id, expiresAt: session.expiresAt } });
   return { id, cookie: `sid=${session.token}` };
 }
+const preparedWorlds = new Set<string>();
+const preparationOwners = new Map<string, string[]>();
+async function prepareReviewWorld(initial: WorldInit, armies: Array<{ generalId: number; troops: number }>) {
+  const started = performance.now();
+  const key = initial.generals.map((general) => general.userId ?? '').join(',');
+  let owners = preparationOwners.get(key);
+  if (!owners) {
+    owners = [];
+    for (const general of initial.generals) owners.push(general.userId ?? (await user()).id);
+    preparationOwners.set(key, owners);
+  }
+  initial.nations = initial.nations.map((nation) => ({ ...nation, isNpc: false }));
+  for (const [index, general] of initial.generals.entries()) {
+    general.userId = owners[index]!;
+    general.crew = 0;
+    general.gold = general.rice = 10_000_000;
+    if (armies.some((army) => army.generalId === general.id)) general.nextTurnTick = general.id * 100;
+  }
+  for (const city of initial.cities) {
+    city.population = city.populationMax = 50000;
+    city.commerce = city.commerceMax = 2_000_000;
+    const farmingRoom = city.agricultureMax - city.agriculture;
+    city.agriculture = 2_000_000;
+    city.agricultureMax = 2_000_000 + farmingRoom;
+  }
+  syncFixtureMap(initial);
+  const { worldId } = await saveInitialWorld(db, initial, {
+    name: '월단평 실제 부곡 준비',
+    turnTermMinutes: 60,
+    endYear: null,
+    featureData: recruitmentFixtureData(initial),
+  });
+  worldIds.push(worldId);
+  await controlClock(db, worldId, 'start');
+  await advance(worldId, 10000);
+  for (let step = 0; step < 9; step++) {
+    let last = 0;
+    for (const army of armies) {
+      const general = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: army.generalId } } });
+      const commandKey = step === 0 ? 'recruit' : step <= 4 ? 'train' : 'morale';
+      await recordTestTurns(
+        db,
+        worldId,
+        army.generalId,
+        commandKey,
+        step === 0 ? { amount: army.troops, crewType: 1100, unitId: 'new' } : {},
+      );
+      last = Math.max(last, general.nextTurnTick);
+    }
+    await advance(worldId, last);
+  }
+  await advance(worldId, 100000);
+  const state = (await snapshot(worldId)).state;
+  for (const army of armies)
+    expect(state.campaign!.units).toContainEqual(
+      expect.objectContaining({
+        ownerId: army.generalId,
+        troops: army.troops,
+        train: expect.any(Number),
+        atmos: expect.any(Number),
+      }),
+    );
+  console.info(
+    JSON.stringify({ event: 'monthly-review-preparation', ms: performance.now() - started, armies: armies.length }),
+  );
+  preparedWorlds.add(worldId);
+  return { worldId };
+}
 async function advance(worldId: string, tick: number, fail = false) {
+  if (preparedWorlds.has(worldId)) tick += 100000;
   const lease = await acquireLease(db, worldId, randomUUID(), 120_000);
   if (!lease) throw Error('월단평 시험의 실행권이 없습니다.');
   try {
-    await new TurnLoop(
+    const loop = new TurnLoop(
       db,
       lease,
       fail
@@ -85,56 +158,78 @@ async function advance(worldId: string, tick: number, fail = false) {
             },
           }
         : {},
-    ).advanceTo(tick);
+    );
+    if (preparedWorlds.has(worldId) && !fail) {
+      while ((await db.world.findUniqueOrThrow({ where: { id: worldId } })).status === 'RUNNING') {
+        const next = await db.general.findFirst({
+          where: { worldId, removedAt: null },
+          orderBy: { nextTurnTick: 'asc' },
+          select: { nextTurnTick: true },
+        });
+        if (!next || next.nextTurnTick > tick) break;
+        await loop.advanceTo(next.nextTurnTick);
+        await settlePendingBattle(db, worldId);
+      }
+    }
+    await loop.advanceTo(tick);
   } finally {
     await releaseLease(db, lease);
   }
 }
 const snapshot = (worldId: string) => db.$transaction((tx) => loadReplayState(tx, worldId));
-async function fixture(enabled = true, players?: [Player, Player]) {
+async function fixture(players?: [Player, Player]) {
   const initial = await monthlyFixture();
-  initial.seed = 'monthly-review-integration';
+  // 실제 준비 뒤 11월에도 기존 점령·내정 문구를 고정한다.
+  initial.seed = 'monthly-review-integration-11';
   initial.generals = initial.generals.map((general) => ({ ...general, nextTurnTick: 1_000_000_000, injury: 0 }));
   if (players) {
     Object.assign(initial.generals[0]!, {
       userId: players[0].id,
       cityKey: 1,
       nextTurnTick: 100,
-      crew: 10000,
+      crew: 0,
       rice: 100000,
       train: 100,
       atmos: 100,
     });
-    Object.assign(initial.generals[1]!, { cityKey: 2, crew: 1, train: 100, atmos: 100 });
+    Object.assign(initial.generals[1]!, { cityKey: 2, crew: 0, train: 100, atmos: 100 });
     Object.assign(initial.generals[2]!, {
       userId: players[1].id,
-      cityKey: 3,
+      cityKey: 1,
       activeFromYear: initial.startYear,
       nextTurnTick: 500,
       gold: 100000,
     });
     initial.cities.find((row) => row.cityKey === 2)!.wall = 0;
-    const city = initial.cities.find((row) => row.cityKey === 3)!;
+    const city = initial.cities.find((row) => row.cityKey === 1)!;
     city.agriculture = city.agricultureMax - 1;
     initial.diplomacies = [{ nationA: 1, nationB: 2, state: 'WAR', untilTick: 0 }];
   }
-  const features = [...(players ? ['policy'] : []), ...(enabled ? ['reputation-v1'] : [])];
-  const { worldId } = await saveInitialWorld(db, initial, {
-    name: '월단평 실제 검증',
-    turnTermMinutes: 60,
-    endYear: null,
-    replayFormat: 3,
-    ruleFeatures: features,
-  });
-  worldIds.push(worldId);
-  await controlClock(db, worldId, 'start');
+
+  syncFixtureMap(initial);
+
+  const { worldId } = players
+    ? await prepareReviewWorld(initial, [
+        { generalId: 1, troops: 1900 },
+        { generalId: 2, troops: 20 },
+      ])
+    : await saveInitialWorld(db, initial, {
+        name: '월단평 실제 검증',
+        turnTermMinutes: 60,
+        endYear: null,
+        replayFormat: 3,
+      });
+  if (!players) {
+    worldIds.push(worldId);
+    await controlClock(db, worldId, 'start');
+  }
   if (players)
     for (const [index, player] of players.entries()) {
       const result = await rpc(
         'turns.set',
         {
           worldId,
-          revision: 0,
+          revision: (await db.general.findFirstOrThrow({ where: { worldId, userId: player.id } })).turnRevision,
           slots: Array.from({ length: 30 }, (_, slot) =>
             slot === 0
               ? { commandKey: index === 0 ? 'attack' : 'farm', args: index === 0 ? { cityKey: 2 } : {} }
@@ -154,17 +249,26 @@ beforeAll(async () => {
 afterAll(async () => {
   await app.close();
   await db.world.deleteMany({ where: { id: { in: worldIds } } });
-  await db.user.deleteMany({ where: { id: { in: userIds } } });
+  // 종료 때 적립된 불변 유산 원장과 그 계정은 전용 DB 정리까지 보존한다.
+  await db.user.deleteMany({ where: { id: { in: userIds }, heritageAccount: { is: null } } });
   await db.$disconnect();
 });
 
 it('T3-07 AC-M3-15 실제 전투·내정 사건과 월 정산은 기존 기록을 보존하고 12개월 재생된다', async () => {
   const players: [Player, Player] = [await user(), await user()];
-  const modern = await fixture(true, players),
-    old = await fixture(false, players);
-  for (const { worldId } of [modern, old]) await advance(worldId, 10000);
+  const modern = await fixture(players),
+    replica = await fixture(players);
+  for (const { worldId } of [modern, replica]) await advance(worldId, 10000);
   const events = await db.reputationEvent.findMany({ where: { worldId: modern.worldId }, orderBy: { id: 'asc' } });
-  expect(events.map((row) => [row.generalId, row.kind])).toEqual([
+  expect(
+    events.map((row) => [row.generalId, row.kind]),
+    JSON.stringify(
+      await db.generalLog.findMany({
+        where: { worldId: modern.worldId, tick: { gt: 100000 } },
+        select: { tick: true, generalId: true, commandKey: true, kind: true, text: true },
+      }),
+    ),
+  ).toEqual([
     [1, 'victory'],
     [2, 'defeat'],
     [1, 'conquest'],
@@ -172,15 +276,21 @@ it('T3-07 AC-M3-15 실제 전투·내정 사건과 월 정산은 기존 기록�
   ]);
   expect(events.find((row) => row.kind === 'domestic')).toMatchObject({ cityKey: null, cityName: null });
   const stored = await snapshot(modern.worldId),
-    legacy = await snapshot(old.worldId);
-  expect(legacy).not.toHaveProperty('reputation');
-  const same = structuredClone(stored);
-  delete same.reputation;
-  same.state.ruleFeatures = legacy.state.ruleFeatures;
-  expect(same).toEqual(legacy);
-  for (const { worldId } of [modern, old]) expect((await exportReplay(db, worldId)).months).toHaveLength(1);
-  const oldRows = await db.yearbookSnapshot.findMany({
-    where: { worldId: old.worldId },
+    replicated = await snapshot(replica.worldId);
+  expect(replicated.reputation).toEqual(stored.reputation);
+  // 독립 실행의 DB 시각은 다르다. 각 원본 시각을 포함한 해시는 아래에서 각자 재생한다.
+  const withoutDeadlines = (replay: typeof stored) => {
+    const copy = structuredClone(replay);
+    for (const battle of copy.state.campaign?.tactical?.battles ?? []) {
+      battle.deadlineAt = 0;
+      battle.hardDeadlineAt = 0;
+    }
+    return copy;
+  };
+  expect(withoutDeadlines(stored)).toEqual(withoutDeadlines(replicated));
+  for (const { worldId } of [modern, replica]) expect((await exportReplay(db, worldId)).months).toHaveLength(11);
+  const replicaRows = await db.yearbookSnapshot.findMany({
+    where: { worldId: replica.worldId },
     select: { tick: true, year: true, month: true, sequence: true, data: true },
   });
   expect(
@@ -188,65 +298,65 @@ it('T3-07 AC-M3-15 실제 전투·내정 사건과 월 정산은 기존 기록�
       where: { worldId: modern.worldId },
       select: { tick: true, year: true, month: true, sequence: true, data: true },
     }),
-  ).toEqual(oldRows);
+  ).toEqual(replicaRows);
   const logs = (worldId: string) =>
     db.generalLog.findMany({
       where: { worldId },
       orderBy: [{ sequence: 'asc' }, { ordinal: 'asc' }],
       select: { tick: true, generalId: true, sequence: true, ordinal: true, text: true, commandKey: true, kind: true },
     });
-  expect(await logs(modern.worldId)).toEqual(await logs(old.worldId));
+  expect(await logs(modern.worldId)).toEqual(await logs(replica.worldId));
   const histories = (worldId: string) =>
     db.nationHistory.findMany({
       where: { worldId },
       orderBy: [{ tick: 'asc' }, { nationId: 'asc' }],
       select: { tick: true, nationId: true, data: true },
     });
-  expect(await histories(modern.worldId)).toEqual(await histories(old.worldId));
+  expect(await histories(modern.worldId)).toEqual(await histories(replica.worldId));
   const ranking = (worldId: string) =>
     db.rankingSnapshot.findUnique({ where: { worldId }, select: { tick: true, generals: true, nations: true } });
-  expect(await ranking(modern.worldId)).toEqual(await ranking(old.worldId));
-  expect(await db.reputationEvent.count({ where: { worldId: old.worldId } })).toBe(0);
-  expect(await db.monthlyReview.count({ where: { worldId: old.worldId } })).toBe(0);
-  expect(stored.reputation?.reviews[0]?.entries.map((row) => [row.generalId, row.score])).toEqual([
+  expect(await ranking(modern.worldId)).toEqual(await ranking(replica.worldId));
+  expect(await db.reputationEvent.count({ where: { worldId: replica.worldId } })).toBe(events.length);
+  expect(await db.monthlyReview.count({ where: { worldId: replica.worldId } })).toBe(11);
+  expect(stored.reputation?.reviews.at(-1)?.entries.map((row) => [row.generalId, row.score])).toEqual([
     [1, 8],
     [3, 2],
   ]);
-  expect(stored.reputation!.reviews[0]).toMatchObject({
+  expect(stored.reputation!.reviews.at(-1)!).toMatchObject({
     year: 191,
-    month: 1,
-    tick: 10000,
-    headline: '191년 1월 월단평 1위 소제1, 2위 사마휘',
+    month: 11,
+    tick: 110000,
+    headline: '191년 11월 월단평 1위 소제1, 2위 사마휘',
     entries: [
       { rank: 1, generalId: 1, score: 8, kinds: ['conquest', 'victory'], line: '소제1가 도시2 점령을 이끌었다.' },
       { rank: 2, generalId: 3, score: 2, kinds: ['domestic'], line: '사마휘의 내정 성과가 기록에 올랐다.' },
     ],
   });
-  const first = await db.yearbookSnapshot.findFirstOrThrow({ where: { worldId: modern.worldId } });
+  const first = await db.yearbookSnapshot.findFirstOrThrow({ where: { worldId: modern.worldId, tick: 110000 } });
   expect(hashState(stored)).toBe(first.stateHash);
   const strip = { ...stored };
   delete strip.reputation;
   expect(hashState(strip)).not.toBe(first.stateHash);
   const publicReview = await rpc('review.latest', { worldId: modern.worldId }, players[0]);
-  expect(publicReview.data?.entries).toEqual(stored.reputation!.reviews[0]!.entries);
+  expect(publicReview.data?.entries).toEqual(stored.reputation!.reviews.at(-1)!.entries);
   expect(Object.keys(publicReview.data!).sort()).toEqual(['entries', 'month', 'year']);
   const publicRecords = await rpc('records.world', { worldId: modern.worldId }, players[0]);
-  expect(publicRecords.data?.items[0]?.review?.headline).toBe(stored.reputation!.reviews[0]!.headline);
-  expect((await rpc('records.world', { worldId: old.worldId }, players[0])).data?.items[0]).not.toHaveProperty(
-    'review',
+  expect(publicRecords.data?.items[0]?.review?.headline).toBe(stored.reputation!.reviews.at(-1)!.headline);
+  expect((await rpc('records.world', { worldId: replica.worldId }, players[0])).data?.items[0]?.review?.headline).toBe(
+    stored.reputation!.reviews.at(-1)!.headline,
   );
   for (const key of ['gold', 'rice', 'crew', 'stateHash', 'seed', 'agriculture'])
     expect(publicReview.text).not.toContain(`"${key}"`);
-  for (const { worldId } of [modern, old]) {
+  for (const { worldId } of [modern, replica]) {
     await advance(worldId, 120000);
     const archive = await exportReplay(db, worldId);
-    expect(replayArchive(archive, 12)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
+    expect(replayArchive(archive, 22)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
   }
 }, 60_000);
 
 it('T3-07 AC-M3-15 사건은 최초 값을 보존하고 실패한 턴·정산은 원자적으로 되돌린다', async () => {
   const players: [Player, Player] = [await user(), await user()],
-    f = await fixture(true, players);
+    f = await fixture(players);
   const before = await snapshot(f.worldId);
   await expect(advance(f.worldId, 100, true)).rejects.toThrow('review-rollback');
   expect(await snapshot(f.worldId)).toEqual(before);
@@ -254,6 +364,12 @@ it('T3-07 AC-M3-15 사건은 최초 값을 보존하고 실패한 턴·정산은
   await advance(f.worldId, 100);
   const current = await snapshot(f.worldId),
     first = current.reputation!.events[0]!;
+  expect(
+    first,
+    JSON.stringify(
+      await db.generalLog.findMany({ where: { worldId: f.worldId, tick: { gt: 100000 } }, select: { text: true } }),
+    ),
+  ).toBeDefined();
   await db.$transaction((tx) =>
     appendReputationEvents(tx, f.worldId, [
       { ...first, tick: 1, data: { ...first.data, name: '후속 덮어쓰기 금지' } },
@@ -265,18 +381,18 @@ it('T3-07 AC-M3-15 사건은 최초 값을 보존하고 실패한 턴·정산은
   const monthBefore = await snapshot(f.worldId);
   await expect(advance(f.worldId, 10000, true)).rejects.toThrow('review-rollback');
   expect(await snapshot(f.worldId)).toEqual(monthBefore);
-  expect(await db.monthlyReview.count({ where: { worldId: f.worldId } })).toBe(0);
+  expect(await db.monthlyReview.count({ where: { worldId: f.worldId } })).toBe(10);
   await advance(f.worldId, 10000);
   const settled = await snapshot(f.worldId),
-    review = settled.reputation!.reviews[0]!;
+    review = settled.reputation!.reviews.at(-1)!;
   const originalWorld = await db.world.findUniqueOrThrow({ where: { id: f.worldId } });
   await expect(
     db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "World" WHERE id=${f.worldId} FOR UPDATE`;
       await tx.world.update({ where: { id: f.worldId }, data: { clockRevision: { increment: 1 } } });
-      await persistMonthly(tx, f.worldId, f.initial.seed, 10000, originalWorld.actionSequence + 1);
+      await persistMonthly(tx, f.worldId, f.initial.seed, 110000, originalWorld.actionSequence + 1);
     }),
-  ).rejects.toThrow('같은 달의 월단평이 이미 있습니다.');
+  ).rejects.toThrow('가문 월 정산이 중복되거나 달을 건너뛰었습니다.');
   expect(await db.world.findUniqueOrThrow({ where: { id: f.worldId } })).toEqual(originalWorld);
   await expect(
     db.$transaction(async (tx) => {
@@ -321,12 +437,12 @@ it('T3-07 AC-M3-15 실제 조약 파기의 적용·거절·롤백은 큐 입력 
     nextTurnTick: 1_000_000_000,
     ...(row.id < 3 ? { userId: row.id === 1 ? alice.id : bob.id, officerLevel: 12 } : {}),
   }));
+  syncFixtureMap(initial);
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '월단평 파기 입력 검증',
     turnTermMinutes: 60,
     endYear: null,
     replayFormat: 3,
-    ruleFeatures: ['reputation-v1', 'treaty', 'treaty-break'],
   });
   worldIds.push(worldId);
   await controlClock(db, worldId, 'start');
@@ -467,20 +583,17 @@ it('T3-07 AC-M3-15 장수 제거와 국가 멸망 뒤에도 과거 순위의 공
     train: 100,
     atmos: 100,
   }));
-  Object.assign(initial.generals[0]!, { userId: alice.id, cityKey: 1, nextTurnTick: 100, crew: 1 });
-  Object.assign(initial.generals[1]!, { userId: null, cityKey: 2, crew: 100, officerLevel: 1 });
-  Object.assign(initial.generals[2]!, { userId: fighter.id, cityKey: 1, nextTurnTick: 500, crew: 10000 });
+  Object.assign(initial.generals[0]!, { userId: alice.id, cityKey: 1, nextTurnTick: 100, crew: 0 });
+  Object.assign(initial.generals[1]!, { userId: null, cityKey: 2, crew: 0, officerLevel: 1 });
+  Object.assign(initial.generals[2]!, { userId: fighter.id, cityKey: 1, nextTurnTick: 500, crew: 0 });
   initial.cities.find((row) => row.cityKey === 2)!.wall = 0;
   initial.diplomacies = [{ nationA: 1, nationB: 2, state: 'WAR', untilTick: 0 }];
-  const { worldId } = await saveInitialWorld(db, initial, {
-    name: '월단평 과거 소속 검증',
-    turnTermMinutes: 60,
-    endYear: null,
-    replayFormat: 3,
-    ruleFeatures: ['policy', 'reputation-v1'],
-  });
-  worldIds.push(worldId);
-  await controlClock(db, worldId, 'start');
+  syncFixtureMap(initial);
+  const { worldId } = await prepareReviewWorld(initial, [
+    { generalId: 1, troops: 1 },
+    { generalId: 2, troops: 100 },
+    { generalId: 3, troops: 7000 },
+  ]);
   const setAttack = async (player: Player, generalId: number, cityKey: number) => {
     const actor = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: generalId } } });
     const result = await rpc(
@@ -500,7 +613,7 @@ it('T3-07 AC-M3-15 장수 제거와 국가 멸망 뒤에도 과거 순위의 공
   await setAttack(alice, 1, 2);
   await setAttack(fighter, 3, 2);
   await advance(worldId, 10000);
-  const before = await rpc('review.get', { worldId, year: 191, month: 1 }, fighter);
+  const before = await rpc('review.get', { worldId, year: 191, month: 11 }, fighter);
   expect(before.status, before.text).toBe(200);
   const historical = before.data!.entries.find((entry) => entry.generalId === 2)!;
   const nation = initial.nations.find((row) => row.id === 2)!;
@@ -530,18 +643,18 @@ it('T3-07 AC-M3-15 장수 제거와 국가 멸망 뒤에도 과거 순위의 공
   expect(removed.status, JSON.stringify(removed.result)).toBe('APPLIED');
   expect((await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 2 } } })).removedAt).not.toBeNull();
   expect(await db.nation.findUnique({ where: { worldId_id: { worldId, id: 2 } } })).toBeNull();
-  expect((await rpc('review.get', { worldId, year: 191, month: 1 }, fighter)).data).toEqual(before.data);
+  expect((await rpc('review.get', { worldId, year: 191, month: 11 }, fighter)).data).toEqual(before.data);
   const archive = await exportReplay(db, worldId);
   if (archive.version !== 3) throw Error('월단평의 재생 형식이 다릅니다.');
   expect(archive.end).not.toBeNull();
-  expect(archive.months).toHaveLength(1);
-  expect(replayArchive(archive, 1)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
+  expect(archive.months).toHaveLength(12);
+  expect(replayArchive(archive, 12)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
   expect(replayToEnd(archive)).toEqual(archive.end);
   expect(archive.end!.finalStateHash).toBe(hashState(await snapshot(worldId)));
 });
 
-it('T3-07 AC-M3-15 비활성 조회는 비어 있고 손상 JSON은 일반 오류로 거부한다', async () => {
-  const off = await fixture(false),
+it('T3-07 AC-M3-15 정산 전 조회는 비어 있고 손상 JSON은 일반 오류로 거부한다', async () => {
+  const off = await fixture(),
     on = await fixture(),
     reader = await user();
   for (const route of ['review.latest', 'review.get', 'review.months'] as const) {
@@ -563,3 +676,35 @@ it('T3-07 AC-M3-15 비활성 조회는 비어 있고 손상 JSON은 일반 오�
   }
   await expect(snapshot(on.worldId)).rejects.toThrow();
 });
+
+// 합성 지도의 생성 원본에도 변경한 도시 값과 연결을 기록한다.
+function syncFixtureMap(initial: Parameters<typeof saveInitialWorld>[1]) {
+  const map = initial.operationalMap;
+  if (!map) return;
+  for (const city of initial.cities) city.connections.sort((a, b) => a - b);
+  for (const site of map.sites) {
+    if (site.kind !== 'CITY') continue;
+    const city = initial.cities.find((row) => row.cityKey === site.anchorKey);
+    if (!city) continue;
+    site.name = city.name;
+    site.level = city.level;
+    site.region = city.region;
+    site.position = { x: city.x, y: city.y };
+    for (const field of ['population', 'agriculture', 'commerce', 'security', 'defence', 'wall'] as const) {
+      site.initial![field] = city[field];
+      site.max![field] = city[`${field}Max`];
+    }
+  }
+  map.routes = initial.cities.flatMap((city) =>
+    city.connections
+      .filter((key) => city.cityKey < key)
+      .map((key) => ({
+        id: `route:${city.cityKey}:${key}`,
+        from: `city:${city.cityKey}`,
+        to: `city:${key}`,
+        mode: 'LAND' as const,
+        direction: 'BOTH' as const,
+        enabled: true,
+      })),
+  );
+}

@@ -5,7 +5,6 @@ import { worldResolver } from './resolver';
 const world = {
   preset: null,
   replayFormat: 3,
-  ruleFeatures: ['campaign-v1', 'five-stats', 'operational-map', 'personnel', 'policy'],
 };
 const resolver = worldResolver(world).resolver;
 
@@ -20,8 +19,8 @@ it.each(['recruit', 'conscript', 'train', 'morale', 'dismiss'])(
   },
 );
 
-it('부곡 입력을 허용해도 그 월드에서 꺼진 명령을 등록하지 않는다', () => {
+it('AC-INT-28 부곡 입력과 함께 상시 제공 명령을 허용한다', () => {
   const disabled = parseSlot({ commandKey: 'fire_attack', args: { cityKey: 2 } }, true, resolver);
-  expect(() => assertEnabledSlots(world, [disabled])).toThrow('명령과 인자');
+  expect(() => assertEnabledSlots(world, [disabled])).not.toThrow();
   expect(parseSlot(null, true, resolver)).toMatchObject({ commandKey: 'rest', args: {}, explicit: false });
 });

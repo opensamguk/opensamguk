@@ -18,6 +18,8 @@ const presetDir = new URL('../../resources/preset/', import.meta.url);
 const catalogFile = new URL('../../docs/user/command-catalog.generated.md', import.meta.url);
 const headings = { domestic: '내정', military: '군사', strategy: '전략', personal: '개인', nation: '국가' };
 const fieldLabels = {
+  slotId: '건설 자리',
+  building: '건물 종류',
   cityKey: '대상 도시',
   nationId: '대상 국가',
   generalId: '대상 장수',
@@ -28,6 +30,12 @@ const fieldLabels = {
   name: '나라 이름',
   color: '나라 색',
   unitId: '대상 부곡',
+  recipientId: '새 부곡 수령 장수',
+  supplyLoad: '출병 보급 적재량(SP)',
+  routeId: '행군 경로',
+  routeRevision: '경로 판',
+  ownershipRevision: '소유 판',
+  diplomacyRevision: '외교 판',
   target: '훈련 대상',
   slot: '장비 칸',
   itemKey: '장비 종류',
@@ -50,7 +58,7 @@ function featureCommands(): CommandDef[] {
       if (!feature) throw new Error(`등록부에 없는 선행 기능입니다: ${dependency}`);
       for (const required of feature.requires) selected.add(required);
     }
-    const resolver = resolverForRuleFeatures({ ruleFeatures: [...selected].sort() });
+    const resolver = resolverForRuleFeatures({});
     return resolver ? [...resolver.list('general'), ...resolver.list('nation')] : [];
   });
 }

@@ -16,7 +16,6 @@ const actor = { generalId: 1 };
 const horse = { slot: 'horse' as const, itemKey: 'horse_01' };
 function fixture() {
   const world = commandWorld();
-  world.ruleFeatures = ['equipment-v1', 'logistics-v1'];
   world.equipment = initialEquipment(TEST_EQUIPMENT_CONFIG);
   world.logistics = initialLogisticsState(TEST_EQUIPMENT_LOGISTICS_CONFIG, world);
   Object.assign(world.logistics.cities['1']!, { iron: 20, wood: 20, horses: 20 });
@@ -86,21 +85,6 @@ it('AC-P2-12 인공 제안 정책의 교체는 이전 장비 판매 금을 더�
 });
 
 it.each<[string, (world: WorldState) => void, string]>([
-  [
-    '끈 판',
-    (w) => {
-      w.ruleFeatures = ['logistics-v1'];
-    },
-    'COMMAND_DISABLED',
-  ],
-  [
-    '물류 없는 판',
-    (w) => {
-      w.ruleFeatures = ['equipment-v1'];
-      delete w.logistics;
-    },
-    'COMMAND_DISABLED',
-  ],
   [
     '무소속',
     (w) => {
@@ -196,4 +180,12 @@ it('AC-P2-12 장수 부재와 판매 금 한도를 실행 전에 거부한다', 
   world.equipment!.generals['1'] = { horse: 'horse_01' };
   world.generals[1]!.gold = EQUIPMENT_MAX;
   expect(equipmentTrade.check(world, actor, { slot: 'horse', itemKey: 'none' })?.code).toBe('BAD_STATE');
+});
+
+it('AC-INT-28 필수 물류 원장 누락은 계산 전에 거부한다', () => {
+  const world = fixture();
+  delete world.logistics;
+  const before = structuredClone(world);
+  expect(() => equipmentTrade.check(world, actor, horse)).toThrow();
+  expect(world).toEqual(before);
 });

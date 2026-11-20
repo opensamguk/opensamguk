@@ -4,7 +4,9 @@
 }
 .table {
   width: 100%;
-  border-collapse: collapse;
+  /* 키트 줄 그림은 칸마다 border-image로 그리므로 칸을 겹치지 않게 둔다(kitFrame.module.css). */
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: var(--text-sm);
 }
 .caption {
@@ -12,30 +14,18 @@
   font-weight: 600;
   padding-bottom: var(--space-1);
 }
-/* 머리글은 먹 두 줄 아래 옅은 먹 글자, 몸통은 한지 줄 (INT-20). */
+/* 머리글은 키트 표 머리 위 한지 글자, 몸통은 키트 표 줄 (INT-29). 그림과 색은 kitFrame.module.css가 정한다. */
 .table thead th {
   position: sticky;
   top: 0;
-  background: var(--color-surface);
-  border-bottom: 2px solid var(--color-ink);
-  color: var(--color-text-muted);
+  z-index: 1;
   font-size: var(--text-xs);
-  font-weight: 500;
   text-align: left;
   white-space: nowrap;
   padding: var(--space-1) var(--space-2);
-  height: var(--row-height);
 }
 .table thead th:global(.num) {
   text-align: right;
-}
-.table tbody tr {
-  height: var(--row-height);
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface);
-}
-.table tbody tr:nth-child(even) {
-  background: var(--color-surface-muted);
 }
 .table td {
   padding: 0 var(--space-2);
@@ -43,7 +33,7 @@
 }
 .sort {
   font: inherit;
-  font-weight: 500;
+  font-weight: 700;
   color: inherit;
   background: none;
   border: 0;
@@ -69,8 +59,13 @@
 .mobileSort label {
   flex-basis: 100%;
 }
-.mobileSort select,
 .mobileSort button {
+  min-height: 44px;
+  min-width: 44px;
+  max-width: 100%;
+  font-size: 16px;
+}
+.mobileSort select {
   min-height: 44px;
   min-width: 44px;
   max-width: 100%;

@@ -17,7 +17,6 @@ const context: AdminGameContext = {
 const payload = (action: AdminGameAction) => ({ version: 1, reason: '운영 검증', action });
 function fixture(features: string[] = []) {
   const initial = commandInitial();
-  initial.ruleFeatures = features;
   return initialReplayState(
     initial,
     features.includes('policy') ? { policy: { version: 1, turnTermMinutes: 10 } } : undefined,
@@ -72,7 +71,6 @@ it('AC-INT-23 8종 조치를 기록으로 재생하고 원본·활동·기존 �
       changes: {
         gold: { expected: 100000, value: 123 },
         cityKey: { expected: 1, value: 3 },
-        crewType: { expected: 1100, value: 1200 },
       },
     },
     {
@@ -102,7 +100,8 @@ it('AC-INT-23 8종 조치를 기록으로 재생하고 원본·활동·기존 �
       expect(next.state.generals[1]!.userId).toBeNull();
       expect(next.state.nations[1]!.isNpc).toBe(true);
       expect(next.policy!.lastActiveTicks).toEqual({});
-      expect(next.state.generals[1]!.crew).toBe(10000);
+      expect(next.state.generals[1]!.crew).toBe(0);
+      expect(next.state.campaign!.units).toEqual(replay.state.campaign!.units);
       expect(next.state.generals[1]!.officerLevel).toBe(12);
     } else if (action.kind === 'admin.general.clearTurns') {
       expect(next.turns[1]).toEqual(emptyQueue());
@@ -136,7 +135,6 @@ it('AC-INT-23 인증·월드·대상·expected·부곡·범위의 거절 순서�
   expect(apply({ kind: 'admin.general.rename', generalId: 99, name: '새이름' })).toMatchObject({
     result: { code: 'TARGET_MISSING' },
   });
-  replay.state.ruleFeatures!.push('campaign-v1');
   const campaign: AdminGameAction = {
     kind: 'admin.general.adjust',
     generalId: 1,
@@ -157,7 +155,7 @@ it('AC-INT-23 인증·월드·대상·expected·부곡·범위의 거절 순서�
   for (const value of [1000, 9999])
     expect(
       apply({ kind: 'admin.general.adjust', generalId: 1, changes: { crewType: { expected: 1100, value } } }),
-    ).toMatchObject({ result: { code: 'INVALID_VALUE' } });
+    ).toMatchObject({ result: { code: 'CAMPAIGN_FIELD' } });
   const maxed = fixture();
   maxed.revisions[1] = 2_147_483_647;
   expect(apply({ kind: 'admin.general.clearTurns', generalId: 1 }, maxed)).toMatchObject({
@@ -190,9 +188,10 @@ it('AC-INT-23 재생은 변경 전후 위조·입력 종류 불일치·추가 �
     { ...input, generalId: 1 },
     { ...input, actorId: 'spoof' },
   ])
-    expect(() => applyRecordedInput(replay, tampered)).toThrow();
+    expect(() => applyRecordedInput(replay, tampered), JSON.stringify(tampered)).toThrow();
   const rejected = { ...input, status: 'REJECTED' as const, result: { code: 'TARGET_CHANGED', message: '위조 문구' } };
   expect(() => applyRecordedInput(replay, rejected)).toThrow();
+  expect(() => applyRecordedInput(replay, { ...rejected, result: { ...rejected.result, extra: true } })).toThrow();
   const noResources = {
     kind: 'admin.general.adjust' as const,
     generalId: 1,
@@ -200,5 +199,7 @@ it('AC-INT-23 재생은 변경 전후 위조·입력 종류 불일치·추가 �
   };
   const withoutResources = { ...context };
   delete withoutResources.unitSet;
-  expect(() => decideAdminGameAction(replay, payload(noResources), withoutResources)).toThrow('원생성');
+  expect(decideAdminGameAction(replay, payload(noResources), withoutResources)).toMatchObject({
+    result: { code: 'CAMPAIGN_FIELD' },
+  });
 });

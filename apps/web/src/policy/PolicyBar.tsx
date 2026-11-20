@@ -74,7 +74,7 @@ export function PolicyBar({ worldId }: { worldId: string }) {
       <p className={styles.sentence} data-testid="policy-sentence">
         {policySentence(view.processing ? current : selected)}
         {view.processing && selected && selected !== current
-          ? ` 엔진이 처리하면 ${selected.name}${directionParticle(selected.name)} 바뀝니다.`
+          ? ` 처리되면 ${selected.name}${directionParticle(selected.name)} 바뀝니다.`
           : null}
       </p>
       <p className={styles.muted} data-testid="policy-inactive">

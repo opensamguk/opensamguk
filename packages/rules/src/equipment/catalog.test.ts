@@ -14,7 +14,6 @@ import { equipmentTrade } from './trade';
 const actor = { generalId: 1 };
 function fixture() {
   const world = commandWorld();
-  world.ruleFeatures = ['equipment-v1', 'logistics-v1'];
   world.equipment = initialEquipment(STANDARD_EQUIPMENT_CONFIG);
   world.logistics = initialLogisticsState(TEST_EQUIPMENT_LOGISTICS_CONFIG, world);
   Object.assign(world.logistics.cities['1']!, { iron: 100, wood: 100, horses: 100 });

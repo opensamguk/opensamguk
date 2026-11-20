@@ -126,10 +126,11 @@ async function renderHelp(path: string) {
 }
 
 describe('도움말 화면', () => {
-  it('가이드를 그리고 작성자용 상태 안내는 빼며 문서 안 링크는 도움말 주소로 간다', async () => {
+  it('가이드를 그리고 작성자용 상태 안내와 근거 줄은 빼며 문서 안 링크는 도움말 주소로 간다', async () => {
     await renderHelp('/help/index');
     expect(await screen.findByRole('heading', { level: 1, name: '시작하기' })).toBeTruthy();
     expect(screen.queryByText(/사실 기준/)).toBeNull();
+    expect(screen.queryByText(/^근거:/)).toBeNull();
     const link = screen.getAllByRole('link', { name: '시간과 턴' })[0]!;
     expect(link.getAttribute('href')).toBe('/help/time-and-turns');
     expect(screen.getByRole('navigation', { name: '가이드 목록' }).querySelectorAll('li')).toHaveLength(11);
@@ -146,7 +147,7 @@ describe('도움말 화면', () => {
     await renderHelp(`/help/${CATALOG_DOC}`);
     expect(await screen.findByRole('heading', { name: '장수 명령' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: '국가 명령' })).toBeTruthy();
-    const recruit = screen.getByRole('row', { name: /군사 모병 병사를 모집합니다/ });
+    const recruit = screen.getByRole('row', { name: /군사 모병 .*병사를 모집합니다/ });
     expect(recruit.querySelectorAll('br')).toHaveLength(2);
   });
 

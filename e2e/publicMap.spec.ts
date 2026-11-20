@@ -77,12 +77,25 @@ const B_NATION = { id: 2, name: '사본 B 오', color: '#00aa00', capitalCityKey
 const NOW_NATION = { name: '지금 오', color: '#123456' };
 
 // 서버 원본 응답의 기대값. 도시 key·links는 문자열이다 (T2-24).
+// 공개 사본은 도시마다 성 상태와 폐허, 분리 여부를 함께 싣고 황제가 있는 도시를 따로 적는다(visibility.ts publicMapInfo).
+const CITY_STATE = { ruin: null, state: 0, stateTerm: 0, parentCityKey: null, detached: false };
 const RAW_GA = {
+  emperorCityKey: 3,
   cities: [
-    { key: '1', name: '업', level: 7, x: 120, y: 90, nationId: 1, links: ['2'], supplied: true },
-    { key: '2', name: '허창', level: 6, x: 300, y: 220, nationId: 2, links: ['1', '3', '4'], supplied: true },
-    { key: '3', name: '낙양', level: 8, x: 480, y: 120, nationId: 1, links: ['2'], supplied: true },
-    { key: '4', name: '완', level: 5, x: 320, y: 400, nationId: 2, links: ['2'], supplied: true },
+    { ...CITY_STATE, key: '1', name: '업', level: 7, x: 120, y: 90, nationId: 1, links: ['2'], supplied: true },
+    {
+      ...CITY_STATE,
+      key: '2',
+      name: '허창',
+      level: 6,
+      x: 300,
+      y: 220,
+      nationId: 2,
+      links: ['1', '3', '4'],
+      supplied: true,
+    },
+    { ...CITY_STATE, key: '3', name: '낙양', level: 8, x: 480, y: 120, nationId: 1, links: ['2'], supplied: true },
+    { ...CITY_STATE, key: '4', name: '완', level: 5, x: 320, y: 400, nationId: 2, links: ['2'], supplied: true },
   ],
   nations: [
     { id: 1, name: '위', color: '#000080', capitalCityKey: 1 },
@@ -90,11 +103,12 @@ const RAW_GA = {
   ],
 };
 const RAW_NA = {
+  emperorCityKey: 1,
   cities: [
-    { key: '1', name: '성도', level: 8, x: 25, y: 20, nationId: 1, links: ['2'], supplied: true },
-    { key: '2', name: '면죽', level: 4, x: 250, y: 200, nationId: null, links: ['1', '3'] },
-    { key: '3', name: '한중', level: 6, x: 460, y: 300, nationId: 1, links: ['2', '4'], supplied: true },
-    { key: '4', name: '장안', level: 8, x: 680, y: 480, nationId: 2, links: ['3'], supplied: true },
+    { ...CITY_STATE, key: '1', name: '성도', level: 8, x: 25, y: 20, nationId: 1, links: ['2'], supplied: true },
+    { ...CITY_STATE, key: '2', name: '면죽', level: 4, x: 250, y: 200, nationId: null, links: ['1', '3'] },
+    { ...CITY_STATE, key: '3', name: '한중', level: 6, x: 460, y: 300, nationId: 1, links: ['2', '4'], supplied: true },
+    { ...CITY_STATE, key: '4', name: '장안', level: 8, x: 680, y: 480, nationId: 2, links: ['3'], supplied: true },
   ],
   nations: [
     { id: 1, name: '촉', color: '#008000', capitalCityKey: 1 },
@@ -160,6 +174,14 @@ function shape(template: WorldInit, spec: WorldSpec): WorldInit {
     return { ...city, name, level, x, y, nationId, connections: links };
   });
   state.diplomacies = [];
+  // 이 시험은 운영 지도 없는 단순 지도 월드의 공개 지도를 본다. 월 정산 고정물의 운영 지도와 거점 종류는 뺀다.
+  // 운영 지도가 있으면 공개 응답과 화면이 운영 지도 갈래로 바뀐다(publicMap 운영 지도 갈래는 이 시험의 범위가 아니다).
+  delete state.operationalMap;
+  state.cities = state.cities.map((city) => {
+    const plain = { ...city };
+    delete plain.kind;
+    return plain;
+  });
   return state;
 }
 
@@ -169,16 +191,16 @@ const iso = (time: number) => new Date(time).toISOString();
 test.beforeAll(async ({ publicMapStack }) => {
   // 아래에서 DB를 쓰는 도우미가 모두 이 파일의 DB를 가리키는지 먼저 확인한다.
   if (e2eDatabaseUrl() !== publicMapStack.databaseUrl) throw new Error('공개 지도 E2E가 자기 DB를 쓰지 않습니다.');
-  const [{ monthlyFixture }, { saveInitialWorld }, { TurnLoop }] = await Promise.all([
+  const [{ monthlyFixture }, { saveFixtureWorld }, { TurnLoop }] = await Promise.all([
     import('../apps/engine/test/monthlyFixture'),
-    import('../apps/engine/src/world/persistence'),
+    import('./worldFixture'),
     import('../apps/engine/src/turnLoop'),
   ]);
   const template = await monthlyFixture();
   const tag = `${Date.now() % 100_000}`;
   await withE2eDb(async (db) => {
     const create = async (spec: WorldSpec, name: string, status: Made['status']): Promise<Made> => {
-      const { worldId } = await saveInitialWorld(db, shape(template, spec), {
+      const { worldId } = await saveFixtureWorld(db, shape(template, spec), {
         name,
         turnTermMinutes: 60,
         endYear: null,
@@ -342,13 +364,18 @@ test('로그인 뒤 /lobby의 월드 목록 위에 같은 탭과 지도가 있�
   await expect(page).toHaveURL('/lobby');
 
   await expect(tabs(page)).toHaveText([ga.name, `${na.name}멈춤`, da.name]);
+  // 로비는 고른 월드와 지도 탭을 맞춘다(INT-29). 고른 것이 없으면 목록의 첫 월드(가장 최근에 시작한 진행 중 월드)다.
+  // 이 시험은 가 월드의 지도를 보므로 가 탭을 눌러 고른다.
+  await tabs(page).first().click();
   await expect(tabs(page).first()).toHaveAttribute('aria-selected', 'true');
   expect(await drawn(page)).toEqual(DRAWN_GA);
   const card = page.getByRole('article', { name: ga.name, exact: true });
   await expect(card).toBeVisible();
   const mapBox = await area(page).boundingBox();
-  const listBox = await page.getByRole('heading', { level: 2, name: '월드', exact: true }).boundingBox();
-  expect(mapBox && listBox && mapBox.y + mapBox.height <= listBox.y).toBe(true);
+  // INT-29 로비는 월드 목록('서버 선택')이 본문이고 공개 지도는 옆 칸(aside)에 있다(apps/web/src/lobby/LobbyPage.tsx).
+  // 넓은 화면에서는 지도가 목록 오른쪽에 놓인다.
+  const listBox = await page.getByRole('heading', { level: 2, name: '서버 선택', exact: true }).boundingBox();
+  expect(mapBox && listBox && mapBox.x > listBox.x + listBox.width / 2).toBe(true);
 
   // 지도 탭을 바꿔도 월드 카드와 주소는 그대로다.
   const cards = await page.getByRole('article').allTextContents();
@@ -423,14 +450,19 @@ test('수도와 보급을 표시하고 장수·병력·국고 없이 읽기 전�
     expect(world.background).toBeNull();
   }
   for (const map of [raw.worlds[0]!.map!, raw.worlds[1]!.map!]) {
-    expect(Object.keys(map).sort()).toEqual(['cities', 'month', 'nations', 'takenAt', 'year']);
+    expect(Object.keys(map).sort()).toEqual(['cities', 'emperorCityKey', 'month', 'nations', 'takenAt', 'year']);
     for (const city of map.cities)
       expect(Object.keys(city).sort()).toEqual([
+        'detached',
         'key',
         'level',
         'links',
         'name',
         'nationId',
+        'parentCityKey',
+        'ruin',
+        'state',
+        'stateTerm',
         ...(city.nationId === null ? [] : ['supplied']),
         'x',
         'y',
@@ -564,6 +596,7 @@ test('지연 시간이 지난 사본 B를 다시 받으면 그 사본의 도시 
       takenAt: iso(eligible),
       year: 191,
       month: 2,
+      emperorCityKey: RAW_GA.emperorCityKey,
       cities: RAW_GA.cities.map((city) => (city.key === '3' ? { ...city, nationId: 2 } : city)),
       nations: RAW_GA.nations.map((nation) => (nation.id === B_NATION.id ? B_NATION : nation)),
     });

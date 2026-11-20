@@ -229,14 +229,63 @@
   align-items: flex-end;
 }
 
+/* 명령 찾기: 이름으로 걸러 고른다. 띠와 함께 둔다(INT-29 뒤에도 유지). */
 .search {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  flex: 1 1 160px;
+  max-width: 320px;
 }
 
-.search input,
+.search input {
+  font: inherit;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.found {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.foundOption {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.foundOption[data-checked='true'] {
+  border-color: var(--color-accent);
+}
+
+.foundOption[data-available='false'] {
+  color: var(--color-text-muted);
+}
+
+.foundCost,
+.foundReason,
+.foundEmpty {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.foundEmpty {
+  margin: 0;
+}
+
 .argLabel input,
 .argLabel select,
 .inline input {
@@ -259,23 +308,593 @@
   overflow-wrap: anywhere;
 }
 
+/* 직위별 명령 띠 (D-099). 담장 바탕은 직위마다 다르고 신분이 오를수록 화려하다. 둥근 모서리는 쓰지 않는다. */
+.categories[data-role] {
+  align-items: stretch;
+  padding: var(--space-2);
+  border: 2px solid #5a3a22;
+  border-bottom-width: 6px;
+}
+.categories[data-role='ruler'] {
+  background:
+    repeating-linear-gradient(90deg, rgb(0 0 0 / 18%) 0 2px, transparent 2px 46px),
+    linear-gradient(180deg, #8a8378 0 14%, #6f685e 14% 100%);
+  border-color: #3a3530;
+  border-top: 8px solid #2c2f36;
+}
+.categories[data-role='chief'] {
+  background: linear-gradient(180deg, #a09482 0 16%, #857a68 16% 100%);
+  border-top: 6px solid #2c2f36;
+}
+.categories[data-role='governor'] {
+  background: linear-gradient(180deg, #8c2a1e 0 12%, #c9a25a 12% 100%);
+  border-color: #6b1f15;
+}
+.categories[data-role='officer'] {
+  background: linear-gradient(180deg, #5b3a2a 0 10%, #b2533a 10% 100%);
+}
+.categories[data-role='free'] {
+  background:
+    repeating-linear-gradient(90deg, rgb(60 40 20 / 30%) 0 3px, transparent 3px 14px),
+    linear-gradient(180deg, #a4927a, #8a7a62);
+  border-color: #6a5a44;
+}
+.bandRole {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--space-2);
+  min-height: 44px;
+  background: #2a1d14;
+  color: #f1dfb8;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+.categories[data-role] .chip {
+  border-radius: 0;
+  border: 2px solid #3a2416;
+  font-weight: 700;
+  color: #fff4dc;
+  text-shadow: 0 1px 0 rgb(0 0 0 / 55%);
+  box-shadow: inset 0 0 0 1px rgb(255 230 180 / 30%);
+}
+.categories[data-role] .chip[data-side='realm'] {
+  background: linear-gradient(180deg, #d0613a, #9c3220);
+}
+.categories[data-role] .chip[data-side='appoint'] {
+  background: linear-gradient(180deg, #e2b448, #a87a1c);
+  color: #2a1a06;
+  text-shadow: none;
+}
+.categories[data-role] .chip[data-side='self'] {
+  background: linear-gradient(180deg, #7a5bb8, #4b347f);
+}
+.categories[data-role] .chip[data-side='all'],
+.categories[data-role] .chip[data-side='other'] {
+  background: linear-gradient(180deg, #6b5a48, #43372b);
+}
+.categories[data-role] .chip[aria-pressed='true'] {
+  outline: 3px solid #ffe08a;
+  outline-offset: -3px;
+  transform: translateY(-2px);
+}
+/* 담장 그림 (Codex walls2/): 바닥 무늬를 아래에 깔고, 이음 담장을 가로로 되풀이하고, 가운데 문을 얹는다.
+   양끝 마감은 가상 요소로 그리고 오른끝은 뒤집는다. 그림은 같은 비율로만 줄인다(가로세로 따로 늘이지 않는다). */
+.categories[data-walls='true'] {
+  position: relative;
+  isolation: isolate;
+  padding: 10px 112px 14px;
+  border: 0;
+  border-top: 0;
+  background:
+    var(--wall-center) center bottom 22px / auto 112px no-repeat,
+    var(--wall-tile) left bottom 22px / auto 112px repeat-x,
+    var(--wall-floor) 0 100% / 44px 44px repeat-x,
+    linear-gradient(180deg, #2b2620, #3d352a);
+}
+.categories[data-walls='true']::before,
+.categories[data-walls='true']::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  bottom: 22px;
+  width: 112px;
+  height: 112px;
+  background: var(--wall-cap) left bottom / contain no-repeat;
+  pointer-events: none;
+}
+.categories[data-walls='true']::before {
+  left: 0;
+}
+.categories[data-walls='true']::after {
+  right: 0;
+  transform: scaleX(-1);
+}
+.categories[data-walls='true'] > * {
+  position: relative;
+}
+/* 담장 띠는 한 줄로 세운다. 폭이 모자라면 띠 안에서 가로로 밀어 본다(쪽 전체가 옆으로 넘치지 않게). */
+.categories[data-walls='true'] {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+/* 좁은 화면(모바일)에서는 화면 안에 가로로 밀리는 칸을 두지 않는다(T3-10, AC-M3-08). 담장 띠도 여러 줄로 감는다. */
+@media (max-width: 767px) {
+  .categories[data-walls='true'] {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+}
+@media (max-width: 640px) {
+  .categories[data-walls='true'] {
+    padding-inline: 40px;
+  }
+  .categories[data-walls='true']::before,
+  .categories[data-walls='true']::after {
+    width: 40px;
+  }
+}
+/* 담장 띠에서는 직위 칸이 벽을 가리지 않는다. 표지와 글자만 벽 위에 얹고 그림자로 읽히게 한다. */
+.categories[data-walls='true'] .bandRole {
+  background: none;
+  padding: 0 4px;
+  filter: drop-shadow(0 2px 2px rgb(0 0 0 / 0.7));
+}
+.bandBadge {
+  width: 32px;
+  height: 32px;
+  margin-right: 4px;
+  object-fit: contain;
+}
+/* 패 그림: 한 장에 평상·올림·누름·불가 4상태가 가로로 있다 (Codex 생성, D-099). */
+.categories[data-role] .chip[data-plaque] {
+  width: 56px;
+  min-height: 72px;
+  padding: 10px 0 6px;
+  border: 0;
+  outline-offset: -4px;
+  background: var(--plaque) 0 0 / 400% 100% no-repeat;
+  box-shadow: none;
+  writing-mode: vertical-rl;
+  letter-spacing: 0.15em;
+  font-size: var(--text-base);
+  color: #fff6e0;
+  text-shadow:
+    0 0 3px #000,
+    0 1px 0 #000;
+}
+.categories[data-role] .chip[data-plaque]:hover {
+  background-position: 33.333% 0;
+}
+.categories[data-role] .chip[data-plaque][aria-pressed='true'] {
+  background-position: 66.667% 0;
+}
+.categories[data-role] .chip[data-plaque]:disabled {
+  background-position: 100% 0;
+}
+/* 패를 누를 때의 움직임 (사용자 2026-11-15 "명령 패는 클릭하면 좀 다이나믹하게", "군주의 경우 명령패를 클릭하면
+   패 자체를 위로 올리는 삼국지 7를 참고해", "병사가 패 자체를 드는거야 병사가 공중으로 뜨는게 아니라").
+   단추 자리는 그대로 두고 움직임은 그림 안에서 일어난다. 5칸 그림(평상, 올림, 드는 중, 고름, 불가)이면
+   누를 때 드는 중 칸을 거쳐 고름 칸에 멈춘다. 고르지 않은 패는 조금 어두워져 고른 패가 앞으로 나온다. */
+.categories[data-role] .chip[data-plaque][data-frames='5'] {
+  position: relative;
+  flex: none;
+  width: 64px;
+  height: 96px;
+  min-height: 96px;
+  padding: 0;
+  background-size: 500% 100%;
+  writing-mode: horizontal-tb;
+  --fx: var(--f0x);
+  --fy: var(--f0y);
+  --ft: var(--f0t);
+  --fb: var(--f0b);
+}
+.categories[data-role] .chip[data-frames='5']:hover {
+  --fx: var(--f1x);
+  --fy: var(--f1y);
+  --ft: var(--f1t);
+  --fb: var(--f1b);
+}
+.categories[data-role] .chip[data-frames='5'][aria-pressed='true'] {
+  --fx: var(--f3x);
+  --fy: var(--f3y);
+  --ft: var(--f3t);
+  --fb: var(--f3b);
+}
+.categories[data-role] .chip[data-frames='5']:disabled {
+  --fx: var(--f4x);
+  --fy: var(--f4y);
+  --ft: var(--f4t);
+  --fb: var(--f4b);
+}
+/* Codex 글자 그림: 패와 직위 칸은 세로 글자(256×320)다. 같은 비율로만 줄인다. */
+.lettering {
+  display: block;
+  height: 30px;
+  width: auto;
+  pointer-events: none;
+}
+/* 패 앞면 글자: 글자 그림 높이 --lh(plaqueFaces.ts)로 앞면을 가득 채운다. 칸이 바뀌어도 크기는 그대로다. */
+.plaqueText .lettering {
+  height: var(--lh, 30px);
+  max-width: none;
+}
+/* 넓고 낮은 앞면: 세로 글자 그림(가로 0.8 비율)에서 위 글자(세로 8.1~49.7%)와 아래 글자(49.7~91.3%)를 잘라 나란히 둔다. */
+.plaqueText[data-flow='h'] {
+  display: flex;
+  writing-mode: horizontal-tb;
+}
+.plaqueChar {
+  display: block;
+  width: calc(var(--lh) * 0.48);
+  height: calc(var(--lh) * 0.416);
+  background-repeat: no-repeat;
+  background-size: calc(var(--lh) * 0.8) var(--lh);
+  background-position-x: 50%;
+}
+.plaqueChar[data-char='0'] {
+  background-position-y: calc(var(--lh) * -0.081);
+}
+.plaqueChar[data-char='1'] {
+  background-position-y: calc(var(--lh) * -0.497);
+}
+/* 가로 명령 글자 그림은 위아래 여백이 그림 높이의 14%씩이라 글자가 72%만 차지한다.
+   --gh(글자 높이)를 정하면 그림을 1/0.72배로 키우고 여백만큼 바깥으로 빼서 글자가 자리를 가득 채운다.
+   긴 이름은 자리 너비에 맞춰 같은 비율로 줄어든다. */
+.subLettering {
+  --gh: 26px;
+  display: block;
+  height: calc(var(--gh) / 0.72);
+  width: auto;
+  max-width: calc(100% + var(--gh) / 0.72 * 0.28);
+  margin: calc(var(--gh) / 0.72 * -0.14);
+  object-fit: contain;
+  object-position: left center;
+  pointer-events: none;
+}
+.roleLettering {
+  display: block;
+  height: 40px;
+  width: auto;
+}
+/* 글자는 그림 앞면 가운데에 세로로 얹는다. 패가 들릴 때 같은 박자로 따라 올라간다. */
+.plaqueText {
+  position: absolute;
+  left: var(--fx);
+  top: var(--fy);
+  transform: translate(-50%, -50%);
+  /* 휘장, 말린 두루마리가 덮은 부분은 글자도 가린다(가로는 자르지 않는다). */
+  clip-path: inset(var(--ft, 0px) -40px var(--fb, 0px) -40px);
+  writing-mode: vertical-rl;
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.categories[data-role] .chip[data-frames='5'][aria-pressed='true'] .plaqueText {
+  animation: plaqueTextLift 180ms steps(1, end);
+}
+@keyframes plaqueTextLift {
+  from {
+    left: var(--f2x);
+    top: var(--f2y);
+    clip-path: inset(var(--f2t) -40px var(--f2b) -40px);
+  }
+  to {
+    left: var(--f3x);
+    top: var(--f3y);
+    clip-path: inset(var(--f3t) -40px var(--f3b) -40px);
+  }
+}
+.categories[data-role] .chip[data-plaque][data-frames='5']:hover {
+  background-position: 25% 0;
+}
+.categories[data-role] .chip[data-plaque][data-frames='5'][aria-pressed='true'] {
+  background-position: 75% 0;
+  animation: plaqueLift 180ms steps(1, end);
+}
+.categories[data-role] .chip[data-plaque][data-frames='5']:disabled {
+  background-position: 100% 0;
+}
+@keyframes plaqueLift {
+  from {
+    background-position: 50% 0;
+  }
+  to {
+    background-position: 75% 0;
+  }
+}
+.categories[data-role] .chip[data-plaque][aria-pressed='true'] {
+  transform: none;
+  outline: 0;
+}
+.categories[data-role]:has(.chip[aria-pressed='true']) .chip[data-plaque][aria-pressed='false'] {
+  filter: brightness(0.78) saturate(0.85);
+  transition: filter 200ms ease;
+}
+/* 세부 명령 목록 (D-099, 사용자 2026-11-15 "명령패 다음엔 명령 리스트가 있어야 하는데?").
+   고른 패 바로 위로 세로 목록이 솟아오른다(사용자 2026-11-15 "아래 세로목록이 아닐걸? 위쪽일텐데?").
+   다른 내용 위에 떠 있고, 폭이 모자라면 오른쪽 끝에 맞춘다.
+   목록 그림(Codex, sublist/)이 오기 전에는 신분마다 색 판으로 그린다: 군주는 깃대에 단 깃발. */
+.bandWrap {
+  position: relative;
+  /* 명령 띠는 화면 아래를 가로로 다 채운다(삼국지7처럼 띠만 아래에 둔다). */
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.subBand {
+  position: absolute;
+  z-index: 3;
+  /* 고른 패 위 끝에 붙인다(--anchor-bottom은 띠 바닥에서 패 위 끝까지). */
+  bottom: var(--anchor-bottom, calc(100% - 6px));
+  left: clamp(0px, var(--anchor, 0px), calc(100% - min(240px, 100%)));
+  width: min(240px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  background: rgb(30 20 12 / 92%);
+  border: 2px solid #5a3a22;
+  box-shadow: 0 8px 18px rgb(0 0 0 / 45%);
+  transform-origin: bottom left;
+  animation: subBandUnroll 240ms 60ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.subBand[data-role='ruler'] {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0 0 4px;
+}
+.subBand[data-role='chief'] {
+  background: linear-gradient(90deg, #1c1410, #2c201a 50%, #1c1410);
+  border-color: #b08a3a;
+}
+.subBand[data-role='governor'] {
+  background: #7a2418;
+  border-color: #3a1008;
+}
+.subBand[data-role='officer'] {
+  background: repeating-linear-gradient(180deg, #6a3e26 0 50px, #4e2c1a 50px 52px);
+  border-color: #3a2416;
+}
+.subBand[data-role='free'] {
+  background: #8a8272;
+  border-color: #5a5446;
+}
+.subName {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  line-height: 0;
+}
+.subCommand:has(:focus-visible) {
+  outline: 3px solid #ffe08a;
+  outline-offset: -3px;
+}
+.subCommand {
+  position: relative;
+  cursor: pointer;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 28px 0 12px;
+  border: 2px solid #3a2416;
+  border-radius: 0;
+  white-space: nowrap;
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: #fff4dc;
+  text-align: left;
+  text-shadow: 0 1px 0 rgb(0 0 0 / 60%);
+  background: linear-gradient(180deg, #c95a36, #8e2c1c);
+  transition:
+    transform 120ms ease,
+    filter 120ms ease;
+}
+/* 군주: 왼쪽 깃대에 매단 깃발, 오른끝은 갈라진 술. */
+.subBand[data-role='ruler'] .subCommand {
+  border: 0;
+  border-left: 4px solid #6a4a2a;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 33%, 100% 50%, calc(100% - 14px) 67%, 100% 100%, 0 100%);
+}
+.subBand[data-role='ruler'] .subCommand:hover {
+  transform: skewY(-1.5deg);
+}
+.subBand[data-side='appoint'] .subCommand {
+  background: linear-gradient(180deg, #e2b448, #a87a1c);
+  color: #2a1a06;
+  text-shadow: none;
+}
+.subBand[data-side='self'] .subCommand {
+  background: linear-gradient(180deg, #7a5bb8, #4b347f);
+}
+.subCommand:hover {
+  filter: brightness(1.12);
+}
+.subCommand:active {
+  filter: brightness(0.9);
+}
+.subCommand[data-checked='true'] {
+  outline: 3px solid #ffe08a;
+  outline-offset: -3px;
+  filter: brightness(1.15);
+}
+.subCommand[data-available='false'] {
+  filter: grayscale(0.7) brightness(0.8);
+}
+/* 받침 판 그림(256px 폭)을 192px로 같은 비율(0.75)로 줄인다. 원작처럼 고른 패 위에 좁게 서되, 우리 명령 이름이
+   원작보다 길고 홈 한 칸이 누를 자리 44px를 넘어야 해서 이 너비다: 위끝, 아래끝 28px, 홈 한 칸 45px,
+   홈 안 목록 패 자리는 x 22.5, y 5.6, 135×33.8. 홈은 목록 줄 수만큼 세로로 이어 붙는다. */
+.subBand[data-framed='true'] {
+  width: 192px;
+  left: clamp(0px, var(--anchor, 0px), calc(100% - 192px));
+  gap: 0;
+  padding: 28px 0;
+  border: 0;
+  box-shadow: none;
+  background:
+    var(--frame-top) top / 100% auto no-repeat,
+    var(--frame-bottom) bottom / 100% auto no-repeat,
+    var(--frame-slot) 0 28px / 100% 45px repeat-y;
+  background-clip: border-box, border-box, content-box;
+  filter: drop-shadow(0 6px 10px rgb(0 0 0 / 45%));
+}
+.subBand[data-framed='true'] .subCommand {
+  height: 45px;
+  min-height: 45px;
+  padding: 5.6px 22.5px;
+  border: 0;
+  justify-content: center;
+}
+/* 목록 패 그림: 한 장에 평상, 올림, 누름, 불가 4칸. 홈 안 자리(content-box)에만 그린다. */
+.subBand[data-item-art='true'] .subCommand {
+  border: 0;
+  clip-path: none;
+  background: var(--item) 0 0 / 400% 100% no-repeat;
+  background-origin: content-box;
+  background-clip: content-box;
+  filter: none;
+  outline: 0;
+}
+.subBand[data-item-art='true'] .subCommand:hover {
+  background-position: 33.333% 0;
+  filter: none;
+}
+.subBand[data-item-art='true'] .subCommand:active,
+.subBand[data-item-art='true'] .subCommand[data-checked='true'] {
+  background-position: 66.667% 0;
+  filter: none;
+}
+.subBand[data-item-art='true'] .subCommand[data-available='false'] {
+  background-position: 100% 0;
+  filter: none;
+}
+.subBand[data-item-art='true'] .subCommand:has(:focus-visible) {
+  outline: 3px solid #ffe08a;
+  outline-offset: -3px;
+}
+.subBand[data-role='ruler'][data-item-art='true'] .subCommand {
+  height: 60px;
+  padding: 0 40px 0 22px;
+  background-origin: border-box;
+  background-clip: border-box;
+}
+/* 군주 세부 목록은 삼국지 7처럼 깃발을 다닥다닥 겹쳐 세운다. 깃발마다 위 14px를 앞 깃발 아래에 넣고,
+   보이는 띠는 46px라 누를 자리 44px를 지킨다. 고르거나 가리킨 깃발은 앞으로 나온다. */
+.subBand[data-role='ruler'][data-item-art='true'] {
+  gap: 0;
+  /* 깃봉(27×32을 0.9375배) 자리 */
+  padding-top: 28px;
+}
+/* 깃대: 깃발들 왼쪽의 깃대 토막을 가리며 한 줄로 이어 그린다. 깃대 토막 그림(9×16, 가운데 x 4)을 깃발과 같은 0.9375배로 놓아
+   가운데가 깃발 안 깃대 가운데(6.6px)와 맞는다. 맨 위에는 깃봉(가운데 x 13)을 얹는다. */
+.subBand[data-role='ruler'][data-item-art='true']::before,
+.subBand[data-role='ruler'][data-item-art='true']::after {
+  content: '';
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+}
+.subBand[data-role='ruler'][data-item-art='true']::before {
+  top: 26px;
+  bottom: 0;
+  left: calc(6.6px - 4px * 0.9375);
+  width: calc(9px * 0.9375);
+  background: var(--pole) 0 0 / 100% calc(16px * 0.9375) repeat-y;
+}
+.subBand[data-role='ruler'][data-item-art='true']::after {
+  top: 0;
+  left: calc(6.6px - 13px * 0.9375);
+  width: calc(27px * 0.9375);
+  height: 30px;
+  background: var(--finial) center / contain no-repeat;
+}
+.subBand[data-role='ruler'][data-item-art='true'] .subCommand + .subCommand {
+  margin-top: -14px;
+}
+.subBand[data-role='ruler'][data-item-art='true'] .subCommand {
+  position: relative;
+}
+.subBand[data-role='ruler'][data-item-art='true'] .subCommand:hover,
+.subBand[data-role='ruler'][data-item-art='true'] .subCommand:has(:focus-visible),
+.subBand[data-role='ruler'][data-item-art='true'] .subCommand[data-checked='true'] {
+  z-index: 1;
+}
+.subLettering {
+  --gh: 28px;
+  object-position: center;
+}
+/* 받침 판 홈의 목록 패(180×45)와 군주 깃발(240×60)은 글자 자리를 채운다. */
+.subBand[data-item-art='true'] .subLettering {
+  --gh: 23px;
+}
+.subBand[data-role='ruler'][data-item-art='true'] .subLettering {
+  --gh: 34px;
+}
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.subBand .subCommand {
+  animation: subCommandIn 200ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: calc(120ms + (var(--n, 1) - 1 - var(--i, 0)) * 35ms);
+}
+@keyframes subBandUnroll {
+  from {
+    clip-path: inset(100% 0 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes subCommandIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .categories[data-role] .chip[data-plaque][aria-pressed='true'],
+  .categories[data-role] .chip[data-frames='5'][aria-pressed='true'] .plaqueText,
+  .subBand,
+  .subBand .subCommand {
+    animation: none;
+  }
+}
+
+.group[data-side='realm'] legend {
+  color: #b84a2c;
+}
+.group[data-side='appoint'] legend {
+  color: #a87a1c;
+}
+.group[data-side='self'] legend {
+  color: #6a4fa8;
+}
+
 /* 명령 선택기의 분류·검색·넣기는 모든 폭에서 44px 누름 영역을 지킨다 (T4-92). */
 .picker .chip,
 .picker .primary,
 .picker .secondary,
-.picker button[data-unavailable],
-.search input {
+.picker button[data-unavailable] {
   min-width: 44px;
   min-height: 44px;
   box-sizing: border-box;
-}
-
-.commandList {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-2);
-  max-height: 220px;
-  overflow-y: auto;
 }
 
 .group {
@@ -292,78 +911,6 @@
   color: var(--color-text-muted);
   overflow-wrap: anywhere;
   max-width: 100%;
-}
-
-.commandCards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(160px, 100%), 1fr));
-  gap: var(--space-1);
-}
-
-.commandOption {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-  min-height: 44px;
-  padding: var(--space-2);
-  border: 1px solid var(--color-border);
-  border-inline-start: 3px solid var(--color-border);
-  background: var(--color-surface-raised);
-  box-sizing: border-box;
-  cursor: pointer;
-}
-
-.commandOption[data-checked='true'] {
-  border-color: var(--color-accent);
-  border-inline-start-width: 5px;
-  background: var(--color-surface-muted);
-}
-
-/* 키보드 초점만 카드 테두리로 보인다. 마우스로 고른 카드는 굵은 왼쪽 선과 배경으로 구분한다. */
-.commandOption:has(:focus-visible) {
-  outline: 2px solid var(--color-accent);
-  outline-offset: -2px;
-}
-
-.commandOption input:focus-visible {
-  outline: none;
-}
-
-.commandBody {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  gap: 2px;
-  overflow-wrap: anywhere;
-}
-
-.commandHint {
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
-}
-
-/* 카드 둘째 줄의 비용 (INT-26 도움말). */
-.commandCost {
-  color: var(--color-text);
-  font-size: var(--text-xs);
-  font-weight: 600;
-}
-
-/* 지금 실행할 수 없는 명령 카드 (commands.list available false). 글자는 흐리지 않고 바탕·테두리로 구분해 대비를 지킨다. */
-.commandOption[data-available='false'] {
-  border-style: dashed;
-  background: var(--color-surface-muted);
-}
-
-.commandOption[data-available='false'] strong {
-  color: var(--color-text-muted);
-}
-
-/* 카드의 실행 불가 사유. */
-.commandReason {
-  color: var(--color-warning);
-  font-size: var(--text-xs);
 }
 
 /* 수량 칸 옆 예상 금 (사전 검사 미리보기). */
@@ -448,6 +995,12 @@
 .putRow {
   display: flex;
 }
+/* 고른 명령을 넣을 수 없을 때의 이유 줄(넣기 단추 대신). */
+.putReason {
+  margin: var(--space-1) 0 0;
+  color: var(--color-warning);
+  font-size: var(--text-sm);
+}
 
 .inline {
   display: inline-flex;
@@ -473,9 +1026,7 @@
   .secondary,
   .chip,
   .linkButton,
-  .commandOption,
   .editor button[data-unavailable],
-  .search input,
   .argLabel input,
   .argLabel select,
   .inline input {
@@ -492,8 +1043,7 @@
   }
 
   .argLabel,
-  .argRow,
-  .search {
+  .argRow {
     min-width: 0;
   }
 
@@ -535,4 +1085,56 @@
 }
 .argScreenFields:empty {
   display: none;
+}
+
+/* 단계식 인자 창의 단계 칸과 확인 단계 (D-100). */
+.argStep {
+  min-width: 0;
+}
+.advisor {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: #f3e8cf;
+  color: #2a1a0c;
+  border: 3px solid #7a2a1a;
+}
+.advisorSummary {
+  margin: 0;
+  font-weight: 700;
+}
+.advisorSays {
+  margin: 0;
+  padding-left: var(--space-2);
+  border-left: 4px solid #b84a2c;
+}
+.advisorSays[data-ok='true'] {
+  border-left-color: #2f6e5e;
+}
+.proposeForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-2);
+}
+.proposeForm textarea {
+  min-width: min(360px, 70vw);
+}
+
+/* 국가 명령 제안(D-100). 접힌 한 줄로 두고 펼치면 명령 고르기를 보인다. */
+.proposal {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.proposal > summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  font-weight: 600;
 }

@@ -26,7 +26,6 @@ it.each([false, true])(
     });
     world.generals[mother!]!.sex = 'FEMALE';
     world.lineage!.persons[String(to)] = { ...emptyLineagePerson(), parents: [from!, mother!] };
-    if (withPolicy) world.ruleFeatures!.push('policy');
     const before: ReplayState = {
       state: world,
       monthlyTick: 0,

@@ -17,7 +17,7 @@ export const sabotage: CommandDef = {
   category: 'strategy',
   target: 'general',
   args: stratagemArgs,
-  check: checkStratagem,
-  precheck: checkStratagem,
+  check: (view, actor, raw) => checkStratagem(view, actor, raw, 'sabotage'),
+  precheck: (view, actor, raw) => checkStratagem(view, actor, raw, 'sabotage'),
   execute: (view, actor, raw, rng) => executeStratagem(sabotageSpec, view, actor, raw, rng),
 };

@@ -43,7 +43,7 @@ export function cellFor(member: MemberTimeline, month: GameDate): TimelineCell |
 // 비워 둔 칸이 실행할 방침 명령은 그 장수의 방침이라 여기서 짐작하지 않는다.
 export type SlotLabel = { kind: 'empty' | 'rest' | 'command'; text: string };
 export const EMPTY_SLOT_TEXT = '빈 칸';
-export const EMPTY_SLOT_TITLE = '비워 둔 칸입니다. 그 장수의 기본 방침대로 실행합니다.';
+export const EMPTY_SLOT_TITLE = '빈 칸은 그 장수의 기본 방침대로 실행합니다.';
 export function slotLabel(slot: SlotView, names: ArgNames): SlotLabel {
   if (!slot.explicit) return { kind: 'empty', text: EMPTY_SLOT_TEXT };
   const args = describeArgs(toTurn(slot).args, names);

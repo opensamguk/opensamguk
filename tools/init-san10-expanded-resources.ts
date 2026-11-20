@@ -22,10 +22,13 @@ if (createHash('sha256').update(manifestBytes).digest('hex') !== manifestSha)
 const manifest = JSON.parse(manifestBytes.toString('utf8')) as {
   sourceUrl: string;
   sourceHash: string;
+  resourceVersion?: number;
   map: { path: string; contentHash: string };
   scenarios: { id: string; path: string; contentHash: string }[];
 };
 const mapName = 'san10-expanded';
+const resourceVersion = manifest.resourceVersion ?? 1;
+if (![1, 2, 3].includes(resourceVersion)) throw Error('지원하지 않는 확장판 자원 판입니다.');
 const portraitMap = { portraits: {} };
 const read = async (path: string) => JSON.parse(await readFile(join(directory, path), 'utf8')) as unknown;
 if (
@@ -37,8 +40,10 @@ if (
 const map = operationalMapSchema.parse(await read('map.json'));
 if (
   map.id !== mapName ||
-  map.sites.length !== 322 ||
-  map.routes.length !== 467 ||
+  map.sites.length !== (resourceVersion >= 2 ? 323 : 322) ||
+  map.routes.length !== (resourceVersion >= 2 ? 585 : 467) ||
+  (resourceVersion >= 2 && map.siteClassification !== 'd096') ||
+  (resourceVersion === 3) !== (map.capturableFields === true) ||
   hashState(map) !== manifest.map.contentHash
 )
   throw Error('확장판 지도와 게시 명세가 일치하지 않습니다.');
@@ -53,11 +58,11 @@ const rows = [] as {
   content: Prisma.InputJsonValue;
   contentHash: string;
 }[];
-function add(kind: GameResourceKind, name: string, content: Prisma.InputJsonValue) {
-  rows.push({ kind, name, version: 1, content, contentHash: hashState(content) });
+function add(kind: GameResourceKind, name: string, content: Prisma.InputJsonValue, version = resourceVersion) {
+  rows.push({ kind, name, version, content, contentHash: hashState(content) });
 }
 add('MAP', mapName, map);
-add('PORTRAIT_MAP', 'san10-expanded-portraits', portraitMap);
+add('PORTRAIT_MAP', 'san10-expanded-portraits', portraitMap, 1);
 for (const entry of manifest.scenarios) {
   if (!/^san10-expanded-[a-z0-9]+$/.test(entry.id) || entry.path !== `${entry.id}.json`)
     throw Error('시나리오 경로를 확인하세요.');
@@ -69,35 +74,35 @@ for (const entry of manifest.scenarios) {
   if (
     entry.id === 'san10-expanded-empty' &&
     (scenario.nation.length ||
-      scenario.general.length !== 3011 ||
+      scenario.general.length !== (resourceVersion >= 2 ? 3111 : 3011) ||
       scenario.general.some((row) => row[3] !== 0 || row[8] !== 0))
   )
     throw Error('공백지의 재야 장수 명단을 확인하세요.');
   add('SCENARIO', entry.id, scenario);
 }
 if (mode === '--bootstrap-sql') {
-  add('UNIT_SET', 'expanded', unitSet as Prisma.InputJsonValue);
-  add('STAT_RULES', 'five-stats', statRules as Prisma.InputJsonValue);
+  add('UNIT_SET', 'expanded', unitSet as Prisma.InputJsonValue, 1);
+  add('STAT_RULES', 'five-stats', statRules as Prisma.InputJsonValue, 1);
   const literal = (value: string) => "'" + value.replaceAll("'", "''") + "'";
   const values = rows.map(
     (row) =>
-      `(${literal(row.kind)}, ${literal(row.name)}, ${literal(JSON.stringify(row.content))}, ${literal(row.contentHash)})`,
+      `(${literal(row.kind)}, ${literal(row.name)}, ${row.version}, ${literal(JSON.stringify(row.content))}, ${literal(row.contentHash)})`,
   );
   process.stdout.write(`BEGIN;
 SET LOCAL standard_conforming_strings = on;
 LOCK TABLE public."GameResource" IN SHARE ROW EXCLUSIVE MODE;
-CREATE TEMP TABLE san10_seed (kind public."GameResourceKind", name text, content jsonb, hash text) ON COMMIT DROP;
+CREATE TEMP TABLE san10_seed (kind public."GameResourceKind", name text, version integer, content jsonb, hash text) ON COMMIT DROP;
 INSERT INTO san10_seed VALUES
 ${values.join(',\n')};
 DO $bootstrap$
 BEGIN
-  IF EXISTS (SELECT 1 FROM san10_seed s JOIN public."GameResource" r ON (r.kind, r.name, r.version) = (s.kind, s.name, 1)
+  IF EXISTS (SELECT 1 FROM san10_seed s JOIN public."GameResource" r ON (r.kind, r.name, r.version) = (s.kind, s.name, s.version)
       WHERE r.status <> 'PUBLISHED' OR r.content <> s.content OR r."contentHash" <> s.hash)
   THEN RAISE EXCEPTION 'Published SAN10 resource differs from bootstrap data'; END IF;
 END
 $bootstrap$;
 INSERT INTO public."GameResource" ("id", "kind", "name", "version", "status", "content", "contentHash", "source", "publishedAt")
-SELECT gen_random_uuid()::text, kind, name, 1, 'PUBLISHED', content, hash,
+SELECT gen_random_uuid()::text, kind, name, version, 'PUBLISHED', content, hash,
   CASE WHEN kind IN ('UNIT_SET', 'STAT_RULES') THEN 'resources/NOTICE.md' ELSE ${literal(source)} END, now()
 FROM san10_seed
 ON CONFLICT ("kind", "name", "version") DO NOTHING;

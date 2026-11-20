@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { rngFor } from '@opensamguk/shared';
-import { commandWorld, testUnits } from '../../test/commandFixture';
+import { commandWorld, testUnits } from '../../test/builtinCommandFixture';
 import type { WorldState } from '../model/world';
 import { applyEffects } from './effects';
 import { attack } from './attack';
@@ -221,61 +221,61 @@ describe('T4-33 출병 추출 전 골든', () => {
           "calls": 6,
           "name": "수비 둘과 성벽, 마지막 도시 멸망",
           "next": 0.5024574538692832,
-          "sha256": "bdbf8afb0f0fdd00e7552f4f7c8eb1f215953ad8efe7ece016ec8fe4ff08d8f1",
+          "sha256": "f039b41e966a564e1b58cb05c62247d5ea5a3a6a8566e69d4005f1438274db83",
         },
         {
           "calls": 6,
           "name": "동률 수비의 ID 순서",
           "next": 0.8002542273607105,
-          "sha256": "bdbf8afb0f0fdd00e7552f4f7c8eb1f215953ad8efe7ece016ec8fe4ff08d8f1",
+          "sha256": "f039b41e966a564e1b58cb05c62247d5ea5a3a6a8566e69d4005f1438274db83",
         },
         {
           "calls": 20,
           "name": "열 페이즈 뒤 양쪽 생존",
           "next": 0.7206481471657753,
-          "sha256": "fd504e3f3f0c510459979a067904e6444dfe6ac156f0a83009dae0eab9eff792",
+          "sha256": "3361e25c542b77571d85ec828b9192f78f5cbba1e09a8e06eb394155314eb057",
         },
         {
           "calls": 0,
           "name": "공격군 기아로 전투 전 사기 소진",
           "next": 0.3639177978038788,
-          "sha256": "a3e9c0e93881e02eb1d308ba10624b97bdcec5b4918fd1003fcf899c5b9039b2",
+          "sha256": "668f6b6dff8e62ee480e3d3c77c563a35ae5b8311b834c9eff9f1543019071a7",
         },
         {
           "calls": 4,
           "name": "수비군 기아로 전투 전 사기 소진",
           "next": 0.08207402820698917,
-          "sha256": "e352ea8b51a23395971227e60bfa12e2637fc8b1b127e2dbf70999b71b6bcea3",
+          "sha256": "543c706a37ff8cba75f80abe3869dd603241d7cfff53d80c58fef2244acbe07e",
         },
         {
           "calls": 2,
           "name": "병력 하나씩 동시 전멸",
           "next": 0.2810764138121158,
-          "sha256": "26cc44f7ad3bde6aa0885d433f1752c13c227d1dd09b3e161a86774d3a7ef4f5",
+          "sha256": "af2d84766ba940034112d4b1daea1529cdcb9073759758acfb9a5743a97087e9",
         },
         {
           "calls": 20,
           "name": "양쪽 사기 동시 소진",
           "next": 0.45156482700258493,
-          "sha256": "0437ca955c67d3e1c24a4f4dd70cb03343d0076244661a90d11c6c21e948b310",
+          "sha256": "a571f95bf57084ace93ba532fb8286e42c786f031e19486d545b8d052bae4227",
         },
         {
           "calls": 20,
           "name": "수비 없는 성벽과 방어 보정",
           "next": 0.6770514904055744,
-          "sha256": "20869a40036d986fcff0a33777e0cbb65235a590cb88331ae8dff807056946ad",
+          "sha256": "55022594c46494491d47d99067c964e1fa7b4b9c4697492fcaeca5814722e1ad",
         },
         {
-          "calls": 12,
+          "calls": 20,
           "name": "병종 상성과 양국 기술",
-          "next": 0.6161481768358499,
-          "sha256": "c86c6d8d62008e996a6c099ca507d1cc58972c89a9e53fedb50bf8ad25b71878",
+          "next": 0.1869112327694893,
+          "sha256": "a7661a7418f8142c5b717f9e1e9100789799062b849aaf56631e527c8a2f33bb",
         },
         {
           "calls": 0,
           "name": "수비와 성벽이 없는 도시",
           "next": 0.1679761114064604,
-          "sha256": "279d6dd3923889890198aa0c27dad93b55711d11c9548f3f3b253788c4abf303",
+          "sha256": "851199d49ca10ffcc0c6eafc330219b08454d27c2556fd7b344abb251eba5ec0",
         },
         {
           "calls": 0,
@@ -293,13 +293,13 @@ describe('T4-33 출병 추출 전 골든', () => {
           "calls": 6,
           "name": "수도 함락과 같은 인구 도시 천도",
           "next": 0.9483208600431681,
-          "sha256": "983dc1766037f66ba2471c70a7e8f5a790d0ffae5959dba5aea52f95689d0419",
+          "sha256": "ba44ead6e805f90bd58ff687a3a4dd31bbe47afa0f24f47eec5e0e6812a675b7",
         },
         {
           "calls": 2,
           "name": "훈련 미달과 미등장 수비 제외",
           "next": 0.46699898410588503,
-          "sha256": "ceaae56ab653b62f5c4d99ee8590d57976dbcfc62aa2246f8b03fa1333d8878f",
+          "sha256": "ee8bc879a2b34e6d69ada8919ffbe7c84ecc39890d9d8efa43bb93cb12d38fe6",
         },
       ]
     `);

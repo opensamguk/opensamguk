@@ -28,6 +28,14 @@
 }
 .text {
   min-width: 0;
+  /* 여러 줄 로그(공격 결과 등)는 줄바꿈을 살린다(원작과 같다). */
+  white-space: pre-line;
+}
+/* 개인 기록 줄 끝의 작은 시각(원작 HH:MM) */
+.clock {
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--color-text-muted);
 }
 .headline {
   flex: 1 0 100%;

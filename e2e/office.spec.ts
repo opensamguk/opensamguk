@@ -2,22 +2,20 @@ import { expect, test } from '@playwright/test';
 import { setTimeout as delay } from 'node:timers/promises';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { controlClock } from '../apps/engine/src/world/clock';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld } from './worldFixture';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { createAccount, withE2eDb } from './account';
 import { createGeneralByApi, holdLease, mutate, query, releaseHold, stubPortraits, turns } from './game';
 
 test('AC-M3-12 군주의 지방 임명·교체·해임, 장수 이동과 375px 관직 화면', async ({ browser }, info) => {
   test.setTimeout(180_000);
-  const features = ['office-effects', 'personnel'];
   const { worldId } = await withE2eDb(async (db) => {
     const initial = await loadInitialWorldFromDb(db, { scenario: '1030', map: 'che', seed: 'e2e-office-residence' });
-    return saveInitialWorld(db, initial, {
+    return saveFixtureWorld(db, initial, {
       name: 'E2E 관직 주재',
       turnTermMinutes: 60,
       endYear: 300,
       replayFormat: 3,
-      ruleFeatures: features,
     });
   });
   const hold = await holdLease(worldId);

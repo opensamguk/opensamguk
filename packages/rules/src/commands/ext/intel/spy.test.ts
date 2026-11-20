@@ -23,6 +23,7 @@ function world() {
   const state = commandWorld();
   state.ext = createExtStateWithRegistry(enabled, state, registry)!;
   state.generals[3]!.crewType = 1200;
+  state.campaign!.units.find((unit) => unit.ownerId === 3)!.crewType = 1200;
   state.cities[2]!.trust = 73.25;
   return state;
 }
@@ -169,6 +170,12 @@ describe('AC-P2-07 첩보 규칙', () => {
     state.generals[4]!.cityKey = 2;
     state.generals[5] = { ...target, id: 5, crew: 1000, activeFromYear: 193 };
     state.generals[6] = { ...target, id: 6, crew: 5, activeFromYear: 192, crewType: 1000 };
+    state.campaign!.units.push(
+      { id: 5, ownerId: 5, commanderId: 5, troops: 1000, crewType: 1100, train: 100, atmos: 100 },
+      { id: 6, ownerId: 6, commanderId: 6, troops: 5, crewType: 1000, train: 100, atmos: 100 },
+    );
+    state.campaign!.nextUnitId = 7;
+    state.generals[5]!.crew = state.generals[6]!.crew = 0;
     expect(run(state).intel['1']!['2']).toEqual({
       ...golden(1),
       generals: 2,
@@ -190,8 +197,8 @@ describe('AC-P2-07 첩보 규칙', () => {
       ...golden(1),
       owner: null,
       generals: 1,
-      crew: 100,
-      crewTypes: [{ crewType: 1100, generals: 1 }],
+      crew: 0,
+      crewTypes: [],
     };
     delete expected.tech;
     expect(output.intel['1']!['2']).toStrictEqual(expected);
@@ -298,7 +305,7 @@ describe('AC-P2-07 첩보 규칙', () => {
     expect(intelSlice.validate((roundtrip as WorldState).ext!.intel)).toBe(true);
     for (const off of [null, { general: [], nation: [] }]) {
       expect(createExtStateWithRegistry(off, commandWorld(), registry)).toBeUndefined();
-      expect(Object.hasOwn(commandWorld(), 'ext')).toBe(false);
+      expect(Object.hasOwn(commandWorld(), 'ext')).toBe(true);
     }
   });
 
@@ -433,6 +440,7 @@ describe('AC-P2-07 첩보 규칙', () => {
   });
   it('X7 조각 누락은 예외이고 RNG를 소비하지 않는다', () => {
     const state = commandWorld();
+    delete state.ext;
     const rng = createRng('missing');
     const int = vi.spyOn(rng, 'int');
     expect(() => spy.execute(state, actor, args, rng)).toThrow('intel');

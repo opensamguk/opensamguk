@@ -80,8 +80,8 @@ describe('기수 결과 칸 (T1-27)', () => {
     const region = screen.getByRole('region', { name: '기수 결과' });
     expect(within(region).getByTestId('season-reason').textContent).toBe('천하통일');
     const badge = within(region).getByText('조조');
-    // 색만으로 구별하지 않게 이름을 함께 쓰고, 이름표 바탕이 국가색이다.
-    expect(badge.style.background).toBe('rgb(0, 0, 128)');
+    // 색만으로 구별하지 않게 이름을 함께 쓰고, 이름표 바탕이 국가색이다(칩 그림에 --nation을 곱한다).
+    expect(badge.parentElement!.style.getPropertyValue('--nation').toLowerCase()).toBe('#000080');
     expect(within(region).getByTestId('season-date').textContent).toBe('192년 3월');
     expect(within(region).getByTestId('season-nations').textContent).toBe('1');
     expect(within(region).queryByText('승자 없음')).toBeNull();

@@ -13,7 +13,7 @@ export const SOURCE_LABEL: Record<AdviceItem['source'], string> = {
 };
 
 export const ENDED_REASON = '끝난 판이라 예턴을 바꿀 수 없습니다.';
-export const DRAFT_REASON = '편집 중인 예턴을 저장하거나 취소하면 넣을 수 있습니다';
+export const DRAFT_REASON = '편집 중인 예턴을 먼저 저장하거나 취소하세요';
 export const STALE_TEXT = '다른 곳에서 먼저 바뀌었습니다. 최신 목록을 다시 불러왔습니다.';
 
 export const adviceItemKey = (item: AdviceItem) => `${item.source}:${item.commandKey}:${JSON.stringify(item.args)}`;
@@ -70,7 +70,7 @@ export function putBlockedReason(g: PutGuard): string | null {
   if (g.saving) return '저장하는 중입니다.';
   if (g.pending) return '먼저 편집기의 충돌 안내에서 다시 적용할지 고르세요.';
   if (g.hasDraft) return DRAFT_REASON;
-  if (g.serverRevision === undefined) return '예턴을 불러온 뒤에 넣을 수 있습니다.';
+  if (g.serverRevision === undefined) return '예턴을 불러온 뒤에 넣으세요.';
   if (!g.actorMatches) return '계정이나 장수가 바뀌어 조언을 다시 확인해야 합니다.';
   if (g.fetching || g.serverRevision !== g.basisRevision) return '예턴이 바뀌어 조언을 다시 받는 중입니다.';
   return null;

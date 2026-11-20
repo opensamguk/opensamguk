@@ -1,26 +1,22 @@
-import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, expect, it as test } from 'vitest';
 import { createDb, type Prisma } from '../packages/db/src/index';
 import { rngFor } from '../packages/shared/src/index';
 import type { CommandResult } from '../packages/rules/src/index';
 import { campaignAttack } from '../packages/rules/src/campaign/attack';
-import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
+import { tacticalCommandInitial } from './fixtures/tactical';
+import { applyBattleStep } from '../packages/rules/src/tactical/input';
+import { tacticalBattleReports } from '../packages/rules/src/campaign/attack';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { loadWorld } from '../apps/engine/src/worldLoader';
 import { acquireLease, assertLease, lockLease, releaseLease } from '../apps/engine/src/lease';
 import { persistCommandReports } from '../apps/engine/src/commandPersistence';
 
-// AC-INT-09 보고 PK 회귀. 정식491명에서 만든 통제된 교전 스냅샷의 결과를 실제 DB에 쓴다.
+// AC-INT-09 보고 PK 회귀. 합성 지도에서 만든 통제된 전술 교전 스냅샷의 결과를 실제 DB에 쓴다.
 // 부대·위치·전쟁을 준비한 이 좁은 검사는 정식 플레이·점령·한 기수 인수 증거가 아니다.
 const url = process.env.TEST_DATABASE_URL;
-if (
-  !url ||
-  !['127.0.0.1', 'localhost'].includes(new URL(url).hostname) ||
-  !/^\/[a-z][a-z0-9_]*_test$/.test(new URL(url).pathname)
-)
-  throw new Error('loopback 전용 테스트 DB가 필요합니다.');
+if (!url || !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(new URL(url).pathname)) throw new Error('전용 테스트 DB가 필요합니다.');
 const db = createDb(url);
-let worldId: string | undefined, attackerId: number, defenderId: number, result: CommandResult;
+let worldId: string, attackerId: number, defenderId: number, result: CommandResult;
 let preparation: Promise<void> | undefined, execution: Promise<unknown> | undefined;
 const it = (name: string, action: () => Promise<void>) => test(name, () => (execution = action()));
 beforeEach(async () => {
@@ -43,26 +39,25 @@ async function fenced(action: (tx: Prisma.TransactionClient) => Promise<void>) {
 beforeAll(
   () =>
     (preparation = (async () => {
-      const initial = await loadInitialWorldFromDb(db, {
-        scenario: 'integration191',
-        map: 'integration',
-        statRules: 'five-stats',
-        portraitMap: '191-map',
-        seed: `int09-report-${randomUUID()}`,
-      });
-      initial.ruleFeatures = ['campaign-v1', 'five-stats', 'operational-map', 'personnel', 'policy'];
+      const initial = tacticalCommandInitial();
+      initial.generals[2]!.nationId = 1;
+      initial.generals[2]!.cityKey = 1;
       ({ worldId } = await saveInitialWorld(db, initial, { name: 'INT09 보고 키', turnTermMinutes: 60, endYear: 201 }));
       const state = await db.$transaction((tx) => loadWorld(tx, worldId!));
       const from = Object.values(state.cities).find(
         (city) =>
+          city.kind !== 'FIELD' &&
           city.nationId !== null &&
           city.connections.some(
-            (id) => state.cities[id]!.nationId !== null && state.cities[id]!.nationId !== city.nationId,
+            (id) =>
+              state.cities[id]!.kind !== 'FIELD' &&
+              state.cities[id]!.nationId !== null &&
+              state.cities[id]!.nationId !== city.nationId,
           ),
       )!;
       const target = from.connections
         .map((id) => state.cities[id]!)
-        .find((city) => city.nationId !== null && city.nationId !== from.nationId)!;
+        .find((city) => city.kind !== 'FIELD' && city.nationId !== null && city.nationId !== from.nationId)!;
       const friendly = Object.values(state.generals)
         .filter((general) => general.nationId === from.nationId && general.activeFromYear <= 191)
         .sort((a, b) => b.leadership - a.leadership || a.id - b.id);
@@ -102,9 +97,34 @@ beforeAll(
       state.campaign!.nextUnitId = 5;
       attackerId = owner.id;
       defenderId = defender.id;
+      state.cityResources!.cities[String(from.cityKey)]!.rice = 1_000_000;
       const actor = { generalId: attackerId, tick: 100, unitSet: initial.unitSet };
       expect(campaignAttack.check(state, actor, { cityKey: target.cityKey })).toBeNull();
-      result = campaignAttack.execute(state, actor, { cityKey: target.cityKey }, rngFor('int09-report', 1));
+      const opened = campaignAttack.execute(state, actor, { cityKey: target.cityKey }, rngFor('int09-report', 1));
+      const settled = opened.effects.find((effect) => effect.kind === 'world')!;
+      if (settled.kind !== 'world') throw Error('전술 시작 상태가 없습니다.');
+      const before = settled.state;
+      const battleId = before.campaign!.tactical!.battles[0]!.id;
+      let after = before;
+      for (let step = 0; step < 40; step++) {
+        const battle = after.campaign!.tactical!.battles.find((b) => b.id === battleId)!;
+        if (battle.settled) break;
+        after = applyBattleStep(
+          after,
+          {
+            battleId,
+            now: Math.max(1, battle.deadlineAt),
+            turnTermMinutes: 60,
+            present: false,
+            orders: [],
+            cancel: null,
+          },
+          initial.unitSet,
+          100,
+        );
+      }
+      expect(after.campaign!.tactical!.battles[0]!.settled).toBe(true);
+      result = tacticalBattleReports(before, after, battleId, 100);
       expect(result.reports).toHaveLength(1);
       expect(result.reports![0]).toMatchObject({ generalId: defenderId, text: expect.stringContaining('부곡1') });
       expect(result.reports![0]!.text).toContain('부곡4');

@@ -60,14 +60,8 @@ describe('T4-13 W1 표시 함수', () => {
 });
 
 describe('T4-13 W2 응답 상태', () => {
-  it('꺼진 월드, 재야, 기록 없음, 기록 있음이 서로 다른 화면이다', () => {
-    const { rerender } = render(
-      <IntelRecordsPanel data={{ enabled: false, items: [] }} ronin={false} cities={cities} />,
-    );
-    expect(screen.getByText('이 월드에서는 첩보를 쓰지 않습니다')).toBeTruthy();
-    expect(screen.queryByRole('table')).toBeNull();
-
-    rerender(<IntelRecordsPanel data={enabled([])} ronin cities={cities} />);
+  it('재야, 기록 없음, 기록 있음이 서로 다른 화면이다', () => {
+    const { rerender } = render(<IntelRecordsPanel data={enabled([])} ronin cities={cities} />);
     expect(screen.getByText('국가에 소속되면 나라의 첩보 기록을 봅니다')).toBeTruthy();
 
     rerender(<IntelRecordsPanel data={enabled([])} ronin={false} cities={cities} />);

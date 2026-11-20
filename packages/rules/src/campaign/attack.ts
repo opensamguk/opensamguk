@@ -1,3 +1,6 @@
+import { commandAttackTargets } from '../commandPaths';
+import { captureCounties } from '../cityAffiliation';
+import { marchSupplyArgs, previewMarchSupply, applyMarchSupply, marchForce } from './supply';
 import { z } from 'zod';
 import type { Rng } from '@opensamguk/shared';
 import { BALANCE } from '../balance';
@@ -13,8 +16,10 @@ import { fightCampaignCityGarrison, fightCampaignUnits, fightCampaignWall } from
 import { readCampaignState, type CampaignUnitState } from './state';
 import { readCityResourcesState } from '../cityResources/state';
 import { disbandCityGarrison } from '../cityResources/ownership';
+import { battleBusy, openTacticalBattle } from '../tactical/world';
+import { reputationBattleEvents } from '../review/events';
 
-const argsSchema = z.strictObject({ cityKey: positive });
+const argsSchema = z.strictObject({ cityKey: positive, ...marchSupplyArgs });
 const year = (view: WorldView, tick: number) => view.startYear + Math.floor(tick / (12 * TICKS_PER_MONTH));
 export function campaignAttackingUnits(view: WorldView, actor: Actor) {
   const owner = view.generals[actor.generalId]!;
@@ -61,25 +66,63 @@ function check(view: WorldView, actor: Actor, raw: unknown) {
     return fail('BAD_TARGET', '자기 국가 도시에는 출병할 수 없습니다.');
   if (from?.nationId !== owner.nationId) return fail('NOT_OWN_CITY', '자기 국가 도시에서 출병해야 합니다.');
   if (!from.supplied) return fail('NO_SUPPLY', '보급이 끊긴 도시입니다.');
-  if (!from.connections.includes(target.cityKey)) return fail('NOT_ADJACENT', '연결된 도시가 아닙니다.');
+  const path = commandAttackTargets(view, owner.id).find((row) => row.cityKey === target.cityKey);
+  if (!path) return fail('NOT_ADJACENT', '연결된 도시가 아닙니다.');
+  if (path.blockedBy !== null)
+    return fail('BLOCKED_BY_COUNTY', `${view.cities[path.blockedBy]!.name}: 수비 있는 현이 길을 막습니다.`);
   if (target.nationId !== null && relation(view, owner.nationId, target.nationId)?.state !== 'WAR')
     return fail('NOT_WAR', '교전 중인 국가가 아닙니다.');
   if (Object.values(view.generals).some((general) => general.crew !== 0))
     throw new Error('부곡 월드에 장수 병력을 중복 저장할 수 없습니다.');
   const force = campaignAttackingUnits(view, actor);
+  if (battleBusy(view, { cityKeys: [parsed.data.cityKey], generalIds: [owner.id], unitIds: force.map((u) => u.id) }))
+    return fail('BATTLE_BUSY', '전투 중');
   if (!force.length) return fail('NO_CREW', '같은 거점에 집결한 부곡 병력이나 사기가 부족합니다.');
+  if (force.some((unit) => unit.supply) && force.some((unit) => !unit.supply))
+    return fail('BAD_STATE', '귀환을 마친 뒤 새 부곡과 함께 출병하세요.');
   const all = [...force, ...campaignDefenders(view, actor.tick ?? 0, target.cityKey)];
-  if (view.ruleFeatures?.includes('city-resources-v1'))
-    readCityResourcesState(
-      view.cityResources,
-      view,
-      actor.unitSet?.crewTypes.filter((row) => row.armType > 0).map((row) => row.id),
-    );
+  readCityResourcesState(
+    view.cityResources,
+    view,
+    actor.unitSet?.crewTypes.filter((row) => row.armType > 0).map((row) => row.id),
+  );
   if (
     !actor.unitSet?.crewTypes.some((unit) => unit.id === 1000) ||
     all.some((row) => !actor.unitSet!.crewTypes.some((unit) => unit.id === row.crewType))
   )
     return fail('NO_UNIT_SET', '전투 병종이 없습니다.');
+  if (view.campaign?.supplyLedger) {
+    try {
+      const preview = cloneWorld(view);
+      openTacticalBattle(
+        preview,
+        actor.tick ?? 0,
+        force as CampaignUnitState[],
+        campaignDefenders(view, actor.tick ?? 0, target.cityKey) as CampaignUnitState[],
+        target.cityKey,
+        actor.unitSet!,
+        parsed.data,
+      );
+    } catch {
+      return fail('BAD_TARGET', '전장 지도·배치·병종을 사용할 수 없습니다.');
+    }
+    let preview;
+    const army = marchForce(force);
+    try {
+      preview = previewMarchSupply(view, army, parsed.data.cityKey, parsed.data);
+    } catch {
+      return fail('BAD_TARGET', '행군 경로를 사용할 수 없습니다.');
+    }
+    if (preview) {
+      if (army.supply && parsed.data.supplyLoad !== undefined)
+        return fail('BAD_ARGS', '행군 중에는 보급을 다시 적재할 수 없습니다.');
+      for (const key of ['routeRevision', 'ownershipRevision', 'diplomacyRevision'] as const)
+        if (parsed.data[key] !== undefined && parsed.data[key] !== preview[key])
+          return fail('STALE_SUPPLY_PREVIEW', '보급 미리보기가 오래됐습니다. 다시 확인하세요.');
+      if ((view.cityResources?.cities[String(owner.cityKey)]?.rice ?? 0) < preview.riceCost)
+        return fail('NO_RICE', '출병 도시의 쌀이 부족합니다.');
+    }
+  }
   return null;
 }
 function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): CommandResult {
@@ -90,18 +133,57 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
   let state = cloneWorld(view);
   const nationId = state.generals[ownerId]!.nationId!,
     defendingNation = state.cities[cityKey]!.nationId;
-  const attackingIds = campaignAttackingUnits(state, actor).map((unit) => unit.id);
+  const force = campaignAttackingUnits(state, actor);
+  const marchLogs: string[] = [];
+  if (!applyMarchSupply(state, force, cityKey, argsSchema.parse(raw)))
+    marchLogs.push('보급 고갈: 원정 병력을 해산하고 장수들이 복귀했습니다.');
+  const attackingIds = force
+    .map((unit) => unit.id)
+    .filter((id) => state.campaign!.units.some((unit) => unit.id === id));
+  if (!attackingIds.length) {
+    state.campaign!.revision++;
+    return {
+      ...success(marchLogs.join('\n')),
+      effects: [{ kind: 'world', state }],
+      history: [{ nationId, text: marchLogs.join('; ') }],
+    };
+  }
+  if (state.cities[cityKey]!.state != null) {
+    state.cities[cityKey]!.state = 43;
+    state.cities[cityKey]!.stateTerm = 3;
+  }
   // 출병 시작 때의 수비 순서를 고정한다. 사람의 예약이나 다른 소유자의 부곡을 공격 편성에 넣지 않는다.
   const defendingIds = campaignDefenders(state, actor.tick ?? 0, cityKey).map((unit) => unit.id);
-  const cityResources = state.ruleFeatures?.includes('city-resources-v1') ?? false;
-  const cityDefense = () => (cityResources ? state.cityResources!.cities[String(cityKey)]!.garrison : []);
+  if (
+    state.campaign!.supplyLedger &&
+    !(
+      state.cities[cityKey]!.kind === 'FIELD' &&
+      !defendingIds.length &&
+      !state.cityResources?.cities[String(cityKey)]?.garrison.some((u) => u.troops > 0)
+    )
+  ) {
+    const battle = openTacticalBattle(
+      state,
+      actor.tick ?? 0,
+      attackingIds.map((id) => state.campaign!.units.find((u) => u.id === id)!),
+      defendingIds.map((id) => state.campaign!.units.find((u) => u.id === id)!),
+      cityKey,
+      actor.unitSet!,
+      argsSchema.parse(raw),
+    );
+    return {
+      ...success(`${state.cities[cityKey]!.name} 작전 회의: ${battle.id}`),
+      effects: [{ kind: 'world', state }],
+      attackTarget: { cityKey, defendingNationId: defendingNation },
+    };
+  }
+  const cityDefense = () => state.cityResources!.cities[String(cityKey)]!.garrison;
   const alive = (unit: CampaignUnitState) => unit.troops > 0 && unit.atmos > 0;
   const get = (id: number) => state.campaign!.units.find((unit) => unit.id === id)!;
-  const rounds: string[] = [],
+  const rounds: string[] = [...marchLogs],
     reports: NonNullable<CommandResult['reports']> = [];
   const battleAwards: NonNullable<CommandResult['battleAwards']> = [];
   const battleOutcomes: NonNullable<CommandResult['battleOutcomes']> = [];
-  const reputation = state.ruleFeatures?.includes('reputation-v1');
   for (const attackerId of attackingIds) {
     let attackerFirstVolleyUsed = false;
     const fightWall = (openingSkirmish = false) => {
@@ -134,10 +216,10 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
         d = get(defenderId);
       if (alive(a) && !alive(d)) {
         battleAwards.push({ generalId: attackerCommander, wins: 1, captures: 0 });
-        if (reputation) battleOutcomes.push({ winnerId: attackerCommander, loserId: defenderCommander });
+        battleOutcomes.push({ winnerId: attackerCommander, loserId: defenderCommander });
       } else if (!alive(a) && alive(d)) {
         battleAwards.push({ generalId: defenderCommander, wins: 1, captures: 0 });
-        if (reputation) battleOutcomes.push({ winnerId: defenderCommander, loserId: attackerCommander });
+        battleOutcomes.push({ winnerId: defenderCommander, loserId: attackerCommander });
       }
       const text = `${state.generals[attackerCommander]!.name} 부곡${attackerId} 대 ${state.generals[defenderCommander]!.name} 부곡${defenderId}: 공격 ${a.troops}명, 수비 ${d.troops}명`;
       rounds.push(text);
@@ -178,7 +260,7 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
     attackingIds.some((id) => alive(get(id)));
   const history: NonNullable<CommandResult['history']> = [];
   if (captured) {
-    if (cityResources) {
+    {
       const outcome = disbandCityGarrison(state, cityKey);
       state = outcome.state;
       rounds.push(outcome.text);
@@ -186,6 +268,7 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
     battleAwards.push({ generalId: ownerId, wins: 0, captures: 1 });
     const city = state.cities[cityKey]!;
     city.nationId = nationId;
+    captureCounties(state, city.cityKey);
     city.defence = 0;
     city.security = Math.round(city.security * BALANCE.CAPTURE_SECURITY_FACTOR);
     city.trust = Math.max(0, city.trust - BALANCE.CAPTURE_TRUST_LOSS);
@@ -193,10 +276,10 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
     if (defendingNation !== null) {
       const nation = state.nations[defendingNation]!;
       const remaining = Object.values(state.cities)
-        .filter((row) => row.nationId === defendingNation && row.kind !== 'PASS')
+        .filter((row) => row.nationId === defendingNation && row.kind !== 'PASS' && row.kind !== 'FIELD')
         .sort((a, b) => b.population - a.population || a.cityKey - b.cityKey);
       if (!remaining.length) {
-        if (cityResources) {
+        {
           for (const neutralized of Object.values(state.cities).filter((row) => row.nationId === defendingNation)) {
             const ended = disbandCityGarrison(state, neutralized.cityKey);
             state = ended.state;
@@ -218,6 +301,7 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
   for (const report of reports) report.text += `, ${captured ? '점령' : '수비 유지'}`;
   history.push({ nationId, text: `${rounds.join('; ')}; ${summary}` });
   if (defendingNation !== null) history.push({ nationId: defendingNation, text: summary });
+  state.campaign!.units = state.campaign!.units.filter((unit) => unit.troops > 0);
   readCampaignState(state.campaign, state);
   return {
     ...success(`${rounds.join('\n')}\n${summary}`),
@@ -226,8 +310,51 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
     history,
     battleAwards,
     attackTarget: { cityKey, defendingNationId: defendingNation },
-    ...(reputation ? { battleOutcomes } : {}),
+    ...{ battleOutcomes },
   };
+}
+
+// 엔진 저장과 재생 결과의 대조가 같은 정산 경계와 참여자를 사용한다.
+export function tacticalBattleReports(
+  before: WorldView,
+  after: WorldView,
+  battleId: string,
+  tick: number,
+  cancelled = false,
+): CommandResult {
+  const result: CommandResult = { ...success(''), effects: [], reports: [], battleAwards: [], history: [] };
+  const old = before.campaign?.tactical?.battles.find((b) => b.id === battleId);
+  const battle = after.campaign?.tactical?.battles.find((b) => b.id === battleId);
+  if (!old || old.settled || !battle?.settled || battle.fault) return result;
+  const attackerId = battle.units.find((u) => u.side === 'attack' && u.ownerId !== null)?.ownerId;
+  if (attackerId == null) return result;
+  const target = before.cities[battle.targetCityKey]!;
+  const captured =
+    battle.result === 'attack' && after.cities[target.cityKey]?.nationId === battle.sides.attack.nationId;
+  const summary = `${before.generals[attackerId]!.name} ${target.name} ${captured ? '점령' : '점령 실패'}: ${battle.reason ?? ''}`;
+  const defenders = [
+    ...new Set(battle.units.filter((u) => u.side === 'defend' && u.commanderId !== null).map((u) => u.commanderId!)),
+  ];
+  for (const generalId of defenders)
+    result.reports!.push({
+      generalId,
+      text: `${summary}; ${battle.units.map((u) => `${u.sourceId === null ? '수비병' : `부곡${u.sourceId}`} ${u.troops}명`).join('; ')}`,
+    });
+  // 재생이 기록하는 승패·점령 사건과 같은 계산을 전공 저장에도 쓴다.
+  for (const event of reputationBattleEvents(before, after, tick, cancelled ? battleId : undefined)) {
+    if (event.data.city?.cityKey !== target.cityKey) continue;
+    if (event.kind === 'victory') result.battleAwards!.push({ generalId: event.generalId, wins: 1, captures: 0 });
+    if (event.kind === 'conquest') result.battleAwards!.push({ generalId: attackerId, wins: 0, captures: 1 });
+  }
+  for (const nationId of new Set([battle.sides.attack.nationId, battle.sides.defend.nationId])) {
+    if (nationId === null) continue;
+    const destroyed = before.nations[nationId] && !after.nations[nationId];
+    result.history!.push({
+      nationId,
+      text: destroyed ? `${before.nations[nationId]!.name} 멸망, 소속 장수 재야; ${summary}` : summary,
+    });
+  }
+  return result;
 }
 
 export const campaignAttack: CommandDef = {

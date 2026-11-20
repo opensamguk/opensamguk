@@ -12,11 +12,11 @@ import { authenticate, newSession } from '../apps/server/src/auth/session';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { createSanction, liftSanction } from '../apps/server/src/admin/sanctionStore';
 import { changeAdminRole } from '../apps/server/src/admin/roleStore';
-import { testDatabaseUrl } from './test-database';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
 import { initializeResources } from './init-resources';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { initializeIntegrationResources } from './integration-resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -34,11 +34,10 @@ const { Client } = createRequire(requireDb.resolve('@prisma/adapter-pg'))('pg') 
 };
 if (!process.env.TEST_DATABASE_URL) throw new Error('전용 테스트 DB가 필요합니다.');
 const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-if (!['localhost', '127.0.0.1'].includes(source.hostname)) throw new Error('loopback 시험 서버가 필요합니다.');
 for (const key of source.searchParams.keys())
   if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
     throw new Error('접속 대상 질의 인자는 쓸 수 없습니다.');
-const name = `t305_sanction_${randomUUID().replaceAll('-', '')}_test`;
+const name = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
 const adminUrl = new URL(source),
   target = new URL(source);
 adminUrl.pathname = '/postgres';
@@ -127,8 +126,17 @@ async function advanceRenewing(worldId: string, tick: number) {
 async function settle() {
   while (executions.size) await Promise.allSettled([...executions]);
 }
-const catalog = async () =>
-  (await admin.query('SELECT datname,oid::text AS oid FROM pg_database ORDER BY datname')).rows;
+const catalog = async () => {
+  const rows = (await admin.query('SELECT datname,oid::text AS oid FROM pg_database ORDER BY datname')).rows;
+  // CI의 다른 담당 DB만 비교에서 빼고 자기 DB·개발 DB의 식별자는 계속 확인한다.
+  return process.env.CI_GREEN_DATABASE
+    ? rows.filter(
+        (row) =>
+          row.datname === process.env.CI_GREEN_DATABASE ||
+          !/^opensamguk_ci_green_[a-z0-9]+_test$/.test(String(row.datname)),
+      )
+    : rows;
+};
 beforeEach(settle);
 async function user(
   role: 'USER' | 'ADMIN' = 'USER',
@@ -888,7 +896,7 @@ it('제재 트랜잭션 뒤 대기 중이던 실제 로그인은 새 세션을 �
     await creating;
     const result = await loggingIn;
     expect(result.status).toBe(401);
-    expect(result.body[0].error.data.code).toBe('UNAUTHORIZED');
+    expect(result.body).toMatchObject([{ error: { data: { code: 'UNAUTHORIZED' } } }]);
     expect(result.cookie).toBe(null);
     expect(await db.session.count({ where: { userId: victim.id } })).toBe(0);
   } catch (error) {
@@ -934,15 +942,6 @@ it('정식 두191년 월드에서21개 변경 차단·본인 조회·같은 월�
     portraitMap: '191-map',
     seed: 'sanction-formal-191',
   });
-  initial.ruleFeatures = [
-    'campaign-v1',
-    'five-stats',
-    'operational-map',
-    'personnel',
-    'policy',
-    'stratagem-basic',
-    'treaty',
-  ];
   expect(initial.nations).toHaveLength(21);
   expect(initial.generals).toHaveLength(491);
   for (const name of ['제재 월드', '허용 월드']) {
@@ -960,6 +959,7 @@ it('정식 두191년 월드에서21개 변경 차단·본인 조회·같은 월�
           intel: 55,
           politics: 55,
           charm: 55,
+          sex: 'MALE' as const,
           portraitId: null,
         },
         sid,
@@ -992,6 +992,7 @@ it('정식 두191년 월드에서21개 변경 차단·본인 조회·같은 월�
             intel: 55,
             politics: 55,
             charm: 55,
+            sex: 'MALE' as const,
             portraitId: null,
           },
           otherSid,
@@ -1053,7 +1054,45 @@ it('정식 두191년 월드에서21개 변경 차단·본인 조회·같은 월�
   const guarded = Object.entries(procedures)
     .filter(([, procedure]) => procedure._def.meta?.worldSanction)
     .map(([path]) => path);
-  expect(guarded).toHaveLength(30);
+  expect([...guarded].sort()).toEqual([
+    'battle.council.set',
+    'battle.plan.set',
+    'battle.presence.heartbeat',
+    'battle.turn.submit',
+    'campaign.order',
+    'campaign.relationship',
+    'campaign.unit',
+    'cityResources.allocate',
+    'entry.possess',
+    'general.create',
+    'general.setPolicy',
+    'governance.submit',
+    'intel.records',
+    'lineage.submit',
+    'logistics.submit',
+    'message.markRead',
+    'message.send',
+    'nationTurns.edit',
+    'nationTurns.set',
+    'notice.nation.markSeen',
+    'notice.nation.set',
+    'offers.respond',
+    'operation.close',
+    'operation.create',
+    'personnel.appoint',
+    'personnel.dismiss',
+    'proposals.cancel',
+    'proposals.create',
+    'proposals.respond',
+    'records.season',
+    'relations.list',
+    'stratagemCards.setTrap',
+    'treaty.break',
+    'treaty.propose',
+    'treaty.respond',
+    'turns.edit',
+    'turns.set',
+  ]);
   expect(guarded).toContain('relations.list');
   expect(guarded).toContain('records.season');
   expect(guarded).toContain('intel.records');
@@ -1065,9 +1104,7 @@ it('정식 두191년 월드에서21개 변경 차단·본인 조회·같은 월�
   expect(guarded).toContain('cityResources.allocate');
   // AC-INT-19B: 장수 지시 접수도 월드 제재 대상이다.
   expect(guarded).toContain('campaign.order');
-  expect(
-    (await db.world.findUniqueOrThrow({ where: { id: worldId }, select: { ruleFeatures: true } })).ruleFeatures,
-  ).not.toContain('city-resources-v1');
+  expect((await db.world.findUniqueOrThrow({ where: { id: worldId } })).cityResourcesState).not.toBeNull();
   const cityInput = {
     worldId,
     requestId: randomUUID(),

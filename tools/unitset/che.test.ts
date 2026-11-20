@@ -4,7 +4,7 @@ import { simulateBattle } from '../../packages/rules/src/battle/simulate';
 import { campaignAttack } from '../../packages/rules/src/campaign/attack';
 import { emptyCampaignState } from '../../packages/rules/src/campaign/state';
 import { emptyCityResourcesState } from '../../packages/rules/src/cityResources/state';
-import { attack } from '../../packages/rules/src/commands/attack';
+import { resolverForRuleFeatures } from '../../packages/rules/src/ruleCommands';
 import { commandWorld } from '../../packages/rules/test/commandFixture';
 import { rngFor } from '../../packages/shared/src/index';
 import { buildInitialWorld } from '../../packages/rules/src/world/bootstrap';
@@ -341,12 +341,17 @@ it.each([false, true])('목우의 저지는 수비측일 때만 발동한다 (�
   expect(result.defender.atmos).toBe(0);
 });
 
-it.each(['장수', '부곡', '두 번째 부곡'] as const)('%s 출병에서 정란의 선제사격을 한 번만 적용한다', (kind) => {
+it.each(['등록 명령', '부곡', '두 번째 부곡'] as const)('%s 출병에서 정란의 선제사격을 한 번만 적용한다', (kind) => {
   const world = commandWorld();
-  world.ruleFeatures = ['battle-affinity-v2'];
+  // 보급 원장 없는 즉시 교전 경로에서 병종의 선제사격 RNG 소비를 검사한다.
+  world.campaign = {
+    ...emptyCampaignState(world, 'che-sortie', 'sourced-fixture'),
+    units: world.campaign!.units,
+    nextUnitId: world.campaign!.nextUnitId,
+  };
   Object.assign(world.cities[2]!, { wall: 5000, wallMax: 5000, defence: 1500, defenceMax: 1500 });
-  world.generals[1]!.crewType = 1500;
-  world.generals[2]!.crewType = 1200;
+  world.campaign!.units[0]!.crewType = 1500;
+  world.campaign!.units[1]!.crewType = 1200;
   let calls = 0;
   const seed = rngFor('che-1500-sortie', 1);
   const rng = {
@@ -358,42 +363,28 @@ it.each(['장수', '부곡', '두 번째 부곡'] as const)('%s 출병에서 정
   };
   const actor = { generalId: 1, tick: 100, unitSet };
   const target = { cityKey: 2 };
-  if (kind !== '장수') {
-    world.ruleFeatures.push('five-stats', 'city-resources-v1');
+  {
     for (const general of Object.values(world.generals)) Object.assign(general, { politics: 60, charm: 55 });
-    world.campaign = emptyCampaignState(world, 'che-sortie', 'sourced-fixture');
     world.cityResources = emptyCityResourcesState(world);
     const cityResource = world.cityResources.cities['2']!;
     cityResource.rice = 100;
     cityResource.garrison = [{ crewType: 1200, troops: 10, train: 100, atmos: 100 }];
-    world.campaign.units = [1, 2, 3].map((id) => {
-      const general = world.generals[id]!;
-      return {
-        id,
-        ownerId: id,
-        commanderId: id,
-        troops: general.crew,
-        crewType: general.crewType,
-        train: 100,
-        atmos: 100,
-      };
-    });
-    world.campaign.nextUnitId = 4;
     if (kind === '두 번째 부곡') {
-      const first = world.campaign.units[0]!;
-      world.campaign.units.push({ ...first, id: 4, troops: first.troops - 1 });
-      world.campaign.nextUnitId = 5;
+      const first = world.campaign!.units[0]!;
+      world.campaign!.units.push({ ...first, id: 4, troops: first.troops - 1 });
+      world.campaign!.nextUnitId = 5;
       first.troops = 1;
     }
-    for (const general of Object.values(world.generals)) general.crew = 0;
   }
-  const command = kind === '장수' ? attack : campaignAttack;
+  expect(Object.values(world.generals).every(({ crew }) => crew === 0)).toBe(true);
+  expect(world.campaign!.units.every(({ troops }) => troops > 0)).toBe(true);
+  const command = kind === '등록 명령' ? resolverForRuleFeatures(world)!.get('attack')! : campaignAttack;
   const result = command.execute(world, actor, target, rng);
   const rounds = result.logs[0]!.text.split('\n');
   const openingCount = kind === '두 번째 부곡' ? 2 : 1;
   expect(rounds.filter((text) => text.includes('성벽 선제 교전'))).toHaveLength(openingCount);
   expect(rounds.filter((text) => text.includes('성벽 교전'))).toHaveLength(1);
   expect(result.reports?.map(({ generalId }) => generalId)).toEqual([2, 3]);
-  // 양쪽 성벽 선제 2, 궁병 수비 3, 보병 수비 2, 본공성 20. 부곡은 도시 궁병 수비 3이 더해진다.
-  expect(calls).toBe(openingCount * 2 + 3 + 2 + 20 + (kind === '장수' ? 0 : 3));
+  // 양쪽 성벽 선제 2, 궁병 수비 3, 보병 수비 2, 본공성 20, 도시 궁병 수비 3.
+  expect(calls).toBe(openingCount * 2 + 3 + 2 + 20 + 3);
 });

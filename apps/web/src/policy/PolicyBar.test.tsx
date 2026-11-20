@@ -136,7 +136,7 @@ describe('기본 방침 고르기', () => {
     expect(select).toHaveProperty('value', 'drill');
     expect(select).toHaveProperty('disabled', true);
     expect(screen.getByTestId('policy-sentence').textContent).toBe(
-      '빈 칸은 농지 개간을 합니다. 실패하면 휴식합니다. 엔진이 처리하면 훈련으로 바뀝니다.',
+      '빈 칸은 농지 개간을 합니다. 실패하면 휴식합니다. 처리되면 훈련으로 바뀝니다.',
     );
   });
 

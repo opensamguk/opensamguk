@@ -2,7 +2,7 @@
 import type { AppRouter } from '@opensamguk/server/router';
 import type { inferRouterOutputs } from '@trpc/server';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { createTRPCClient, TRPCClientError, type TRPCLink } from '@trpc/client';
 import { observable } from '@trpc/server/observable';
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
@@ -210,8 +210,12 @@ describe('AC-INT-19C 장수 지시 화면', () => {
   it('기존 명령 선택기를 사용하고 발송 직전 최신 관계·revision을 읽는다', async () => {
     const view = mount();
     fireEvent.change(await screen.findByLabelText('받을 장수'), { target: { value: '2' } });
-    fireEvent.click(await screen.findByRole('radio', { name: '농지 개간' }));
-    fireEvent.click(screen.getByRole('button', { name: '보낼 지시에 넣기' }));
+    // 명령은 띠의 묶음 패를 눌러 뜬 세부 명령에서 고르고, 인자 없는 명령은 누르는 순간 보낼 지시에 들어간다.
+    fireEvent.click(await screen.findByRole('button', { name: '내정' }));
+    fireEvent.click(
+      within(screen.getByRole('group', { name: '내정 세부 명령' })).getByRole('button', { name: '농지 개간' }),
+    );
+    expect(screen.getByText(/선택한 지시: 농지 개간/)).toBeTruthy();
     view.setBoard({ ...base, revision: 9 });
     fireEvent.click(screen.getByRole('button', { name: '지시 보내기' }));
     await waitFor(() => expect(view.mutations).toHaveLength(1));

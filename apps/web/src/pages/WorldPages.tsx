@@ -87,7 +87,6 @@ export function MapPage() {
 export function CityPage({ cityKeyParam }: { cityKeyParam: string }) {
   const worldId = useWorldId();
   const map = useWorldMap(worldId);
-  const summary = useWorldSummary(worldId);
   const navigate = useNavigate();
   const cityKey = /^[1-9][0-9]{0,9}$/.test(cityKeyParam) ? Number(cityKeyParam) : null;
   const name = cityKey === null ? undefined : map.data?.cities.find((city) => city.key === cityKey)?.name;
@@ -105,7 +104,6 @@ export function CityPage({ cityKeyParam }: { cityKeyParam: string }) {
             worldId={worldId}
             cityKey={cityKey}
             nations={map.data?.nations ?? []}
-            logisticsEnabled={summary.data?.logisticsEnabled === true}
             onSelectCity={(key) =>
               void navigate({ to: '/w/$worldId/city/$cityKey', params: { worldId, cityKey: String(key) } })
             }
@@ -149,7 +147,7 @@ export function NationPage({ nationIdParam }: { nationIdParam: string }) {
             <NationFinanceGrid nation={nation.data} />
             <NationExtras worldId={worldId} nation={nation.data} />
           </Panel>
-          <Panel title="소유 도시·소속 장수">
+          <Panel title="소유 도시와 소속 장수">
             <NationTables worldId={worldId} nationId={nationId} />
           </Panel>
         </>

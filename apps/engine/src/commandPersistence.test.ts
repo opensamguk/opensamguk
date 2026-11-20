@@ -1,5 +1,5 @@
 import type { Prisma } from '@opensamguk/db';
-import { toWorldState, type WorldState } from '@opensamguk/rules';
+import { initialReplayState, providedRuleData, type WorldState } from '@opensamguk/rules';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { monthlyFixture } from '../test/monthlyFixture';
 import { persistCommandState } from './commandPersistence';
@@ -7,7 +7,11 @@ import { persistEffects } from './persist';
 import { loadWorld } from './worldLoader';
 
 vi.mock('./worldLoader', () => ({ loadWorld: vi.fn() }));
-beforeEach(() => vi.clearAllMocks());
+let initial: Awaited<ReturnType<typeof monthlyFixture>>;
+beforeEach(async () => {
+  vi.clearAllMocks();
+  initial = await monthlyFixture();
+});
 
 const worldId = '00000000-0000-4000-8000-000000000001';
 const at = { sequence: 7, tick: 100 };
@@ -23,9 +27,26 @@ function transaction() {
     nation: { create: write('nation.create'), update: write('nation.update'), delete: write('nation.delete') },
     city: { update: write('city.update') },
     general: { update: write('general.update') },
+    commandProposal: { updateMany: write('commandProposal.updateMany') },
     diplomacy: { deleteMany: write('diplomacy.deleteMany'), createMany: write('diplomacy.createMany') },
     nationTurn: { deleteMany: write('nationTurn.deleteMany'), createMany: write('nationTurn.createMany') },
-    world: { update: write('world.update') },
+    world: {
+      update: write('world.update'),
+      updateMany: vi.fn((...args: unknown[]) => {
+        calls.push({ method: 'world.updateMany', args: structuredClone(args) });
+        return { count: 1 };
+      }),
+      findUniqueOrThrow: vi.fn(async () => ({
+        unitSet: initial.unitSet,
+        replayOrigin: {
+          version: 3,
+          initial,
+          initialStateHash: '',
+          resourceHash: '',
+          featureData: providedRuleData(initial, 60),
+        },
+      })),
+    },
     removedNation: { create: write('removedNation.create') },
     publicNationEvent: { createMany: write('publicNationEvent.createMany') },
     $executeRaw: write('$executeRaw'),
@@ -35,7 +56,7 @@ function transaction() {
 }
 
 async function transition(): Promise<{ before: WorldState; after: WorldState }> {
-  const before = toWorldState(await monthlyFixture());
+  const before = initialReplayState(await monthlyFixture()).state;
   const after = structuredClone(before);
   after.generals[1]!.gold += 1;
   after.generals[1]!.nextTurnTick += 30_000;
@@ -81,7 +102,13 @@ it('같은 트랜잭션의 이전 상태를 넘기면 재조회 없이 기존과
     args: [
       {
         data: expect.arrayContaining([
-          { worldId, ...at, kind: 'fall', text: `${before.nations[2]!.name} 멸망` },
+          {
+            worldId,
+            ...at,
+            kind: 'fall',
+            text: `${before.nations[2]!.name} 멸망`,
+            nations: [{ id: 2, name: before.nations[2]!.name, color: before.nations[2]!.color }],
+          },
           ...Object.values(before.cities)
             .filter((city) => city.nationId === 2)
             .map((city) => ({
@@ -89,6 +116,7 @@ it('같은 트랜잭션의 이전 상태를 넘기면 재조회 없이 기존과
               ...at,
               kind: 'capture',
               text: `${before.nations[1]!.name}의 ${city.name} 점령`,
+              nations: [{ id: 1, name: before.nations[1]!.name, color: before.nations[1]!.color }],
             })),
         ]),
       },
@@ -101,7 +129,7 @@ it('같은 트랜잭션의 이전 상태를 넘기면 재조회 없이 기존과
 });
 
 it('이전 상태와 같은 결과는 조회와 행 쓰기를 모두 생략한다', async () => {
-  const before = toWorldState(await monthlyFixture());
+  const before = initialReplayState(await monthlyFixture()).state;
   const supplied = transaction();
   await persistCommandState(supplied.tx, worldId, structuredClone(before), at, before);
   expect(loadWorld).not.toHaveBeenCalled();
@@ -122,6 +150,23 @@ it('월드 효과도 이전 상태를 전달하고 기존 저장 요청과 원�
   expect(loadWorld).not.toHaveBeenCalled();
   expect(supplied.calls).toEqual(legacy.calls);
   expect(before).toEqual(original);
+});
+
+it('인사 기능에서 소속·직위 전환이 제안 원장을 영구 종료한다', async () => {
+  const { before } = await transition();
+  const next = structuredClone(before);
+  next.generals[1]!.officerLevel = before.generals[1]!.officerLevel === 12 ? 1 : 12;
+  const f = transaction();
+  await persistCommandState(f.tx, worldId, next, at, before);
+  expect(f.calls).toContainEqual({
+    method: 'commandProposal.updateMany',
+    args: [
+      {
+        where: { worldId, proposerId: { in: [1] }, status: 'PENDING' },
+        data: { status: 'EXPIRED' },
+      },
+    ],
+  });
 });
 
 it('후속 직책 저장은 새 국가 생성 뒤와 멸망 국가의 연쇄 삭제 전에 한 번 실행한다', async () => {

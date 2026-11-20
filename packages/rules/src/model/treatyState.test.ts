@@ -1,3 +1,4 @@
+import { extRegistryForRuleFeatures } from '../commands/ext/state';
 import { expect, it } from 'vitest';
 import { commandWorld } from '../../test/commandFixture';
 import { runGeneralTurn, type TreatyState, type WorldState } from '../index';
@@ -61,15 +62,14 @@ it('조약 없는 월드의 복제는 기본 키와 직렬화 값을 유지한�
   const world = commandWorld();
   const next = cloneWorld(world);
   expect(Object.hasOwn(world, 'treaties')).toBe(false);
-  expect(Object.keys(next)).toEqual(Object.keys(world));
-  expect(JSON.stringify(next)).toBe(JSON.stringify(world));
+  expect(next).toEqual(world);
   expect(Object.hasOwn(next, 'treaties')).toBe(false);
   const empty = cloneWorld({ ...world, treaties: [] });
   expect(Object.hasOwn(empty, 'treaties')).toBe(false);
-  expect(JSON.stringify(empty)).toBe(JSON.stringify(world));
+  expect(empty).toEqual(world);
 });
 
-it.each([cloneWorld, (world: WorldState) => cloneWorldWithRegistry(world, { slices: [], bindings: [] })])(
+it.each([cloneWorld, (world: WorldState) => cloneWorldWithRegistry(world, extRegistryForRuleFeatures())])(
   '조약 복제는 registry와 무관하게 ACTIVE와 null 기한, 중첩 조항을 분리한다 (%#)',
   (clone) => {
     const world = treatyWorld();

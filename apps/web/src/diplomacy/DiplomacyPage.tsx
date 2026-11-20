@@ -226,7 +226,6 @@ function Diplomacy({
 
       <nav className={styles.tabs} aria-label="외교실 탭">
         {DIPLOMACY_TABS.map((key) => {
-          if (key === 'trust' && !head?.breakEnabled) return null;
           const count = key === 'write' || !head ? null : treatiesForTab(items, key).length;
           return (
             <Link
@@ -265,18 +264,12 @@ function Diplomacy({
           <RelationGrid worldId={worldId} ownNationId={ownNationId} />
         </>
       ) : tab === 'trust' ? (
-        head.breakEnabled ? (
-          <TrustTable worldId={worldId} />
-        ) : (
-          <EmptyState title="신의 기능을 쓰지 않는 월드입니다" />
-        )
+        <TrustTable worldId={worldId} />
       ) : tab === 'write' ? (
         head.canPropose.ok ? (
           <TreatyComposer
             worldId={worldId}
             targets={head.targets}
-            tradeEnabled={head.tradeEnabled === true}
-            expandedEnabled={head.expandedEnabled === true}
             ownNationId={ownNationId}
             map={map.data}
             busyFor={(toNationId) => {
@@ -476,12 +469,12 @@ function NationTable({
   const withNation = (id: number) => items.filter((t) => t.fromNationId === id || t.toNationId === id);
   const at = ranking.data?.at;
   const caption = ranking.isError
-    ? '국력·장수·도시를 불러오지 못했습니다.'
+    ? '국력, 장수, 도시를 불러오지 못했습니다.'
     : !ranking.data
-      ? '국력·장수·도시를 불러오는 중입니다.'
+      ? '국력, 장수, 도시를 불러오는 중입니다.'
       : at
-        ? `국력·장수·도시는 ${at.year}년 ${at.month}월 정산 기준입니다.`
-        : '국력·장수·도시는 아직 정산 전입니다.';
+        ? `국력, 장수, 도시는 ${at.year}년 ${at.month}월 정산 기준입니다.`
+        : '국력, 장수, 도시는 아직 정산 전입니다.';
   return (
     <div className={styles.sheet}>
       <table className={styles.table} data-testid="nation-relations">

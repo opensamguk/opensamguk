@@ -16,7 +16,6 @@ beforeAll(async () => {
 });
 function fixture() {
   const state = toWorldState(initial);
-  state.ruleFeatures = ['campaign-v1', 'five-stats', 'operational-map', 'personnel', 'policy'];
   for (const general of Object.values(state.generals)) Object.assign(general, { politics: 60, charm: 55, crew: 0 });
   state.campaign = emptyCampaignState(state, 'storage-test-seed', 'source-scenario');
   const execute = vi.fn().mockResolvedValue(1);
@@ -25,11 +24,13 @@ function fixture() {
 }
 
 describe('AC-INT-06 휘하 저장 경계', () => {
-  it('꺼진 월드는 기존 병력을 보존하고 저장 상태가 없을 때만 허용한다', () => {
+  it('AC-INT-28 부곡 원장 누락과 General.crew 중복 병력을 거부한다', () => {
     const state = toWorldState(initial);
     state.generals[1]!.crew = 123;
-    expect(readStoredCampaign(null, state, 'seed')).toBeUndefined();
-    expect(() => readStoredCampaign({}, state, 'seed')).toThrow('끈 월드');
+    expect(() => readStoredCampaign(null, state, 'seed')).toThrow('중복 저장');
+    for (const general of Object.values(state.generals)) general.crew = 0;
+    expect(() => readStoredCampaign(null, state, 'seed')).toThrow();
+    expect(() => readStoredCampaign({}, state, 'seed')).toThrow();
   });
   it.each(['missing', 'seed', 'duplicate', 'source'] as const)('%s 저장을 빈 상태로 보정하지 않는다', (kind) => {
     const f = fixture();

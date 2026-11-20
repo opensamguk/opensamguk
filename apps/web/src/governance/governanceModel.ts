@@ -24,6 +24,24 @@ export const OFFICE_POWER: Record<GovernanceOffice, string> = {
   grandMarshal: '황제국 계열 밖 국가 견책',
   minister: '황제국이 직접 상위인 관계의 공납 면제',
 };
+/**
+ * 내 장수가 거느린 군사·막료 판의 이름(사용자 2026-11-15 "휘하보단 막부 혹은 부가 낫지않나? … 대장군부인거지." /
+ * "그 외가 막부가 맞아? 사서 뒤져봐").
+ * - 부(府)는 장군과 삼공이 연다. 막부는 장군의 부다: 대장군 하진 「幕府初開」(後漢書 文苑傳), 거기장군 원소의 격문
+ *   「幕府董統鷹揚」, 「行車騎將軍河南尹莫府」(後漢書 皇甫嵩傳), 좌장군 유비의 「左將軍府」(資治通鑑 卷67).
+ * - 그래서 조정 직위(승상·대장군·사도)나 장군·삼공 관직을 가진 장수는 그 이름의 부(대장군부·표기장군부·승상부)다.
+ * - 그 밖의 장수는 부를 열지 않는다. 자기 깃발 아래 군사라는 휘하(麾下, 「帥麾下數千騎」 晉書 姚襄 載記)로 부른다.
+ * courtTitle은 서버가 주는 내 관직명(core2026 관직표, 예: 표기장군·사공). 아직 없으면 null.
+ */
+export function bureauName(board: GovernanceBoard | undefined, courtTitle: string | null = null): string {
+  const view = board?.view;
+  const office = view?.enabled ? viewerOffice(view) : null;
+  if (office) return `${OFFICE_LABEL[office]}부`;
+  if (courtTitle && (courtTitle.endsWith('장군') || ['승상', '태위', '사도', '사공'].includes(courtTitle)))
+    return `${courtTitle}부`;
+  return '휘하';
+}
+
 // 봉록 원장의 refId는 직위 순서(1부터)다.
 const OFFICE_ORDER: readonly GovernanceOffice[] = ['chancellor', 'grandMarshal', 'minister'];
 export const officeByRef = (refId: number): GovernanceOffice | null => OFFICE_ORDER[refId - 1] ?? null;
@@ -108,7 +126,7 @@ export function offerCheck(view: GovernanceView, draft: OfferDraft) {
     rice = readBp(draft.rice);
   const max = view.limits.maxBp;
   if (gold === null || rice === null || gold > max || rice > max)
-    reasons.push(`금·쌀 비율은 각각 0~${percent(max)}, 소수 둘째 자리까지 넣으세요.`);
+    reasons.push(`금과 쌀 비율은 각각 0~${percent(max)}, 소수 둘째 자리까지 넣으세요.`);
   let upper: number | null = null,
     lower: number | null = null;
   if (source.nationId !== null && target !== null) {

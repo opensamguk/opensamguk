@@ -1,3 +1,4 @@
+import { providedRuleData } from '../providedRuleData';
 import { expect, it } from 'vitest';
 import { buildInitialWorld } from '../world/bootstrap';
 import { operationalInput } from '../../test/operationalMapFixture';
@@ -23,8 +24,10 @@ const features = [
 ];
 function origin() {
   const initial = buildInitialWorld(operationalInput());
-  initial.ruleFeatures = [...features];
-  for (const general of initial.generals) general.crew = 0;
+  for (const general of initial.generals) {
+    general.crew = 0;
+    general.sex = 'UNKNOWN';
+  }
   return {
     version: 3 as const,
     initial,
@@ -32,6 +35,7 @@ function origin() {
     initialStateHash: 'adapter-checks-hash',
     resourceHash: 'adapter-checks-hash',
     featureData: {
+      ...providedRuleData(initial, 60),
       policy: { version: 1, turnTermMinutes: 60 },
       'equipment-v1': structuredClone(TEST_EQUIPMENT_CONFIG),
       'logistics-v1': structuredClone(TEST_EQUIPMENT_LOGISTICS_CONFIG),

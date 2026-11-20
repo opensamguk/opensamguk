@@ -1,41 +1,21 @@
 import type { Prisma } from '@opensamguk/db';
 import { hashState } from '@opensamguk/shared/node';
-import { parsePreset, presetRules } from '@opensamguk/rules';
+import { initialReplayState, providedRuleData, replayResourceHashInput, type WorldInit } from '@opensamguk/rules';
+import { readFileSync } from 'node:fs';
 import { expect, it, vi } from 'vitest';
 import { readView } from './queries';
 
-const regular = {
-  name: '정규',
-  turnTermMinutes: 60,
-  scenario: '1030',
-  map: 'che',
-  unitSet: 'basic',
-  commands: null,
-  npc: {
-    fillRatio: 1,
-    aggression: 1,
-  },
-  protection: {
-    foundUntilMonths: 0,
-    peaceMonths: 0,
-    maxGeneralsPerNation: null,
-  },
-  boost: {
-    smallWorld: null,
-    lateJoin: null,
-  },
-  features: {
-    advisor: false,
-  },
-};
-
 const statuses = ['PROPOSED', 'ACTIVE', 'REJECTED', 'EXPIRED', 'ENDED'] as const;
+const initial = JSON.parse(
+  readFileSync(new URL('../../../engine/test/fixtures/monthly-initial.json', import.meta.url), 'utf8'),
+).initial as WorldInit;
+const featureData = providedRuleData(initial, 30);
 const origin = {
-  version: 6,
-  initial: { startYear: 190 },
-  initialStateHash: 'initial',
-  resourceHash: 'resource',
-  capabilities: { version: 1, treaty: { version: 1 } },
+  version: 3 as const,
+  initial,
+  initialStateHash: hashState(initial),
+  resourceHash: hashState(replayResourceHashInput(initial, featureData)),
+  featureData,
 };
 function row(status: (typeof statuses)[number] = 'ACTIVE', id = 1) {
   return {
@@ -47,21 +27,30 @@ function row(status: (typeof statuses)[number] = 'ACTIVE', id = 1) {
     clauses: [{ kind: 'peace' }, { kind: 'nonAggression', months: 1 }],
     proposedTick: 500,
     respondByTick: 60500,
-    startTick: status === 'PROPOSED' ? null : 1500,
-    endTick: status === 'PROPOSED' ? null : 11500,
-    costFrom: status === 'PROPOSED' ? null : 17,
-    costTo: status === 'PROPOSED' ? null : 9,
+    startTick: status === 'ACTIVE' || status === 'ENDED' ? 1500 : null,
+    endTick: status === 'ACTIVE' || status === 'ENDED' ? 11500 : null,
+    costFrom: status === 'ACTIVE' || status === 'ENDED' ? 17 : null,
+    costTo: status === 'ACTIVE' || status === 'ENDED' ? 9 : null,
     closedSequence: status === 'PROPOSED' || status === 'ACTIVE' ? null : 20,
   };
 }
 type Query = { where: { worldId: string }; select: Record<string, boolean> };
 function transaction(rows: unknown[] = [], changes: Record<string, unknown> = {}) {
+  const { state } = initialReplayState(initial, featureData);
   const world = {
+    ...Object.fromEntries(Object.entries(state).map(([key, value]) => [`${key}State`, value])),
+    officeEffects: state.officeEffects,
+    statRules: initial.statRules,
+    unitSet: initial.unitSet,
+    seed: initial.seed,
+    replayFormat: 3,
+    initialStateHash: origin.initialStateHash,
+    monthlyTick: 0,
     id: 'world',
     preset: null,
     commandMeta: null,
     status: 'RUNNING',
-    startYear: 190,
+    startYear: initial.startYear,
     treatyFormat: 1,
     personnelFormat: null,
     policyFromSequence: null,
@@ -70,8 +59,8 @@ function transaction(rows: unknown[] = [], changes: Record<string, unknown> = {}
     endYear: null,
     outcomeFromSequence: 0,
     replayOrigin: origin,
-    ruleFeatures: [],
-    operationalMap: null,
+
+    operationalMap: initial.operationalMap,
     ...changes,
   };
   const write = vi.fn(() => {
@@ -85,15 +74,17 @@ function transaction(rows: unknown[] = [], changes: Record<string, unknown> = {}
       ),
     );
   });
-  const city = vi.fn().mockResolvedValue([]);
+  const city = vi.fn().mockResolvedValue(initial.cities);
   const tx = {
     world: { findUnique: vi.fn().mockResolvedValue(world), update: write },
     treaty: { findMany, create: write, update: write },
     city: { findMany: city },
-    nation: { findMany: vi.fn().mockResolvedValue([]) },
-    general: { findMany: vi.fn().mockResolvedValue([]) },
+    nation: { findMany: vi.fn().mockResolvedValue(initial.nations) },
+    general: {
+      findMany: vi.fn().mockResolvedValue(initial.generals.map((general) => ({ ...general, removedAt: null }))),
+    },
     diplomacy: { findMany: vi.fn().mockResolvedValue([]) },
-    $queryRaw: vi.fn().mockResolvedValue([]),
+    $queryRaw: vi.fn().mockResolvedValue([{ key: 'intel', value: {} }]),
     $executeRaw: write,
   };
   return { tx: tx as unknown as Prisma.TransactionClient, findMany, city, write };
@@ -122,33 +113,6 @@ it('3a readView는 모든 status를 검사하고 toWorldState 뒤 열린 조약�
   expect(write).not.toHaveBeenCalled();
 });
 
-it('T4-17 B ext 단독 readView도 잔존 조약만 한 번 검사한다 (단위)', async () => {
-  const commands = { general: ['fire_attack'], nation: [] };
-  const preset = parsePreset({ ...regular, commands });
-  // 조약 분기용 손 행이다. 확장 프리셋 대조와 실제 ON은 이 시험의 범위가 아니다.
-  const changes = {
-    preset,
-    treatyFormat: null,
-    policyFromSequence: 0,
-    replayOrigin: {
-      ...origin,
-      initial: { startYear: 190, presetRules: presetRules(preset) },
-      capabilities: { version: 1, ext: { version: 1, commands, preset, resources: {}, sliceKeys: [] } },
-    },
-  };
-  const empty = transaction([], changes);
-  expect(await readView(empty.tx, 'world')).not.toHaveProperty('treaties');
-  expect(empty.findMany).toHaveBeenCalledOnce();
-  expect(empty.write).not.toHaveBeenCalled();
-  for (const status of statuses) {
-    const f = transaction([row(status)], changes);
-    await expect(readView(f.tx, 'world')).rejects.toThrow('조약을 끈 월드');
-    expect(f.findMany).toHaveBeenCalledOnce();
-    expect(f.city).not.toHaveBeenCalled();
-    expect(f.write).not.toHaveBeenCalled();
-  }
-});
-
 it.each(['REJECTED', 'EXPIRED', 'ENDED'] as const)(
   '3a readView도 닫힌 %s 파손을 거부한다 (단위 stub)',
   async (status) => {
@@ -166,7 +130,7 @@ it.each(['REJECTED', 'EXPIRED', 'ENDED'] as const)(
 );
 
 it.each(statuses)('3a readView는 off의 %s 잔여 행을 거부한다 (단위 stub)', async (status) => {
-  const { tx, city, write } = transaction([row(status)], { treatyFormat: null, replayOrigin: null });
+  const { tx, city, write } = transaction([row(status)], { replayFormat: 1, treatyFormat: null, replayOrigin: null });
   await expect(readView(tx, 'world')).rejects.toThrow('조약을 끈 월드');
   expect(city).not.toHaveBeenCalled();
   expect(write).not.toHaveBeenCalled();
@@ -175,28 +139,27 @@ it.each(statuses)('3a readView는 off의 %s 잔여 행을 거부한다 (단위 s
 it('3a readView도 World 상태와 관계없이 같은 검사를 한다 (단위 stub)', async () => {
   for (const status of ['PREOPEN', 'RUNNING', 'PAUSED', 'ENDED']) {
     const { tx, write } = transaction([{ ...row('ENDED'), closedSequence: null }], { status });
-    await expect(readView(tx, 'world')).rejects.toThrow('마감 기록');
+    await expect(readView(tx, 'world')).rejects.toMatchObject({
+      issues: expect.arrayContaining([expect.objectContaining({ path: ['closedSequence'] })]),
+    });
     expect(write).not.toHaveBeenCalled();
   }
 });
 
-it('3a readView는 off·닫힌 행뿐인 경우 빈 키와 metadata를 싣지 않는다 (단위 stub)', async () => {
-  for (const fixture of [
-    transaction([], { treatyFormat: null, replayOrigin: null }),
-    transaction([], { treatyFormat: null, replayOrigin: { version: 1 } }),
-    transaction([row('ENDED')]),
-  ]) {
+it('AC-INT-28 readView는 열린 조약이 없으면 조약 키를 싣지 않고 필수 정보 조각은 유지한다', async () => {
+  for (const fixture of [transaction([]), transaction([row('ENDED')])]) {
     const loaded = await readView(fixture.tx, 'world');
     expect(Object.hasOwn(loaded, 'treaties')).toBe(false);
-    expect(hashState(loaded)).toBe(
-      hashState({ startYear: 190, cities: {}, nations: {}, generals: {}, diplomacies: [] }),
-    );
+    expect(loaded.ext).toEqual({ intel: {} });
     expect(fixture.write).not.toHaveBeenCalled();
   }
 });
 
 it('3a readView의 정적 불일치는 저장 행 읽기 전에 실패한다 (단위 stub)', async () => {
-  for (const changes of [{ treatyFormat: null }, { policyFromSequence: 20, actionSequence: 19 }]) {
+  for (const changes of [
+    { replayFormat: 1, treatyFormat: null },
+    { replayFormat: 1, policyFromSequence: 20, actionSequence: 19 },
+  ]) {
     const { tx, findMany, city, write } = transaction([], changes);
     await expect(readView(tx, 'world')).rejects.toThrow();
     expect(findMany).not.toHaveBeenCalled();

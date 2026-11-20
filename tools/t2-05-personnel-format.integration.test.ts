@@ -2,19 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { readdir, readFile } from 'node:fs/promises';
 import { expect, it } from 'vitest';
-import { createDb } from '../packages/db/src/index';
-import {
-  capsResourceHashInput,
-  checkReplayOrigin,
-  parseCapsOrigin,
-  selectSupportedCapabilities,
-  selectWorldCapabilities,
-} from '../packages/rules/src/index';
-import { commandInitial } from '../packages/rules/test/commandFixture';
 import { hashState } from '../packages/shared/src/node/hashState';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
-import legacy from '../apps/engine/test/fixtures/replay-v1-b8f5074.json';
-import { testDatabaseUrl } from './test-database';
+import legacy from './fixtures/migration-replay-v1.json';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
 
 type PgClient = {
   connect(): Promise<void>;
@@ -118,7 +108,7 @@ async function insertOldWorld(client: PgClient, id: string, origin: unknown, tre
   );
 }
 
-it('PG-B8-1 인사 표지 migration은 구 SQL fixture를 보존하고 현재 factory의 두 OFF 월드를 만든다', async () => {
+it('PG-B8-1 인사 표지 migration은 과거 SQL 행·원본을 보존하고 새 행의 NULL 기본값을 지킨다', async () => {
   if (!process.env.TEST_DATABASE_URL) throw new Error('시험 접속값이 필요합니다.');
   let source: URL;
   try {
@@ -126,21 +116,24 @@ it('PG-B8-1 인사 표지 migration은 구 SQL fixture를 보존하고 현재 fa
   } catch {
     throw new Error('시험 접속값을 확인하세요.');
   }
-  if (!['127.0.0.1', 'localhost'].includes(source.hostname) || !['5432', '5433'].includes(source.port || '5432'))
+  if (
+    !['127.0.0.1', 'localhost'].includes(source.hostname) ||
+    !['5432', '5433', '5561'].includes(source.port || '5432')
+  )
     throw new Error('loopback 5432 또는 5433 시험 서버가 필요합니다.');
   for (const key of source.searchParams.keys())
     if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
       throw new Error('접속 대상 질의 인자는 쓸 수 없습니다.');
   source.port ||= '5432';
-  const name = `t205_personnel_format_${randomUUID().replaceAll('-', '')}_test`;
-  if (!/^t205_personnel_format_[a-f0-9]{32}_test$/.test(name)) throw new Error('자체 DB 이름을 확인하세요.');
+  const name = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
+  if (!(/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(name) || name === ciGreenDatabaseName('')))
+    throw new Error('자체 DB 이름을 확인하세요.');
   const adminUrl = new URL(source),
     target = new URL(source);
   adminUrl.pathname = '/postgres';
   target.pathname = `/${name}`;
   const admin = new Client({ connectionString: adminUrl.href });
   const client = new Client({ connectionString: target.href });
-  let db: ReturnType<typeof createDb> | undefined;
   let adminConnected = false,
     created = false,
     completed = false,
@@ -165,7 +158,9 @@ it('PG-B8-1 인사 표지 migration은 구 SQL fixture를 보존하고 현재 fa
     console.info('T2-05 인사 표지 DB 생성', JSON.stringify({ name, createdOid }));
     expect(createdOid).not.toBeNull();
     await client.connect();
-    const directories = (await readdir(migrations)).filter((directory) => /^\d{14}_/.test(directory)).sort();
+    const directories = (await readdir(migrations))
+      .filter((directory) => /^\d{14}_/.test(directory) && directory < '20261223000000_always_on_rules')
+      .sort();
     expect(directories.slice(0, required20.length)).toEqual(required20);
     expect(directories[required20.length]).toBe(marker);
     async function apply(directory: string) {
@@ -176,29 +171,24 @@ it('PG-B8-1 인사 표지 migration은 구 SQL fixture를 보존하고 현재 fa
     expect(await markerColumn(client)).toEqual([]);
 
     // 구 schema의 직접 SQL metadata fixture다. 옛 선택자나 게임 경로를 실행하지 않는다.
-    const treatyOrigin = parseCapsOrigin({
+    const treatyOrigin = {
       ...legacy.origin,
       version: 6,
       resourceHash: '',
       capabilities: { version: 1, treaty: { version: 1 } },
+    };
+    treatyOrigin.resourceHash = hashState({
+      scenarioKey: legacy.origin.initial.scenarioKey,
+      mapKey: legacy.origin.initial.mapKey,
+      unitSetKey: legacy.origin.initial.unitSetKey,
+      statRules: legacy.origin.initial.statRules,
+      unitSet: legacy.origin.initial.unitSet,
+      capabilities: treatyOrigin.capabilities,
     });
-    treatyOrigin.resourceHash = hashState(capsResourceHashInput(treatyOrigin));
     const expectedOrigins = new Map<string, unknown>([
       ['legacy-origin1', structuredClone(legacy.origin)],
       ['treaty-origin6', structuredClone(treatyOrigin)],
     ]);
-    const policy = { version: 1 as const, fromSequence: 0, turnTermMinutes: 30 };
-    const expectedSelections = new Map<string, unknown>([
-      ['legacy-origin1', { kind: 'legacy', policy: null }],
-      [
-        'treaty-origin6',
-        { kind: 'caps', origin: structuredClone(treatyOrigin), selection: { treaty: { version: 1 }, policy } },
-      ],
-    ]);
-    expect(selectSupportedCapabilities(treatyOrigin, { endYear: null, outcomeFromSequence: 0, policy })).toEqual({
-      treaty: { version: 1 },
-      policy,
-    });
     await insertOldWorld(client, 'legacy-origin1', legacy.origin, false);
     await insertOldWorld(client, 'treaty-origin6', treatyOrigin, true);
     const ids = [...expectedOrigins.keys()];
@@ -241,61 +231,14 @@ it('PG-B8-1 인사 표지 migration은 구 SQL fixture를 보존하고 현재 fa
       ).rows,
     ).toEqual(ids.map((id) => ({ id, isNull: true })));
 
-    // 현재 client는 표지와 모든 꼬리 migration을 적용한 뒤 처음 만든다.
-    db = createDb(target.href);
-    for (const id of ids) {
-      const row = await db.world.findUniqueOrThrow({ where: { id } });
-      expect(row.personnelFormat).toBeNull();
-      expect(row.replayFormat).toBe(1);
-      expect(row.ruleFeatures).toEqual([]);
-      expect(selectWorldCapabilities(row)).toEqual(expectedSelections.get(id));
-    }
-    const initial = commandInitial();
-    expect(initial.generals.every((general) => general.userId === null)).toBe(true);
-    const initialHash = hashState(initial),
-      factoryIds: string[] = [];
-    for (const treaty of [false, true]) {
-      const result = await saveInitialWorld(db, initial, {
-        name: treaty ? '조약 단독 OFF' : '일반 OFF',
-        turnTermMinutes: 30,
-        endYear: null,
-        ...(treaty ? { treatyFormat: 1 as const } : {}),
-      });
-      factoryIds.push(result.worldId);
-      const row = await db.world.findUniqueOrThrow({ where: { id: result.worldId } });
-      const expectedOrigin = treaty
-        ? parseCapsOrigin({
-            version: 6,
-            initial,
-            initialStateHash: initialHash,
-            resourceHash: '',
-            capabilities: { version: 1, treaty: { version: 1 } },
-          })
-        : { version: 3, initial, initialStateHash: initialHash, resourceHash: '' };
-      expectedOrigin.resourceHash = treaty
-        ? hashState(capsResourceHashInput(expectedOrigin as Parameters<typeof capsResourceHashInput>[0]))
-        : hashState({
-            scenarioKey: initial.scenarioKey,
-            mapKey: initial.mapKey,
-            unitSetKey: initial.unitSetKey,
-            statRules: initial.statRules,
-            unitSet: initial.unitSet,
-          });
-      expect(result.stateHash).toBe(initialHash);
-      expect(row.initialStateHash).toBe(initialHash);
-      expect(row.personnelFormat).toBeNull();
-      expect(row.treatyFormat).toBe(treaty ? 1 : null);
-      expect(row.replayFormat).toBe(treaty ? 1 : 3);
-      expect(row.ruleFeatures).toEqual([]);
-      expect(row.policyFromSequence).toBe(treaty ? 0 : null);
-      expect(row.replayOrigin).toEqual(expectedOrigin);
-      if (treaty)
-        expect(selectWorldCapabilities(row)).toEqual({
-          kind: 'caps',
-          origin: expectedOrigin,
-          selection: { treaty: { version: 1 }, policy },
-        });
-      else expect(() => checkReplayOrigin(row.replayOrigin)).not.toThrow();
+    const factoryIds = ['new-legacy-origin1', 'new-treaty-origin6'];
+    for (const [index, id] of factoryIds.entries()) {
+      const origin = index === 0 ? legacy.origin : treatyOrigin;
+      await insertOldWorld(client, id, origin, index === 1);
+      const [row] = await snapshots(client, [id]);
+      expect(row!.data.personnelFormat).toBeNull();
+      expect(row!.origin).toEqual(origin);
+      expect(row!.stateHash).toBe(legacy.origin.initialStateHash);
     }
     expect(
       (
@@ -323,7 +266,7 @@ it('PG-B8-1 인사 표지 migration은 구 SQL fixture를 보존하고 현재 fa
         marker,
         tailCount: directories.length - required20.length - 1,
         oldSqlFixtureRows: 2,
-        currentFactoryRows: factoryIds.length,
+        newSqlFixtureRows: factoryIds.length,
       }),
     );
     completed = true;
@@ -331,7 +274,7 @@ it('PG-B8-1 인사 표지 migration은 구 SQL fixture를 보존하고 현재 fa
     bodyFailed = true;
     bodyError = error;
   } finally {
-    const closed = await Promise.allSettled([client.end(), ...(db ? [db.$disconnect()] : [])]);
+    const closed = await Promise.allSettled([client.end()]);
     const ownClosed = closed.every((result) => result.status === 'fulfilled');
     try {
       expect(ownClosed, '자체 연결 종료').toBe(true);

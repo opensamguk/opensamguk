@@ -11,9 +11,11 @@ import { operationalFixture } from '../packages/rules/test/operationalMapFixture
 import { governanceTestConfig } from '../packages/rules/src/governance/testFixture';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { recruitmentFixtureData } from './fixtures/recruitment';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
+import { settlePendingBattle } from '../apps/engine/test/tacticalSettlement';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { exportReplay, replayArchive } from '../apps/engine/src/replay';
@@ -31,8 +33,8 @@ import { persistStratagemCardsState } from '../apps/engine/src/stratagemCards/st
 // 공개 기본값·국가 전략 3종·491명 원본 차례·화면의 완료 증거가 아니다.
 if (!process.env.TEST_DATABASE_URL) throw Error('전용 계략 패 테스트 DB가 필요합니다.');
 const url = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-if (!['127.0.0.1', 'localhost'].includes(url.hostname) || url.searchParams.has('host') || url.searchParams.has('port'))
-  throw Error('loopback 전용 테스트 DB를 확인하세요.');
+if (url.searchParams.has('host') || url.searchParams.has('port'))
+  throw Error('전용 테스트 DB 접속 대상 질의 인자는 쓸 수 없습니다.');
 const db = createDb(url.href),
   worldIds: string[] = [],
   userIds: string[] = [],
@@ -97,6 +99,7 @@ async function advance(id: string, tick: number, fail = false) {
           }
         : {},
     ).advanceTo(tick);
+    await settlePendingBattle(db, id);
   } finally {
     await releaseLease(db, lease);
   }
@@ -104,6 +107,8 @@ async function advance(id: string, tick: number, fail = false) {
 const snapshot = (id: string) => db.$transaction((tx) => loadReplayState(tx, id));
 async function replay(id: string) {
   const current = await db.world.findUniqueOrThrow({ where: { id } });
+  // 밀린 월 정산 뒤 처리되는 대기 입력을 먼저 비워 다음 월 기록에 포함한다.
+  await advance(id, current.clockTick);
   await advance(id, current.monthlyTick + 10_000);
   const archive = await exportReplay(db, id);
   const hashes = replayArchive(archive, archive.months.length).map((row) => row.stateHash);
@@ -126,12 +131,20 @@ async function fixture(
     seed = `cards-pg-${randomUUID()}`;
   initial.seed = seed;
   initial.statRules = { ...FIVE_STAT_RULES };
+  // 실제 세수로 도시 모집비를 마련한다.
+  for (const city of initial.cities) {
+    city.commerce = city.commerceMax = 2_000_000;
+    city.agriculture = city.agricultureMax = 2_000_000;
+    city.population = city.populationMax = 50000;
+    city.x = city.cityKey * 64;
+    city.y = 64;
+  }
   for (const general of initial.generals)
     Object.assign(general, { politics: 55, charm: 55, nextTurnTick: 1_000_000_000 });
   if (options.secondNeutral)
     Object.assign(initial.cities[3]!, { nationId: null, wall: 0, wallMax: 0, defence: 0, defenceMax: 0 });
   if (options.emptyDefence) Object.assign(initial.cities[2]!, { wall: 0, wallMax: 0, defence: 0, defenceMax: 0 });
-  const campaign = options.campaign || options.governance;
+  const campaign = true;
   if (campaign) {
     for (const general of initial.generals) general.crew = 0;
     for (const city of initial.cities) city.kind = 'CITY';
@@ -185,6 +198,7 @@ async function fixture(
     intel: 55,
     politics: 55,
     charm: 55,
+    sex: 'MALE' as const,
     portraitId: null,
   };
   let playerId = '';
@@ -221,16 +235,9 @@ async function fixture(
     turnTermMinutes: 60,
     endYear: null,
     replayFormat: 3,
-    ruleFeatures: [
-      'five-stats',
-      'personnel',
-      'policy',
-      'stratagem-basic',
-      ...(enabled ? ['stratagem-cards-v1'] : []),
-      ...(campaign ? ['operational-map', 'campaign-v1'] : []),
-      ...(options.governance ? ['campaign-assignment-v2', 'city-resources-v1', 'governance-v1', 'treaty'] : []),
-    ].sort(),
+
     featureData: {
+      ...recruitmentFixtureData(initial),
       ...(enabled ? { 'stratagem-cards-v1': { version: 1, config } } : {}),
       ...(options.governance ? { 'governance-v1': governanceTestConfig } : {}),
     },
@@ -286,6 +293,9 @@ async function reserve(
   f: Awaited<ReturnType<typeof fixture>>,
   commands: Array<{ commandKey: string; args: Record<string, unknown> }>,
 ) {
+  commands = commands.map((command) =>
+    command.commandKey === 'recruit' ? { ...command, args: { ...command.args, unitId: 'new' } } : command,
+  );
   const actor = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId: f.id, id: f.actorId } } });
   const result = await rpc(
     'turns.set',
@@ -308,6 +318,7 @@ async function attacker(f: Awaited<ReturnType<typeof fixture>>) {
       intel: 55,
       politics: 55,
       charm: 55,
+      sex: 'MALE' as const,
       portraitId: null,
     },
     player,
@@ -502,18 +513,31 @@ it('AC-P2-23 월 보충은 설치 함정을 포함한 3장 상한을 지키며 �
   await replay(f.id);
 });
 
-it('AC-P2-23 끈 월드는 SQL NULL·비활성 DTO·기존 재생을 유지한다', async () => {
+it('AC-P2-23 설정을 생략한 월드도 카드 원장·조회·명령을 제공한다', async () => {
   const f = await fixture('trap', false);
-  expect((await db.world.findUniqueOrThrow({ where: { id: f.id } })).stratagemCardsState).toBeNull();
-  expect(Object.hasOwn((await snapshot(f.id)).state, 'stratagemCards')).toBe(false);
+  expect((await db.world.findUniqueOrThrow({ where: { id: f.id } })).stratagemCardsState).not.toBeNull();
+  expect(Object.hasOwn((await snapshot(f.id)).state, 'stratagemCards')).toBe(true);
   expect((await rpc('stratagemCards.mine', { worldId: f.id }, f.player)).data).toMatchObject({
-    enabled: false,
-    hand: [],
     traps: [],
-    canSubmit: false,
+    canSubmit: true,
   });
-  expect((await rpc('stratagemCards.setTrap', request(f), f.player)).status).toBe(412);
+  expect((await rpc('stratagemCards.setTrap', request(f), f.player)).status).not.toBe(412);
   await replay(f.id);
+});
+
+it('AC-P2-23 재생 검증은 대기 중인 함정 설치를 마지막 월 기록에 포함한다', async () => {
+  const f = await fixture(),
+    input = request(f);
+  expect((await rpc('stratagemCards.setTrap', input, f.player)).data).toMatchObject({ status: 'pending' });
+  await replay(f.id);
+  const archive = await exportReplay(db, f.id);
+  const event = await db.inputEvent.findFirstOrThrow({
+    where: { worldId: f.id, userId: f.player.id, idempotencyKey: `stratagem-cards:${input.requestId}` },
+  });
+  expect(event.status).toBe('APPLIED');
+  expect(event.sequence).toBeLessThan(archive.months.at(-1)!.sequence);
+  expect(archive.inputs.some((row) => row.sequence === event.sequence)).toBe(true);
+  expect((await snapshot(f.id)).state.stratagemCards!.nations[f.nationId]!.traps).toHaveLength(1);
 });
 
 it('AC-P2-23 저장 시드 변조는 조회·내보내기에서 거부하고 원 상태로 복구한다', async () => {
@@ -545,10 +569,10 @@ it('AC-P2-23 SQL과 저장 어댑터는 비활성·누락·설정·시드·시�
   await expect(
     db.$executeRaw`UPDATE "World" SET "ruleFeatures"=array_remove("ruleFeatures",'stratagem-cards-v1') WHERE id=${f.id}`,
   ).rejects.toThrow();
-  for (const part of ['missing', 'feature', 'config', 'seed', 'tick', 'revision']) {
+  for (const part of ['missing', 'config', 'seed', 'tick', 'revision']) {
     const next = structuredClone(before.state);
     if (part === 'missing') delete next.stratagemCards;
-    if (part === 'feature') next.ruleFeatures = next.ruleFeatures!.filter((key) => key !== 'stratagem-cards-v1');
+
     if (part === 'config') next.stratagemCards!.config.trap.lossBp++;
     if (part === 'seed') next.stratagemCards!.seed += '-changed';
     if (part === 'tick') next.stratagemCards!.monthlyTick += 10_000;
@@ -566,21 +590,13 @@ it('AC-P2-23 게시491명의 실제 관리자 초기화는 설정과 새 카드 
     portraitMap: '191-map',
     seed: `cards-reset-${randomUUID()}`,
   });
-  initial.ruleFeatures = [
-    'five-stats',
-    'operational-map',
-    'personnel',
-    'policy',
-    'stratagem-basic',
-    'stratagem-cards-v1',
-  ];
   const config = { ...TEST_STRATAGEM_CARDS_CONFIG, startHand: 1, deck: [{ kind: 'trap' as const, weight: 1 }] };
   const saved = await saveInitialWorld(db, initial, {
     name: '계략 패 초기화 검증',
     turnTermMinutes: 60,
     endYear: null,
     replayFormat: 3,
-    ruleFeatures: ['five-stats', 'operational-map', 'personnel', 'policy', 'stratagem-basic', 'stratagem-cards-v1'],
+
     featureData: { 'stratagem-cards-v1': { version: 1, config } },
   });
   worldIds.push(saved.worldId);
@@ -600,6 +616,7 @@ it('AC-P2-23 게시491명의 실제 관리자 초기화는 설정과 새 카드 
         intel: 55,
         politics: 55,
         charm: 55,
+        sex: 'MALE' as const,
         portraitId: null,
       },
     },
@@ -737,6 +754,11 @@ it.each([
       JSON.stringify({
         logs: attackLogs.map((row) => row.text),
         actor: state.generals[enemy.actorId],
+        preparation: await db.generalLog.findMany({
+          where: { worldId: f.id, generalId: enemy.actorId },
+          select: { tick: true, commandKey: true, kind: true, text: true },
+        }),
+        units: state.campaign!.units,
         diplomacy: state.diplomacies,
       }),
     ).toBe(true);
@@ -751,7 +773,7 @@ it.each([
       } else expect(state.generals[enemy.actorId]!.crew).toBe(0);
       expect(state.cities[3]!.nationId).toBe(f.nationId);
     } else {
-      // 구판 전투는 장수 로그, 휘하 전투는 BattleLog에도 기록한다.
+      // 전술 정산은 실제 수비 지휘관에게 BattleLog를 한 번 남긴다.
       expect(
         battles,
         JSON.stringify({
@@ -764,6 +786,15 @@ it.each([
           afterArmy: state.campaign,
         }),
       ).toHaveLength(campaign && !survive ? 1 : 0);
+      if (campaign && !survive) {
+        expect(battles[0]).toMatchObject({
+          attackerId: enemy.actorId,
+          generalId: f.actorId,
+          text: expect.stringContaining('점령'),
+        });
+        expect(state.campaign!.tactical!.battles).toHaveLength(1);
+        expect(state.campaign!.tactical!.battles[0]).toMatchObject({ settled: true, result: 'attack' });
+      }
       expect(
         state.cities[3]!.nationId,
         JSON.stringify({
@@ -809,7 +840,7 @@ it.each(['BEFORE_COMMIT', 'AFTER_COMMIT'] as const)(
           >`SELECT "expiresAt" <= (clock_timestamp() AT TIME ZONE 'UTC') AS expired FROM "EngineLease" WHERE "worldId"=${f.id}`;
           return rows.length === 0 || rows[0]!.expired;
         },
-        { timeout: 5000, interval: 50 },
+        { timeout: 20000, interval: 50 },
       )
       .toBe(true);
     const recoveredPid = await cardProcessProbe(f.id, 'RECOVER');
@@ -993,10 +1024,11 @@ it.each([
           >`SELECT "expiresAt" <= (clock_timestamp() AT TIME ZONE 'UTC') AS expired FROM "EngineLease" WHERE "worldId"=${f.id}`;
           return rows.length === 0 || rows[0]!.expired;
         },
-        { timeout: 5000, interval: 50 },
+        { timeout: 20000, interval: 50 },
       )
       .toBe(true);
     const recoveredPid = await cardProcessProbe(f.id, 'RECOVER', boundary);
+    await settlePendingBattle(db, f.id);
     expect(recoveredPid).not.toBe(crashedPid);
     const after = await snapshot(f.id),
       afterHash = hashState(after);

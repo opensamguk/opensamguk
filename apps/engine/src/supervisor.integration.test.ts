@@ -13,6 +13,7 @@ import { controlClock } from './world/clock';
 import { saveInitialWorld } from './world/persistence';
 import { loadInitialWorldFromDb } from './world/resources';
 import { requestShutdown } from './process-lifecycle';
+import { SUPERVISOR_TEST_WORLD_PREFIX } from '../test/supervisorScope';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
@@ -98,9 +99,10 @@ async function create(second = false) {
   }
   // 실제 월간 정산과 NPC 규칙은 유지하고 자식 장애 시험의 실행량만 줄인다.
   initial.generals = initial.generals.slice(0, 2);
+  initial.scenarioKey = second ? 'supervisor-later' : 'supervisor-small';
   const result = await saveInitialWorld(db, initial, {
-    replayFormat: 'legacy',
-    name: second ? '감독 B' : '감독 A',
+    replayFormat: 3,
+    name: `${SUPERVISOR_TEST_WORLD_PREFIX}${second ? 'B' : 'A'}`,
     turnTermMinutes: second ? 60 : 10,
     endYear: null,
   });
@@ -367,6 +369,7 @@ describe('AC-M2-01 실제 PostgreSQL·감독·자식 프로세스', () => {
     let shutdownReceived = 0;
     const running = runSupervisor(db, {
       signal: controller.signal,
+      worldScope: { name: { startsWith: SUPERVISOR_TEST_WORLD_PREFIX } },
       spawnChild: () => {
         const child = spawn(
           process.execPath,

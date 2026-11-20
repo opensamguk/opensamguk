@@ -1,46 +1,11 @@
 import type { Prisma } from '@opensamguk/db';
-import {
-  capsResourceHashInput,
-  monthlyDate,
-  runMonthly,
-  settleTreaties,
-  toWorldState,
-  parsePreset,
-  presetRules,
-  type CapsOrigin,
-} from '@opensamguk/rules';
-import { rngFor } from '@opensamguk/shared';
+import { settleReplayMonth } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { expect, it, vi } from 'vitest';
 import { monthlyFixture } from '../test/monthlyFixture';
 import { loadReplayState, persistMonthly } from './monthly';
-import { resourceHash } from './replay';
+import { storedFixture, storedReaders } from '../test/storedFixture';
 import { loadWorld } from './worldLoader';
-
-const regular = {
-  name: '정규',
-  turnTermMinutes: 60,
-  scenario: '1030',
-  map: 'che',
-  unitSet: 'basic',
-  commands: null,
-  npc: {
-    fillRatio: 1,
-    aggression: 1,
-  },
-  protection: {
-    foundUntilMonths: 0,
-    peaceMonths: 0,
-    maxGeneralsPerNation: null,
-  },
-  boost: {
-    smallWorld: null,
-    lateJoin: null,
-  },
-  features: {
-    advisor: false,
-  },
-};
 
 vi.mock('@opensamguk/rules', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@opensamguk/rules')>();
@@ -95,52 +60,27 @@ function active(permanent = false): Treaty {
 }
 
 // 실제 월간·투영·닫힘·해시 함수를 호출한다. 메모리 TX이므로 DB 원자성 증거가 아니다.
-async function fixture(
-  treaties: Treaty[] = [],
-  caps: boolean | 'ext' = true,
-  policyFromSequence: number | null = null,
-) {
+async function fixture(treaties: Treaty[] = [], policyFromSequence: number | null = null) {
   const initial = await monthlyFixture();
   initial.diplomacies = treaties.some((entry) => entry.endTick === 60000)
     ? [{ nationA: 1, nationB: 2, state: 'NON_AGGRESSION', untilTick: 60000 }]
     : [];
-  const origin: CapsOrigin = {
-    version: 6,
-    initial: structuredClone(initial),
-    initialStateHash: hashState(initial),
-    resourceHash: '',
-    capabilities: { version: 1, treaty: { version: 1 } },
-  };
-  if (caps === 'ext') {
-    const commands = { general: ['fire_attack'], nation: [] };
-    const preset = parsePreset({ ...regular, commands });
-    origin.initial.presetRules = presetRules(preset);
-    origin.initialStateHash = hashState(origin.initial);
-    origin.capabilities = { version: 1, ext: { version: 1, commands, preset, resources: {}, sliceKeys: [] } };
-  }
-  origin.resourceHash = hashState(capsResourceHashInput(origin));
+  const stored = storedFixture(initial, 30);
+  stored.world.monthlyTick = 50000;
+  stored.world.logisticsState!.monthlyTick = 50000;
+  stored.world.governanceState!.monthlyTick = 50000;
+  stored.world.lineageState!.monthlyTick = 50000;
+  stored.world.stratagemCardsState!.monthlyTick = 50000;
   const world = {
     id: 'world',
-    replayFormat: 1,
-    ruleFeatures: [],
     startYear: initial.startYear,
-    monthlyTick: 50000,
-    treatyFormat: caps === true ? 1 : null,
-    personnelFormat: null,
-    replayOrigin: caps
-      ? origin
-      : {
-          version: 1,
-          initial: origin.initial,
-          initialStateHash: origin.initialStateHash,
-          resourceHash: resourceHash(initial),
-        },
+    seed: initial.seed,
+    ...stored.world,
     actionSequence: 7,
     policyFromSequence,
-    turnTermMinutes: 30,
     endYear: null,
     outcomeFromSequence: 0,
-    preset: caps === 'ext' ? origin.capabilities.ext!.preset : null,
+    preset: null,
     commandMeta: null,
   };
   const trace: string[] = [];
@@ -157,6 +97,7 @@ async function fixture(
     lastActiveTick: null,
     lastActiveAt: null,
     noticeSeen: 0,
+    residenceTick: null,
   }));
   let diplomacies = withWorld(initial.diplomacies);
   const rows = withWorld(treaties);
@@ -177,9 +118,18 @@ async function fixture(
       return found;
     });
   const snapshots: Row[] = [];
+  const reviews: Row[] = [];
+  const offices: Row[] = [];
+  const officeTurns: Row[] = [];
+  const readers = storedReaders(initial, world.id);
   const tx = {
+    ...readers,
     world: {
       findUniqueOrThrow: vi.fn(async () => ({ ...world })),
+      updateMany: vi.fn(async ({ data }: { data: Row }) => {
+        Object.assign(world, data);
+        return { count: 1 };
+      }),
       update: vi.fn(async ({ data }: { data: Row }) => {
         if ('actionSequence' in data) throw new Error('월간 처리기가 sequence를 배정했습니다.');
         trace.push('monthlyTick');
@@ -223,34 +173,67 @@ async function fixture(
     },
     generalTurn: {
       findMany: vi.fn(async () =>
-        policyFromSequence === null
-          ? []
-          : generals.flatMap((general) =>
-              Array.from({ length: 30 }, (_, slot) => ({
-                worldId: world.id,
-                generalId: general.id,
-                slot,
-                commandKey: 'rest',
-                args: {},
-                explicit: true,
-              })),
-            ),
+        generals.flatMap((general) =>
+          Array.from({ length: 30 }, (_, slot) => ({
+            worldId: world.id,
+            generalId: general.id,
+            slot,
+            commandKey: 'rest',
+            args: {},
+            explicit: true,
+          })),
+        ),
       ),
     },
-    nationTurn: { findMany: vi.fn().mockResolvedValue([]) },
+    nationTurn: { findFirst: async () => null, findMany: vi.fn().mockResolvedValue([]) },
     yearbookSnapshot: {
       create: vi.fn(async ({ data }: { data: Row }) => {
         trace.push('snapshot');
         snapshots.push(structuredClone(data));
       }),
     },
+    nationOfficeTurn: { findMany: async () => officeTurns, deleteMany: vi.fn() },
+    nationOffice: {
+      findMany: async () => offices,
+      create: vi.fn(async ({ data }: { data: Row }) => {
+        offices.push(data);
+      }),
+    },
+    generalLog: { create: vi.fn(), createMany: vi.fn() },
+    publicNationEvent: { createMany: vi.fn() },
+    removedNation: { create: vi.fn() },
     yearbookNation: { createMany: vi.fn().mockResolvedValue({ count: 2 }) },
     nationHistory: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn() },
     rankingSnapshot: { upsert: vi.fn() },
-    $queryRaw: vi.fn(async () => []),
-    $executeRaw: vi.fn(async () => {
-      throw new Error('예상하지 않은 단위 쓰기입니다.');
+    $queryRaw: vi.fn(async () => [{ key: 'intel', value: {} }]),
+    $executeRaw: vi.fn(async (strings: TemplateStringsArray, ...values: unknown[]) => {
+      const sql = strings.join('?');
+      if (sql.includes('INSERT INTO "NationOfficeTurn"')) {
+        const turns = JSON.parse(values[3] as string) as Row[];
+        officeTurns.push(
+          ...turns.map((turn, slot) => ({
+            ...turn,
+            slot,
+            worldId: values[0],
+            nationId: values[1],
+            officerLevel: values[2],
+          })),
+        );
+        return 12;
+      }
+      for (const field of ['cityResourcesState', 'cityRuinsState'])
+        if (sql.includes(field)) Object.assign(world, { [field]: JSON.parse(values[0] as string) });
+      return 1;
     }),
+    logisticsMovement: { groupBy: async () => [], createMany: vi.fn() },
+    governanceMovement: { findMany: async () => [], createMany: vi.fn() },
+    reputationEvent: { findMany: async () => [], createMany: vi.fn(async () => ({ count: 0 })) },
+    monthlyReview: {
+      findMany: async () => reviews,
+      create: vi.fn(async ({ data }: { data: Row }) => {
+        reviews.push(data);
+      }),
+    },
   };
   return {
     initial,
@@ -269,13 +252,8 @@ async function fixture(
 
 it('제안 만료를 월간 sequence로 저장한 뒤 현재 replay 해시를 스냅샷에 쓴다 (단위)', async () => {
   const f = await fixture([proposed()]);
-  const before = await loadWorld(f.client, f.world.id);
+  const expected = settleReplayMonth(await loadReplayState(f.client, f.world.id), f.initial.seed, 60000).replay.state;
   f.trace.length = 0;
-  const date = monthlyDate(before.startYear, 60000);
-  const expected = settleTreaties(
-    runMonthly(before, 60000, rngFor(f.initial.seed, 'monthly', date.year, date.month)).state,
-    60000,
-  );
   const next = await f.run();
   expect(next).toEqual(expected);
   expect(Object.hasOwn(next, 'treaties')).toBe(false);
@@ -328,6 +306,7 @@ it('기한 없는 note 조약은 월간 뒤에도 canonical fragment로 남는�
 it('멸망한 당사국의 ACTIVE 조약도 같은 월간 sequence로 닫는다 (단위)', async () => {
   const f = await fixture([active(true)]);
   f.nations.splice(1, 1);
+  delete f.world.stratagemCardsState!.nations['2'];
   for (const city of f.cities) if (city.nationId === 2) city.nationId = null;
   for (const general of f.generals) if (general.nationId === 2) general.nationId = null;
   expect(Object.hasOwn(await f.run(), 'treaties')).toBe(false);
@@ -335,35 +314,17 @@ it('멸망한 당사국의 ACTIVE 조약도 같은 월간 sequence로 닫는다 
 });
 
 it('off legacy 월간의 상태와 해시는 기존 정산 결과를 유지한다 (단위)', async () => {
-  const f = await fixture([], false);
-  const before = toWorldState(f.initial);
-  const date = monthlyDate(before.startYear, 60000);
-  const expected = runMonthly(before, 60000, rngFor(f.initial.seed, 'monthly', date.year, date.month)).state;
+  const f = await fixture([]);
+  const expected = settleReplayMonth(await loadReplayState(f.client, f.world.id), f.initial.seed, 60000).replay.state;
   expect(await f.run()).toEqual(expected);
   expect(f.tx.treaty.updateMany).not.toHaveBeenCalled();
   expect(Object.hasOwn((await loadReplayState(f.client, 'world')).state, 'treaties')).toBe(false);
   expect(f.snapshots[0]!.stateHash).toBe(hashState(await loadReplayState(f.client, 'world')));
 });
 
-it('T4-17 B ext 단독 월간은 조약 정산·마감 쓰기 없이 스냅샷을 남긴다 (단위)', async () => {
-  // 손 origin으로 조약 guard만 본다. 프리셋 ON·생성·적재 증거는 아니다.
-  const f = await fixture([], 'ext', 0);
-  const before = await loadWorld(f.client, f.world.id);
-  const date = monthlyDate(before.startYear, 60000);
-  const expected = runMonthly(before, 60000, rngFor(f.initial.seed, 'monthly', date.year, date.month)).state;
-  vi.mocked(settleTreaties).mockClear();
-  const next = await f.run();
-  expect(next).toEqual(expected);
-  expect(settleTreaties).not.toHaveBeenCalled();
-  expect(f.tx.treaty.updateMany).not.toHaveBeenCalled();
-  expect(f.tx.treaty.findMany.mock.calls.every(([query]) => query.where.status === undefined)).toBe(true);
-  expect(f.snapshots[0]!.stateHash).toBe(hashState(await loadReplayState(f.client, 'world')));
-  expect(next).not.toHaveProperty('treaties');
-});
-
 it('빈 caps 월간은 빈 treaties 키를 만들지 않고 legacy와 같은 replay 해시를 쓴다 (단위)', async () => {
   const caps = await fixture(),
-    off = await fixture([], false);
+    off = await fixture([]);
   expect(await caps.run()).toEqual(await off.run());
   expect(Object.hasOwn(await loadWorld(caps.client, 'world'), 'treaties')).toBe(false);
   expect(caps.snapshots[0]!.stateHash).toBe(off.snapshots[0]!.stateHash);
@@ -379,7 +340,7 @@ it('닫힘 저장 실패는 monthlyTick과 스냅샷보다 먼저 전달된다 (
 });
 
 it.each([0, 1])('정책 F=%s 월간도 닫힌 행 뒤 policy 포함 replay 해시를 쓴다 (단위)', async (fromSequence) => {
-  const f = await fixture([proposed()], true, fromSequence);
+  const f = await fixture([proposed()], fromSequence);
   await f.run();
   const replay = await loadReplayState(f.client, 'world');
   expect(replay.policy).toEqual({

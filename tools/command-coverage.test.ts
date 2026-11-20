@@ -1,9 +1,10 @@
+import ts from 'typescript';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join, normalize } from 'node:path';
+import { dirname, join, normalize, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { commands, extensionCommands, resolverForRuleFeatures, ruleRegistry } from '../packages/rules/src/index';
@@ -68,7 +69,7 @@ const runCli = (...args: string[]) =>
   spawnSync(process.execPath, ['tools/command-coverage.mjs', ...args], { cwd: root, encoding: 'utf8' });
 
 it('AC-M1-14 기능 명령 목록을 최종 resolver와 대조하고 잘못된 대상·중복을 거부한다', () => {
-  const resolver = resolverForRuleFeatures({ ruleFeatures: ruleRegistry.features.map(({ key }) => key).sort() })!;
+  const resolver = resolverForRuleFeatures({})!;
   const builtins = new Set(commands.map(({ key }) => key));
   const registered = [...resolver.list('general'), ...resolver.list('nation')]
     .filter(({ key }) => !builtins.has(key))
@@ -113,18 +114,37 @@ describe('T4-02 등록된 확장 명령 대조', () => {
     }
   };
   const command = (key: string, target = 'general') => `({ key: '${key}', target: '${target}' })`;
-  const actualSupport = () =>
-    Object.fromEntries(
-      [
-        'support.ts',
-        '../balance.ts',
-        '../model/clone.ts',
-        'ext/state.ts',
-        'ext/intel/record.ts',
-        '../personnel/permissions.ts',
-        '../personnel/types.ts',
-      ].map((file) => [file, readFileSync(join(root, 'packages/rules/src/commands', file), 'utf8')]),
-    );
+  const actualSupport = () => {
+    const files: Record<string, string> = {};
+    const commandRoot = join(root, 'packages/rules/src/commands');
+    const visit = (file: string) => {
+      const key = relative(commandRoot, file).replaceAll('\\', '/');
+      if (Object.hasOwn(files, key)) return;
+      const source = readFileSync(file, 'utf8').replaceAll('\r\n', '\n');
+      files[key] = source;
+      const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+      for (const node of parsed.statements) {
+        if (
+          (!ts.isImportDeclaration(node) && !ts.isExportDeclaration(node)) ||
+          !node.moduleSpecifier ||
+          !ts.isStringLiteral(node.moduleSpecifier)
+        )
+          continue;
+        const specifier = node.moduleSpecifier.text;
+        if (specifier === '@opensamguk/shared') visit(join(root, 'packages/shared/src/index.ts'));
+        else if (specifier.startsWith('.')) {
+          const base = resolve(dirname(file), specifier);
+          const target = [base, `${base}.ts`, join(base, 'index.ts')].find(
+            (candidate) => candidate.endsWith('.ts') && existsSync(candidate),
+          );
+          if (target) visit(target);
+        }
+      }
+    };
+    visit(join(commandRoot, 'support.ts'));
+    visit(join(commandRoot, '../personnel/permissions.ts'));
+    return files;
+  };
   const importWithTsx = (dir: string, expression: string) => {
     const file = pathToFileURL(join(dir, 'packages/rules/src/commands/ext/registry.ts')).href;
     const runtime = spawnSync(
@@ -178,6 +198,27 @@ describe('T4-02 등록된 확장 명령 대조', () => {
         readFileSync(join(root, 'packages/rules/src/commands', file), 'utf8').replaceAll('\r\n', '\n'),
       ]),
     ),
+  });
+
+  it('shared의 재수출 아래 숨은 초기화도 검사한다', () => {
+    fixture(
+      {
+        'ext/registry.ts': `export { list as extensionCommands } from '@opensamguk/shared';`,
+        '../../../shared/src/index.ts': `export {list} from './definitions.ts';`,
+        '../../../shared/src/definitions.ts': `export const list = [${command('fire_attack')}]; list.push(${command('hidden_command')});`,
+      },
+      (dir) => expect(() => readExtensionRegistryKeys(dir)).toThrow('최상위 실행문'),
+    );
+  });
+
+  it.each([
+    `const Math = {max: () => { throw Error('실행 금지'); }}; const value = Math.max(1);`,
+    `const entries = [[{valueOf() { throw Error('실행 금지'); }}, 'x']]; const value = new Map(entries);`,
+    `const entries = [[1]]; const value = entries.map(([x = (() => { throw Error('실행 금지'); })()]) => x);`,
+  ])('닫힌 자료 확장도 사용자 코드가 실행될 초기값은 거부한다: %s', (source) => {
+    fixture({ 'ext/registry.ts': `${source} export const extensionCommands = [];` }, (dir) =>
+      expect(() => readExtensionRegistryKeys(dir)).toThrow('확장 registry'),
+    );
   });
 
   it('T4-17 실제 계략 import와 정적 목록·인자 검사가 같다', () => {
@@ -246,7 +287,7 @@ describe('T4-02 등록된 확장 명령 대조', () => {
             ]);
           }
           expect(() => readExtensionRegistryKeys(dir)).toThrow(
-            kind === 'factory' ? '선언 makeStratagem을 찾지 못했다' : undefined,
+            kind === 'factory' ? 'makeStratagem은 초기값이 있는 const여야 한다' : undefined,
           );
           emptyLegacyRegistry(dir);
           const result = main(['--root', dir, '--file', tablePath]);
@@ -866,7 +907,7 @@ describe('T4-02 등록된 확장 명령 대조', () => {
       const valid = analyze(table(), ctx);
       expect(valid.errors).toEqual([]);
       expect(valid.summary!.legacySubset).toEqual(analyze(table(), context).summary!.legacySubset);
-      expect(valid.summary!.denominator).toBe(94);
+      expect(valid.summary!.denominator).toBe(96);
       expect(valid.summary!.unresolvedReferences).toBe(3);
       const doc = table();
       doc.commands = doc.commands.filter(({ id }) => id !== 'fire_attack');
@@ -1165,11 +1206,11 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
       [
         {
           readme: context.readme.replace(
-            '원작 비교 분모 90개, 정본 분모 94개, 전 단계 완료 2개',
+            '원작 비교 분모 90개, 정본 분모 96개, 전 단계 완료 2개',
             '원작 비교 분모 37개, 정본 분모 37개, 전 단계 완료 37개',
           ),
         },
-        'README: 명령 대응표 출력(원작/정본/전 단계 완료) 불일치 (문서 37/37/37, 원장 90/94/2)',
+        'README: 명령 대응표 출력(원작/정본/전 단계 완료) 불일치 (문서 37/37/37, 원장 90/96/2)',
       ],
       [
         { readme: context.readme.replace(readmeM1Line, readmeM1Line.replace(readmeProgress, '통과')) },
@@ -1205,12 +1246,12 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
               line.startsWith('| AC-M1-14 ')
                 ? line
                     .replace('| 🟨 |', '| ✅ |')
-                    .replace('정본 분모 94(명령 91 + 미해결 원본 3), 전 단계 완료 2', '정본 분모 37, 전 단계 완료 37')
+                    .replace('정본 분모 96(명령 93 + 미해결 원본 3), 전 단계 완료 2', '정본 분모 37, 전 단계 완료 37')
                 : line,
             )
             .join('\n'),
         },
-        '인수조건 AC-M1-14: 남은 행이 있는데 ✅다 (전 단계 완료 2/94)',
+        '인수조건 AC-M1-14: 남은 행이 있는데 ✅다 (전 단계 완료 2/96)',
       ],
       [
         {
@@ -1259,7 +1300,7 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
     const noTrade = table();
     noTrade.commands = noTrade.commands.filter((command) => command.id !== 'trade');
     expect(errorsOf(noTrade)).toContain(
-      'README: 명령 대응표 출력(원작/정본/전 단계 완료) 불일치 (문서 90/94/2, 원장 90/93/2)',
+      'README: 명령 대응표 출력(원작/정본/전 단계 완료) 불일치 (문서 90/96/2, 원장 90/95/2)',
     );
   });
 

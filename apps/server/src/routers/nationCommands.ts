@@ -2,6 +2,7 @@ import {
   canExecuteNationCommand,
   canExecuteCityNationCommand,
   canExecuteResearchNationCommand,
+  canExecuteCityUpgradeCommand,
   canUseNationTurns,
   STRATEGY_KEYS,
   strategyMonth,
@@ -29,6 +30,7 @@ async function actorCommands(tx: Parameters<typeof requireWorld>[0], worldId: st
       (def) =>
         canExecuteNationCommand(actor.officerLevel, def.key) ||
         canExecuteCityNationCommand(world, actor.officerLevel, def.key) ||
+        canExecuteCityUpgradeCommand(world, actor.officerLevel, def.key) ||
         canExecuteResearchNationCommand(world, actor.officerLevel, def.key),
     );
   return { world, actor, commands };

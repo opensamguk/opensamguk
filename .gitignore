@@ -29,3 +29,6 @@ packages/db/src/generated/
 
 # 비공개 자료 (공개 저장소에 올리지 않음): v1 요소 목록·v1 백로그 등
 /private/
+
+# 작업 메모 폴더(AGENTS.md: 작업 메모는 커밋하지 않는다)
+.tmp-*/

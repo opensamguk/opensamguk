@@ -10,7 +10,6 @@ import { CreateGeneralPage } from './CreateGeneralPage';
 const USER_A = '00000000-0000-4000-8000-00000000000a';
 const USER_B = '00000000-0000-4000-8000-00000000000b';
 const mocks = vi.hoisted(() => ({
-  lineage: true,
   heritageBalance: null as number | null,
   userId: '',
   create: vi.fn(),
@@ -36,8 +35,6 @@ vi.mock('../trpc', () => ({
               min: 15,
               max: 80,
               count: 3,
-              campaignEnabled: false,
-              ...(mocks.lineage ? { lineageEnabled: true } : {}),
               ...(mocks.heritageBalance === null
                 ? {}
                 : {
@@ -105,7 +102,6 @@ function mount() {
 }
 beforeEach(() => {
   vi.resetAllMocks();
-  mocks.lineage = true;
   mocks.heritageBalance = null;
   mocks.userId = USER_A;
   // 결과는 보지 않는다. 보낸 입력만 확인한다.
@@ -116,6 +112,9 @@ afterEach(() => {
   for (const client of clients) client.clear();
   clients.length = 0;
 });
+
+// 성별은 늘 필수다(가문 규칙 상시, D-104).
+const pickSex = () => fireEvent.click(screen.getByRole('radio', { name: '남' }));
 
 it('INT-25 AC-INT-25 머리에 재야 시작 안내와 이 월드의 연월·턴 간격·사람 장수 수를 보이고 지도는 접어 둔다', async () => {
   mount();
@@ -130,7 +129,7 @@ it('INT-25 AC-INT-25 머리에 재야 시작 안내와 이 월드의 연월·턴
   expect(screen.queryByTestId('world-map')).toBeNull();
 });
 
-it('T4-95 AC-P2-32 가문 월드는 기본 선택 없는 성별 칸을 보이고 고르기 전에는 보내지 않는다', async () => {
+it('T4-95 AC-P2-32 성별 칸은 기본 선택 없이 보이고 고르기 전에는 보내지 않는다', async () => {
   mount();
   fireEvent.change(await screen.findByLabelText('이름'), { target: { value: '서윤' } });
   const group = screen.getByRole('group', { name: '성별 (필수)' });
@@ -148,25 +147,11 @@ it('T4-95 AC-P2-32 가문 월드는 기본 선택 없는 성별 칸을 보이고
   expect(mocks.create.mock.calls[0]![0]).toMatchObject({ worldId: 'world-one', name: '서윤', sex: 'FEMALE' });
 });
 
-it('T4-95 AC-P2-32 가문을 끈 월드에는 성별 칸이 없고 sex 키도 보내지 않는다', async () => {
-  mocks.lineage = false;
-  mount();
-  fireEvent.change(await screen.findByLabelText('이름'), { target: { value: '서윤' } });
-  expect(screen.queryByRole('group', { name: '성별 (필수)' })).toBeNull();
-  expect(screen.queryByRole('group', { name: '유산 능력치 (선택)' })).toBeNull();
-  fireEvent.click(screen.getByRole('button', { name: '장수 만들기' }));
-  await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1));
-  expect(mocks.create.mock.calls[0]![0]).not.toHaveProperty('sex');
-  expect(mocks.create.mock.calls[0]![0]).not.toHaveProperty('heritage');
-  // 유산을 끈 월드는 예전 payload 그대로다.
-  expect(mocks.create.mock.calls[0]![0]).not.toHaveProperty('expectedUserId');
-});
-
 it('T4-96 AC-P2-33 유산 월드는 0으로 시작하고 쓰지 않으면 heritage 키를 보내지 않는다', async () => {
-  mocks.lineage = false;
   mocks.heritageBalance = 4;
   mount();
   fireEvent.change(await screen.findByLabelText('이름'), { target: { value: '서윤' } });
+  pickSex();
   expect(screen.getByRole('group', { name: '유산 능력치 (선택)' })).toBeTruthy();
   expect(screen.getByRole<HTMLButtonElement>('button', { name: '통솔 유산 줄이기' }).disabled).toBe(true);
   fireEvent.click(screen.getByRole('button', { name: '장수 만들기' }));
@@ -175,10 +160,10 @@ it('T4-96 AC-P2-33 유산 월드는 0으로 시작하고 쓰지 않으면 herita
 });
 
 it('T4-96 AC-P2-33 유산 배분은 0이 아닌 키만 보내고 기본 능력치는 그대로 보낸다', async () => {
-  mocks.lineage = false;
   mocks.heritageBalance = 4;
   mount();
   fireEvent.change(await screen.findByLabelText('이름'), { target: { value: '서윤' } });
+  pickSex();
   const up = screen.getByRole('button', { name: '통솔 유산 늘리기' });
   fireEvent.click(up);
   fireEvent.click(up);
@@ -190,10 +175,10 @@ it('T4-96 AC-P2-33 유산 배분은 0이 아닌 키만 보내고 기본 능력�
 });
 
 it('T4-96 AC-P2-33 다시 읽은 계정이 바뀌면 이전 계정의 입력·배분을 지우고 새 계정으로 다시 시작하며 보내지 않는다', async () => {
-  mocks.lineage = false;
   mocks.heritageBalance = 4;
   mount();
   fireEvent.change(await screen.findByLabelText('이름'), { target: { value: '서윤' } });
+  pickSex();
   fireEvent.click(screen.getByRole('button', { name: '통솔 유산 늘리기' }));
   fireEvent.click(screen.getByRole('button', { name: '통솔 유산 늘리기' }));
   expect(screen.getByRole('button', { name: '장수 만들기 (유산 2점 사용)' })).toBeTruthy();
@@ -215,6 +200,7 @@ it('T4-96 AC-P2-33 다시 읽은 계정이 바뀌면 이전 계정의 입력·�
 
   // 새 계정으로 다시 넣으면 새 계정 UUID로 보내고 이전 배분은 따라오지 않는다.
   fireEvent.change(screen.getByLabelText('이름'), { target: { value: '서윤' } });
+  pickSex();
   fireEvent.click(screen.getByRole('button', { name: '장수 만들기' }));
   await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1));
   const sent = mocks.create.mock.calls[0]![0];
@@ -223,7 +209,6 @@ it('T4-96 AC-P2-33 다시 읽은 계정이 바뀌면 이전 계정의 입력·�
 });
 
 it('T4-96 AC-P2-33 다시 읽기 전에 누른 이전 입력은 처음 계정 UUID로만 보내고 계정 변경 거절 뒤 다시 보내지 않는다', async () => {
-  mocks.lineage = false;
   mocks.heritageBalance = 4;
   mocks.create.mockRejectedValueOnce(
     new TRPCClientError('계정이 바뀌었습니다. 현재 계정으로 다시 확인하세요.', {
@@ -232,6 +217,7 @@ it('T4-96 AC-P2-33 다시 읽기 전에 누른 이전 입력은 처음 계정 UU
   );
   mount();
   fireEvent.change(await screen.findByLabelText('이름'), { target: { value: '서윤' } });
+  pickSex();
   fireEvent.click(screen.getByRole('button', { name: '통솔 유산 늘리기' }));
   fireEvent.click(screen.getByRole('button', { name: '통솔 유산 늘리기' }));
 
@@ -251,13 +237,13 @@ it('T4-96 AC-P2-33 다시 읽기 전에 누른 이전 입력은 처음 계정 UU
 });
 
 it('T4-96 AC-P2-33 잔액 부족 거절은 배분을 두고 다시 보내지 않으며 잔액을 직접 다시 확인해야 제출 판단을 연다', async () => {
-  mocks.lineage = false;
   mocks.heritageBalance = 4;
   mocks.create.mockRejectedValueOnce(
     new TRPCClientError('유산 포인트가 부족합니다.', { result: { error: { data: { code: 'CONFLICT' } } } } as never),
   );
   mount();
   fireEvent.change(await screen.findByLabelText('이름'), { target: { value: '서윤' } });
+  pickSex();
   fireEvent.click(screen.getByRole('button', { name: '통솔 유산 늘리기' }));
   fireEvent.click(screen.getByRole('button', { name: '통솔 유산 늘리기' }));
   fireEvent.click(screen.getByRole('button', { name: '장수 만들기 (유산 2점 사용)' }));

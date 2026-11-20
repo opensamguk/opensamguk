@@ -9,6 +9,7 @@ import { FIVE_STAT_RULES } from '../packages/rules/src/general/fiveStats';
 import type { ResearchName } from '../packages/rules/src/nationResearch/state';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { providedRuleData, logisticsConfigSchema } from '../packages/rules/src/index';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -102,16 +103,10 @@ async function advance(worldId: string, tick = 0, beforeCommit?: (tx: Prisma.Tra
 }
 const snapshot = (worldId: string) =>
   db.$transaction((tx) => loadReplayState(tx, worldId), { isolationLevel: 'RepeatableRead' });
-async function fixture(enabled = true, research: ResearchName = 'greatsword') {
+async function fixture(research: ResearchName = 'greatsword') {
   const initial = commandInitial();
   initial.seed = `nation-research-${randomUUID()}`;
   initial.statRules = { ...FIVE_STAT_RULES };
-  initial.ruleFeatures = [
-    'five-stats',
-    'personnel',
-    'policy',
-    ...(enabled ? ['prepared-turns-v1', 'nation-research-v1'] : []),
-  ].sort();
   initial.unitSet.crewTypes[1]!.requirements = [{ kind: 'research', name: research }];
   for (const general of initial.generals)
     Object.assign(general, {
@@ -123,11 +118,16 @@ async function fixture(enabled = true, research: ResearchName = 'greatsword') {
   Object.assign(initial.generals[2]!, { nationId: 1, cityKey: 1, officerLevel: 5 });
   Object.assign(initial.generals[3]!, { nationId: 1, cityKey: 1, officerLevel: 1 });
   initial.generals[0]!.crew = 0;
+  const logistics = logisticsConfigSchema.parse(providedRuleData(initial, 60)['logistics-v1']);
+  logistics.recruitPer100 = Object.fromEntries(
+    Object.keys(logistics.recruitPer100).map((key) => [key, { iron: 0, wood: 0, horses: 0 }]),
+  );
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '연구 실제 HTTP·저장·재생',
     turnTermMinutes: 60,
     endYear: null,
     replayFormat: 3,
+    featureData: { 'logistics-v1': logistics },
   });
   worldIds.push(worldId);
   const operator = await user(true),
@@ -293,15 +293,15 @@ it('세션·직책·기능을 목록과 예약에서 함께 검사하고 조회�
   ).toEqual({ ok: true });
   expect(await footprint(f.worldId)).toEqual(before);
   expect((await reserve(f, f.staff, 5, 'nation_research_greatsword', 12, { generalId: 1 })).status).toBe(400);
-  const old = await fixture(false);
+  const old = await fixture();
   expect(
     (await rpc('nationCommands.list', { worldId: old.worldId }, old.ruler)).data!.some((row) =>
       row.key.startsWith('nation_research_'),
     ),
-  ).toBe(false);
-  expect((await reserve(old, old.ruler, 12, 'nation_research_greatsword')).status).toBe(400);
-  expect((await db.world.findUniqueOrThrow({ where: { id: old.worldId } })).preparedTurnsState).toBeNull();
-  expect((await db.world.findUniqueOrThrow({ where: { id: old.worldId } })).nationResearchState).toBeNull();
+  ).toBe(true);
+  expect((await reserve(old, old.ruler, 12, 'nation_research_greatsword')).status).toBe(200);
+  expect((await db.world.findUniqueOrThrow({ where: { id: old.worldId } })).preparedTurnsState).not.toBeNull();
+  expect((await db.world.findUniqueOrThrow({ where: { id: old.worldId } })).nationResearchState).not.toBeNull();
 });
 
 it('12회 연구의 준비·완료 commit 실패는 전부 복구되고 새 리스의 재개·재생이 일치한다', async () => {
@@ -370,7 +370,7 @@ it.each([
   { research: 'elephant', unit: '상병', turns: 24, cost: 100_000 },
   { research: 'fire_wheel', unit: '화륜차', turns: 24, cost: 100_000 },
 ] as const)('AC-P2-06 $unit 연구의 완료 횟수와 모집 개방을 검증한다', async ({ research, unit, turns, cost }) => {
-  const f = await fixture(true, research),
+  const f = await fixture(research),
     key = `nation_research_${research}`,
     recruit = { worldId: f.worldId, commandKey: 'recruit', args: { amount: 1, crewType: 1100 } },
     completionTick = (turns - 1) * 10_000 + 100;
@@ -403,7 +403,7 @@ it.each([
 });
 
 it('AC-P2-06 준비 중과 완료 직후 실제 SIGKILL 뒤 연구를 한 번만 반영한다', async () => {
-  const f = await fixture(true, 'halberd');
+  const f = await fixture('halberd');
   const key = 'nation_research_halberd';
   expect((await reserve(f, f.ruler, 12, key)).status).toBe(200);
   await advance(f.worldId, 110_099);

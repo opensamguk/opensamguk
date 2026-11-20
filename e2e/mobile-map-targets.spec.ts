@@ -6,7 +6,7 @@ import { createAccount, withE2eDb } from './account';
 import { holdLease, query, releaseHold } from './game';
 import type { WorldMap } from '../apps/web/src/game/types';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { loadWorld } from '../apps/engine/src/worldLoader';
@@ -103,18 +103,9 @@ test('T3-10 정식 GIS61거점 실제 터치·밀집 후보·끌기·취소와 �
           portraitMap: '191-map',
           seed: 'mobile-map-191',
         });
-        initial.ruleFeatures = [
-          'campaign-v1',
-          'five-stats',
-          'operational-map',
-          'personnel',
-          'policy',
-          'stratagem-basic',
-          'treaty',
-        ];
         expect(initial.generals).toHaveLength(491);
         expect(initial.nations).toHaveLength(21);
-        return saveInitialWorld(db, initial, { name: '지도 터치 정식191', turnTermMinutes: 60, endYear: 201 });
+        return saveFixtureWorld(db, initial, { name: '지도 터치 정식191', turnTermMinutes: 60, endYear: 201 });
       })
     ).worldId;
     hold = await holdLease(ownWorld);
@@ -125,6 +116,8 @@ test('T3-10 정식 GIS61거점 실제 터치·밀집 후보·끌기·취소와 �
     await page.goto(`/w/${ownWorld}/create`);
     await expect(page.getByRole('spinbutton')).toHaveCount(5);
     await page.getByLabel('이름', { exact: true }).fill('지도장수');
+    // 성별은 늘 필수다(가문 규칙 상시, D-104).
+    await page.getByRole('radio', { name: '남', exact: true }).check();
     await page.getByRole('button', { name: '장수 만들기', exact: true }).click();
     await expect
       .poll(() =>

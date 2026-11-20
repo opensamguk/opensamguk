@@ -9,11 +9,11 @@ import { authzCase } from '../apps/server/src/authz/case';
 import { categories } from '../apps/server/src/authz/coverage';
 import { newSession } from '../apps/server/src/auth/session';
 import { hashPassword } from '../apps/server/src/auth/password';
-import { testDatabaseUrl } from './test-database';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
 import { initializeResources } from './init-resources';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { initializeIntegrationResources } from './integration-resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -29,11 +29,10 @@ const { Client } = createRequire(requireDb.resolve('@prisma/adapter-pg'))('pg') 
 };
 if (!process.env.TEST_DATABASE_URL) throw new Error('전용 테스트 DB가 필요합니다.');
 const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-if (!['localhost', '127.0.0.1'].includes(source.hostname)) throw new Error('loopback 시험 서버가 필요합니다.');
 for (const key of source.searchParams.keys())
   if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
     throw new Error('접속 대상 질의 인자는 쓸 수 없습니다.');
-const name = `t305_read_${randomUUID().replaceAll('-', '')}_test`;
+const name = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
 const adminUrl = new URL(source),
   target = new URL(source);
 adminUrl.pathname = '/postgres';
@@ -65,14 +64,23 @@ function track<T>(action: () => Promise<T>) {
   );
   return promise;
 }
-function it(title: string, action: () => Promise<void>) {
-  test(title, () => track(action));
+function it(title: string, action: () => Promise<void>, timeout?: number) {
+  test(title, () => track(action), timeout);
 }
 async function settle() {
   while (executions.size) await Promise.allSettled([...executions]);
 }
-const catalog = async () =>
-  (await admin.query('SELECT datname,oid::text AS oid FROM pg_database ORDER BY datname')).rows;
+const catalog = async () => {
+  const rows = (await admin.query('SELECT datname,oid::text AS oid FROM pg_database ORDER BY datname')).rows;
+  // CI의 다른 담당 DB만 비교에서 빼고 자기 DB·개발 DB의 식별자는 계속 확인한다.
+  return process.env.CI_GREEN_DATABASE
+    ? rows.filter(
+        (row) =>
+          row.datname === process.env.CI_GREEN_DATABASE ||
+          !/^opensamguk_ci_green_[a-z0-9]+_test$/.test(String(row.datname)),
+      )
+    : rows;
+};
 beforeEach(settle);
 async function user(
   role: 'USER' | 'ADMIN' = 'USER',
@@ -141,7 +149,9 @@ async function gameSnapshot(all = false) {
   for (const { tablename } of tables) {
     const quoted = '"' + tablename.replaceAll('"', '""') + '"';
     const rows = await db.$queryRawUnsafe<Array<{ body: string }>>(
-      `SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text),'[]'::jsonb)::text AS body FROM ${quoted} t`,
+      // 51개 참가 고정물의 큰 원생성 JSON을 정렬·전송하는 대신 모든 행의 전체 값을 해시한다.
+      `SELECT COALESCE(string_agg(row_hash,'' ORDER BY row_hash),'') AS body
+       FROM (SELECT encode(sha256(convert_to(to_jsonb(t)::text,'UTF8')),'hex') AS row_hash FROM ${quoted} t) rows`,
     );
     hash.update(tablename + '\n' + rows[0]!.body + '\n');
   }
@@ -403,16 +413,6 @@ for (const index of [0, 1])
       portraitMap: '191-map',
       seed: 'admin-read-formal',
     });
-    initial.ruleFeatures = [
-      'campaign-assignment-v2',
-      'campaign-v1',
-      'five-stats',
-      'operational-map',
-      'personnel',
-      'policy',
-      'stratagem-basic',
-      'treaty',
-    ];
     expect(initial.nations).toHaveLength(21);
     expect(initial.generals).toHaveLength(491);
     const { worldId } = await saveInitialWorld(db, initial, {
@@ -435,6 +435,7 @@ for (const index of [0, 1])
             intel: 55,
             politics: 55,
             charm: 55,
+            sex: 'MALE' as const,
             portraitId: null,
           },
         }),
@@ -595,8 +596,16 @@ it('목록 경계 전용51개 참가 행도 최대50명과 정확한 전체 수�
     `INSERT INTO "City" SELECT (jsonb_populate_record(NULL::"City",to_jsonb(c)||jsonb_build_object('worldId',n.id,'nationId',NULL))).* FROM "City" c CROSS JOIN unnest($1::text[]) n(id) WHERE c."worldId"=$2 AND c."cityKey"=$3`,
     [ids, formalWorlds[0], human.cityKey],
   );
+  const result =
+    await client.query(`SELECT string_agg(quote_ident(column_name),',' ORDER BY ordinal_position) AS columns
+    FROM information_schema.columns WHERE table_schema='public' AND table_name='General' AND is_generated='NEVER'`);
+  const columns = result.rows[0]?.columns;
+  if (typeof columns !== 'string') throw Error('참가 목록 고정물의 장수 열을 확인하세요.');
   await client.query(
-    `INSERT INTO "General" SELECT (jsonb_populate_record(NULL::"General",to_jsonb(g)||jsonb_build_object('worldId',n.id,'userId',$4::text,'nationId',NULL))).* FROM "General" g CROSS JOIN unnest($1::text[]) n(id) WHERE g."worldId"=$2 AND g.id=$3`,
+    `INSERT INTO "General" (${columns}) SELECT ${columns} FROM (
+      SELECT (jsonb_populate_record(NULL::"General",to_jsonb(g)||jsonb_build_object('worldId',n.id,'userId',$4::text,'nationId',NULL))).*
+      FROM "General" g CROSS JOIN unnest($1::text[]) n(id) WHERE g."worldId"=$2 AND g.id=$3
+    ) copied`,
     [ids, formalWorlds[0], human.id, victim.id],
   );
   const before = await gameSnapshot();
@@ -608,7 +617,9 @@ it('목록 경계 전용51개 참가 행도 최대50명과 정확한 전체 수�
   expect(generals.map((row) => row.worldId)).toEqual([...ids].sort().reverse().slice(0, 50));
   expect(generals.every((row) => row.generalId === human.id && row.name === human.name)).toBe(true);
   expect(await gameSnapshot()).toBe(before);
-});
+  // 늘 켠 규칙의 World 행은 부곡, 운영 지도 원장을 담아 크다. 51행 복제와 게임 전체 지문 두 번이 바쁜 CI에서
+  // 30초를 넘긴 적이 있다(PR #674에서 다섯 번). 비교 대상은 줄이지 않고 시간만 준다.
+}, 90_000);
 
 it('없는 상세 대상은 감사1행을 확정한 뒤 NOT_FOUND이며 잘못된 UUID·추가 입력은 DB를 바꾸지 않는다', async () => {
   const actor = await user('ADMIN'),

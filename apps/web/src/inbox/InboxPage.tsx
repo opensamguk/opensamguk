@@ -14,15 +14,15 @@ import { NoGeneral, QueryError } from '../game/QueryState';
 import { useHome, useWorldId } from '../game/queries';
 import { CAMPAIGN_RELATIONS } from '../personnel/CampaignPanel';
 import { personnelKeys, usePersonnelApi } from '../personnel/contract';
-import { usePersonnelEnabled } from '../personnel/usePersonnelEnabled';
 import { OfferBox } from '../personnel/OfferBox';
 import { Portrait } from '../portrait/Portrait';
+import { ProposalBox, useOpenProposalCount } from '../proposals/ProposalBox';
 import { useTRPC } from '../trpc';
 import { EmptyState, LoadingState } from '../ui/States';
 import { incomingTreaties, retinueOffers } from './count';
 import styles from './Inbox.module.css';
 
-// 받은 제안함 (INT-20, 시안 X-Inbox). 발령·휘하·외교 제안을 한곳에 모은다. 화면만 바꾸며 기존 조회만 쓴다.
+// 받은 제안함 (INT-20, 시안 X-Inbox). 발령, 명령 제안(상신, D-100), 휘하, 외교 제안을 한곳에 모은다.
 // 발령은 메인의 제안 상자를 그대로 쓰고 휘하·외교는 수와 요약을 보인 뒤 답하는 화면으로 잇는다.
 export function InboxPage() {
   const worldId = useWorldId();
@@ -35,14 +35,7 @@ export function InboxPage() {
   else if (home.isError)
     body = <QueryError error={home.error} notFound="월드를 찾을 수 없습니다" onRetry={() => void home.refetch()} />;
   else if (!home.data) body = <LoadingState />;
-  else
-    body = (
-      <Inbox
-        worldId={worldId}
-        hasNation={home.data.nation !== null}
-        campaign={Boolean(mine.data?.general && mine.data.creationRules.campaignEnabled)}
-      />
-    );
+  else body = <Inbox worldId={worldId} hasNation={home.data.nation !== null} campaign={Boolean(mine.data?.general)} />;
 
   return (
     <section className={styles.page}>
@@ -50,7 +43,6 @@ export function InboxPage() {
         <img className="pixel-art" src={messagesIcon} alt="" width={48} height={48} />
         <h1>받은 제안함</h1>
       </div>
-      <p className={styles.lead}>발령·휘하·외교 제안을 한곳에서 봅니다.</p>
       {body}
     </section>
   );
@@ -59,12 +51,10 @@ export function InboxPage() {
 export function Inbox({ worldId, hasNation, campaign }: { worldId: string; hasNation: boolean; campaign: boolean }) {
   const trpc = useTRPC();
   const api = usePersonnelApi();
-  const personnel = usePersonnelEnabled(worldId);
-  // 메인의 발령 상자와 같은 키다. 주기 조회는 상자가 한다. 인사 기능이 없는 월드는 묻지 않는다.
+  // 메인의 발령 상자와 같은 키다. 주기 조회는 상자가 한다.
   const offers = useQuery({
     queryKey: personnelKeys.offers(worldId),
     queryFn: () => api.offers({ worldId }),
-    enabled: personnel,
     retry: false,
   });
   const board = useQuery({ ...trpc.campaign.get.queryOptions({ worldId }), enabled: campaign, retry: false });
@@ -78,16 +68,21 @@ export function Inbox({ worldId, hasNation, campaign }: { worldId: string; hasNa
     retry: false,
   });
 
-  const loading = (personnel && offers.isPending) || (campaign && board.isPending) || (hasNation && treaties.isPending);
+  // 명령 제안(상신, D-100)은 국가에 속한 장수만 받고 보낸다.
+  const proposals = useOpenProposalCount(worldId, hasNation);
+  const loading =
+    offers.isPending || (campaign && board.isPending) || (hasNation && treaties.isPending) || proposals.pending;
   const retinue = campaign ? retinueOffers(board.data) : [];
   const incoming = hasNation ? incomingTreaties(treaties.data) : [];
   const people = new Map(board.data?.people.map((person) => [person.id, person]) ?? []);
-  const empty = !loading && (offers.data?.length ?? 0) + retinue.length + incoming.length === 0;
+  const empty = !loading && (offers.data?.length ?? 0) + retinue.length + incoming.length + proposals.count === 0;
   const treatyBlocked = treaties.isError && treatyListBlocked(treaties.error) !== null;
 
   return (
     <div className={styles.list}>
       <OfferBox worldId={worldId} />
+
+      {hasNation ? <ProposalBox worldId={worldId} generalName={(id) => people.get(id)?.name} /> : null}
 
       {retinue.length > 0 ? (
         <section className={styles.card} aria-labelledby="inbox-retinue">
@@ -149,7 +144,9 @@ export function Inbox({ worldId, hasNation, campaign }: { worldId: string; hasNa
       ) : null}
 
       {loading ? <LoadingState /> : null}
-      {empty ? <EmptyState title="받은 제안이 없습니다">발령·휘하·외교 제안이 오면 여기에 모입니다.</EmptyState> : null}
+      {empty ? (
+        <EmptyState title="받은 제안이 없습니다">발령, 휘하, 외교 제안이 오면 여기에 모입니다.</EmptyState>
+      ) : null}
     </div>
   );
 }

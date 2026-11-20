@@ -8,8 +8,11 @@ import { warFixture } from '../apps/engine/test/warFixture';
 import { acquireLease, releaseLease, type Lease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { controlClock } from '../apps/engine/src/world/clock';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../apps/engine/test/worldFixture';
 import { suggestionOps } from '../apps/web/src/operations/timeline';
+import { recordTestTurns } from '../apps/engine/test/seasonFixture';
+import { recruitmentFixtureData } from './fixtures/recruitment';
+import { FIVE_STAT_RULES, toGameDate } from '../packages/rules/src/index';
 import { applyOps, toSaveSlots, toTurn } from '../apps/web/src/turns/draft';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -75,27 +78,72 @@ async function identity() {
 
 async function fixture(keepEnemyCity = false) {
   const initial = await warFixture();
-  const actors = [];
+  initial.statRules = FIVE_STAT_RULES;
+  initial.cityScale ??= { cities: [] };
+  initial.generals = initial.generals.map((general) => ({
+    ...general,
+    politics: general.politics ?? 50,
+    charm: general.charm ?? 50,
+    sex: general.sex ?? 'MALE',
+  }));
+  const actors: Awaited<ReturnType<typeof identity>>[] = [];
   for (const general of initial.generals) {
     const actor = await identity();
     general.userId = actor.id;
     actors.push(actor);
+    if (general.id !== 1) general.nextTurnTick = 1_000_000_000;
   }
   if (keepEnemyCity) initial.cities[3]!.nationId = 2;
+  Object.assign(initial.cities[0]!, {
+    commerce: 2_000_000,
+    commerceMax: 2_000_000,
+    agriculture: 2_000_000,
+    agricultureMax: 2_000_000,
+  });
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '작전 저장과 실행 검증',
     turnTermMinutes: 60,
     endYear: null,
-    replayFormat: 'policy',
+    replayFormat: 3,
+    featureData: recruitmentFixtureData(initial),
   });
   worlds.push(worldId);
   await controlClock(db, worldId, 'start');
+  const preparationLease = await acquireLease(db, worldId);
+  if (!preparationLease) throw Error('작전 모병 준비 실행권이 없습니다.');
+  try {
+    const loop = new TurnLoop(db, preparationLease);
+    await loop.advanceTo(10_000);
+    const recruiting = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
+    await recordTestTurns(db, worldId, 1, 'recruit', { amount: 1000, crewType: 1100, unitId: 'new' });
+    await loop.advanceTo(recruiting.nextTurnTick);
+    for (const key of ['train', 'morale'] as const) {
+      for (let i = 0; i < 20; i++) {
+        const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+        const unit = (
+          world.campaignState as unknown as { units: Array<{ ownerId: number; train: number; atmos: number }> }
+        ).units.find((unit) => unit.ownerId === 1)!;
+        if (unit[key === 'train' ? 'train' : 'atmos'] >= 90) break;
+        const general = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
+        await recordTestTurns(db, worldId, 1, key, {});
+        await loop.advanceTo(general.nextTurnTick);
+      }
+    }
+    expect(
+      await db.generalLog.findFirstOrThrow({ where: { worldId, generalId: 1, commandKey: 'recruit' } }),
+    ).toMatchObject({ kind: 'success' });
+  } finally {
+    await releaseLease(db, preparationLease);
+  }
+  const commanderState = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
   return {
     initial,
     worldId,
     commander: actors[0]!,
     commanderGeneralId: initial.generals.find((general) => general.userId === actors[0]!.id)!.id,
     enemy: actors[1]!,
+    revision: commanderState.turnRevision,
+    commandTick: commanderState.nextTurnTick,
   };
 }
 
@@ -105,8 +153,8 @@ async function createOperation(f: Awaited<ReturnType<typeof fixture>>, enemy = f
     {
       worldId: f.worldId,
       targetCityKey: enemy ? 1 : 2,
-      targetYear: f.initial.startYear,
-      targetMonth: 2,
+      targetYear: toGameDate(f.initial.startYear, f.commandTick + 10000).year,
+      targetMonth: toGameDate(f.initial.startYear, f.commandTick + 10000).month,
       min: { crew: 100, train: 90, atmos: 90 },
       memberIds: enemy ? [2, 3] : [1],
     },
@@ -171,7 +219,7 @@ describe('T2-11 / AC-M2-15 실제 HTTP 저장과 엔진 반영', () => {
     const slots: SlotInput[] = Array.from({ length: 30 }, () => null);
     slots[27] = { commandKey: 'rest', args: {} };
     slots[29] = { commandKey: 'farm', args: {} };
-    const seeded = await rpc('turns.set', { worldId: f.worldId, revision: 0, slots }, f.commander.cookie);
+    const seeded = await rpc('turns.set', { worldId: f.worldId, revision: f.revision, slots }, f.commander.cookie);
     expect(seeded.ok).toBe(true);
     const operation = await createOperation(f);
     const beforeSuggest = await snapshot(f.worldId);
@@ -215,7 +263,7 @@ describe('T2-11 / AC-M2-15 실제 HTTP 저장과 엔진 반영', () => {
     for (let slot = 1; slot < 30; slot++) expect(saved.slots[slot]).toEqual(suggestion.current[slot]);
     const detail = await rpc('operation.get', { worldId: f.worldId, id: operation.id }, f.commander.cookie);
     const planned = detail.timeline.find(({ generalId }) => generalId === 1)!.sortie!;
-    expect(planned.tick).toBe(100);
+    expect(planned.tick).toBe(f.commandTick);
     expect(planned.tick).toBeLessThan(detail.targetTick);
     const loop = await engine(f.worldId);
     expect(await loop.advanceTo(planned.tick - 1)).toEqual([]);
@@ -236,9 +284,9 @@ describe('T2-11 / AC-M2-15 실제 HTTP 저장과 엔진 반영', () => {
     ).toMatchObject({
       nationId: 1,
     });
-    expect(await db.generalLog.findMany({ where: { worldId: f.worldId, generalId: 1 } })).toMatchObject([
-      { tick: planned.tick, commandKey: 'attack', kind: 'success' },
-    ]);
+    expect(
+      await db.generalLog.findMany({ where: { worldId: f.worldId, generalId: 1, commandKey: 'attack' } }),
+    ).toMatchObject([{ tick: planned.tick, commandKey: 'attack', kind: 'success' }]);
     const after = await rpc('turns.get', { worldId: f.worldId }, f.commander.cookie);
     expect(after.revision).toBe(saved.revision + 1);
     expect(after.slots.slice(0, 29)).toEqual(saved.slots.slice(1));
@@ -305,7 +353,7 @@ describe('T2-11 / AC-M2-15 실제 HTTP 저장과 엔진 반영', () => {
       'turns.set',
       {
         worldId: f.worldId,
-        revision: 0,
+        revision: f.revision,
         slots: Array.from({ length: 30 }, (_, slot) =>
           slot === 0 ? { commandKey: 'attack', args: { cityKey: 2 } } : null,
         ),
@@ -313,7 +361,6 @@ describe('T2-11 / AC-M2-15 실제 HTTP 저장과 엔진 반영', () => {
       f.commander.cookie,
     );
     expect(saved.ok).toBe(true);
-    const before = await db.world.findUniqueOrThrow({ where: { id: f.worldId } });
     const victim = await db.nation.findUniqueOrThrow({ where: { worldId_id: { worldId: f.worldId, id: 2 } } });
     expect(victim.capitalCityKey).toBe(2);
     expect(await db.city.count({ where: { worldId: f.worldId, nationId: 2 } })).toBe(1);
@@ -361,13 +408,27 @@ describe('T2-11 / AC-M2-15 실제 HTTP 저장과 엔진 반영', () => {
     // Prisma 확장은 같은 DB·트랜잭션을 쓰지만 $on 노출과 $transaction 제네릭 시그니처가 원형 타입과 다르다.
     // TurnLoop가 쓰는 실제 $transaction과 질의는 확장 연결이 그대로 실행한다.
     const loop = await engine(f.worldId, observed as unknown as typeof db);
-    expect(await loop.advanceTo(100)).toEqual([{ generalId: 1, tick: 100, commandKey: 'attack' }]);
+    await loop.advanceTo(f.commandTick - 1);
+    const before = await db.world.findUniqueOrThrow({ where: { id: f.worldId } });
+    expect(await loop.advanceTo(f.commandTick)).toEqual([{ generalId: 1, tick: f.commandTick, commandKey: 'attack' }]);
     expect(removalOrder).toEqual(['archive', 'clear-capital', 'delete']);
     const world = await db.world.findUniqueOrThrow({ where: { id: f.worldId } });
-    expect(world).toMatchObject({ status: 'RUNNING', clockTick: 100, actionSequence: before.actionSequence + 1 });
-    expect(await db.generalLog.findMany({ where: { worldId: f.worldId, generalId: 1 } })).toMatchObject([
-      { tick: 100, commandKey: 'attack', kind: 'success' },
-    ]);
+    expect(
+      world,
+      JSON.stringify({
+        status: world.status,
+        tick: world.clockTick,
+        sequence: world.actionSequence,
+        previousSequence: before.actionSequence,
+      }),
+    ).toMatchObject({
+      status: 'RUNNING',
+      clockTick: f.commandTick,
+      actionSequence: before.actionSequence + 1,
+    });
+    expect(
+      await db.generalLog.findMany({ where: { worldId: f.worldId, generalId: 1, commandKey: 'attack' } }),
+    ).toMatchObject([{ tick: f.commandTick, commandKey: 'attack', kind: 'success' }]);
     expect(
       await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId: f.worldId, cityKey: 2 } } }),
     ).toMatchObject({
@@ -380,7 +441,7 @@ describe('T2-11 / AC-M2-15 실제 HTTP 저장과 엔진 반영', () => {
       nationId: 2,
       name: victim.name,
       color: victim.color,
-      removedTick: 100,
+      removedTick: f.commandTick,
       removedSequence: world.actionSequence,
     });
     expect(await db.nation.findUnique({ where: { worldId_id: { worldId: f.worldId, id: 2 } } })).toBeNull();

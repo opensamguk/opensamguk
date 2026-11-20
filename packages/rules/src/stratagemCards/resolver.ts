@@ -8,11 +8,11 @@ import { STRATAGEM_CARD_KINDS } from './config';
 import { incrementCardsRevision, readStratagemCardsState, reconcileStratagemCards } from './state';
 import { triggerStratagemTrap } from './trap';
 
-const enabled = (world: WorldView) => world.ruleFeatures?.includes('stratagem-cards-v1') ?? false;
+const enabled = () => true;
 const cardFor = (key: string) => STRATAGEM_CARD_KINDS.find((kind) => kind !== 'trap' && kind === key);
 
 function cardFailure(world: WorldView, actor: Actor, key: string, reserve: boolean) {
-  if (!enabled(world) || !cardFor(key)) return null;
+  if (!enabled() || !cardFor(key)) return null;
   const state = readStratagemCardsState(world.stratagemCards, world);
   if (reserve && !state.config.checkOnReserve) return null;
   const nationId = world.generals[actor.generalId]?.nationId;
@@ -31,28 +31,28 @@ export function createStratagemCardResolver(base: CommandResolver): CommandResol
       check: (world, actor, args) => original.check(world, actor, args) ?? cardFailure(world, actor, key, false),
       precheck: (world, actor, args) => original.precheck(world, actor, args) ?? cardFailure(world, actor, key, true),
       execute(world, actor, args, rng) {
-        if (!enabled(world)) return original.execute(world, actor, args, rng);
+        if (!enabled()) return original.execute(world, actor, args, rng);
         const denied = original.check(world, actor, args) ?? cardFailure(world, actor, key, false);
         if (denied) throw Error(denied.message);
-        let state = cloneWorld(world);
         const kind = cardFor(key);
+        const prepared = kind || world.campaign?.land ? cloneWorld(world) : null;
+        const view = prepared ?? world;
         if (kind) {
-          const cards = readStratagemCardsState(state.stratagemCards, state);
+          const cards = readStratagemCardsState(view.stratagemCards, view);
           // 확률 실패 미소모는 결과 판정 계약이 추가로 필요하다. 미구현 값을 조용히 무시하지 않는다.
           if (!cards.config.consumeOnRollFailure) throw Error('확률 실패 미소모 규칙은 아직 지원하지 않습니다.');
-          const nationId = state.generals[actor.generalId]!.nationId!,
+          const nationId = view.generals[actor.generalId]!.nationId!,
             hand = cards.nations[nationId]!.hand;
           hand.splice(hand.indexOf(kind), 1);
           incrementCardsRevision(cards);
-          state.stratagemCards = cards;
+          prepared!.stratagemCards = cards;
         }
-        const trap =
-          key === 'attack' ? triggerStratagemTrap(state, actor, (args as { cityKey: number }).cityKey) : null;
-        if (trap) state = trap.state;
+        const trap = key === 'attack' ? triggerStratagemTrap(view, actor, (args as { cityKey: number }).cityKey) : null;
+        const input = trap?.state ?? view;
         const result = trap?.cancelled
           ? { ...success('함정 피해로 출병 병력이 전투하지 못해 점령에 실패했습니다.'), effects: [] }
-          : original.execute(state, actor, args, rng);
-        state = applyEffects(state, result.effects);
+          : original.execute(input, actor, args, rng);
+        const state = applyEffects(input, result.effects);
         state.stratagemCards = reconcileStratagemCards(state, state.stratagemCards, actor.tick ?? 0);
         return {
           ...result,
@@ -78,12 +78,12 @@ export function createStratagemCardResolver(base: CommandResolver): CommandResol
     get: definition,
     list: (target) => base.list(target).map((def) => definition(def.key)!),
     precheck(world, actor, key, args) {
-      if (!enabled(world) || !base.get(key)) return base.precheck(world, actor, key, args);
+      if (!enabled() || !base.get(key)) return base.precheck(world, actor, key, args);
       const prepared = prepare(actor, key, args);
       return 'failure' in prepared ? prepared.failure : prepared.def.precheck(world, actor, prepared.args);
     },
     run(world, actor, key, args, rng) {
-      if (!enabled(world) || !base.get(key)) return base.run(world, actor, key, args, rng);
+      if (!enabled() || !base.get(key)) return base.run(world, actor, key, args, rng);
       const prepared = prepare(actor, key, args);
       if ('failure' in prepared) return prepared.failure;
       return prepared.def.check(world, actor, prepared.args) ?? prepared.def.execute(world, actor, prepared.args, rng);

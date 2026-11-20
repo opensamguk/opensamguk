@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
-import { commandWorld, testUnits } from '../../test/commandFixture';
+import { tacticalFixture, testUnits } from '../../test/tacticalFixture';
+import { applyBattleStep } from '../tactical/input';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import type { WorldState } from '../model/world';
 import { initialNationLifecycle } from '../nationLifecycle/state';
@@ -8,15 +9,28 @@ import { runGeneralTurn } from './turn';
 
 const firstMonthOf195 = 36 * TICKS_PER_MONTH;
 function fixture() {
-  const world = commandWorld();
+  const { world } = tacticalFixture();
+  delete world.campaign!.tactical;
   world.startYear = 192;
+  world.campaign!.units[0]!.troops = 10000;
+  world.campaign!.units[1]!.troops = 20;
+  world.cities[2]!.wall = 0;
+  world.cityResources!.cities['1']!.rice = 100000;
+  for (const general of Object.values(world.generals)) general.userId = `recruitment-${general.id}`;
   world.nations[1]!.isNpc = false;
   world.commandMeta = { nextNationId: 3, offers: { 4: 1 }, lastNationRecruitmentLock: { fromYear: 195 } };
   return world;
 }
 
-function run(state: WorldState, tick: number, generalId: number, commandKey: string, args: unknown = {}) {
-  return runGeneralTurn(
+function run(
+  state: WorldState,
+  tick: number,
+  generalId: number,
+  commandKey: string,
+  args: unknown = {},
+  settlementTick = tick,
+) {
+  const outcome = runGeneralTurn(
     state,
     { generalId, tick, unitSet: testUnits },
     { commandKey, args },
@@ -24,6 +38,30 @@ function run(state: WorldState, tick: number, generalId: number, commandKey: str
     {},
     resolverForRuleFeatures(state),
   );
+  if (commandKey === 'attack') {
+    expect(outcome.result, JSON.stringify(outcome.result)).not.toHaveProperty('code');
+    let next = outcome.state;
+    for (let step = 0; step < 33; step++) {
+      const battle = next.campaign!.tactical!.battles[0]!;
+      if (battle.settled) break;
+      next = applyBattleStep(
+        next,
+        {
+          battleId: battle.id,
+          now: Math.max(1, battle.deadlineAt),
+          turnTermMinutes: 60,
+          present: false,
+          orders: [],
+          cancel: null,
+        },
+        testUnits,
+        settlementTick,
+      );
+    }
+    expect(next.campaign!.tactical!.battles[0]).toMatchObject({ settled: true, result: 'attack' });
+    outcome.state = next;
+  }
+  return outcome;
 }
 
 it('AC-P2-24 195년 전 멸망은 임관을 막지 않고 경계일에도 소급하지 않는다', () => {
@@ -65,7 +103,6 @@ it('AC-P2-24 방랑국 자진 해산으로 한 나라가 남아도 임관을 허
   const world = fixture();
   world.nations[2]!.isNpc = false;
   world.diplomacies = [];
-  world.ruleFeatures = ['nation-lifecycle-v1', 'personnel'];
   world.nationLifecycle = initialNationLifecycle();
   const wandering = run(world, firstMonthOf195, 2, 'wander');
   expect(wandering.state.nationLifecycle?.nations[2]).toEqual({ sinceTick: firstMonthOf195 });
@@ -74,4 +111,9 @@ it('AC-P2-24 방랑국 자진 해산으로 한 나라가 남아도 임관을 허
   expect(state.commandMeta?.lastNationRecruitmentLock).toEqual({ fromYear: 195 });
   const { state: joined } = run(state, firstMonthOf195 + 2, 4, 'join', { nationId: 1 });
   expect(joined.generals[4]!.nationId).toBe(1);
+});
+
+it('AC-P2-24 195년 전 출병해도 경계일에 전술 정산하면 모집을 잠근다', () => {
+  const { state } = run(fixture(), firstMonthOf195 - 1, 1, 'attack', { cityKey: 2 }, firstMonthOf195);
+  expect(state.commandMeta?.lastNationRecruitmentLock).toEqual({ fromYear: 195, blockedNationId: 1 });
 });

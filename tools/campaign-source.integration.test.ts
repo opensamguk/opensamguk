@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb, loadSexLedger } from '../apps/engine/src/world/resources';
+import { applySexLedger } from '../packages/rules/src/index';
+import { storedFixture } from '../apps/engine/test/storedFixture';
 import { readCampaignArmyTypes } from '../apps/engine/src/campaignState';
 import { checkStoredReplayFormat } from '../apps/engine/src/features';
 import { createDb } from '../packages/db/src/index';
@@ -22,19 +24,13 @@ describe('AC-INT-06 휘하 저장 경계', () => {
       portraitMap: '191-map',
       seed: 'immutable-army-source',
     });
-    initial.ruleFeatures = ['campaign-v1', 'five-stats', 'operational-map', 'personnel', 'policy'];
-    const origin = {
-      version: 3,
-      initial,
-      initialStateHash: 'hash',
-      resourceHash: 'hash',
-      featureData: { policy: { version: 1, turnTermMinutes: 60 } },
-    };
+    initial.generals = applySexLedger(initial, loadSexLedger(initial.scenarioKey));
+    const { origin } = storedFixture(initial);
     const row = JSON.parse(JSON.stringify({ unitSet: initial.unitSet, replayOrigin: origin }));
     const types = readCampaignArmyTypes(row);
     expect(types).toContain(1100);
     expect(types).not.toContain(1000);
-    const checked = checkStoredReplayFormat({ ...row, replayFormat: 3, ruleFeatures: initial.ruleFeatures });
+    const checked = checkStoredReplayFormat({ ...row, replayFormat: 3 });
     expect(checked).toBe(row.replayOrigin);
     expect(readCampaignArmyTypes(row, checked)).toEqual(types);
     expect(() => readCampaignArmyTypes({ ...row, replayOrigin: structuredClone(row.replayOrigin) }, checked)).toThrow(

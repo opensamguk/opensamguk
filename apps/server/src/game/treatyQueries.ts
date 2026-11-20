@@ -47,8 +47,6 @@ function invalid(): never {
 
 export function requireTreatyWorld(world: StoredWorld): void {
   if (world.replayFormat === 3) {
-    if (!world.ruleFeatures.includes('treaty'))
-      throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '조약 기능을 쓰지 않는 월드입니다.' });
     return;
   }
   let selected: ReturnType<typeof selectWorldCapabilities>;
@@ -62,19 +60,16 @@ export function requireTreatyWorld(world: StoredWorld): void {
 }
 
 export function treatyTradeEnabled(world: StoredWorld): boolean {
-  return (
-    world.replayFormat === 3 && world.ruleFeatures.includes('treaty') && world.ruleFeatures.includes('treaty-trade')
-  );
+  return world.replayFormat === 3;
 }
 
 export function worldTreatyOptions(world: StoredWorld) {
-  return treatyOptions(world.replayFormat === 3 && world.ruleFeatures.includes('treaty') ? world.ruleFeatures : []);
+  requireTreatyWorld(world);
+  return treatyOptions();
 }
 
 export function treatyBreakEnabled(world: StoredWorld): boolean {
-  return (
-    world.replayFormat === 3 && world.ruleFeatures.includes('treaty') && world.ruleFeatures.includes('treaty-break')
-  );
+  return world.replayFormat === 3;
 }
 
 export function requireTreatyBreakWorld(world: StoredWorld): void {

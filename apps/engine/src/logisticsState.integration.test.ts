@@ -24,6 +24,9 @@ import { loadInitialWorldFromDb } from './world/resources';
 import { saveInitialWorld } from './world/persistence';
 import { controlClock } from './world/clock';
 import { loadReplayState } from './monthly';
+import { persistGovernanceState } from './governance/repository';
+import { persistLineageState } from './lineage/repository';
+import { persistStratagemCardsState } from './stratagemCards/state';
 import { acquireLease, releaseLease } from './lease';
 import { TurnLoop } from './turnLoop';
 import { exportReplay, replayArchive } from './replay';
@@ -50,16 +53,7 @@ const db = createDb(url),
   ids: string[] = [],
   userIds: string[] = [];
 let initial: WorldInit, config: LogisticsConfig;
-const features = [
-  'campaign-assignment-v2',
-  'campaign-v1',
-  'city-resources-v1',
-  'five-stats',
-  'logistics-v1',
-  'operational-map',
-  'personnel',
-  'policy',
-];
+
 beforeAll(async () => {
   initial = await loadInitialWorldFromDb(db, {
     scenario: 'integration191',
@@ -70,7 +64,6 @@ beforeAll(async () => {
   });
   // 이 스케줄도 원생성에 고정한다. DB를 고쳐서 NPC 차례를 생략하지 않는다.
   initial.generals = initial.generals.map((general) => ({ ...general, crew: 0, nextTurnTick: 1_000_000 }));
-  initial.ruleFeatures = [...features];
   const city = initial.cities.find(
     (row) =>
       row.kind !== 'PASS' &&
@@ -116,7 +109,7 @@ async function fixture(source = initial, rules = config, seed: string = randomUU
       turnTermMinutes: 60,
       endYear: 201,
       replayFormat: 3,
-      ruleFeatures: features,
+
       featureData: { 'logistics-v1': rules },
     },
   );
@@ -130,6 +123,15 @@ async function saveMonth(id: string, before: WorldState, fail = false) {
     await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${id} FOR UPDATE`;
     await persistLogisticsState(tx, id, before, next.state);
     await appendLogisticsMovements(tx, id, next.movements, { tick: 10_000, sequence: 1 });
+    const coupled = {
+      ...next.state,
+      governance: { ...before.governance!, monthlyTick: 10_000 },
+      lineage: { ...before.lineage!, monthlyTick: 10_000 },
+      stratagemCards: { ...before.stratagemCards!, monthlyTick: 10_000 },
+    };
+    await persistGovernanceState(tx, id, before, coupled);
+    await persistLineageState(tx, id, before, coupled);
+    await persistStratagemCardsState(tx, id, before, coupled, 10_000);
     await tx.world.update({ where: { id }, data: { monthlyTick: 10_000 } });
     if (fail) throw new Error('after-logistics-save');
   });
@@ -187,6 +189,7 @@ async function queuedFixture() {
 async function npcFixture(mode: 'buy' | 'transport', treasuryBudgetBp?: number) {
   const source = structuredClone(initial),
     byCity = new Map(source.cities.map((city) => [city.cityKey, city]));
+  source.scenarioKey = 'engine-logistics-npc-fixture';
   const rulers = source.generals.filter(
     (general) => general.userId === null && general.officerLevel === 12 && general.activeFromYear <= source.startYear,
   );
@@ -531,7 +534,7 @@ describe('AC-P2-30 실제 PostgreSQL 물류', () => {
     await expect(
       db.world.update({
         where: { id: world.id },
-        data: { ruleFeatures: features.filter((key) => key !== 'logistics-v1') },
+        data: { logisticsState: {} },
       }),
     ).rejects.toThrow();
     const corrupted = structuredClone(world.before.logistics!);
@@ -566,7 +569,13 @@ describe('AC-P2-30 실제 PostgreSQL 물류', () => {
     const before = await db.$transaction((tx) => loadReplayState(tx, world.id));
     const date = monthlyDate(before.state.startYear, 10_000);
     const base = runMonthly(before.state, 10_000, rngFor(world.seed, 'monthly', date.year, date.month));
-    const expected = settleMonthlyFeatures(before, { ...before, state: base.state, monthlyTick: 10_000 }, 10_000);
+    const expected = settleMonthlyFeatures(
+      before,
+      { ...before, state: base.state, monthlyTick: 10_000 },
+      10_000,
+      undefined,
+      world.seed,
+    );
     const expectedRows = z
       .strictObject({ movements: z.array(logisticsMovementSchema) })
       .parse(expected.effects['logistics-v1']).movements;

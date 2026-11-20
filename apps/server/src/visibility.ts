@@ -25,8 +25,15 @@ type General = Omit<
   | 'sex'
   | 'removedAt'
   | 'officerCityKey'
+  | 'cityAnchorKey'
+  | 'movePath'
 > & { politics?: number | null; charm?: number | null };
-type City = Omit<Prisma.CityGetPayload<true>, 'kind'> & { kind?: string | null };
+type City = Omit<Prisma.CityGetPayload<true>, 'kind' | 'state' | 'stateTerm' | 'parentCityKey'> & {
+  kind?: string | null;
+  state?: number | null;
+  stateTerm?: number | null;
+  parentCityKey?: number | null;
+};
 type Nation = Omit<
   Prisma.NationGetPayload<true>,
   'notice' | 'noticeDirective' | 'noticeRevision' | 'noticeUpdatedAt' | 'noticeUpdatedBy'
@@ -81,12 +88,14 @@ export function visibility(viewer: Viewer) {
   };
 }
 
-export function mapCity(city: City) {
+export function mapCity(city: City, discloseState = true) {
   return {
     key: city.cityKey,
     ...(city.kind != null ? { kind: city.kind } : {}),
     name: city.name,
     level: city.level,
+    ...(discloseState ? { state: city.state ?? 0, stateTerm: city.stateTerm ?? 0 } : {}),
+    parentCityKey: city.parentCityKey ?? null,
     x: city.x,
     y: city.y,
     nationId: city.nationId,
@@ -199,8 +208,8 @@ export function cityCapacity(city: City) {
   };
 }
 
-export function cityInfo(city: City, viewer: Viewer, alliedResidence = false) {
-  const publicInfo = { ...mapCity(city), ...cityCapacity(city) };
+export function cityInfo(city: City, viewer: Viewer, alliedResidence = false, discloseState = true) {
+  const publicInfo = { ...mapCity(city, discloseState), ...cityCapacity(city) };
   if (!alliedResidence && !visibility(viewer).city(city))
     return city.nationId === null ? { ...publicInfo, defence: city.defence, wall: city.wall } : publicInfo;
   return {
@@ -296,14 +305,21 @@ export function publicTimelapseCityInfo(city: Prisma.CityGetPayload<{ select: ty
 }
 
 const publicMapData = z.object({
-  capitalAndSupply: z.unknown().optional(),
+  siteOwnership: z
+    .array(z.object({ anchorKey: z.number().int().positive(), nationId: z.number().int().positive().nullable() }))
+    .optional(),
+  emperorCityKey: z.number().int().positive().nullable().optional(),
   operationalMap: publicGeographySchema.optional(),
   cities: z.array(
     z.object({
       key: z.string(),
       name: z.string(),
       level: z.number().int(),
-      kind: z.enum(['CITY', 'PASS']).optional(),
+      state: z.number().int().min(0).max(49).optional(),
+      stateTerm: z.number().int().nonnegative().optional(),
+      parentCityKey: z.number().int().positive().nullable().optional(),
+      detached: z.boolean().optional(),
+      kind: z.enum(['CITY', 'PASS', 'FIELD']).optional(),
       ruin: z
         .object({ percent: z.union([z.literal(10), z.literal(40), z.literal(70)]) })
         .nullable()
@@ -329,21 +345,18 @@ const publicMapData = z.object({
 export function publicMapInfo(data: Prisma.JsonValue) {
   const result = publicMapData.safeParse(data);
   if (!result.success) return null;
-  const { capitalAndSupply, cities, nations, ...geography } = result.data;
+  const { cities, nations, ...geography } = result.data;
   const cityOwners = new Map(cities.map((city) => [city.key, city.nationId]));
   return {
     ...geography,
     cities: cities.map(({ supplied, ...city }) =>
-      capitalAndSupply === true && typeof supplied === 'boolean' && city.nationId !== null
-        ? { ...city, supplied }
-        : city,
+      typeof supplied === 'boolean' && city.nationId !== null ? { ...city, supplied } : city,
     ),
     nations: nations.map(({ capitalCityKey, ...nation }) =>
-      capitalAndSupply === true &&
-      (capitalCityKey === null ||
-        (typeof capitalCityKey === 'number' &&
-          Number.isSafeInteger(capitalCityKey) &&
-          cityOwners.get(String(capitalCityKey)) === nation.id))
+      capitalCityKey === null ||
+      (typeof capitalCityKey === 'number' &&
+        Number.isSafeInteger(capitalCityKey) &&
+        cityOwners.get(String(capitalCityKey)) === nation.id)
         ? { ...nation, capitalCityKey }
         : nation,
     ),

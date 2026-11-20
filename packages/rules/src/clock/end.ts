@@ -37,18 +37,13 @@ export const adminEndRejectedSchema = z
   .refine((value) => adminEndRejectMessages[value.code] === value.message);
 
 export function checkAdminEndOrigin(
-  world: { replayFormat: number; replayOrigin: unknown; ruleFeatures: string[] },
+  world: { replayFormat: number; replayOrigin: unknown },
   checkOrigin: (value: unknown) => asserts value is ReplayOriginV1 | ReplayOriginV3,
   hash: (value: unknown) => string,
 ): void {
   const origin = world.replayOrigin;
   checkOrigin(origin);
-  if (
-    world.replayFormat !== 3 ||
-    origin.version !== 3 ||
-    JSON.stringify(origin.initial.ruleFeatures ?? []) !== JSON.stringify(world.ruleFeatures)
-  )
-    throw new Error('원생성 형식3 월드가 필요합니다.');
+  if (world.replayFormat !== 3 || origin.version !== 3) throw new Error('원생성 형식3 월드가 필요합니다.');
   const initial = origin.initial;
   const resources = {
     scenarioKey: initial.scenarioKey,

@@ -1,21 +1,16 @@
+import { CONTENT_TAG, RESOURCE_INPUTS } from './resources-sql/convert';
+import { hashState } from '../packages/shared/src/node/hashState';
+import { integrationResourceRows } from './integration-resources';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { createHash, randomUUID, randomInt } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { afterAll, beforeAll, beforeEach, expect, it as test } from 'vitest';
 import { createDb } from '../packages/db/src/index';
-import { buildServer } from '../apps/server/src/server';
-import { newSession } from '../apps/server/src/auth/session';
-import { hashPassword } from '../apps/server/src/auth/password';
-import { initializeResources } from './init-resources';
-import { initializeIntegrationResources } from './integration-resources';
-import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
-import { controlClock } from '../apps/engine/src/world/clock';
-import { acquireLease, releaseLease } from '../apps/engine/src/lease';
-import { TurnLoop } from '../apps/engine/src/turnLoop';
-import { testDatabaseUrl } from './test-database';
+import { composeInitialWorld } from '../apps/engine/src/world/resources';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
 import { confirmDisconnectedDatabase } from './test-db-close';
+import { insertHistoricalWorld } from './historical-world-fixture';
 
 type Pg = {
   connect(): Promise<void>;
@@ -32,7 +27,7 @@ if (!['localhost', '127.0.0.1'].includes(source.hostname)) throw new Error('loop
 for (const key of source.searchParams.keys())
   if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
     throw new Error('접속 대상 질의 인자는 쓸 수 없습니다.');
-const name = 't305_create_migration_' + randomUUID().replaceAll('-', '') + '_test',
+const name = ciGreenDatabaseName('opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test'),
   target = new URL(source),
   adminUrl = new URL(source);
 target.pathname = '/' + name;
@@ -46,13 +41,9 @@ const pending = new Set<Promise<unknown>>(),
   secrets = new Set<string>(),
   logs: string[] = [];
 let oid: string | undefined,
-  app: Awaited<ReturnType<typeof buildServer>> | undefined,
-  address = '',
   ownerId = '',
   passwordHash = '';
-const officeRequestColumn = 'ALTER TABLE "WorldCreateRequest" ADD COLUMN "officeEffects" JSONB;';
-const migration = '20261110000000_world_create_requests',
-  origin = 'http://127.0.0.1:5173';
+const migration = '20261110000000_world_create_requests';
 function track<T>(work: () => Promise<T>) {
   const promise = Promise.resolve().then(work);
   pending.add(promise);
@@ -228,68 +219,26 @@ beforeAll(
           all = (await checked(async () => readdir(directory))).filter((value) => /^\d{14}_/.test(value)).sort();
         expect(all).toContain(migration);
         expect(all.indexOf('20261117000000_stratagem_cards_state')).toBe(44);
-        for (const item of all.filter((value) => value !== migration)) {
+        for (const item of all.filter((value) => value < migration)) {
           signal.throwIfAborted();
-          const sql = await checked(async () => readFile(new URL(item + '/migration.sql', directory), 'utf8'));
-          if (item === '20261215000000_resident_city_offices') {
-            expect(sql).toContain(officeRequestColumn);
-            // The current client needs the new office columns, except on the request table that this test migrates.
-            await checked(async () => gate.query(sql.replace(officeRequestColumn, '')));
-          } else await checked(async () => gate.query(sql));
+          await checked(async () => gate.query(await readFile(new URL(item + '/migration.sql', directory), 'utf8')));
         }
-        await checked(async () =>
-          initializeResources(
-            db,
-            await checked(async () =>
-              readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8'),
-            ),
+        ownerId = randomUUID();
+        passwordHash = 'historical-preserved-hash';
+        secrets.add(passwordHash);
+        await checked(() =>
+          gate.query(
+            `INSERT INTO "User" (id,email,"passwordHash",role,"emailVerifiedAt") VALUES ($1,$2,$3,'ADMIN',NOW())`,
+            [ownerId, randomUUID() + '@example.test', passwordHash],
           ),
         );
-        await checked(async () => initializeIntegrationResources(db));
-        passwordHash = await checked(async () => hashPassword(randomUUID()));
-        secrets.add(passwordHash);
-        const owner = await checked(async () =>
-          db.user.create({
-            data: { email: randomUUID() + '@example.test', passwordHash, role: 'ADMIN', emailVerifiedAt: new Date() },
-          }),
+        await checked(() =>
+          gate.query(`INSERT INTO "AccountToken" (id,"userId",purpose,"expiresAt") VALUES ($1,$2,'VERIFY_EMAIL',$3)`, [
+            randomUUID(),
+            ownerId,
+            new Date('2027-01-01T00:00:00Z'),
+          ]),
         );
-        ownerId = owner.id;
-        secrets.add(owner.email);
-        const session = newSession(Date.now());
-        secrets.add(session.token);
-        await checked(async () =>
-          db.session.create({ data: { id: session.id, userId: owner.id, expiresAt: session.expiresAt } }),
-        );
-        await checked(async () =>
-          db.accountToken.create({
-            data: {
-              id: randomUUID(),
-              userId: owner.id,
-              purpose: 'VERIFY_EMAIL',
-              expiresAt: new Date(Date.now() + 60_000),
-            },
-          }),
-        );
-        app = await buildServer({
-          db,
-          publicOrigin: origin,
-          logStream: {
-            write(chunk: string) {
-              logs.push(chunk);
-            },
-          },
-        });
-        await checked(async () => app!.ready());
-        const binds: unknown[] = [];
-        for (let attempt = 0; attempt < 16; attempt++)
-          try {
-            address = await checked(async () => app!.listen({ host: '127.0.0.1', port: randomInt(20_000, 50_000) }));
-            break;
-          } catch (error) {
-            if (app.server.listening || (error as NodeJS.ErrnoException).code !== 'EADDRINUSE') throw error;
-            binds.push(error);
-          }
-        if (!address) throw new AggregateError(binds, '자기 migration listener bind 실패');
       },
       track,
     ),
@@ -298,106 +247,56 @@ beforeAll(
 it('AC-M3-04 새 migration 전 정식 두 월드·사람30·입력·감사·토큰을 준비한다', async (signal) => {
   for (const index of [0, 1]) {
     signal.throwIfAborted();
-    const initial = await checked(async () =>
-      loadInitialWorldFromDb(db, {
-        scenario: 'integration191',
-        map: 'integration',
-        statRules: 'five-stats',
-        portraitMap: '191-map',
-        seed: 'create-migration-' + index,
-      }),
-    );
-    const { worldId } = await checked(async () =>
-      saveInitialWorld(db, initial, {
-        name: 'migration 보존 정식' + index,
-        turnTermMinutes: 60,
-        endYear: 300,
-      }),
-    );
+    const initial = await historicalInitial('create-migration-' + index);
+    const worldId = await checked(() => insertHistoricalWorld(gate, initial, 'migration-preserved-' + index));
     worlds.push(worldId);
-    expect(await checked(async () => db.general.count({ where: { worldId } }))).toBe(491);
-    expect(await checked(async () => db.nation.count({ where: { worldId } }))).toBe(21);
-    await checked(async () => controlClock(db, worldId, 'start'));
-    const user =
-      index === 0
-        ? await checked(async () => db.user.findUniqueOrThrow({ where: { id: ownerId } }))
-        : await checked(async () =>
-            db.user.create({
-              data: { email: randomUUID() + '@example.test', passwordHash, emailVerifiedAt: new Date() },
-            }),
-          );
-    secrets.add(user.email);
-    const sid = newSession(Date.now());
-    secrets.add(sid.token);
-    await checked(async () => db.session.create({ data: { id: sid.id, userId: user.id, expiresAt: sid.expiresAt } }));
-    const request = track(async () => {
-      signal.throwIfAborted();
-      const response = await fetch(address + '/trpc/general.create', {
-        method: 'POST',
-        signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)]),
-        headers: { origin, cookie: 'sid=' + sid.token, 'content-type': 'application/json' },
-        body: JSON.stringify({
-          worldId,
-          name: '이전사람' + index,
-          portraitId: null,
-          leadership: 55,
-          strength: 55,
-          intel: 55,
-          politics: 55,
-          charm: 55,
-        }),
-      });
-      await response.text();
-      signal.throwIfAborted();
-      return response.status;
-    });
-    const settled = Promise.allSettled([request]),
-      failures: unknown[] = [];
-    try {
-      await checked(async () =>
-        expect
-          .poll(() => checked(() => db.inputEvent.count({ where: { worldId, userId: user.id, status: 'PENDING' } })), {
-            timeout: 10_000,
-          })
-          .toBe(1),
+    expect((await gate.query('SELECT count(*)::int AS n FROM "General" WHERE "worldId"=$1', [worldId])).rows).toEqual([
+      { n: 491 },
+    ]);
+    expect((await gate.query('SELECT count(*)::int AS n FROM "Nation" WHERE "worldId"=$1', [worldId])).rows).toEqual([
+      { n: 21 },
+    ]);
+    const userId = index === 0 ? ownerId : randomUUID();
+    if (index !== 0)
+      await checked(() =>
+        gate.query('INSERT INTO "User" (id,email,"passwordHash") VALUES ($1,$2,$3)', [
+          userId,
+          randomUUID() + '@example.test',
+          passwordHash,
+        ]),
       );
-      signal.throwIfAborted();
-      const lease = await acquireLease(db, worldId);
-      if (!lease) throw new Error('자기 migration 리스가 필요합니다.');
-      try {
-        await checked(async () => new TurnLoop(db, lease).advanceTo(0, signal));
-      } catch (error) {
-        failures.push(error);
-      } finally {
-        try {
-          await releaseLease(db, lease);
-        } catch (error) {
-          failures.push(error);
-        }
-      }
-    } catch (error) {
-      failures.push(error);
-    }
-    for (const result of await settled) if (result.status === 'rejected') failures.push(result.reason);
-    if (failures.length) throw new AggregateError(failures, 'migration 사람 생성 정착 실패');
-    expect(await request).toBe(200);
-    const general = await checked(async () =>
-      db.general.findUniqueOrThrow({ where: { worldId_userId: { worldId, userId: user.id } } }),
+    await checked(() =>
+      gate.query('INSERT INTO "Session" (id,"userId","expiresAt") VALUES ($1,$2,$3)', [
+        randomUUID(),
+        userId,
+        new Date('2027-01-01T00:00:00Z'),
+      ]),
     );
-    expect(await checked(async () => db.generalTurn.count({ where: { worldId, generalId: general.id } }))).toBe(30);
-    await checked(async () => controlClock(db, worldId, 'pause'));
+    const generalId = initial.generals[0]!.id;
+    await checked(() =>
+      gate.query('UPDATE "General" SET "userId"=$1 WHERE "worldId"=$2 AND id=$3', [userId, worldId, generalId]),
+    );
+    await checked(() =>
+      gate.query(
+        'INSERT INTO "GeneralTurn" ("worldId","generalId",slot,explicit) SELECT $1,$2,generate_series(0,29),false',
+        [worldId, generalId],
+      ),
+    );
+    expect(
+      (await gate.query('SELECT count(*)::int AS n FROM "GeneralTurn" WHERE "worldId"=$1', [worldId])).rows,
+    ).toEqual([{ n: 30 }]);
+    await checked(() =>
+      gate.query(
+        `INSERT INTO "InputEvent" ("worldId","userId","generalId",kind,"idempotencyKey",payload,status,sequence,result,"stepTick") VALUES ($1,$2,$3,'general.create',$4,'{}','APPLIED',1,'{}',0)`,
+        [worldId, userId, generalId, randomUUID()],
+      ),
+    );
   }
-  await checked(async () =>
-    db.auditLog.create({
-      data: {
-        actorKind: 'ADMIN',
-        actorUserId: ownerId,
-        action: 'migration.fixture',
-        targetType: 'World',
-        targetId: worlds[0]!,
-        payload: { kept: true },
-      },
-    }),
+  await checked(() =>
+    gate.query(
+      `INSERT INTO "AuditLog" ("actorKind","actorUserId",action,"targetType","targetId",payload) VALUES ('ADMIN',$1,'migration.fixture','World',$2,'{"kept":true}')`,
+      [ownerId, worlds[0]],
+    ),
   );
   beforeTables = await checked(async () => tables());
   beforeHash = await checked(async () => rowsHash(beforeTables));
@@ -411,7 +310,6 @@ it('AC-M3-04 새 생성 요청 migration은 기존 모든 표·값·sequence를 
   expect(await rowsHash(beforeTables)).toBe(beforeHash);
   expect(await sequences()).toEqual(beforeSequences);
   expect((await gate.query('SELECT * FROM "WorldCreateRequest"')).rows).toEqual([]);
-  await gate.query(officeRequestColumn);
 });
 async function transaction(work: () => Promise<void>) {
   operationSignals.getStore()?.throwIfAborted();
@@ -591,11 +489,7 @@ afterAll(
       // Late setup/body/close success never clears suite.failed or authorizes DROP.
       await cleanupAttempt(settle, 70_000, false);
 
-      const closers: Array<() => Promise<unknown>> = [
-        async () => app?.close(),
-        () => gate.end(),
-        () => db.$disconnect(),
-      ];
+      const closers: Array<() => Promise<unknown>> = [() => gate.end(), () => db.$disconnect()];
       await Promise.all(closers.map((close) => cleanupAttempt(close)));
       if (pending.size) suite.fail(new Error('미정착 원 작업이 있어 DB 보존'));
       for (const secret of secrets)
@@ -720,3 +614,31 @@ for (const hook of ['setup', 'cleanup'])
     if (!guard.failed) drops++;
     expect(drops).toBe(0);
   });
+
+// 옛 schema에는 현 Prisma의 GameResource 열이 없다. 정식 파일을 공식 합성기로 읽는다.
+async function historicalInitial(seed: string) {
+  const rows = await integrationResourceRows();
+  const sql = await readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8');
+  const parts = sql.split(CONTENT_TAG);
+  const index = parts.findIndex((part) => part.includes("'UNIT_SET', 'basic', 1, 'PUBLISHED', resource_content"));
+  const unitSet: unknown = JSON.parse(parts[index - 1] ?? 'null');
+  if (hashState(unitSet) !== RESOURCE_INPUTS.find((row) => row.kind === 'UNIT_SET')!.contentHash)
+    throw Error('옛 schema 고정물의 내장 병종 해시가 다릅니다.');
+  return composeInitialWorld(
+    {
+      map: rows.find((row) => row.kind === 'MAP')!,
+      scenario: rows.find((row) => row.kind === 'SCENARIO')!,
+      statRules: rows.find((row) => row.kind === 'STAT_RULES')!,
+      portraitMap: rows.find((row) => row.kind === 'PORTRAIT_MAP')!,
+      unitSet: {
+        kind: 'UNIT_SET',
+        name: 'basic',
+        version: 1,
+        content: unitSet,
+        contentHash: hashState(unitSet),
+        source: 'core2026 df6c926 MIT; resources/NOTICE.md',
+      },
+    },
+    seed,
+  );
+}

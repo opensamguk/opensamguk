@@ -8,6 +8,7 @@ import {
   query,
   releaseIdleWorld,
   setTurns,
+  placeGeneral,
   startEngine,
   stubPortraits,
   turns,
@@ -39,13 +40,10 @@ async function member(browser: Browser, world: string, nationId: number, officer
       await stop();
     }
   })();
-  await withE2eDb(async (db) => {
-    const city = await db.city.findFirstOrThrow({ where: { worldId: world, nationId }, select: { cityKey: true } });
-    await db.general.update({
-      where: { worldId_id: { worldId: world, id: general.id } },
-      data: { nationId, officerLevel, cityKey: city.cityKey, crew: 0 },
-    });
-  });
+  const city = await withE2eDb((db) =>
+    db.city.findFirstOrThrow({ where: { worldId: world, nationId }, select: { cityKey: true } }),
+  );
+  await placeGeneral(world, general.id, { nationId, officerLevel, cityKey: city.cityKey, crew: 0 });
   return { page, generalId: general.id, name: general.name };
 }
 
@@ -130,11 +128,12 @@ test.describe('국가 작전판', () => {
       Array.from({ length: 30 }, (_, i) => (i === 20 ? { commandKey: 'farm' } : null)),
     );
 
-    // 메인에서 저장하지 않은 편집 하나를 만든다.
+    // 메인에서 저장하지 않은 편집 하나를 만든다. 훈련은 부곡을 고르는 인자가 있어(결정 19) 부곡 없는 장수로는 넣지 못하므로
+    // 인자 없는 상업 투자를 넣는다. 이 시험이 보는 것은 명령 종류가 아니라 초안 보존과 덮기 확인이다.
     await chief.page.goto(`/w/${s.world}`);
     await editor(chief.page).locator('tr[data-slot="25"]').click();
-    await editor(chief.page).getByLabel('명령 찾기').fill('훈련');
-    await editor(chief.page).getByRole('radio', { name: '훈련' }).check();
+    await editor(chief.page).getByLabel('명령 찾기').fill('상업 투자');
+    await editor(chief.page).getByRole('radio', { name: '상업 투자' }).check();
     await editor(chief.page)
       .getByRole('button', { name: /25번 칸에 넣기/ })
       .click();
@@ -158,7 +157,7 @@ test.describe('국가 작전판', () => {
 
     const saved = await turns(chief.page, s.world);
     expect(saved.slots.some((slot) => slot.commandKey === 'attack')).toBe(true);
-    expect(saved.slots[24]!.commandKey).toBe('train');
+    expect(saved.slots[24]!.commandKey).toBe('commerce');
   });
 
   test('미리보기 중 다른 탭에서 예턴을 바꾸면 저장 때 충돌 안내와 다시 받은 비교를 보이고 고치던 초안은 남는다', async ({
@@ -210,13 +209,14 @@ test.describe('국가 작전판', () => {
 
     await chief.page.goto(`/w/${s.world}`);
     await chief.page.getByRole('link', { name: '감찰' }).click();
-    await expect(chief.page.getByTestId('inspection-table')).toBeVisible();
+    // 감찰 표는 소속 장수마다 예턴 30칸을 읽어 CI에서 5초를 넘긴 적이 있다(PR #674).
+    await expect(chief.page.getByTestId('inspection-table')).toBeVisible({ timeout: 20_000 });
   });
 
   // U62-4a대로 출병 tick이 목표 연월 첫 tick보다 작아야 제때이고 같으면 늦음이다. 기준을 0/0/0으로 두어 준비 부족이 아닌 시간 경계만 본다.
   // 목표 첫 tick은 world.summary 한 응답의 연월과 nowTick으로 따로 셈한다. operation.get 응답에서 기대값을 만들지 않는다.
   // DB는 이 장수 행의 nextTurnTick 하나만 다음 달 첫 tick으로 옮겨 출병 칸이 목표 첫 tick에 닿게 한다. 출병은 실제 turns.set으로 저장한다.
-  test('출병 칸의 tick이 목표 연월 첫 tick과 같으면 서버와 화면 모두 늦음이다', async ({ browser, page }) => {
+  test('출병 칸의 tick이 목표 연월 첫 tick과 같으면 서버와 화면 모두 늦음이다', async ({ browser, page }, info) => {
     const s = await setup(page);
     const chief = await member(browser, s.world, s.ours, 5);
     const summary = await query<{ gameDate: { year: number; month: number }; nowTick: number }>(
@@ -259,6 +259,7 @@ test.describe('국가 작전판', () => {
     expect(detail.targetTick % 10_000).toBe(0);
     expect(detail.target.cityKey).toBe(s.target.key);
     expect(detail.min).toEqual({ crew: 0, train: 0, atmos: 0 });
+    expect(detail.members).toBe(1);
     expect(detail.timeline.map((m) => m.generalId)).toEqual([chief.generalId]);
     const mine = detail.timeline.find((m) => m.generalId === chief.generalId);
     expect(mine?.cells[0]?.tick).toBe(nextTurnTick);
@@ -271,7 +272,25 @@ test.describe('국가 작전판', () => {
     expect(mine?.cells[sortieSlot - 1]?.tick).toBe(firstTick - 10_000);
     expect(mine?.verdict).toBe('LATE');
 
+    // 페이지의 실제 조회가 끝난 뒤 행을 찾는다. 직접 조회 성공만으로 화면 조회 완료를 가정하지 않는다.
+    const loaded = chief.page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return (
+        url.pathname.startsWith('/trpc/') && url.pathname.slice('/trpc/'.length).split(',').includes('operation.get')
+      );
+    });
     await chief.page.goto(`/w/${s.world}/operations/${id}`);
+    const response = await loaded;
+    expect(response.ok()).toBe(true);
+    const body = await response.json();
+    const paths = new URL(response.url()).pathname.slice('/trpc/'.length).split(',');
+    const rendered = (Array.isArray(body) ? body[paths.indexOf('operation.get')] : body).result.data as OperationDetail;
+    await info.attach('operation.get 경계 판정', {
+      body: JSON.stringify({ members: rendered.members, timeline: rendered.timeline }),
+      contentType: 'application/json',
+    });
+    expect(rendered.members).toBe(1);
+    expect(rendered.timeline.map((member) => member.generalId)).toEqual([chief.generalId]);
     const timeline = chief.page.getByTestId('operation-timeline');
     const line = timeline.locator(`tbody tr[data-general-id="${chief.generalId}"]`);
     await expect(line).toHaveCount(1);

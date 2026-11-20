@@ -14,7 +14,14 @@ export async function bindGeneral(worldId: string, userId: string): Promise<void
   const count = await withE2eDb((db) =>
     db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${worldId} FOR UPDATE`;
-      return tx.$executeRaw`UPDATE "General" SET "userId" = ${userId}
+      // 사람 장수에는 활동 tick과 물리 거주 앵커가 있어야 엔진이 월드를 읽는다(apps/engine/src/ruleFeatures.ts,
+      // residenceState.ts). 비워 두면 감독이 띄운 엔진이 반복 종료되어 공유 시험 월드 전체가 멈춘다. 정식 맡기(general.possess)처럼
+      // 붙이는 순간의 월드 시각을 활동 tick에 넣는다(packages/rules/src/personnel/residence.ts). 거주 앵커는 앞으로 처리할
+      // 어떤 tick보다 늦으면 안 된다(npcMonth.ts). 엔진이 밀린 월 정산을 clockTick보다 이른 tick에서 처리할 수 있으므로
+      // 마지막 월 정산 tick(monthlyTick)을 쓴다.
+      return tx.$executeRaw`UPDATE "General" SET "userId" = ${userId},
+  "lastActiveTick" = (SELECT "clockTick" FROM "World" WHERE id = ${worldId}),
+  "residenceTick" = (SELECT "monthlyTick" FROM "World" WHERE id = ${worldId})
 WHERE "worldId" = ${worldId} AND "id" = (
   SELECT g."id" FROM "General" g
   JOIN "City" c ON c."worldId" = g."worldId" AND c."cityKey" = g."cityKey"

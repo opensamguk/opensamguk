@@ -155,7 +155,8 @@ test('상위 100위 밖이면 표 끝에 따로 한 줄 두고 내 순위로 이
   expect(data.top.some((g) => g.generalId === data.me!.generalId)).toBe(false);
 
   await page.goto(`/w/${worldId}/ranking?tab=generals&by=dedication`);
-  await expect(generalsTable(page).locator('tbody').first().locator('tr')).toHaveCount(100);
+  // 100행과 얼굴을 그리는 데 CI에서 5초를 넘긴 적이 있다(PR #674). 로컬에서는 같은 단계가 통과한다.
+  await expect(generalsTable(page).locator('tbody').first().locator('tr')).toHaveCount(100, { timeout: 20_000 });
   const last = generalsTable(page).locator('tr').last();
   await expect(last).toHaveAttribute('data-me', 'true');
   await expect(last).toContainText(displayName(data.me!.name));

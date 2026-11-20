@@ -8,8 +8,8 @@ import { appOrigin, e2eDatabaseUrl, withE2eDb } from './account';
 
 // 실제 서버·DB·엔진으로 게임 화면을 시험하는 도우미 (T1-15).
 // pnpm dev의 엔진 감독은 10초마다 RUNNING·PAUSED 월드를 모두 찾아 월드마다 엔진을 하나씩 띄운다 (T2-01).
-// world.list는 RUNNING 월드를 만든 순서로 주므로 그 첫 월드를 쓴다. 없으면 1분 턴 월드를 만들고 시작한다.
-// 1분 턴이라 시험 중에도 장수 턴이 실행된다 (waitTurnWindow 참고).
+// world.list는 RUNNING 월드를 만든 순서로 주므로 그 첫 월드를 쓴다. 없으면 2분 턴 월드를 만들고 시작한다.
+// 짧은 턴이라 시험 중에도 장수 턴이 실행된다 (waitTurnWindow 참고).
 // DB를 직접 쓰는 도우미는 account.ts의 e2eDatabaseUrl로 E2E 전용 DB(_test)만 쓴다.
 
 type Json = Record<string, unknown>;
@@ -53,13 +53,7 @@ const CHE_1030 = ['--scenario', '1030', '--map', 'che'];
 
 // PREOPEN 월드를 만든다. 감독은 world:start로 RUNNING이 된 뒤에야 이 월드를 찾는다.
 // resources는 world:create의 자원 인자다. 기본은 1030 시나리오와 che 지도다.
-function createWorld(
-  seed: string,
-  name: string,
-  ruleFeatures: string[] = [],
-  resources = CHE_1030,
-  turnTermMinutes = 1,
-): string {
+function createWorld(seed: string, name: string, resources = CHE_1030, turnTermMinutes = 1): string {
   const created = run([
     'world:create',
     ...resources,
@@ -71,24 +65,16 @@ function createWorld(
     '300',
     '--name',
     name,
-    ...(ruleFeatures.length ? ['--rule-features', ruleFeatures.join(',')] : []),
   ]);
   return (JSON.parse(created.trim().split('\n').at(-1)!) as { worldId: string }).worldId;
 }
 
 let worldId: string | undefined;
-// 기능 검사는 기존 월드의 설정을 바꾸지 않고 필요한 기능을 켠 전용 월드를 만든다.
+// 기능 검사는 기존 월드의 설정을 바꾸지 않고 전용 월드를 만든다. 모든 규칙은 늘 켜져 있다.
 export async function e2eFeatureWorld(
-  ruleFeatures: string[],
   options: { npcNations?: boolean; resources?: string[]; turnTermMinutes?: number } = {},
 ): Promise<string> {
-  const id = createWorld(
-    `e2e-features-${Date.now()}`,
-    'E2E 기능 월드',
-    ruleFeatures,
-    options.resources,
-    options.turnTermMinutes,
-  );
+  const id = createWorld(`e2e-features-${Date.now()}`, 'E2E 기능 월드', options.resources, options.turnTermMinutes);
   const npcNations = options.npcNations;
   if (npcNations !== undefined)
     await withE2eDb((db) => db.nation.updateMany({ where: { worldId: id }, data: { isNpc: npcNations } }));
@@ -102,7 +88,9 @@ export async function e2eWorld(page: Page): Promise<string> {
   const { worlds } = await query<{ worlds: Array<{ id: string }> }>(page, 'world.list');
   let id = worlds[0]?.id;
   if (!id) {
-    id = createWorld(`e2e-${Date.now()}`, 'E2E 월드');
+    // 1030 한 달 처리(491명)는 로컬 20초, CI는 더 느리고 브라우저, 서버, DB와 CPU를 나눈다. 1분 턴이면 엔진이 실시간을
+    // 따라가지 못해 다음 턴 시각이 지나 있고 입력 처리도 밀린다(PR #674). 공용 월드는 2분 턴으로 여유를 둔다.
+    id = createWorld(`e2e-${Date.now()}`, 'E2E 월드', CHE_1030, 2);
     run(['world:start', '--world', id]);
   }
   await waitEngineReady(id);
@@ -131,6 +119,21 @@ async function waitEngineReady(world: string) {
         },
       )
       .toBe(true);
+  } catch (error) {
+    // CI 기록에는 감독과 엔진의 stderr가 남지 않는다. 엔진이 마지막으로 쓴 heartbeat와 오류를 붙여 원인을 남긴다.
+    const heartbeat = await db.engineHeartbeat
+      .findUnique({ where: { worldId: world }, select: { at: true, lastTick: true, lagMs: true, lastError: true } })
+      .catch((reason: unknown) => ({ readFailed: String(reason) }));
+    const state = await db.world
+      .findUnique({ where: { id: world }, select: { status: true, clockTick: true } })
+      .catch((reason: unknown) => ({ readFailed: String(reason) }));
+    throw new Error(
+      `${error instanceof Error ? error.message : String(error)}
+` +
+        `월드 ${world}: ${JSON.stringify(state)}
+EngineHeartbeat: ${JSON.stringify(heartbeat)}`,
+      { cause: error },
+    );
   } finally {
     await db.$disconnect();
   }
@@ -153,7 +156,10 @@ let idle: { id: string; hold: LeaseHold } | undefined;
 export async function idleWorld(page: Page): Promise<string> {
   await e2eWorld(page);
   if (idle) return idle.id;
-  const id = createWorld(`e2e-idle-${Date.now()}`, 'E2E 대기 월드');
+  // 대기 월드는 시험이 입력 처리만 위해 엔진을 잠깐 돌리고, 끝나면 감독 엔진에 넘긴다. 1분 턴이면 엔진을 켤 때마다
+  // 지난 달들을 따라잡고(1030 한 달은 로컬 20초) 넘긴 뒤에도 계속 돌아 CI의 서버 연결과 CPU를 막았다(PR #674).
+  // 월 진행을 기다리는 대기 월드 시험은 없으므로 60분 턴으로 만든다.
+  const id = createWorld(`e2e-idle-${Date.now()}`, 'E2E 대기 월드', CHE_1030, 60);
   const hold = await holdLease(id);
   try {
     run(['world:start', '--world', id]);
@@ -273,10 +279,34 @@ export async function mine(page: Page, world: string) {
   });
 }
 
+// 시험 고정물이 장수 하나를 한 나라의 장수나 직책자로 둔다. 늘 켠 인사 규칙은 한 나라의 한 직책에 장수 하나만 허용하므로
+// (packages/rules/src/personnel/offices.ts) 같은 직책의 기존 장수를 먼저 일반(1)으로 내린다. 그러지 않으면 감독이 띄운
+// 엔진이 PersonnelInvariantError로 반복 종료되어 공유 시험 월드 전체가 멈춘다. 엔진 턴과 겹치지 않게 월드 행 잠금 안에서 쓴다.
+export async function placeGeneral(
+  world: string,
+  generalId: number,
+  data: { nationId: number; officerLevel: number; cityKey: number; crew?: number },
+): Promise<void> {
+  const { canUseNationTurns } = await import('../packages/rules/src/index');
+  await withE2eDb((db) =>
+    db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${world} FOR UPDATE`;
+      if (canUseNationTurns(data.officerLevel))
+        await tx.general.updateMany({
+          where: { worldId: world, nationId: data.nationId, officerLevel: data.officerLevel, id: { not: generalId } },
+          data: { officerLevel: 1 },
+        });
+      const moved = await tx.general.updateMany({ where: { worldId: world, id: generalId }, data });
+      if (moved.count !== 1) throw new Error('시험 장수를 찾지 못했습니다.');
+    }),
+  );
+}
+
 export async function createGeneralByApi(page: Page, world: string, name = newGeneralName()): Promise<OwnGeneral> {
   const result = await mutate<{ status: string; general?: OwnGeneral }>(page, 'general.create', {
     worldId: world,
     name,
+    sex: 'MALE',
     leadership: 55,
     strength: 55,
     intel: 55,
@@ -330,7 +360,7 @@ export async function waitNextTurn(page: Page, world: string, timeoutMs = 150_00
   const at = await nextTurnAt(page, world);
   if (at === null) throw new Error('월드가 멈춰 있어 턴이 실행되지 않습니다.');
   if (at - Date.now() > timeoutMs)
-    throw new Error('다음 턴이 시험 제한 시간보다 늦습니다. 1분 턴 월드에서 실행하세요.');
+    throw new Error('다음 턴이 시험 제한 시간보다 늦습니다. 2분 이하 턴 월드에서 실행하세요.');
   return at;
 }
 

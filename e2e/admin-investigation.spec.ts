@@ -5,7 +5,7 @@ import { TEST_PASSWORD } from './account';
 import { sanctionAccount } from './adminSanctionSetup';
 import { changeAdminRole } from '../apps/server/src/admin/roleStore';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { holdLease } from './game';
@@ -160,20 +160,10 @@ const test = base.extend<{ investigation: Journey }>({
             portraitMap: '191-map',
             seed: 'investigation-screen-' + index,
           });
-          initial.ruleFeatures = [
-            'campaign-assignment-v2',
-            'campaign-v1',
-            'five-stats',
-            'operational-map',
-            'personnel',
-            'policy',
-            'stratagem-basic',
-            'treaty',
-          ];
           expect(initial.nations).toHaveLength(21);
           expect(initial.generals).toHaveLength(491);
           expect(initial.cities).toHaveLength(61);
-          const { worldId } = await saveInitialWorld(stack.db, initial, {
+          const { worldId } = await saveFixtureWorld(stack.db, initial, {
             name: '조사 화면 정식191-' + index,
             turnTermMinutes: 60,
             endYear: 201,
@@ -186,6 +176,8 @@ const test = base.extend<{ investigation: Journey }>({
             await person.page
               .getByRole('textbox', { name: '이름', exact: true })
               .fill('조사사람' + people.indexOf(person));
+            // 성별은 늘 필수다(가문 규칙 상시, D-104).
+            await person.page.getByRole('radio', { name: '남', exact: true }).check();
             await person.page.getByRole('button', { name: '장수 만들기', exact: true }).click();
             await expect
               .poll(

@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '@opensamguk/rules';
 import type { Prisma } from '@opensamguk/db';
 import { readFile } from 'node:fs/promises';
 import { TRPCError } from '@trpc/server';
@@ -13,6 +14,7 @@ import {
   featureProfileSchema,
   type FeatureProfile,
   parseResourceKey,
+  formatResourceKey,
 } from '@opensamguk/rules';
 import { operationalMapSchema, validateWorldResources } from '@opensamguk/rules/resource-validation';
 import { hashState } from '@opensamguk/shared/node';
@@ -30,6 +32,7 @@ export const creationFeatures = [
   'campaign-v1',
   'city-resources-v1',
   'five-stats',
+  'march-supply-v1',
   'operational-map',
   'personnel',
   'policy',
@@ -179,7 +182,7 @@ export type AvailableCreationProfile = Identity & {
     roads?: number;
   };
   resources: Array<{ kind: string; key: string; version: number; contentHash: string }>;
-  ruleFeatures: string[];
+
   presets: CreationPreset[];
   suggestedEndYear: number;
   featureProfileKey?: string;
@@ -203,7 +206,7 @@ export function creationProfile(
   const profile = contracts[profileId],
     refs = profileRefs(profileId);
   try {
-    checkRuleFeatures([...creationFeatures], registry);
+    checkRuleFeatures(providedRuleKeys, registry);
   } catch {
     return unavailable(profileId, 'RULES_UNAVAILABLE');
   }
@@ -316,7 +319,7 @@ export function creationProfile(
       contentHash: rows.find((row) => row.kind === ref.kind && row.name === ref.name && row.version === ref.version)!
         .contentHash,
     })),
-    ruleFeatures: [...creationFeatures],
+
     presets: options,
     suggestedEndYear: profile.suggestedEndYear,
   };
@@ -338,11 +341,6 @@ export function expandedCreationProfile(
     profile = featureProfileSchema.parse(data);
     if (
       profile.key !== expandedProfiles.find(([id]) => id === profileId)?.[1] ||
-      !profile.ruleFeatures.includes('battle-affinity-v2') ||
-      (profileId === 'san10-191-lifecycle' && !profile.ruleFeatures.includes('nation-lifecycle-v1')) ||
-      (profileId === 'san10-191-research' && !profile.ruleFeatures.includes('nation-research-v1')) ||
-      (profileId === 'san10-191-border-return' &&
-        (!profile.ruleFeatures.includes('border-return-v1') || !profile.ruleFeatures.includes('nation-research-v1'))) ||
       profile.scenarioKey !== contracts[profileId].selection.scenarioKey ||
       profile.mapKey !== contracts[profileId].selection.mapKey ||
       (profileId !== 'integration-v01' &&
@@ -352,7 +350,7 @@ export function expandedCreationProfile(
           profile.portraitMapKey !== contracts[profileId].selection.portraitMapKey))
     )
       throw new Error();
-    checkRuleFeatures(profile.ruleFeatures, registry);
+    checkRuleFeatures(providedRuleKeys, registry);
   } catch {
     return {
       ...identity,
@@ -366,7 +364,7 @@ export function expandedCreationProfile(
   return {
     ...base,
     ...identity,
-    ruleFeatures: [...profile.ruleFeatures],
+
     featureProfileKey: profile.key,
     featureProfileHash: hashState(profile),
     suggestedEndYear: 231,
@@ -382,7 +380,12 @@ export const artifactSelection = {
 };
 export const artifactScenarioPattern = '^san10-expanded-[a-z0-9]+$';
 export const artifactPublication = { status: 'PUBLISHED', createdBy: null, publishedBy: null } as const;
-export const artifactMapVersion = { kind: 'MAP', name: artifactMap, version: 1, ...artifactPublication } as const;
+export const artifactMapVersion = {
+  kind: 'MAP',
+  name: artifactMap,
+  version: { gte: 1, lte: 3 },
+  ...artifactPublication,
+} as const;
 const artifactRefs = [
   artifactMapVersion,
   { kind: 'UNIT_SET', name: artifactSelection.unitSetKey, version: 1 },
@@ -390,12 +393,22 @@ const artifactRefs = [
   { kind: 'PORTRAIT_MAP', name: artifactSelection.portraitMapKey, version: 1 },
 ] as const;
 
-async function artifactCreationProfiles(
+export async function artifactCreationProfiles(
   tx: Prisma.TransactionClient,
   presets: readonly PresetSource[],
 ): Promise<CreationProfile[] | null> {
+  const latestMap = await tx.gameResource.findFirst({
+    where: artifactMapVersion,
+    orderBy: { version: 'desc' },
+    select: { version: true },
+  });
+  if (!latestMap) return null;
+  const edition = latestMap.version;
   const rows = await tx.gameResource.findMany({
-    where: { status: 'PUBLISHED', OR: artifactRefs.map((ref) => ({ ...ref })) },
+    where: {
+      status: 'PUBLISHED',
+      OR: artifactRefs.map((ref) => (ref.kind === 'MAP' ? { ...ref, version: edition } : { ...ref })),
+    },
     select: { kind: true, name: true, version: true, contentHash: true },
   });
   if (!rows.some((row) => row.kind === 'MAP')) return null;
@@ -413,7 +426,7 @@ async function artifactCreationProfiles(
     SELECT name, content->>'title' AS title, (content->>'startYear')::int AS year,
       jsonb_array_length(content->'general') AS generals, jsonb_array_length(content->'nation') AS nations, "contentHash"
     FROM "GameResource"
-    WHERE kind = 'SCENARIO' AND version = 1 AND status = 'PUBLISHED'
+    WHERE kind = 'SCENARIO' AND version = ${edition} AND status = 'PUBLISHED'
       AND "createdBy" IS NULL AND "publishedBy" IS NULL
       AND name ~ ${artifactScenarioPattern} AND content->>'requiredMap' = ${artifactMap}
     ORDER BY (name = 'san10-expanded-empty'), year, name`;
@@ -438,24 +451,36 @@ async function artifactCreationProfiles(
       id: entry.name,
       label: entry.title,
       available: true,
-      selection: { ...artifactSelection, scenarioKey: entry.name },
+      selection: {
+        ...artifactSelection,
+        mapKey: formatResourceKey({ name: artifactMap, version: edition }),
+        scenarioKey: formatResourceKey({ name: entry.name, version: edition }),
+      },
       scenarioTitle: entry.title,
       scenarioCategory,
       mapName: 'SAN10 확장 확정판',
       startYear: entry.year,
       counts: {
-        cities: 314,
+        cities: edition >= 2 ? 277 : 314,
         gates: 8,
         ports: 0,
-        fields: 0,
-        anchors: 322,
-        markers: 322,
-        roads: 467,
+        fields: edition >= 2 ? 38 : 0,
+        anchors: edition === 3 ? 195 : edition === 2 ? 157 : 322,
+        markers: edition >= 2 ? 323 : 322,
+        roads: edition >= 2 ? 585 : 467,
         generals: entry.generals,
         nations: entry.nations,
       },
-      resources: [...resources, { kind: 'SCENARIO', key: entry.name, version: 1, contentHash: entry.contentHash }],
-      ruleFeatures: [...creationFeatures, 'treaty-break', 'treaty-expanded', 'treaty-trade'],
+      resources: [
+        ...resources,
+        {
+          kind: 'SCENARIO',
+          key: entry.name,
+          version: edition,
+          contentHash: entry.contentHash,
+        },
+      ],
+
       presets: [
         {
           key: isEmpty ? 'empty' : 'regular',

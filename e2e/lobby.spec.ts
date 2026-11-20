@@ -3,6 +3,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { pnpmCli } from '../tools/node-cli';
 import { appOrigin, createAccount, e2eDatabaseUrl, newEmail, TEST_PASSWORD, withE2eDb } from './account';
 import { createGeneralByApi, e2eWorld, query } from './game';
+import { noticeBanner, openNoticeBoard } from './lobbyNotices';
 
 // T2-04 · AC-M2-02: 로비에서 월드 목록을 보고 참가한다. 실제 서버·DB·엔진으로 돈다.
 // D-025(가오픈 생성·총정원)는 승인 전이라 승인 전 모습만 시험한다.
@@ -231,7 +232,10 @@ test('공지: 서버 순서대로 놓고 최신 1개를 펼치며 한 번에 하
     expect(notices.slice(0, 2).map((n) => n.id)).toEqual([newerId, olderId]);
 
     await page.goto('/lobby');
-    const board = page.getByRole('region', { name: '공지', exact: true });
+    // 맨 위 띠는 가장 최근 공지 제목을 보이고, 눌러야 공지판이 펼쳐진다(devsam 로비 상단 공지).
+    await expect(noticeBanner(page)).toContainText(newer.title);
+    await expect(noticeBanner(page)).toHaveAttribute('aria-expanded', 'false');
+    const board = await openNoticeBoard(page);
     const heads = board.getByRole('button');
     await expect(heads.nth(0)).toContainText(newer.title);
     await expect(heads.nth(1)).toContainText(older.title);

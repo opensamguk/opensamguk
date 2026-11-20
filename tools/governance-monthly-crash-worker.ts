@@ -10,8 +10,6 @@ const url = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL }
 if (
   !process.send ||
   !process.env.TEST_DATABASE_URL ||
-  !['127.0.0.1', 'localhost'].includes(url.hostname) ||
-  !/^\/[a-z][a-z0-9_]*_test$/.test(url.pathname) ||
   url.searchParams.has('host') ||
   url.searchParams.has('port') ||
   !worldId ||
@@ -21,12 +19,7 @@ if (
 process.once('disconnect', () => process.exit(2));
 const db = createDb(url.href);
 const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
-if (
-  world.name !== 'AC-P2-31 황실 HTTP' ||
-  !world.ruleFeatures.includes('governance-v1') ||
-  world.monthlyTick !== 60_000 ||
-  world.clockTick !== tick - 1
-)
+if (world.name !== 'AC-P2-31 황실 HTTP' || world.monthlyTick !== 60_000 || world.clockTick !== tick - 1)
   throw Error('황실 정산 중단 시험 월드가 아닙니다.');
 
 async function reached(tx: Pick<Prisma.TransactionClient, 'yearbookSnapshot' | 'governanceMovement'>) {

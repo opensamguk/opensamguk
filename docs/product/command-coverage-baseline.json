@@ -111,6 +111,22 @@
   "approvedChanges": [
     {
       "kind": "addition",
+      "command": "build",
+      "target": "general",
+      "sourceIds": [],
+      "approvalRefs": ["D-061"],
+      "note": "INT-29에서 사용자가 승인한 성 건물 건설 명령이다. D-061 형식으로 추가 승인을 기록한다."
+    },
+    {
+      "kind": "addition",
+      "command": "demolish",
+      "target": "general",
+      "sourceIds": [],
+      "approvalRefs": ["D-061"],
+      "note": "INT-29에서 사용자가 승인한 성 건물 철거 명령이다. D-061 형식으로 추가 승인을 기록한다."
+    },
+    {
+      "kind": "addition",
       "command": "trade",
       "target": "general",
       "sourceIds": [],

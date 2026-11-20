@@ -1,4 +1,5 @@
 import { setTimeout as delay, setImmediate as yieldImmediate } from 'node:timers/promises';
+import { errorDiagnostic } from '@opensamguk/shared/node';
 import type { PrismaClient } from '@opensamguk/db';
 import {
   acquireLease,
@@ -38,7 +39,7 @@ export async function writeHeartbeat(db: PrismaClient, lease: Lease, lagMs: numb
 export function engineFailureMessage(error: unknown): string {
   if (error instanceof LeaseLostError) return `[engine] ${error.name}: ${error.message}`;
   // 연결 문자열을 포함할 수 있는 원본 DB 오류는 노출하지 않는다.
-  return '[engine] 실행 실패. 월드 ID·DB 연결·migration·실행권을 확인하세요.';
+  return `[engine] 실행 실패. ${JSON.stringify(errorDiagnostic(error))}`;
 }
 
 export async function runEngine(

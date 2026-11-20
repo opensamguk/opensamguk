@@ -4,7 +4,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, afterEach, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import { commandInitial } from '../packages/rules/test/commandFixture';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { issueAccountToken, resetPasswordToken } from '../apps/server/src/auth/accountTokenStore';
 import { newSession } from '../apps/server/src/auth/session';
 import { buildServer } from '../apps/server/src/server';
@@ -63,7 +63,6 @@ it.each(['message', 'sse'] as const)(
       turnTermMinutes: 1,
       endYear: null,
       replayFormat: 3,
-      ruleFeatures: ['policy'],
     });
     worlds.add(worldId);
     const suffix = randomUUID().replaceAll('-', '');

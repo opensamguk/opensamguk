@@ -6,7 +6,7 @@ const STRONG: Record<StatKey, string> = {
   leadership: '통솔이 높아 많은 병력을 지휘하고 받는 피해를 줄입니다.',
   strength: '무력이 높아 직접 싸울 때 피해를 크게 줍니다.',
   intel: '지력이 높아 기술 연구와 화계에 강합니다.',
-  politics: '정치가 높아 개간·상업 같은 내정에 강합니다.',
+  politics: '정치가 높아 개간이나 상업 같은 내정에 강합니다.',
   charm: '매력이 높아 모병 비용이 적게 들고 민심을 잘 얻습니다.',
 };
 

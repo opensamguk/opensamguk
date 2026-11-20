@@ -134,7 +134,7 @@ test('E8 국가 16개와 공백지의 범례를 모두 그린 PNG는 1400×1352�
   expect(png.signature).toEqual(PNG_SIGNATURE);
   expect(png.chunk).toBe('IHDR');
   expect([png.width, png.height]).toEqual([1400, 1352]);
-  const drawn = await page.evaluate(() => (window as Window & { __t437TextDraws: TextDraw[] }).__t437TextDraws);
+  const drawn = await page.evaluate(() => (window as unknown as { __t437TextDraws: TextDraw[] }).__t437TextDraws);
   await test.info().attach('png-text-draws', { body: JSON.stringify(drawn), contentType: 'application/json' });
   const note = '국가 이름과 색은 그 달에 기록된 값입니다. 오픈삼국';
   expect(drawn.map(({ text }) => text)).toEqual([
@@ -172,9 +172,10 @@ test('E2 내려받은 그림의 도시 점 색은 그 달 저장 국가 색이�
   expect(await pixelOf(page, aPng.bytes, one.x, one.y)).toEqual(rgbOf('#000080'));
   expect(await pixelOf(page, aPng.bytes, three.x, three.y)).toEqual(rgbOf(NEUTRAL));
 
-  // P의 첫 달: 국가 2는 그 뒤 실제 출병으로 멸망했다. 그림은 첫 정산에 저장된 색이다.
+  // P는 80,100에 전술 점령으로 멸망한다. 10,000의 첫 프레임은 멸망 전 저장 색이다.
+  expect(p.ticks[0]).toBe(10_000);
   await page.goto(tabUrl(p));
-  await expect(panel(page).locator('[data-frame-tick="10000"]')).toBeVisible();
+  await expect(panel(page).locator(`[data-frame-tick="${p.ticks[0]}"]`)).toBeVisible();
   const pPng = await readPng(await downloadShown(page));
   const two = await dotCenter(p.id, 2);
   expect(await pixelOf(page, pPng.bytes, two.x, two.y)).toEqual(rgbOf(pSaved.removed.color));

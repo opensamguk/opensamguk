@@ -1,6 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { assertActionCoverage } from './worker';
-import { loadDatabaseUrl } from './server';
+import { loadDatabaseUrl, localRehearsalDatabaseUrl } from './server';
+
+it('pins local rehearsal to the approved database and never echoes malformed credentials', () => {
+  const url = new URL(localRehearsalDatabaseUrl('postgresql://fixture:canary@other:1234/other?sslmode=require#hash'));
+  expect([url.hostname, url.port, url.pathname, url.search, url.hash]).toEqual([
+    '127.0.0.1',
+    '5561',
+    '/opensamguk_int29_test',
+    '',
+    '',
+  ]);
+  for (const raw of [undefined, 'private-canary', 'https://fixture:canary@host/'])
+    expect(() => localRehearsalDatabaseUrl(raw)).toThrow(/^LOAD_LOCAL_DATABASE_CONFIG_INVALID$/);
+});
 
 describe('L4 독립 DB witness', () => {
   const valid = {

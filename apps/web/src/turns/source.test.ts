@@ -62,6 +62,11 @@ function setup() {
 beforeEach(() => setMutate.mockReset());
 
 describe('개인 예턴 연결', () => {
+  it('개인 칸은 장수 지갑이라 편집기가 내 부곡(campaign.get)을 받는다', () => {
+    // walletKind가 없으면 편집기의 campaign.get 조회가 꺼져 새 탭에서 모병의 부곡 칸에 새 부곡만 보였다(PR #674 Codex 리뷰).
+    expect(setup().source.walletKind).toBe('general');
+  });
+
   it('조회한 칸의 빈칸·직접 휴식과 이름·인자를 그대로 읽는다', async () => {
     const { queryClient, source } = setup();
     const data = await queryClient.query({ queryKey: source.list.queryKey, queryFn: source.list.queryFn });

@@ -8,7 +8,6 @@ import { saveInitialWorld } from '../../apps/engine/src/world/persistence';
 import { controlClock } from '../../apps/engine/src/world/clock';
 import {
   LOAD_CONTRACT,
-  LOAD_FEATURES,
   LOAD_FIXTURE_POLICY,
   LOAD_PREPARATION_TURN_MINUTES,
   LOAD_RESOURCES,
@@ -29,6 +28,7 @@ export type LoadFixtureOptions = {
   startEngine: (worldId: string) => Promise<void>;
   onWorldCreated: (worldId: string) => void;
   onActorPrepared: () => void;
+  localRehearsal?: { onUserCreated: (userId: string) => void };
 };
 
 async function setMeasurementTurnTerm(
@@ -67,10 +67,15 @@ async function setMeasurementTurnTerm(
 export async function prepareLoadFixtures(db: PrismaClient, options: LoadFixtureOptions) {
   loadOrigin(options.target);
   loadOrigin(options.origin);
-  const expectedName = loadDatabaseName(options.runId);
+  const expectedName = options.localRehearsal ? 'opensamguk_int29_test' : loadDatabaseName(options.runId);
+  if (options.localRehearsal && new URL(options.target).hostname !== '127.0.0.1')
+    throw new Error('LOAD_LOCAL_ORIGIN_REQUIRED');
   options.signal.throwIfAborted();
   const [identity] = await db.$queryRaw<Array<{ name: string }>>`SELECT current_database() AS name`;
-  if (identity?.name !== expectedName || (await db.world.count()) !== 0 || (await db.user.count()) !== 0)
+  if (
+    identity?.name !== expectedName ||
+    (!options.localRehearsal && ((await db.world.count()) !== 0 || (await db.user.count()) !== 0))
+  )
     throw new Error('LOAD_FRESH_DEDICATED_DATABASE_REQUIRED');
   const resources = await readInitialResources(db, LOAD_RESOURCES);
   const resourceManifest = loadResourceManifest(resources);
@@ -81,7 +86,6 @@ export async function prepareLoadFixtures(db: PrismaClient, options: LoadFixture
     options.signal.throwIfAborted();
     const initial = composeInitialWorld(resources, plan.seed);
     const profile = assertLoadProfile(initial);
-    initial.ruleFeatures = [...LOAD_FEATURES];
     const { worldId } = await activateOwnedLoadWorld(
       () =>
         saveInitialWorld(db, initial, {
@@ -112,6 +116,7 @@ export async function prepareLoadFixtures(db: PrismaClient, options: LoadFixture
           sessions: { create: { id: session.id, expiresAt: session.expiresAt } },
         },
       });
+      options.localRehearsal?.onUserCreated(userId);
       options.signal.throwIfAborted();
       const client = new LoadHttpClient(options.target, options.origin, session.token);
       const created = await client.request(
@@ -124,6 +129,7 @@ export async function prepareLoadFixtures(db: PrismaClient, options: LoadFixture
           intel: 55,
           politics: 55,
           charm: 55,
+          sex: 'MALE',
           portraitId: null,
         },
         options.signal,
@@ -155,8 +161,9 @@ export async function prepareLoadFixtures(db: PrismaClient, options: LoadFixture
     }
     // Independent accounts can wait on the same engine poll. Retain the planned client order and settle every request.
     const creationBatchSize = 8;
-    for (let offset = 0; offset < plan.humanNames.length; offset += creationBatchSize) {
-      const batch = plan.humanNames.slice(offset, offset + creationBatchSize);
+    const humanNames = options.localRehearsal ? plan.humanNames.slice(0, 5) : plan.humanNames;
+    for (let offset = 0; offset < humanNames.length; offset += creationBatchSize) {
+      const batch = humanNames.slice(offset, offset + creationBatchSize);
       const settled = await Promise.allSettled(batch.map(prepareActor));
       for (const result of settled) {
         if (result.status === 'rejected') throw result.reason;
@@ -168,7 +175,7 @@ export async function prepareLoadFixtures(db: PrismaClient, options: LoadFixture
     });
     if (
       historicalRows !== LOAD_CONTRACT.historicalGenerals ||
-      (await db.general.count({ where: { worldId } })) < LOAD_CONTRACT.generalsPerWorld
+      (await db.general.count({ where: { worldId } })) < LOAD_CONTRACT.historicalGenerals + humanNames.length
     )
       throw new Error('LOAD_WORLD_POPULATION_MISMATCH');
     worlds.push({
@@ -179,11 +186,13 @@ export async function prepareLoadFixtures(db: PrismaClient, options: LoadFixture
       users: actors.slice(0, LOAD_CONTRACT.usersPerWorld),
     });
   }
-  const fixtureAccounts = await db.user.count();
+  const worldIds = worlds.map((world) => world.worldId);
+  const userIds = worlds.flatMap((world) => world.actors.map((actor) => actor.userId));
+  const fixtureAccounts = await db.user.count({ where: options.localRehearsal ? { id: { in: userIds } } : {} });
   const realApiHumans = worlds.reduce((count, world) => count + world.actors.length, 0);
   if (
-    fixtureAccounts !== LOAD_CONTRACT.accounts ||
-    realApiHumans !== LOAD_CONTRACT.accounts ||
+    fixtureAccounts !== (options.localRehearsal ? 10 : LOAD_CONTRACT.accounts) ||
+    realApiHumans !== (options.localRehearsal ? 10 : LOAD_CONTRACT.accounts) ||
     new Set(worlds.map((world) => world.worldId)).size !== 2
   )
     throw new Error('LOAD_FIXTURE_CARDINALITY_MISMATCH');
@@ -192,10 +201,15 @@ export async function prepareLoadFixtures(db: PrismaClient, options: LoadFixture
     await setMeasurementTurnTerm(db, world.actors[0]!, world.turnTermMinutes, options.signal);
   }
   const finalWorlds = await db.world.findMany({
+    where: options.localRehearsal ? { id: { in: worldIds } } : {},
     select: { id: true, status: true, clockMode: true, turnTermMinutes: true },
   });
-  const pendingInputs = await db.inputEvent.count({ where: { status: 'PENDING' } });
-  const temporaryOperators = await db.user.count({ where: { role: 'ADMIN' } });
+  const pendingInputs = await db.inputEvent.count({
+    where: { status: 'PENDING', ...(options.localRehearsal ? { worldId: { in: worldIds } } : {}) },
+  });
+  const temporaryOperators = await db.user.count({
+    where: { role: 'ADMIN', ...(options.localRehearsal ? { id: { in: userIds } } : {}) },
+  });
   if (
     pendingInputs !== 0 ||
     temporaryOperators !== 0 ||

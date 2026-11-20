@@ -28,7 +28,6 @@ export function affordableByGoods(
 }
 
 function current(view: WorldView): LogisticsState {
-  if (!view.ruleFeatures?.includes('logistics-v1')) throw new Error('물류 판이 아닙니다.');
   return readLogisticsState(view.logistics, view);
 }
 
@@ -42,7 +41,7 @@ function costFailure(
   const stock = state.cities[String(cityKey)];
   if (!stock) throw new Error('물류 소비 거점이 없습니다.');
   if (LOGISTICS_GOODS.some((good) => stock[good] < cost[good]))
-    return { code: 'NO_GOODS', message: '도시의 철·목재·말이 부족합니다.' };
+    return { code: 'NO_GOODS', message: '도시의 철, 목재, 말이 부족합니다.' };
   if (LOGISTICS_GOODS.some((good) => cost[good] > 0) && !logisticsQuantity.safeParse(state.revision + 1).success)
     return { code: 'BAD_STATE', message: '물류 변경 횟수의 한도에 도달했습니다.' };
   return null;
@@ -66,8 +65,7 @@ export function consumeCityGoods(view: WorldView, cityKey: number, cost: Readonl
 // 한 차례의 개인·국가 명령을 모두 반영한 뒤 한 번 기록한다. 이동·교역은 별도 입력 경로다.
 export function logisticsCommandMovements(before: WorldView, after: WorldView): LogisticsMovement[] {
   if (!before.logistics && !after.logistics) {
-    if (before.ruleFeatures?.includes('logistics-v1') || after.ruleFeatures?.includes('logistics-v1'))
-      throw new Error('물류 판의 재고가 없습니다.');
+    throw new Error('물류 판의 재고가 없습니다.');
     return [];
   }
   const prior = current(before),

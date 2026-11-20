@@ -27,11 +27,17 @@
   --color-warning: #8a5a00;
   --color-info: #263552;
 
-  --font-sans: 'Pretendard Variable', Pretendard, system-ui, sans-serif;
+  /* 화면 글꼴: Noto Serif KR(OFL, 굵기 200~900 명조). 글꼴에 없는 기호의 대체는 Pretendard가 맡는다. */
+  --font-sans: 'Noto Serif KR Variable', 'Pretendard Variable', Pretendard, system-ui, serif;
   /* 비트맵 글꼴이라 16px 배수(16·32·48)에서만 또렷하다. */
   --font-title: 'OpenSamguk Myungjo', 'Pretendard Variable', serif;
   --font-display: 'OpenSamguk Iyagi', 'OpenSamguk Myungjo', serif;
   --font-pixel: 'DotGothic16', ui-monospace, monospace;
+  /* 줄 안 그림 요소(아이콘, 얼굴, 칩)를 맞출 한글 글자의 가운데 높이(기준선 위). Noto Serif KR 한글은
+     기준선 위 0.86em부터 아래 0.11em까지라 가운데가 0.375em이다(2026-11-15 실측).
+     줄 안 그림 요소는 모두 vertical-align: calc(var(--glyph-mid) - 높이 / 2)로 이 높이에 가운데를 맞추고,
+     margin-block: min(0px, calc((1em - 높이) / 2))로 글자보다 큰 만큼을 줄 상자에서 뺀다. */
+  --glyph-mid: 0.375em;
 
   --text-xs: 12px;
   --text-sm: 13px;

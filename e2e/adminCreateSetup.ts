@@ -7,7 +7,7 @@ import { initializeIntegrationResources } from '../tools/integration-resources';
 import { ruleRegistry } from '../packages/rules/src/index';
 import { processWorldCreateRequest } from '../apps/engine/src/admin/createRequests';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld } from './worldFixture';
 import { buildServer } from '../apps/server/src/server';
 import { listenLegalLoopback } from './legalFixturePorts';
 
@@ -62,7 +62,7 @@ export async function reviewCreationPage(page: Page) {
   const dialog = page.getByRole('dialog', { name: '개장 전 월드 생성 확인', exact: true });
   await expect(dialog).toBeVisible();
   await dialog
-    .getByRole('checkbox', { name: '이름·현재 설정·시드와 개장 전 생성을 확인했습니다.', exact: true })
+    .getByRole('checkbox', { name: '이름, 현재 설정, 시드와 개장 전 생성을 확인했습니다.', exact: true })
     .check();
   return dialog;
 }
@@ -121,17 +121,7 @@ export async function creationSource(stack: LegalStack) {
     portraitMap: '191-map',
     seed: 'create-ui-preserved-' + randomUUID(),
   });
-  initial.ruleFeatures = [
-    'campaign-assignment-v2',
-    'campaign-v1',
-    'five-stats',
-    'operational-map',
-    'personnel',
-    'policy',
-    'stratagem-basic',
-    'treaty',
-  ];
-  const saved = await saveInitialWorld(stack.db, initial, {
+  const saved = await saveFixtureWorld(stack.db, initial, {
     name: '보존할 기존 월드',
     turnTermMinutes: 60,
     endYear: 201,

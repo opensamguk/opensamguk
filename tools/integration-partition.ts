@@ -1,10 +1,11 @@
 import { isAbsolute } from 'node:path';
 
 export const AUTHZ_SHARD_TOTAL = 3;
-export const ENGINE_SHARD_TOTAL = 2;
+export const ENGINE_SHARD_TOTAL = 4;
 
 export function integrationShardArgs(suite: string | undefined, shard: string | undefined, report: string | undefined) {
   if (shard === undefined && report === undefined) return [];
+  // engine-long은 파일 하나짜리 별도 job이라 나누지 않는다.
   if (suite !== 'api' && suite !== 'engine') throw new Error('integration shard suite');
   if (!shard || !report || !isAbsolute(report) || !/^[1-9]\d*\/[1-9]\d*$/.test(shard))
     throw new Error('integration shard-spec');
@@ -58,9 +59,15 @@ export const ENGINE_INTEGRATION_FILES = [
   'tools/int22-expanded-units.integration.test.ts',
 ] as const;
 
+// 엔진 묶음 가운데 한 파일이 30분을 넘는 시험. 나눌 수 없으므로 자기 job(engine-long)에서 따로 돈다.
+// AC-INT-22는 정식 12개월 재적재와 재생을 요구한다(로컬 33분).
+export const ENGINE_LONG_INTEGRATION_FILES = ['tools/int22-expanded-units.integration.test.ts'] as const;
+const long = new Set<string>(ENGINE_LONG_INTEGRATION_FILES);
+
 export function integrationPartition(value: string | undefined): string[] {
   if (value === undefined || value === 'all') return [];
-  if (value === 'engine') return [...ENGINE_INTEGRATION_FILES];
+  if (value === 'engine') return ENGINE_INTEGRATION_FILES.filter((file) => !long.has(file));
+  if (value === 'engine-long') return [...ENGINE_LONG_INTEGRATION_FILES];
   if (value === 'api') return ENGINE_INTEGRATION_FILES.flatMap((file) => ['--exclude', file]);
-  throw new Error('INTEGRATION_SUITE는 all·api·engine 중 하나여야 합니다.');
+  throw new Error('INTEGRATION_SUITE는 all, api, engine, engine-long 중 하나여야 합니다.');
 }

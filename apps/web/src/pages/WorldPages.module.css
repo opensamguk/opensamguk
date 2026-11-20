@@ -30,7 +30,8 @@
 .tab {
   display: inline-flex;
   align-items: center;
-  min-height: 36px;
+  /* 누르는 대상은 모든 폭에서 44px 이상이다(T3-10, AC-M3-08). */
+  min-height: 44px;
   padding: 0 var(--space-4);
   margin-bottom: -2px;
   border: 2px solid transparent;

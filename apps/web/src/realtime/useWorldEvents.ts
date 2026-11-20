@@ -34,6 +34,9 @@ export function invalidationTargets(event: WorldEvent, worldId: string, trpc: Tr
         trpc.records.activity.queryKey({ worldId }),
         trpc.city.get.queryKey({ worldId }),
         trpc.personnel.officers.queryKey({ worldId }),
+        // 모병, 징병, 배속으로 부곡이 생기거나 바뀐다. 예턴 편집기의 부곡 칸 선택지(내 부곡, 국가 부곡)를 다시 받는다.
+        trpc.campaign.get.queryKey({ worldId }),
+        trpc.campaign.nationUnits.queryKey({ worldId }),
       ];
     case 'message.new':
       return [
@@ -55,6 +58,9 @@ export function invalidationTargets(event: WorldEvent, worldId: string, trpc: Tr
         trpc.records.world.queryKey({ worldId }),
         // 정산 중 생긴 국가 사건(멸망 등)과 평판 사건. 다른 장수의 턴은 알림이 없어 정산 때 함께 다시 읽는다.
         trpc.records.activity.queryKey({ worldId }),
+        // NPC 군주의 월간 배속(nation_city_allocate)이 부곡을 바꾼다.
+        trpc.campaign.get.queryKey({ worldId }),
+        trpc.campaign.nationUnits.queryKey({ worldId }),
       ];
     // 발령 상자(T2-06 offers·personnel)와 외교실(T2-08 treaty)의 경로 키다. 그 라우터가 없으면 맞는 query가 없어 아무 일도 없다.
     case 'offer.new':

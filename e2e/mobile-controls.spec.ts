@@ -8,7 +8,7 @@ import { TICKS_PER_MONTH } from '../packages/rules/src/index';
 import { createAccount, withE2eDb } from './account';
 import { holdLease, releaseHold } from './game';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
-import { prepareInitialWorld, saveInitialWorld, savePreparedInitialWorld } from '../apps/engine/src/world/persistence';
+import { prepareInitialWorld, saveFixtureWorld, savePreparedInitialWorld } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { initializeExpandedResources } from '../tools/expanded-resources';
@@ -137,16 +137,6 @@ async function joinMobileWorld(page: Page, name: string, edition: 'integration' 
       ...(expanded ? { unitSet: 'expanded' } : {}),
       seed: 'mobile-controls-191',
     });
-    initial.ruleFeatures = [
-      ...(expanded ? ['battle-affinity-v2'] : []),
-      'campaign-v1',
-      'five-stats',
-      'operational-map',
-      'personnel',
-      'policy',
-      'stratagem-basic',
-      'treaty',
-    ];
     expect(initial.generals).toHaveLength(expanded ? 928 : 491);
     expect(initial.nations).toHaveLength(expanded ? 20 : 21);
     expect(initial.cities).toHaveLength(expanded ? 322 : edition === 'san10' ? 155 : 61);
@@ -154,7 +144,7 @@ async function joinMobileWorld(page: Page, name: string, edition: 'integration' 
     if (expanded)
       initial.generals = initial.generals.map((general) => ({ ...general, nextTurnTick: TICKS_PER_MONTH + 1 }));
     const options = { name, turnTermMinutes: 60, endYear: initial.startYear + 10 };
-    if (edition === 'integration') return saveInitialWorld(db, initial, options);
+    if (edition === 'integration') return saveFixtureWorld(db, initial, options);
     const prepared = prepareInitialWorld(initial, options);
     return db.$transaction((tx) => savePreparedInitialWorld(tx, prepared), { timeout: 30_000 });
   });
@@ -168,6 +158,8 @@ async function joinMobileWorld(page: Page, name: string, edition: 'integration' 
   await page.goto(`/w/${worldId}/create`);
   await expect(page.getByRole('spinbutton')).toHaveCount(5);
   await page.getByLabel('이름', { exact: true }).fill('손가락장수');
+  // 성별은 늘 필수다(가문 규칙 상시, D-104).
+  await page.getByRole('radio', { name: '남', exact: true }).check();
   await page.getByRole('button', { name: '장수 만들기', exact: true }).click();
   await expect
     .poll(() => worldHold.db.inputEvent.count({ where: { worldId, kind: 'general.create', status: 'PENDING' } }))

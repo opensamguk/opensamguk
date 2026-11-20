@@ -87,11 +87,19 @@ export function sameSlot(a: PolicySlot, b: PolicySlot): boolean {
 export function choosePolicyCommand(view: WorldView, generalId: number, policy: PolicyKey) {
   const general = view.generals[generalId];
   if (!general || general.userId === null) return null;
+  // 훈련 명령의 권한 기준인 자기 소유 부곡 중 ID가 가장 작은 부곡을 고른다(배열 순서와 무관).
+  const unit =
+    policy === 'drill'
+      ? view.campaign?.units.filter((unit) => unit.ownerId === generalId).sort((a, b) => a.id - b.id)[0]
+      : undefined;
   const city = view.cities[general.cityKey];
   const maximum =
     policy === 'defend'
       ? city !== undefined && city.defence >= city.defenceMax
-      : policy === 'drill' && general.train >= 100;
+      : policy === 'drill' && unit !== undefined && unit.train >= 100;
   const definition = definitions[policy];
-  return { commandKey: maximum && definition.then ? definition.then : definition.first, args: {} };
+  return {
+    commandKey: maximum && definition.then ? definition.then : definition.first,
+    args: unit ? { unitId: unit.id } : {},
+  };
 }

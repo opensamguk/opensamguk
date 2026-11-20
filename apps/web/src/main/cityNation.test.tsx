@@ -66,7 +66,6 @@ describe('주둔 병력 요약 줄', () => {
   it('아군 병력·출전 가능 병력·타국·재야 수를 쓴다', () => {
     render(
       <GarrisonLine
-        campaign={false}
         generals={[
           detailed(1, '가', { crew: 3000, train: 95, atmos: 92 }),
           detailed(2, '나', { crew: 1000, train: 70, atmos: 65 }),
@@ -77,8 +76,8 @@ describe('주둔 병력 요약 줄', () => {
       />,
     );
     const line = screen.getByTestId('garrison-summary').textContent;
-    expect(line).toContain('아군 병력 4,000 · 병력 있는 장수 2명 / 아군 3명');
-    expect(line).toContain('훈련·사기 90 이상 3,000명(1장수) · 60 이상 4,000명(2장수)');
+    expect(line).toContain('아군 지휘 병력 4,000 · 병력 있는 장수 2명 / 아군 3명');
+    expect(line).toContain('훈련과 사기 90 이상 3,000명(1장수) · 60 이상 4,000명(2장수)');
     expect(line).toContain('타국 장수 1명 · 재야 1명');
   });
 });
@@ -200,20 +199,27 @@ describe('펼친 도시의 장수 표', () => {
   const props = {
     caption: '허창 배치 장수 2명',
     generals,
-    crewTypes: undefined,
-    campaign: false,
-    fiveStats: false,
     names,
     summary: undefined,
   };
   const headers = () => screen.getAllByRole('columnheader').map((th) => th.textContent?.replace(/[▲▼]/g, '').trim());
 
-  it('일반 장수에게는 능력치·금·쌀·병종·병력·훈련·사기·다음 턴만 보이고 예턴 열이 없다', () => {
+  it('일반 장수에게는 능력치·금·쌀·지휘 병력·훈련·사기·다음 턴만 보이고 예턴 열이 없다', () => {
     render(<StationedTable {...props} inspection={null} />);
-    expect(headers()).toEqual(['장수', '직책', '통·무·지', '금', '쌀', '병종', '병력', '훈련', '사기', '다음 턴']);
+    expect(headers()).toEqual([
+      '장수',
+      '직책',
+      '통·무·지·정·매',
+      '금',
+      '쌀',
+      '지휘 병력',
+      '평균 훈련',
+      '평균 사기',
+      '다음 턴',
+    ]);
     const row = screen.getByText('조조').closest('tr')!;
     const cells = Array.from(row.querySelectorAll('td'), (td) => td.textContent);
-    expect(cells.slice(1, 9)).toEqual(['군주', '70 / 60 / 50', '3,000', '2,500', '병종 1', '2,000', '80', '70']);
+    expect(cells.slice(1, 8)).toEqual(['군주', '70 / 60 / 50 / — / —', '3,000', '2,500', '2,000', '80', '70']);
     expect(screen.queryByText('NPC')).toBeNull();
   });
 

@@ -6,6 +6,7 @@ import {
   CI_LIMITS,
   ciFailureCode,
   fixedImageId,
+  generatorFailureSummary,
   publicLoadSummary,
   runtimeBuildArguments,
   verifyBuilder,
@@ -15,6 +16,23 @@ import { userWorkload } from './workload';
 import type { LoadRun } from './report';
 
 const id = (n: number) => `00000000-0000-4000-8000-${n.toString(16).padStart(12, '0')}`;
+
+it('publishes generator failure counts without fragment identifiers or unknown errors', () => {
+  const fragment = {
+    complete: false,
+    generatorFailures: ['SSE_READ_FAILED', 'SSE_READ_FAILED'],
+    workers: [{ terminal: 'window-complete', userId: 'private-canary' }],
+    sse: [{ failed: true }],
+  };
+  expect(generatorFailureSummary(fragment)).toEqual({
+    complete: false,
+    failures: { SSE_READ_FAILED: 2 },
+    completedWorkers: 1,
+    failedStreams: 1,
+  });
+  expect(JSON.stringify(generatorFailureSummary(fragment))).not.toContain('private-canary');
+  expect(generatorFailureSummary({ ...fragment, generatorFailures: ['private-canary'] })).toBeNull();
+});
 
 it('publishes only allowlisted CI failure codes', () => {
   expect(ciFailureCode(new Error('LOAD_BUILDER_UNVERIFIED'))).toBe('LOAD_BUILDER_UNVERIFIED');

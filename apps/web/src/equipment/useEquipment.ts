@@ -16,8 +16,8 @@ export const EQUIPMENT_STATS = { leadership: '통솔', strength: '무력', intel
 
 export function useEquipment(
   worldId: string,
-  enabled: boolean,
   generalId: number | undefined,
+  enabled = true,
 ): EquipmentRead | undefined {
   const trpc = useTRPC();
   const query = useQuery({

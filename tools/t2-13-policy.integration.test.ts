@@ -4,11 +4,10 @@ import { createDb } from '../packages/db/src/index';
 import type { PolicyKey, PolicySlot } from '../packages/rules/src/policy';
 import { commandInitial } from '../packages/rules/test/commandFixture';
 import { renewLeaseDuringTest } from '../apps/engine/test/leaseHeartbeat';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { exportReplay, replayArchive } from '../apps/engine/src/replay';
-import { loadReplayState } from '../apps/engine/src/monthly';
 import { buildServer } from '../apps/server/src/server';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { newSession } from '../apps/server/src/auth/session';
@@ -54,19 +53,21 @@ async function fixture(options: { farmMax?: boolean; npc?: boolean } = {}) {
     userId: i ? (options.npc ? null : bob.id) : alice.id,
     nextTurnTick: i ? 5000 : 100,
   }));
+  syncFixtureMap(initial);
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '방침 실제 HTTP',
     turnTermMinutes: 30,
     endYear: null,
-    // 이 회귀 시험은 archive 5와 기존 전환 표지 계약을 검증한다.
-    replayFormat: 'policy',
+    // 방침은 형식3 생성 시부터 제공된다.
+    replayFormat: 3,
   });
   worlds.push(worldId);
   await db.world.update({ where: { id: worldId }, data: { status: 'RUNNING', clockAnchorAt: new Date(now) } });
   const lease = await acquireLease(db, worldId);
   if (!lease) throw new Error('시험 실행권이 없습니다.');
   leases.push(lease);
-  return { alice, bob, worldId, lease, loop: new TurnLoop(db, lease) };
+  const baseline = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
+  return { alice, bob, worldId, lease, baseline, loop: new TurnLoop(db, lease) };
 }
 async function rpc<T = Record<string, unknown>>(path: string, input: unknown, cookie?: string, mutation = false) {
   const encoded = JSON.stringify({ 0: input });
@@ -101,7 +102,7 @@ it(
     const f = await fixture();
     await appliedPolicy(f, 'farm');
     const slots = Array.from({ length: 30 }, (_, i) => (i === 0 ? { commandKey: 'rest' } : null));
-    const saved = await rpc<Slots>('turns.set', { worldId: f.worldId, revision: 0, slots }, f.alice.cookie, true);
+    const saved = await rpc<Slots>('turns.set', { worldId: f.worldId, revision: 1, slots }, f.alice.cookie, true);
     expect(saved.data!.slots.slice(0, 2).map((slot) => slot.explicit)).toEqual([true, false]);
     const before = await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId: f.worldId, cityKey: 1 } } });
     await f.loop.advanceTo(100);
@@ -122,7 +123,7 @@ it(
     expect(home.data!.turnsPreview.every((slot) => slot.explicit === false)).toBe(true);
     await restarted.advanceTo(120000);
     const archive = await exportReplay(db, f.worldId);
-    expect(archive.version).toBe(5);
+    expect(archive.version).toBe(3);
     expect(replayArchive(archive, 12)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
     expect((await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId: f.worldId, id: 1 } } })).userId).toBe(
       f.alice.id,
@@ -138,11 +139,11 @@ it(
     const slots = Array.from({ length: 30 }, (_, i) =>
       i === 0 ? { commandKey: 'rest' } : i === 2 ? { commandKey: 'commerce' } : null,
     );
-    let saved = await rpc<Slots>('turns.set', { worldId: f.worldId, revision: 0, slots }, f.alice.cookie, true);
+    let saved = await rpc<Slots>('turns.set', { worldId: f.worldId, revision: 1, slots }, f.alice.cookie, true);
     await f.loop.advanceTo(60);
     const active = (await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId: f.worldId, id: 1 } } }))
       .lastActiveTick;
-    const stale = await rpc<Slots>('turns.set', { worldId: f.worldId, revision: 0, slots }, f.alice.cookie, true);
+    const stale = await rpc<Slots>('turns.set', { worldId: f.worldId, revision: 1, slots }, f.alice.cookie, true);
     expect(stale.data).toMatchObject({ ok: false, reason: 'STALE' });
     expect(stale.data!.slots[0]!.explicit).toBe(true);
     const policy = await rpc('general.policy', { worldId: f.worldId }, f.alice.cookie);
@@ -243,7 +244,7 @@ it('엔진 제재 거절은 상태·활동을 바꾸지 않고 이유를 재조�
   });
   const general = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId: f.worldId, id: 1 } } });
   expect(general.lastActiveTick).toBe(0);
-  expect(general.lastActiveAt).toBeNull();
+  expect(general.lastActiveAt).toEqual(f.baseline.lastActiveAt);
   const pending = rpc('general.setPolicy', { worldId: f.worldId, policy: 'farm' }, f.alice.cookie, true);
   await expect.poll(() => db.inputEvent.count({ where: { worldId: f.worldId, status: 'PENDING' } })).toBe(1);
   await db.session.delete({ where: { id: f.alice.sessionId } });
@@ -259,13 +260,13 @@ it('로그인은 여러 월드 활동을 중복 없이 접수하고 ENDED와 실
     name: '다른 활동 월드',
     turnTermMinutes: 60,
     endYear: null,
-    replayFormat: 'policy',
+    replayFormat: 3,
   });
   const ended = await saveInitialWorld(db, initial, {
     name: '끝난 활동 월드',
     turnTermMinutes: 60,
     endYear: null,
-    replayFormat: 'policy',
+    replayFormat: 3,
   });
   worlds.push(other.worldId, ended.worldId);
   await db.world.update({ where: { id: ended.worldId }, data: { status: 'ENDED' } });
@@ -273,7 +274,7 @@ it('로그인은 여러 월드 활동을 중복 없이 접수하고 ENDED와 실
   await Promise.all([rpc('auth.login', login, undefined, true), rpc('auth.login', login, undefined, true)]);
   for (const worldId of [f.worldId, other.worldId])
     expect(await db.inputEvent.count({ where: { worldId, kind: 'general.active', status: 'PENDING' } })).toBe(1);
-  expect(await db.inputEvent.count({ where: { worldId: ended.worldId } })).toBe(0);
+  expect(await db.inputEvent.count({ where: { worldId: ended.worldId, kind: 'general.active' } })).toBe(0);
   const before = await db.inputEvent.count({ where: { userId: f.alice.id, kind: 'general.active' } });
   await rpc('auth.login', { ...login, password: randomUUID() }, undefined, true);
   await rpc('general.policy', { worldId: f.worldId }, f.alice.cookie);
@@ -314,26 +315,39 @@ it('활동과 방침을 id 순으로 집행하며 commit 실패는 상태·결�
     },
   });
   await expect(failing.advanceTo(50)).rejects.toThrow('시험 commit 중단');
-  expect((await db.world.findUniqueOrThrow({ where: { id: f.worldId } })).actionSequence).toBe(0);
+  expect((await db.world.findUniqueOrThrow({ where: { id: f.worldId } })).actionSequence).toBe(2);
   expect(await db.inputEvent.count({ where: { worldId: f.worldId, status: 'PENDING' } })).toBe(2);
   expect(
     (await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId: f.worldId, id: 1 } } })).lastActiveAt,
-  ).toBeNull();
+  ).toEqual(f.baseline.lastActiveAt);
   await f.loop.advanceTo(50);
   expect((await request).data).toMatchObject({ status: 'applied' });
-  const events = await db.inputEvent.findMany({ where: { worldId: f.worldId }, orderBy: { id: 'asc' } });
+  const events = await db.inputEvent.findMany({
+    where: { worldId: f.worldId, kind: { not: 'general.possess' } },
+    orderBy: { id: 'asc' },
+  });
   expect(events.map((event) => [event.kind, event.sequence, event.status])).toEqual([
-    ['general.active', 1, 'APPLIED'],
-    ['general.setPolicy', 2, 'APPLIED'],
+    ['general.active', 3, 'APPLIED'],
+    ['general.setPolicy', 4, 'APPLIED'],
   ]);
 });
 
-it('방침 월드에서 HTTP 장수 생성 뒤 빈칸·활동과 archive5의 12개월 재생이 일치한다', async () => {
+it('방침 월드에서 HTTP 장수 생성 뒤 빈칸·활동과 형식3의 12개월 재생이 일치한다', async () => {
   const f = await fixture();
   const newcomer = await user();
   const request = rpc(
     'general.create',
-    { worldId: f.worldId, name: '새방침장수', leadership: 70, strength: 65, intel: 65, portraitId: 10001 },
+    {
+      worldId: f.worldId,
+      name: '새방침장수',
+      leadership: 55,
+      strength: 55,
+      intel: 55,
+      politics: 55,
+      charm: 55,
+      sex: 'MALE',
+      portraitId: 10001,
+    },
     newcomer.cookie,
     true,
   );
@@ -352,7 +366,7 @@ it('방침 월드에서 HTTP 장수 생성 뒤 빈칸·활동과 archive5의 12�
   );
   await f.loop.advanceTo(120000);
   const archive = await exportReplay(db, f.worldId);
-  expect(archive.version).toBe(5);
+  expect(archive.version).toBe(3);
   expect(replayArchive(archive, 12)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
 });
 
@@ -375,134 +389,34 @@ it('방침 월드 NPC는 빈칸에서도 AI를 실행하고 12개월 실제 엔�
   expect(replayArchive(archive, 12)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
 });
 
-async function legacyWorld(f: Awaited<ReturnType<typeof fixture>>, marker: boolean) {
-  await db.world.update({ where: { id: f.worldId }, data: { policyFromSequence: null } });
-  await db.general.updateMany({
-    where: { worldId: f.worldId },
-    data: { defaultPolicy: null, lastActiveTick: null, lastActiveAt: null },
-  });
-  if (!marker) await db.generalTurn.updateMany({ where: { worldId: f.worldId }, data: { explicit: true } });
-  else
-    await db.inputEvent.create({
-      data: {
-        worldId: f.worldId,
-        userId: 'system:policy',
-        kind: 'system.policy.enable',
-        idempotencyKey: 'system.policy.enable:5',
-        payload: { version: 5, emptySlots: [1, 2] },
-      },
-    });
-}
-async function refusedWrites(f: Awaited<ReturnType<typeof fixture>>) {
-  for (const [path, input] of [
-    ['turns.set', { revision: 0, slots: Array.from({ length: 30 }, () => null) }],
-    ['turns.edit', { revision: 0, op: { shift: 1 } }],
-    ['general.setPolicy', { policy: 'farm' }],
-  ] as const)
-    expect((await rpc(path, { worldId: f.worldId, ...input }, f.alice.cookie, true)).error).toBe('PRECONDITION_FAILED');
-  expect((await rpc<Slots>('turns.get', { worldId: f.worldId }, f.alice.cookie)).data!.slots).toHaveLength(30);
-}
-
-it('정상 T 전환 뒤 로그인·생성을 순서대로 처리하고 실제 예턴 저장만 활동을 남긴다', async () => {
-  const f = await fixture();
-  renewLeaseDuringTest(db, f.lease);
-  await legacyWorld(f, true);
-  await refusedWrites(f);
-  await rpc('auth.login', { email: f.alice.email, password }, undefined, true);
-  await db.inputEvent.create({
-    data: { worldId: f.worldId, userId: f.bob.id, kind: 'general.create', idempotencyKey: randomUUID(), payload: {} },
-  });
-  expect((await f.loop.advanceTo(60000)).length).toBeGreaterThan(0);
-  const inputs = await db.inputEvent.findMany({ where: { worldId: f.worldId }, orderBy: { id: 'asc' } });
-  expect(inputs.slice(0, 3)).toMatchObject([
-    { kind: 'system.policy.enable', status: 'APPLIED', sequence: 1, result: { clockTick: 0, baselineActiveTick: 0 } },
-    { kind: 'general.active', status: 'APPLIED', sequence: 2, result: { activeTick: 60000 } },
-    { kind: 'general.create', status: 'REJECTED', sequence: 3, result: { code: 'ALREADY_EXISTS' } },
-  ]);
-  expect(await db.inputEvent.count({ where: { worldId: f.worldId, status: 'PENDING' } })).toBe(0);
-  expect(await db.yearbookSnapshot.count({ where: { worldId: f.worldId } })).toBe(6);
-  const actor = () => db.general.findUniqueOrThrow({ where: { worldId_id: { worldId: f.worldId, id: 1 } } });
-  expect(await actor()).toMatchObject({ lastActiveTick: 60000, lastActiveAt: inputs[1]!.createdAt });
-  expect(await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId: f.worldId, id: 2 } } })).toMatchObject({
-    lastActiveTick: 0,
-    lastActiveAt: null,
-  });
-  expect(await db.world.findUniqueOrThrow({ where: { id: f.worldId } })).toMatchObject({
-    policyFromSequence: 1,
-    clockTick: 60000,
-  });
-  await rpc('auth.login', { email: f.alice.email, password }, undefined, true);
-  await f.loop.advanceTo(60000);
-  const nextLogin = await db.inputEvent.findFirstOrThrow({
-    where: { worldId: f.worldId, kind: 'general.active' },
-    orderBy: { id: 'desc' },
-  });
-  expect(nextLogin).toMatchObject({ status: 'APPLIED', result: { activeTick: 60000 } });
-  expect(await actor()).toMatchObject({ lastActiveTick: 60000, lastActiveAt: nextLogin.createdAt });
-  const revision = (await rpc<Slots>('turns.get', { worldId: f.worldId }, f.alice.cookie)).data!.revision;
-  expect(revision).toBe(6);
-  const slots = Array.from({ length: 30 }, () => null);
-  const saved = await rpc<Slots>('turns.set', { worldId: f.worldId, revision, slots }, f.alice.cookie, true);
-  expect(saved.data).toMatchObject({ ok: true, revision: revision + 1 });
-  const editEvent = await db.inputEvent.findFirstOrThrow({
-    where: { worldId: f.worldId, kind: 'turns.set' },
-    orderBy: { id: 'desc' },
-  });
-  expect(await actor()).toMatchObject({ lastActiveTick: 60000, lastActiveAt: editEvent.createdAt });
-  const stale = await rpc<Slots>('turns.set', { worldId: f.worldId, revision, slots }, f.alice.cookie, true);
-  expect(stale.data).toMatchObject({ ok: false, reason: 'STALE' });
-  expect(await actor()).toMatchObject({ lastActiveTick: 60000, lastActiveAt: editEvent.createdAt });
-  expect((await rpc('general.policy', { worldId: f.worldId }, f.alice.cookie)).data).toMatchObject({
-    current: 'none',
-    pending: null,
-    lastRejected: null,
-  });
-});
-
-it('표지가 없는 옛 월드는 쓰기를 거부하되 기존 생성·직접 휴식·옛 큐 모양을 보존한다', async () => {
-  const f = await fixture();
-  await legacyWorld(f, false);
-  await refusedWrites(f);
-  const newcomer = await user();
-  const request = rpc(
-    'general.create',
-    { worldId: f.worldId, name: '옛생성장수', leadership: 70, strength: 65, intel: 65, portraitId: 10001 },
-    newcomer.cookie,
-    true,
+// 합성 지도의 생성 원본에도 변경한 도시 값과 연결을 기록한다.
+function syncFixtureMap(initial: Parameters<typeof saveInitialWorld>[1]) {
+  const map = initial.operationalMap;
+  if (!map) return;
+  for (const city of initial.cities) city.connections.sort((a, b) => a - b);
+  for (const site of map.sites) {
+    if (site.kind !== 'CITY') continue;
+    const city = initial.cities.find((row) => row.cityKey === site.anchorKey);
+    if (!city) continue;
+    site.name = city.name;
+    site.level = city.level;
+    site.region = city.region;
+    site.position = { x: city.x, y: city.y };
+    for (const field of ['population', 'agriculture', 'commerce', 'security', 'defence', 'wall'] as const) {
+      site.initial![field] = city[field];
+      site.max![field] = city[`${field}Max`];
+    }
+  }
+  map.routes = initial.cities.flatMap((city) =>
+    city.connections
+      .filter((key) => city.cityKey < key)
+      .map((key) => ({
+        id: `route:${city.cityKey}:${key}`,
+        from: `city:${city.cityKey}`,
+        to: `city:${key}`,
+        mode: 'LAND' as const,
+        direction: 'BOTH' as const,
+        enabled: true,
+      })),
   );
-  await expect
-    .poll(() => db.inputEvent.count({ where: { worldId: f.worldId, kind: 'general.create', status: 'PENDING' } }))
-    .toBe(1);
-  let sequence: number | undefined;
-  await new TurnLoop(db, f.lease, {
-    beforeCommit: async (tx) => {
-      if (sequence !== undefined) return;
-      const general = await tx.general.findUniqueOrThrow({
-        where: { worldId_id: { worldId: f.worldId, id: 1 } },
-        select: { nextTurnTick: true, world: { select: { actionSequence: true } } },
-      });
-      if (general.nextTurnTick === 10100) sequence = general.world.actionSequence;
-    },
-  }).advanceTo(100);
-  expect(sequence).toBeTypeOf('number');
-  expect((await request).data).toMatchObject({ status: 'created' });
-  const general = await db.general.findUniqueOrThrow({
-    where: { worldId_userId: { worldId: f.worldId, userId: newcomer.id } },
-  });
-  expect(general).toMatchObject({ defaultPolicy: null, lastActiveTick: null, lastActiveAt: null });
-  expect(await db.generalTurn.count({ where: { worldId: f.worldId, generalId: general.id, explicit: true } })).toBe(30);
-  expect(
-    await db.generalLog.findFirstOrThrow({
-      where: { worldId: f.worldId, generalId: 1, tick: 100, sequence: sequence! },
-    }),
-  ).toMatchObject({ commandKey: 'rest' });
-  const replay = await db.$transaction((tx) => loadReplayState(tx, f.worldId));
-  expect(replay).not.toHaveProperty('policy');
-  expect(
-    Object.values(replay.turns)
-      .flat()
-      .every((slot) => !Object.hasOwn(slot, 'explicit')),
-  ).toBe(true);
-  const input = await db.inputEvent.findFirstOrThrow({ where: { worldId: f.worldId, kind: 'general.create' } });
-  expect(input.result).not.toHaveProperty('activeTick');
-});
+}

@@ -103,10 +103,10 @@ async function review() {
   await screen.findByRole('dialog');
 }
 async function submit() {
-  fireEvent.click(screen.getByRole('checkbox', { name: '이름·현재 설정·시드와 개장 전 생성을 확인했습니다.' }));
+  fireEvent.click(screen.getByRole('checkbox', { name: '이름, 현재 설정, 시드와 개장 전 생성을 확인했습니다.' }));
   fireEvent.click(screen.getByRole('button', { name: '개장 전 월드 생성 요청' }));
   await waitFor(() => expect(state.create).toHaveBeenCalledTimes(1));
-  await waitFor(() => expect(screen.queryByText('계정·생성 설정과 요청을 확인하고 있습니다.')).toBeNull());
+  await waitFor(() => expect(screen.queryByText('계정과 생성 설정, 요청을 확인하고 있습니다.')).toBeNull());
 }
 beforeEach(() => {
   vi.clearAllMocks();
@@ -128,6 +128,7 @@ beforeEach(() => {
   state.status.mockImplementation(async (input: { idempotencyKey: string }) => pending(input.idempotencyKey));
 });
 afterEach(cleanup);
+const CONSENT = '이름, 현재 설정, 시드와 개장 전 생성을 확인했습니다.';
 describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
   it('AC-P2-30~34 기본 SAN10을 보존하고 확장판의 설명·권장 연도·키를 세 조회와 제출에 연결한다', async () => {
     const value = profileOptions();
@@ -138,7 +139,7 @@ describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
     const scenario = await screen.findByRole('combobox', { name: '시나리오' });
     expect((scenario as HTMLSelectElement).value).toBe('san10-191');
     fireEvent.change(scenario, { target: { value: expandedProfile.id } });
-    expect(screen.getByText(/철·목재·말과 수송망/)).toBeTruthy();
+    expect(screen.getByText(/철, 목재, 말과 수송망/)).toBeTruthy();
     expect((screen.getByLabelText('종료 연도') as HTMLInputElement).value).toBe('231');
     fireEvent.change(screen.getByLabelText('월드 이름'), { target: { value: '새 확장 월드' } });
     fireEvent.change(screen.getByLabelText('프리셋'), { target: { value: 'regular' } });
@@ -146,14 +147,14 @@ describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
     fireEvent.click(screen.getByRole('button', { name: '현재 설정 검토' }));
     const confirmation = within(await screen.findByRole('dialog'));
     expect(confirmation.getByText(expandedProfile.label)).toBeTruthy();
-    expect(confirmation.getByText(/철·목재·말과 수송망/)).toBeTruthy();
+    expect(confirmation.getByText(/철, 목재, 말과 수송망/)).toBeTruthy();
     await submit();
     expect(state.settings).toHaveBeenCalledTimes(3);
     for (const [input] of state.settings.mock.calls)
       expect(input).toEqual({ expectedUserId: viewerId, expandedProfiles: true });
     const input = state.create.mock.calls[0]![0] as CreateInput;
     expect(input.featureProfileKey).toBe('expanded-191-v3');
-    expect(input.ruleFeatures).toEqual(expandedProfile.ruleFeatures);
+    expect(input).not.toHaveProperty('ruleFeatures');
     expect(input.endYear).toBe(235);
     for (const key of ['featureProfileHash', 'expandedProfiles', 'profileId']) expect(input).not.toHaveProperty(key);
   });
@@ -270,7 +271,7 @@ describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
       presetKey: 'san10-191-preset',
       turnTermMinutes: 120,
       endYear: 201,
-      ruleFeatures: value.profiles[2]!.ruleFeatures,
+      fogOfWar: false,
     });
     expect(state.create.mock.calls[0]![0]).not.toHaveProperty('profileId');
   });
@@ -305,9 +306,8 @@ describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
       presetKey: 'san10-empty-preset',
       turnTermMinutes: 30,
       endYear: 190,
-      ruleFeatures: value.profiles[1]!.ruleFeatures,
+      fogOfWar: false,
     });
-    expect(input.ruleFeatures).toHaveLength(10);
     expect(input).not.toHaveProperty('profileId');
     state.settings.mockResolvedValue(options);
     fireEvent.click(screen.getByRole('button', { name: '같은 요청 접수 확인' }));
@@ -372,6 +372,9 @@ describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
         exactLabels();
         const controls = [...labels, ...versionLabels].map((label) => screen.getByRole('combobox', { name: label }));
         controls.push(exactInput('textbox', '월드 이름'), exactInput('spinbutton', '턴 간격 (분)'));
+        const fog = screen.getByRole('checkbox', { name: '안개 (다른 나라 정보 가리기)' });
+        expect(fog).toBe(screen.getByLabelText('안개 (다른 나라 정보 가리기)', { exact: true }));
+        controls.push(fog);
         if (endMode === 'year') controls.push(exactInput('spinbutton', '종료 연도'));
         else expect(screen.queryByRole('spinbutton', { name: '종료 연도' })).toBeNull();
         if (seedMode === 'custom') {
@@ -387,7 +390,7 @@ describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
     fireEvent.change(exactInput('textbox', '시드'), { target: { value: 'label-regression' } });
     fireEvent.click(screen.getByRole('button', { name: '현재 설정 검토' }));
     await screen.findByRole('dialog');
-    const consent = '이름·현재 설정·시드와 개장 전 생성을 확인했습니다.';
+    const consent = '이름, 현재 설정, 시드와 개장 전 생성을 확인했습니다.';
     expect(screen.getByRole('checkbox', { name: consent })).toBe(screen.getByLabelText(consent, { exact: true }));
     expect(state.create).not.toHaveBeenCalled();
   });
@@ -395,7 +398,7 @@ describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
     setup();
     await review();
     expect(state.create).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('checkbox', { name: CONSENT }));
     const button = screen.getByRole('button', { name: '개장 전 월드 생성 요청' });
     fireEvent.click(button);
     fireEvent.click(button);
@@ -403,7 +406,7 @@ describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
     await screen.findByText('접수됨 · 생성 대기');
     const input = state.create.mock.calls[0]![0] as CreateInput;
     expect(input.expectedUserId).toBe(viewerId);
-    expect(input.ruleFeatures).toContain('city-resources-v1');
+    expect(input).not.toHaveProperty('ruleFeatures');
     const stored = sessionStorage.getItem(`opensamguk:admin-create:v1:${viewerId}`)!;
     expect(stored).toContain(input.idempotencyKey);
     expect(stored).not.toContain(input.seed!);
@@ -413,11 +416,11 @@ describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
     setup();
     await review();
     state.settings.mockResolvedValue({ ...options, revision: 'changed' });
-    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('checkbox', { name: CONSENT }));
     fireEvent.click(screen.getByRole('button', { name: '개장 전 월드 생성 요청' }));
     await screen.findByText('생성 설정이 바뀌었습니다. 현재 내용을 다시 확인하세요.');
     expect(state.create).not.toHaveBeenCalled();
-    expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByRole('checkbox', { name: CONSENT }) as HTMLInputElement).checked).toBe(false);
   });
   it('응답 유실 뒤 수동 재접수는 같은 객체·키·시드이며 focus에 자동POST가 없다', async () => {
     setup();
@@ -437,7 +440,7 @@ describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
     setup();
     await review();
     state.me.mockResolvedValue({ user: { id: worldId } });
-    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('checkbox', { name: CONSENT }));
     fireEvent.click(screen.getByRole('button', { name: '개장 전 월드 생성 요청' }));
     await waitFor(() => expect(state.invalidate).toHaveBeenCalled());
     expect(state.create).not.toHaveBeenCalled();
@@ -520,7 +523,7 @@ describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
     );
     setup();
     await review();
-    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('checkbox', { name: CONSENT }));
     fireEvent.click(screen.getByRole('button', { name: '개장 전 월드 생성 요청' }));
     await waitFor(() => expect(state.create).toHaveBeenCalledTimes(1));
     const input = state.create.mock.calls[0]![0] as CreateInput;
@@ -608,7 +611,7 @@ describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
       expect(values('지도')).toEqual(['che@2', 'che@10', 'integration']);
       expect(select('시나리오').value).toBe('integration191');
     });
-    it('시나리오와 지도를 따로 고르면 정확한 키만 보내고 ruleFeatures·기본 요약은 보내지도 보이지도 않는다', async () => {
+    it('시나리오와 지도를 따로 고르면 정확한 키만 보내고 기본 요약은 보이지 않는다', async () => {
       setup();
       await openForm();
       fireEvent.change(select('시나리오'), { target: { value: '1030@2' } });
@@ -634,7 +637,7 @@ describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
       expect(Object.keys(input)).not.toContain('featureProfileKey');
       expect(JSON.stringify(input)).not.toContain('@1');
     });
-    it('건드리지 않은 기본 묶음은 이전과 같은 다섯 키와 10기능을 보낸다', async () => {
+    it('건드리지 않은 기본 묶음은 이전과 같은 다섯 키를 보내고 규칙 목록은 보내지 않는다', async () => {
       setup();
       await openForm();
       await confirm();
@@ -647,7 +650,7 @@ describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
         statRulesKey: 'five-stats',
         portraitMapKey: '191-map',
       });
-      expect(input.ruleFeatures).toEqual(options.profiles[0]!.available ? options.profiles[0]!.ruleFeatures : []);
+      expect(input).not.toHaveProperty('ruleFeatures');
     });
     it('한 종류의 목록이 실패하면 그 칸만 잠그고 다시 시도하며 기본 묶음 제출은 막지 않는다', async () => {
       let broken = true;

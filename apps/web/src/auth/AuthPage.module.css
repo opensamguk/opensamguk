@@ -1,34 +1,112 @@
-/* 로그인·가입 (INT-20 한지 군략도). 양식은 한지 첩, 로그인에는 대표 그림을 단다. */
-.page {
-  max-width: 520px;
-  margin: 64px auto;
-  padding: var(--space-6);
-  background: var(--color-surface);
-  border: var(--frame);
-  box-shadow: var(--frame-inset), var(--shadow-step);
+/* 계정 화면 틀 (INT-29 화면 개편): 표지 그림 바탕, 위 가운데 로고, 키트 창 하나, 아래 중원 정세 띠. */
+.screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 100dvh;
+  padding: var(--space-6) var(--space-4) 0;
+  box-sizing: border-box;
+  background: #1d140c center / cover no-repeat;
+  color: #f5e6c8;
 }
-/* 꾸밈 현판. 제목이 아니라 글자 띠다. */
-.plaque {
-  display: inline-flex;
-  margin-bottom: var(--space-3);
-  padding: 6px 12px 5px;
-  font-family: var(--font-title);
+.brand {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+/* 로고는 넓은 화면에서 520px, 낮은 화면(가로로 든 전화)에서는 높이에 맞춰 줄인다. */
+.logo {
+  display: block;
+  width: min(520px, 80vw, 60dvh);
+  height: auto;
+  filter: drop-shadow(0 4px 10px rgb(0 0 0 / 45%));
+}
+.logoText {
+  margin: 0;
+  font-size: var(--title-lg);
+  font-weight: 900;
+  color: #fff3d6;
+  text-shadow: 0 2px 0 #1a0a04;
+}
+.stage {
+  display: grid;
+  grid-template-columns: minmax(0, 460px);
+  justify-content: center;
+  align-items: start;
+  gap: var(--space-6);
+  width: 100%;
+  padding-bottom: var(--space-8);
+}
+/* 곁 칸이 있으면 창을 가운데 두고 곁 칸을 오른쪽 빈 자리에 붙인다. */
+.withAside {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 460px) minmax(0, 1fr);
+}
+.withAside .window {
+  grid-column: 2;
+}
+/* 어두운 창 안에서는 공용 색 이름을 창 색에 맞춘다. 양식 부품(동의 칸, 오류 판)이 그대로 읽힌다. */
+.window {
+  --color-text: #f5e6c8;
+  --color-text-muted: #d9c59c;
+  --color-surface: rgb(0 0 0 / 22%);
+  --color-surface-muted: rgb(0 0 0 / 30%);
+  --color-surface-raised: rgb(255 240 210 / 8%);
+  --color-border: rgb(201 163 90 / 40%);
+  --color-border-strong: #c9a35a;
+  --color-ink: #0c0605;
+  --color-accent: #f0a060;
+  --color-accent-text: #1a0a04;
+  --color-gold: #c9a24a;
+  --color-success: #8fd9b4;
+  --color-danger: #ff9a86;
+  --color-warning: #f0c060;
+  --color-info: #a8c4f0;
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-2);
+}
+.window a {
+  color: #ffd77a;
+}
+.title {
+  justify-content: center;
+  margin: 0 0 var(--space-3);
   font-size: var(--title-sm);
-  line-height: 1;
-  color: var(--color-accent-text);
-  background: var(--color-accent);
-  border: var(--frame);
+  line-height: 1.2;
 }
-.page h1,
-.formColumn h1 {
-  margin-bottom: var(--space-4);
-  font-size: var(--title-md);
-  line-height: 1.1;
+.aside {
+  --color-surface: #f4ecd8;
+  --color-surface-muted: #efe5cc;
+  --color-surface-raised: #fbf4e4;
+  --color-text: #221d17;
+  --color-text-muted: #5a5044;
+  --color-border: #cdbf9e;
+  --color-ink: #221d17;
+  --color-accent: #9b2c1f;
+  --color-accent-text: #fbf4e4;
+  justify-self: start;
+  width: min(460px, 100%);
+  min-width: 0;
+}
+/* 카드 틀 안에서는 공개 지도 첩의 제 테두리를 지운다. */
+.aside [data-testid='public-map'] {
+  padding: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+}
+.footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  align-self: stretch;
+  margin: auto calc(-1 * var(--space-4)) 0;
 }
 .switch {
-  margin: var(--space-4) 0 0;
+  margin: var(--space-3) 0 0;
   font-size: var(--text-sm);
-  color: var(--color-text-muted);
+  color: #d9c59c;
 }
 .switch + .switch {
   margin-top: 0;
@@ -42,73 +120,36 @@
 .status {
   margin: var(--space-2) 0 0;
   font-size: var(--text-xs);
-  color: var(--color-text-muted);
-}
-.formColumn {
-  min-width: 0;
-  padding: var(--space-6);
-  background: var(--color-surface);
-  border: var(--frame);
-  box-shadow: var(--frame-inset), var(--shadow-step);
-}
-@media (max-width: 640px) {
-  .page {
-    margin: var(--space-6) var(--space-4);
-    padding: var(--space-4);
-  }
-  .formColumn {
-    padding: var(--space-4);
-  }
+  color: #d9c59c;
 }
 
-/* 로그인: 공개 지도를 화면 전체에 깔고 양식 첩을 오른쪽에 띄운다. */
-.mapStage {
-  position: relative;
-  display: flex;
-  justify-content: flex-end;
-  align-items: flex-start;
-  min-height: 100dvh;
-  padding: 48px var(--space-6);
-  overflow: hidden;
-}
-.mapStage .formColumn {
-  position: relative;
-  z-index: 3;
-  width: min(420px, 100%);
-}
-.stageMap {
-  position: absolute;
-  inset: 0;
-}
-.banner {
-  display: block;
-  width: calc(100% + 2 * var(--space-6));
-  height: auto;
-  aspect-ratio: 16 / 9;
-  margin: calc(-1 * var(--space-6)) calc(-1 * var(--space-6)) var(--space-4);
-  object-fit: cover;
-  image-rendering: pixelated;
-  border-bottom: var(--frame);
-}
-@media (max-width: 640px) {
-  .mapStage {
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--space-4);
-    padding: var(--space-4);
+/* 곁 칸이 들어갈 자리가 없으면 창 아래로 내린다. */
+@media (max-width: 1199px) {
+  .withAside {
+    grid-template-columns: minmax(0, 560px);
   }
-  .mapStage .formColumn {
+  .withAside .window {
+    grid-column: auto;
+    justify-self: center;
+    max-width: 460px;
+  }
+  .aside {
+    justify-self: stretch;
     width: auto;
   }
-  .banner {
-    width: calc(100% + 2 * var(--space-4));
-    height: 120px;
-    aspect-ratio: auto;
-    margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-4)) var(--space-3);
+}
+@media (max-width: 640px) {
+  .screen {
+    padding: var(--space-4) var(--space-3) 0;
   }
-  .stageMap {
-    position: relative;
-    inset: auto;
-    height: 70dvh;
+  .footer {
+    margin: auto calc(-1 * var(--space-3)) 0;
+  }
+}
+/* 가로로 든 전화처럼 낮은 화면: 로고와 창 사이를 좁힌다. */
+@media (max-height: 480px) {
+  .screen {
+    gap: var(--space-2);
+    padding-top: var(--space-2);
   }
 }

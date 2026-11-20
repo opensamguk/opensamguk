@@ -20,7 +20,7 @@ export const GUIDE_STEPS = [
     label: '예턴 넣기',
     hint: '칸 고르고 명령',
     title: '예턴에 첫 명령을 넣으세요',
-    text: '명령 목록의 예턴은 30칸입니다. 한 턴은 게임 달력의 한 달이고 턴마다 1칸씩 실행합니다. 칸을 고른 뒤 명령 찾기에서 명령을 골라 넣으세요.',
+    text: '명령 목록의 예턴은 30칸입니다. 한 턴은 게임 달력의 한 달이고 턴마다 1칸씩 실행합니다. 칸을 고른 뒤 아래 명령 띠에서 패를 누르고 위로 올라오는 세부 명령을 누르면 들어갑니다.',
   },
   {
     icon: nationIcon,
@@ -138,7 +138,9 @@ function GuideDialog({ onClose }: { onClose: () => void }) {
             안내 닫기
           </button>
         </div>
-        <p className={styles.note}>한 번 닫으면 이 월드에서는 다시 뜨지 않습니다. 도움말에서 다시 볼 수 있습니다.</p>
+        <p className={styles.note}>
+          한 번 닫으면 이 월드에서는 다시 뜨지 않습니다. 도움말의 첫 턴 안내 다시 보기로 다시 엽니다.
+        </p>
       </div>
     </div>
   );

@@ -1,0 +1,124 @@
+/* 명령 제안 목록 (D-100). UI 키트 그림이 오면 판과 단추를 그림으로 바꾼다. */
+.box {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: #2a1d14;
+  color: #f1e4c8;
+  border: 2px solid #8a6a34;
+}
+.title {
+  margin: 0;
+  font-size: var(--text-lg);
+  color: #ffd27a;
+}
+.empty {
+  margin: 0;
+  color: #b9aa8c;
+}
+.list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: start;
+  padding: var(--space-2) var(--space-3);
+  background: #f3e8cf;
+  color: #2a1a0c;
+  border: 2px solid #7a2a1a;
+}
+.row[data-status='rejected'],
+.row[data-status='expired'],
+.row[data-status='cancelled'] {
+  opacity: 0.7;
+}
+.who {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+.who p {
+  margin: 0;
+  display: grid;
+}
+.who small {
+  color: #6a4a2a;
+}
+.what {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.what p {
+  margin: 0;
+}
+.command {
+  font-weight: 700;
+}
+.command span {
+  margin-left: var(--space-2);
+  font-weight: 400;
+}
+.note {
+  color: #4a3420;
+}
+.warn {
+  color: #9c2a14;
+}
+.meta {
+  font-size: var(--text-sm);
+  color: #6a4a2a;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: end;
+  justify-content: end;
+}
+.field {
+  display: grid;
+  gap: 2px;
+  font-size: var(--text-sm);
+}
+.field input {
+  width: 5em;
+  min-height: 44px;
+}
+.primary,
+.secondary,
+.danger {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 2px solid #3a2416;
+  border-radius: 0;
+  font-weight: 700;
+}
+.primary {
+  background: linear-gradient(180deg, #c95a36, #8e2c1c);
+  color: #fff4dc;
+}
+.secondary {
+  background: linear-gradient(180deg, #8a6a48, #5c4430);
+  color: #fff4dc;
+}
+.danger {
+  background: #1e1612;
+  color: #ffb8a0;
+  border-color: #9c2a14;
+}
+@media (max-width: 720px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .actions {
+    justify-content: start;
+  }
+}

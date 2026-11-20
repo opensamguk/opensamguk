@@ -29,7 +29,7 @@ type OperationWorld = ReadWorld & {
   policyFromSequence: number | null;
   actionSequence: number;
   replayFormat: number;
-  ruleFeatures: string[];
+
   unitSet: Prisma.JsonValue;
   tick: number;
 };
@@ -40,10 +40,7 @@ const include = {
   members: { include: { general: { include: { city: { select: { name: true } } } } } },
 } as const satisfies Prisma.OperationInclude;
 type Operation = Prisma.OperationGetPayload<{ include: typeof include }>;
-type ForecastWorld = Pick<
-  OperationWorld,
-  'startYear' | 'replayFormat' | 'ruleFeatures' | 'policyFromSequence' | 'actionSequence'
->;
+type ForecastWorld = Pick<OperationWorld, 'startYear' | 'replayFormat' | 'policyFromSequence' | 'actionSequence'>;
 
 const denied = (code: string, reason: string) => ({ ok: false as const, code, reason });
 const allowed = { ok: true as const };
@@ -127,7 +124,7 @@ async function readOperation<T>(
   return readWorld(ctx.db, worldId, async (tx, world) => {
     const extra = await tx.world.findUniqueOrThrow({
       where: { id: worldId },
-      select: { policyFromSequence: true, actionSequence: true, unitSet: true, replayFormat: true, ruleFeatures: true },
+      select: { policyFromSequence: true, actionSequence: true, unitSet: true, replayFormat: true },
     });
     const actor = await requireGeneral(tx, worldId, ctx.user.id);
     return read(tx, { ...world, ...extra, tick: clock(world, ctx.now) }, actor);
@@ -139,6 +136,16 @@ async function readRecord(tx: Tx, worldId: string, id: string, actor: Actor) {
   if (!row) throw new TRPCError({ code: 'FORBIDDEN', message: '이 작전을 볼 수 없습니다.' });
   return row;
 }
+// AC-M2-15 / 결정 19: 소유 부곡의 병력과 병력 가중 준비도를 읽는다.
+export function operationReadiness(view: WorldView, generalId: number): Readiness {
+  const units = view.campaign!.units.filter((unit) => unit.ownerId === generalId);
+  const crew = units.reduce((sum, unit) => sum + unit.troops, 0);
+  return {
+    crew,
+    train: crew ? Math.floor(units.reduce((sum, unit) => sum + unit.troops * unit.train, 0) / crew) : 0,
+    atmos: crew ? Math.floor(units.reduce((sum, unit) => sum + unit.troops * unit.atmos, 0) / crew) : 0,
+  };
+}
 function forecastInput(
   world: ForecastWorld,
   general: Actor,
@@ -148,7 +155,7 @@ function forecastInput(
 ) {
   const policyMode =
     world.replayFormat === 3
-      ? world.ruleFeatures.includes('policy')
+      ? true
       : isPolicyMode({ fromSequence: world.policyFromSequence, actionSequence: world.actionSequence });
   const policy = policyMode && general.userId !== null ? general.defaultPolicy : 'none';
   if (!isPolicyKey(policy)) throw new Error('저장된 기본 방침이 올바르지 않습니다.');
@@ -157,7 +164,7 @@ function forecastInput(
     nextTurnTick: general.nextTurnTick,
     deadlineTick: operationTick(operation.targetTick),
     targetCityKey: operation.targetCityKey,
-    current: { crew: general.crew, train: general.train, atmos: general.atmos },
+    current: operationReadiness(view, general.id),
     min: { crew: operation.minCrew, train: operation.minTrain, atmos: operation.minAtmos },
     turns,
     view,
@@ -232,7 +239,7 @@ async function timelines(tx: Tx, world: OperationWorld, operation: Operation, ac
         name: general.name,
         portraitId: general.portraitId,
         cityKey: general.cityKey,
-        cityName: general.city.name,
+        cityName: general.city?.name ?? '',
         isMe: general.id === actor.id,
         verdict: forecast.verdict,
         beyondWindow: forecast.beyondWindow,
@@ -415,6 +422,7 @@ export function inspectMembers(ctx: OperationContext, worldId: string) {
       include: { city: { select: { name: true } } },
       orderBy: [{ officerLevel: 'desc' }, { id: 'asc' }],
     });
+    const view = await readView(tx, worldId);
     return {
       items: await Promise.all(
         rows.map(async (general) => ({
@@ -423,11 +431,9 @@ export function inspectMembers(ctx: OperationContext, worldId: string) {
           portraitId: general.portraitId,
           officerLevel: general.officerLevel,
           cityKey: general.cityKey,
-          cityName: general.city.name,
+          cityName: general.city?.name ?? '',
           isHuman: general.userId !== null,
-          crew: general.crew,
-          train: general.train,
-          atmos: general.atmos,
+          ...operationReadiness(view, general.id),
           turns: displaySlots(await readSlots(tx, worldId, general.id)).slice(0, 5),
           nextTurnAt: nextTurnAt(world, general.nextTurnTick),
           lastActiveAt: general.lastActiveAt?.toISOString() ?? null,

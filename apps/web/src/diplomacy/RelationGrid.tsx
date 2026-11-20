@@ -81,9 +81,7 @@ export function RelationGridView({ data, ownNationId }: { data: RelationsReply; 
           );
         })}
       </ul>
-      <p className={styles.muted}>
-        우리 국가의 줄과 칸은 붉게 칠하고 「우리」를 붙입니다. 다른 국가끼리의 불가침은 통상으로 보입니다.
-      </p>
+      <p className={styles.muted}>다른 국가끼리의 불가침은 통상으로 보입니다.</p>
       <div className={styles.gridBox} tabIndex={0} role="region" aria-label="국가별 관계표, 옆으로 밀어 봅니다">
         <table className={styles.grid} data-testid="relation-grid">
           <thead>

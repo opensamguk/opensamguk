@@ -6,7 +6,7 @@ import type { AppRouter } from '../apps/server/src/router';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { newSession } from '../apps/server/src/auth/session';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld } from './worldFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -19,6 +19,7 @@ import { BALANCE } from '../packages/rules/src/balance';
 import { test as legalTest, expect, type LegalStack } from './legalFixture';
 import { e2eDatabaseUrl, TEST_PASSWORD } from './account';
 import { holdLease, type LeaseHold } from './game';
+import { argsScreen, putPicked, toFieldStep } from './commandPicker';
 import { trpcCalls } from './t210-fixture';
 
 // AC-INT-18C: 실제 공개 dist·PG·API·Chromium의 도시 모집/준비/배속 경계다.
@@ -48,17 +49,6 @@ type ApiResult<T> = {
   data: T | undefined;
 };
 type Call = { path: string; input: unknown };
-const features = [
-  'campaign-assignment-v2',
-  'campaign-v1',
-  'city-resources-v1',
-  'five-stats',
-  'operational-map',
-  'personnel',
-  'policy',
-  'stratagem-basic',
-  'treaty',
-];
 
 // page.evaluate fetch는 실제 브라우저의 cookie/Origin을 쓴다. 응답을 대체하지 않는다.
 async function api<T>(page: Page, path: string, input: unknown, mutation = false): Promise<ApiResult<T>> {
@@ -108,7 +98,7 @@ function watch(page: Page) {
   return calls;
 }
 function resourcePanel(page: Page) {
-  return page.getByRole('region', { name: '도시 금·쌀·수비병', exact: true });
+  return page.getByRole('region', { name: '도시 금, 쌀, 수비병', exact: true });
 }
 async function photo(page: Page, info: TestInfo, name: string) {
   const path = info.outputPath(`${name}.png`);
@@ -148,7 +138,8 @@ type CityRun = {
   reject(error: unknown): void;
   closeContexts(): Promise<void>;
 };
-const CASE_BUDGET_MS = 600_000;
+// 정식 491명 한 달 진행이 CI에서 52~86초, 가끔 120초를 넘는다(PR #674). 한 사례가 네 달까지 진행한다.
+const CASE_BUDGET_MS = 900_000;
 const LIFECYCLE_BUDGET_MS = 180_000;
 // Three separate AC cases have a NEW aggregate scheduling budget; old single-case performance did not pass.
 const SUITE_BUDGET_MS = 3 * CASE_BUDGET_MS + 2 * LIFECYCLE_BUDGET_MS;
@@ -245,7 +236,7 @@ const test = legalTest.extend<{ cityCase: CityRun }, { cityJourney: CityRun }>({
           !scope.failed &&
           scope.phase === 3 &&
           JSON.stringify(scope.passedPhaseIds) === '[1,2,3]' &&
-          JSON.stringify(scope.completedStepIds) === '["F01","F02","F03","F04","F05","F06","F07","F08"]';
+          JSON.stringify(scope.completedStepIds) === '["F01","F02","F03","F04","F05","F06","F08"]';
         if (!allCasesPassed) scope.reject(new Error('INT18 세 검사와 여덟 단계가 모두 완료되지 않았습니다.'));
         for (const world of scope.worlds) {
           if (!world.hold) {
@@ -420,14 +411,14 @@ test.describe.serial('AC-INT-18C 공개 빌드 정식 도시 자원 직렬 인�
     try {
       expect(cityJourney.phase).toBe(3);
       expect(cityJourney.passedPhaseIds).toEqual([1, 2, 3]);
-      expect(cityJourney.completedStepIds).toEqual(['F01', 'F02', 'F03', 'F04', 'F05', 'F06', 'F07', 'F08']);
+      expect(cityJourney.completedStepIds).toEqual(['F01', 'F02', 'F03', 'F04', 'F05', 'F06', 'F08']);
       expect(cityJourney.failed).toBe(false);
     } catch (error) {
       cityJourney.reject(error);
       throw error;
     }
   });
-  test('AC-INT-18C-01 원생성·사람·임관·이동·30칸·빈 부곡', async ({ cityCase }, info) => {
+  test('AC-INT-18C-01 원생성·사람·임관·이동·30칸·새 부곡 모병', async ({ cityCase }, info) => {
     test.setTimeout(CASE_BUDGET_MS);
     await cityCase.run(async () => {
       expect(cityCase.phase).toBe(0);
@@ -443,7 +434,7 @@ test.describe.serial('AC-INT-18C 공개 빌드 정식 도시 자원 직렬 인�
       cityCase.phase = 2;
     });
   });
-  test('AC-INT-18C-03 배속 권한·멱등·375px·구판·재시작 복구', async ({ cityCase }, info) => {
+  test('AC-INT-18C-03 배속 권한·멱등·375px·재시작 복구', async ({ cityCase }, info) => {
     test.setTimeout(CASE_BUDGET_MS);
     await cityCase.run(async () => {
       expect(cityCase.phase).toBe(2);
@@ -520,7 +511,7 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
     if (world.hold.lost) throw world.hold.lost;
     const started = performance.now();
     progress('advance', 'start', started, tick);
-    const signal = AbortSignal.any([cityRun.controller.signal, AbortSignal.timeout(120_000)]);
+    const signal = AbortSignal.any([cityRun.controller.signal, AbortSignal.timeout(240_000)]);
     const executions = await track(world.loop.advanceTo(tick, signal));
     signal.throwIfAborted();
     if (world.hold.lost) throw world.hold.lost;
@@ -536,7 +527,7 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
     });
     return advance(world, clockTick);
   }
-  async function createWorld(enabled: boolean) {
+  async function createWorld() {
     cityRun.controller.signal.throwIfAborted();
     const initial = await loadInitialWorldFromDb(db, {
       scenario: 'integration191',
@@ -545,14 +536,13 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
       portraitMap: '191-map',
       seed: 'int18-chromium-formal-v1',
     });
-    initial.ruleFeatures = features.filter((key) => enabled || key !== 'city-resources-v1');
     expect(initial.generals).toHaveLength(491);
     expect(initial.nations).toHaveLength(21);
     expect(initial.cities.filter((city) => city.kind === 'CITY')).toHaveLength(53);
     expect(initial.cities.filter((city) => city.kind === 'PASS')).toHaveLength(8);
     cityRun.controller.signal.throwIfAborted();
-    const { worldId } = await saveInitialWorld(db, initial, {
-      name: enabled ? 'INT18 Chromium 정식 도시 자원' : 'INT18 Chromium 기존 판',
+    const { worldId } = await saveFixtureWorld(db, initial, {
+      name: 'INT18 Chromium 정식 도시 자원',
       turnTermMinutes: 60,
       endYear: 201,
     });
@@ -647,6 +637,8 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
     await expect(page.getByRole('spinbutton')).toHaveCount(5);
     await page.getByLabel('이름', { exact: true }).fill(name);
     await page.getByRole('button', { name: '고르게 나누기', exact: true }).click();
+    // 성별은 늘 필수다(가문 규칙 상시, D-104).
+    await page.getByRole('radio', { name: '남', exact: true }).check();
     await page.getByRole('button', { name: '장수 만들기', exact: true }).click();
     await expect
       .poll(() =>
@@ -694,6 +686,8 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
         .getByRole('combobox', { name: label, exact: true })
         .or(editor.getByRole('spinbutton', { name: label, exact: true }))
         .or(editor.getByRole('textbox', { name: label, exact: true }));
+      // 인자 화면은 단계가 여럿이다(INT-29). 그 칸이 있는 단계로 간 뒤 고른다.
+      if (await argsScreen(actor.page).isVisible()) await toFieldStep(actor.page, group.or(control).first());
       await group.or(control).first().waitFor();
       if ((await group.count()) > 0) {
         await group.locator(`[data-value="${value}"], input[value="${value}"]`).first().click();
@@ -703,21 +697,14 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
       else await control.fill(value);
     }
     if (beforePut) await beforePut(editor);
-    await editor.getByRole('button', { name: `${slot}번 칸에 넣기`, exact: true }).click();
+    // 넣기 단추는 인자 화면의 끝 단계에만 있다. 인자 없는 명령은 편집기의 넣기 단추를 누른다.
+    await putPicked(actor.page, editor, `${slot}번 칸에 넣기`);
     await expect(editor.locator(`tr[data-slot="${slot}"]`)).toContainText(name);
   }
   async function save(actor: Actor) {
     const editor = actor.page.getByTestId('turn-editor');
     await editor.getByRole('button', { name: '저장', exact: true }).click();
     await expect(editor.getByTestId('draft-state')).toHaveText('저장된 목록');
-  }
-  async function join(world: OwnedWorld, actor: Actor, nationId: number) {
-    await put(actor, 1, '임관', { '대상 국가': String(nationId) });
-    await save(actor);
-    const tick = (await person(world, actor)).nextTurnTick;
-    await advance(world, tick);
-    expect((await person(world, actor)).nationId).toBe(nationId);
-    await actor.page.reload();
   }
   async function board(world: OwnedWorld, actor: Actor, cityKey: number): Promise<Board> {
     const response = await read<Outputs['cityResources']['get']>(actor.page, 'cityResources.get', {
@@ -764,7 +751,7 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
     progress('resources', 'complete', started);
     return value;
   }
-  let a: OwnedWorld | undefined, b: OwnedWorld | undefined, legacy: OwnedWorld | undefined;
+  let a: OwnedWorld | undefined, b: OwnedWorld | undefined;
   let owner: Actor | undefined, other: Actor | undefined;
   let cityKey = 0,
     nationId = 0,
@@ -772,7 +759,7 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
   let request: Allocation | undefined;
   let browserCalls: Call[] = [];
 
-  let main: OwnedWorld, isolated: OwnedWorld, oldWorld: OwnedWorld;
+  let main: OwnedWorld, isolated: OwnedWorld;
   let actor: Actor, protectedActor: Actor;
   let info: TestInfo;
   async function step(id: string, title: string, body: () => Promise<void>) {
@@ -784,12 +771,11 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
   return {
     async origin(currentInfo) {
       info = currentInfo;
-      await step('F01', 'F01 정식 191년491장수21국61거점 새 판·두 월드·구판 원생성', async () => {
-        a = await createWorld(true);
-        b = await createWorld(true);
-        legacy = await createWorld(false);
-        const [first, second, old] = await Promise.all([snapshot(a), snapshot(b), snapshot(legacy)]);
-        for (const world of [a, b, legacy]) {
+      await step('F01', 'F01 정식 191년491장수21국61거점 새 판 두 월드 원생성', async () => {
+        a = await createWorld();
+        b = await createWorld();
+        const [first, second] = await Promise.all([snapshot(a), snapshot(b)]);
+        for (const world of [a, b]) {
           expect(await db.general.count({ where: { worldId: world.id } })).toBe(491);
           expect(await db.nation.count({ where: { worldId: world.id } })).toBe(21);
           expect(await db.city.count({ where: { worldId: world.id } })).toBe(61);
@@ -798,8 +784,6 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
         const ledger = first.state.cityResources!;
         expect(Object.keys(ledger.cities)).toHaveLength(61);
         for (const row of Object.values(ledger.cities)) expect(row).toEqual({ gold: 0, rice: 0, garrison: [] });
-        expect(old.state.cityResources).toBeUndefined();
-        expect((await db.world.findUniqueOrThrow({ where: { id: legacy.id } })).cityResourcesState).toBeNull();
         isolatedHash = hashState(second);
         evidence.formalOrigin = {
           generals: 491,
@@ -811,8 +795,7 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
       });
       main = a!;
       isolated = b!;
-      oldWorld = legacy!;
-      await step('F02', 'F02 화면 실제 사람 생성·임관·각자 2월 이동·30칸·빈 부곡', async () => {
+      await step('F02', 'F02 화면 실제 사람 생성·임관·각자 2월 이동·30칸·새 부곡 모병', async () => {
         owner = await createActor(main, '도시검사1');
         other = await createActor(main, '도시검사2');
         // 아직 모집/정산하지 않았으므로 실제 사람 생성 뒤 첫 상세 화면에서만 0 panel을 검사한다.
@@ -829,7 +812,7 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
         expect(main.initial.cities.find((city) => city.cityKey === 87)?.kind).toBe('PASS');
         expect(main.initial.cities.find((city) => city.cityKey === 44)?.kind).toBe('CITY');
         nationId = nation.id;
-        cityKey = nation.capitalCityKey;
+        cityKey = nation.capitalCityKey!;
         // 두 사람 예약을 먼저 저장한 뒤 큰 tick까지 진행한다. 시계를 뒤로 이동하지 않는다.
         for (const actor of [owner, other]) {
           await put(actor, 1, '임관', { '대상 국가': String(nationId) });
@@ -899,41 +882,7 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
           independentHumanCommands: true,
           resourceOrPositionInjection: false,
         };
-        // 휘하·부곡은 전용 화면이다 (INT-25). 부곡을 편성한 뒤 군략도로 돌아간다.
-        await owner.page.goto(`/w/${main.id}/campaign`);
-        const campaign = owner.page.getByRole('region', {
-          name: '개인 휘하·부곡',
-          exact: true,
-        });
-        await campaign
-          .getByRole('combobox', { name: '새 부곡 지휘관', exact: true })
-          .selectOption(String(owner.generalId));
-        await campaign.getByRole('combobox', { name: '새 부곡 병종', exact: true }).selectOption('1100');
-        await campaign.getByRole('button', { name: '빈 부곡 편성', exact: true }).click();
-        await expect
-          .poll(() =>
-            db.inputEvent.count({
-              where: {
-                worldId: main.id,
-                kind: 'campaign.unit',
-                status: 'PENDING',
-              },
-            }),
-          )
-          .toBe(1);
-        await drain(main);
-        const state = (await snapshot(main)).state;
-        const unit = state.campaign!.units.find((row) => row.ownerId === owner!.generalId);
-        expect(unit).toMatchObject({
-          troops: 0,
-          commanderId: owner.generalId,
-          crewType: 1100,
-        });
-        owner.unitId = unit!.id;
-        expect(state.generals[owner.generalId]!.crew).toBe(0);
-        expect(await turns(main, other)).toHaveLength(30);
-        await expect(campaign).toContainText('소유 부곡 1개');
-        await photo(owner.page, info, '02-person-30slots-empty-unit');
+        // D-098: 빈 부곡을 미리 만들지 않고 실제 모병을 실행해 준비한다.
         await owner.page.goto(`/w/${main.id}`);
         // 같은 세수 준비를 첫 검사에 둔다. 다음 검사는 기존 네 명령과 단차 검증을 이어서 실행한다.
         actor = owner!;
@@ -942,10 +891,33 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
         // 임의 자금 없이 실제 월 경계를 진행한다. 금0이면 다음 실제 수확까지 기다린다.
         for (let month = 0; month < 7; month++) {
           const state = (await snapshot(main)).state;
-          if (state.cityResources!.cities[String(cityKey)]!.gold >= 1000) break;
+          if (state.cityResources!.cities[String(cityKey)]!.gold >= 1100) break;
           const current = (await db.world.findUniqueOrThrow({ where: { id: main.id } })).clockTick;
           await advance(main, (Math.floor(current / TICKS_PER_MONTH) + 1) * TICKS_PER_MONTH);
         }
+        const general = await person(main, owner);
+        const slots = (await turns(main, owner)).map(({ commandKey, args }) => ({ commandKey, args }));
+        slots[0] = { commandKey: 'recruit', args: { unitId: 'new', crewType: 1100, amount: 1 } };
+        expect(
+          await api(
+            owner.page,
+            'turns.set',
+            {
+              worldId: main.id,
+              revision: general.turnRevision,
+              slots,
+            },
+            true,
+          ),
+        ).toMatchObject({ http: 200 });
+        await advance(main, general.nextTurnTick);
+        const state = (await snapshot(main)).state;
+        const unit = state.campaign!.units.find((row) => row.ownerId === owner!.generalId);
+        expect(unit).toMatchObject({ troops: 1, commanderId: owner.generalId, crewType: 1100 });
+        owner.unitId = unit!.id;
+        expect(state.generals[owner.generalId]!.crew).toBe(0);
+        expect(await turns(main, other)).toHaveLength(30);
+        await photo(owner.page, info, '02-person-30slots-recruited-unit');
       });
     },
     async commands(currentInfo) {
@@ -969,6 +941,8 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
             name: '훈련',
             args: { target: 'city', crewType: 1100 },
           },
+          // 준비된 수비병은 다음 NPC 군주 차례에 부곡으로 배속된다. 사기진작용 병력도 실제 모병으로 마련한다.
+          { key: 'recruit', name: '모병', args: { amount: 40, crewType: 1100 } },
           {
             key: 'morale',
             name: '사기진작',
@@ -978,8 +952,9 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
         for (const command of commands) {
           const fields: Record<string, string> =
             command.key === 'recruit' || command.key === 'conscript'
-              ? { 수량: String(command.args.amount), 병종: '1100' }
-              : { '훈련·사기 대상': 'city', 병종: '1100' };
+              ? // 모병, 징병의 기본 모집 대상은 부곡(unitId)이다. 이 인수는 현재 도시 수비병 갈래를 본다.
+                { '모집 대상': 'city', 수량: String(command.args.amount), 병종: '1100' }
+              : { '훈련과 사기 대상': 'city', 병종: '1100' };
           await put(actor, 1, command.name, fields);
           await save(actor);
           const saved = await turns(main, actor);
@@ -1361,33 +1336,6 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
           rejectedInputCount: 0,
         };
       });
-      await step('F07', 'F07 구판은 도시 원장 UI/API 없음·기존 부곡 인자 보존', async () => {
-        const oldActor = await createActor(oldWorld, '구판검사');
-        const oldCalls = watch(oldActor.page);
-        await join(oldWorld, oldActor, nationId);
-        const summary = await read<Outputs['world']['summary']>(oldActor.page, 'world.summary', {
-          worldId: oldWorld.id,
-        });
-        expect(Object.hasOwn(summary, 'cityResourcesEnabled')).toBe(false);
-        await expect(resourcePanel(oldActor.page)).toHaveCount(0);
-        await put(
-          oldActor,
-          1,
-          '모병',
-          {
-            수량: '1',
-            병종: '1100',
-            '부곡 번호': '1',
-          },
-          async (editor) => {
-            await expect(editor.getByLabel('부곡 번호', { exact: true })).toBeVisible();
-            await expect(editor.getByLabel('훈련·사기 대상', { exact: true })).toHaveCount(0);
-          },
-        );
-        expect(oldCalls.filter((call) => call.path.startsWith('cityResources.'))).toHaveLength(0);
-        expect((await db.world.findUniqueOrThrow({ where: { id: oldWorld.id } })).cityResourcesState).toBeNull();
-        await photo(oldActor.page, info, '07-legacy-without-city-resources');
-      });
       await step('F08', 'F08 같은 탭 pending을 API 재시작 뒤 복구·새 context는 알려진 UUID 조회', async () => {
         await actor.page.bringToFront();
         const form = actor.page.getByRole('form', {
@@ -1425,7 +1373,9 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
           .toBe(1);
         await legalStack.restart(null);
         await actor.page.reload();
-        await expect(resourcePanel(actor.page)).toContainText('배속 요청을 확인하는 중입니다.');
+        // 방금 다시 띄운 API의 첫 조회(신원, 도시 자원, 신원 재확인)라 바쁜 CI에서 기본 5초를 넘긴 적이 있다(PR #674 머지
+        // 대기열). 그때 판은 오류 없이 불러오는 중이었다. 재시작 직후의 이 확인에만 30초를 준다.
+        await expect(resourcePanel(actor.page)).toContainText('배속 요청을 확인하는 중입니다.', { timeout: 30_000 });
         expect(browserCalls.slice(start).filter((call) => call.path === 'cityResources.allocate')).toHaveLength(1);
         await drain(main);
         await expect(resourcePanel(actor.page)).toContainText('도시 병력을 부곡에 배속했습니다.');

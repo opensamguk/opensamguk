@@ -4,6 +4,8 @@ import type { WorldView } from '../model/world';
 import type { CommandResult, Failure } from '../commands/types';
 import { DOMESTIC_SPECS } from '../commands/domestic/investment';
 import type { RecordedInput } from '../replay';
+import { battleCancellation } from '../tactical/world';
+import { battleStepSchema } from '../tactical/input';
 import { reputationEventSchema, type ReputationEventRecord, type ReputationKind } from './schema';
 
 function record(
@@ -88,9 +90,48 @@ export function reputationTurnEvents(context: {
   return events;
 }
 
-export function reputationInputEvents(context: { before: WorldView; input: RecordedInput }): ReputationEventRecord[] {
-  const { before, input } = context;
-  if (input.status !== 'APPLIED' || input.kind !== 'treaty.break') return [];
+export function reputationInputEvents(context: {
+  before: WorldView;
+  after?: WorldView;
+  input: RecordedInput;
+}): ReputationEventRecord[] {
+  const { before, after, input } = context;
+  if (input.status !== 'APPLIED') return [];
+  if (input.kind === 'battle.step' && after) {
+    if (input.tick == null) throw Error('전술 평판의 정산 시각이 없습니다.');
+    const payload = battleStepSchema.parse(input.payload);
+    return reputationBattleEvents(before, after, input.tick, payload.cancel ? payload.battleId : undefined);
+  }
+  if (input.kind !== 'treaty.break') return [];
   if (input.generalId === null || input.tick == null) throw Error('조약 파기 평판의 행위자나 시각이 없습니다.');
   return [record(before, input.generalId, input.tick, 'betrayal')];
+}
+
+export function reputationBattleEvents(
+  before: WorldView,
+  after: WorldView,
+  tick: number,
+  cancelledBattleId?: string,
+): ReputationEventRecord[] {
+  const events: ReputationEventRecord[] = [];
+  for (const battle of after.campaign?.tactical?.battles ?? []) {
+    const old = before.campaign?.tactical?.battles.find((row) => row.id === battle.id);
+    if (!old || old.settled || !battle.settled || !battle.result) continue;
+    if (battle.id === cancelledBattleId || battleCancellation(before, old) || battle.reason === '참가 국가 멸망')
+      continue;
+    const winner = battle.sides[battle.result].commanderId;
+    const loser = battle.sides[battle.result === 'attack' ? 'defend' : 'attack'].commanderId;
+    if (winner !== null && loser !== null) {
+      events.push(record(before, winner, tick, 'victory', battle.targetCityKey));
+      events.push(record(before, loser, tick, 'defeat', battle.targetCityKey));
+    }
+    if (
+      battle.result === 'attack' &&
+      winner !== null &&
+      before.cities[battle.targetCityKey]?.nationId !== after.cities[battle.targetCityKey]?.nationId &&
+      after.cities[battle.targetCityKey]?.nationId === battle.sides.attack.nationId
+    )
+      events.push(record(before, winner, tick, 'conquest', battle.targetCityKey));
+  }
+  return events;
 }

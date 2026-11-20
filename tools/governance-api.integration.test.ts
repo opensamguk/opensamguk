@@ -25,7 +25,7 @@ import { newSession } from '../apps/server/src/auth/session';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
-import { acquireLease, releaseLease } from '../apps/engine/src/lease';
+import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { exportReplay, replayArchive } from '../apps/engine/src/replay';
@@ -39,29 +39,18 @@ if (!url) throw new Error('전용 황실 테스트 DB가 필요합니다.');
 const target = new URL(url);
 if (
   !['postgres:', 'postgresql:'].includes(target.protocol) ||
-  !['127.0.0.1', 'localhost'].includes(target.hostname) ||
-  !/^\/[a-z][a-z0-9_]*_test$/.test(target.pathname) ||
+  !/^\/[a-z][a-zA-Z0-9_]*_test$/.test(target.pathname) ||
   target.searchParams.has('host') ||
   target.searchParams.has('port')
 )
-  throw new Error('loopback 전용 테스트 DB를 확인하세요.');
+  throw new Error('전용 테스트 DB를 확인하세요.');
 const db = createDb(url),
   worldIds: string[] = [],
   userIds: string[] = [];
 const now = Date.now();
 const app = await buildServer({ db, now: () => now, logging: false });
 let base: string, initial: WorldInit;
-const features = [
-  'campaign-assignment-v2',
-  'campaign-v1',
-  'city-resources-v1',
-  'five-stats',
-  'governance-v1',
-  'operational-map',
-  'personnel',
-  'policy',
-  'treaty',
-];
+
 type Out = inferRouterOutputs<AppRouter>;
 type Results = {
   'general.create': Out['general']['create'];
@@ -115,17 +104,12 @@ async function advance(worldId: string, tick: number, fail = false, connection =
   const lease = await acquireLease(connection, worldId);
   if (!lease) throw new Error('황실 시험 실행권이 없습니다.');
   try {
-    await new TurnLoop(
-      connection,
-      lease,
-      fail
-        ? {
-            beforeCommit: async () => {
-              throw new Error('governance-save-failure');
-            },
-          }
-        : {},
-    ).advanceTo(tick);
+    await new TurnLoop(connection, lease, {
+      beforeCommit: async (tx) => {
+        await renewLease(tx, lease);
+        if (fail) throw new Error('governance-save-failure');
+      },
+    }).advanceTo(tick);
   } finally {
     await releaseLease(connection, lease);
   }
@@ -169,6 +153,7 @@ function creation(name: string) {
     intel: stat,
     politics: stat,
     charm: stat,
+    sex: 'MALE' as const,
     portraitId: null,
   };
 }
@@ -176,7 +161,7 @@ function selectPlayer(seed: string, id: number, tick: number, excluded: readonly
   const payload = creation('황실장수');
   const cities = initial.cities.filter(
     (city) =>
-      city.kind !== 'PASS' &&
+      (city.kind === undefined || city.kind === 'CITY') &&
       city.nationId === null &&
       city.population >= 100_000 &&
       city.commerce >= 1000 &&
@@ -192,7 +177,9 @@ function selectPlayer(seed: string, id: number, tick: number, excluded: readonly
       startYear: initial.startYear,
       tick,
       monthlyTick: 0,
-      cityKeys: initial.cities.filter((city) => city.kind !== 'PASS').map((city) => city.cityKey),
+      cityKeys: initial.cities
+        .filter((city) => city.kind === undefined || city.kind === 'CITY')
+        .map((city) => city.cityKey),
       unitSet: initial.unitSet,
     });
     // 월말 스냅샷 뒤 같은 tick에 장수 턴이 실행되는 경우를 피한다.
@@ -253,6 +240,7 @@ async function createRuler(worldId: string, player: User, name: string) {
   return ruler;
 }
 async function fixture(withRival = false) {
+  const started = performance.now();
   const seed = randomUUID(),
     firstId = Math.max(...initial.generals.map((general) => general.id)) + 1;
   const first = selectPlayer(seed, firstId, 0, [], 5000);
@@ -286,11 +274,15 @@ async function fixture(withRival = false) {
       turnTermMinutes: 60,
       endYear: 201,
       replayFormat: 3,
-      ruleFeatures: features,
+
       featureData: { 'governance-v1': config },
     },
   );
   const id = saved.worldId;
+  console.info(
+    'governance-fixture-save',
+    JSON.stringify({ withRival, elapsedMs: Math.round(performance.now() - started) }),
+  );
   worldIds.push(id);
   await controlClock(db, id, 'start');
   const emperor = await user(first.userId),
@@ -314,6 +306,10 @@ async function fixture(withRival = false) {
   const state = await snapshot(id);
   expect(state.state.governance!.legitimacy[String(ruler.nationId)]).toBe(2);
   expect(state.state.cityResources!.cities[String(lower.cityKey)]!.gold).toBeGreaterThan(100);
+  console.info(
+    'governance-fixture-ready',
+    JSON.stringify({ withRival, elapsedMs: Math.round(performance.now() - started) }),
+  );
   return { id, seed, emperor, ruler, vassal, lower, rival };
 }
 type Fixture = Awaited<ReturnType<typeof fixture>>;
@@ -339,7 +335,6 @@ beforeAll(async () => {
     portraitMap: '191-map',
     seed: 'governance-api',
   });
-  initial.ruleFeatures = [...features];
   initial.generals = initial.generals.map((general) => ({ ...general, crew: 0, nextTurnTick: 1_000_000 }));
   base = await app.listen({ host: '127.0.0.1', port: 0 });
 });
@@ -750,7 +745,13 @@ describe('AC-P2-31 실제 HTTP 황실 접수·동의·경제', () => {
       count = await db.governanceMovement.count({ where: { worldId: world.id } });
     const date = monthlyDate(before.state.startYear, 70_000);
     const baseMonth = runMonthly(before.state, 70_000, rngFor(world.seed, 'monthly', date.year, date.month));
-    const expected = settleMonthlyFeatures(before, { ...before, state: baseMonth.state, monthlyTick: 70_000 }, 70_000);
+    const expected = settleMonthlyFeatures(
+      before,
+      { ...before, state: baseMonth.state, monthlyTick: 70_000 },
+      70_000,
+      undefined,
+      world.seed,
+    );
     const expectedRows = z
       .object({ movements: z.array(governanceMovementSchema) })
       .parse(expected.effects['governance-v1']).movements;

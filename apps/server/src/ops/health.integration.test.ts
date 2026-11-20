@@ -6,6 +6,7 @@ import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 // eslint-disable-next-line opensamguk/no-cross-package-relative -- 통합 시험에서 루트 Probe와 서버를 연결하는 단일 import다.
 import { probeHealth } from '../../../../tools/monitor/uptimeProbe';
+import { saveTestWorld } from '../../test/saveTestWorld';
 import { buildServer } from '../server';
 import { countEngineHealth, ENGINE_STALE_AGE_MS, ENGINE_STALE_LAG_MS, readEngineHealth } from './health';
 
@@ -23,9 +24,13 @@ if (
 )
   throw new Error('전용 통합 시험 DB 이름이 필요합니다.');
 
-const ownName = `t311_health_${randomUUID().replaceAll('-', '')}_test`;
+const ownName = process.env.CI_GREEN_DATABASE ?? `t311_health_${randomUUID().replaceAll('-', '')}_test`;
 function checkedName() {
-  if (!/^t311_health_[0-9a-f]{32}_test$/.test(ownName)) throw new Error('자체 시험 DB 이름을 확인하세요.');
+  if (
+    !/^t311_health_[0-9a-f]{32}_test$/.test(ownName) &&
+    !(ownName === parsedDatabase.pathname.slice(1) && /^opensamguk_ci_green_[a-z0-9]+_test$/.test(ownName))
+  )
+    throw new Error('자체 시험 DB 이름을 확인하세요.');
   return ownName;
 }
 checkedName();
@@ -290,22 +295,7 @@ async function dbNow(): Promise<Date> {
 }
 
 async function world(status: 'RUNNING' | 'PAUSED' | 'PREOPEN' | 'ENDED', heartbeat?: { at: Date; lagMs: number }) {
-  const created = await db.world.create({
-    data: {
-      name: '건강 경로 통합 시험',
-      scenarioKey: 'health-fixture',
-      mapKey: 'health-fixture',
-      unitSetKey: 'health-fixture',
-      seed: 'health-fixture',
-      startYear: 191,
-      turnTermMinutes: 1,
-      status,
-      initialStateHash: 'health-fixture',
-      statRules: {},
-      unitSet: {},
-    },
-    select: { id: true },
-  });
+  const created = await saveTestWorld(db, { name: 'health integration fixture', status });
   ownedWorlds.push(created.id);
   if (heartbeat) await db.engineHeartbeat.create({ data: { worldId: created.id, lastTick: 0, ...heartbeat } });
   return created.id;

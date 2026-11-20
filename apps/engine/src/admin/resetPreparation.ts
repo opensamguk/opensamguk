@@ -1,8 +1,10 @@
+import { matchesPinnedFeatureProfile } from './profileReference';
 import type { Prisma, PrismaClient, PublishedResource } from '@opensamguk/db';
 import {
   checkReplayOrigin,
   OFFICE_EFFECTS_FEATURE,
   officeEffectsSchema,
+  defaultOfficeEffects,
   parsePreset,
   presetRules,
   statRulesSchema,
@@ -17,9 +19,7 @@ import {
   type WorldInit,
   type WorldPreset,
   type SexLedger,
-  featureProfileSchema,
   featureProfileReferenceSchema,
-  FEATURE_PROFILE_DATA_KEYS,
   formatResourceKey,
   parseResourceKey,
   resourceKeySchema,
@@ -163,6 +163,7 @@ function sourceOrigin(world: SourceWorld): {
       world.mapKey !== initial.mapKey ||
       world.unitSetKey !== initial.unitSetKey ||
       world.startYear !== initial.startYear ||
+      world.fogOfWar !== initial.fogOfWar ||
       !same(world.statRules, initial.statRules) ||
       !same(world.unitSet, initial.unitSet) ||
       !same(world.operationalMap, initial.operationalMap ?? null) ||
@@ -181,9 +182,10 @@ function sourceOrigin(world: SourceWorld): {
     const options: InitialWorldOptions = {
       name: world.name,
       turnTermMinutes: world.turnTermMinutes,
+      fogOfWar: world.fogOfWar,
       endYear: world.endYear,
       replayFormat: 3,
-      ruleFeatures: [...world.ruleFeatures],
+
       ...(origin.featureData === undefined ? {} : { featureData: structuredClone(origin.featureData) }),
       ...(preset ? { preset: { key: world.presetKey!, value: structuredClone(preset) } } : {}),
     };
@@ -201,8 +203,9 @@ export function resetSourceSettingsHash(world: SourceWorld): string {
     presetKey: world.presetKey,
     preset: world.preset,
     turnTermMinutes: world.turnTermMinutes,
+    fogOfWar: world.fogOfWar,
     endYear: world.endYear,
-    ruleFeatures: world.ruleFeatures,
+
     origin: world.replayOrigin,
   });
 }
@@ -216,8 +219,9 @@ export function resetSettingsReference(world: SourceWorld) {
     presetKey: world.presetKey,
     presetHash: world.preset === null ? null : hashState(world.preset),
     turnTermMinutes: world.turnTermMinutes,
+    fogOfWar: world.fogOfWar,
     endYear: world.endYear,
-    ruleFeatures: world.ruleFeatures,
+
     featureDataHash: hashState(origin.featureData ?? null),
   });
 }
@@ -389,7 +393,8 @@ function requestRefs(
       scenario,
       map,
       unitSet: intent.unitSetKey ?? preset?.unitSet ?? 'basic',
-      ...(intent.statRulesKey === null ? {} : { statRules: intent.statRulesKey }),
+      // 자료에 따라 골랐던 기본 판도 생성 때 고정한 참조로 복원한다.
+      statRules: intent.statRulesKey ?? resolution.selection.statRules,
       ...(intent.portraitMapKey === null ? {} : { portraitMap: intent.portraitMapKey }),
     });
     if (
@@ -404,8 +409,8 @@ function requestRefs(
       !z.uuid().safeParse(request.idempotencyKey).success ||
       request.intentHash !== hashState(intent) ||
       intent.name !== intent.name.trim() ||
-      (intent.ruleFeatures !== null && !same(intent.ruleFeatures, [...intent.ruleFeatures].sort())) ||
       intent.name !== world.name ||
+      (intent.fogOfWar ?? false) !== world.fogOfWar ||
       request.effectiveSeed !== world.seed ||
       (intent.seed !== null && intent.seed !== world.seed) ||
       !same(resolution.selection, expected) ||
@@ -423,44 +428,16 @@ function requestRefs(
     )
       fail('PROVENANCE_INVALID');
     const requestedOfficeEffects =
-      request.officeEffects == null ? null : officeEffectsSchema.parse(request.officeEffects);
+      request.officeEffects == null ? defaultOfficeEffects : officeEffectsSchema.parse(request.officeEffects);
     if (!same(requestedOfficeEffects, origin.featureData?.[OFFICE_EFFECTS_FEATURE] ?? null)) fail('PROVENANCE_INVALID');
     if ((intent.featureProfileKey === undefined) !== (resolution.featureProfile === undefined))
       fail('PROVENANCE_INVALID');
-    if (resolution.featureProfile !== undefined) {
-      const equipment = origin.initial.ruleFeatures?.includes('equipment-v1') === true;
-      const cards = origin.initial.ruleFeatures?.includes('stratagem-cards-v1') === true;
-      const profile = featureProfileSchema.parse({
-        version: cards ? 3 : equipment ? 2 : 1,
-        key: intent.featureProfileKey,
-        scenarioKey: expected.scenario,
-        mapKey: expected.map,
-        ...(cards
-          ? {
-              unitSetKey: expected.unitSet,
-              statRulesKey: expected.statRules,
-              portraitMapKey: expected.portraitMap,
-            }
-          : {}),
-        ruleFeatures: intent.ruleFeatures,
-        featureData: Object.fromEntries(
-          [
-            ...FEATURE_PROFILE_DATA_KEYS,
-            ...(equipment ? ['equipment-v1'] : []),
-            ...(cards ? ['stratagem-cards-v1'] : []),
-          ].map((key) => [key, origin.featureData?.[key]]),
-        ),
-      });
-      if (
-        profile.key !== resolution.featureProfile.key ||
-        hashState(profile) !== resolution.featureProfile.contentHash ||
-        !same(
-          [...new Set([...profile.ruleFeatures, ...(requestedOfficeEffects ? [OFFICE_EFFECTS_FEATURE] : [])])].sort(),
-          origin.initial.ruleFeatures,
-        )
-      )
-        fail('PROVENANCE_INVALID');
-    }
+    if (
+      resolution.featureProfile !== undefined &&
+      (intent.featureProfileKey !== resolution.featureProfile.key ||
+        !matchesPinnedFeatureProfile(origin, expected, resolution.featureProfile))
+    )
+      fail('PROVENANCE_INVALID');
     selectionRefs(resolution.selection, resolution.resources);
     return resolution.resources;
   });
@@ -505,39 +482,18 @@ function prepared(
   sexLedger?: SexLedger,
 ) {
   return fixed('RESOURCE_INVALID', () => {
-    const state: WorldInit = composeInitialWorld(resources, effectiveSeed),
-      features = options.ruleFeatures ?? [];
+    const state: WorldInit = composeInitialWorld(resources, effectiveSeed);
     if (request) {
       const intent = worldCreateIntentSchema.parse(request.intent);
-      if (intent.recruitmentLocation !== original.initial.recruitmentLocation) fail('PROVENANCE_INVALID');
-      const inferred = [state.unitSet.coefMode === 'multiply' ? ['battle-affinity-v2'] : []];
-      // 기존 1판 요청의 기능 합성도 원생성 해시와 함께 확인한다.
-      if (Object.values(resources).every((resource) => resource.version === 1))
-        inferred.push(
-          options.preset?.value.unitSet === 'expanded' && resources.unitSet.name === 'expanded'
-            ? ['battle-affinity-v2']
-            : [],
-        );
       if (
-        !inferred.some((presetFeatures) =>
-          same(
-            [
-              ...new Set([
-                ...(state.ruleFeatures ?? []),
-                ...presetFeatures,
-                ...(intent.ruleFeatures ?? []),
-                ...(request.officeEffects != null ? [OFFICE_EFFECTS_FEATURE] : []),
-              ]),
-            ].sort(),
-            features,
-          ),
-        )
+        intent.recruitmentLocation !== original.initial.recruitmentLocation ||
+        (intent.fogOfWar ?? false) !== (original.initial.fogOfWar ?? false)
       )
         fail('PROVENANCE_INVALID');
     }
-    if (state.generals.some((g) => g.userId !== null) || (state.ruleFeatures ?? []).some((f) => !features.includes(f)))
-      fail('RESOURCE_INVALID');
-    if (state.ruleFeatures || features.length) state.ruleFeatures = [...features];
+    if (state.generals.some((g) => g.userId !== null)) fail('RESOURCE_INVALID');
+
+    state.fogOfWar = original.initial.fogOfWar ?? false;
     if (original.initial.recruitmentLocation) state.recruitmentLocation = original.initial.recruitmentLocation;
     if (resourceHashV3({ ...original, initial: state }) !== original.resourceHash) fail('RESOURCE_INVALID');
     return prepareInitialWorld(state, options, sexLedger);
@@ -550,9 +506,7 @@ function originalPrepared(
   effectiveSeed: string,
   request?: Request,
 ) {
-  const ledgers = options.ruleFeatures?.includes('lineage-v1')
-    ? fixed('RESOURCE_INVALID', loadSexLedgers)
-    : [undefined];
+  const ledgers = fixed('RESOURCE_INVALID', loadSexLedgers);
   for (const ledger of ledgers) {
     try {
       const value = prepared(resources, origin, options, effectiveSeed, request, ledger);

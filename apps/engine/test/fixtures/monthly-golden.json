@@ -1,112 +1,1574 @@
 {
-  "date": {
-    "year": 191,
-    "month": 1
-  },
-  "yearbook": {
-    "nations": [
-      {
-        "nationId": 1,
-        "cities": 2,
-        "generals": 1,
-        "power": 2360,
-        "gold": 120,
-        "rice": 200
+  "stateHash": "7d3a7cd0378de405d8db754e8d7ab954b9a59b5442945b3e8a1bac70d83169db",
+  "replay": {
+    "state": {
+      "fogOfWar": false,
+      "relations": { "version": 1, "pairs": [] },
+      "officeEffects": {
+        "version": 1,
+        "minimumAbility": 65,
+        "tax": { "3": 10, "4": 10, "11": 5 },
+        "supplyLoss": { "5": 10, "6": 10, "7": 10, "8": 10, "9": 10, "10": 10 },
+        "secretary": true
       },
-      {
-        "nationId": 2,
-        "cities": 2,
-        "generals": 1,
-        "power": 2360,
-        "gold": 120,
-        "rice": 200
+      "preparedTurns": { "version": 1, "nations": {} },
+      "nationResearch": { "version": 1, "nations": {} },
+      "nationLifecycle": { "version": 1, "nations": {} },
+      "nationStrategy": { "version": 1, "nations": {} },
+      "cityRuins": { "version": 1, "cities": [] },
+      "equipment": {
+        "version": 1,
+        "config": {
+          "version": 1,
+          "items": [
+            {
+              "key": "horse_01",
+              "name": "노기",
+              "slot": "horse",
+              "grade": 1,
+              "cost": 1000,
+              "requiredSecurity": 1000,
+              "stat": "leadership",
+              "bonus": 1,
+              "goods": { "iron": 0, "wood": 0, "horses": 5 }
+            },
+            {
+              "key": "horse_02",
+              "name": "조랑",
+              "slot": "horse",
+              "grade": 2,
+              "cost": 3000,
+              "requiredSecurity": 2000,
+              "stat": "leadership",
+              "bonus": 2,
+              "goods": { "iron": 0, "wood": 0, "horses": 10 }
+            },
+            {
+              "key": "horse_03",
+              "name": "노새",
+              "slot": "horse",
+              "grade": 3,
+              "cost": 6000,
+              "requiredSecurity": 3000,
+              "stat": "leadership",
+              "bonus": 3,
+              "goods": { "iron": 0, "wood": 0, "horses": 15 }
+            },
+            {
+              "key": "horse_04",
+              "name": "나귀",
+              "slot": "horse",
+              "grade": 4,
+              "cost": 10000,
+              "requiredSecurity": 4000,
+              "stat": "leadership",
+              "bonus": 4,
+              "goods": { "iron": 0, "wood": 0, "horses": 20 }
+            },
+            {
+              "key": "horse_05",
+              "name": "갈색마",
+              "slot": "horse",
+              "grade": 5,
+              "cost": 15000,
+              "requiredSecurity": 5000,
+              "stat": "leadership",
+              "bonus": 5,
+              "goods": { "iron": 0, "wood": 0, "horses": 25 }
+            },
+            {
+              "key": "horse_06",
+              "name": "흑색마",
+              "slot": "horse",
+              "grade": 6,
+              "cost": 21000,
+              "requiredSecurity": 6000,
+              "stat": "leadership",
+              "bonus": 6,
+              "goods": { "iron": 0, "wood": 0, "horses": 30 }
+            },
+            {
+              "key": "weapon_01",
+              "name": "단도",
+              "slot": "weapon",
+              "grade": 1,
+              "cost": 1000,
+              "requiredSecurity": 1000,
+              "stat": "strength",
+              "bonus": 1,
+              "goods": { "iron": 5, "wood": 0, "horses": 0 }
+            },
+            {
+              "key": "weapon_02",
+              "name": "단궁",
+              "slot": "weapon",
+              "grade": 2,
+              "cost": 3000,
+              "requiredSecurity": 2000,
+              "stat": "strength",
+              "bonus": 2,
+              "goods": { "iron": 10, "wood": 0, "horses": 0 }
+            },
+            {
+              "key": "weapon_03",
+              "name": "단극",
+              "slot": "weapon",
+              "grade": 3,
+              "cost": 6000,
+              "requiredSecurity": 3000,
+              "stat": "strength",
+              "bonus": 3,
+              "goods": { "iron": 15, "wood": 0, "horses": 0 }
+            },
+            {
+              "key": "weapon_04",
+              "name": "목검",
+              "slot": "weapon",
+              "grade": 4,
+              "cost": 10000,
+              "requiredSecurity": 4000,
+              "stat": "strength",
+              "bonus": 4,
+              "goods": { "iron": 20, "wood": 0, "horses": 0 }
+            },
+            {
+              "key": "weapon_05",
+              "name": "죽창",
+              "slot": "weapon",
+              "grade": 5,
+              "cost": 15000,
+              "requiredSecurity": 5000,
+              "stat": "strength",
+              "bonus": 5,
+              "goods": { "iron": 25, "wood": 0, "horses": 0 }
+            },
+            {
+              "key": "weapon_06",
+              "name": "소부",
+              "slot": "weapon",
+              "grade": 6,
+              "cost": 21000,
+              "requiredSecurity": 6000,
+              "stat": "strength",
+              "bonus": 6,
+              "goods": { "iron": 30, "wood": 0, "horses": 0 }
+            },
+            {
+              "key": "book_01",
+              "name": "효경전",
+              "slot": "book",
+              "grade": 1,
+              "cost": 1000,
+              "requiredSecurity": 1000,
+              "stat": "intel",
+              "bonus": 1,
+              "goods": { "iron": 0, "wood": 0, "horses": 0 }
+            },
+            {
+              "key": "book_02",
+              "name": "회남자",
+              "slot": "book",
+              "grade": 2,
+              "cost": 3000,
+              "requiredSecurity": 2000,
+              "stat": "intel",
+              "bonus": 2,
+              "goods": { "iron": 0, "wood": 0, "horses": 0 }
+            },
+            {
+              "key": "book_03",
+              "name": "변도론",
+              "slot": "book",
+              "grade": 3,
+              "cost": 6000,
+              "requiredSecurity": 3000,
+              "stat": "intel",
+              "bonus": 3,
+              "goods": { "iron": 0, "wood": 0, "horses": 0 }
+            },
+            {
+              "key": "book_04",
+              "name": "건상역주",
+              "slot": "book",
+              "grade": 4,
+              "cost": 10000,
+              "requiredSecurity": 4000,
+              "stat": "intel",
+              "bonus": 4,
+              "goods": { "iron": 0, "wood": 0, "horses": 0 }
+            },
+            {
+              "key": "book_05",
+              "name": "여씨춘추",
+              "slot": "book",
+              "grade": 5,
+              "cost": 15000,
+              "requiredSecurity": 5000,
+              "stat": "intel",
+              "bonus": 5,
+              "goods": { "iron": 0, "wood": 0, "horses": 0 }
+            },
+            {
+              "key": "book_06",
+              "name": "사민월령",
+              "slot": "book",
+              "grade": 6,
+              "cost": 21000,
+              "requiredSecurity": 6000,
+              "stat": "intel",
+              "bonus": 6,
+              "goods": { "iron": 0, "wood": 0, "horses": 0 }
+            }
+          ],
+          "sellRateBp": 5000,
+          "tradeExperience": 10
+        },
+        "generals": {}
+      },
+      "stratagemCards": {
+        "version": 1,
+        "seed": "monthly-golden",
+        "config": {
+          "version": 1,
+          "capacity": 3,
+          "deck": [
+            { "kind": "fire_attack", "weight": 1 },
+            { "kind": "sabotage", "weight": 1 },
+            { "kind": "incite", "weight": 1 },
+            { "kind": "plunder", "weight": 1 },
+            { "kind": "nation_mobilize", "weight": 1 },
+            { "kind": "nation_rivalry", "weight": 1 },
+            { "kind": "nation_raid", "weight": 1 },
+            { "kind": "trap", "weight": 1 }
+          ],
+          "trapCountsInCapacity": true,
+          "trap": { "lossBp": 1000, "atmosLoss": 10 },
+          "campaignLoss": "eligibleAll",
+          "consumeOnRollFailure": true,
+          "checkOnReserve": false,
+          "setter": "ruler",
+          "zeroForce": "cancel",
+          "startHand": 0,
+          "trapExpiryMonths": null
+        },
+        "monthlyTick": 10000,
+        "revision": 1,
+        "nations": { "1": { "hand": ["plunder"], "traps": [] }, "2": { "hand": ["incite"], "traps": [] } }
+      },
+      "lineage": {
+        "version": 1,
+        "config": {
+          "version": 2,
+          "marriage": {
+            "minAge": 16,
+            "maxAge": 60,
+            "maxSpouses": 1,
+            "kinDepth": 3,
+            "offerMonths": 6,
+            "npc": { "perMonth": 10, "affinityGap": 30, "chanceBp": 3000 }
+          },
+          "birth": {
+            "minParentAge": 16,
+            "maxParentAge": 45,
+            "chanceBp": 500,
+            "comingOfAgeYears": 15,
+            "femaleBp": 5000,
+            "statSpread": 10,
+            "lifespan": { "min": 50, "max": 75 },
+            "givenNames": [
+              "가",
+              "각",
+              "간",
+              "강",
+              "개",
+              "거",
+              "거아",
+              "건",
+              "견",
+              "겸",
+              "경",
+              "공",
+              "광",
+              "굉",
+              "교",
+              "구검",
+              "군",
+              "궁",
+              "권",
+              "궐",
+              "규",
+              "균",
+              "근",
+              "기",
+              "길",
+              "녕",
+              "다나",
+              "단",
+              "달",
+              "담",
+              "당",
+              "대",
+              "대목",
+              "덕",
+              "도",
+              "도영",
+              "돈",
+              "돌골",
+              "동",
+              "둔",
+              "등",
+              "란",
+              "람",
+              "랑",
+              "량",
+              "령",
+              "례",
+              "로",
+              "료",
+              "루",
+              "륭",
+              "림",
+              "립",
+              "막",
+              "망",
+              "모",
+              "몽",
+              "무",
+              "묵",
+              "민",
+              "박",
+              "반",
+              "방",
+              "배",
+              "백",
+              "백호",
+              "번",
+              "범",
+              "벽",
+              "병",
+              "보",
+              "복",
+              "봉",
+              "부",
+              "부라",
+              "분",
+              "비",
+              "비능",
+              "빙",
+              "사",
+              "사인",
+              "상",
+              "색",
+              "서",
+              "선",
+              "섬",
+              "섭",
+              "성",
+              "소",
+              "속",
+              "손",
+              "송",
+              "수",
+              "숙",
+              "순",
+              "술",
+              "숭",
+              "습",
+              "승",
+              "시",
+              "식",
+              "심",
+              "쌍",
+              "아장",
+              "안",
+              "안국",
+              "앙",
+              "애",
+              "약",
+              "양흥",
+              "언",
+              "엄",
+              "여",
+              "역거",
+              "연",
+              "염",
+              "엽",
+              "영",
+              "예",
+              "온",
+              "옹",
+              "완",
+              "요",
+              "우",
+              "우경",
+              "욱",
+              "운",
+              "웅",
+              "원",
+              "원소",
+              "원지",
+              "월",
+              "위",
+              "위황",
+              "유",
+              "유지",
+              "윤",
+              "융",
+              "은",
+              "의",
+              "의거",
+              "이",
+              "익",
+              "인",
+              "일",
+              "임",
+              "자",
+              "장",
+              "저",
+              "적",
+              "전",
+              "정",
+              "제",
+              "조",
+              "종",
+              "주",
+              "주천",
+              "준",
+              "중",
+              "지",
+              "직",
+              "진",
+              "질",
+              "찬",
+              "창",
+              "책",
+              "철",
+              "첨",
+              "초",
+              "총",
+              "추",
+              "축",
+              "충",
+              "치",
+              "침",
+              "타",
+              "탁",
+              "탄",
+              "탐",
+              "태",
+              "택",
+              "통",
+              "파",
+              "패",
+              "평",
+              "포",
+              "표",
+              "풍",
+              "합",
+              "항",
+              "해",
+              "핵",
+              "향",
+              "헌",
+              "혁",
+              "현",
+              "형",
+              "혜",
+              "호",
+              "혼",
+              "화",
+              "환",
+              "황",
+              "회",
+              "회남",
+              "획",
+              "횡",
+              "후",
+              "훈",
+              "휘",
+              "휴",
+              "흠",
+              "흥",
+              "희"
+            ],
+            "compoundSurnames": ["공손", "사마", "제갈", "하후", "황보", "태사"]
+          },
+          "heir": { "depth": 3 },
+          "limits": {
+            "maxGenerals": 10000,
+            "maxBirthsPerYear": 30,
+            "sentOffers": 3,
+            "receivedOffers": 5,
+            "worldOffers": 200
+          }
+        },
+        "seed": "monthly-golden",
+        "monthlyTick": 10000,
+        "revision": 1,
+        "nextOfferId": 1,
+        "nextMarriageId": 1,
+        "persons": {
+          "1": {
+            "parents": [],
+            "bornTick": null,
+            "exit": { "tick": 10000, "cause": "DIED", "activeFromYear": 191 },
+            "successorId": null,
+            "heirId": null
+          }
+        },
+        "marriages": [],
+        "offers": []
+      },
+      "governance": {
+        "version": 1,
+        "config": {
+          "version": 1,
+          "seatCityKey": 1,
+          "legitimacy": {
+            "seatGain": 2,
+            "emperorGain": 1,
+            "officeGain": 1,
+            "maxOfficeGain": 3,
+            "decay": 1,
+            "ascendAt": 60,
+            "censureLoss": 5,
+            "renounceLoss": 10
+          },
+          "tribute": { "maxBp": 2000, "maxAmount": 100000 },
+          "stipendGold": { "chancellor": 100, "grandMarshal": 100, "minister": 100 },
+          "offerMonths": 6,
+          "maxDepth": 3,
+          "maxRemitMonths": 12,
+          "censureCooldownMonths": 6,
+          "npc": { "cityRatio": 2, "acceptMaxBp": 1000, "offerBp": 500, "cooldownMonths": 12 },
+          "limits": { "sentOffers": 3, "receivedOffers": 5, "worldOffers": 200 }
+        },
+        "monthlyTick": 10000,
+        "revision": 1,
+        "nextOfferId": 1,
+        "nextVassalId": 1,
+        "throne": { "emperorGeneralId": null, "emperorNationId": null, "sinceTick": 0 },
+        "court": { "chancellor": null, "grandMarshal": null, "minister": null },
+        "legitimacy": { "1": 2, "2": 0 },
+        "vassals": [],
+        "offers": [],
+        "pendingRenounce": [],
+        "censuredAt": {},
+        "npcOfferAt": {}
+      },
+      "logistics": {
+        "version": 1,
+        "config": {
+          "version": 1,
+          "specialties": [],
+          "capacity": { "base": 10000, "perLevel": 10000, "maxLevel": 5 },
+          "upgrade": { "gold": 1000, "wood": 500 },
+          "transport": {
+            "maxHops": 8,
+            "hopsPerMonth": 2,
+            "lossBpPerHop": 100,
+            "maxPerOrder": 100000,
+            "maxActivePerNation": 20
+          },
+          "recruitPer100": {
+            "1": { "iron": 2, "wood": 0, "horses": 0 },
+            "2": { "iron": 2, "wood": 0, "horses": 0 },
+            "3": { "iron": 2, "wood": 0, "horses": 10 }
+          },
+          "build": {
+            "wall": { "iron": 0, "wood": 50, "horses": 0 },
+            "defence": { "iron": 20, "wood": 20, "horses": 0 }
+          },
+          "trade": {
+            "iron": { "buy": 3, "sell": 1 },
+            "wood": { "buy": 3, "sell": 1 },
+            "horses": { "buy": 3, "sell": 1 }
+          },
+          "npc": { "recruitTarget": 1000, "budgetBp": 1000, "maxActions": 3, "stockCapBp": 5000, "upgradeAtBp": 8000 }
+        },
+        "revision": 1,
+        "monthlyTick": 10000,
+        "nextConvoyId": 1,
+        "cities": {
+          "1": { "iron": 0, "wood": 0, "horses": 0, "level": 0 },
+          "2": { "iron": 0, "wood": 0, "horses": 0, "level": 0 },
+          "3": { "iron": 0, "wood": 0, "horses": 0, "level": 0 },
+          "4": { "iron": 0, "wood": 0, "horses": 0, "level": 0 }
+        },
+        "convoys": []
+      },
+      "cityResources": {
+        "version": 1,
+        "cities": {
+          "1": { "gold": 10, "rice": 0, "garrison": [] },
+          "2": { "gold": 10, "rice": 0, "garrison": [] },
+          "3": { "gold": 10, "rice": 0, "garrison": [] },
+          "4": { "gold": 10, "rice": 0, "garrison": [] }
+        }
+      },
+      "campaign": {
+        "cityUpgrade": {
+          "version": 1,
+          "enabled": true,
+          "originalLevels": { "1": 8, "2": 8, "3": 8, "4": 8 },
+          "completed": {}
+        },
+        "version": 1,
+        "seed": "monthly-golden",
+        "revision": 1,
+        "nextUnitId": 1,
+        "nextOfferId": 1,
+        "sources": {
+          "1": "scenario:engine-monthly-fixture#general:1",
+          "2": "scenario:engine-monthly-fixture#general:2",
+          "3": "scenario:engine-monthly-fixture#general:3"
+        },
+        "links": [],
+        "offers": [],
+        "units": [],
+        "attempts": [],
+        "supplyLedger": {
+          "version": 1,
+          "cellSize": 16,
+          "routes": [
+            {
+              "routeId": "route:1:2",
+              "from": 1,
+              "to": 2,
+              "segments": [
+                {
+                  "routeId": "route:1:2",
+                  "mode": "LAND",
+                  "cells": [
+                    {
+                      "cellId": "cell:22:8",
+                      "pathCellIndex": 0,
+                      "x": 352,
+                      "y": 128,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 1
+                    },
+                    {
+                      "cellId": "cell:22:9",
+                      "pathCellIndex": 1,
+                      "x": 352,
+                      "y": 144,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 1
+                    },
+                    {
+                      "cellId": "cell:22:10",
+                      "pathCellIndex": 2,
+                      "x": 352,
+                      "y": 160,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 1
+                    },
+                    {
+                      "cellId": "cell:21:11",
+                      "pathCellIndex": 3,
+                      "x": 336,
+                      "y": 176,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 2
+                    },
+                    {
+                      "cellId": "cell:21:12",
+                      "pathCellIndex": 4,
+                      "x": 336,
+                      "y": 192,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 2
+                    },
+                    {
+                      "cellId": "cell:21:13",
+                      "pathCellIndex": 5,
+                      "x": 336,
+                      "y": 208,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 2
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "routeId": "route:1:2",
+              "from": 2,
+              "to": 1,
+              "segments": [
+                {
+                  "routeId": "route:1:2",
+                  "mode": "LAND",
+                  "cells": [
+                    {
+                      "cellId": "cell:21:13",
+                      "pathCellIndex": 5,
+                      "x": 336,
+                      "y": 208,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 2
+                    },
+                    {
+                      "cellId": "cell:21:12",
+                      "pathCellIndex": 4,
+                      "x": 336,
+                      "y": 192,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 2
+                    },
+                    {
+                      "cellId": "cell:21:11",
+                      "pathCellIndex": 3,
+                      "x": 336,
+                      "y": 176,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 2
+                    },
+                    {
+                      "cellId": "cell:22:10",
+                      "pathCellIndex": 2,
+                      "x": 352,
+                      "y": 160,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 1
+                    },
+                    {
+                      "cellId": "cell:22:9",
+                      "pathCellIndex": 1,
+                      "x": 352,
+                      "y": 144,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 1
+                    },
+                    {
+                      "cellId": "cell:22:8",
+                      "pathCellIndex": 0,
+                      "x": 352,
+                      "y": 128,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 1
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "routeId": "route:2:3",
+              "from": 2,
+              "to": 3,
+              "segments": [
+                {
+                  "routeId": "route:2:3",
+                  "mode": "LAND",
+                  "cells": [
+                    {
+                      "cellId": "cell:21:13",
+                      "pathCellIndex": 0,
+                      "x": 336,
+                      "y": 208,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 2
+                    },
+                    {
+                      "cellId": "cell:20:13",
+                      "pathCellIndex": 1,
+                      "x": 320,
+                      "y": 208,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 2
+                    },
+                    {
+                      "cellId": "cell:19:12",
+                      "pathCellIndex": 2,
+                      "x": 304,
+                      "y": 192,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 3
+                    },
+                    {
+                      "cellId": "cell:18:12",
+                      "pathCellIndex": 3,
+                      "x": 288,
+                      "y": 192,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 3
+                    },
+                    {
+                      "cellId": "cell:17:11",
+                      "pathCellIndex": 4,
+                      "x": 272,
+                      "y": 176,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 3
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "routeId": "route:2:4",
+              "from": 2,
+              "to": 4,
+              "segments": [
+                {
+                  "routeId": "route:2:4",
+                  "mode": "LAND",
+                  "cells": [
+                    {
+                      "cellId": "cell:21:13",
+                      "pathCellIndex": 0,
+                      "x": 336,
+                      "y": 208,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 2
+                    },
+                    {
+                      "cellId": "cell:20:13",
+                      "pathCellIndex": 1,
+                      "x": 320,
+                      "y": 208,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 2
+                    },
+                    {
+                      "cellId": "cell:19:13",
+                      "pathCellIndex": 2,
+                      "x": 304,
+                      "y": 208,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 2
+                    },
+                    {
+                      "cellId": "cell:18:12",
+                      "pathCellIndex": 3,
+                      "x": 288,
+                      "y": 192,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 3
+                    },
+                    {
+                      "cellId": "cell:17:12",
+                      "pathCellIndex": 4,
+                      "x": 272,
+                      "y": 192,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 3
+                    },
+                    {
+                      "cellId": "cell:16:12",
+                      "pathCellIndex": 5,
+                      "x": 256,
+                      "y": 192,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 3
+                    },
+                    {
+                      "cellId": "cell:15:12",
+                      "pathCellIndex": 6,
+                      "x": 240,
+                      "y": 192,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 3
+                    },
+                    {
+                      "cellId": "cell:14:11",
+                      "pathCellIndex": 7,
+                      "x": 224,
+                      "y": 176,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 3
+                    },
+                    {
+                      "cellId": "cell:13:11",
+                      "pathCellIndex": 8,
+                      "x": 208,
+                      "y": 176,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 4
+                    },
+                    {
+                      "cellId": "cell:12:11",
+                      "pathCellIndex": 9,
+                      "x": 192,
+                      "y": 176,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 4
+                    },
+                    {
+                      "cellId": "cell:11:11",
+                      "pathCellIndex": 10,
+                      "x": 176,
+                      "y": 176,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 4
+                    },
+                    {
+                      "cellId": "cell:10:10",
+                      "pathCellIndex": 11,
+                      "x": 160,
+                      "y": 160,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 4
+                    },
+                    {
+                      "cellId": "cell:9:10",
+                      "pathCellIndex": 12,
+                      "x": 144,
+                      "y": 160,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 4
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "routeId": "route:2:3",
+              "from": 3,
+              "to": 2,
+              "segments": [
+                {
+                  "routeId": "route:2:3",
+                  "mode": "LAND",
+                  "cells": [
+                    {
+                      "cellId": "cell:17:11",
+                      "pathCellIndex": 4,
+                      "x": 272,
+                      "y": 176,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 3
+                    },
+                    {
+                      "cellId": "cell:18:12",
+                      "pathCellIndex": 3,
+                      "x": 288,
+                      "y": 192,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 3
+                    },
+                    {
+                      "cellId": "cell:19:12",
+                      "pathCellIndex": 2,
+                      "x": 304,
+                      "y": 192,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 3
+                    },
+                    {
+                      "cellId": "cell:20:13",
+                      "pathCellIndex": 1,
+                      "x": 320,
+                      "y": 208,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 2
+                    },
+                    {
+                      "cellId": "cell:21:13",
+                      "pathCellIndex": 0,
+                      "x": 336,
+                      "y": 208,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 2
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "routeId": "route:2:4",
+              "from": 4,
+              "to": 2,
+              "segments": [
+                {
+                  "routeId": "route:2:4",
+                  "mode": "LAND",
+                  "cells": [
+                    {
+                      "cellId": "cell:9:10",
+                      "pathCellIndex": 12,
+                      "x": 144,
+                      "y": 160,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 4
+                    },
+                    {
+                      "cellId": "cell:10:10",
+                      "pathCellIndex": 11,
+                      "x": 160,
+                      "y": 160,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 4
+                    },
+                    {
+                      "cellId": "cell:11:11",
+                      "pathCellIndex": 10,
+                      "x": 176,
+                      "y": 176,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 4
+                    },
+                    {
+                      "cellId": "cell:12:11",
+                      "pathCellIndex": 9,
+                      "x": 192,
+                      "y": 176,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 4
+                    },
+                    {
+                      "cellId": "cell:13:11",
+                      "pathCellIndex": 8,
+                      "x": 208,
+                      "y": 176,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 4
+                    },
+                    {
+                      "cellId": "cell:14:11",
+                      "pathCellIndex": 7,
+                      "x": 224,
+                      "y": 176,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 3
+                    },
+                    {
+                      "cellId": "cell:15:12",
+                      "pathCellIndex": 6,
+                      "x": 240,
+                      "y": 192,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 3
+                    },
+                    {
+                      "cellId": "cell:16:12",
+                      "pathCellIndex": 5,
+                      "x": 256,
+                      "y": 192,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 3
+                    },
+                    {
+                      "cellId": "cell:17:12",
+                      "pathCellIndex": 4,
+                      "x": 272,
+                      "y": 192,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 3
+                    },
+                    {
+                      "cellId": "cell:18:12",
+                      "pathCellIndex": 3,
+                      "x": 288,
+                      "y": 192,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 3
+                    },
+                    {
+                      "cellId": "cell:19:13",
+                      "pathCellIndex": 2,
+                      "x": 304,
+                      "y": 208,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 2
+                    },
+                    {
+                      "cellId": "cell:20:13",
+                      "pathCellIndex": 1,
+                      "x": 320,
+                      "y": 208,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 2
+                    },
+                    {
+                      "cellId": "cell:21:13",
+                      "pathCellIndex": 0,
+                      "x": 336,
+                      "y": 208,
+                      "mountain": false,
+                      "remote": false,
+                      "ownerAnchorKey": 2
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "ext": { "intel": {} },
+      "startYear": 191,
+      "cities": {
+        "1": {
+          "cityKey": 1,
+          "name": "도시1",
+          "level": 8,
+          "region": 1,
+          "x": 345,
+          "y": 130,
+          "connections": [2],
+          "nationId": 1,
+          "population": 1020,
+          "populationMax": 2000,
+          "agriculture": 200,
+          "agricultureMax": 1000,
+          "commerce": 100,
+          "commerceMax": 1000,
+          "security": 50,
+          "securityMax": 1000,
+          "defence": 50,
+          "defenceMax": 1000,
+          "wall": 50,
+          "wallMax": 1000,
+          "trust": 80,
+          "supplied": true,
+          "kind": "CITY"
+        },
+        "2": {
+          "cityKey": 2,
+          "name": "도시2",
+          "level": 8,
+          "region": 2,
+          "x": 330,
+          "y": 215,
+          "connections": [1, 3, 4],
+          "nationId": 2,
+          "population": 1020,
+          "populationMax": 2000,
+          "agriculture": 200,
+          "agricultureMax": 1000,
+          "commerce": 100,
+          "commerceMax": 1000,
+          "security": 50,
+          "securityMax": 1000,
+          "defence": 50,
+          "defenceMax": 1000,
+          "wall": 50,
+          "wallMax": 1000,
+          "trust": 80,
+          "supplied": true,
+          "kind": "CITY"
+        },
+        "3": {
+          "cityKey": 3,
+          "name": "도시3",
+          "level": 8,
+          "region": 2,
+          "x": 275,
+          "y": 180,
+          "connections": [2],
+          "nationId": 1,
+          "population": 1020,
+          "populationMax": 2000,
+          "agriculture": 180,
+          "agricultureMax": 1000,
+          "commerce": 90,
+          "commerceMax": 1000,
+          "security": 45,
+          "securityMax": 1000,
+          "defence": 45,
+          "defenceMax": 1000,
+          "wall": 45,
+          "wallMax": 1000,
+          "trust": 80,
+          "supplied": false,
+          "kind": "CITY"
+        },
+        "4": {
+          "cityKey": 4,
+          "name": "도시4",
+          "level": 8,
+          "region": 3,
+          "x": 145,
+          "y": 165,
+          "connections": [2],
+          "nationId": 2,
+          "population": 1020,
+          "populationMax": 2000,
+          "agriculture": 200,
+          "agricultureMax": 1000,
+          "commerce": 100,
+          "commerceMax": 1000,
+          "security": 50,
+          "securityMax": 1000,
+          "defence": 50,
+          "defenceMax": 1000,
+          "wall": 50,
+          "wallMax": 1000,
+          "trust": 80,
+          "supplied": true,
+          "kind": "CITY"
+        }
+      },
+      "nations": {
+        "1": {
+          "id": 1,
+          "name": "조조",
+          "color": "#000080",
+          "gold": 100,
+          "rice": 200,
+          "description": "여포에게 본거지를 빼앗긴 위기의 조조",
+          "tech": 1000,
+          "philosophy": "병가",
+          "level": 2,
+          "capitalCityKey": 1,
+          "isNpc": true
+        },
+        "2": {
+          "id": 2,
+          "name": "원소",
+          "color": "#FFFF00",
+          "gold": 100,
+          "rice": 200,
+          "description": "기주에서 세력을 넓이고 있는 원소",
+          "tech": 1000,
+          "philosophy": "법가",
+          "level": 2,
+          "capitalCityKey": 4,
+          "isNpc": true
+        }
+      },
+      "generals": {
+        "1": {
+          "id": 1,
+          "userId": null,
+          "affinity": 1,
+          "name": "소제1",
+          "portraitId": null,
+          "nationId": null,
+          "cityKey": 3,
+          "leadership": 20,
+          "strength": 11,
+          "intel": 48,
+          "officerLevel": 0,
+          "birthYear": 168,
+          "deathYear": 190,
+          "activeFromYear": 2147483647,
+          "personality": "유지",
+          "special": null,
+          "gold": 0,
+          "rice": 0,
+          "crew": 0,
+          "crewType": 1100,
+          "train": 30,
+          "atmos": 40,
+          "experience": 0,
+          "dedication": 0,
+          "age": 23,
+          "injury": 2,
+          "nextTurnTick": 100,
+          "politics": 50,
+          "charm": 50,
+          "sex": "UNKNOWN"
+        },
+        "2": {
+          "id": 2,
+          "userId": null,
+          "affinity": 1,
+          "name": "헌제",
+          "portraitId": null,
+          "nationId": 2,
+          "cityKey": 4,
+          "leadership": 17,
+          "strength": 13,
+          "intel": 61,
+          "officerLevel": 12,
+          "birthYear": 170,
+          "deathYear": 250,
+          "activeFromYear": 191,
+          "personality": "안전",
+          "special": null,
+          "gold": 1020,
+          "rice": 1000,
+          "crew": 0,
+          "crewType": 1100,
+          "train": 30,
+          "atmos": 40,
+          "experience": 0,
+          "dedication": 0,
+          "age": 21,
+          "injury": 2,
+          "nextTurnTick": 10000,
+          "politics": 50,
+          "charm": 50,
+          "sex": "UNKNOWN"
+        },
+        "3": {
+          "id": 3,
+          "userId": null,
+          "affinity": 999,
+          "name": "사마휘",
+          "portraitId": null,
+          "nationId": 1,
+          "cityKey": 1,
+          "leadership": 71,
+          "strength": 11,
+          "intel": 96,
+          "officerLevel": 0,
+          "birthYear": 173,
+          "deathYear": 234,
+          "activeFromYear": 192,
+          "personality": "은둔",
+          "special": "신산",
+          "gold": 1000,
+          "rice": 1000,
+          "crew": 0,
+          "crewType": 1100,
+          "train": 30,
+          "atmos": 40,
+          "experience": 0,
+          "dedication": 0,
+          "age": 18,
+          "injury": 2,
+          "nextTurnTick": 10500,
+          "politics": 50,
+          "charm": 50,
+          "sex": "UNKNOWN"
+        }
+      },
+      "diplomacies": [{ "nationA": 1, "nationB": 2, "state": "WAR", "untilTick": 10000 }],
+      "officeTurns": {
+        "2": {
+          "12": [
+            { "commandKey": "nation_rest", "args": {} },
+            { "commandKey": "nation_rest", "args": {} },
+            { "commandKey": "nation_rest", "args": {} },
+            { "commandKey": "nation_rest", "args": {} },
+            { "commandKey": "nation_rest", "args": {} },
+            { "commandKey": "nation_rest", "args": {} },
+            { "commandKey": "nation_rest", "args": {} },
+            { "commandKey": "nation_rest", "args": {} },
+            { "commandKey": "nation_rest", "args": {} },
+            { "commandKey": "nation_rest", "args": {} },
+            { "commandKey": "nation_rest", "args": {} },
+            { "commandKey": "nation_rest", "args": {} }
+          ]
+        }
       }
-    ],
-    "cities": [
-      {
-        "cityKey": 1,
-        "nationId": 1
-      },
-      {
-        "cityKey": 2,
-        "nationId": 2
-      },
-      {
-        "cityKey": 3,
-        "nationId": 1
-      },
-      {
-        "cityKey": 4,
-        "nationId": 2
-      }
-    ]
-  },
-  "cities": [
-    {
-      "cityKey": 1,
-      "population": 1020,
-      "agriculture": 200,
-      "commerce": 100,
-      "trust": 80,
-      "supplied": true
     },
-    {
-      "cityKey": 2,
-      "population": 1020,
-      "agriculture": 200,
-      "commerce": 100,
-      "trust": 80,
-      "supplied": true
+    "turns": {
+      "1": [
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false }
+      ],
+      "2": [
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false }
+      ],
+      "3": [
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false },
+        { "commandKey": "rest", "args": {}, "explicit": false }
+      ]
     },
-    {
-      "cityKey": 3,
-      "population": 1020,
-      "agriculture": 180,
-      "commerce": 90,
-      "trust": 80,
-      "supplied": false
+    "revisions": { "1": 0, "2": 0, "3": 0 },
+    "monthlyTick": 10000,
+    "campaignArmyTypes": [1100, 1200, 1300],
+    "campaignUnitSet": {
+      "id": "basic",
+      "name": "basic",
+      "defaultCrewTypeId": 1100,
+      "armTypes": { "1": "보병", "2": "궁병", "3": "기병" },
+      "crewTypes": [
+        {
+          "id": 1000,
+          "armType": 0,
+          "name": "성벽",
+          "attack": 100,
+          "defence": 100,
+          "speed": 7,
+          "avoid": 0,
+          "magicCoef": 0,
+          "cost": 99,
+          "rice": 9,
+          "attackCoef": [],
+          "defenceCoef": { "1": 1.2 }
+        },
+        {
+          "id": 1100,
+          "armType": 1,
+          "name": "보병",
+          "attack": 100,
+          "defence": 150,
+          "speed": 7,
+          "avoid": 10,
+          "magicCoef": 0,
+          "cost": 9,
+          "rice": 9,
+          "attackCoef": { "2": 1.2, "3": 0.8 },
+          "defenceCoef": { "2": 0.8, "3": 1.2 }
+        },
+        {
+          "id": 1200,
+          "armType": 2,
+          "name": "궁병",
+          "attack": 100,
+          "defence": 100,
+          "speed": 7,
+          "avoid": 20,
+          "magicCoef": 0,
+          "cost": 10,
+          "rice": 10,
+          "attackCoef": { "1": 0.8, "3": 1.2 },
+          "defenceCoef": { "1": 1.2, "3": 0.8 }
+        },
+        {
+          "id": 1300,
+          "armType": 3,
+          "name": "기병",
+          "attack": 150,
+          "defence": 100,
+          "speed": 7,
+          "avoid": 5,
+          "magicCoef": 0,
+          "cost": 11,
+          "rice": 11,
+          "attackCoef": { "1": 1.2, "2": 0.8 },
+          "defenceCoef": { "1": 0.8, "2": 1.2 }
+        }
+      ]
     },
-    {
-      "cityKey": 4,
-      "population": 1020,
-      "agriculture": 200,
-      "commerce": 100,
-      "trust": 80,
-      "supplied": true
+    "lineageResources": {
+      "statRules": { "count": 5, "total": 275, "min": 15, "max": 90 },
+      "unitSet": { "defaultCrewTypeId": 1100 }
+    },
+    "offices": { "2": { "12": { "revision": 1, "tenure": 1 } } },
+    "residenceAnchors": {},
+    "policy": { "turnTermMinutes": 60, "policies": { "1": "none", "2": "none", "3": "none" }, "lastActiveTicks": {} },
+    "reputation": {
+      "events": [],
+      "reviews": [{ "year": 191, "month": 1, "tick": 10000, "entries": [], "headline": null }]
     }
-  ],
-  "generals": [
-    {
-      "id": 1,
-      "gold": 1020,
-      "rice": 1000,
-      "train": 20,
-      "atmos": 30,
-      "nextTurnTick": 100
-    },
-    {
-      "id": 2,
-      "gold": 1020,
-      "rice": 1000,
-      "train": 30,
-      "atmos": 40,
-      "nextTurnTick": 10000
-    },
-    {
-      "id": 3,
-      "gold": 1000,
-      "rice": 1000,
-      "train": 30,
-      "atmos": 40,
-      "nextTurnTick": 10500
-    }
-  ],
-  "diplomacies": [
-    {
-      "nationA": 1,
-      "nationB": 2,
-      "state": "WAR",
-      "untilTick": 10000
-    }
-  ]
+  }
 }

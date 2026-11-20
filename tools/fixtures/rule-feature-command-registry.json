@@ -4,6 +4,14 @@
     "target": "general"
   },
   {
+    "key": "build",
+    "target": "general"
+  },
+  {
+    "key": "demolish",
+    "target": "general"
+  },
+  {
     "key": "disband",
     "target": "general"
   },
@@ -16,15 +24,15 @@
     "target": "general"
   },
   {
-    "key": "form_unit",
-    "target": "general"
-  },
-  {
     "key": "incite",
     "target": "general"
   },
   {
     "key": "nation_city_allocate",
+    "target": "nation"
+  },
+  {
+    "key": "nation_expand",
     "target": "nation"
   },
   {
@@ -65,6 +73,10 @@
   },
   {
     "key": "nation_rivalry",
+    "target": "nation"
+  },
+  {
+    "key": "nation_shrink",
     "target": "nation"
   },
   {

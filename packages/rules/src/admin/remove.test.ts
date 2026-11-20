@@ -19,7 +19,14 @@ function fixture() {
   initial.generals[2]!.userId = 'human';
   initial.generals[2]!.officerLevel = 11;
   initial.generals[2]!.nextTurnTick = 10;
-  return initialReplayState(initial);
+  for (const general of initial.generals) general.crew = 0;
+  const replay = initialReplayState(initial);
+  replay.residenceAnchors = { 3: 0 };
+  replay.state.campaign!.units = [
+    { id: 1, ownerId: 3, commanderId: 3, troops: 10, crewType: 1100, train: 100, atmos: 100 },
+  ];
+  replay.state.campaign!.nextUnitId = 2;
+  return replay;
 }
 
 it('AC-INT-23 내보내기는 기록과 재산을 남기고 소속·조작권·병력을 해제하며 같은 tick으로 재생된다', () => {
@@ -133,8 +140,10 @@ it('AC-INT-23 내보낸 재야 장수에게 등용 명령을 보낼 수 없다',
 it('AC-INT-23 직접 운영 입력도 현재 혼인을 정리하며 가문의 사망·계승 기록으로 바꾸지 않는다', () => {
   const replay = fixture();
   replay.state = lineageFixture();
+  replay.state.campaign!.sources = Object.fromEntries(
+    Object.keys(replay.state.generals).map((id) => [id, `fixture:${id}`]),
+  );
   delete replay.state.governance;
-  replay.state.ruleFeatures = ['lineage-v1'];
   replay.state.generals[3]!.officerLevel = 1;
   replay.state.lineage!.marriages = [{ id: 1, a: 3, b: 4, householdGeneralId: 3, sinceTick: 0 }];
   replay.state.lineage!.nextMarriageId = 2;
@@ -157,6 +166,9 @@ it('AC-INT-23 조정 직위도 퇴장과 함께 비우며 변경 번호 한도�
   const replay = fixture();
   replay.state = governanceFixture();
   replay.state.generals[6] = { ...replay.state.generals[1]!, id: 6, name: '조정장수', officerLevel: 1 };
+  replay.state.campaign!.sources = Object.fromEntries(
+    Object.keys(replay.state.generals).map((id) => [id, `fixture:${id}`]),
+  );
   replay.state.governance!.throne = { emperorGeneralId: 1, emperorNationId: 1, sinceTick: 0 };
   replay.state.governance!.court.minister = { generalId: 6, appointedTick: 0 };
   assertGovernanceFinal(replay.state, 10);

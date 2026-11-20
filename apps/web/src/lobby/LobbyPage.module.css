@@ -1,153 +1,139 @@
-/* 로비: 먹 띠, 대표 그림, 월드 첩과 방(榜) (INT-20 한지 군략도). */
+/* 로비 (INT-29 화면 개편, 사용자 승인 시안): 표지 그림 바탕, 위 띠, 공지 틀, 왼쪽 「서버 선택」 창, 오른쪽 공개 지도 카드,
+   아래 중원 정세 띠. 틀 그림은 전역 키트 클래스(kit-*)가 그리고 여기서는 배치와 글자색만 정한다. */
+
+/* 어두운 키트 틀(창, 표 줄) 안의 공용 색 이름. 꼬리표, 이름표, 안내 부품이 그대로 읽힌다. */
+.dark {
+  --color-text: #f5e6c8;
+  --color-text-muted: #d9c59c;
+  --color-surface: rgb(0 0 0 / 22%);
+  --color-surface-muted: rgb(0 0 0 / 30%);
+  --color-surface-raised: rgb(255 240 210 / 8%);
+  --color-border: rgb(201 163 90 / 40%);
+  --color-border-strong: #c9a35a;
+  --color-ink: #0c0605;
+  --color-accent: #f0a060;
+  --color-accent-text: #1a0a04;
+  --color-gold: #c9a24a;
+  --color-success: #8fd9b4;
+  --color-danger: #ff9a86;
+  --color-warning: #f0c060;
+  --color-info: #a8c4f0;
+  color: var(--color-text);
+}
+/* 밝은 키트 틀(카드, 공지, 고른 줄) 안의 공용 색 이름. 어두운 화면 설정에서도 종이 위 글자는 먹색이다. */
+.light,
+.rows > li > .row[data-selected='true'] {
+  --color-text: #2a1d14;
+  --color-text-muted: #5a4632;
+  --color-surface: #f4ecd8;
+  --color-surface-muted: #efe5cc;
+  --color-surface-raised: #fbf4e4;
+  --color-border: #cdbf9e;
+  --color-border-strong: #221d17;
+  --color-ink: #221d17;
+  --color-accent: #9b2c1f;
+  --color-accent-text: #fbf4e4;
+  --color-gold: #a8822f;
+  --color-success: #2f6e5e;
+  --color-danger: #9b2c1f;
+  --color-warning: #8a5a00;
+  --color-info: #263552;
+  color: var(--color-text);
+}
+
 .page {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  min-height: 100dvh;
+  background: #1d140c center / cover no-repeat;
+  color: #f5e6c8;
 }
+.muted {
+  color: var(--color-text-muted);
+}
+
+/* 위 띠: 이름, 화면 제목, 계정 단추 */
 .top {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: var(--space-2) var(--space-3);
-  min-height: var(--topbar-height);
-  padding: var(--space-1) var(--space-4);
-  background: var(--color-banner);
-  color: var(--color-banner-text);
-  border-bottom: 4px solid var(--color-accent);
+  min-height: 56px;
+  padding: var(--space-1) var(--space-2);
 }
-/* 이름표는 금빛 제목 글꼴, 화면 제목은 그 옆에 작게 둔다. */
 .brand {
   font-family: var(--font-title);
   font-size: var(--title-md);
   line-height: 1;
-  color: var(--color-banner-gold);
+  color: #ffd77a;
+  text-shadow: 0 2px 0 #1a0a04;
 }
 .title {
   margin: 0 auto 0 0;
   font-size: var(--title-sm);
   line-height: 1;
-  color: var(--color-banner-text);
+  color: #f5e6c8;
 }
 .account {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   min-width: 44px;
   min-height: 44px;
-  padding: 0 var(--space-3);
-  font: inherit;
   font-size: var(--text-sm);
-  border: 2px solid var(--color-banner-text);
-  border-radius: var(--radius);
-  background: transparent;
-  color: var(--color-banner-text);
   text-decoration: none;
+}
+
+/* 공지 틀: 가장 최근 공지를 크게, 누르면 목록을 펼친다. */
+.noticeBanner {
+  margin: var(--space-3) 40px 0;
+}
+.noticeHeadline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  font: inherit;
+  font-size: var(--title-sm);
+  font-weight: 800;
+  text-align: left;
+  color: inherit;
+  background: none;
+  border: 0;
   cursor: pointer;
 }
-.account:disabled {
-  border-style: dashed;
-  cursor: progress;
-}
-.hero {
-  position: relative;
-  height: 300px;
-  overflow: hidden;
-  border-bottom: 4px solid var(--color-ink);
-  background: var(--color-surface-muted);
-}
-.heroArt {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: 50% 60%;
-  image-rendering: pixelated;
-}
-.heroText {
-  position: absolute;
-  left: 48px;
-  right: var(--space-4);
-  bottom: 32px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-2);
-}
-/* 대표 그림의 어두운 숲 위에서도 읽히도록 위 띠와 같은 먹색 판에 금색 글자를 얹는다. 그림자만으로는 대비가 모자랐다. */
-.tagline {
-  margin: 0;
-  padding: var(--space-2) var(--space-3);
-  font-family: var(--font-display);
-  font-size: var(--title-lg);
-  line-height: 1;
-  color: var(--color-banner-gold);
-  background: var(--color-banner);
-  border: 2px solid var(--color-banner-gold);
-}
-.caption {
-  max-width: 640px;
-  margin: 0;
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--text-md);
-  color: var(--color-text);
-  background: var(--color-surface);
-  border: var(--frame);
-  box-shadow: var(--frame-inset);
-}
-.single {
-  width: 100%;
-  max-width: 1280px;
-  margin: 0 auto;
-}
-.layout {
-  display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-  align-items: start;
-  gap: var(--space-6);
-  width: 100%;
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: var(--space-6) var(--space-6) var(--space-8);
-}
-.side {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
+.noticeHeadline > span:nth-child(2) {
+  flex: 1;
   min-width: 0;
+  overflow-wrap: anywhere;
 }
-/* 절 제목은 주칠 현판으로 단다. */
-.heading {
-  align-self: flex-start;
-  margin: 0 0 var(--space-3);
-  padding: 6px 12px 5px;
-  font-size: var(--title-sm);
-  line-height: 1;
-  color: var(--color-accent-text);
-  background: var(--color-accent);
-  border: var(--frame);
+.noticeHeadline > .muted {
+  font-size: var(--text-sm);
+  font-weight: 600;
 }
-.muted {
-  color: var(--color-text-muted);
+.noticeLabel {
+  padding: 2px 8px;
+  font-size: var(--text-sm);
+  color: #fff3d6;
+  background: #7a1e12;
 }
-.notices,
-.worlds {
+.noticeHeadline:focus-visible,
+.noticeHead:focus-visible {
+  outline: 2px solid #7a1e12;
+  outline-offset: 2px;
+}
+
+/* 공지 목록 (펼친 공지 틀 안과 단독 사용) */
+.notices {
   display: flex;
   flex-direction: column;
   min-width: 0;
-}
-.noticeList,
-.cards {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
 }
 .noticeList {
-  padding: var(--space-1);
-  background: var(--color-surface);
-  border: var(--frame);
-  box-shadow: var(--frame-inset), var(--shadow-step);
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 .notice + .notice {
   border-top: 1px solid var(--color-border);
@@ -167,12 +153,12 @@
   cursor: pointer;
 }
 .noticeHead[aria-expanded='true'] {
-  font-weight: 600;
+  font-weight: 700;
 }
 .noticeHead time {
   flex: none;
-  font-family: var(--font-pixel);
   font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
 }
 .noticeBody {
   margin: 0;
@@ -181,18 +167,94 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.cards {
-  gap: var(--space-4);
+
+/* 판: 왼쪽 큰 창, 오른쪽 기둥 */
+.board {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 1fr);
+  align-items: start;
+  gap: var(--space-6);
+  width: 100%;
+  max-width: 1520px;
+  margin: 0 auto;
+  padding: var(--space-4) 40px var(--space-6);
+  box-sizing: border-box;
 }
-.card {
+.side {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-4);
-  background: var(--color-surface);
-  border: var(--frame);
-  box-shadow: var(--frame-inset), var(--shadow-step);
+  gap: var(--space-4);
   min-width: 0;
+}
+
+/* 서버 선택 창: 표 머리와 줄은 같은 칸 너비(--cols)를 쓴다. */
+.servers {
+  --cols: minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 1fr) 140px;
+  min-width: 0;
+  padding: var(--space-2);
+}
+.boardHead {
+  justify-content: center;
+  margin: 0 0 var(--space-3);
+  font-size: var(--title-sm);
+  line-height: 1.2;
+}
+.thead {
+  display: grid;
+  grid-template-columns: var(--cols);
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 36px;
+  padding: 0 var(--space-2);
+  font-size: var(--text-sm);
+}
+.rows {
+  display: grid;
+  gap: 2px;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+}
+/* 월드 줄: 서버, 정보, 내 장수, 선택. 줄 아무 곳이나 누르면 그 월드를 고른다. */
+.row {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--cols);
+  grid-template-areas: 'server meta general action';
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  min-height: 64px;
+  padding: var(--space-2);
+  cursor: pointer;
+}
+.rows > li:nth-child(even) > .row {
+  border-image-source: var(--kit-table-row-1);
+}
+.rows > li > .row[data-selected='true'] {
+  border-image-source: var(--kit-table-row-2);
+  background-color: #d9b878;
+}
+.row:hover {
+  filter: brightness(1.08);
+}
+.cellServer {
+  grid-area: server;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px var(--space-2);
+  min-width: 0;
+}
+.name {
+  order: -1;
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 800;
+  line-height: 1.2;
+  color: inherit;
+  overflow-wrap: anywhere;
 }
 .cardHead {
   display: flex;
@@ -201,89 +263,81 @@
   gap: var(--space-2);
 }
 .preset {
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   color: var(--color-text-muted);
 }
-.name {
-  order: -1;
+.paused {
   flex-basis: 100%;
-  margin: 0;
-  font-size: var(--title-md);
-  line-height: 1.1;
-  overflow-wrap: anywhere;
+  font-size: var(--text-xs);
+  color: var(--color-warning);
 }
 .meta {
+  grid-area: meta;
   margin: 0;
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--color-border);
   font-size: var(--text-sm);
   color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
 }
-.cardFoot {
+/* 줄 고르기 단추: 줄 전체를 덮는 투명 단추라 키보드로도 고른다. 안의 링크와 단추가 그 위에 온다. */
+.pick {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.pick:focus-visible {
+  outline: 2px solid #ffd77a;
+  outline-offset: -2px;
+}
+.cellGeneral,
+.cellAction {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+.cellGeneral {
+  grid-area: general;
+}
+.cellAction {
+  grid-area: action;
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: var(--space-3);
+  justify-content: flex-end;
 }
 .action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 140px;
+  min-width: 120px;
   min-height: 44px;
-  padding: 0 var(--space-4);
-  border: var(--frame);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-button);
-  background: var(--color-surface);
-  color: var(--color-text);
-  font-weight: 600;
   text-decoration: none;
 }
-.primary {
-  background: var(--color-accent);
-  color: var(--color-accent-text);
+.rules {
+  display: grid;
+  gap: 4px;
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-xs);
+  color: #d9c59c;
+  background: rgb(0 0 0 / 25%);
+}
+.rules p {
+  margin: 0;
+}
+.rulesWarn {
+  font-weight: 800;
+  color: #ff9a86;
 }
 
-@media (max-width: 767px) {
-  .hero {
-    height: 200px;
-  }
-  .heroText {
-    left: var(--space-4);
-    bottom: var(--space-3);
-  }
-  .tagline {
-    font-size: var(--title-md);
-  }
-  .caption {
-    font-size: var(--text-sm);
-  }
-  .layout {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-6);
-    padding: var(--space-4) var(--space-4) var(--space-8);
-  }
-  .name {
-    font-size: var(--title-sm);
-  }
-  .action {
-    min-width: 44px;
-  }
-}
-
-/* 로비의 내 장수 (D-085): 원형 icon 얼굴 + 이름·소속·능력치 */
+/* 내 장수(줄 안): 원형 icon 얼굴과 이름, 소속, 능력치 */
 .myGeneral {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
   min-width: 0;
 }
 .myFace {
-  width: 64px;
-  height: 64px;
+  flex: none;
+  width: 48px;
+  height: 48px;
 }
 .myInfo {
   display: flex;
@@ -292,11 +346,11 @@
   min-width: 0;
 }
 .myName {
-  font-family: var(--font-title);
-  font-size: var(--title-sm);
+  font-weight: 700;
 }
 .myMeta {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
   font-size: var(--text-sm);
@@ -307,19 +361,68 @@
   text-align: left;
 }
 
-/* 지난 기수 (INT-26): 끝난 월드를 한 줄씩. 좁은 화면에서는 이름·승자·링크가 차례로 접힌다. */
+/* 오른쪽 기둥의 카드 제목 */
+.heading {
+  margin: 0 0 var(--space-2);
+  font-size: var(--title-sm);
+  font-weight: 900;
+  line-height: 1.2;
+  color: #7a1e12;
+}
+
+/* 공개 지도 카드: 카드 틀 안에서는 지도 첩의 제 테두리를 지운다. */
+.mapCard {
+  min-width: 0;
+  padding: var(--space-1);
+}
+.mapCard [data-testid='public-map'] {
+  padding: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+}
+
+/* 고른 월드 카드: 내 장수 얼굴은 portrait로 크게 */
+.chosen {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-1);
+}
+.chosenBody {
+  display: flex;
+  gap: var(--space-3);
+}
+.chosenFace {
+  flex: none;
+  width: 148px;
+  height: 210px;
+  border: 2px solid #a8822f;
+}
+.chosenInfo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.chosenName {
+  font-size: var(--title-sm);
+}
+.chosenMeta {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* 지난 기수 카드: 끝난 월드를 한 줄씩. 좁으면 이름, 승자, 링크가 차례로 접힌다. */
 .past {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  margin-top: var(--space-6);
+  padding: var(--space-1);
 }
 .pastList {
-  list-style: none;
   margin: 0;
-  padding: var(--space-1) var(--space-3);
-  background: var(--color-surface);
-  border: var(--frame);
+  padding: 0;
+  list-style: none;
 }
 .pastRow {
   display: flex;
@@ -335,8 +438,7 @@
 }
 .pastName {
   min-width: 0;
-  font-family: var(--font-title);
-  font-size: var(--title-sm);
+  font-weight: 800;
   overflow-wrap: anywhere;
 }
 .pastWinner {
@@ -353,6 +455,45 @@
   gap: var(--space-2);
   margin-left: auto;
 }
-.pastLinks .action {
-  min-width: 0;
+.pastAction {
+  min-height: 44px;
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+
+/* 오른쪽 기둥이 들어갈 자리가 없으면 아래로 내린다(태블릿, 가로로 든 전화). */
+@media (max-width: 1099px) {
+  .board {
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--space-3) var(--space-4) var(--space-6);
+  }
+  .noticeBanner {
+    margin: var(--space-2) var(--space-4) 0;
+  }
+}
+/* 세로로 든 전화: 표 머리를 숨기고 줄 안 칸을 위아래로 쌓는다. */
+@media (max-width: 719px) {
+  .board {
+    padding: var(--space-2) var(--space-2) var(--space-6);
+  }
+  .noticeBanner {
+    margin: var(--space-2) var(--space-2) 0;
+  }
+  .thead {
+    display: none;
+  }
+  .row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'server action'
+      'meta meta'
+      'general general';
+  }
+  .action {
+    min-width: 44px;
+  }
+  .chosenFace {
+    width: 104px;
+    height: 148px;
+  }
 }

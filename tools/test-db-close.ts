@@ -1,4 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises';
+import { testDatabaseUrl } from './test-database';
 
 type Client = { query(sql: string, values?: unknown[]): Promise<{ rows: Record<string, unknown>[] }> };
 
@@ -34,8 +35,9 @@ export async function observeDisconnectedDatabase(
   readCount: () => Promise<unknown>,
   readOid: () => Promise<unknown>,
 ) {
-  if (!/^[a-z][a-z0-9_]*_test$/.test(name) || !/^[1-9]\d*$/.test(oid))
+  if (!/^[a-z][a-zA-Z0-9_]*(?:_test)?$/.test(name) || !/^[1-9]\d*$/.test(oid))
     throw new Error('자기 시험 DB 식별자를 확인하세요.');
+  testDatabaseUrl({ TEST_DATABASE_URL: `postgresql://localhost/${name}` });
   let connections: number | undefined,
     initialConnections: number | undefined,
     observations = 0;

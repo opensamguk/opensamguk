@@ -64,7 +64,7 @@ export class PgLineageStore implements LineageStore {
       select: { id: true },
     });
     const state = options.state ? await readView(tx, worldId) : null;
-    if (state?.ruleFeatures?.includes('personnel'))
+    if (state)
       Object.assign(
         state,
         pendingAssignmentsFromRows(

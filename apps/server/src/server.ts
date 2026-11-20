@@ -1,4 +1,6 @@
 import { PLAYER_PORTRAIT_MIN_ID, publicMapConfig } from '@opensamguk/shared';
+import { errorDiagnostic } from '@opensamguk/shared/node';
+import { transactionFailure } from './readTransaction';
 import { requestGuard } from '@opensamguk/shared/request-policy';
 import { randomBytes } from 'node:crypto';
 import cookie from '@fastify/cookie';
@@ -202,8 +204,16 @@ export async function buildServer(options: {
             : undefined,
         };
       },
-      onError({ error }) {
-        server.log.error({ code: error.code }, 'tRPC 요청 실패');
+      onError({ error, path }) {
+        server.log.error(
+          {
+            code: error.code,
+            path: path && Object.hasOwn(appRouter._def.procedures, path) ? path : undefined,
+            diagnostic: errorDiagnostic(error.cause ?? error),
+            transactionFailure: transactionFailure(error.cause ?? error),
+          },
+          'tRPC 요청 실패',
+        );
       },
     } satisfies FastifyTRPCPluginOptions<AppRouter>['trpcOptions'],
   });

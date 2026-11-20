@@ -1,3 +1,4 @@
+import { providedRuleKeys } from '../packages/rules/src/providedRules';
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { readdir, readFile } from 'node:fs/promises';
@@ -9,7 +10,7 @@ import { buildServer } from '../apps/server/src/server';
 import { newSession } from '../apps/server/src/auth/session';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { authzCase } from '../apps/server/src/authz/case';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { saveFixtureWorld as saveInitialWorld } from '../e2e/worldFixture';
 import { loadFeatureProfile, loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { initializeIntegrationResources } from './integration-resources';
 import { initializeResources } from './init-resources';
@@ -33,7 +34,7 @@ import {
   type ReplayOriginV3,
 } from '../packages/rules/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
-import { testDatabaseUrl } from './test-database';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
 import { confirmDisconnectedDatabase } from './test-db-close';
 
 type Pg = {
@@ -47,7 +48,7 @@ const { Client } = createRequire(requireDb.resolve('@prisma/adapter-pg'))('pg') 
 };
 const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
 if (!['127.0.0.1', 'localhost'].includes(source.hostname)) throw Error('자기 loopback 시험 DB가 필요합니다.');
-const name = 'npc_entry_' + randomUUID().replaceAll('-', '') + '_test';
+const name = ciGreenDatabaseName('opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test');
 const target = new URL(source),
   adminUrl = new URL(source);
 target.pathname = '/' + name;
@@ -100,9 +101,8 @@ async function call<T = unknown>(path: string, input: unknown, cookie?: string) 
   ];
   return { status: response.status, data: body.result?.data, code: body.error?.data.code, raw };
 }
-async function world(features = true) {
+async function world() {
   const initial = commandInitial();
-  initial.ruleFeatures = features ? ['personnel', 'policy'] : [];
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '역할 입장 검증',
     turnTermMinutes: 60,
@@ -185,7 +185,7 @@ async function expectReplayed(worldId: string) {
   expect(hashState(replay)).toBe(hashState(await db.$transaction((tx) => loadReplayState(tx, worldId))));
 }
 function supervisor() {
-  const child = spawn(process.execPath, ['--import', 'tsx', 'apps/engine/test/supervisorWorker.ts'], {
+  const child = spawn(process.execPath, ['--import', 'tsx', 'apps/engine/src/index.ts'], {
     cwd: new URL('../', import.meta.url),
     env: { ...process.env, DATABASE_URL: target.href, TEST_DATABASE_URL: target.href },
     windowsHide: true,
@@ -279,15 +279,17 @@ it('AC-M3-14 정식491명 확장 판에서5능력치 후보를 맡고 장비·�
     seed: 'npc-expanded-ownership',
   });
   expect(initial.generals).toHaveLength(491);
-  const features = [...profile.ruleFeatures, 'equipment-v1'].sort();
-  initial.ruleFeatures = features;
+  [...providedRuleKeys, 'equipment-v1'].sort();
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '정식 확장 맡기',
     turnTermMinutes: 60,
     endYear: 231,
     replayFormat: 3,
-    ruleFeatures: features,
-    featureData: { ...profile.featureData, 'equipment-v1': STANDARD_EQUIPMENT_CONFIG },
+
+    featureData: {
+      ...Object.fromEntries(Object.entries(profile.featureData).filter(([, data]) => data !== undefined)),
+      'equipment-v1': STANDARD_EQUIPMENT_CONFIG,
+    },
   });
   await enable(worldId);
   const before = await db.$transaction((tx) => loadReplayState(tx, worldId));
@@ -375,7 +377,17 @@ it('AC-M3-14·AC-INT-24 기본 off PREOPEN을 실제 감독이 운영 API로 열
     (
       await call(
         'general.create',
-        { worldId, name: '직접입장', leadership: 70, strength: 70, intel: 60, portraitId: null },
+        {
+          worldId,
+          name: '직접입장',
+          leadership: 70,
+          strength: 70,
+          intel: 60,
+          sex: 'MALE' as const,
+          politics: 38,
+          charm: 37,
+          portraitId: null,
+        },
         unused.cookie,
       )
     ).status,
@@ -458,6 +470,8 @@ it(
           'leadership',
           'strength',
           'intel',
+          'politics',
+          'charm',
           'officerLevel',
           'recommendedNation',
         ].sort(),
@@ -621,7 +635,17 @@ it('NPC 무장 맡기가 대기 중인 계정은 신규 장수를 함께 만들 
   expect(
     await call(
       'general.create',
-      { worldId, name: '새장수', leadership: 70, strength: 70, intel: 60, portraitId: null },
+      {
+        worldId,
+        name: '새장수',
+        leadership: 70,
+        strength: 70,
+        intel: 60,
+        sex: 'MALE' as const,
+        politics: 38,
+        charm: 37,
+        portraitId: null,
+      },
       ordinary.cookie,
     ),
   ).toMatchObject({ status: 409, code: 'CONFLICT' });
@@ -716,7 +740,6 @@ it('AC-M3-14 commit 실패는 소유권·앵커·맡기 로그·완료 기록을
 
 it('AC-M3-14 맡기 입력과 실제 턴·월 정산을 섞은 12개월 보관 파일을 엄격하게 재생한다', async () => {
   const initial = commandInitial();
-  initial.ruleFeatures = ['personnel', 'policy'];
   initial.diplomacies = [{ nationA: 1, nationB: 2, state: 'NON_AGGRESSION', untilTick: 130000 }];
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '맡기 월간 재생',

@@ -171,6 +171,16 @@
 --
 -- `packages/rules/src/commands/ext/return_border/`는 core2026 `df6c9269fa1e2862418ba9da481c8dd2d758d6c5`의 `packages/logic/src/actions/turn/general/che_접경귀환.ts`에서 연결 3칸의 탐색 규칙을 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다.
 --
+-- ## INT-27 확장 지도 손질
+--
+-- `resources/map/san10-expanded*.json`은 사용자가 제공한 [시나리오 기획판 아티팩트](https://claude.ai/artifact/YDyLtPmfANcJ6uqj8Vpi82)의 SHA-256 `eb764cc8d722fae4e0be4cb3dc7fff7f8155a3c58ad915338cd8c2c155fd1e1c`와 Claude의 2026-11-15 인계 자료를 반영했다. 원래 SAN10 지도에서 이어받은 자료의 출처·권리 고지는 위 SAN10 고지를 따른다. 새 분류·좌표 과장·191년 개명·길 재편은 사용자 승인 편집이며 각 기록의 reason·note·source에 사료와 게임상 판단을 구분해 남긴다.
+--
+-- 설명 정리본은 사용자가 지정한 최종 미리보기 `rodin/map/expanded-map.json`에서 가져왔으며 원문 해시는 `san10-expanded-descriptions.json`에 보존한다. 원본 메타 설명을 지운 두 곳은 빈 문자열이다. `tools/map-data/route-plan.py`와 `painted-water.py`는 같은 Claude 인계본이며 후자는 선택 실행에 NumPy와 Pillow가 필요하다. 원본 전체와 시나리오 생성물은 외부 데이터 저장소에 보존한다.
+--
+-- ## 월간 재해와 도시 상태
+--
+-- `packages/rules/src/monthly/disaster.ts`의 분기·확률·배율·문구·부상은 사용자 제공 core2026 `81e101f`의 `app/game-engine/src/turn/monthlyDisasterAction.ts`를 옮겼다. 계략 상태32와 출병 상태43은 같은 판의 `che_선동.ts`, `che_탈취.ts`, `che_파괴.ts`, `che_출병.ts`를 참고했다. 위 devsam MIT 고지를 유지한다.
+--
 -- ## 새 지도·시나리오 초안
 --
 -- `resources/map-drafts/san10-v2/`의 출처와 권리는 [그 폴더의 고지](./map-drafts/san10-v2/NOTICE.md)에 따로 적었다. 게임 런타임은 이 폴더를 읽지 않는다.

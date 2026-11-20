@@ -10,7 +10,6 @@ import { STANDARD_EQUIPMENT_CONFIG } from './catalog';
 function family() {
   const world = lineageFixture(),
     [from, heir, mother] = Object.keys(world.generals).map(Number);
-  world.ruleFeatures!.push('equipment-v1');
   Object.assign(world.generals[from!]!, { userId: 'lineage-player', officerLevel: 1, gold: 100, rice: 200, crew: 0 });
   Object.assign(world.generals[heir!]!, {
     userId: null,

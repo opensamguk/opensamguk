@@ -36,10 +36,12 @@ type Event = Prisma.InputEventGetPayload<Record<string, never>>;
 // 정적 선택과 실제 처리기 호출을 보는 단위 fixture다. DB 월드 생성이나 PG 증거가 아니다.
 function world(changes: Partial<World> = {}): World {
   const origin: CapsOrigin = {
-    ...legacy.origin,
+    initial: legacy.origin.initial,
+    initialStateHash: legacy.origin.initialStateHash,
+    resourceHash: legacy.origin.resourceHash,
     version: 6,
     capabilities: { version: 1, treaty: { version: 1 } },
-  } as CapsOrigin;
+  } as unknown as CapsOrigin;
   origin.resourceHash = hashState(capsResourceHashInput(origin));
   return {
     id: 'world',
@@ -165,7 +167,8 @@ it.each(['treaty.propose', 'treaty.respond'])(
         treatyFormat: null,
         policyFromSequence: 0,
         replayOrigin: {
-          ...legacy.origin,
+          initialStateHash: legacy.origin.initialStateHash,
+          resourceHash: legacy.origin.resourceHash,
           version: 6,
           initial: { ...legacy.origin.initial, presetRules: presetRules(preset) },
           capabilities: { version: 1, ext: { version: 1, commands, preset, resources: {}, sliceKeys: [] } },

@@ -145,6 +145,8 @@ async function choosePolicyWithEngine(page: Page, world: PolicyWorld, key: strin
   return { pending, outcome };
 }
 
+// 사람 소유자 부착(general.possess) 입력이 시계 0에 남기는 개인 기록.
+const POSSESS_LOG = { tick: 0, commandKey: 'general.possess', kind: 'possess', text: '이 장수를 맡았습니다.' };
 test('1 고른 방침은 엔진 적용으로 바로 확정되고 새로고침 뒤에도 남는다. 미접속 안내와 장수 정보도 응답과 같다', async ({
   page,
   policyWorld,
@@ -209,7 +211,7 @@ test('2 엔진이 처리하기 전에는 처리 중이고 5초 뒤 pending을 �
   await expect(policyStatus(page)).toHaveText('처리 중');
   await expect(policySelect(page)).toBeDisabled();
   await expect(policySelect(page)).toHaveValue('drill');
-  await expect(sentence(page)).toHaveText('빈 칸은 휴식합니다. 엔진이 처리하면 훈련으로 바뀝니다.');
+  await expect(sentence(page)).toHaveText('빈 칸은 휴식합니다. 처리되면 훈련으로 바뀝니다.');
   const outcome = await responded;
   evidence.setPolicy = outcome;
   expect(outcome).toEqual({ input: { worldId: world.id, policy: 'drill' }, data: { status: 'pending' } });
@@ -384,12 +386,14 @@ test('5 소속 장수의 빈 칸은 엔진 턴에서 권농 방침의 농지 개
   const logs = await myLogs(world);
   const cityAfter = await myCity(world);
   evidence.db = { logs, cityAfter, clock: await readWorld(world) };
-  expect(logs).toHaveLength(1);
-  expect(logs[0]).toMatchObject({ tick: HUMAN_TURN, commandKey: 'farm', kind: 'success' });
-  expect(logs[0]!.text).toMatch(/^기본 방침\(권농\)으로 농지 개간\n농지 개간: \d+$/);
+  // 고정물이 사람 소유자를 general.possess 입력으로 붙여 시계 0에 '맡았습니다' 기록이 먼저 남는다.
+  expect(logs).toHaveLength(2);
+  expect(logs[0]).toEqual(POSSESS_LOG);
+  expect(logs[1]).toMatchObject({ tick: HUMAN_TURN, commandKey: 'farm', kind: 'success' });
+  expect(logs[1]!.text).toMatch(/^기본 방침\(권농\)으로 농지 개간\n농지 개간: \d+$/);
 
   await page.reload();
-  await expect(records(page)).toHaveCount(1);
+  await expect(records(page)).toHaveCount(2);
   await expect(records(page).first()).toContainText('기본 방침(권농)으로 농지 개간');
   await expect(records(page).first()).toHaveAttribute('data-log-kind', 'success');
   // 1번 칸은 당겨진 직접 휴식, 나머지는 빈 칸이다.
@@ -425,6 +429,7 @@ test('6 재야 장수의 빈 칸은 방침 명령이 실패하면 휴식하고 �
   evidence.first = { executions: first, logs: afterFirst };
   expect(first).toContainEqual({ generalId: HUMAN_ID, tick: HUMAN_TURN, commandKey: 'rest' });
   expect(afterFirst).toEqual([
+    POSSESS_LOG,
     { tick: HUMAN_TURN, commandKey: 'rest', kind: 'success', text: '기본 방침 실패: 국가에 소속되어야 합니다. → 휴식' },
   ]);
 
@@ -433,16 +438,18 @@ test('6 재야 장수의 빈 칸은 방침 명령이 실패하면 휴식하고 �
   evidence.second = { executions: second, logs: afterSecond, clock: await readWorld(world) };
   expect(second).toContainEqual({ generalId: HUMAN_ID, tick: HUMAN_TURN + 10_000, commandKey: 'rest' });
   expect(afterSecond).toEqual([
+    POSSESS_LOG,
     { tick: HUMAN_TURN, commandKey: 'rest', kind: 'success', text: '기본 방침 실패: 국가에 소속되어야 합니다. → 휴식' },
     { tick: HUMAN_TURN + 10_000, commandKey: 'rest', kind: 'success', text: '휴식' },
   ]);
 
   await page.reload();
   // 최근 기록은 최신순이다. 직접 휴식 줄에는 기본 방침 문구가 없다.
-  await expect(records(page)).toHaveCount(2);
+  await expect(records(page)).toHaveCount(3);
   await expect(records(page).nth(0)).toContainText('휴식');
   await expect(records(page).nth(0)).not.toContainText('기본 방침');
   await expect(records(page).nth(1)).toContainText('기본 방침 실패: 국가에 소속되어야 합니다. → 휴식');
+  await expect(records(page).nth(2)).toContainText(POSSESS_LOG.text);
   for (const slot of [1, 2, 30]) {
     await expect(row(page, slot)).toHaveAttribute('data-empty', 'true');
     await expect(row(page, slot)).toContainText('(권농) 농지 개간');

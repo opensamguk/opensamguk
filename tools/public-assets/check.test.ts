@@ -92,12 +92,14 @@ afterEach(async () => {
 describe('공개 배포 파일 검사', () => {
   async function addMapImages() {
     manifest.mapImages = [];
-    for (const source of APPROVED_MAP_IMAGES) {
+    for (const [index, source] of APPROVED_MAP_IMAGES.entries()) {
       const bytes = Buffer.from(`unit fixture: ${source}`);
       const name = basename(source);
       const dot = name.lastIndexOf('.');
+      // 다른 폴더의 같은 파일 이름(예: battle/siegeA/defenders.webp)이 배포 파일 이름에서 겹치지 않게 번호를 붙인다.
+      const hash = index === 0 ? 'abcdefgh' : `abcdefgh-${index}`;
       await put(source, bytes);
-      await put(`apps/web/dist/assets/${name.slice(0, dot)}-abcdefgh${name.slice(dot)}`, bytes);
+      await put(`apps/web/dist/assets/${name.slice(0, dot)}-${hash}${name.slice(dot)}`, bytes);
       manifest.mapImages.push({ source, sha256: sha(bytes) });
     }
     await seal();

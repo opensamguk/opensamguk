@@ -1,7 +1,9 @@
-import { randomUUID } from 'node:crypto';
+﻿import { randomUUID } from 'node:crypto';
 import type { inferRouterOutputs } from '@trpc/server';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb } from '@opensamguk/db';
+// eslint-disable-next-line opensamguk/no-cross-package-relative -- ?? ?? ??? ?? ???.
+import { saveFixtureWorld } from '../../../../e2e/worldFixture';
 import { readFixture } from '../../test/readFixture';
 import { newSession } from '../auth/session';
 import type { AppRouter } from '../router';
@@ -78,28 +80,13 @@ const inputFor = (route: keyof Results, id = worldId) => ({
 });
 
 async function fixtureWorld(label: string, snapshot: boolean, other = false) {
-  const world = await db.world.create({
-    data: {
-      name: label,
-      scenarioKey: state.scenarioKey,
-      mapKey: state.mapKey,
-      unitSetKey: state.unitSetKey,
-      seed: state.seed,
-      startYear: 190,
-      turnTermMinutes: 1,
-      status: 'PAUSED',
-      clockTick: 19_999,
-      monthlyTick: 10_000,
-      initialStateHash: 'private-ranking-hash',
-      statRules: {},
-      unitSet: {},
-    },
+  const { worldId: id } = await saveFixtureWorld(db, state, { name: label, turnTermMinutes: 1, endYear: null });
+  const world = await db.world.update({
+    where: { id },
+    data: { status: 'PAUSED', clockTick: 19_999, monthlyTick: 10_000 },
   });
-  worlds.push(world.id);
-  await db.nation.createMany({
-    data: state.nations.map((nation) => ({ ...nation, worldId: world.id, capitalCityKey: null })),
-  });
-  await db.city.createMany({ data: state.cities.map((city) => ({ ...city, worldId: world.id })) });
+  worlds.push(id);
+  await db.general.deleteMany({ where: { worldId: id } });
   await db.general.createMany({
     data: generalRows.map((row) => ({
       ...state.generals[0]!,

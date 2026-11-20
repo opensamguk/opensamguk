@@ -2,6 +2,7 @@ import type { Prisma, PrismaClient } from '@opensamguk/db';
 import * as rules from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { afterEach, expect, it, vi } from 'vitest';
+import { storedFixture, storedReaders } from '../test/storedFixture';
 import { monthlyFixture } from '../test/monthlyFixture';
 import { type Lease } from './lease';
 import * as monthly from './monthly';
@@ -22,11 +23,11 @@ type Row = Record<string, unknown>;
 // World 상태 저장과 예턴 이동은 stub이다. 실제 rule·gate·끝 해시 연결만 보는 단위 시험이다.
 async function fixture(caps = true, modern = false) {
   const initial = await monthlyFixture();
-  initial.generals = initial.generals
-    .slice(0, 1)
-    .map((general) => ({ ...general, userId: 'human', nextTurnTick: 100 }));
+  initial.generals = initial.generals.slice(0, 1).map((general) => ({ ...general, userId: null, nextTurnTick: 100 }));
   initial.diplomacies = [];
-  let state = rules.toWorldState(initial);
+  const stored = storedFixture(initial, 30);
+  let state = stored.state;
+  state.generals[1]!.userId = 'human';
   const treaty: NonNullable<rules.WorldState['treaties']>[number] = {
     id: 1,
     fromNationId: 1,
@@ -39,18 +40,10 @@ async function fixture(caps = true, modern = false) {
     endTick: null,
   };
   if (caps) state.treaties = [structuredClone(treaty)];
-  const origin: rules.CapsOrigin = {
-    version: 6,
-    initial: structuredClone(initial),
-    initialStateHash: hashState(initial),
-    resourceHash: '',
-    capabilities: { version: 1, treaty: { version: 1 } },
-  };
-  origin.resourceHash = hashState(rules.capsResourceHashInput(origin));
   const world = {
     id: '00000000-0000-4000-8000-000000000003',
-    replayFormat: 1,
-    ruleFeatures: [],
+    ...stored.world,
+
     status: 'RUNNING',
     startYear: initial.startYear,
     seed: initial.seed,
@@ -59,7 +52,7 @@ async function fixture(caps = true, modern = false) {
     commandMeta: null,
     treatyFormat: caps ? 1 : null,
     personnelFormat: null,
-    replayOrigin: caps ? origin : null,
+
     policyFromSequence: modern ? 0 : null,
     actionSequence: 0,
     turnTermMinutes: 30,
@@ -87,6 +80,7 @@ async function fixture(caps = true, modern = false) {
     ...state.generals[1]!,
     worldId: world.id,
     turnRevision: revision,
+    residenceTick: 0,
     defaultPolicy: 'none',
     lastActiveTick: 0,
     lastActiveAt: null,
@@ -103,6 +97,7 @@ async function fixture(caps = true, modern = false) {
       explicit: true,
     }));
   const tx = {
+    ...storedReaders(initial, world.id),
     world: {
       findUniqueOrThrow: vi.fn(async () => ({ ...world })),
       update: vi.fn(async ({ data }: { data: Row }) => {
@@ -115,8 +110,12 @@ async function fixture(caps = true, modern = false) {
       }),
     },
     treaty: { findMany: vi.fn(async () => structuredClone(rows)), updateMany: vi.fn() },
-    inputEvent: { findFirst: vi.fn().mockResolvedValue(null) },
+    user: { findUnique: async () => ({ status: 'ACTIVE' }) },
+    heritageEntry: { createMany: async () => ({ count: 1 }) },
+    heritageAccount: { upsert: async () => ({}) },
+    inputEvent: { findFirst: vi.fn().mockResolvedValue(null), findMany: vi.fn().mockResolvedValue([]) },
     general: {
+      ...storedReaders(initial, world.id).general,
       findFirst: vi.fn(async ({ where }: { where: Row }) => {
         if ('userId' in where) return { id: 1 };
         const limit = (where.nextTurnTick as { lte: number }).lte;
@@ -141,13 +140,20 @@ async function fixture(caps = true, modern = false) {
     $executeRaw: vi.fn(async (strings: TemplateStringsArray) => {
       const sql = strings.join('?').trim();
       if (sql.startsWith('INSERT INTO "SeasonGeneral"')) return 1;
+      if (sql.startsWith('UPDATE "General"')) return 1;
       throw new Error(`예상하지 않은 단위 쓰기: ${sql}`);
     }),
     $queryRaw: vi.fn(async (strings: TemplateStringsArray) => {
       const sql = strings.join('?').trim().replace(/\s+/g, ' ');
-      if (sql.startsWith('SELECT 1 FROM "EngineLease"')) return [{}];
+      if (sql.startsWith('WITH locked AS MATERIALIZED') || sql.startsWith('SELECT 1 FROM "EngineLease"')) return [{}];
+      if (sql.startsWith('SELECT * FROM "World"')) return [{ ...world }];
+      if (sql.startsWith('SELECT * FROM "General"')) return [rawGeneral()];
+      if (sql.startsWith('SELECT g.id, g."defaultPolicy"'))
+        return [{ id: 1, defaultPolicy: 'none', userId: 'human', lastActiveTick: 0, validSlots: true }];
       if (sql.startsWith('SELECT clock_timestamp()')) return [{ now: new Date(0) }];
-      if (sql.includes('FOR UPDATE') || sql.includes('FROM "WorldExtSlice"')) return [];
+      if (sql.includes('FROM "WorldExtSlice"')) return [{ key: 'intel', value: {} }];
+      if (sql.includes('FOR SHARE')) return [];
+      if (sql.includes('FOR UPDATE')) return [];
       throw new Error(`예상하지 않은 단위 조회: ${sql}`);
     }),
   };
@@ -189,10 +195,15 @@ it.each([false, true])(
     expect(f.loop.state?.treaties).toEqual(before);
     expect(run).toHaveBeenCalledOnce();
     const args = run.mock.calls[0]!;
-    expect(args).toHaveLength(6);
+    expect(args).toHaveLength(7);
     // AC-INT-19B: 저장 지시의 예약 변경 번호 대조에 쓰는 현재 turnRevision을 함께 넘긴다.
-    expect(args[4]).toEqual({ ...(modern ? { policy: 'none' } : {}), turnRevision: 0 });
-    expect([...args[5]!.list('general'), ...args[5]!.list('nation')]).toHaveLength(37);
+    expect(args[4]).toEqual({ policy: 'none', turnRevision: 0 });
+    expect(args[5]!.list('general').map(({ key }) => key)).toEqual(
+      rules
+        .resolverForRuleFeatures({})!
+        .list('general')
+        .map(({ key }) => key),
+    );
     expect(f.tx.treaty.updateMany).not.toHaveBeenCalled();
     expect(f.world.actionSequence).toBe(1);
     expect(f.tx.generalLog.create).toHaveBeenCalledWith(
@@ -209,7 +220,13 @@ it.each(['remove', 'mutate'] as const)(
       const next = structuredClone(state);
       if (change === 'remove') delete next.treaties;
       else next.treaties![0]!.clauses = [{ kind: 'peace' }];
-      return { state: next, result: { effects: [], logs: [] }, commandKey: 'rest', nation: undefined };
+      return {
+        state: next,
+        result: { effects: [], logs: [] },
+        commandKey: 'rest',
+        nation: undefined,
+        personnel: { offices: {}, closedOffers: [], logs: [] },
+      };
     });
     await expect(f.loop.advanceTo(100)).rejects.toThrow('조약 목록이 바뀌었습니다');
     expect(persistEffects).not.toHaveBeenCalled();
@@ -230,6 +247,7 @@ it('빈 caps 상태에 생긴 빈 treaties 키도 키 생략 대조로 거부한
     result: { effects: [], logs: [] },
     commandKey: 'rest',
     nation: undefined,
+    personnel: { offices: {}, closedOffers: [], logs: [] },
   }));
   await expect(f.loop.advanceTo(100)).rejects.toThrow('조약 목록이 바뀌었습니다');
   expect(persistEffects).not.toHaveBeenCalled();
@@ -260,7 +278,13 @@ it('턴 종료는 조약을 일괄 닫지 않고 실제 loadReplayState 해시�
     const next = structuredClone(before);
     delete next.nations[2];
     for (const city of Object.values(next.cities)) city.nationId = 1;
-    return { state: next, result: { effects: [], logs: [] }, commandKey: 'rest', nation: undefined };
+    return {
+      state: next,
+      result: { effects: [], logs: [] },
+      commandKey: 'rest',
+      nation: undefined,
+      personnel: { offices: {}, closedOffers: [], logs: [] },
+    };
   });
   expect(await f.loop.advanceTo(100)).toHaveLength(1);
   expect(f.ended[0]).toMatchObject({ reason: 'UNIFIED', endedTick: 100, endedSequence: 1 });
@@ -274,7 +298,10 @@ it('턴 종료는 조약을 일괄 닫지 않고 실제 loadReplayState 해시�
 
 it('월간 뒤 기수 종료는 정산된 상태의 실제 loadReplayState 해시를 기록한다 (정산 연결 stub)', async () => {
   const f = await fixture();
+  f.world.actionSequence = 2;
   f.world.monthlyTick = 110000;
+  for (const field of ['logisticsState', 'governanceState', 'lineageState', 'stratagemCardsState'] as const)
+    (f.world[field] as { monthlyTick: number }).monthlyTick = 110000;
   f.world.endYear = f.world.startYear;
   const state = f.state();
   state.generals[1]!.nextTurnTick = 130000;
@@ -286,11 +313,13 @@ it('월간 뒤 기수 종료는 정산된 상태의 실제 loadReplayState 해�
     const settled = rules.settleTreaties(f.state(), tick);
     f.setState(settled);
     f.world.monthlyTick = tick;
-    Object.assign(f.rows[0]!, { status: 'ENDED', closedSequence: 1 });
+    for (const field of ['logisticsState', 'governanceState', 'lineageState', 'stratagemCardsState'] as const)
+      (f.world[field] as { monthlyTick: number }).monthlyTick = tick;
+    Object.assign(f.rows[0]!, { status: 'ENDED', closedSequence: 3 });
     return settled;
   });
   expect(await f.loop.advanceTo(120000)).toEqual([]);
-  expect(f.ended[0]).toMatchObject({ reason: 'END_YEAR', endedTick: 120000, endedSequence: 1 });
+  expect(f.ended[0]).toMatchObject({ reason: 'END_YEAR', endedTick: 120000, endedSequence: 3 });
   expect(Object.hasOwn(f.state(), 'treaties')).toBe(false);
   expect(f.tx.$executeRaw).toHaveBeenCalledTimes(1);
   expect(f.tx.$executeRaw).toHaveBeenCalledWith(expect.any(Array), f.world.id, f.world.startYear);

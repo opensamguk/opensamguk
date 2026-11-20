@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { rngFor } from '@opensamguk/shared';
-import { commandWorld, testUnits } from '../../test/commandFixture';
+import { commandWorld, testUnits } from '../../test/builtinCommandFixture';
 import { commandCases } from './contracts';
 import { commands, runCommand } from './registry';
 import { createCommandResolver, createCommandResolverWithCommands } from './resolve';

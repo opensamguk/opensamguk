@@ -52,15 +52,15 @@ export function dissolveNation(state: WorldState, nationId: number): NationLifec
         throw new NationLifecycleRevisionLimitError('휘하 변경 번호 한도를 넘었습니다.');
       campaign.revision++;
     }
+    campaign.units = campaign.units.filter((unit) => unit.troops > 0);
     state.campaign = campaign;
   }
   const cities = Object.values(state.cities).filter((city) => city.nationId === nationId);
-  if (state.ruleFeatures?.includes('city-resources-v1'))
-    for (const city of cities) {
-      const ended = disbandCityGarrison(state, city.cityKey);
-      state.cityResources = ended.state.cityResources!;
-      city.population = ended.state.cities[city.cityKey]!.population;
-    }
+  for (const city of cities) {
+    const ended = disbandCityGarrison(state, city.cityKey);
+    state.cityResources = ended.state.cityResources!;
+    city.population = ended.state.cities[city.cityKey]!.population;
+  }
   removeNation(state, nationId);
   if (cities.length) refreshSupply(state);
   for (const general of members) {

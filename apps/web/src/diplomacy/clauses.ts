@@ -38,10 +38,6 @@ export const CLAUSE_LABELS: Record<ClauseKind, string> = {
   cityTransfer: '도시 이양',
 };
 
-// 이 편집기에서 아직 선택하지 않는 조항. 서버 지원은 월드의 기능 선택에 따른다.
-export const UNSUPPORTED_CLAUSE_LABELS = ['통행 허용', '정기 원조', '교역 허용', '도시 이양'] as const;
-export const UNSUPPORTED_CLAUSE_REASON = '아직 지원하지 않는 조항입니다.';
-
 // 종전은 교전 중이거나 선포한 사이에서만 고른다 (서버 TreatyTarget.relation).
 export const canChoosePeace = (relation: Relation | undefined) => relation === 'WAR' || relation === 'DECLARED';
 

@@ -3,7 +3,7 @@ import type { Prisma } from '@opensamguk/db';
 import { readCityResourcesState, type CityResourcesState, type WorldView } from '@opensamguk/rules';
 import { readCampaignArmyTypes } from './campaignState';
 
-type CityWorld = Pick<WorldView, 'cities' | 'ruleFeatures'>;
+type CityWorld = Pick<WorldView, 'cities'>;
 
 // 같은 World 행 잠금을 가진 호출자가 저장 순서와 트랜잭션을 관리한다.
 export function readStoredCityResources(
@@ -11,12 +11,6 @@ export function readStoredCityResources(
   world: CityWorld,
   armyTypes: readonly number[],
 ): CityResourcesState | undefined {
-  if (!world.ruleFeatures?.includes('city-resources-v1')) {
-    if (value !== null && value !== undefined) throw new Error('도시 자원 기능을 끈 월드에 저장 상태가 있습니다.');
-    return undefined;
-  }
-  if (!world.ruleFeatures.includes('campaign-v1') || !world.ruleFeatures.includes('campaign-assignment-v2'))
-    throw new Error('도시 자원의 휘하 기능 의존 관계가 없습니다.');
   return readCityResourcesState(value, world, armyTypes);
 }
 
@@ -25,21 +19,17 @@ export async function assertStoredCityResources(
   tx: Prisma.TransactionClient,
   world: Pick<
     Prisma.WorldGetPayload<Record<string, never>>,
-    'id' | 'replayFormat' | 'ruleFeatures' | 'replayOrigin' | 'unitSet' | 'cityResourcesState'
+    'id' | 'replayFormat' | 'replayOrigin' | 'unitSet' | 'cityResourcesState'
   >,
   armyTypes?: readonly number[],
+  loadedCities?: Prisma.CityGetPayload<Record<string, never>>[],
 ): Promise<void> {
-  if (!world.ruleFeatures.includes('city-resources-v1')) {
-    readStoredCityResources(world.cityResourcesState, { cities: {}, ruleFeatures: world.ruleFeatures }, []);
-    return;
-  }
   if (world.replayFormat !== 3) throw new Error('도시 자원은 새 판 재생 형식에서만 쓸 수 있습니다.');
-  const cities = await tx.city.findMany({ where: { worldId: world.id }, omit: { kind: true } });
+  const cities = loadedCities ?? (await tx.city.findMany({ where: { worldId: world.id }, omit: { kind: true } }));
   readStoredCityResources(
     world.cityResourcesState,
     {
       cities: Object.fromEntries(cities.map((city) => [city.cityKey, city])),
-      ruleFeatures: world.ruleFeatures,
     },
     armyTypes ?? readCampaignArmyTypes(world),
   );

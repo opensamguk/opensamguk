@@ -241,6 +241,38 @@ export function publicLoadSummary(raw: unknown, lifecycle: unknown) {
   };
 }
 
+export function generatorFailureSummary(raw: unknown) {
+  const fragment = z
+    .object({
+      complete: z.boolean(),
+      generatorFailures: z
+        .array(
+          z.enum([
+            'SSE_EARLY_END',
+            'SSE_READ_FAILED',
+            'SSE_CANCEL_FAILED',
+            'SSE_PUMP_CLEANUP_FAILED',
+            'LOAD_GENERATOR_INTERRUPTED_OR_FAILED',
+            'GENERATOR_TASK_REJECTED',
+          ]),
+        )
+        .max(500),
+      workers: z.array(z.object({ terminal: z.enum(['failed', 'aborted', 'window-complete']) })).max(100),
+      sse: z.array(z.object({ failed: z.boolean() })).max(100),
+    })
+    .safeParse(raw);
+  if (!fragment.success) return null;
+  const { complete, generatorFailures, workers, sse } = fragment.data;
+  return {
+    complete,
+    failures: Object.fromEntries(
+      [...new Set(generatorFailures)].map((code) => [code, generatorFailures.filter((value) => value === code).length]),
+    ),
+    completedWorkers: workers.filter((row) => row.terminal === 'window-complete').length,
+    failedStreams: sse.filter((row) => row.failed).length,
+  };
+}
+
 async function partialMeasurementSummary(reportPath: string) {
   const partial = resolve(reportPath, 'partial-artifacts');
   const fragment = z
@@ -764,6 +796,11 @@ async function main() {
         bodyFailureDiagnostic: state.success ? state.data.bodyFailureDiagnostic : null,
         bodyFailureReason: state.success ? state.data.bodyFailureReason : null,
         worker: worker.success ? worker.data : null,
+        generator: generatorFailureSummary(
+          await readFile(resolve(reportPath, 'partial-artifacts/fragment.json'), 'utf8')
+            .then(JSON.parse)
+            .catch(() => null),
+        ),
         volumeInitFailure: state.success ? state.data.volumeInitFailure : null,
         complete: state.success ? state.data.complete : false,
         deleted: state.success ? state.data.deleted : false,

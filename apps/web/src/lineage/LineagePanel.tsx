@@ -54,11 +54,8 @@ import { useLineageBoard } from './useLineageBoard';
 
 // 장수 정보 칸 아래의 가문 칸 (T4-95, AC-P2-32). 가계·혼인·제안·계승·기록을 lineage.get 값으로만 보인다.
 // 모든 행동은 확인 대화상자를 거쳐 명시 요청 한 건으로 보낸다. 명령 카드·예턴에는 넣지 않는다.
-// world.summary에 lineageEnabled가 있을 때만 조회한다. 없으면 아무것도 그리지 않고 요청도 하지 않는다.
 export function LineagePanel({ worldId }: { worldId: string }) {
-  const data = useWorldSummary(worldId).data;
-  const enabled = data !== undefined && 'lineageEnabled' in data && data.lineageEnabled === true;
-  return enabled ? <LineageBoardView key={worldId} worldId={worldId} /> : null;
+  return <LineageBoardView key={worldId} worldId={worldId} />;
 }
 
 type When = (tick: number) => string;
@@ -93,8 +90,7 @@ const TABS = [
 
 function readOnlyReason(board: LineageBoard): string {
   if (board.status !== 'RUNNING') return '진행 중인 월드가 아니라 가문 정보는 볼 수만 있습니다.';
-  if (board.settling)
-    return '월 정산을 처리하는 중이라 지금은 볼 수만 있습니다. 정산이 끝나면 다시 요청할 수 있습니다.';
+  if (board.settling) return '월 정산 중이라 지금은 볼 수만 있습니다. 정산이 끝나면 다시 요청하세요.';
   if (!board.view.mine) return '장수가 있어야 가문 요청을 보낼 수 있습니다.';
   if (!board.view.mine.active) return '등장한 장수만 가문 요청을 보낼 수 있습니다.';
   return '이 월드의 이용이 제한된 동안에는 볼 수만 있습니다.';
@@ -206,8 +202,8 @@ function LineageBoardView({ worldId }: { worldId: string }) {
                 {!board.unconfirmed
                   ? '접수한 요청을 처리하고 있습니다. 결과가 나올 때까지 다른 가문 요청은 기다려 주세요.'
                   : oldActor
-                    ? '이 요청의 접수 기록을 찾지 못했습니다. 장수가 이미 바뀌어, 이전 장수 명의 요청은 서버가 거부하므로 앞으로도 처리되지 않습니다. 기록 지우기를 누르면 지금 장수와 접수 기록을 한 번 더 확인한 뒤 이 탭의 기록만 지웁니다. 다시 보내지 않습니다.'
-                    : '이 요청의 접수 기록을 아직 찾지 못했습니다. 보내던 요청이 늦게 접수될 수도 있습니다. 같은 요청을 그대로 다시 접수하면 서버가 같은 번호로 한 번만 받습니다. 결과를 받기 전에는 새 요청을 만들지 않습니다.'}
+                    ? '이 요청의 접수 기록을 찾지 못했습니다. 장수가 이미 바뀌어 이전 장수 명의 요청은 앞으로도 처리되지 않습니다. 기록 지우기를 누르면 지금 장수와 접수 기록을 한 번 더 확인하고 이 탭의 기록만 지웁니다. 다시 보내지 않습니다.'
+                    : '이 요청의 접수 기록을 아직 찾지 못했습니다. 보내던 요청이 늦게 접수될 수도 있습니다. 다시 접수해도 같은 요청은 한 번만 처리됩니다. 결과를 받기 전에는 새 요청을 만들지 않습니다.'}
               </p>
               {oldActor ? (
                 <p className={base.note}>
@@ -216,7 +212,7 @@ function LineageBoardView({ worldId }: { worldId: string }) {
                 </p>
               ) : null}
               {board.unconfirmed && !oldActor && !board.canSubmit ? (
-                <p className={base.note}>지금은 다시 접수할 수 없어 같은 요청의 상태만 확인할 수 있습니다.</p>
+                <p className={base.note}>지금은 다시 접수할 수 없습니다. 상태만 확인하세요.</p>
               ) : null}
               <div className={base.row}>
                 <button type="button" className={base.secondary} disabled={board.busy} onClick={board.recheck}>
@@ -403,7 +399,7 @@ function Person({ ctx, id }: { ctx: Ctx; id: number }) {
 function Household({ ctx, id }: { ctx: Ctx; id: number }) {
   return (
     <p className={styles.household}>
-      <strong>가주 문구</strong> · 자녀는 출생 때 가주(제안한 장수 {personName(ctx.view, id)})의 국가·도시를 따르고
+      <strong>가주 문구</strong> · 자녀는 출생 때 가주(제안한 장수 {personName(ctx.view, id)})의 국가와 도시를 따르고
       가주의 성씨를 잇습니다. 가주는 성별과 관계없이 제안한 쪽입니다.
     </p>
   );
@@ -526,7 +522,7 @@ function FamilyTab({ ctx }: { ctx: Ctx }) {
         </ul>
       ) : (
         <>
-          <p className={base.note}>아직 혼인·자녀가 없습니다. 자녀는 혼인한 남녀 부부에게서만 태어납니다.</p>
+          <p className={base.note}>아직 혼인도 자녀도 없습니다. 자녀는 혼인한 남녀 부부에게서만 태어납니다.</p>
           {mine ? (
             <div className={base.row}>
               <button type="button" className={base.secondary} onClick={() => ctx.goto('marriage', 'marriage')}>
@@ -537,7 +533,7 @@ function FamilyTab({ ctx }: { ctx: Ctx }) {
         </>
       )}
       <p className={base.note}>
-        자녀는 출생 때 가주(혼인을 제안한 쪽)의 국가·도시·성씨를 따릅니다. 미등장 자녀는 등장한 뒤부터 후계자가 될 수
+        자녀는 출생 때 가주(혼인을 제안한 쪽)의 국가, 도시, 성씨를 따릅니다. 미등장 자녀는 등장한 뒤부터 후계자가 될 수
         있습니다.
       </p>
       <details className={base.disc} onToggle={(event) => setShowAll(event.currentTarget.open)}>
@@ -551,11 +547,11 @@ function FamilyTab({ ctx }: { ctx: Ctx }) {
                 ))}
               </ul>
             ) : (
-              <p className={base.note}>아직 공개된 혼인·출생이 없습니다.</p>
+              <p className={base.note}>아직 공개된 혼인과 출생이 없습니다.</p>
             )}
             <p className={base.note}>
-              누구나 보는 것: 부모·배우자·자녀 관계, 가주, 출생, 성별, 퇴장 시점과 원인, 누가 누구를 이었는지. 후계
-              지정·금액은 보이지 않습니다. 나이·도시·직책·사람 장수 여부·등장 연도는 내 장수와 같은 국가 장수만
+              누구나 보는 것: 부모, 배우자, 자녀 관계, 가주, 출생, 성별, 퇴장 시점과 원인, 누가 누구를 이었는지. 후계
+              지정과 금액은 보이지 않습니다. 나이, 도시, 직책, 사람 장수 여부, 등장 연도는 내 장수와 같은 국가 장수만
               보입니다.
             </p>
           </div>
@@ -565,14 +561,14 @@ function FamilyTab({ ctx }: { ctx: Ctx }) {
         <summary>성별 표시 안내</summary>
         <ul>
           <li>
-            <SexTag sex="MALE" /> <SexTag sex="FEMALE" /> 출처로 확인했거나, 생성 때 플레이어가 골랐거나, 출생 때 정해진
+            <SexTag sex="MALE" /> <SexTag sex="FEMALE" /> 출처로 확인했거나 생성 때 플레이어가 골랐거나 출생 때 정해진
             값입니다. 바뀌지 않습니다.
           </li>
           <li>
-            <SexTag sex="UNKNOWN" /> 출처가 성별을 밝히지 않은 시나리오 인물입니다. 이름·초상·직책으로 추정하지 않으며
+            <SexTag sex="UNKNOWN" /> 출처가 성별을 밝히지 않은 시나리오 인물입니다. 이름, 초상, 직책으로 추정하지 않으며
             혼인할 수 없습니다.
           </li>
-          <li>나이·사망·계승·후계자·군주 청구는 성별을 보지 않습니다.</li>
+          <li>나이, 사망, 계승, 후계자, 군주 청구는 성별을 보지 않습니다.</li>
         </ul>
       </details>
     </>
@@ -612,8 +608,8 @@ function MarriageTab({ ctx }: { ctx: Ctx }) {
         지금 혼인할 수 있는 장수 <span className={base.note}>{formatCount(ok.length)}명</span>
       </h4>
       <p className={styles.household}>
-        <strong>가주</strong> · 제안을 보낸 장수가 가주가 됩니다. 성별과 관계없습니다. 자녀는 출생 때 가주의 국가·도시를
-        따르고 가주의 성씨를 잇습니다. 가주가 되려면 먼저 제안하세요.
+        <strong>가주</strong> · 제안을 보낸 장수가 가주가 됩니다. 성별과 관계없습니다. 자녀는 출생 때 가주의 국가와
+        도시를 따르고 가주의 성씨를 잇습니다. 가주가 되려면 먼저 제안하세요.
       </p>
       {ok.length ? (
         <div className={base.cards}>
@@ -666,9 +662,7 @@ function MarriageTab({ ctx }: { ctx: Ctx }) {
           </details>
         </>
       ) : null}
-      <p className={base.note}>
-        혼인은 남·여 짝만 됩니다. 판정은 서버가 하며 화면은 성별로 거르지 않습니다. 처리할 때 다시 판정합니다.
-      </p>
+      <p className={base.note}>혼인은 남녀 짝만 됩니다. 처리할 때 다시 판정합니다.</p>
     </>
   );
 }
@@ -846,7 +840,7 @@ function SuccessionTab({ ctx }: { ctx: Ctx }) {
             </ul>
           ) : (
             <p className={base.note}>
-              직계 자손이 없습니다. 혼인·출생 뒤 지정할 수 있습니다. 비혈연 후계자는 없습니다.
+              직계 자손이 없습니다. 자녀가 태어난 뒤 지정할 수 있습니다. 비혈연 후계자는 없습니다.
             </p>
           )}
           {heir !== null && !mine.heirCandidates.some((row) => row.generalId === heir) ? (
@@ -945,10 +939,10 @@ function HistoryTab({ ctx }: { ctx: Ctx }) {
           mobileDetails={['kind']}
         />
       ) : (
-        <p className={base.note}>아직 공개된 출생·사망·계승·혼인 기록이 없습니다.</p>
+        <p className={base.note}>아직 공개된 출생, 사망, 계승, 혼인 기록이 없습니다.</p>
       )}
       <p className={base.note}>
-        지금 남은 인물과 혼인에서 만든 공개 기록입니다. 끝난 혼인 제안, 후계 지정, 금액은 보이지 않습니다. 공석·청구는
+        지금 남은 인물과 혼인에서 만든 공개 기록입니다. 끝난 혼인 제안, 후계 지정, 금액은 보이지 않습니다. 공석과 청구는
         국가 기록에 남습니다.
       </p>
     </>
@@ -963,7 +957,7 @@ function confirmText(
   const recheck = '처리할 때 조건을 다시 판정합니다. 그사이 바뀌면 거부됩니다.';
   const me = view.actorId === null ? '내 장수' : personName(view, view.actorId);
   const household = (id: number) =>
-    `가주 문구 · 자녀는 출생 때 가주(제안한 장수 ${personName(view, id)})의 국가·도시를 따르고 가주의 성씨를 잇습니다. 가주는 성별과 관계없이 제안한 쪽입니다.`;
+    `가주 문구 · 자녀는 출생 때 가주(제안한 장수 ${personName(view, id)})의 국가와 도시를 따르고 가주의 성씨를 잇습니다. 가주는 성별과 관계없이 제안한 쪽입니다.`;
   switch (payload.type) {
     case 'marriage.propose':
       return {
@@ -1045,7 +1039,7 @@ function confirmText(
           `지금 직책${level === undefined ? '' : `(${officerName(level)})`}을 떠납니다.`,
           `${nation}이(가) 사람 국가로 바뀝니다. 이후 조약 자동 응답이 멈춥니다.`,
           '국가 예턴의 군주 칸이 내 칸이 됩니다.',
-          '금·쌀·병력·휘하는 바뀌지 않습니다.',
+          '금, 쌀, 병력, 휘하는 바뀌지 않습니다.',
           '같은 국가의 다른 사람 장수도 청구할 수 있습니다. 먼저 처리된 청구 하나만 적용되고 월 정산이 NPC로 먼저 채우면 이 청구는 거부됩니다.',
         ],
       };

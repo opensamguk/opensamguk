@@ -12,6 +12,7 @@ import { initializeSan10Resources } from '../tools/san10-resources';
 import { appOrigin, createAccount, withE2eDb } from './account';
 import { e2eFeatureWorld, e2eWorld, setTurns, turns, waitTurnWindow } from './game';
 import { bindGeneral, query } from './world';
+import { argsScreen, putFromArgsScreen, toFieldStep } from './commandPicker';
 
 // T4-34 · AC-P2-16 일부: 실제 Chromium에서 전투 시뮬레이터가 진짜 Web Worker로 simulateBattle을 한 번 실행하는지 본다.
 // T4-86 · AC-P2-26: 기대값은 손으로 적지 않고 Node에서 같은 packages/rules의 simulateBattle과
@@ -296,7 +297,7 @@ test('병력에 1.5·-1·10001·빈칸을 넣으면 이유가 보이고 실행�
     await expect(dashed).toHaveAttribute('data-unavailable', 'true');
     expect(await dashed.evaluate((el) => getComputedStyle(el).borderStyle)).toBe('dashed');
     await dashed.click();
-    await expect(page.getByRole('note').filter({ hasText: '표시한 칸을 고치면' })).toBeVisible();
+    await expect(page.getByRole('note').filter({ hasText: '표시한 칸을 먼저 고치세요' })).toBeVisible();
     await dashed.click();
   }
   await expect(result(page)).toHaveAttribute('data-state', 'idle');
@@ -311,7 +312,7 @@ test('Worker 파일을 못 받으면 오류와 다시 실행이 보이고 풀면
   await page.route('**/battle.worker*', (route) => route.abort());
   await page.getByRole('button', { name: '실행', exact: true }).click();
   await expect(result(page)).toHaveAttribute('data-state', 'error');
-  await expect(result(page).getByRole('alert')).toContainText('계산 Worker를 실행하지 못했습니다.');
+  await expect(result(page).getByRole('alert')).toContainText('계산기를 실행하지 못했습니다.');
   await shot(page, 't4-34-worker-error.png');
 
   await page.unroute('**/battle.worker*');
@@ -415,8 +416,11 @@ test('T4-86 AC-P2-26 확장 병종표 월드에서 시뮬레이터와 개인 예
     );
     await initializeSan10Resources(db);
   });
-  const worldId = await e2eFeatureWorld([], {
+  // 이 시험은 저장만 보고 턴 진행을 기다리지 않는다. san10-191 한 달 처리가 1분 턴보다 길어(실측 62~65초)
+  // 1분 턴이면 다음 턴까지 여유가 생기지 않으므로 60분 턴으로 만든다.
+  const worldId = await e2eFeatureWorld({
     resources: ['--scenario', 'san10-191', '--map', 'san10', '--unit-set', 'expanded'],
+    turnTermMinutes: 60,
   });
   const world = await worldUnitSet(worldId);
   expect(world.unitSetKey).toBe('expanded');
@@ -464,13 +468,16 @@ test('T4-86 AC-P2-26 확장 병종표 월드에서 시뮬레이터와 개인 예
   await editor.locator('tr[data-slot="1"]').click();
   await editor.getByLabel('명령 찾기').fill('모병');
   await editor.getByRole('radio', { name: '모병' }).check();
-  // 병종은 인자 입력 화면의 병종표에서 고른다 (INT-25).
-  const crew = editor.getByRole('radiogroup', { name: '병종', exact: true });
+  // 병종은 인자 입력 화면의 병종표에서 고른다 (INT-25). 인자 화면은 단계가 여럿인 dialog다(INT-29).
+  const crew = argsScreen(page).getByRole('radiogroup', { name: '병종', exact: true });
+  await toFieldStep(page, crew);
   await expect(crew.getByRole('radio')).toHaveCount(generals.length);
   await crew.locator(`input[value="${locked.id}"]`).check();
-  await editor.getByRole('spinbutton', { name: '수량' }).fill('100');
-  await expect(editor.getByRole('status').filter({ hasText: '사전 검사 경고' })).toBeVisible();
-  await editor.getByRole('button', { name: '1번 칸에 넣기', exact: true }).click();
+  const amount = argsScreen(page).getByRole('spinbutton', { name: '수량' });
+  await toFieldStep(page, amount);
+  await amount.fill('100');
+  await expect(argsScreen(page).getByRole('status').filter({ hasText: '사전 검사 경고' })).toBeVisible();
+  await putFromArgsScreen(page, '1번 칸에 넣기');
   await expect(editor.locator('tr[data-slot="1"]')).toContainText(`수량 100 · ${locked.name}`);
   await editor.getByRole('button', { name: '저장', exact: true }).click();
   await expect(editor.getByText('저장했습니다.')).toBeVisible();

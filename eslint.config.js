@@ -77,6 +77,8 @@ export default defineConfig([
     'playwright-report/',
     'test-results/',
     '.claude/worktrees/',
+    // 작업 메모 폴더(.tmp-*)는 커밋하지 않는다(AGENTS.md). 검사에서도 뺀다.
+    '**/.tmp-*/',
   ]),
   js.configs.recommended,
   tseslint.configs.recommended,

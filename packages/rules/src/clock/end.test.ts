@@ -79,8 +79,6 @@ describe('ADMIN-END AC-M3-04 엄격 입력 기록', () => {
   });
   it('현재 format 숫자만 바꾼 구월드는 인정하지 않는다', () => {
     for (const replayOrigin of [null, { version: 1, initial: {} }, { version: 6, initial: {} }])
-      expect(() =>
-        checkAdminEndOrigin({ replayFormat: 3, ruleFeatures: [], replayOrigin }, checkReplayOrigin, () => ''),
-      ).toThrow();
+      expect(() => checkAdminEndOrigin({ replayFormat: 3, replayOrigin }, checkReplayOrigin, () => '')).toThrow();
   });
 });

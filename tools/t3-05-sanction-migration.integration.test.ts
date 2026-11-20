@@ -1,12 +1,15 @@
+import { CONTENT_TAG, RESOURCE_INPUTS } from './resources-sql/convert';
+import { hashState } from '../packages/shared/src/node/hashState';
+import { integrationResourceRows } from './integration-resources';
 import { createHash, randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, beforeEach, expect, it as test } from 'vitest';
 import { createDb } from '../packages/db/src/index';
-import { testDatabaseUrl } from './test-database';
-import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { ciGreenDatabaseName, testDatabaseUrl } from './test-database';
+import { composeInitialWorld } from '../apps/engine/src/world/resources';
+import { insertHistoricalWorld } from './historical-world-fixture';
 
 type Pg = {
   connect(): Promise<void>;
@@ -45,7 +48,15 @@ afterAll(async () => {
 });
 
 async function catalog(client: Pg) {
-  return (await client.query('SELECT datname,oid::text AS oid FROM pg_database ORDER BY datname')).rows;
+  const rows = (await client.query('SELECT datname,oid::text AS oid FROM pg_database ORDER BY datname')).rows;
+  // CI의 다른 담당 DB만 비교에서 빼고 자기 DB·개발 DB의 식별자는 계속 확인한다.
+  return process.env.CI_GREEN_DATABASE
+    ? rows.filter(
+        (row) =>
+          row.datname === process.env.CI_GREEN_DATABASE ||
+          !/^opensamguk_ci_green_[a-z0-9]+_test$/.test(String(row.datname)),
+      )
+    : rows;
 }
 async function snapshot(client: Pg, tables: string[]) {
   const hash = createHash('sha256');
@@ -73,8 +84,9 @@ for (const marker of ['20261104000000_account_world_sanctions', '20261107000000_
     for (const key of source.searchParams.keys())
       if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
         throw new Error('접속 대상 질의 인자는 쓸 수 없습니다.');
-    const name = `t305_sanction_migration_${randomUUID().replaceAll('-', '')}_test`;
-    if (!/^t305_sanction_migration_[a-f0-9]{32}_test$/.test(name)) throw new Error('자체 DB 이름을 확인하세요.');
+    const name = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`);
+    if (!(/^opensamguk_ci_green_[a-f0-9]{20}_test$/.test(name) || name === ciGreenDatabaseName('')))
+      throw new Error('자체 DB 이름을 확인하세요.');
     const adminUrl = new URL(source),
       target = new URL(source);
     adminUrl.pathname = '/postgres';
@@ -106,28 +118,10 @@ for (const marker of ['20261104000000_account_world_sanctions', '20261107000000_
       expect(index).toBeGreaterThan(0);
       for (const migration of migrations.slice(0, index))
         await client.query(await readFile(new URL(`${migration}/migration.sql`, root), 'utf8'));
-      const resourceDb = createDb(source.href);
-      let initial: Awaited<ReturnType<typeof loadInitialWorldFromDb>>;
-      try {
-        initial = await loadInitialWorldFromDb(resourceDb, {
-          scenario: 'integration191',
-          map: 'integration',
-          statRules: 'five-stats',
-          portraitMap: '191-map',
-          seed: 't305-preservation',
-        });
-      } finally {
-        await resourceDb.$disconnect();
-      }
-      expect(initial.nations).toHaveLength(21);
-      expect(initial.generals).toHaveLength(491);
+      const initial = await historicalInitial('t305-preservation');
       db = createDb(target.href);
-      await saveInitialWorld(db, initial, { name: '기존 정식 월드 하나', turnTermMinutes: 60, endYear: 201 });
-      await saveInitialWorld(
-        db,
-        { ...initial, seed: 't305-preservation-two' },
-        { name: '기존 정식 월드 둘', turnTermMinutes: 60, endYear: 201 },
-      );
+      await insertHistoricalWorld(client, initial, 'historical-world-one');
+      await insertHistoricalWorld(client, { ...initial, seed: 't305-preservation-two' }, 'historical-world-two');
       expect(await db.general.count()).toBe(982);
       const ids: string[] = [];
       for (const [index, status] of ['ACTIVE', 'SANCTIONED', 'WITHDRAWN'].entries()) {
@@ -268,3 +262,31 @@ for (const marker of ['20261104000000_account_world_sanctions', '20261107000000_
     const errors = [...(bodyError ? [bodyError] : []), ...cleanupErrors];
     if (errors.length) throw new AggregateError([...new Set(errors)], '제재 migration 본문·정리 실패');
   });
+
+// 옛 schema에는 현 Prisma의 GameResource 열이 없다. 정식 파일을 공식 합성기로 읽는다.
+async function historicalInitial(seed: string) {
+  const rows = await integrationResourceRows();
+  const sql = await readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8');
+  const parts = sql.split(CONTENT_TAG);
+  const index = parts.findIndex((part) => part.includes("'UNIT_SET', 'basic', 1, 'PUBLISHED', resource_content"));
+  const unitSet: unknown = JSON.parse(parts[index - 1] ?? 'null');
+  if (hashState(unitSet) !== RESOURCE_INPUTS.find((row) => row.kind === 'UNIT_SET')!.contentHash)
+    throw Error('옛 schema 고정물의 내장 병종 해시가 다릅니다.');
+  return composeInitialWorld(
+    {
+      map: rows.find((row) => row.kind === 'MAP')!,
+      scenario: rows.find((row) => row.kind === 'SCENARIO')!,
+      statRules: rows.find((row) => row.kind === 'STAT_RULES')!,
+      portraitMap: rows.find((row) => row.kind === 'PORTRAIT_MAP')!,
+      unitSet: {
+        kind: 'UNIT_SET',
+        name: 'basic',
+        version: 1,
+        content: unitSet,
+        contentHash: hashState(unitSet),
+        source: 'core2026 df6c926 MIT; resources/NOTICE.md',
+      },
+    },
+    seed,
+  );
+}

@@ -1,3 +1,4 @@
+import { ciGreenDatabaseName } from './test-database';
 import { randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -8,6 +9,7 @@ import { hashState } from '../packages/shared/src/node/hashState';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { initializeIntegrationResources } from './integration-resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { prepareFixtureUnit, recruitmentFixtureData } from './fixtures/recruitment';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, assertLease, lockLease, releaseLease } from '../apps/engine/src/lease';
 import { processInputs } from '../apps/engine/src/inputs';
@@ -45,8 +47,10 @@ const { Client } = createRequire(requireDb.resolve('@prisma/adapter-pg'))('pg') 
     statement_timeout: number;
   }) => PgClient;
 };
-const databaseName = 'int18_authz_' + randomUUID().replaceAll('-', '') + '_test';
-if (!/^int18_authz_[a-f0-9]{32}_test$/.test(databaseName)) throw new Error('자기 시험 DB 이름이 다릅니다.');
+const databaseName = ciGreenDatabaseName(
+  'opensamguk_ci_green_' + randomUUID().replaceAll('-', '').slice(0, 20) + '_test',
+);
+if (!/^opensamguk_ci_green_[a-zA-Z0-9]+_test$/.test(databaseName)) throw new Error('자기 시험 DB 이름이 다릅니다.');
 const target = new URL(url),
   adminUrl = new URL(url);
 target.pathname = '/' + databaseName;
@@ -191,6 +195,7 @@ async function createActor(index: number): Promise<Actor> {
       {
         worldId,
         name: `권한원장${index}`,
+        sex: 'MALE' as const,
         portraitId: null,
         leadership: 55,
         strength: 55,
@@ -339,27 +344,19 @@ beforeAll(() =>
       portraitMap: '191-map',
       seed: 'int18-authz-formal191',
     });
-    initial.ruleFeatures = [
-      'campaign-assignment-v2',
-      'campaign-v1',
-      'city-resources-v1',
-      'five-stats',
-      'operational-map',
-      'personnel',
-      'policy',
-      'stratagem-basic',
-      'treaty',
-    ];
     expect(initial.startYear).toBe(191);
     expect(initial.nations).toHaveLength(21);
     expect(initial.generals).toHaveLength(491);
     expect(initial.cities.filter((city) => city.kind === 'CITY')).toHaveLength(53);
     expect(initial.cities.filter((city) => city.kind === 'PASS')).toHaveLength(8);
+    // 권한 검증용 두 사람의 모병 차례만 진행한다. 명단과 원래 차례의 인수는 원생성 시험이 맡는다.
+    for (const general of initial.generals) general.nextTurnTick = 1_000_000;
     for (let index = 0; index < 2; index++) {
       const created = await saveInitialWorld(db, structuredClone(initial), {
         name: `INT18 권한 원장 통제 고정물 ${index}`,
         turnTermMinutes: 60,
         endYear: 201,
+        featureData: recruitmentFixtureData(initial),
       });
       worlds.push(created.worldId);
       expect(await db.general.count({ where: { worldId: created.worldId } })).toBe(491);
@@ -404,30 +401,17 @@ beforeAll(() =>
       };
       await persistCityResourcesState(tx, worldId, before.state, next, before.campaignArmyTypes!);
     });
-    const state = await db.$transaction((tx) => loadReplayState(tx, worldId));
-    expect(
-      (
-        await call(
-          'campaign.unit',
-          {
-            worldId,
-            requestId: randomUUID(),
-            payload: {
-              type: 'form',
-              commanderId: actor.generalId,
-              crewType: 1100,
-              revision: state.state.campaign!.revision,
-            },
-          },
-          actor.cookie,
-        )
-      ).data,
-    ).toMatchObject({ status: 'pending' });
-    await drain();
-    const formed = await db.$transaction((tx) => loadReplayState(tx, worldId));
-    const unit = formed.state.campaign!.units.find((unit) => unit.ownerId === actor.generalId);
-    expect(unit).toBeDefined();
-    unitId = unit!.id;
+    unitId = await prepareFixtureUnit(db, worldId, actor.generalId);
+    await db.$transaction(async (tx) => {
+      const before = await loadReplayState(tx, worldId),
+        next = structuredClone(before.state);
+      next.cityResources!.cities[String(cityKey)] = {
+        gold: 10000,
+        rice: 10000,
+        garrison: [{ crewType: 1100, troops: 300, train: 40, atmos: 60 }],
+      };
+      await persistCityResourcesState(tx, worldId, before.state, next, before.campaignArmyTypes!);
+    });
     ownRequestId = randomUUID();
     expect(
       (
@@ -669,6 +653,7 @@ for (const path of paths)
                 'armyTypes',
                 'canAllocate',
                 'cityKey',
+                'newUnitRecipients',
                 'resources',
                 'status',
                 'targets',

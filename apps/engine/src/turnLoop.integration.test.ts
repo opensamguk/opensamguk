@@ -1,3 +1,6 @@
+import { loadReplayState } from './monthly';
+import { randomUUID } from 'node:crypto';
+import { saveFixtureWorld as saveInitialWorld } from '../test/worldFixture';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -9,7 +12,7 @@ import { acquireLease, LeaseLostError, releaseLease, renewLease } from './lease'
 import { CLOCK_CHECKPOINT_MS, TurnLoop } from './turnLoop';
 import * as worldLoader from './worldLoader';
 import { loadInitialWorldFromDb } from './world/resources';
-import { readWorldState, saveInitialWorld } from './world/persistence';
+import { readWorldState } from './world/persistence';
 import { controlClock } from './world/clock';
 import { runEngine } from './main';
 import { requestShutdown } from './process-lifecycle';
@@ -18,18 +21,20 @@ const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
 const db = createDb(url);
 let template: WorldInit;
+const humanId = randomUUID();
 beforeAll(async () => {
   await db.world.deleteMany();
   template = await loadInitialWorldFromDb(db, { scenario: '1030', map: 'che', seed: 'engine-test' });
 });
 afterAll(async () => {
   await db.world.deleteMany();
-  await db.user.deleteMany({ where: { id: 'turn-rest-human' } });
+  await db.user.deleteMany({ where: { id: humanId } });
   await db.$disconnect();
 });
 
 async function create(count = 1, human = false) {
   const initial = structuredClone(template);
+  initial.scenarioKey = 'engine-turn-loop-fixture';
   const city = initial.cities.find((city) => city.nationId !== null)!;
   city.agriculture = 100;
   city.agricultureMax = 10_000;
@@ -43,9 +48,10 @@ async function create(count = 1, human = false) {
     nextTurnTick: 500,
     gold: 1000,
     injury: 3,
+    deathYear: initial.startYear + 100,
   }));
   if (human) {
-    const userId = 'turn-rest-human';
+    const userId = humanId;
     await db.user.upsert({
       where: { id: userId },
       update: {},
@@ -54,7 +60,7 @@ async function create(count = 1, human = false) {
     initial.generals[0]!.userId = userId;
   }
   const { worldId } = await saveInitialWorld(db, initial, {
-    replayFormat: 'legacy',
+    replayFormat: 3,
     name: '엔진 통합',
     turnTermMinutes: 10,
     endYear: null,
@@ -63,11 +69,13 @@ async function create(count = 1, human = false) {
   return { worldId, cityKey: city.cityKey };
 }
 async function queue(worldId: string, generalId = 1, commandKey = 'farm') {
-  await db.generalTurn.createMany({
-    data: [
-      { worldId, generalId, slot: 0, explicit: true, commandKey, args: {} },
-      { worldId, generalId, slot: 1, explicit: true, commandKey: 'rest', args: {} },
-    ],
+  await db.generalTurn.update({
+    where: { worldId_generalId_slot: { worldId, generalId, slot: 0 } },
+    data: { commandKey, args: {}, explicit: true },
+  });
+  await db.generalTurn.update({
+    where: { worldId_generalId_slot: { worldId, generalId, slot: 1 } },
+    data: { explicit: true },
   });
 }
 async function engine(worldId: string) {
@@ -109,7 +117,11 @@ it('AC-M3-07 연결 풀이 잠시 가득 차도 다음 턴을 한 번만 저장�
     const pending = loop.advanceTo(500);
     void pending.catch(() => undefined);
     await delay(2500);
-    expect(await db.generalLog.count({ where: { worldId } })).toBe(0);
+    expect(
+      await db.generalLog.count({
+        where: { worldId, commandKey: { notIn: ['general.possess', 'office.residence', 'monthly.disaster'] } },
+      }),
+    ).toBe(0);
     release();
     await pending;
     await loop.advanceTo(500);
@@ -167,18 +179,35 @@ async function kill(child: ChildProcess) {
 }
 
 describe('AC-M1-10 턴 실행, 실제 PostgreSQL', () => {
+  it('AC-INT-04 다른 장수의 누락된 예턴도 첫 장수 실행 전에 거부한다', async () => {
+    const { worldId } = await create(2, true);
+    await db.generalTurn.delete({ where: { worldId_generalId_slot: { worldId, generalId: 2, slot: 29 } } });
+    const before = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+    const loop = await engine(worldId);
+    await expect(loop.advanceTo(500)).rejects.toThrow();
+    expect((await db.world.findUniqueOrThrow({ where: { id: worldId } })).actionSequence).toBe(before.actionSequence);
+    expect((await general(worldId)).nextTurnTick).toBe(500);
+  });
+
   it('시계 주입: 턴 시각에 농업·금·로그·30칸 당김·revision을 함께 저장한다', async () => {
     const { worldId, cityKey } = await create(1, true);
     await queue(worldId);
     const loop = await engine(worldId);
     expect(await loop.advanceTo(499)).toEqual([]);
-    expect(await db.generalLog.count({ where: { worldId } })).toBe(0);
+    expect(
+      await db.generalLog.count({
+        where: { worldId, commandKey: { notIn: ['general.possess', 'office.residence', 'monthly.disaster'] } },
+      }),
+    ).toBe(0);
     expect(await loop.advanceTo(500)).toEqual([{ generalId: 1, tick: 500, commandKey: 'farm' }]);
     expect(
       (await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId, cityKey } } })).agriculture,
     ).toBeGreaterThan(100);
-    expect(await general(worldId)).toMatchObject({ gold: 900, turnRevision: 1, nextTurnTick: 10_500 });
-    const logs = await db.generalLog.findMany({ where: { worldId } });
+    expect(await general(worldId)).toMatchObject({ turnRevision: 2, nextTurnTick: 10_500 });
+    expect((await general(worldId)).gold).toBeLessThan(1000);
+    const logs = await db.generalLog.findMany({
+      where: { worldId, commandKey: { notIn: ['general.possess', 'office.residence', 'monthly.disaster'] } },
+    });
     expect(logs).toHaveLength(1);
     expect(logs[0]).toMatchObject({ tick: 500, commandKey: 'farm', kind: 'success' });
     const turns = await db.generalTurn.findMany({ where: { worldId }, orderBy: { slot: 'asc' } });
@@ -186,7 +215,7 @@ describe('AC-M1-10 턴 실행, 실제 PostgreSQL', () => {
     expect(turns.every((turn, slot) => turn.slot === slot && turn.commandKey === 'rest')).toBe(true);
     expect(await loop.advanceTo(10_000)).toEqual([]);
     expect(await loop.advanceTo(10_500)).toHaveLength(1);
-    expect(await general(worldId)).toMatchObject({ injury: 2, turnRevision: 2 });
+    expect(await general(worldId)).toMatchObject({ injury: 2, turnRevision: 3 });
     // 1월 세입·봉급은 10,000 tick에서 별도로 반영된다.
     expect((await general(worldId)).gold).toBeGreaterThan(900);
   });
@@ -204,14 +233,15 @@ describe('AC-M1-10 턴 실행, 실제 PostgreSQL', () => {
       [1, 10_500],
       [2, 10_500],
     ]);
-    expect(await db.generalLog.count({ where: { worldId } })).toBe(6);
+    expect(
+      await db.generalLog.count({
+        where: { worldId, OR: executions.map(({ generalId, tick, commandKey }) => ({ generalId, tick, commandKey })) },
+      }),
+    ).toBe(6);
   });
 
   it('내용이 동일한 30칸은 다시 쓰지 않고 턴과 revision을 커밋한다', async () => {
     const { worldId } = await create(1, true);
-    await db.generalTurn.createMany({
-      data: Array.from({ length: 30 }, (_, slot) => ({ worldId, generalId: 1, slot, explicit: true })),
-    });
     const rowVersions = () => db.$queryRaw<{ slot: number; version: string }[]>`
       SELECT slot, xmin::text AS version FROM "GeneralTurn" WHERE "worldId" = ${worldId} ORDER BY slot
     `;
@@ -220,8 +250,12 @@ describe('AC-M1-10 턴 실행, 실제 PostgreSQL', () => {
     const loop = await engine(worldId);
     expect(await loop.advanceTo(500)).toEqual([{ generalId: 1, tick: 500, commandKey: 'rest' }]);
     expect(await rowVersions()).toEqual(before);
-    expect(await general(worldId)).toMatchObject({ turnRevision: 1, nextTurnTick: 10_500 });
-    expect(await db.generalLog.count({ where: { worldId } })).toBe(1);
+    expect(await general(worldId)).toMatchObject({ turnRevision: 2, nextTurnTick: 10_500 });
+    expect(
+      await db.generalLog.count({
+        where: { worldId, commandKey: { notIn: ['general.possess', 'office.residence', 'monthly.disaster'] } },
+      }),
+    ).toBe(1);
   });
 
   it('실행 시 재검사 실패는 실패 로그를 남기고 턴과 예턴을 진행한다', async () => {
@@ -234,7 +268,11 @@ describe('AC-M1-10 턴 실행, 실제 PostgreSQL', () => {
     expect((await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId, cityKey } } })).agriculture).toBe(
       100,
     );
-    expect(await db.generalLog.findFirst({ where: { worldId } })).toMatchObject({
+    expect(
+      await db.generalLog.findFirst({
+        where: { worldId, commandKey: { notIn: ['general.possess', 'office.residence', 'monthly.disaster'] } },
+      }),
+    ).toMatchObject({
       kind: 'failure',
       text: expect.stringContaining('NO_GOLD'),
     });
@@ -250,7 +288,11 @@ describe('AC-M1-10 턴 실행, 실제 PostgreSQL', () => {
       });
     await (await engine(worldId)).advanceTo(500);
     expect(await general(worldId)).toMatchObject({ gold: 1000, nextTurnTick: 10_500 });
-    expect(await db.generalLog.findFirst({ where: { worldId } })).toMatchObject({
+    expect(
+      await db.generalLog.findFirst({
+        where: { worldId, commandKey: { notIn: ['general.possess', 'office.residence', 'monthly.disaster'] } },
+      }),
+    ).toMatchObject({
       kind: 'failure',
       text: expect.stringContaining(kind === 'missing-command' ? 'UNKNOWN_COMMAND' : 'BAD_ARGS'),
     });
@@ -286,12 +328,14 @@ describe('AC-M1-10 턴 실행, 실제 PostgreSQL', () => {
     await expect(loop.advanceTo(first - 1)).rejects.toThrow('뒤로');
   });
 
-  it('턴이 없는 폴링은 전체 월드 적재를 생략하고 시계는 5초마다만 저장한다', async () => {
+  it('턴이 없는 폴링도 제공 상태를 확인하고 시계는 5초마다만 저장한다', async () => {
     const { worldId } = await create();
     await db.general.updateMany({ where: { worldId }, data: { nextTurnTick: 100_000 } });
     let elapsed = 0;
     const loop = new TurnLoop(db, (await acquireLease(db, worldId))!, { elapsedNow: () => elapsed });
+    // 부곡 원장이 있는 월드는 capability 검사 직후 같은 잠금의 적재(loadWorldAfterCapabilityCheck)로 상태를 검사한다.
     const load = vi.spyOn(worldLoader, 'loadWorld');
+    const checkedLoad = vi.spyOn(worldLoader, 'loadWorldAfterCapabilityCheck');
     try {
       const before = await db.world.findUniqueOrThrow({ where: { id: worldId } });
       for (let i = 0; i < 5; i++) await loop.poll();
@@ -309,10 +353,11 @@ describe('AC-M1-10 턴 실행, 실제 PostgreSQL', () => {
       elapsed += CLOCK_CHECKPOINT_MS;
       for (let i = 0; i < 3; i++) await loop.poll();
       expect(await db.world.findUniqueOrThrow({ where: { id: worldId } })).toEqual(paused);
-      expect(load).not.toHaveBeenCalled();
+      expect(load.mock.calls.length + checkedLoad.mock.calls.length).toBeGreaterThan(0);
       expect(loop.state).toBeNull();
     } finally {
       load.mockRestore();
+      checkedLoad.mockRestore();
     }
   });
 
@@ -376,9 +421,15 @@ describe('AC-M1-10 턴 실행, 실제 PostgreSQL', () => {
         expect(paused.status).toBe('PAUSED');
         if (i === 0) {
           await db.general.updateMany({ where: { worldId }, data: { nextTurnTick: 0 } });
-          const logs = await db.generalLog.count({ where: { worldId } });
+          const logs = await db.generalLog.count({
+            where: { worldId, commandKey: { notIn: ['general.possess', 'office.residence', 'monthly.disaster'] } },
+          });
           await delay(300);
-          expect(await db.generalLog.count({ where: { worldId } })).toBe(logs);
+          expect(
+            await db.generalLog.count({
+              where: { worldId, commandKey: { notIn: ['general.possess', 'office.residence', 'monthly.disaster'] } },
+            }),
+          ).toBe(logs);
           expect((await general(worldId)).nextTurnTick).toBe(0);
           expect((await controlClock(db, worldId, 'status')).tick).toBe(paused.tick);
         }
@@ -418,7 +469,11 @@ describe('AC-M1-11 리스·재시작·펜싱, 실제 PostgreSQL', () => {
     expect(next.lease.fencingToken).toBe(old.lease.fencingToken + 1);
     await expect(old.advanceTo(500)).rejects.toBeInstanceOf(LeaseLostError);
     await next.advanceTo(500);
-    expect(await db.generalLog.count({ where: { worldId } })).toBe(1);
+    expect(
+      await db.generalLog.count({
+        where: { worldId, commandKey: { notIn: ['general.possess', 'office.residence', 'monthly.disaster'] } },
+      }),
+    ).toBe(1);
   });
 
   it('commit 직전 오류는 엔티티·로그·예턴·시계·메모리 사본을 모두 롤백한다', async () => {
@@ -435,8 +490,12 @@ describe('AC-M1-11 리스·재시작·펜싱, 실제 PostgreSQL', () => {
     expect(loop.state).toBeNull();
     expect(await readWorldState(db, worldId)).toEqual(before);
     expect(await db.world.findUniqueOrThrow({ where: { id: worldId } })).toEqual(clock);
-    expect(await db.generalLog.count({ where: { worldId } })).toBe(0);
-    expect(await db.generalTurn.count({ where: { worldId } })).toBe(2);
+    expect(
+      await db.generalLog.count({
+        where: { worldId, commandKey: { notIn: ['general.possess', 'office.residence', 'monthly.disaster'] } },
+      }),
+    ).toBe(0);
+    expect(await db.generalTurn.count({ where: { worldId } })).toBe(30);
     expect((await general(worldId)).turnRevision).toBe(0);
     await releaseLease(db, loop.lease);
     expect(await (await engine(worldId)).advanceTo(500)).toHaveLength(1);
@@ -451,7 +510,11 @@ describe('AC-M1-11 리스·재시작·펜싱, 실제 PostgreSQL', () => {
     });
     await expect(loop.advanceTo(500)).rejects.toBeInstanceOf(LeaseLostError);
     expect(await general(worldId)).toMatchObject({ nextTurnTick: 500, turnRevision: 0 });
-    expect(await db.generalLog.count({ where: { worldId } })).toBe(0);
+    expect(
+      await db.generalLog.count({
+        where: { worldId, commandKey: { notIn: ['general.possess', 'office.residence', 'monthly.disaster'] } },
+      }),
+    ).toBe(0);
   });
 
   it('저장 도중 리스가 만료되면 같은 토큰이어도 commit을 롤백한다', async () => {
@@ -462,7 +525,11 @@ describe('AC-M1-11 리스·재시작·펜싱, 실제 PostgreSQL', () => {
       },
     });
     await expect(loop.advanceTo(500)).rejects.toBeInstanceOf(LeaseLostError);
-    expect(await db.generalLog.count({ where: { worldId } })).toBe(0);
+    expect(
+      await db.generalLog.count({
+        where: { worldId, commandKey: { notIn: ['general.possess', 'office.residence', 'monthly.disaster'] } },
+      }),
+    ).toBe(0);
   });
 
   it('종료 신호가 처리 중 들어오면 현재 트랜잭션을 취소한다', async () => {
@@ -474,7 +541,11 @@ describe('AC-M1-11 리스·재시작·펜싱, 실제 PostgreSQL', () => {
       },
     });
     await expect(loop.advanceTo(500, abort.signal)).rejects.toThrow();
-    expect(await db.generalLog.count({ where: { worldId } })).toBe(0);
+    expect(
+      await db.generalLog.count({
+        where: { worldId, commandKey: { notIn: ['general.possess', 'office.residence', 'monthly.disaster'] } },
+      }),
+    ).toBe(0);
     expect(await general(worldId)).toMatchObject({ nextTurnTick: 500, turnRevision: 0 });
     expect(loop.state).toBeNull();
   });
@@ -485,13 +556,7 @@ describe('AC-M1-11 리스·재시작·펜싱, 실제 PostgreSQL', () => {
       const { worldId } = await create();
       await queue(worldId);
       const initial = await readWorldState(db, worldId);
-      const state = {
-        startYear: initial.startYear,
-        cities: Object.fromEntries(initial.cities.map((c) => [c.cityKey, c])),
-        nations: Object.fromEntries(initial.nations.map((n) => [n.id, n])),
-        generals: Object.fromEntries(initial.generals.map((g) => [g.id, g])),
-        diplomacies: initial.diplomacies,
-      };
+      const state = (await db.$transaction((tx) => loadReplayState(tx, worldId))).state;
       const expected = runCommand(state, { generalId: 1 }, 'farm', {}, rngFor(initial.seed, 'turn', 500, 1));
       if ('code' in expected) throw new Error('검증 명령 실패');
       const next = applyEffects(state, expected.effects);
@@ -499,7 +564,11 @@ describe('AC-M1-11 리스·재시작·펜싱, 실제 PostgreSQL', () => {
       try {
         await message(child, phase);
         await kill(child);
-        expect(await db.generalLog.count({ where: { worldId } })).toBe(phase === 'committed' ? 1 : 0);
+        expect(
+          await db.generalLog.count({
+            where: { worldId, commandKey: { notIn: ['general.possess', 'office.residence', 'monthly.disaster'] } },
+          }),
+        ).toBe(phase === 'committed' ? 1 : 0);
         await expire(worldId);
         const restarted = await engine(worldId);
         await restarted.advanceTo(500);
@@ -510,9 +579,17 @@ describe('AC-M1-11 리스·재시작·펜싱, 실제 PostgreSQL', () => {
           nextTurnTick: 10_500,
           turnRevision: 1,
         });
-        expect(await db.generalLog.count({ where: { worldId } })).toBe(1);
+        expect(
+          await db.generalLog.count({
+            where: { worldId, commandKey: { notIn: ['general.possess', 'office.residence', 'monthly.disaster'] } },
+          }),
+        ).toBe(1);
         expect(await db.generalTurn.count({ where: { worldId } })).toBe(30);
-        expect(await db.generalLog.findFirst({ where: { worldId } })).toMatchObject({ text: expected.logs[0]!.text });
+        expect(
+          await db.generalLog.findFirst({
+            where: { worldId, commandKey: { notIn: ['general.possess', 'office.residence', 'monthly.disaster'] } },
+          }),
+        ).toMatchObject({ text: expected.logs[0]!.text });
       } finally {
         await kill(child);
       }
@@ -529,7 +606,11 @@ describe('AC-M1-11 리스·재시작·펜싱, 실제 PostgreSQL', () => {
     try {
       const outcomes = await Promise.all([readyA, readyB]);
       expect(outcomes.sort()).toEqual(['committed', 'waiting']);
-      expect(await db.generalLog.count({ where: { worldId } })).toBe(1);
+      expect(
+        await db.generalLog.count({
+          where: { worldId, commandKey: { notIn: ['general.possess', 'office.residence', 'monthly.disaster'] } },
+        }),
+      ).toBe(1);
     } finally {
       await Promise.all([kill(a), kill(b)]);
     }

@@ -1,3 +1,4 @@
+import { ciGreenDatabaseName } from './test-database';
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -42,11 +43,10 @@ for (const mode of ['delayed', 'lingering', 'lingering-two', 'wrong-oid'] as con
   it(`정상 종료 관측 ${mode}는 실제 연결과 자기 DB 식별자를 확인한다`, async () => {
     if (!process.env.TEST_DATABASE_URL) throw new Error('전용 시험 DB가 필요합니다.');
     const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
-    if (!['127.0.0.1', 'localhost'].includes(source.hostname)) throw new Error('loopback 시험 DB가 필요합니다.');
     for (const key of source.searchParams.keys())
       if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
         throw new Error('대상 변경 인자는 받지 않습니다.');
-    const name = `db_close_${randomUUID().replaceAll('-', '')}_test`,
+    const name = ciGreenDatabaseName(`opensamguk_ci_green_${randomUUID().replaceAll('-', '').slice(0, 20)}_test`),
       target = new URL(source),
       root = new URL(source);
     target.pathname = '/' + name;
@@ -234,4 +234,33 @@ it('잘못된 연결 수와 행 개수는 0으로 취급하지 않는다', async
       '1',
     ),
   ).rejects.toMatchObject({ reason: 'invalid-count' });
+});
+
+it('승인된 시험 DB 이름도 OID·연결 검사를 거치고 개발 DB 이름은 거부한다', async () => {
+  for (const name of ['opensamguk_ci_green_toolsa5_test', 'opensamguk_ci_green_toolsA4_test', 'opensamguk_ci_green']) {
+    expect(
+      await observeDisconnectedDatabase(
+        name,
+        '1',
+        async () => 0,
+        async () => '1',
+      ),
+    ).toMatchObject({ connections: 0 });
+    await expect(
+      observeDisconnectedDatabase(
+        name,
+        '1',
+        async () => 0,
+        async () => '2',
+      ),
+    ).rejects.toMatchObject({ reason: 'identity-changed' });
+  }
+  await expect(
+    observeDisconnectedDatabase(
+      'opensamguk',
+      '1',
+      async () => 0,
+      async () => '1',
+    ),
+  ).rejects.toThrow();
 });

@@ -13,8 +13,8 @@ export async function persistNationLifecycle(
   before: WorldView,
   next: WorldView,
 ) {
-  const original = readNationLifecycle(before.nationLifecycle, before);
-  const final = readNationLifecycle(next.nationLifecycle, next);
+  const original = readNationLifecycle(before.nationLifecycle);
+  const final = readNationLifecycle(next.nationLifecycle);
   if (!original && !final) return;
   if (!original || !final) throw new Error('진행 중 국가 변천 기능을 바꿀 수 없습니다.');
   assertNationLifecycle(before);

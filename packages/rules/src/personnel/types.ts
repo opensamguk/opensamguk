@@ -31,7 +31,15 @@ export interface PersonnelChange {
 export type PersonnelFailure = {
   ok: false;
   code:
-    'NO_ACTOR' | 'NOT_NATION' | 'NOT_RULER' | 'BAD_ARGS' | 'BAD_TARGET' | 'BAD_STATE' | 'OFFER_CLOSED' | 'NOT_ALLOWED';
+    | 'NO_ACTOR'
+    | 'NOT_NATION'
+    | 'NOT_RULER'
+    | 'BAD_ARGS'
+    | 'BAD_TARGET'
+    | 'BAD_STATE'
+    | 'OFFER_CLOSED'
+    | 'NOT_ALLOWED'
+    | 'BATTLE_BUSY';
   message: string;
 };
 export type PersonnelResult<T> = (PersonnelChange & { ok: true; result: T }) | PersonnelFailure;

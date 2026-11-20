@@ -2,6 +2,7 @@ import type { DeepReadonly } from '../model/world';
 import type { Actor, CommandResult, Failure } from '../commands/types';
 import { commandRegistry } from '../commands/registry';
 import { assignGeneral } from './assignments';
+import { battleCommandBusy } from '../tactical/world';
 import type { OfficeRevisions, OfficeView } from './offices';
 import { canUseNationTurns } from './permissions';
 import { PersonnelInvariantError, type ClosedOffer, type PersonnelLog } from './types';
@@ -79,6 +80,8 @@ export type OfficeAssignRun = Readonly<{
 }>;
 
 export function runOfficeAssign(view: OfficeView, actor: Actor, args: unknown, tick: number): OfficeAssignRun {
+  if (battleCommandBusy(view, actor.generalId, 'nation_assign', args))
+    return { result: { code: 'BATTLE_BUSY', message: '전투 중' }, closedOffers: [], logs: [] };
   const parsed = commandRegistry.get('nation_assign')!.args.safeParse(args);
   if (!parsed.success)
     return {

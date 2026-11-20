@@ -1,0 +1,1664 @@
+[
+  {
+    "key": 1,
+    "name": "업",
+    "style": "hebei",
+    "grade": "특"
+  },
+  {
+    "key": 2,
+    "name": "허",
+    "style": "central",
+    "grade": "특"
+  },
+  {
+    "key": 3,
+    "name": "낙양",
+    "style": "central",
+    "grade": "특"
+  },
+  {
+    "key": 4,
+    "name": "장안",
+    "style": "central",
+    "grade": "특"
+  },
+  {
+    "key": 5,
+    "name": "성도",
+    "style": "ba-shu",
+    "grade": "특"
+  },
+  {
+    "key": 6,
+    "name": "양양",
+    "style": "jing",
+    "grade": "특"
+  },
+  {
+    "key": 7,
+    "name": "말릉",
+    "style": "yang",
+    "grade": "특"
+  },
+  {
+    "key": 8,
+    "name": "북평",
+    "style": "hebei",
+    "grade": "대"
+  },
+  {
+    "key": 9,
+    "name": "남피",
+    "style": "hebei",
+    "grade": "대"
+  },
+  {
+    "key": 10,
+    "name": "완",
+    "style": "jing",
+    "grade": "대"
+  },
+  {
+    "key": 11,
+    "name": "수춘",
+    "style": "yang",
+    "grade": "대"
+  },
+  {
+    "key": 13,
+    "name": "강릉",
+    "style": "jing",
+    "grade": "대"
+  },
+  {
+    "key": 14,
+    "name": "장사",
+    "style": "jing",
+    "grade": "대"
+  },
+  {
+    "key": 15,
+    "name": "시상",
+    "style": "yang",
+    "grade": "대"
+  },
+  {
+    "key": 1133,
+    "name": "야마타이국",
+    "style": "east-wa",
+    "grade": "대"
+  },
+  {
+    "key": 1149,
+    "name": "부여",
+    "style": "east-buyeo",
+    "grade": "대"
+  },
+  {
+    "key": 17,
+    "name": "계",
+    "style": "hebei",
+    "grade": "중"
+  },
+  {
+    "key": 18,
+    "name": "복양",
+    "style": "central",
+    "grade": "중"
+  },
+  {
+    "key": 19,
+    "name": "진류",
+    "style": "central",
+    "grade": "중"
+  },
+  {
+    "key": 20,
+    "name": "여남",
+    "style": "central",
+    "grade": "중"
+  },
+  {
+    "key": 21,
+    "name": "하비",
+    "style": "central",
+    "grade": "중"
+  },
+  {
+    "key": 22,
+    "name": "무위",
+    "style": "liang",
+    "grade": "중"
+  },
+  {
+    "key": 23,
+    "name": "하내",
+    "style": "central",
+    "grade": "중"
+  },
+  {
+    "key": 24,
+    "name": "한중",
+    "style": "ba-shu",
+    "grade": "중"
+  },
+  {
+    "key": 25,
+    "name": "상용",
+    "style": "ba-shu",
+    "grade": "중"
+  },
+  {
+    "key": 27,
+    "name": "강주",
+    "style": "ba-shu",
+    "grade": "중"
+  },
+  {
+    "key": 28,
+    "name": "익주군",
+    "style": "nanzhong",
+    "grade": "중"
+  },
+  {
+    "key": 29,
+    "name": "남해",
+    "style": "nanzhong",
+    "grade": "중"
+  },
+  {
+    "key": 30,
+    "name": "계양",
+    "style": "jing",
+    "grade": "중"
+  },
+  {
+    "key": 31,
+    "name": "오",
+    "style": "yang",
+    "grade": "중"
+  },
+  {
+    "key": 1082,
+    "name": "낙랑",
+    "style": "hebei",
+    "grade": "중"
+  },
+  {
+    "key": 1095,
+    "name": "진",
+    "style": "central",
+    "grade": "중"
+  },
+  {
+    "key": 1134,
+    "name": "투마국",
+    "style": "east-wa",
+    "grade": "중"
+  },
+  {
+    "key": 1140,
+    "name": "국내성",
+    "style": "east-goguryeo",
+    "grade": "중"
+  },
+  {
+    "key": 1145,
+    "name": "목지국",
+    "style": "east-mahan",
+    "grade": "중"
+  },
+  {
+    "key": 35,
+    "name": "진양",
+    "style": "hebei",
+    "grade": "소"
+  },
+  {
+    "key": 36,
+    "name": "평원",
+    "style": "central",
+    "grade": "소"
+  },
+  {
+    "key": 37,
+    "name": "북해",
+    "style": "central",
+    "grade": "소"
+  },
+  {
+    "key": 38,
+    "name": "초",
+    "style": "central",
+    "grade": "소"
+  },
+  {
+    "key": 39,
+    "name": "소패",
+    "style": "central",
+    "grade": "소"
+  },
+  {
+    "key": 40,
+    "name": "한양",
+    "style": "liang",
+    "grade": "소"
+  },
+  {
+    "key": 41,
+    "name": "안정",
+    "style": "liang",
+    "grade": "소"
+  },
+  {
+    "key": 42,
+    "name": "홍농",
+    "style": "central",
+    "grade": "소"
+  },
+  {
+    "key": 43,
+    "name": "무도",
+    "style": "liang",
+    "grade": "소"
+  },
+  {
+    "key": 44,
+    "name": "재동",
+    "style": "ba-shu",
+    "grade": "소"
+  },
+  {
+    "key": 45,
+    "name": "어복",
+    "style": "ba-shu",
+    "grade": "소"
+  },
+  {
+    "key": 48,
+    "name": "운남",
+    "style": "nanzhong",
+    "grade": "소"
+  },
+  {
+    "key": 50,
+    "name": "교지",
+    "style": "nanzhong",
+    "grade": "소"
+  },
+  {
+    "key": 51,
+    "name": "신야",
+    "style": "jing",
+    "grade": "소"
+  },
+  {
+    "key": 52,
+    "name": "강하",
+    "style": "jing",
+    "grade": "소"
+  },
+  {
+    "key": 53,
+    "name": "무릉",
+    "style": "jing",
+    "grade": "소"
+  },
+  {
+    "key": 54,
+    "name": "영릉",
+    "style": "jing",
+    "grade": "소"
+  },
+  {
+    "key": 56,
+    "name": "여강",
+    "style": "yang",
+    "grade": "소"
+  },
+  {
+    "key": 57,
+    "name": "회계",
+    "style": "yang",
+    "grade": "소"
+  },
+  {
+    "key": 83,
+    "name": "광릉",
+    "style": "central",
+    "grade": "소"
+  },
+  {
+    "key": 95,
+    "name": "상당",
+    "style": "hebei",
+    "grade": "소"
+  },
+  {
+    "key": 97,
+    "name": "영창",
+    "style": "nanzhong",
+    "grade": "소"
+  },
+  {
+    "key": 99,
+    "name": "양평",
+    "style": "hebei",
+    "grade": "소"
+  },
+  {
+    "key": 1059,
+    "name": "주천",
+    "style": "liang",
+    "grade": "소"
+  },
+  {
+    "key": 1060,
+    "name": "적도",
+    "style": "liang",
+    "grade": "소"
+  },
+  {
+    "key": 1061,
+    "name": "남안",
+    "style": "liang",
+    "grade": "소"
+  },
+  {
+    "key": 1072,
+    "name": "월수",
+    "style": "nanzhong",
+    "grade": "소"
+  },
+  {
+    "key": 1073,
+    "name": "주제",
+    "style": "nanzhong",
+    "grade": "소"
+  },
+  {
+    "key": 1078,
+    "name": "합포",
+    "style": "nanzhong",
+    "grade": "소"
+  },
+  {
+    "key": 1079,
+    "name": "오원",
+    "style": "hebei",
+    "grade": "소"
+  },
+  {
+    "key": 1084,
+    "name": "거록",
+    "style": "hebei",
+    "grade": "소"
+  },
+  {
+    "key": 1086,
+    "name": "임치",
+    "style": "central",
+    "grade": "소"
+  },
+  {
+    "key": 1087,
+    "name": "태산",
+    "style": "central",
+    "grade": "소"
+  },
+  {
+    "key": 1088,
+    "name": "낭야",
+    "style": "central",
+    "grade": "소"
+  },
+  {
+    "key": 1089,
+    "name": "평양",
+    "style": "central",
+    "grade": "소"
+  },
+  {
+    "key": 1091,
+    "name": "정도",
+    "style": "central",
+    "grade": "소"
+  },
+  {
+    "key": 1093,
+    "name": "팽성",
+    "style": "central",
+    "grade": "소"
+  },
+  {
+    "key": 1110,
+    "name": "예장",
+    "style": "yang",
+    "grade": "소"
+  },
+  {
+    "key": 1119,
+    "name": "창오",
+    "style": "nanzhong",
+    "grade": "소"
+  },
+  {
+    "key": 1127,
+    "name": "대마국",
+    "style": "east-wa",
+    "grade": "소"
+  },
+  {
+    "key": 1128,
+    "name": "일지국",
+    "style": "east-wa",
+    "grade": "소"
+  },
+  {
+    "key": 1129,
+    "name": "말로국",
+    "style": "east-wa",
+    "grade": "소"
+  },
+  {
+    "key": 1130,
+    "name": "이도국",
+    "style": "east-wa",
+    "grade": "소"
+  },
+  {
+    "key": 1131,
+    "name": "노국",
+    "style": "east-wa",
+    "grade": "소"
+  },
+  {
+    "key": 1132,
+    "name": "불미국",
+    "style": "east-wa",
+    "grade": "소"
+  },
+  {
+    "key": 1135,
+    "name": "지유국",
+    "style": "east-wa",
+    "grade": "소"
+  },
+  {
+    "key": 1136,
+    "name": "이사국",
+    "style": "east-wa",
+    "grade": "소"
+  },
+  {
+    "key": 1137,
+    "name": "파리국",
+    "style": "east-wa",
+    "grade": "소"
+  },
+  {
+    "key": 1139,
+    "name": "졸본",
+    "style": "east-goguryeo",
+    "grade": "소"
+  },
+  {
+    "key": 1141,
+    "name": "부조",
+    "style": "east-okjeo-ye",
+    "grade": "소"
+  },
+  {
+    "key": 1142,
+    "name": "화려",
+    "style": "east-okjeo-ye",
+    "grade": "소"
+  },
+  {
+    "key": 1143,
+    "name": "불내",
+    "style": "east-okjeo-ye",
+    "grade": "소"
+  },
+  {
+    "key": 1144,
+    "name": "백제국",
+    "style": "east-mahan",
+    "grade": "소"
+  },
+  {
+    "key": 1146,
+    "name": "건마국",
+    "style": "east-mahan",
+    "grade": "소"
+  },
+  {
+    "key": 1147,
+    "name": "사로국",
+    "style": "east-jinbyeon",
+    "grade": "소"
+  },
+  {
+    "key": 1148,
+    "name": "구야국",
+    "style": "east-jinbyeon",
+    "grade": "소"
+  },
+  {
+    "key": 1150,
+    "name": "읍루",
+    "style": "east-eupru",
+    "grade": "소"
+  },
+  {
+    "key": 1151,
+    "name": "북옥저",
+    "style": "east-okjeo-ye",
+    "grade": "소"
+  },
+  {
+    "key": 1152,
+    "name": "주호",
+    "style": "east-mahan",
+    "grade": "소"
+  },
+  {
+    "key": 10005,
+    "name": "맥국",
+    "style": "east-okjeo-ye",
+    "grade": "소"
+  },
+  {
+    "key": 10006,
+    "name": "동예",
+    "style": "east-okjeo-ye",
+    "grade": "소"
+  },
+  {
+    "key": 10010,
+    "name": "동해",
+    "style": "central",
+    "grade": "소"
+  },
+  {
+    "key": 10011,
+    "name": "산양",
+    "style": "central",
+    "grade": "소"
+  },
+  {
+    "key": 10012,
+    "name": "제음",
+    "style": "central",
+    "grade": "소"
+  },
+  {
+    "key": 10018,
+    "name": "신미",
+    "style": "east-mahan",
+    "grade": "소"
+  },
+  {
+    "key": 10020,
+    "name": "안평",
+    "style": "hebei",
+    "grade": "소"
+  },
+  {
+    "key": 10021,
+    "name": "사벌",
+    "style": "east-jinbyeon",
+    "grade": "소"
+  },
+  {
+    "key": 10024,
+    "name": "조문",
+    "style": "east-jinbyeon",
+    "grade": "소"
+  },
+  {
+    "key": 10026,
+    "name": "다벌",
+    "style": "east-jinbyeon",
+    "grade": "소"
+  },
+  {
+    "key": 10027,
+    "name": "초팔",
+    "style": "east-jinbyeon",
+    "grade": "소"
+  },
+  {
+    "key": 10028,
+    "name": "고자미동",
+    "style": "east-jinbyeon",
+    "grade": "소"
+  },
+  {
+    "key": 10031,
+    "name": "우시산",
+    "style": "east-jinbyeon",
+    "grade": "소"
+  },
+  {
+    "key": 10035,
+    "name": "모로비리",
+    "style": "east-mahan",
+    "grade": "소"
+  },
+  {
+    "key": 10039,
+    "name": "안야",
+    "style": "east-jinbyeon",
+    "grade": "소"
+  },
+  {
+    "key": 10041,
+    "name": "감문",
+    "style": "east-jinbyeon",
+    "grade": "소"
+  },
+  {
+    "key": 10042,
+    "name": "골벌",
+    "style": "east-jinbyeon",
+    "grade": "소"
+  },
+  {
+    "key": 10043,
+    "name": "근기",
+    "style": "east-jinbyeon",
+    "grade": "소"
+  },
+  {
+    "key": 10048,
+    "name": "옥저",
+    "style": "east-okjeo-ye",
+    "grade": "소"
+  },
+  {
+    "key": 10052,
+    "name": "어양",
+    "style": "hebei",
+    "grade": "소"
+  },
+  {
+    "key": 10053,
+    "name": "역양",
+    "style": "yang",
+    "grade": "소"
+  },
+  {
+    "key": 10059,
+    "name": "건위",
+    "style": "ba-shu",
+    "grade": "소"
+  },
+  {
+    "key": 10060,
+    "name": "장가",
+    "style": "ba-shu",
+    "grade": "소"
+  },
+  {
+    "key": 10065,
+    "name": "포산",
+    "style": "nanzhong",
+    "grade": "소"
+  },
+  {
+    "key": 10066,
+    "name": "구진",
+    "style": "nanzhong",
+    "grade": "소"
+  },
+  {
+    "key": 10073,
+    "name": "금성",
+    "style": "liang",
+    "grade": "소"
+  },
+  {
+    "key": 10074,
+    "name": "운중",
+    "style": "hebei",
+    "grade": "소"
+  },
+  {
+    "key": 10076,
+    "name": "현도",
+    "style": "hebei",
+    "grade": "소"
+  },
+  {
+    "key": 10080,
+    "name": "대",
+    "style": "hebei",
+    "grade": "소"
+  },
+  {
+    "key": 10081,
+    "name": "서하",
+    "style": "hebei",
+    "grade": "소"
+  },
+  {
+    "key": 10083,
+    "name": "요서",
+    "style": "hebei",
+    "grade": "소"
+  },
+  {
+    "key": 10093,
+    "name": "음평",
+    "style": "ba-shu",
+    "grade": "소"
+  },
+  {
+    "key": 10100,
+    "name": "정양",
+    "style": "hebei",
+    "grade": "소"
+  },
+  {
+    "key": 10101,
+    "name": "삭방",
+    "style": "hebei",
+    "grade": "소"
+  },
+  {
+    "key": 10104,
+    "name": "구노",
+    "style": "east-wa",
+    "grade": "소"
+  },
+  {
+    "key": 10119,
+    "name": "중산",
+    "style": "hebei",
+    "grade": "소"
+  },
+  {
+    "key": 10139,
+    "name": "동평",
+    "style": "central",
+    "grade": "소"
+  },
+  {
+    "key": 10142,
+    "name": "동래",
+    "style": "central",
+    "grade": "소"
+  },
+  {
+    "key": 10146,
+    "name": "단양",
+    "style": "yang",
+    "grade": "소"
+  },
+  {
+    "key": 10158,
+    "name": "하간",
+    "style": "hebei",
+    "grade": "소"
+  },
+  {
+    "key": 10159,
+    "name": "안문",
+    "style": "hebei",
+    "grade": "소"
+  },
+  {
+    "key": 10178,
+    "name": "감릉",
+    "style": "hebei",
+    "grade": "소"
+  },
+  {
+    "key": 10192,
+    "name": "제남",
+    "style": "central",
+    "grade": "소"
+  },
+  {
+    "key": 10204,
+    "name": "광한",
+    "style": "ba-shu",
+    "grade": "소"
+  },
+  {
+    "key": 10205,
+    "name": "탁군",
+    "style": "hebei",
+    "grade": "소"
+  },
+  {
+    "key": 10208,
+    "name": "상곡",
+    "style": "hebei",
+    "grade": "소"
+  },
+  {
+    "key": 10212,
+    "name": "북지",
+    "style": "liang",
+    "grade": "소"
+  },
+  {
+    "key": 96,
+    "name": "서평",
+    "style": "liang",
+    "grade": "현"
+  },
+  {
+    "key": 98,
+    "name": "건안",
+    "style": "yang",
+    "grade": "현"
+  },
+  {
+    "key": 1064,
+    "name": "진창",
+    "style": "central",
+    "grade": "현"
+  },
+  {
+    "key": 1067,
+    "name": "서성",
+    "style": "ba-shu",
+    "grade": "현"
+  },
+  {
+    "key": 1068,
+    "name": "방릉",
+    "style": "ba-shu",
+    "grade": "현"
+  },
+  {
+    "key": 1069,
+    "name": "한가",
+    "style": "ba-shu",
+    "grade": "현"
+  },
+  {
+    "key": 1070,
+    "name": "강양",
+    "style": "ba-shu",
+    "grade": "현"
+  },
+  {
+    "key": 1071,
+    "name": "임강",
+    "style": "ba-shu",
+    "grade": "현"
+  },
+  {
+    "key": 1075,
+    "name": "애뢰",
+    "style": "nanzhong",
+    "grade": "현"
+  },
+  {
+    "key": 1076,
+    "name": "사룡",
+    "style": "nanzhong",
+    "grade": "현"
+  },
+  {
+    "key": 1077,
+    "name": "완온",
+    "style": "nanzhong",
+    "grade": "현"
+  },
+  {
+    "key": 1083,
+    "name": "역현",
+    "style": "hebei",
+    "grade": "현"
+  },
+  {
+    "key": 1097,
+    "name": "노양",
+    "style": "jing",
+    "grade": "현"
+  },
+  {
+    "key": 1098,
+    "name": "평춘",
+    "style": "jing",
+    "grade": "현"
+  },
+  {
+    "key": 1099,
+    "name": "번성",
+    "style": "jing",
+    "grade": "현"
+  },
+  {
+    "key": 1100,
+    "name": "합비",
+    "style": "yang",
+    "grade": "현"
+  },
+  {
+    "key": 1102,
+    "name": "유수구",
+    "style": "yang",
+    "grade": "현"
+  },
+  {
+    "key": 1104,
+    "name": "이릉",
+    "style": "jing",
+    "grade": "현"
+  },
+  {
+    "key": 1105,
+    "name": "화용",
+    "style": "jing",
+    "grade": "현"
+  },
+  {
+    "key": 1107,
+    "name": "적벽",
+    "style": "jing",
+    "grade": "현"
+  },
+  {
+    "key": 1108,
+    "name": "잔릉",
+    "style": "jing",
+    "grade": "현"
+  },
+  {
+    "key": 1109,
+    "name": "심양",
+    "style": "yang",
+    "grade": "현"
+  },
+  {
+    "key": 1111,
+    "name": "회음",
+    "style": "central",
+    "grade": "현"
+  },
+  {
+    "key": 1113,
+    "name": "단도",
+    "style": "yang",
+    "grade": "현"
+  },
+  {
+    "key": 1114,
+    "name": "부춘",
+    "style": "yang",
+    "grade": "현"
+  },
+  {
+    "key": 1115,
+    "name": "장안현",
+    "style": "yang",
+    "grade": "현"
+  },
+  {
+    "key": 1117,
+    "name": "임하",
+    "style": "nanzhong",
+    "grade": "현"
+  },
+  {
+    "key": 1118,
+    "name": "곡강",
+    "style": "jing",
+    "grade": "현"
+  },
+  {
+    "key": 1120,
+    "name": "강",
+    "style": "tribe-qiang",
+    "grade": "현"
+  },
+  {
+    "key": 1121,
+    "name": "오환",
+    "style": "tribe-wuhuan",
+    "grade": "현"
+  },
+  {
+    "key": 1122,
+    "name": "남만",
+    "style": "tribe-nanman",
+    "grade": "현"
+  },
+  {
+    "key": 1123,
+    "name": "산월",
+    "style": "tribe-shanyue",
+    "grade": "현"
+  },
+  {
+    "key": 1124,
+    "name": "선비",
+    "style": "tribe-xianbei",
+    "grade": "현"
+  },
+  {
+    "key": 1125,
+    "name": "흉노",
+    "style": "tribe-xiongnu",
+    "grade": "현"
+  },
+  {
+    "key": 1126,
+    "name": "저",
+    "style": "tribe-di",
+    "grade": "현"
+  },
+  {
+    "key": 1138,
+    "name": "서안평",
+    "style": "hebei",
+    "grade": "현"
+  },
+  {
+    "key": 1153,
+    "name": "이주",
+    "style": "tribe-yizhou",
+    "grade": "현"
+  },
+  {
+    "key": 1154,
+    "name": "파양",
+    "style": "yang",
+    "grade": "현"
+  },
+  {
+    "key": 10001,
+    "name": "대방",
+    "style": "hebei",
+    "grade": "현"
+  },
+  {
+    "key": 10002,
+    "name": "천주",
+    "style": "hebei",
+    "grade": "현"
+  },
+  {
+    "key": 10003,
+    "name": "임유",
+    "style": "hebei",
+    "grade": "현"
+  },
+  {
+    "key": 10008,
+    "name": "도하",
+    "style": "hebei",
+    "grade": "현"
+  },
+  {
+    "key": 10014,
+    "name": "상락",
+    "style": "central",
+    "grade": "현"
+  },
+  {
+    "key": 10016,
+    "name": "양현",
+    "style": "central",
+    "grade": "현"
+  },
+  {
+    "key": 10017,
+    "name": "형양",
+    "style": "central",
+    "grade": "현"
+  },
+  {
+    "key": 10019,
+    "name": "급현",
+    "style": "central",
+    "grade": "현"
+  },
+  {
+    "key": 10022,
+    "name": "서현",
+    "style": "liang",
+    "grade": "현"
+  },
+  {
+    "key": 10023,
+    "name": "환현",
+    "style": "yang",
+    "grade": "현"
+  },
+  {
+    "key": 10033,
+    "name": "기춘",
+    "style": "jing",
+    "grade": "현"
+  },
+  {
+    "key": 10036,
+    "name": "수현",
+    "style": "jing",
+    "grade": "현"
+  },
+  {
+    "key": 10037,
+    "name": "저현",
+    "style": "liang",
+    "grade": "현"
+  },
+  {
+    "key": 10038,
+    "name": "포한",
+    "style": "liang",
+    "grade": "현"
+  },
+  {
+    "key": 10040,
+    "name": "임조",
+    "style": "liang",
+    "grade": "현"
+  },
+  {
+    "key": 10044,
+    "name": "고",
+    "style": "central",
+    "grade": "현"
+  },
+  {
+    "key": 10046,
+    "name": "산상",
+    "style": "central",
+    "grade": "현"
+  },
+  {
+    "key": 10047,
+    "name": "성보",
+    "style": "central",
+    "grade": "현"
+  },
+  {
+    "key": 10051,
+    "name": "박망",
+    "style": "jing",
+    "grade": "현"
+  },
+  {
+    "key": 10054,
+    "name": "곡아",
+    "style": "yang",
+    "grade": "현"
+  },
+  {
+    "key": 10058,
+    "name": "당양",
+    "style": "jing",
+    "grade": "현"
+  },
+  {
+    "key": 10070,
+    "name": "고현",
+    "style": "hebei",
+    "grade": "현"
+  },
+  {
+    "key": 10077,
+    "name": "망평",
+    "style": "hebei",
+    "grade": "현"
+  },
+  {
+    "key": 10078,
+    "name": "평곽",
+    "style": "hebei",
+    "grade": "현"
+  },
+  {
+    "key": 10079,
+    "name": "답씨",
+    "style": "hebei",
+    "grade": "현"
+  },
+  {
+    "key": 10089,
+    "name": "익양",
+    "style": "jing",
+    "grade": "현"
+  },
+  {
+    "key": 10094,
+    "name": "석현",
+    "style": "central",
+    "grade": "현"
+  },
+  {
+    "key": 10097,
+    "name": "설",
+    "style": "central",
+    "grade": "현"
+  },
+  {
+    "key": 10098,
+    "name": "서평현",
+    "style": "central",
+    "grade": "현"
+  },
+  {
+    "key": 10099,
+    "name": "미현",
+    "style": "central",
+    "grade": "현"
+  },
+  {
+    "key": 10102,
+    "name": "무종",
+    "style": "hebei",
+    "grade": "현"
+  },
+  {
+    "key": 10105,
+    "name": "영성",
+    "style": "hebei",
+    "grade": "현"
+  },
+  {
+    "key": 10109,
+    "name": "탕거",
+    "style": "ba-shu",
+    "grade": "현"
+  },
+  {
+    "key": 10110,
+    "name": "안한",
+    "style": "ba-shu",
+    "grade": "현"
+  },
+  {
+    "key": 10111,
+    "name": "거현",
+    "style": "central",
+    "grade": "현"
+  },
+  {
+    "key": 10112,
+    "name": "불기",
+    "style": "central",
+    "grade": "현"
+  },
+  {
+    "key": 10113,
+    "name": "양선",
+    "style": "yang",
+    "grade": "현"
+  },
+  {
+    "key": 10114,
+    "name": "파강",
+    "style": "liang",
+    "grade": "현"
+  },
+  {
+    "key": 10115,
+    "name": "거소",
+    "style": "yang",
+    "grade": "현"
+  },
+  {
+    "key": 10116,
+    "name": "원릉",
+    "style": "jing",
+    "grade": "현"
+  },
+  {
+    "key": 10120,
+    "name": "진정",
+    "style": "hebei",
+    "grade": "현"
+  },
+  {
+    "key": 10121,
+    "name": "양국",
+    "style": "hebei",
+    "grade": "현"
+  },
+  {
+    "key": 10122,
+    "name": "위현",
+    "style": "hebei",
+    "grade": "현"
+  },
+  {
+    "key": 10124,
+    "name": "평성",
+    "style": "hebei",
+    "grade": "현"
+  },
+  {
+    "key": 10125,
+    "name": "포판",
+    "style": "central",
+    "grade": "현"
+  },
+  {
+    "key": 10126,
+    "name": "옹현",
+    "style": "central",
+    "grade": "현"
+  },
+  {
+    "key": 10127,
+    "name": "칠현",
+    "style": "central",
+    "grade": "현"
+  },
+  {
+    "key": 10128,
+    "name": "사연",
+    "style": "hebei",
+    "grade": "현"
+  },
+  {
+    "key": 10129,
+    "name": "영주",
+    "style": "liang",
+    "grade": "현"
+  },
+  {
+    "key": 10131,
+    "name": "처현",
+    "style": "ba-shu",
+    "grade": "현"
+  },
+  {
+    "key": 10133,
+    "name": "임공",
+    "style": "ba-shu",
+    "grade": "현"
+  },
+  {
+    "key": 10148,
+    "name": "임여",
+    "style": "yang",
+    "grade": "현"
+  },
+  {
+    "key": 10150,
+    "name": "감현",
+    "style": "yang",
+    "grade": "현"
+  },
+  {
+    "key": 10151,
+    "name": "전당",
+    "style": "yang",
+    "grade": "현"
+  },
+  {
+    "key": 10153,
+    "name": "후관",
+    "style": "yang",
+    "grade": "현"
+  },
+  {
+    "key": 10154,
+    "name": "동안",
+    "style": "yang",
+    "grade": "현"
+  },
+  {
+    "key": 10162,
+    "name": "정현",
+    "style": "central",
+    "grade": "현"
+  },
+  {
+    "key": 10172,
+    "name": "구장",
+    "style": "yang",
+    "grade": "현"
+  },
+  {
+    "key": 10174,
+    "name": "시안",
+    "style": "jing",
+    "grade": "현"
+  },
+  {
+    "key": 10179,
+    "name": "고도",
+    "style": "hebei",
+    "grade": "현"
+  },
+  {
+    "key": 10180,
+    "name": "임진",
+    "style": "central",
+    "grade": "현"
+  },
+  {
+    "key": 10182,
+    "name": "고노",
+    "style": "hebei",
+    "grade": "현"
+  },
+  {
+    "key": 10184,
+    "name": "가맹",
+    "style": "ba-shu",
+    "grade": "현"
+  },
+  {
+    "key": 10185,
+    "name": "낭중",
+    "style": "ba-shu",
+    "grade": "현"
+  },
+  {
+    "key": 10186,
+    "name": "덕양",
+    "style": "ba-shu",
+    "grade": "현"
+  },
+  {
+    "key": 10193,
+    "name": "여릉",
+    "style": "yang",
+    "grade": "현"
+  },
+  {
+    "key": 10194,
+    "name": "영녕",
+    "style": "yang",
+    "grade": "현"
+  },
+  {
+    "key": 10195,
+    "name": "파구",
+    "style": "jing",
+    "grade": "현"
+  },
+  {
+    "key": 10196,
+    "name": "소릉",
+    "style": "jing",
+    "grade": "현"
+  },
+  {
+    "key": 10199,
+    "name": "울림",
+    "style": "nanzhong",
+    "grade": "현"
+  },
+  {
+    "key": 10200,
+    "name": "영방",
+    "style": "nanzhong",
+    "grade": "현"
+  },
+  {
+    "key": 10209,
+    "name": "자씨",
+    "style": "hebei",
+    "grade": "현"
+  },
+  {
+    "key": 10211,
+    "name": "견현",
+    "style": "central",
+    "grade": "현"
+  },
+  {
+    "key": 10213,
+    "name": "조음",
+    "style": "hebei",
+    "grade": "현"
+  },
+  {
+    "key": 10214,
+    "name": "부리",
+    "style": "central",
+    "grade": "현"
+  },
+  {
+    "key": 10216,
+    "name": "액현",
+    "style": "central",
+    "grade": "현"
+  },
+  {
+    "key": 10217,
+    "name": "동무",
+    "style": "central",
+    "grade": "현"
+  },
+  {
+    "key": 10219,
+    "name": "구현",
+    "style": "central",
+    "grade": "현"
+  },
+  {
+    "key": 10220,
+    "name": "염차",
+    "style": "central",
+    "grade": "현"
+  },
+  {
+    "key": 10221,
+    "name": "우이",
+    "style": "central",
+    "grade": "현"
+  },
+  {
+    "key": 10222,
+    "name": "종리",
+    "style": "yang",
+    "grade": "현"
+  },
+  {
+    "key": 10223,
+    "name": "주현",
+    "style": "jing",
+    "grade": "현"
+  },
+  {
+    "key": 10226,
+    "name": "의춘",
+    "style": "yang",
+    "grade": "현"
+  },
+  {
+    "key": 10227,
+    "name": "오상",
+    "style": "yang",
+    "grade": "현"
+  },
+  {
+    "key": 10228,
+    "name": "태말",
+    "style": "yang",
+    "grade": "현"
+  },
+  {
+    "key": 10230,
+    "name": "송양",
+    "style": "yang",
+    "grade": "현"
+  },
+  {
+    "key": 10231,
+    "name": "예릉",
+    "style": "jing",
+    "grade": "현"
+  },
+  {
+    "key": 10232,
+    "name": "섬현",
+    "style": "yang",
+    "grade": "현"
+  },
+  {
+    "key": 10233,
+    "name": "작당",
+    "style": "jing",
+    "grade": "현"
+  },
+  {
+    "key": 10234,
+    "name": "영현",
+    "style": "jing",
+    "grade": "현"
+  },
+  {
+    "key": 10236,
+    "name": "영포",
+    "style": "jing",
+    "grade": "현"
+  },
+  {
+    "key": 10237,
+    "name": "안륙",
+    "style": "jing",
+    "grade": "현"
+  },
+  {
+    "key": 10238,
+    "name": "자귀",
+    "style": "jing",
+    "grade": "현"
+  },
+  {
+    "key": 10244,
+    "name": "선한",
+    "style": "ba-shu",
+    "grade": "현"
+  },
+  {
+    "key": 10246,
+    "name": "게양",
+    "style": "nanzhong",
+    "grade": "현"
+  },
+  {
+    "key": 10247,
+    "name": "박라",
+    "style": "nanzhong",
+    "grade": "현"
+  },
+  {
+    "key": 10248,
+    "name": "고요",
+    "style": "nanzhong",
+    "grade": "현"
+  },
+  {
+    "key": 10249,
+    "name": "고량",
+    "style": "nanzhong",
+    "grade": "현"
+  }
+]
