@@ -121,7 +121,7 @@ function GeneralRow({
             {GENERAL_COLUMNS.map((column) => (
               <div key={column.key}>
                 <dt>{column.label}</dt>
-                <dd>{number(row[column.key])}</dd>
+                <dd>{number(column.key === 'stratagem' ? row.stratagemSuccesses : row[column.key])}</dd>
               </div>
             ))}
             {MERIT_PARTS.map((part) => (
@@ -145,6 +145,7 @@ function GeneralRow({
           <td className="num">{number(row.dedication)}</td>
           <td className="num">{number(row.experience)}</td>
           <td className="num">{number(row.merit)}</td>
+          <td className="num">{number(row.stratagemSuccesses)}</td>
           <td className="num">{number(row.wins)}</td>
           <td className="num">{number(row.captures)}</td>
         </>
@@ -212,7 +213,7 @@ export function GeneralRankingTable({
         {ranking.me && !meInTop ? (
           <tbody className={styles.outside}>
             <tr aria-hidden="true">
-              <td colSpan={narrow ? 3 : 8} className={styles.gap}>
+              <td colSpan={narrow ? 3 : 3 + GENERAL_COLUMNS.length + MERIT_PARTS.length} className={styles.gap}>
                 ⋯
               </td>
             </tr>

@@ -497,21 +497,24 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
         nations: nations.map((nation) => {
           return { ...stripWorldId(nation), capitalCityKey: nation.capitalCityKey };
         }),
-        generals: generals.map(({ turnRevision, battleWins, captures, officerCityKey, ...general }) => {
-          void turnRevision;
-          void battleWins;
-          void captures;
-          return storedGeneralStats(
-            storedGeneralRemoval(
-              storedGeneralSex(
-                { ...stripWorldId(general), ...(officerCityKey == null ? {} : { officerCityKey }) },
-                world.ruleFeatures.includes('lineage-v1'),
+        generals: generals.map(
+          ({ turnRevision, battleWins, captures, stratagemSuccesses, officerCityKey, ...general }) => {
+            void turnRevision;
+            void battleWins;
+            void captures;
+            void stratagemSuccesses;
+            return storedGeneralStats(
+              storedGeneralRemoval(
+                storedGeneralSex(
+                  { ...stripWorldId(general), ...(officerCityKey == null ? {} : { officerCityKey }) },
+                  world.ruleFeatures.includes('lineage-v1'),
+                ),
+                world.replayFormat,
               ),
-              world.replayFormat,
-            ),
-            world.ruleFeatures?.includes('five-stats') ?? false,
-          );
-        }),
+              world.ruleFeatures?.includes('five-stats') ?? false,
+            );
+          },
+        ),
         diplomacies: diplomacies.map(stripWorldId),
         ...(await loadCommandState(tx, worldId)),
       };

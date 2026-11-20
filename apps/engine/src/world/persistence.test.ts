@@ -347,6 +347,7 @@ describe('기능 표시 형식의 초기 저장', () => {
       ...general,
       worldId,
       turnRevision: 0,
+      stratagemSuccesses: 0,
       battleWins: 0,
       captures: 0,
       noticeSeen: {},

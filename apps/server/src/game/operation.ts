@@ -426,6 +426,7 @@ export function inspectMembers(ctx: OperationContext, worldId: string) {
           cityName: general.city.name,
           isHuman: general.userId !== null,
           crew: general.crew,
+          stratagemSuccesses: general.stratagemSuccesses,
           train: general.train,
           atmos: general.atmos,
           turns: displaySlots(await readSlots(tx, worldId, general.id)).slice(0, 5),

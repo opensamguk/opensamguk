@@ -90,6 +90,7 @@ async function fixture(caps = true, modern = false) {
     defaultPolicy: 'none',
     lastActiveTick: 0,
     lastActiveAt: null,
+    stratagemSuccesses: 0,
     battleWins: 0,
     captures: 0,
   });

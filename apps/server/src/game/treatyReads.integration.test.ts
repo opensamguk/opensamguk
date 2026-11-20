@@ -102,6 +102,7 @@ function general(patch: Partial<General> = {}): General {
     charm: null,
     worldId: 'world',
     userId: alice,
+    stratagemSuccesses: 0,
     battleWins: 0,
     captures: 0,
     turnRevision: 0,

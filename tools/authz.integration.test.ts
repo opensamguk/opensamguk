@@ -377,6 +377,7 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
       'nation',
       'officerLevel',
       'rank',
+      'stratagemSuccesses',
       'value',
       'wins',
     ]);

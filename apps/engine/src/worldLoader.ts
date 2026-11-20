@@ -99,26 +99,29 @@ export async function loadWorldAfterCapabilityCheck(
       }),
     ),
     generals: Object.fromEntries(
-      generals.map(({ turnRevision, battleWins, captures, residenceTick, officerCityKey, ...general }) => {
-        void turnRevision;
-        void residenceTick;
-        // 순위용 누계는 게임 규칙 입력이 아니다. 기존 재생 해시에 섞지 않는다.
-        void battleWins;
-        void captures;
-        return [
-          general.id,
-          storedGeneralStats(
-            storedGeneralRemoval(
-              storedGeneralSex(
-                { ...stripWorldId(general), ...(officerCityKey == null ? {} : { officerCityKey }) },
-                world.ruleFeatures.includes('lineage-v1'),
+      generals.map(
+        ({ turnRevision, battleWins, captures, stratagemSuccesses, residenceTick, officerCityKey, ...general }) => {
+          void turnRevision;
+          void residenceTick;
+          // 순위용 누계는 게임 규칙 입력이 아니다. 기존 재생 해시에 섞지 않는다.
+          void battleWins;
+          void captures;
+          void stratagemSuccesses;
+          return [
+            general.id,
+            storedGeneralStats(
+              storedGeneralRemoval(
+                storedGeneralSex(
+                  { ...stripWorldId(general), ...(officerCityKey == null ? {} : { officerCityKey }) },
+                  world.ruleFeatures.includes('lineage-v1'),
+                ),
+                world.replayFormat,
               ),
-              world.replayFormat,
+              world.ruleFeatures?.includes('five-stats') ?? false,
             ),
-            world.ruleFeatures?.includes('five-stats') ?? false,
-          ),
-        ];
-      }),
+          ];
+        },
+      ),
     ),
     diplomacies: diplomacies.map(stripWorldId),
     ...(await loadCommandState(tx, worldId, world)),

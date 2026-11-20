@@ -12,6 +12,7 @@ export type DisplaySlot = { commandKey: string; args?: unknown; name: string };
 export interface PersonnelBoard {
   // 이 조회를 받은 계정의 지금 장수. 계승으로 바뀌면 화면이 예전 장수의 입력으로 보내지 않는다 (T4-95).
   actorId: number;
+  topStratagem?: { generalId: number; name: string; portraitId: number | null; successes: number }[];
   appoint: Allowed;
   officeEffectsEnabled?: boolean;
   secretaryEnabled?: boolean;

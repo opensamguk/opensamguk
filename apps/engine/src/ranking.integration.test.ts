@@ -7,6 +7,7 @@ import { warFixture } from '../test/warFixture';
 import { saveInitialWorld, readWorldState } from './world/persistence';
 import { controlClock } from './world/clock';
 import { acquireLease, renewLease } from './lease';
+import { persistCommandReports } from './commandPersistence';
 import { TurnLoop } from './turnLoop';
 import { exportReplay, replayArchive } from './replay';
 
@@ -30,7 +31,10 @@ describe('T2-22 / AC-M2-19 엔진 순위 집계', () => {
     });
     worlds.push(worldId);
     expect(hashState(await readWorldState(db, worldId))).toBe(stateHash);
-    await db.general.update({ where: { worldId_id: { worldId, id: 1 } }, data: { battleWins: 7, captures: 3 } });
+    await db.general.update({
+      where: { worldId_id: { worldId, id: 1 } },
+      data: { battleWins: 7, captures: 3, stratagemSuccesses: 4 },
+    });
     expect(hashState(await readWorldState(db, worldId))).toBe(stateHash);
     await controlClock(db, worldId, 'start');
     const lease = (await acquireLease(db, worldId))!;
@@ -50,7 +54,7 @@ describe('T2-22 / AC-M2-19 엔진 순위 집계', () => {
     expect(first).toMatchObject({ tick: 10000, year: initial.startYear, month: 1 });
     const generals = first.generals as Array<{ id: number; wins: number; captures: number }>;
     expect(generals.map((g) => g.id)).toEqual([1, 2]);
-    expect(generals[0]).toMatchObject({ wins: 7, captures: 3 });
+    expect(generals[0]).toMatchObject({ wins: 7, captures: 3, stratagemSuccesses: 4 });
     const nations = first.nations as Array<{ id: number; cities: number; generals: number; power: number }>;
     const settled = toWorldState(await readWorldState(db, worldId));
     for (const nation of nations) {
@@ -104,5 +108,15 @@ describe('T2-22 / AC-M2-19 엔진 순위 집계', () => {
     expect(await actor()).toMatchObject({ battleWins: 2, captures: 1 });
     const state = await db.$transaction((tx) => tx.general.findMany({ where: { worldId } }));
     expect(state.filter((g) => g.id !== 1).every((g) => g.battleWins === 0 && g.captures === 0)).toBe(true);
+    const recorded = { stratagemSucceeded: true } as const;
+    await expect(
+      db.$transaction(async (tx) => {
+        await persistCommandReports(tx, worldId, 100, 1, { ...recorded, logs: [], effects: [] });
+        throw Error('계략 집계 중단');
+      }),
+    ).rejects.toThrow('계략 집계 중단');
+    expect((await actor()).stratagemSuccesses).toBe(0);
+    await db.$transaction((tx) => persistCommandReports(tx, worldId, 100, 1, { ...recorded, logs: [], effects: [] }));
+    expect((await actor()).stratagemSuccesses).toBe(1);
   });
 });

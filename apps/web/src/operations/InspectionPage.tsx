@@ -112,6 +112,9 @@ export function InspectionTable({
           <th scope="col" className="num">
             사기
           </th>
+          <th scope="col" className="num">
+            계략 성공
+          </th>
           <th scope="col">예턴 앞 5칸</th>
           <th scope="col">다음 턴</th>
           <th scope="col">마지막 접속</th>
@@ -142,6 +145,7 @@ export function InspectionTable({
             <td className="num">{row.crew.toLocaleString('ko-KR')}</td>
             <td className="num">{row.train}</td>
             <td className="num">{row.atmos}</td>
+            <td className="num">{row.stratagemSuccesses}</td>
             <td>
               <TurnPreview turns={row.turns} names={names} />
             </td>

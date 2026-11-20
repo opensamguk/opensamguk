@@ -46,6 +46,7 @@ function general(changes: Partial<General> = {}): General {
     atmos: 0,
     experience: 0,
     dedication: 10,
+    stratagemSuccesses: 0,
     battleWins: 0,
     captures: 0,
     age: 31,
@@ -108,6 +109,9 @@ describe('인사부 내부 읽기', () => {
         officerLevel: true,
         userId: true,
         dedication: true,
+        portraitId: true,
+        removedAt: true,
+        stratagemSuccesses: true,
         city: { select: { cityKey: true, name: true } },
       },
     });

@@ -246,6 +246,7 @@ describe('감찰 표', () => {
     cityName: '진류',
     isHuman: true,
     crew: 1200,
+    stratagemSuccesses: 0,
     train: 70,
     atmos: 60,
     turns: [slot('train', '훈련'), blank, rest, slot('attack', '출병', { cityKey: 12 }), blank],

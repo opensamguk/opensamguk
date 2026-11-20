@@ -151,6 +151,7 @@ async function fixture(
   const generals = withWorld(initial.generals).map((row) => ({
     ...row,
     turnRevision: 0,
+    stratagemSuccesses: 0,
     battleWins: 0,
     captures: 0,
     defaultPolicy: 'none',

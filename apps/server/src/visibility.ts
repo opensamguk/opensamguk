@@ -15,6 +15,7 @@ import { z } from 'zod';
 type General = Omit<
   Prisma.GeneralGetPayload<true>,
   | 'battleWins'
+  | 'stratagemSuccesses'
   | 'captures'
   | 'noticeSeen'
   | 'defaultPolicy'

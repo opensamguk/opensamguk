@@ -703,7 +703,13 @@ describe('T1-26 내보내기와 네 키 상태', () => {
       nation: { findMany: async () => withWorld(initial.nations) },
       general: {
         findMany: async () =>
-          withWorld(initial.generals).map((general) => ({ ...general, turnRevision: 0, battleWins: 0, captures: 0 })),
+          withWorld(initial.generals).map((general) => ({
+            ...general,
+            turnRevision: 0,
+            battleWins: 0,
+            captures: 0,
+            stratagemSuccesses: 0,
+          })),
       },
       diplomacy: { findMany: async () => withWorld(initial.diplomacies) },
       generalTurn: { findMany: async () => [] },

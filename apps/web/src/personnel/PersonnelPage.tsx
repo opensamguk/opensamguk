@@ -204,6 +204,18 @@ export function PersonnelBoardView({
   );
   return (
     <>
+      {board.topStratagem?.length ? (
+        <section className={styles.section} aria-labelledby="stratagem-leaders">
+          <h2 id="stratagem-leaders">건안칠자</h2>
+          <ol>
+            {board.topStratagem.map((member) => (
+              <li key={member.generalId}>
+                {member.name} · 계략 성공 {member.successes}회
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
       <section className={styles.section} aria-labelledby="levels-title">
         <h2 id="levels-title">직책 바꾸기</h2>
         <table className={`${styles.levels} ${pageStyles.levels}`}>
