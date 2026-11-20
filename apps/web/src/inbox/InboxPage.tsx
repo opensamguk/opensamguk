@@ -16,12 +16,13 @@ import { CAMPAIGN_RELATIONS } from '../personnel/CampaignPanel';
 import { personnelKeys, usePersonnelApi } from '../personnel/contract';
 import { OfferBox } from '../personnel/OfferBox';
 import { Portrait } from '../portrait/Portrait';
+import { ProposalBox, useOpenProposalCount } from '../proposals/ProposalBox';
 import { useTRPC } from '../trpc';
 import { EmptyState, LoadingState } from '../ui/States';
 import { incomingTreaties, retinueOffers } from './count';
 import styles from './Inbox.module.css';
 
-// 받은 제안함 (INT-20, 시안 X-Inbox). 발령·휘하·외교 제안을 한곳에 모은다. 화면만 바꾸며 기존 조회만 쓴다.
+// 받은 제안함 (INT-20, 시안 X-Inbox). 발령, 명령 제안(상신, D-100), 휘하, 외교 제안을 한곳에 모은다.
 // 발령은 메인의 제안 상자를 그대로 쓰고 휘하·외교는 수와 요약을 보인 뒤 답하는 화면으로 잇는다.
 export function InboxPage() {
   const worldId = useWorldId();
@@ -67,16 +68,21 @@ export function Inbox({ worldId, hasNation, campaign }: { worldId: string; hasNa
     retry: false,
   });
 
-  const loading = offers.isPending || (campaign && board.isPending) || (hasNation && treaties.isPending);
+  // 명령 제안(상신, D-100)은 국가에 속한 장수만 받고 보낸다.
+  const proposals = useOpenProposalCount(worldId, hasNation);
+  const loading =
+    offers.isPending || (campaign && board.isPending) || (hasNation && treaties.isPending) || proposals.pending;
   const retinue = campaign ? retinueOffers(board.data) : [];
   const incoming = hasNation ? incomingTreaties(treaties.data) : [];
   const people = new Map(board.data?.people.map((person) => [person.id, person]) ?? []);
-  const empty = !loading && (offers.data?.length ?? 0) + retinue.length + incoming.length === 0;
+  const empty = !loading && (offers.data?.length ?? 0) + retinue.length + incoming.length + proposals.count === 0;
   const treatyBlocked = treaties.isError && treatyListBlocked(treaties.error) !== null;
 
   return (
     <div className={styles.list}>
       <OfferBox worldId={worldId} />
+
+      {hasNation ? <ProposalBox worldId={worldId} generalName={(id) => people.get(id)?.name} /> : null}
 
       {retinue.length > 0 ? (
         <section className={styles.card} aria-labelledby="inbox-retinue">

@@ -238,18 +238,19 @@ export function MapStage() {
   const nation = data?.nation ?? null;
   // 성 화면과 성 안 창은 내 도시의 종류, 규모, 이름, 지역만 쓴다. 지도 조회(world.map)는 무거워 늦게 올 수 있으므로
   // 그 전에는 home이 준 같은 도시 자료를 쓴다. 지도에서 성을 눌러도 창이 지도 조회를 기다리지 않는다.
+  // 이름, 규모, 종류는 home을 먼저 쓴다. 증축 직후 turn.result는 home.get만 다시 받으므로 캐시된 지도의 옛 규모와
+  // 새 영지 칸이 한 화면에 섞이지 않게 한다(PR #674 Codex 리뷰). 지역처럼 home에 없는 값만 지도에서 채운다.
   const homeCity = data?.city;
-  const myCity =
-    cities.find((city) => city.key === homeCity?.key) ??
-    (homeCity
-      ? {
-          key: homeCity.key,
-          name: homeCity.name,
-          level: homeCity.level,
-          kind: homeCity.kind,
-          region: 'region' in homeCity ? homeCity.region : undefined,
-        }
-      : undefined);
+  const mapCity = cities.find((city) => city.key === homeCity?.key);
+  const myCity = homeCity
+    ? {
+        key: homeCity.key,
+        name: homeCity.name,
+        level: homeCity.level,
+        kind: homeCity.kind,
+        region: 'region' in homeCity ? homeCity.region : mapCity?.region,
+      }
+    : undefined;
   // 성 화면 대사의 이름 자리: 군주 자리에 내 세력 이름(세력은 군주 이름을 쓴다), 태수 자리에 내 장수, 적은 도시가 가장 많은 다른 세력, 성 안 장수.
   const myNationName = nations.find((nation) => nation.id === general?.nationId)?.name;
   const rival = nations

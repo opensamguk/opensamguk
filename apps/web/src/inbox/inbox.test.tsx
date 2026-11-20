@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import type { AppRouter } from '@opensamguk/server/router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { TRPCClientError, type TRPCLink } from '@trpc/client';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -121,6 +121,9 @@ beforeEach(() => {
   on('general.mine', () => ({ general: null, creationRules: {} }));
   on('offers.mine', () => []);
   on('personnel.recent', () => []);
+  on('proposals.list', () => []);
+  on('world.summary', () => ({ status: 'RUNNING', nowTick: 100 }));
+  on('world.map', () => ({ cities: [{ key: 3, name: '북평' }], nations: [{ id: 2, name: '원소' }] }));
 });
 afterEach(cleanup);
 
@@ -159,6 +162,54 @@ describe('받은 제안함', () => {
     expect(link.getAttribute('data-to')).toBe('/w/$worldId/diplomacy');
     expect(link.getAttribute('data-search')).toBe(JSON.stringify({ tab: 'incoming' }));
 
+    expect(screen.queryByText('받은 제안이 없습니다')).toBeNull();
+  });
+
+  it('D-100 받은 명령 제안은 국가 예턴 칸을 정해 승인하고, 보낸 제안은 답한 장수와 사유를 보인다', async () => {
+    on('home.get', () => ({ nation: { id: 1 } }));
+    on('general.mine', () => ({ general: { id: 1 }, creationRules: {} }));
+    on('campaign.get', () => board);
+    on('treaty.list', () => listPage([]));
+    const row = (over: object) => ({
+      id: 'p1',
+      proposer: { id: 3, name: '관우', portraitId: null, officerTitle: '장군' },
+      commandKey: 'nation_declare',
+      commandName: '선전포고',
+      args: { nationId: 2 },
+      argsSummary: '{"nationId":2}',
+      slot: 2,
+      note: '먼저 쳐야 합니다.',
+      status: 'PENDING',
+      createdTick: 100,
+      expiresTick: 120_100,
+      precheck: { ok: true, message: null },
+      response: null,
+      ...over,
+    });
+    on('proposals.list', (input) =>
+      (input as { box: string }).box === 'received'
+        ? [row({})]
+        : [row({ id: 'p2', status: 'REJECTED', response: { by: 2, at: 150, reason: '아직 이르다' } })],
+    );
+    on('proposals.respond', () => ({ ok: true, status: 'APPROVED' }));
+    renderPage();
+
+    const received = await screen.findByRole('region', { name: '받은 명령 제안' });
+    expect(within(received).getByText('원소')).toBeTruthy();
+    // 서버 칸 번호 2(0부터)는 화면에서 3번 칸이다.
+    expect((within(received).getByRole('spinbutton', { name: '국가 예턴 칸' }) as HTMLInputElement).value).toBe('3');
+    fireEvent.change(within(received).getByRole('spinbutton', { name: '국가 예턴 칸' }), { target: { value: '12' } });
+    fireEvent.click(within(received).getByRole('button', { name: '12번 칸에 승인' }));
+    await waitFor(() =>
+      expect(wire.calls).toContainEqual({
+        path: 'proposals.respond',
+        input: { proposalId: 'p1', decision: 'approve', slot: 11 },
+      }),
+    );
+
+    const sent = await screen.findByRole('region', { name: '보낸 명령 제안' });
+    expect(within(sent).getByText('거절됨, 하후돈')).toBeTruthy();
+    expect(within(sent).getByText('“아직 이르다”')).toBeTruthy();
     expect(screen.queryByText('받은 제안이 없습니다')).toBeNull();
   });
 

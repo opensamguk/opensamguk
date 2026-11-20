@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useRouterState } from '@tanstack/react-router';
 import { createPortal } from 'react-dom';
 import {
@@ -19,7 +19,7 @@ import { useTradeCityChoices } from '../diplomacy/tradeTargets';
 import { useTRPC } from '../trpc';
 import { DisabledReason } from '../ui/DisabledReason';
 import { EmptyState, ErrorState, LoadingState } from '../ui/States';
-import { errorCode, retryUnlessClientError } from './apiError';
+import { errorCode, retryUnlessClientError, serverMessage } from './apiError';
 import { describeArgs, withTargets, type ArgNames, type SlotTargets } from './args';
 import { useWorldRules, useWorldUnits } from '../game/queries';
 import { isDetailedCity, isDetailedGeneral, isMemberNation } from '../game/types';
@@ -275,6 +275,11 @@ function Editor<S extends DisplaySlot>({
     staleTime: 15_000,
     retry: retryUnlessClientError,
   });
+  // 국가 명령 제안(D-100)의 대상 장수. 개인 칸에는 넘겨받은 장수 목록이 없어 같은 국가 장수 조회에서 고른다.
+  const nationGenerals = useMemo(
+    () => nationView.data?.generals.map((general) => ({ id: general.id, name: general.name })),
+    [nationView.data],
+  );
   // 국가별 국력·도시·장수. 순위 화면과 같은 조회다.
   const ranking = useQuery({
     ...trpc.ranking.nations.queryOptions({ worldId, by: 'power' }),
@@ -847,6 +852,31 @@ function Editor<S extends DisplaySlot>({
         pickerTarget,
       )}
 
+      {source.timed && !ended && readOnly === null && myNationId !== null ? (
+        <NationProposal
+          worldId={worldId}
+          render={(commands, propose) => (
+            <CommandPicker
+              commands={commands}
+              cities={cities}
+              nations={nations}
+              selectedCityKey={selectedCityKey}
+              generals={nationGenerals}
+              defaultCrewType={home.data?.general.crewType}
+              units={units}
+              unitNote={unitNote}
+              blockedReason={null}
+              targetLabel="국가 예턴"
+              onPut={() => {}}
+              cityChoicesFor={cityChoicesFor}
+              argContext={argContext}
+              onNeed={onNeed}
+              propose={propose}
+            />
+          )}
+        />
+      ) : null}
+
       <div className={styles.editBar} role="group" aria-label="칸 옮기기와 반복">
         {putBlocked ? (
           <DisabledReason reason={putBlocked}>고른 칸 비우기</DisabledReason>
@@ -1061,5 +1091,66 @@ function RoninNote({ commands }: { commands: readonly CommandInfo[] }) {
       {join?.length ? ` 국가에 들어가기: ${join.join(', ')}.` : ''}
       {rise?.length ? ` 세력 일으키기: ${rise.join(', ')}.` : ''}
     </p>
+  );
+}
+
+// 국가 명령 제안(상신, D-100). 직위로 직접 넣을 수 없는 국가 명령을 같은 국가의 군주와 수뇌에게 올린다.
+// 받은 쪽이 제안함에서 국가 예턴 칸을 정해 승인하면 그 칸에 들어간다. 제안할 명령이 없으면 그리지 않는다.
+// 펼쳤을 때만 명령 고르기를 그린다. 접힌 동안 명령 고르기 영역이 둘로 보이지 않게 한다.
+export function NationProposal({
+  worldId,
+  render,
+}: {
+  worldId: string;
+  render: (
+    commands: CommandInfo[],
+    propose: { to: string; onPropose: (turn: Turn, note: string) => void },
+  ) => ReactNode;
+}) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [sent, setSent] = useState<string | null>(null);
+  const commands = useQuery({ ...trpc.proposals.commands.queryOptions({ worldId }), retry: false, staleTime: 60_000 });
+  const create = useMutation({
+    ...trpc.proposals.create.mutationOptions(),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: trpc.proposals.pathKey() }),
+  });
+  const list: CommandInfo[] = useMemo(() => commands.data ?? [], [commands.data]);
+  if (list.length === 0) return null;
+  return (
+    <details
+      className={styles.proposal}
+      data-testid="nation-proposal"
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <summary>
+        국가 명령 제안 <span className="num">{list.length}</span>
+      </summary>
+      <p className={styles.help}>
+        직위로 직접 넣을 수 없는 국가 명령을 군주와 수뇌에게 올립니다. 받은 쪽이 제안함에서 승인하면 국가 예턴에
+        들어갑니다.
+      </p>
+      {open
+        ? render(list, {
+            to: '군주와 수뇌',
+            onPropose: (turn, note) => {
+              setSent(null);
+              create.mutate(
+                { worldId, commandKey: turn.commandKey, args: turn.args, ...(note ? { note } : {}) },
+                { onSuccess: () => setSent(commands.data?.find((c) => c.key === turn.commandKey)?.name ?? '명령') },
+              );
+            },
+          })
+        : null}
+      {create.isPending ? <p role="status">제안을 보내는 중입니다.</p> : null}
+      {sent && !create.isPending ? (
+        <p role="status">{sent} 제안을 올렸습니다. 제안함에서 진행을 볼 수 있습니다.</p>
+      ) : null}
+      {create.isError ? (
+        <p role="alert">{serverMessage(create.error) ?? '제안을 보내지 못했습니다. 다시 시도하세요.'}</p>
+      ) : null}
+    </details>
   );
 }

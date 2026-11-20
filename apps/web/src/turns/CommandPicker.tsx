@@ -385,7 +385,7 @@ export function CommandPicker({
   const onArgKey = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key === 'Enter' && !(event.target instanceof HTMLSelectElement)) {
       event.preventDefault();
-      put();
+      submitArgs();
     }
   };
 
@@ -460,6 +460,12 @@ export function CommandPicker({
       ]
     : [];
   const stepIndex = Math.min(argStep, Math.max(0, argSteps.length - 1));
+  // 인자 칸의 Enter와 폼 제출. 앞 단계에서는 다음 단계로만 가고, 확인 단계에서만 넣는다(D-100 확인 단계).
+  // 제안해야 하는 명령은 Enter로 보내지 않는다. 사유를 적고 제안하기 단추를 눌러야 한다.
+  const submitArgs = () => {
+    if (needsScreen && stepIndex < argSteps.length - 1) setArgStep(stepIndex + 1);
+    else if (!propose) put();
+  };
   const stepProps = (key: string) => ({
     'data-arg-step': key,
     'data-arg-step-current': argSteps[stepIndex]?.key === key ? 'true' : undefined,
@@ -923,7 +929,7 @@ export function CommandPicker({
             aria-label={`${command.name} 인자`}
             onSubmit={(e) => {
               e.preventDefault();
-              put();
+              submitArgs();
             }}
           >
             {cityDrill ? (

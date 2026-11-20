@@ -51,7 +51,7 @@ describe('D-100 명령 제안 목록', () => {
         ]}
       />,
     );
-    expect(screen.getByText('거절됨 · 조조')).toBeTruthy();
+    expect(screen.getByText('거절됨, 조조')).toBeTruthy();
     expect(screen.getByText('“군량이 모자라다”')).toBeTruthy();
     const buttons = screen.getAllByRole('button', { name: '제안 거두기' });
     expect(buttons).toHaveLength(1);

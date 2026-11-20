@@ -7,7 +7,7 @@ import { loadPreset } from '../apps/engine/src/world/resources';
 import { commandInitial } from '../packages/rules/test/commandFixture';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { holdLease, releaseHold } from './game';
-import { bandCommand, findCommand, putFromArgsScreen } from './commandPicker';
+import { argsScreen, bandCommand, findCommand, putFromArgsScreen, toLastStep } from './commandPicker';
 import { test, expect, apiQuery } from './t210-fixture';
 
 type Outputs = inferRouterOutputs<AppRouter>;
@@ -265,4 +265,77 @@ test('AC-M2-03 프리셋 월드에서 늘 켜진 화계와 대상 도시 칸을 
   await expect(editor.locator('tr[data-slot="1"]')).toContainText('화계');
   const row = await db.generalTurn.findFirstOrThrow({ where: { worldId, generalId: general.id, slot: 0 } });
   expect(row).toMatchObject({ commandKey: 'fire_attack', args: { cityKey: target.cityKey } });
+});
+
+// D-100 국가 명령 상신: 일반 장수가 직위로 넣을 수 없는 국가 명령을 예턴 화면에서 제안하고, 군주가 제안함에서 칸을 정해
+// 승인하면 군주의 국가 예턴 그 칸에 들어간다. 제안한 장수의 제안함에는 승인 결과가 보인다(PR #674 Codex 리뷰 2번).
+test('D-100 일반 장수가 국가 명령을 제안하고 군주가 제안함에서 승인하면 국가 예턴에 들어간다', async ({ world }) => {
+  test.setTimeout(180_000);
+  const ruler = await world.user('ruler');
+  const member = await world.user('member');
+  const initial = await readFixture();
+  const lord = initial.generals[0]!;
+  initial.generals[0] = { ...lord, officerLevel: 12, nextTurnTick: 1_000_000 };
+  initial.generals[1] = {
+    ...initial.generals[1]!,
+    nationId: lord.nationId,
+    cityKey: lord.cityKey,
+    officerLevel: 1,
+    nextTurnTick: 1_000_000,
+  };
+  const { worldId } = await saveFixtureWorld(world.hold.db, initial, {
+    name: '명령 상신 인수',
+    turnTermMinutes: 60,
+    endYear: 201,
+    replayFormat: 3,
+  });
+  const hold = await holdLease(worldId);
+  try {
+    await attachFixtureOwners(hold.db, worldId, [{ id: initial.generals[0]!.id, userId: ruler.userId }]);
+    await attachFixtureOwners(hold.db, worldId, [{ id: initial.generals[1]!.id, userId: member.userId }]);
+    await controlClock(hold.db, worldId, 'start');
+    const proposable = await apiQuery<Outputs['proposals']['commands']>(member, 'proposals.commands', { worldId });
+    expect(proposable.map((command) => command.key)).toContain('nation_capital');
+
+    // 일반 장수: 예턴 화면의 국가 명령 제안을 펼쳐 천도를 고르고 인자 화면 끝에서 사유와 함께 올린다.
+    const page = member.page;
+    await page.goto(`/w/${worldId}/turns`);
+    const box = page.getByTestId('nation-proposal');
+    await expect(box).toContainText(`국가 명령 제안 ${proposable.length}`, { timeout: 15_000 });
+    await box.locator('summary').click();
+    const picker = box.getByRole('region', { name: '명령 고르기' });
+    await findCommand(picker, '천도');
+    const capitalName = initial.cities.find((city) => city.cityKey === initial.nations[0]!.capitalCityKey)!.name;
+    await page
+      .getByRole('radiogroup', { name: '대상 도시' })
+      .getByRole('radio', { name: new RegExp(`^${capitalName}`) })
+      .click();
+    await toLastStep(page);
+    await argsScreen(page)
+      .getByRole('textbox', { name: /군주와 수뇌에게 올릴 사유/ })
+      .fill('도읍을 굳힙시다');
+    await argsScreen(page).getByRole('button', { name: '군주와 수뇌에게 제안하기', exact: true }).click();
+    await expect(box.getByRole('status')).toHaveText('천도 제안을 올렸습니다. 제안함에서 진행을 볼 수 있습니다.');
+
+    // 군주: 제안함에서 5번 칸에 승인한다. 서버에는 0부터 센 4번 칸으로 간다.
+    await ruler.page.goto(`/w/${worldId}/inbox`);
+    const received = ruler.page.getByRole('region', { name: '받은 명령 제안' });
+    await expect(received).toContainText('천도', { timeout: 15_000 });
+    await expect(received).toContainText(capitalName);
+    await expect(received).toContainText('“도읍을 굳힙시다”');
+    await received.getByRole('spinbutton', { name: '국가 예턴 칸' }).fill('5');
+    await received.getByRole('button', { name: '5번 칸에 승인', exact: true }).click();
+    await expect(received).toHaveCount(0, { timeout: 15_000 });
+    const tabs = await apiQuery<Outputs['nationTurns']['get']>(ruler, 'nationTurns.get', { worldId });
+    const own = tabs.tabs.find((tab) => tab.holder?.generalId === initial.generals[0]!.id);
+    expect(own?.slots[4]?.commandKey).toBe('nation_capital');
+
+    // 제안한 장수: 보낸 명령 제안에 승인한 군주와 칸이 보인다.
+    await page.goto(`/w/${worldId}/inbox`);
+    const sent = page.getByRole('region', { name: '보낸 명령 제안' });
+    await expect(sent).toContainText(`승인됨, `, { timeout: 15_000 });
+    await expect(sent).toContainText('5번 칸');
+  } finally {
+    await releaseHold(hold);
+  }
 });

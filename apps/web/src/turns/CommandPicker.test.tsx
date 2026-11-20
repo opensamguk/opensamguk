@@ -601,6 +601,64 @@ it('INT-25 AC-INT-25 모병은 현황 줄과 통솔 한도까지의 절반·채�
   expect((screen.getByRole('spinbutton', { name: '수량' }) as HTMLInputElement).value).toBe('4500');
 });
 
+it('D-100 인자 칸의 Enter는 확인 단계 전에는 다음 단계로만 가고, 확인 단계에서만 넣는다', () => {
+  const recruit: CommandInfo = {
+    key: 'recruit',
+    name: '모병',
+    category: 'military',
+    argsSchema: {
+      type: 'object',
+      properties: {
+        amount: { type: 'integer', exclusiveMinimum: 0, maximum: 1000000 },
+        crewType: { type: 'integer', exclusiveMinimum: 0, maximum: 1000000 },
+      },
+      required: ['amount', 'crewType'],
+    },
+  };
+  const input = props({ commands: [recruit], defaultCrewType: 1100 });
+  render(<CommandPicker {...input} />);
+  fireEvent.click(commandButton('모병'));
+  const amount = screen.getByRole('spinbutton', { name: '수량' });
+  fireEvent.change(amount, { target: { value: '500' } });
+  const current = () =>
+    screen.getByTestId('command-args-screen').querySelector('[data-step]')?.getAttribute('data-step');
+  // 병종, 내용 단계를 거쳐 확인 단계에 닿을 때까지 Enter는 한 단계씩만 옮기고 넣지 않는다.
+  const seen = [current()];
+  for (let guard = 0; guard < 5 && current() !== 'confirm'; guard++) {
+    fireEvent.keyDown(amount, { key: 'Enter' });
+    expect(input.onPut).not.toHaveBeenCalled();
+    seen.push(current());
+  }
+  expect(seen.length).toBeGreaterThan(1);
+  expect(current()).toBe('confirm');
+  fireEvent.submit(screen.getByRole('form', { name: '모병 인자' }));
+  expect(input.onPut).toHaveBeenCalledWith(expect.objectContaining({ commandKey: 'recruit' }));
+});
+
+it('D-100 제안해야 하는 명령은 확인 단계의 Enter로 보내지 않는다', () => {
+  const onPropose = vi.fn();
+  const recruit: CommandInfo = {
+    key: 'recruit',
+    name: '모병',
+    category: 'military',
+    argsSchema: {
+      type: 'object',
+      properties: { amount: { type: 'integer', exclusiveMinimum: 0, maximum: 1000000 } },
+      required: ['amount'],
+    },
+  };
+  const input = props({ commands: [recruit], propose: { to: '군주', onPropose } });
+  render(<CommandPicker {...input} />);
+  fireEvent.click(commandButton('모병'));
+  const amount = screen.getByRole('spinbutton', { name: '수량' });
+  fireEvent.change(amount, { target: { value: '500' } });
+  fireEvent.keyDown(amount, { key: 'Enter' });
+  fireEvent.submit(screen.getByRole('form', { name: '모병 인자' }));
+  expect(input.onPut).not.toHaveBeenCalled();
+  expect(input.onSave ?? vi.fn()).not.toHaveBeenCalled();
+  expect(onPropose).not.toHaveBeenCalled();
+});
+
 const targetMap = {
   cities: [
     { key: 1, name: '허창', level: 8, nationId: 1, links: [2, 3], x: 0, y: 0, supplied: true },

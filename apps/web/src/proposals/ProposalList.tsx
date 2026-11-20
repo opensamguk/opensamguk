@@ -1,6 +1,6 @@
 // 명령 제안(상신) 목록 (D-100, 사용자 2026-11-15 "제안도 넣어.").
 // 받은 제안은 권한자(군주와 수뇌)가 칸을 정해 승인하거나 사유를 적어 거절한다. 보낸 제안은 진행 상태를 보고 거둘 수 있다.
-// 서버 계약은 Codex 요청서 REQUEST-PROPOSALS.md의 proposals.list 항목 형식이다. 조회와 답하기는 연결하는 쪽이 넘긴다.
+// 서버 proposals.list 응답은 contract.ts의 toProposalItem으로 바꿔 넘긴다. 조회와 답하기는 연결하는 쪽(제안함)이 한다.
 import { useState } from 'react';
 import { Portrait } from '../portrait/Portrait';
 import styles from './ProposalList.module.css';
@@ -30,7 +30,8 @@ export const STATUS_LABEL: Record<ProposalStatus, string> = {
   cancelled: '거둠',
 };
 
-const SLOT_MAX = 30;
+// 국가 예턴은 직책 12칸이다(T2-06). 화면은 1~12로 보이고 서버에는 0~11로 보낸다(contract.ts).
+const SLOT_MAX = 12;
 
 function ReceivedRow({
   item,
@@ -120,7 +121,7 @@ function SentRow({ item, onCancel }: { item: ProposalItem; onCancel: (id: string
         </p>
         <p className={styles.meta}>
           {STATUS_LABEL[item.status]}
-          {item.response ? ` · ${item.response.by}` : ''}
+          {item.response ? `, ${item.response.by}` : ''}
           {item.status === 'approved' && item.slot !== null ? `, ${item.slot}번 칸` : ''}
         </p>
         {item.response?.reason ? <p className={styles.note}>“{item.response.reason}”</p> : null}
