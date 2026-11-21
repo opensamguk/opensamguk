@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
-import { expect, test } from '@playwright/test';
+import { expect as baseExpect, test } from '@playwright/test';
 import { createAccount, e2eDatabaseUrl, withE2eDb } from './account';
 import { holdLease, query } from './game';
 import { cleanupHeldWorld } from './heldWorldCleanup';
@@ -17,6 +17,10 @@ let ownEmail: string | undefined;
 let hold: Awaited<ReturnType<typeof holdLease>> | undefined;
 const executions = new Set<Promise<unknown>>();
 test.use({ actionTimeout: 15_000 });
+// 이 시험은 장수 491명 정식 191년 월드를 쓴다. 첫 문서, 새로고침, 저장처럼 서버 응답을 기다리는 단계가 로컬과 바쁜 CI에서
+// 기본 10초를 자주 넘겨, 그때마다 다른 단계에서 떨어졌다(PR #683 머지 대기열 세 번, 로컬 main 코드 다섯 번 중 다섯 번).
+// 이 파일의 기대 시간을 20초로 둔다.
+const expect = baseExpect.configure({ timeout: 20_000 });
 
 test.afterEach(async ({ page }) => {
   const errors: unknown[] = [];
@@ -53,7 +57,8 @@ test.afterEach(async ({ page }) => {
 });
 
 test('정식191년 메인·예턴 메뉴 이동·초점·375~1440px·30초 재조회 뒤 초안 보존', async ({ page }, info) => {
-  test.setTimeout(180_000);
+  // 단계별 기대 시간을 20초로 늘린 만큼 전체 한도도 늘린다.
+  test.setTimeout(300_000);
   const execution = (async () => {
     ownWorld = (
       await withE2eDb(async (db) => {
@@ -109,6 +114,7 @@ test('정식191년 메인·예턴 메뉴 이동·초점·375~1440px·30초 재�
     await new TurnLoop(hold.db, hold.lease).advanceTo(0);
     await expect(page.getByRole('heading', { level: 1, name: '군략도', exact: true })).toBeVisible();
     const editor = page.getByTestId('turn-editor');
+    // 장수를 만들기 전에 받은 예턴 조회는 "없음"이다. 30칸은 10초마다 다시 받는 조회에서 뜬다.
     await expect(editor.locator('tr[data-slot]')).toHaveCount(30);
     const map = await query<WorldMap>(page, 'world.map', { worldId: ownWorld });
     expect(map.operationalMap).not.toBeNull();
@@ -346,7 +352,10 @@ test('정식191년 메인·예턴 메뉴 이동·초점·375~1440px·30초 재�
       await expect(page).toHaveURL(`${base}#main-commands`);
       await expect(editor.getByTestId('draft-state')).toHaveText('저장하지 않은 편집 1건');
       await editor.getByLabel('명령 찾기').focus();
-      const refresh = page.waitForResponse((response) => response.url().includes('turns.get') && response.ok());
+      // 예턴은 10초마다 다시 받는다. 정식 491명 월드에서 바쁜 CI나 로컬은 다음 응답까지 15초를 넘긴 적이 있어 30초를 준다.
+      const refresh = page.waitForResponse((response) => response.url().includes('turns.get') && response.ok(), {
+        timeout: 30_000,
+      });
       await refresh;
       await expect(editor.getByLabel('명령 찾기')).toBeFocused();
       await page.screenshot({ path: info.outputPath(`main-turns-return-${width}.png`) });
@@ -386,19 +395,36 @@ test('정식191년 메인·예턴 메뉴 이동·초점·375~1440px·30초 재�
     expect(saved[29]).toMatchObject({ slot: 29, commandKey: 'farm' });
 
     // 실제 조회 실패와 장수 없음은 구분하고, 복구한 뒤 같은 막대를 쓸 수 있다.
+    // 웹은 여러 조회를 한 HTTP 요청으로 묶는다(httpBatchLink). 묶음을 통째로 끊으면 같은 묶음에 든 장수, 예턴 조회도
+    // 함께 실패해 화면이 지도 오류 안내 대신 다른 오류 상태가 된다(CI에서 이 단계가 흔들린 원인). 그래서 실제 응답을
+    // 받은 뒤 world.map 항목만 서버 오류로 바꾼다.
     await page.route('**/trpc/**', async (route) => {
-      if (route.request().url().includes('world.map')) {
-        const retryClicked = await page.evaluate(() => document.documentElement.dataset.mapRetryClicked === 'true');
-        if (!retryClicked) return route.abort('failed');
-      }
-      await route.continue();
+      const url = new URL(route.request().url());
+      const paths = decodeURIComponent(url.pathname.replace(/^\/trpc\//, '')).split(',');
+      const at = paths.indexOf('world.map');
+      if (at === -1) return route.continue();
+      const retryClicked = await page.evaluate(() => document.documentElement.dataset.mapRetryClicked === 'true');
+      if (retryClicked) return route.continue();
+      const failure = {
+        error: {
+          message: '시험이 지도 조회를 실패시킵니다.',
+          code: -32603,
+          data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500, path: 'world.map' },
+        },
+      };
+      if (paths.length === 1)
+        return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify([failure]) });
+      const response = await route.fetch();
+      const body = (await response.json()) as unknown[];
+      body[at] = failure;
+      await route.fulfill({ status: 207, contentType: 'application/json', body: JSON.stringify(body) });
     });
     await page.reload();
     const mapPanel = page.getByRole('region', { name: '지도', exact: true });
     await tab('지도').click();
     await expect(mapPanel).toBeVisible();
     await expect(page).toHaveURL(base);
-    await expect(mapPanel.getByRole('alert')).toContainText('불러오지 못했습니다', { timeout: 20_000 });
+    await expect(mapPanel.getByRole('alert')).toContainText('불러오지 못했습니다');
     const retry = mapPanel.getByRole('button', { name: '다시 시도', exact: true });
     await expect(retry).toBeVisible();
     // 자동 재조회는 계속 막고, 실제 클릭 뒤 처음 나가는 지도 요청부터 복구한다.
@@ -412,10 +438,9 @@ test('정식191년 메인·예턴 메뉴 이동·초점·375~1440px·30초 재�
       );
     });
     await retry.click();
-    // 다시 받은 지도 자료를 그리는 데 CI에서 5초를 넘긴 적이 있다(PR #674 2차 실행). 오류 안내와 같은 20초를 준다.
-    await expect(page.getByTestId('operational-world-map')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId('operational-world-map')).toBeVisible();
     await page.unroute('**/trpc/**');
-    // 같은 HTTP 배치의 다른 조회도 중단될 수 있다. 새 문서에서 저장한 목록과 선택 도시를 다시 확인한다.
+    // 새 문서에서 저장한 목록과 선택 도시를 다시 확인한다.
     await page.reload();
     await tab('예턴').click();
     await expect(editor.locator('tr[data-slot="30"]')).toContainText('농지 개간');
