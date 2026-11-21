@@ -1,3 +1,5 @@
+import { storedLog } from './logParts';
+import { logPartsRecord } from '@opensamguk/shared';
 import type { Prisma } from '@opensamguk/db';
 import type { RealtimeSignal } from '@opensamguk/db';
 import type { CommandResult, WorldState } from '@opensamguk/rules';
@@ -168,10 +170,18 @@ export async function persistCommandReports(
     });
   }
   await tx.battleLog.createMany({
-    data: (result.reports ?? []).map((report) => ({ ...report, worldId, tick, attackerId })),
+    data: (result.reports ?? []).map((report) => ({
+      generalId: report.generalId,
+      defenderId: report.defenderId ?? null,
+      cityKey: report.cityKey ?? null,
+      ...storedLog(report.text, report.parts),
+      worldId,
+      tick,
+      attackerId,
+    })),
   });
   for (const entry of result.history ?? [])
-    await appendNationHistory(tx, worldId, tick, entry.nationId, entry.text, entry.kind);
+    await appendNationHistory(tx, worldId, tick, entry.nationId, entry.text, entry.kind, entry.parts);
 }
 export async function appendNationHistory(
   tx: Prisma.TransactionClient,
@@ -180,18 +190,25 @@ export async function appendNationHistory(
   nationId: number,
   text: string,
   kind?: 'intel' | 'proposal',
+  parts?: unknown,
 ) {
   const where = { worldId_tick_nationId: { worldId, tick, nationId } };
   const previous = await tx.nationHistory.findUnique({ where });
   const data = (previous?.data ?? {}) as Record<string, Prisma.InputJsonValue>;
   const events = Array.isArray(data.events) ? data.events : [];
   const alerts = Array.isArray(data.intelAlerts) ? data.intelAlerts : [];
+  const structured = Array.isArray(data.structuredEvents) ? data.structuredEvents : [];
   const proposals = Array.isArray(data.proposals) ? data.proposals : [];
+  const record = logPartsRecord(text, parts);
   const next = {
     ...data,
-    events: [...events, text],
-    ...(kind === 'intel' ? { intelAlerts: [...alerts, text] } : {}),
-    ...(kind === 'proposal' ? { proposals: [...proposals, { kind, text }] } : {}),
+    structuredEvents: [
+      ...structured,
+      { ordinal: events.length, kind: kind ?? 'command', visibility: 'nation', ...record },
+    ],
+    events: [...events, record.text],
+    ...(kind === 'intel' ? { intelAlerts: [...alerts, record.text] } : {}),
+    ...(kind === 'proposal' ? { proposals: [...proposals, { kind, text: record.text }] } : {}),
   };
   await tx.nationHistory.upsert({
     where,

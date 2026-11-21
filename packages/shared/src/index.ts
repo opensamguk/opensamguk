@@ -7,6 +7,7 @@ export * from './publicGeography';
 export { APPROVED_MAP_IMAGES } from './publicMapImages';
 
 export const PLAYER_PORTRAIT_MIN_ID = 1_000_000;
+export * from './logParts';
 
 export { CITY_LAND, OPEN_LAND, cityGrade, cityLandSlots, type CityGrade } from './cityLand';
 

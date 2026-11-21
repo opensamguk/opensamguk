@@ -284,9 +284,17 @@ describe('T2-11 / AC-M2-15 실제 HTTP 저장과 엔진 반영', () => {
     ).toMatchObject({
       nationId: 1,
     });
-    expect(
-      await db.generalLog.findMany({ where: { worldId: f.worldId, generalId: 1, commandKey: 'attack' } }),
-    ).toMatchObject([{ tick: planned.tick, commandKey: 'attack', kind: 'success' }]);
+    // 출병 한 번의 기록. 명령 줄마다 한 행이라 행은 여럿일 수 있고 모두 같은 명령 묶음이다(INT-29 기록 조각 v1).
+    const attackLines = await db.generalLog.findMany({
+      where: { worldId: f.worldId, generalId: 1, commandKey: 'attack' },
+      orderBy: { ordinal: 'asc' },
+    });
+    expect(attackLines.length).toBeGreaterThan(0);
+    expect(attackLines.every((line) => line.tick === planned.tick && line.kind === 'success')).toBe(true);
+    expect(new Set(attackLines.map((line) => line.sequence)).size).toBe(1);
+    // 명령 줄마다 한 행이고 본문에 줄바꿈이 없다(INT-29 기록 조각 v1).
+    const lines = await db.generalLog.findMany({ where: { worldId: f.worldId, generalId: 1 } });
+    expect(lines.every(({ text }) => !/[\r\n]/.test(text))).toBe(true);
     const after = await rpc('turns.get', { worldId: f.worldId }, f.commander.cookie);
     expect(after.revision).toBe(saved.revision + 1);
     expect(after.slots.slice(0, 29)).toEqual(saved.slots.slice(1));
@@ -426,9 +434,16 @@ describe('T2-11 / AC-M2-15 실제 HTTP 저장과 엔진 반영', () => {
       clockTick: f.commandTick,
       actionSequence: before.actionSequence + 1,
     });
-    expect(
-      await db.generalLog.findMany({ where: { worldId: f.worldId, generalId: 1, commandKey: 'attack' } }),
-    ).toMatchObject([{ tick: f.commandTick, commandKey: 'attack', kind: 'success' }]);
+    // 출병 한 번의 기록. 명령 줄마다 한 행이라 행은 여럿일 수 있고 모두 같은 명령 묶음이다(INT-29 기록 조각 v1).
+    const attackLines = await db.generalLog.findMany({
+      where: { worldId: f.worldId, generalId: 1, commandKey: 'attack' },
+      orderBy: { ordinal: 'asc' },
+    });
+    expect(attackLines.length).toBeGreaterThan(0);
+    expect(attackLines.every((line) => line.tick === f.commandTick && line.kind === 'success')).toBe(true);
+    expect(new Set(attackLines.map((line) => line.sequence)).size).toBe(1);
+    const lines = await db.generalLog.findMany({ where: { worldId: f.worldId, generalId: 1 } });
+    expect(lines.every(({ text }) => !/[\r\n]/.test(text))).toBe(true);
     expect(
       await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId: f.worldId, cityKey: 2 } } }),
     ).toMatchObject({

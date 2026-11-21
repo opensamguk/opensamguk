@@ -274,7 +274,8 @@ describe('AC-M1-10 턴 실행, 실제 PostgreSQL', () => {
       }),
     ).toMatchObject({
       kind: 'failure',
-      text: expect.stringContaining('NO_GOLD'),
+      code: 'NO_GOLD',
+      text: '금이 부족합니다.',
     });
   });
 
@@ -294,7 +295,7 @@ describe('AC-M1-10 턴 실행, 실제 PostgreSQL', () => {
       }),
     ).toMatchObject({
       kind: 'failure',
-      text: expect.stringContaining(kind === 'missing-command' ? 'UNKNOWN_COMMAND' : 'BAD_ARGS'),
+      code: kind === 'missing-command' ? 'UNKNOWN_COMMAND' : 'BAD_ARGS',
     });
   });
 

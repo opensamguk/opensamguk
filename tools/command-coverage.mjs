@@ -76,6 +76,7 @@ export function readRegistryKeys(root) {
 export function readExtensionRegistryKeys(root) {
   const entry = resolve(root, 'packages/rules/src/commands/ext/registry.ts');
   const support = resolve(root, 'packages/rules/src/commands/support.ts');
+  const logging = resolve(root, 'packages/rules/src/commands/logging.ts');
   const modules = new Map();
   const active = new Set();
   // 고정 의존성 zod의 스키마 생성만 신뢰한다. 임의 패키지·콜백 실행 API는 허용하지 않는다.
@@ -150,7 +151,35 @@ export function readExtensionRegistryKeys(root) {
         if (!clause) fail(file, '부작용 import는 읽을 수 없다');
         if (clause.isTypeOnly) continue;
         // 개별 type import만 있더라도 import {}가 남아 모듈을 초기화할 수 있다.
-        imports.push(statement.moduleSpecifier);
+        // 로그 함수는 명령 본문에서만 호출한다. 초기화 식에서 호출하면 기존 분석기가 거절한다.
+        const logHelpers =
+          file === support
+            ? ['logPartsToText']
+            : file === logging
+              ? ['koreanParticle', 'logDisplayName', 'logPartsToText']
+              : [];
+        const sharedLogImport =
+          ts.isStringLiteral(statement.moduleSpecifier) && statement.moduleSpecifier.text === '@opensamguk/shared';
+        // shared의 로그 함수(INT-29)는 support와 logging에서만 읽는다. 그 밖의 shared 값(성 등급, 영지 칸 등)은
+        // main의 규칙대로 shared 소스를 따라가 분석한다.
+        const LOG_HELPERS = ['koreanParticle', 'logDisplayName', 'logPartsToText'];
+        if (sharedLogImport) {
+          const named = clause.namedBindings;
+          if (clause.name || !named || !ts.isNamedImports(named))
+            fail(file, '허용된 로그 순수 함수만 shared에서 읽을 수 있다');
+          const helpers = named.elements.filter(
+            (item) => !item.isTypeOnly && LOG_HELPERS.includes((item.propertyName ?? item.name).text),
+          );
+          const values = named.elements.filter((item) => !item.isTypeOnly);
+          // support와 logging은 정해 둔 로그 함수만 읽는다. 다른 파일은 로그 함수를 직접 읽지 못한다.
+          if (
+            logHelpers.length > 0
+              ? values.some((item) => !logHelpers.includes((item.propertyName ?? item.name).text))
+              : helpers.length > 0
+          )
+            fail(file, '허용된 로그 순수 함수만 shared에서 읽을 수 있다');
+          if (logHelpers.length === 0 && values.length > 0) imports.push(statement.moduleSpecifier);
+        } else imports.push(statement.moduleSpecifier);
         if (clause.name) put(bindings, clause.name.text, fromModule(statement.moduleSpecifier, 'default'));
         const named = clause.namedBindings;
         if (named && ts.isNamespaceImport(named))
@@ -177,6 +206,15 @@ export function readExtensionRegistryKeys(root) {
         }
       } else if (ts.isExportDeclaration(statement)) {
         if (statement.isTypeOnly) continue;
+        // shared의 기록 조각 모듈(INT-29)은 support와 logging만 읽는 순수 함수 묶음이다. 그 함수의 호출은 위의 로그 함수
+        // 허용 목록이 막으므로, shared를 따라갈 때 이 모듈은 분석하지 않는다.
+        if (
+          file === resolve(root, 'packages/shared/src/index.ts') &&
+          statement.moduleSpecifier &&
+          ts.isStringLiteral(statement.moduleSpecifier) &&
+          statement.moduleSpecifier.text === './logParts'
+        )
+          continue;
         if (statement.moduleSpecifier) imports.push(statement.moduleSpecifier);
         if (statement.exportClause && ts.isNamedExports(statement.exportClause))
           for (const item of statement.exportClause.elements)

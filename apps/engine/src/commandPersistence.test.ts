@@ -2,7 +2,7 @@ import type { Prisma } from '@opensamguk/db';
 import { initialReplayState, providedRuleData, type WorldState } from '@opensamguk/rules';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { monthlyFixture } from '../test/monthlyFixture';
-import { persistCommandState } from './commandPersistence';
+import { appendNationHistory, persistCommandState } from './commandPersistence';
 import { persistEffects } from './persist';
 import { loadWorld } from './worldLoader';
 
@@ -11,6 +11,32 @@ let initial: Awaited<ReturnType<typeof monthlyFixture>>;
 beforeEach(async () => {
   vi.clearAllMocks();
   initial = await monthlyFixture();
+});
+
+it('국가 사건의 문자열 배열과 조각은 같은 본문을 저장하고 옛 사건을 보존한다', async () => {
+  const upsert = vi.fn();
+  const tx = {
+    nationHistory: {
+      findUnique: vi.fn().mockResolvedValue({ data: { events: ['옛 사건'], intelAlerts: [] } }),
+      upsert,
+    },
+  };
+  await appendNationHistory(tx as unknown as Prisma.TransactionClient, worldId, 100, 1, '대체 전 본문', 'intel', [
+    { t: 'text', v: '조각 본문' },
+  ]);
+  const data = upsert.mock.calls[0]![0].create.data;
+  expect(data.events).toEqual(['옛 사건', '조각 본문']);
+  expect(data.intelAlerts).toEqual(['조각 본문']);
+  expect(data.structuredEvents).toEqual([
+    {
+      ordinal: 1,
+      kind: 'intel',
+      visibility: 'nation',
+      text: '조각 본문',
+      parts: [{ t: 'text', v: '조각 본문' }],
+      partsVersion: 1,
+    },
+  ]);
 });
 
 const worldId = '00000000-0000-4000-8000-000000000001';
@@ -102,22 +128,24 @@ it('같은 트랜잭션의 이전 상태를 넘기면 재조회 없이 기존과
     args: [
       {
         data: expect.arrayContaining([
-          {
+          expect.objectContaining({
             worldId,
             ...at,
             kind: 'fall',
             text: `${before.nations[2]!.name} 멸망`,
             nations: [{ id: 2, name: before.nations[2]!.name, color: before.nations[2]!.color }],
-          },
+          }),
           ...Object.values(before.cities)
             .filter((city) => city.nationId === 2)
-            .map((city) => ({
-              worldId,
-              ...at,
-              kind: 'capture',
-              text: `${before.nations[1]!.name}의 ${city.name} 점령`,
-              nations: [{ id: 1, name: before.nations[1]!.name, color: before.nations[1]!.color }],
-            })),
+            .map((city) =>
+              expect.objectContaining({
+                worldId,
+                ...at,
+                kind: 'capture',
+                text: `${before.nations[1]!.name}의 ${city.name} 점령`,
+                nations: [{ id: 1, name: before.nations[1]!.name, color: before.nations[1]!.color }],
+              }),
+            ),
         ]),
       },
     ],

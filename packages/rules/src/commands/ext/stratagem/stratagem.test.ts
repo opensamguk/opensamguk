@@ -164,13 +164,112 @@ it('AC-INT-28 상시 5능력치 네 계략 성공 골든', () => {
           "history": [
             {
               "nationId": 2,
+              "parts": [
+                {
+                  "key": 2,
+                  "name": "도시2",
+                  "t": "city",
+                },
+                {
+                  "t": "text",
+                  "v": ": ",
+                },
+                {
+                  "key": "fire_attack",
+                  "name": "화계",
+                  "t": "act",
+                },
+                {
+                  "t": "text",
+                  "v": "로 ",
+                },
+                {
+                  "t": "text",
+                  "v": "농업 ",
+                },
+                {
+                  "digits": 0,
+                  "t": "num",
+                  "v": 453,
+                },
+                {
+                  "t": "text",
+                  "v": ", 상업 ",
+                },
+                {
+                  "digits": 0,
+                  "t": "num",
+                  "v": 767,
+                },
+                {
+                  "t": "text",
+                  "v": " 감소",
+                },
+              ],
               "text": "도시2: 화계로 농업 453, 상업 767 감소",
             },
           ],
           "logs": [
             {
               "kind": "success",
-              "text": "화계 성공: 도시2 농업 453, 상업 767 감소, 장수 0명 부상",
+              "parts": [
+                {
+                  "key": 2,
+                  "name": "도시2",
+                  "t": "city",
+                },
+                {
+                  "t": "text",
+                  "v": " 대상 ",
+                },
+                {
+                  "key": "fire_attack",
+                  "name": "화계",
+                  "t": "act",
+                },
+                {
+                  "parts": [
+                    {
+                      "t": "text",
+                      "v": " 성공: ",
+                    },
+                  ],
+                  "t": "tone",
+                  "v": "good",
+                },
+                {
+                  "t": "text",
+                  "v": "농업 ",
+                },
+                {
+                  "digits": 0,
+                  "t": "num",
+                  "v": 453,
+                },
+                {
+                  "t": "text",
+                  "v": ", 상업 ",
+                },
+                {
+                  "digits": 0,
+                  "t": "num",
+                  "v": 767,
+                },
+                {
+                  "t": "text",
+                  "v": " 감소, 장수 ",
+                },
+                {
+                  "digits": 0,
+                  "t": "num",
+                  "v": 0,
+                },
+                {
+                  "t": "text",
+                  "v": "명 부상",
+                },
+              ],
+              "text": "도시2 대상 화계 성공: 농업 453, 상업 767 감소, 장수 0명 부상",
             },
           ],
           "reports": [],
@@ -226,13 +325,112 @@ it('AC-INT-28 상시 5능력치 네 계략 성공 골든', () => {
           "history": [
             {
               "nationId": 2,
+              "parts": [
+                {
+                  "key": 2,
+                  "name": "도시2",
+                  "t": "city",
+                },
+                {
+                  "t": "text",
+                  "v": ": ",
+                },
+                {
+                  "key": "sabotage",
+                  "name": "파괴",
+                  "t": "act",
+                },
+                {
+                  "t": "text",
+                  "v": "로 ",
+                },
+                {
+                  "t": "text",
+                  "v": "수비 ",
+                },
+                {
+                  "digits": 0,
+                  "t": "num",
+                  "v": 453,
+                },
+                {
+                  "t": "text",
+                  "v": ", 성벽 ",
+                },
+                {
+                  "digits": 0,
+                  "t": "num",
+                  "v": 600,
+                },
+                {
+                  "t": "text",
+                  "v": " 감소",
+                },
+              ],
               "text": "도시2: 파괴로 수비 453, 성벽 600 감소",
             },
           ],
           "logs": [
             {
               "kind": "success",
-              "text": "파괴 성공: 도시2 수비 453, 성벽 600 감소, 장수 0명 부상",
+              "parts": [
+                {
+                  "key": 2,
+                  "name": "도시2",
+                  "t": "city",
+                },
+                {
+                  "t": "text",
+                  "v": " 대상 ",
+                },
+                {
+                  "key": "sabotage",
+                  "name": "파괴",
+                  "t": "act",
+                },
+                {
+                  "parts": [
+                    {
+                      "t": "text",
+                      "v": " 성공: ",
+                    },
+                  ],
+                  "t": "tone",
+                  "v": "good",
+                },
+                {
+                  "t": "text",
+                  "v": "수비 ",
+                },
+                {
+                  "digits": 0,
+                  "t": "num",
+                  "v": 453,
+                },
+                {
+                  "t": "text",
+                  "v": ", 성벽 ",
+                },
+                {
+                  "digits": 0,
+                  "t": "num",
+                  "v": 600,
+                },
+                {
+                  "t": "text",
+                  "v": " 감소, 장수 ",
+                },
+                {
+                  "digits": 0,
+                  "t": "num",
+                  "v": 0,
+                },
+                {
+                  "t": "text",
+                  "v": "명 부상",
+                },
+              ],
+              "text": "도시2 대상 파괴 성공: 수비 453, 성벽 600 감소, 장수 0명 부상",
             },
           ],
           "reports": [],
@@ -288,13 +486,112 @@ it('AC-INT-28 상시 5능력치 네 계략 성공 골든', () => {
           "history": [
             {
               "nationId": 2,
+              "parts": [
+                {
+                  "key": 2,
+                  "name": "도시2",
+                  "t": "city",
+                },
+                {
+                  "t": "text",
+                  "v": ": ",
+                },
+                {
+                  "key": "incite",
+                  "name": "선동",
+                  "t": "act",
+                },
+                {
+                  "t": "text",
+                  "v": "으로 ",
+                },
+                {
+                  "t": "text",
+                  "v": "치안 ",
+                },
+                {
+                  "digits": 0,
+                  "t": "num",
+                  "v": 453,
+                },
+                {
+                  "t": "text",
+                  "v": ", 민심 ",
+                },
+                {
+                  "digits": 1,
+                  "t": "num",
+                  "v": 15.33532420778647,
+                },
+                {
+                  "t": "text",
+                  "v": " 감소",
+                },
+              ],
               "text": "도시2: 선동으로 치안 453, 민심 15.3 감소",
             },
           ],
           "logs": [
             {
               "kind": "success",
-              "text": "선동 성공: 도시2 치안 453, 민심 15.3 감소, 장수 0명 부상",
+              "parts": [
+                {
+                  "key": 2,
+                  "name": "도시2",
+                  "t": "city",
+                },
+                {
+                  "t": "text",
+                  "v": " 대상 ",
+                },
+                {
+                  "key": "incite",
+                  "name": "선동",
+                  "t": "act",
+                },
+                {
+                  "parts": [
+                    {
+                      "t": "text",
+                      "v": " 성공: ",
+                    },
+                  ],
+                  "t": "tone",
+                  "v": "good",
+                },
+                {
+                  "t": "text",
+                  "v": "치안 ",
+                },
+                {
+                  "digits": 0,
+                  "t": "num",
+                  "v": 453,
+                },
+                {
+                  "t": "text",
+                  "v": ", 민심 ",
+                },
+                {
+                  "digits": 1,
+                  "t": "num",
+                  "v": 15.33532420778647,
+                },
+                {
+                  "t": "text",
+                  "v": " 감소, 장수 ",
+                },
+                {
+                  "digits": 0,
+                  "t": "num",
+                  "v": 0,
+                },
+                {
+                  "t": "text",
+                  "v": "명 부상",
+                },
+              ],
+              "text": "도시2 대상 선동 성공: 치안 453, 민심 15.3 감소, 장수 0명 부상",
             },
           ],
           "reports": [],
@@ -378,13 +675,94 @@ it('AC-INT-28 상시 5능력치 네 계략 성공 골든', () => {
           "history": [
             {
               "nationId": 2,
+              "parts": [
+                {
+                  "key": 2,
+                  "name": "도시2",
+                  "t": "city",
+                },
+                {
+                  "t": "text",
+                  "v": ": ",
+                },
+                {
+                  "t": "text",
+                  "v": "금 ",
+                },
+                {
+                  "digits": 0,
+                  "t": "num",
+                  "v": 408,
+                },
+                {
+                  "t": "text",
+                  "v": ", 쌀 ",
+                },
+                {
+                  "digits": 0,
+                  "t": "num",
+                  "v": 729,
+                },
+                {
+                  "t": "text",
+                  "v": " 도난",
+                },
+              ],
               "text": "도시2: 금 408, 쌀 729 도난",
             },
           ],
           "logs": [
             {
               "kind": "success",
-              "text": "탈취 성공: 도시2 금 408, 쌀 729 획득",
+              "parts": [
+                {
+                  "key": 2,
+                  "name": "도시2",
+                  "t": "city",
+                },
+                {
+                  "t": "text",
+                  "v": " 대상 ",
+                },
+                {
+                  "key": "plunder",
+                  "name": "탈취",
+                  "t": "act",
+                },
+                {
+                  "parts": [
+                    {
+                      "t": "text",
+                      "v": " 성공: ",
+                    },
+                  ],
+                  "t": "tone",
+                  "v": "good",
+                },
+                {
+                  "t": "text",
+                  "v": "금 ",
+                },
+                {
+                  "digits": 0,
+                  "t": "num",
+                  "v": 408,
+                },
+                {
+                  "t": "text",
+                  "v": ", 쌀 ",
+                },
+                {
+                  "digits": 0,
+                  "t": "num",
+                  "v": 729,
+                },
+                {
+                  "t": "text",
+                  "v": " 획득",
+                },
+              ],
+              "text": "도시2 대상 탈취 성공: 금 408, 쌀 729 획득",
             },
           ],
         },
@@ -408,9 +786,9 @@ describe.each(stratagemCommands)('$key shared contract', (def) => {
         return real.int(min, max);
       },
     };
-    expect(run(def.key, world(), rng)).toEqual({
+    expect(run(def.key, world(), rng)).toMatchObject({
       effects: growth(53, 40),
-      logs: [{ kind: 'success', text: `${def.name} 실패: 도시2` }],
+      logs: [{ kind: 'failure', text: `도시2 대상 ${def.name} 시도가 실패했습니다.` }],
     });
     expect(calls).toEqual(['next', 'int(1,100)', 'int(1,70)']);
     expect(real.next()).toBe(0.9833635643590242);
@@ -692,8 +1070,8 @@ it('injuries process only active target nation defenders in id order and preserv
     { kind: 'city', id: 2, field: 'agriculture', op: 'add', value: -800 },
     { kind: 'city', id: 2, field: 'commerce', op: 'add', value: -100 },
   ]);
-  expect(result.reports).toEqual([5, 9].map((generalId) => ({ generalId, text: '도시2: 계략으로 다쳤습니다.' })));
-  expect(result.logs[0]!.text).toBe('화계 성공: 도시2 농업 800, 상업 100 감소, 장수 2명 부상');
+  expect(result.reports).toMatchObject([5, 9].map((generalId) => ({ generalId, text: '도시2: 계략으로 다쳤습니다.' })));
+  expect(result.logs[0]!.text).toBe('도시2 대상 화계 성공: 농업 800, 상업 100 감소, 장수 2명 부상');
   const after = applyEffects(state, result.effects);
   expect(after.generals[5]!.injury).toBe(85);
   expect(after.generals[9]!.injury).toBe(80);
@@ -800,7 +1178,7 @@ for (const { key } of goldens)
       expect(after.generals[2]!.crew).toBe(20);
       expect(after.generals[2]!.train).toBe(98);
       expect(after.generals[2]!.atmos).toBe(98);
-      expect(result.reports).toEqual([{ generalId: 2, text: '도시2: 계략으로 다쳤습니다.' }]);
+      expect(result.reports).toMatchObject([{ generalId: 2, text: '도시2: 계략으로 다쳤습니다.' }]);
     });
 
 it('defence uses the maximum stat and count of active defenders', () => {

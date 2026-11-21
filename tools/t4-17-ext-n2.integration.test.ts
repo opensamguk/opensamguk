@@ -1,3 +1,4 @@
+import { commandLogLines } from '../apps/engine/src/logParts';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
@@ -320,26 +321,34 @@ async function assertFixedTurn(f: Fixture) {
   expect(queue.every((turn, slot) => turn.slot === slot && turn.commandKey === 'rest' && !turn.explicit)).toBe(true);
   const result = f.value.expected.result;
   const failed = 'code' in result;
+  // 명령 줄마다 한 행이고 명령 불가 코드는 code 열에 남는다(INT-29 기록 조각 v1).
   expect(
     await db.generalLog.findMany({
       where: { worldId: f.worldId, commandKey: f.commandKey },
-      select: { generalId: true, tick: true, commandKey: true, kind: true, text: true },
+      orderBy: { ordinal: 'asc' },
+      select: { generalId: true, tick: true, commandKey: true, kind: true, text: true, code: true, ordinal: true },
     }),
-  ).toEqual([
-    {
+  ).toEqual(
+    commandLogLines(result).map((line, ordinal) => ({
       generalId: 1,
       tick: 100,
       commandKey: f.commandKey,
-      kind: failed ? 'failure' : 'success',
-      text: failed ? `${result.code}: ${result.message}` : result.logs.map((log) => log.text).join('\n'),
-    },
-  ]);
+      kind: line.kind,
+      text: line.text,
+      code: 'code' in line ? line.code : null,
+      ordinal,
+    })),
+  );
   expect(await db.battleLog.findMany({ where: { worldId: f.worldId }, orderBy: { generalId: 'asc' } })).toEqual(
     (failed ? [] : (result.reports ?? [])).map((report) => ({
       worldId: f.worldId,
       tick: 100,
       attackerId: 1,
       ...report,
+      parts: report.parts ?? null,
+      partsVersion: report.parts ? 1 : null,
+      defenderId: null,
+      cityKey: null,
     })),
   );
   const recorded = (await rpc('records.general', { worldId: f.worldId }, f.alice.cookie)).data as {
@@ -347,18 +356,18 @@ async function assertFixedTurn(f: Fixture) {
     nextCursor: string | null;
   };
   const executed = { ...recorded, items: recorded.items.filter((item) => item.commandKey === f.commandKey) };
+  // records.general도 명령 줄마다 한 항목이고 code를 따로 준다(INT-29 기록 조각 v1).
   expect(executed).toMatchObject({
-    items: [
-      {
-        tick: 100,
-        commandKey: f.commandKey,
-        kind: failed ? 'failure' : 'success',
-        text: failed ? `${result.code}: ${result.message}` : result.logs.map((log) => log.text).join('\n'),
-      },
-    ],
+    items: commandLogLines(result).map((line) => ({
+      tick: 100,
+      commandKey: f.commandKey,
+      kind: line.kind,
+      text: line.text,
+      code: 'code' in line ? line.code : null,
+    })),
     nextCursor: null,
   });
-  expect(executed.items).toHaveLength(1);
+  expect(executed.items).toHaveLength(commandLogLines(result).length);
   if (f.value.expected.nationTransfer) {
     expect(await db.nation.findUniqueOrThrow({ where: { worldId_id: { worldId: f.worldId, id: 2 } } })).toMatchObject({
       gold: f.value.expected.afterRuleTurnState.nations[2]!.gold,
@@ -385,15 +394,10 @@ async function assertFixedTurn(f: Fixture) {
     if (!('code' in national.result)) entries.push(...(national.result.history ?? []));
     if ('code' in national.result || !national.result.history?.some((entry) => entry.nationId === national.nationId)) {
       const name = resolverForRuleFeatures({})!.get(national.commandKey)?.name ?? '국가 명령';
-      entries.push({
-        nationId: national.nationId,
-        text:
-          name +
-          ': ' +
-          ('code' in national.result
-            ? national.result.code + ': ' + national.result.message
-            : national.result.logs.map((log) => log.text).join('\n')),
-      });
+      // 국가 명령 기록은 명령 줄마다 한 사건이다(engine logParts nationCommandLogLines).
+      const prefix = 'code' in national.result ? `${national.result.code}: ` : '';
+      for (const line of commandLogLines(national.result))
+        entries.push({ nationId: national.nationId, text: `${name}: ${prefix}${line.text}` });
     }
   }
   const expectedHistory = [...new Set(entries.map((entry) => entry.nationId))]
@@ -406,16 +410,21 @@ async function assertFixedTurn(f: Fixture) {
         worldId: f.worldId,
         tick: 100,
         nationId,
-        data: {
+        // structuredEvents(INT-29 기록 조각 v1)는 events와 같은 순서의 조각 기록이라 아래에서 개수를 맞춘다.
+        data: expect.objectContaining({
           events: rows.map((entry) => entry.text),
           ...(alerts.length ? { intelAlerts: alerts.map((entry) => entry.text) } : {}),
           ...(proposals.length
             ? { proposals: proposals.map((entry) => ({ kind: 'proposal', text: entry.text })) }
             : {}),
-        },
+        }),
       };
     });
   expect(history).toEqual(expectedHistory);
+  for (const row of history) {
+    const data = row.data as { events: unknown[]; structuredEvents?: unknown[] };
+    expect(data.structuredEvents).toHaveLength(data.events.length);
+  }
 }
 
 async function worker(worldId: string, phase: 'saved' | 'beforeCommit' | 'committed') {

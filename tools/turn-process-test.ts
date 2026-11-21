@@ -41,8 +41,14 @@ export async function recoverTurnAfterCrash(
     await closed;
   }
 
-  const logs = () => db.generalLog.findMany({ where: { worldId, generalId, tick, commandKey } });
-  expect(await logs()).toHaveLength(phase === 'committed' ? 1 : 0);
+  const logs = () =>
+    db.generalLog.findMany({
+      where: { worldId, generalId, tick, commandKey },
+      orderBy: { ordinal: 'asc' },
+    });
+  const committed = await logs();
+  if (phase === 'committed') expect(committed.length).toBeGreaterThan(0);
+  else expect(committed).toEqual([]);
   const interrupted = await snapshot();
   if (phase === 'beforeCommit') expect(interrupted).toEqual(before);
   const oldLease = await db.engineLease.findUniqueOrThrow({ where: { worldId } });
@@ -62,7 +68,14 @@ export async function recoverTurnAfterCrash(
   );
   expect(recovered.revisions[generalId]).toBe(before.revisions[generalId]! + 1);
   expect(recovered.turns[generalId]![0]!.commandKey).not.toBe(commandKey);
-  expect((await logs()).map(({ kind }) => kind)).toEqual(['success']);
+  const recoveredLines = await logs();
+  expect(recoveredLines.length).toBeGreaterThan(0);
+  expect(recoveredLines.every(({ kind, text }) => kind === 'success' && !/[\r\n]/.test(text))).toBe(true);
+  expect(new Set(recoveredLines.map(({ sequence }) => sequence)).size).toBe(1);
+  expect(recoveredLines.map(({ ordinal }) => ordinal)).toEqual(
+    Array.from({ length: recoveredLines.length }, (_, i) => i),
+  );
+  if (phase === 'committed') expect(recoveredLines).toEqual(committed);
   if (phase === 'committed') expect(recovered).toEqual(interrupted);
   return recovered;
 }

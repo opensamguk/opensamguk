@@ -145,6 +145,22 @@ describe('T4-02 등록된 확장 명령 대조', () => {
     visit(join(commandRoot, '../personnel/permissions.ts'));
     return files;
   };
+  it.each(['direct', 'unknown', 'initializer'] as const)('INT-29 shared 로그 함수의 %s 우회는 거절한다', (kind) => {
+    const files = {
+      ...actualSupport(),
+      'ext/registry.ts': "import { success } from '../support'; export const extensionCommands = [];",
+    };
+    if (kind === 'direct')
+      files['ext/registry.ts'] =
+        "import { logPartsToText } from '@opensamguk/shared'; export const extensionCommands = [];";
+    if (kind === 'unknown') {
+      files['ext/registry.ts'] = "import { textPart } from '../logging'; export const extensionCommands = [];";
+      files['logging.ts'] = files['logging.ts']!.replace('koreanParticle,', 'unknownHelper,');
+    }
+    if (kind === 'initializer') files['support.ts'] += '\nconst hidden = logPartsToText([]);';
+    fixture(files, (dir) => expect(() => readExtensionRegistryKeys(dir)).toThrow());
+  });
+
   const importWithTsx = (dir: string, expression: string) => {
     const file = pathToFileURL(join(dir, 'packages/rules/src/commands/ext/registry.ts')).href;
     const runtime = spawnSync(

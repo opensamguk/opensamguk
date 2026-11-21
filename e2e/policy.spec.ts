@@ -387,14 +387,27 @@ test('5 소속 장수의 빈 칸은 엔진 턴에서 권농 방침의 농지 개
   const cityAfter = await myCity(world);
   evidence.db = { logs, cityAfter, clock: await readWorld(world) };
   // 고정물이 사람 소유자를 general.possess 입력으로 붙여 시계 0에 '맡았습니다' 기록이 먼저 남는다.
-  expect(logs).toHaveLength(2);
-  expect(logs[0]).toEqual(POSSESS_LOG);
-  expect(logs[1]).toMatchObject({ tick: HUMAN_TURN, commandKey: 'farm', kind: 'success' });
-  expect(logs[1]!.text).toMatch(/^기본 방침\(권농\)으로 농지 개간\n농지 개간: \d+$/);
+  // 그 뒤 명령 줄마다 한 행이다(INT-29 기록 조각 v1).
+  expect(logs).toMatchObject([
+    POSSESS_LOG,
+    { tick: HUMAN_TURN, commandKey: 'farm', kind: 'success', text: '기본 방침(권농)으로 농지 개간' },
+    {
+      tick: HUMAN_TURN,
+      commandKey: 'farm',
+      kind: 'success',
+      text: expect.stringMatching(
+        /^농지 개간 작업으로 [\d,]+ 상승했습니다\.(?: 대성공했습니다\.| 성과가 저조했습니다\.)?$/,
+      ),
+    },
+  ]);
 
   await page.reload();
-  await expect(records(page)).toHaveCount(2);
-  await expect(records(page).first()).toContainText('기본 방침(권농)으로 농지 개간');
+  await expect(records(page)).toHaveCount(3);
+  await expect(records(page).nth(0)).toContainText('기본 방침(권농)으로 농지 개간');
+  await expect(records(page).nth(1).locator('span').last()).toHaveText(
+    /^농지 개간 작업으로 [\d,]+ 상승했습니다\.(?: 대성공했습니다\.| 성과가 저조했습니다\.)?$/,
+  );
+  await expect(records(page).nth(2)).toContainText('이 장수를 맡았습니다.');
   await expect(records(page).first()).toHaveAttribute('data-log-kind', 'success');
   // 1번 칸은 당겨진 직접 휴식, 나머지는 빈 칸이다.
   await expect(row(page, 1)).not.toHaveAttribute('data-empty', 'true');
@@ -440,7 +453,7 @@ test('6 재야 장수의 빈 칸은 방침 명령이 실패하면 휴식하고 �
   expect(afterSecond).toEqual([
     POSSESS_LOG,
     { tick: HUMAN_TURN, commandKey: 'rest', kind: 'success', text: '기본 방침 실패: 국가에 소속되어야 합니다. → 휴식' },
-    { tick: HUMAN_TURN + 10_000, commandKey: 'rest', kind: 'success', text: '휴식' },
+    { tick: HUMAN_TURN + 10_000, commandKey: 'rest', kind: 'success', text: '휴식했습니다.' },
   ]);
 
   await page.reload();

@@ -125,7 +125,13 @@ async function withDatabase(caseId: CaseId, run: (context: Context) => Promise<v
     const sql = await openSql();
     const migrations = new URL('../packages/db/prisma/migrations/', import.meta.url);
     const directories = (await readdir(migrations, { withFileTypes: true }))
-      .filter((entry) => entry.isDirectory() && entry.name < '20261223000000_always_on_rules')
+      // 늘 켠 규칙 migration 앞까지 적용한다. 기록 조각 열(INT-29)은 nullable 열만 더하므로 옛 스키마에도 붙이고,
+      // 이 시험이 쓰는 현재 Prisma 클라이언트가 GeneralLog.parts를 읽을 수 있게 한다.
+      .filter(
+        (entry) =>
+          entry.isDirectory() &&
+          (entry.name < '20261223000000_always_on_rules' || entry.name === '20261225000000_log_parts_v1'),
+      )
       .map((entry) => entry.name)
       .sort();
     expect(directories.slice(0, requiredMigrations.length)).toEqual([...requiredMigrations]);

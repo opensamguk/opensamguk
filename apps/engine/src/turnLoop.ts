@@ -1,3 +1,4 @@
+import { commandLogLines, nationCommandLogLines } from './logParts';
 import { publicMapConfig } from '@opensamguk/shared';
 import { processTacticalStep } from './tacticalBattle';
 import { worldClock } from './world/truce';
@@ -382,6 +383,12 @@ export class TurnLoop {
             modern,
             slots,
           });
+          const commandLines = commandLogLines(result);
+          // ID 내림차순 커서를 유지하면서 같은 명령의 0번 줄부터 읽는다.
+          for (const [ordinal, line] of [...commandLines.entries()].reverse())
+            await tx.generalLog.create({
+              data: { worldId, generalId: due.id, tick: due.nextTurnTick, sequence, commandKey, ordinal, ...line },
+            });
           await persistEffects(
             tx,
             worldId,
@@ -429,26 +436,10 @@ export class TurnLoop {
               const name =
                 (loadContext.resolver?.resolver ?? engineResolver(world).resolver).get(turn.nation.commandKey)?.name ??
                 '국가 명령';
-              await appendNationHistory(
-                tx,
-                worldId,
-                due.nextTurnTick,
-                nationId,
-                `${name}: ${'code' in national ? `${national.code}: ${national.message}` : national.logs.map((log) => log.text).join('\n')}`,
-              );
+              for (const log of nationCommandLogLines(turn.nation.commandKey, name, national))
+                await appendNationHistory(tx, worldId, due.nextTurnTick, nationId, log.text, undefined, log.parts);
             }
           }
-          await tx.generalLog.create({
-            data: {
-              worldId,
-              generalId: due.id,
-              tick: due.nextTurnTick,
-              sequence,
-              commandKey,
-              kind: failed ? 'failure' : 'success',
-              text: failed ? `${result.code}: ${result.message}` : result.logs.map((log) => log.text).join('\n'),
-            },
-          });
           await shiftTurns(tx, worldId, due.id, { ...world, actionSequence: sequence }, slots);
           const updated = await tx.general.updateMany({
             where: { worldId, id: due.id, nextTurnTick: due.nextTurnTick, turnRevision: actor.turnRevision },

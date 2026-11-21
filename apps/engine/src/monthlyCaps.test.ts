@@ -199,7 +199,7 @@ async function fixture(treaties: Treaty[] = [], policyFromSequence: number | nul
         offices.push(data);
       }),
     },
-    generalLog: { create: vi.fn(), createMany: vi.fn() },
+    generalLog: { create: vi.fn(), createMany: vi.fn(), findFirst: vi.fn(async () => null) },
     publicNationEvent: { createMany: vi.fn() },
     removedNation: { create: vi.fn() },
     yearbookNation: { createMany: vi.fn().mockResolvedValue({ count: 2 }) },

@@ -114,6 +114,9 @@ model CommandProposal {
 }
 
 model PublicNationEvent {
+  parts        Json?
+  partsVersion Int?
+
   id       BigInt @id @default(autoincrement())
   worldId  String
   sequence Int
@@ -578,6 +581,10 @@ model GeneralTurn {
 }
 
 model GeneralLog {
+  parts        Json?
+  partsVersion Int?
+  code         String?
+
   id         BigInt   @id @default(autoincrement())
   worldId    String
   generalId  Int
@@ -626,6 +633,11 @@ model NationOfficeTurn {
 }
 
 model BattleLog {
+  parts        Json?
+  partsVersion Int?
+  defenderId   Int?
+  cityKey      Int?
+
   worldId    String
   tick       Int
   attackerId Int

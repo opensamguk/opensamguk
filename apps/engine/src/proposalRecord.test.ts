@@ -46,6 +46,17 @@ describe('AC-M1-14 제안 엔진 기록', () => {
               gold: 100,
               events: ['이전 사건', '제안 처리'],
               proposals: [{ kind: 'proposal', text: '제안 처리' }],
+              // INT-29 기록 조각 v1: events와 같은 순서의 구조화 사건. 조각 없는 제안 기록은 본문만 둔다.
+              structuredEvents: [
+                {
+                  ordinal: 1,
+                  kind: 'proposal',
+                  visibility: 'nation',
+                  text: '제안 처리',
+                  parts: null,
+                  partsVersion: null,
+                },
+              ],
             },
           },
         }),

@@ -1,3 +1,5 @@
+import { storedLog } from './logParts';
+import type { LogPart } from '@opensamguk/shared';
 import { notifyActivityOnCommit, type Prisma } from '@opensamguk/db';
 import type { WorldState } from '@opensamguk/rules';
 
@@ -10,20 +12,50 @@ export async function persistPublicNationEvents(
   next: WorldState,
   at: ActionAt,
 ) {
-  const data: { kind: string; text: string; nations: { id: number; name: string; color: string }[] }[] = [];
+  const data: {
+    kind: string;
+    text: string;
+    parts?: Prisma.InputJsonValue;
+    partsVersion?: number;
+    nations: { id: number; name: string; color: string }[];
+  }[] = [];
   const identity = ({ id, name, color }: { id: number; name: string; color: string }) => ({ id, name, color });
+  const nationPart = ({ id, name, color }: { id: number; name: string; color: string }): LogPart => ({
+    t: 'nation',
+    id,
+    name,
+    color,
+  });
   for (const nation of Object.values(next.nations)) {
     if (!before.nations[nation.id])
-      data.push({ kind: 'found', text: `${nation.name} 건국`, nations: [identity(nation)] });
+      data.push({
+        kind: 'found',
+        ...storedLog(`${nation.name} 건국`, [nationPart(nation), { t: 'text', v: ' 건국' }]),
+        nations: [identity(nation)],
+      });
   }
   for (const nation of Object.values(before.nations)) {
-    if (!next.nations[nation.id]) data.push({ kind: 'fall', text: `${nation.name} 멸망`, nations: [identity(nation)] });
+    if (!next.nations[nation.id])
+      data.push({
+        kind: 'fall',
+        ...storedLog(`${nation.name} 멸망`, [nationPart(nation), { t: 'text', v: ' 멸망' }]),
+        nations: [identity(nation)],
+      });
   }
   for (const city of Object.values(next.cities)) {
     const previous = before.cities[city.cityKey]?.nationId;
     const owner = city.nationId === null ? undefined : next.nations[city.nationId];
     if (previous !== undefined && previous !== city.nationId && owner && before.nations[owner.id])
-      data.push({ kind: 'capture', text: `${owner.name}의 ${city.name} 점령`, nations: [identity(owner)] });
+      data.push({
+        kind: 'capture',
+        ...storedLog(`${owner.name}의 ${city.name} 점령`, [
+          nationPart(owner),
+          { t: 'text', v: '의 ' },
+          { t: 'city', key: city.cityKey, name: city.name },
+          { t: 'text', v: ' 점령' },
+        ]),
+        nations: [identity(owner)],
+      });
   }
   if (before.diplomacies !== next.diplomacies) {
     const prior = new Set(
@@ -36,7 +68,17 @@ export async function persistPublicNationEvents(
       const a = next.nations[nationA],
         b = next.nations[nationB];
       if (a && b)
-        data.push({ kind: 'declare', text: `${a.name}·${b.name} 사이 선전포고`, nations: [identity(a), identity(b)] });
+        data.push({
+          kind: 'declare',
+          ...storedLog(`${a.name}·${b.name} 사이 선전포고`, [
+            nationPart(a),
+            { t: 'text', v: '·' },
+            nationPart(b),
+            { t: 'text', v: ' 사이 ' },
+            { t: 'act', key: 'declare', name: '선전포고' },
+          ]),
+          nations: [identity(a), identity(b)],
+        });
     }
   }
   if (data.length) {

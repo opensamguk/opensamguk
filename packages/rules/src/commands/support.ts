@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { Rng } from '@opensamguk/shared';
+import { logPartsToText, type LogPart, type Rng } from '@opensamguk/shared';
 import { BALANCE } from '../balance';
 import type { WorldState, WorldView } from '../model/world';
 import { cloneWorld } from '../model/clone';
@@ -75,7 +75,10 @@ export function defineCommand<A>(spec: {
   };
   return definition;
 }
-export const success = (text: string): Omit<CommandResult, 'effects'> => ({ logs: [{ kind: 'success', text }] });
+export const success = (value: string | LogPart[]): Omit<CommandResult, 'effects'> => ({ logs: [commandLog(value)] });
+export function commandLog(value: string | LogPart[], kind: 'success' | 'failure' = 'success') {
+  return typeof value === 'string' ? { kind, text: value } : { kind, text: logPartsToText(value), parts: value };
+}
 export function commandMeta(state: WorldState) {
   return (state.commandMeta ??= {
     nextNationId: Math.max(0, ...Object.keys(state.nations).map(Number)) + 1,

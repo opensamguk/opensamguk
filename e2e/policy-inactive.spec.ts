@@ -80,7 +80,7 @@ const CASES: Case[] = [
     policyName: '권농',
     expected: 'farm',
     commandName: '농지 개간',
-    resultLine: /^농지 개간: \d+$/,
+    resultLine: /^농지 개간 작업으로 [\d,]+ 상승했습니다\.(?: 대성공했습니다\.| 성과가 저조했습니다\.)?$/,
     emptyLabel: '(권농) 농지 개간',
     shape: { general: RICH, city: { agriculture: 500, agricultureMax: 1000 } },
   },
@@ -91,7 +91,7 @@ const CASES: Case[] = [
     policyName: '중상',
     expected: 'commerce',
     commandName: '상업 투자',
-    resultLine: /^상업 투자: \d+$/,
+    resultLine: /^상업 투자 작업으로 [\d,]+ 상승했습니다\.(?: 대성공했습니다\.| 성과가 저조했습니다\.)?$/,
     emptyLabel: '(중상) 상업 투자',
     shape: { general: RICH, city: { commerce: 500, commerceMax: 1000 } },
   },
@@ -102,7 +102,7 @@ const CASES: Case[] = [
     policyName: '치안',
     expected: 'security',
     commandName: '치안 강화',
-    resultLine: /^치안 강화: \d+$/,
+    resultLine: /^치안 강화 작업으로 [\d,]+ 상승했습니다\.(?: 대성공했습니다\.| 성과가 저조했습니다\.)?$/,
     emptyLabel: '(치안) 치안 강화',
     shape: { general: RICH, city: { security: 500, securityMax: 1000 } },
   },
@@ -113,7 +113,7 @@ const CASES: Case[] = [
     policyName: '수비',
     expected: 'defence',
     commandName: '수비 강화',
-    resultLine: /^수비 강화: \d+$/,
+    resultLine: /^수비 강화 작업으로 [\d,]+ 상승했습니다\.(?: 대성공했습니다\.| 성과가 저조했습니다\.)?$/,
     emptyLabel: '(수비) 수비 강화',
     shape: { general: RICH, city: { defence: 500, defenceMax: 1000 } },
   },
@@ -124,7 +124,7 @@ const CASES: Case[] = [
     policyName: '수비',
     expected: 'wall',
     commandName: '성벽 보수',
-    resultLine: /^성벽 보수: \d+$/,
+    resultLine: /^성벽 보수 작업으로 [\d,]+ 상승했습니다\.(?: 대성공했습니다\.| 성과가 저조했습니다\.)?$/,
     emptyLabel: '(수비) 수비 강화',
     shape: { general: RICH, city: { defence: 1000, defenceMax: 1000, wall: 500, wallMax: 1000 } },
   },
@@ -158,7 +158,7 @@ const CASES: Case[] = [
     policyName: '없음',
     expected: 'rest',
     commandName: '휴식',
-    resultLine: /^휴식$/,
+    resultLine: /^휴식했습니다\.$/,
     emptyLabel: '(빈 칸) 휴식',
     shape: { general: RICH, city: {} },
   },
@@ -245,7 +245,7 @@ async function save(page: Page) {
   await expect(editor(page).getByText('저장했습니다.')).toBeVisible();
 }
 
-// 기록 한 줄이 기대 명령의 기록인지 본다. 없음 방침의 빈 칸 실행은 기본 방침 문구 없이 휴식으로만 남는다.
+// 명령의 논리적 줄마다 저장한 행을 순서대로 본다. 없음 방침은 휴식 한 줄만 남는다.
 async function expectPolicyRecord(page: Page, index: number, c: Case) {
   const line = records(page).nth(index);
   await expect(line).toHaveAttribute('data-log-kind', 'success');
@@ -254,6 +254,9 @@ async function expectPolicyRecord(page: Page, index: number, c: Case) {
     await expect(line).not.toContainText('기본 방침');
   } else {
     await expect(line).toContainText(`기본 방침(${c.policyName})으로 ${c.commandName}`);
+    const result = records(page).nth(index + 1);
+    await expect(result).toHaveAttribute('data-log-kind', 'success');
+    await expect(result.locator('span').last()).toHaveText(c.resultLine);
   }
 }
 
@@ -381,10 +384,12 @@ for (const c of CASES) {
     evidence.first = { executions: first, logs: firstLogs, capital: await capitalCity(world) };
     expect(first).toEqual([{ generalId: HUMAN_ID, tick: INACTIVE_DUE, commandKey: c.expected }]);
     expect(NOT_POLICY).not.toContain(first[0]!.commandKey);
-    expect(firstLogs).toHaveLength(1);
-    expect(firstLogs[0]).toMatchObject({ tick: INACTIVE_DUE, commandKey: c.expected, kind: 'success' });
-    const firstLines = firstLogs[0]!.text.split('\n');
-    if (c.policy === 'none') expect(firstLines).toEqual(['휴식']);
+    const policyLineCount = c.policy === 'none' ? 1 : 2;
+    expect(firstLogs).toHaveLength(policyLineCount);
+    for (const log of firstLogs)
+      expect(log).toMatchObject({ tick: INACTIVE_DUE, commandKey: c.expected, kind: 'success' });
+    const firstLines = firstLogs.map((log) => log.text);
+    if (c.policy === 'none') expect(firstLines).toEqual(['휴식했습니다.']);
     else
       expect(firstLines).toEqual([
         `기본 방침(${c.policyName})으로 ${c.commandName}`,
@@ -401,10 +406,10 @@ for (const c of CASES) {
     await page.reload();
     await expect(row(page, 30)).toBeVisible();
     await expect(policySelect(page)).toHaveValue(c.policy);
-    // 최근 기록은 최신순이다. 맨 아래는 고정물의 소유자 부착(general.possess) 기록이다.
-    await expect(records(page)).toHaveCount(2);
+    // 최근 기록은 최신순이고 명령 줄마다 한 행이다. 맨 아래는 고정물의 소유자 부착(general.possess) 기록이다.
+    await expect(records(page)).toHaveCount(policyLineCount + 1);
     await expectPolicyRecord(page, 0, c);
-    await expect(records(page).nth(1)).toContainText('이 장수를 맡았습니다.');
+    await expect(records(page).nth(policyLineCount)).toContainText('이 장수를 맡았습니다.');
     await expect(row(page, 1)).not.toHaveAttribute('data-empty', 'true');
     await expect(commandCell(page, 1)).toHaveText('휴식');
     await expect(commandCell(page, 2)).toHaveText('농지 개간');
@@ -423,7 +428,7 @@ for (const c of CASES) {
     evidence.second = { executions: second, logs: secondLogs };
     expect(isInactive(0, FOLLOW_REST_DUE, TURN_TERM_MINUTES)).toBe(true);
     expect(second).toEqual([{ generalId: HUMAN_ID, tick: FOLLOW_REST_DUE, commandKey: 'rest' }]);
-    expect(secondLogs).toEqual([{ tick: FOLLOW_REST_DUE, commandKey: 'rest', kind: 'success', text: '휴식' }]);
+    expect(secondLogs).toEqual([{ tick: FOLLOW_REST_DUE, commandKey: 'rest', kind: 'success', text: '휴식했습니다.' }]);
 
     const third = await advance(world, FOLLOW_RESERVED_DUE);
     const thirdLogs = await ownLogAt(world, FOLLOW_RESERVED_DUE);
@@ -432,7 +437,9 @@ for (const c of CASES) {
     expect(third).toEqual([{ generalId: HUMAN_ID, tick: FOLLOW_RESERVED_DUE, commandKey: 'farm' }]);
     expect(thirdLogs).toHaveLength(1);
     expect(thirdLogs[0]).toMatchObject({ tick: FOLLOW_RESERVED_DUE, commandKey: 'farm', kind: 'success' });
-    expect(thirdLogs[0]!.text).toMatch(/^농지 개간: \d+$/);
+    expect(thirdLogs[0]!.text).toMatch(
+      /^농지 개간 작업으로 [\d,]+ 상승했습니다\.(?: 대성공했습니다\.| 성과가 저조했습니다\.)?$/,
+    );
 
     const final = await ownTurnState(world);
     const finalLedger = await inputLedger(world);
@@ -447,13 +454,13 @@ for (const c of CASES) {
     await page.reload();
     await expect(row(page, 30)).toBeVisible();
     await expect(policySelect(page)).toHaveValue(c.policy);
-    await expect(records(page)).toHaveCount(4);
+    await expect(records(page)).toHaveCount(policyLineCount + 3);
     await expect(records(page).nth(0)).toContainText('농지 개간');
     await expect(records(page).nth(0)).not.toContainText('기본 방침');
     await expect(records(page).nth(1)).toContainText('휴식');
     await expect(records(page).nth(1)).not.toContainText('기본 방침');
     await expectPolicyRecord(page, 2, c);
-    await expect(records(page).nth(3)).toContainText('이 장수를 맡았습니다.');
+    await expect(records(page).nth(policyLineCount + 2)).toContainText('이 장수를 맡았습니다.');
     await expect(row(page, 1)).not.toHaveAttribute('data-empty', 'true');
     await expect(commandCell(page, 1)).toHaveText('상업 투자');
     for (const slot of [2, 30]) {

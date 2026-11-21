@@ -1,3 +1,4 @@
+import { actPart, cityPart, numPart, textPart, destination } from './logging';
 import { commandMoveTargets, applyMoveStep } from '../commandPaths';
 import { z } from 'zod';
 import { BALANCE } from '../balance';
@@ -43,7 +44,16 @@ const recruits = (forced: boolean) =>
       general.crewType = args.crewType;
       city.population -= args.amount;
       if (forced) city.trust = Math.max(0, city.trust - BALANCE.CONSCRIPT_TRUST_LOSS);
-      return success(`${forced ? '징병' : '모병'}: ${args.amount}명, 병력 ${general.crew}명`);
+      return success([
+        { t: 'crew', id: unit.id, name: unit.name },
+        textPart(' '),
+        numPart(args.amount),
+        textPart('명을 '),
+        actPart(forced ? 'conscript' : 'recruit', forced ? '징병' : '모병'),
+        textPart('했습니다. 병력 '),
+        numPart(general.crew),
+        textPart('명입니다.'),
+      ]);
     },
   });
 const drill = (morale: boolean) =>
@@ -65,7 +75,12 @@ const drill = (morale: boolean) =>
       general.gold -= BALANCE.DRILL_COST;
       const field = morale ? 'atmos' : 'train';
       general[field] = Math.min(100, general[field] + drillGain(state, general, morale));
-      return success(`${morale ? '사기진작' : '훈련'}: ${general[field]}`);
+      return success([
+        actPart(morale ? 'morale' : 'train', morale ? '사기진작' : '훈련'),
+        textPart('했습니다. 현재 수치 '),
+        numPart(general[field]),
+        textPart('입니다.'),
+      ]);
     },
   });
 export const militaryCommands = [
@@ -90,12 +105,21 @@ export const militaryCommands = [
     change(state, actor, args) {
       const general = state.generals[actor.generalId]!;
       const step = applyMoveStep(state, general.id, args.cityKey, actor.tick ?? 0);
-      const destination = state.cities[step.destination]!.name;
-      return success(
-        step.blocked
-          ? `${destination}에서 이동 중단: 경로 소유 변경`
-          : `${destination} 이동${step.remaining.length ? `, ${state.cities[args.cityKey]!.name}까지 이동 중` : ''}`,
-      );
+      const reached = state.cities[step.destination]!;
+      // 여러 칸 이동은 한 턴에 한 칸씩 간다. 경로 주인이 바뀌면 그 자리에서 멈춘다.
+      if (step.blocked)
+        return success([
+          cityPart(reached),
+          textPart('에서 '),
+          actPart('move', '이동'),
+          textPart(' 중단: 경로 소유 변경'),
+        ]);
+      return success([
+        ...destination(reached, '이동'),
+        ...(step.remaining.length
+          ? [textPart(' '), cityPart(state.cities[args.cityKey]!), textPart('까지 이동 중입니다.')]
+          : []),
+      ]);
     },
   }),
   defineCommand({
@@ -114,7 +138,7 @@ export const militaryCommands = [
     change(state, actor) {
       const general = state.generals[actor.generalId]!;
       general.cityKey = state.nations[general.nationId!]!.capitalCityKey!;
-      return success(`${state.cities[general.cityKey]!.name} 귀환`);
+      return success(destination(state.cities[general.cityKey]!, '귀환'));
     },
   }),
   defineCommand({
@@ -131,7 +155,7 @@ export const militaryCommands = [
       general.crew = 0;
       general.train = 0;
       general.atmos = 0;
-      return success('소집해제');
+      return success([actPart('dismiss', '소집해제'), textPart('했습니다.')]);
     },
   }),
 ];

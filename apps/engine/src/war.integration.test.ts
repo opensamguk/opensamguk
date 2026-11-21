@@ -52,6 +52,16 @@ async function snapshot(worldId: string) {
   };
 }
 
+// 명령 하나의 기록. INT-29 기록 조각 v1부터 명령 줄마다 한 행이므로 행 수 대신 같은 명령 묶음(sequence)
+// 하나이고 순번이 0부터 이어지며 본문에 줄바꿈이 없는지 본다.
+async function expectOneCommandLog(where: Prisma.GeneralLogWhereInput) {
+  const rows = await db.generalLog.findMany({ where, orderBy: { ordinal: 'asc' } });
+  expect(rows.length).toBeGreaterThan(0);
+  expect(new Set(rows.map((row) => `${row.generalId}:${row.tick}:${row.sequence}`)).size).toBe(1);
+  expect(rows.map((row) => row.ordinal)).toEqual(rows.map((_, ordinal) => ordinal));
+  expect(rows.every((row) => !/[\r\n]/.test(row.text))).toBe(true);
+}
+
 describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
   it.each(['basic', 'effects'] as const)(
     'AC-INT-22 %s의 새 계산식은 실제 전투·rollback·12개월 재생·재적재가 같다',
@@ -90,7 +100,7 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
         expect(hashState((await db.$transaction((tx) => loadReplayState(tx, worldId))).state)).toBe(
           hashState(expected),
         );
-        expect(await db.generalLog.count({ where: { worldId, generalId: 1, tick: 100100 } })).toBe(1);
+        await expectOneCommandLog({ worldId, generalId: 1, tick: 100100 });
         for (let month = 1; month <= 12; month++) {
           await renewLease(db, lease);
           await loop.advanceTo((month + 10) * 10000);
@@ -135,7 +145,7 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
         where: { worldId_tick_nationId: { worldId, tick: 100100, nationId: 2 } },
       }),
     ).toMatchObject({ data: { events: expect.arrayContaining([expect.stringContaining('멸망')]) } });
-    expect(await db.generalLog.count({ where: { worldId, tick: { gt: 100000 } } })).toBe(1);
+    await expectOneCommandLog({ worldId, tick: { gt: 100000 } });
     expect(await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } })).toMatchObject({
       turnRevision: 14,
       nextTurnTick: 110100,
@@ -146,7 +156,7 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
     expect(rewardHistory.data).toMatchObject({
       events: expect.arrayContaining([expect.stringMatching(/^포상: .*포상: 금 10$/)]),
     });
-    expect(JSON.stringify(rewardHistory.data)).not.toContain('nation_reward');
+    expect(JSON.stringify((rewardHistory.data as { events: string[] }).events)).not.toContain('nation_reward');
     for (let month = 1; month <= 12; month++) {
       await renewLease(db, lease);
       await loop.advanceTo((month + 10) * 10000);
@@ -180,8 +190,8 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
     });
     expect(histories.map((entry) => entry.nationId)).toEqual([1, 2]);
     for (const history of histories) {
-      expect(history.data).toEqual({ events: [expect.stringContaining(name)] });
-      expect(JSON.stringify(history.data)).not.toContain('nation_');
+      expect(history.data).toMatchObject({ events: [expect.stringContaining(name)] });
+      expect(JSON.stringify((history.data as { events: string[] }).events)).not.toContain('nation_');
     }
     expect(histories[0]!.data).toEqual(histories[1]!.data);
   });
@@ -198,7 +208,7 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
     const history = await db.nationHistory.findUniqueOrThrow({
       where: { worldId_tick_nationId: { worldId, tick: 100100, nationId: 1 } },
     });
-    expect(history.data).toEqual({ events: ['포상: BAD_TARGET: 자기 국가 장수만 가능합니다.'] });
+    expect(history.data).toMatchObject({ events: ['포상: BAD_TARGET: 자기 국가 장수만 가능합니다.'] });
   });
   it.each(['success', 'error', 'token', 'expiry'] as const)(
     '수도 함락 %s 뒤 자동 천도·보급·반격·역사를 저장하고 롤백·재생한다',
@@ -260,7 +270,14 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
       await loop.advanceTo(100200);
       expect(
         await db.generalLog.findFirstOrThrow({
-          where: { worldId, generalId: 2, tick: 100200, sequence: counterattackSequence },
+          // 명령 줄마다 한 행이라 점령 요약 줄을 고른다(INT-29 기록 조각 v1).
+          where: {
+            worldId,
+            generalId: 2,
+            tick: 100200,
+            sequence: counterattackSequence,
+            text: { contains: '도시2 점령:' },
+          },
         }),
       ).toMatchObject({ kind: 'success', text: expect.stringContaining('도시2 점령:') });
       expect(await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId, cityKey: 2 } } })).toMatchObject({
@@ -334,7 +351,7 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
         await loop.advanceTo(100500);
         await loop.advanceTo(100500);
         expect(await db.battleLog.count({ where: { worldId } })).toBe(2);
-        expect(await db.generalLog.count({ where: { worldId, tick: { gt: 100000 } } })).toBe(1);
+        await expectOneCommandLog({ worldId, tick: { gt: 100000 } });
         expect(await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } })).toMatchObject({
           battleWins: 2,
           captures: 1,
@@ -390,9 +407,9 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
       expect(final.commandMeta?.offers[4]).toBe(1);
       expect(
         (await db.generalLog.findMany({ where: { worldId, generalId: { in: [2, 3, 4] }, tick: { gt: 100000 } } })).map(
-          (log) => log.text,
+          ({ code, text }) => ({ code, text }),
         ),
-      ).toEqual(Array(3).fill('PROTECTED: 이 국가에는 임관할 수 없습니다.'));
+      ).toEqual(Array(3).fill({ code: 'PROTECTED', text: '이 국가에는 임관할 수 없습니다.' }));
       const archive = await exportReplay(db, worldId);
       expect(archive.months).toHaveLength(11);
       expect(replayArchive(archive, 11).map(({ stateHash }) => stateHash)).toEqual(

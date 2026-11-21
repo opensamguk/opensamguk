@@ -198,6 +198,9 @@ describe('AC-INT-09 국가 멸망과 직책 저장의 원자적 순서', () => {
         where: { worldId, generalId: 1, tick: 1, commandKey: 'attack', kind: 'success' },
       }),
     ).toBe(1);
+    // 명령 줄마다 한 행이고 본문에 줄바꿈이 없다(INT-29 기록 조각 v1).
+    const lines = await db.generalLog.findMany({ where: { worldId, generalId: 1, commandKey: 'attack' } });
+    expect(lines.every(({ text }) => !/[\r\n]/.test(text))).toBe(true);
     const result = await db.worldResult.findUniqueOrThrow({ where: { worldId } });
     expect(result.reason).toBe('UNIFIED');
     expect(result.finalStateHash).toBe(hashState(await snapshot(worldId)));
