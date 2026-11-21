@@ -1,0 +1,3845 @@
+[
+ {
+  "id": 10003,
+  "birth": 198,
+  "death": 273,
+  "chain": "wu",
+  "bio": "",
+  "source": "三國志 卷48",
+  "verified": true
+ },
+ {
+  "id": 10006,
+  "birth": 158,
+  "death": 214,
+  "chain": "cao",
+  "bio": "조조 휘하의 교위로, 211년 동관에서 마초군과 대치할 때 소와 말을 풀어 적이 약탈에 정신이 팔린 사이 조조가 황하를 건너도록 도운 인물이다.",
+  "source": "三國志 卷1",
+  "verified": false
+ },
+ {
+  "id": 10008,
+  "birth": 170,
+  "death": 230,
+  "chain": "",
+  "bio": "상관씨에 자가 자수로 입력된 인물이나 사료 색인과 연의 본문에서 해당 이름이 확인되지 않아 행적을 특정하지 못했다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10010,
+  "birth": 239,
+  "death": 272,
+  "chain": "cao",
+  "bio": "원래 호열의 휘하에 있다가 종회의 장하독이 되어 신임을 받은 위나라 무장으로, 종회의 반란 계획을 호열에게 몰래 알렸다.",
+  "source": "三國志 卷28",
+  "verified": false
+ },
+ {
+  "id": 10011,
+  "birth": 232,
+  "death": 269,
+  "chain": "cao",
+  "bio": "연의에 나오는 위나라 장수로, 사서에서는 같은 인물을 확인하지 못한 「연의 인물」이다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10012,
+  "birth": 155,
+  "death": 193,
+  "chain": "hs",
+  "bio": "흑산적 두목 가운데 한 사람으로 백요·수고 등과 함께 위군·동군 일대를 휩쓸다 조조·원소 쪽에 격파되었다.",
+  "source": "三國志 卷6",
+  "verified": false
+ },
+ {
+  "id": 10014,
+  "birth": 160,
+  "death": 195,
+  "chain": "han",
+  "bio": "양주자사 유요의 부장으로 번능과 함께 횡강에 주둔해 손책의 도강을 막으려다 패했으며, 연의에서는 손책에게 생포되는 장수로 그려진다.",
+  "source": "資治通鑑 卷61",
+  "verified": false
+ },
+ {
+  "id": 10016,
+  "birth": 190,
+  "death": 249,
+  "chain": "cao",
+  "bio": "",
+  "source": "三國志 卷28",
+  "verified": true
+ },
+ {
+  "id": 10017,
+  "birth": 180,
+  "death": 220,
+  "chain": "cao",
+  "bio": "",
+  "source": "後漢書 卷49",
+  "verified": true
+ },
+ {
+  "id": 10018,
+  "birth": 155,
+  "death": 204,
+  "chain": "cao",
+  "bio": "",
+  "source": "三國志 卷16",
+  "verified": false
+ },
+ {
+  "id": 10019,
+  "birth": 162,
+  "death": 226,
+  "chain": "jing>208:shu",
+  "bio": "형주에서 유표를 따르다 유비가 남쪽으로 내려갈 때 합류하여 입촉했고, 좌장군 종사중랑으로서 손권에게 사신으로 가서 말솜씨로 이름이 났다.",
+  "source": "三國志 卷38",
+  "verified": false
+ },
+ {
+  "id": 10020,
+  "birth": 150,
+  "death": 190,
+  "chain": "han",
+  "bio": "",
+  "source": "後漢書 卷72",
+  "verified": false
+ },
+ {
+  "id": 10021,
+  "birth": 234,
+  "death": 280,
+  "chain": "wu",
+  "bio": "오나라의 강릉독으로, 280년 진군이 오를 칠 때 강릉에서 전사하거나 참수되었다.",
+  "source": "三國志 卷48",
+  "verified": true
+ },
+ {
+  "id": 10022,
+  "birth": 160,
+  "death": 200,
+  "chain": "dong",
+  "bio": "곽사의 부장으로, 곽사를 죽였다고 전해지는 인물이다.",
+  "source": "後漢書 卷72",
+  "verified": false
+ },
+ {
+  "id": 10024,
+  "birth": 160,
+  "death": 225,
+  "chain": "yi>214:shu",
+  "bio": "유장 아래에 있다가 유비의 종사좨주가 되어 유비가 황제에 오르도록 권한 촉한의 관료로, 뒤에 대홍려에 올랐다고 전한다.",
+  "source": "三國志 卷32",
+  "verified": false
+ },
+ {
+  "id": 10026,
+  "birth": 199,
+  "death": 278,
+  "chain": "cao",
+  "bio": "",
+  "source": "晉書 卷33",
+  "verified": true
+ },
+ {
+  "id": 10027,
+  "birth": 230,
+  "death": 284,
+  "chain": "wu",
+  "bio": "오나라의 삼군독으로 반란한 오희를 토벌했고, 오 말기에 사도에 올라 손호와 함께 진에 항복하는 자리에 있었다.",
+  "source": "三國志 卷48",
+  "verified": false
+ },
+ {
+  "id": 10028,
+  "birth": 190,
+  "death": 270,
+  "chain": "cao",
+  "bio": "위·진 교체기의 관료로 정위로서 회남 선무에 파견되었고, 진 초에는 감군으로서 흉노 유맹을 토벌했다.",
+  "source": "晉書 卷3",
+  "verified": false
+ },
+ {
+  "id": 10029,
+  "birth": 150,
+  "death": 190,
+  "chain": "han",
+  "bio": "후한 영제의 황후이자 소제의 생모로 오빠 하진과 함께 외척 정치를 이끌었고, 동탁이 정권을 잡은 뒤 190년 살해되었다.",
+  "source": "後漢書 卷10",
+  "verified": true
+ },
+ {
+  "id": 10030,
+  "birth": 150,
+  "death": 189,
+  "chain": "han",
+  "bio": "",
+  "source": "後漢書 卷69",
+  "verified": true
+ },
+ {
+  "id": 10033,
+  "birth": 165,
+  "death": 220,
+  "chain": "",
+  "bio": "성만 전하는 여성 인물로, 사서에서 같은 인물을 특정할 근거를 찾지 못했다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10034,
+  "birth": 175,
+  "death": 228,
+  "chain": "hansui",
+  "bio": "하동 출신으로 정은·이감 등과 함께 마초 중심의 관중 제장 연합에 참가했다가 조조에게 격파된 장수이다.",
+  "source": "三國志 卷36",
+  "verified": false
+ },
+ {
+  "id": 10037,
+  "birth": 170,
+  "death": 235,
+  "chain": "cao",
+  "bio": "",
+  "source": "三國志 卷16",
+  "verified": false
+ },
+ {
+  "id": 10042,
+  "birth": 185,
+  "death": 240,
+  "chain": "wu",
+  "bio": "",
+  "source": "三國志 卷51",
+  "verified": false
+ },
+ {
+  "id": 10044,
+  "birth": 175,
+  "death": 225,
+  "chain": "cao",
+  "bio": "부섭의 아들로 마등에게 조조 편에 설 것을 설득했고 뒤에 조조의 참군으로 출병을 간언한 문사이다.",
+  "source": "資治通鑑 卷64",
+  "verified": false
+ },
+ {
+  "id": 10047,
+  "birth": 229,
+  "death": 264,
+  "chain": "cao",
+  "bio": "연의에 나오는 등애 휘하 양양 사람으로, 황호에게 금품을 전하고 소문을 퍼뜨리는 임무를 맡는 「연의 인물」이다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10048,
+  "birth": 206,
+  "death": 258,
+  "chain": "wu",
+  "bio": "오나라 손량의 황후 전씨의 아버지로 태상을 지냈으며, 258년 손침 제거 계획이 새어 쫓겨난 뒤 살해되었다.",
+  "source": "三國志 卷48",
+  "verified": true
+ },
+ {
+  "id": 10049,
+  "birth": 212,
+  "death": 265,
+  "chain": "wu>258:cao",
+  "bio": "전종의 아들로 오나라 장수였으며, 제갈탄이 수춘에서 반란했을 때 구원하러 왔다가 258년 위에 항복했다.",
+  "source": "三國志 卷4",
+  "verified": false
+ },
+ {
+  "id": 10050,
+  "birth": 150,
+  "death": 210,
+  "chain": "han",
+  "bio": "전종의 아버지로 효렴에 천거되어 한말에 상서랑 우승을 지냈고 동탁의 난에 관직을 버렸다가 뒤에 오에서 태수를 지냈다고 전한다.",
+  "source": "三國志 卷60",
+  "verified": false
+ },
+ {
+  "id": 10054,
+  "birth": 231,
+  "death": 258,
+  "chain": "wu",
+  "bio": "연의에 나오는 오나라 황문시랑으로 손량의 외숙으로 설정되어 손침 제거 모의에 가담하는 「연의 인물」이다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10055,
+  "birth": 158,
+  "death": 190,
+  "chain": "ys",
+  "bio": "연의에서 원술 휘하 용장으로 나와 화웅과 싸우다 베이는 「연의 인물」이다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10059,
+  "birth": 175,
+  "death": 238,
+  "chain": "liaodong",
+  "bio": "",
+  "source": "三國志 卷8",
+  "verified": false
+ },
+ {
+  "id": 10065,
+  "birth": 181,
+  "death": 235,
+  "chain": "cao",
+  "bio": "전위의 아들로 조조가 아버지를 기려 낭중으로 삼아 곁에 두었고, 뒤에 아버지의 작위를 이었다.",
+  "source": "三國志 卷18",
+  "verified": false
+ },
+ {
+  "id": 10067,
+  "birth": 176,
+  "death": 214,
+  "chain": "yi",
+  "bio": "유장의 장수로 유괴·장임·등현 등과 함께 부성에서 입촉한 유비군을 막았으나 패했다.",
+  "source": "三國志 卷32",
+  "verified": false
+ },
+ {
+  "id": 10070,
+  "birth": 215,
+  "death": 258,
+  "chain": "wu",
+  "bio": "오나라 장군으로, 전상과 함께 손침을 제거하려다 계획이 새어 258년 손침에게 살해되었다.",
+  "source": "三國志 卷64",
+  "verified": true
+ },
+ {
+  "id": 10072,
+  "birth": 160,
+  "death": 220,
+  "chain": "jing>208:cao",
+  "bio": "",
+  "source": "三國志 卷6",
+  "verified": false
+ },
+ {
+  "id": 10073,
+  "birth": 172,
+  "death": 233,
+  "chain": "man",
+  "bio": "남중의 이민족 우두머리로 촉한 건흥 연간에 반란을 일으켰다가 장군 마충에게 평정되었다.",
+  "source": "三國志 卷33",
+  "verified": true
+ },
+ {
+  "id": 10075,
+  "birth": 163,
+  "death": 216,
+  "chain": "ys>199:cao",
+  "bio": "원술의 부하에서 손책에게 쫓겨난 뒤 조조에게 귀순해 열후에 봉해졌고, 뒤에 죄를 지어 죽은 것으로 전해진다.",
+  "source": "三國志 卷1",
+  "verified": false
+ },
+ {
+  "id": 10077,
+  "birth": 185,
+  "death": 233,
+  "chain": "wu",
+  "bio": "",
+  "source": "三國志 卷57",
+  "verified": false
+ },
+ {
+  "id": 10082,
+  "birth": 160,
+  "death": 215,
+  "chain": "cao",
+  "bio": "동군태수로 원소군이 쳐들어온 백마를 지킨 조조 쪽 장수이다.",
+  "source": "後漢書 卷74",
+  "verified": false
+ },
+ {
+  "id": 10084,
+  "birth": 175,
+  "death": 250,
+  "chain": "cao",
+  "bio": "",
+  "source": "三國志 卷14",
+  "verified": false
+ },
+ {
+  "id": 10085,
+  "birth": 185,
+  "death": 260,
+  "chain": "shu",
+  "bio": "",
+  "source": "三國志 卷43",
+  "verified": false
+ },
+ {
+  "id": 10087,
+  "birth": 164,
+  "death": 215,
+  "chain": "",
+  "bio": "성만 전하는 여성 인물로, 사서에서 같은 인물을 특정할 근거를 찾지 못했다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10088,
+  "birth": 210,
+  "death": 270,
+  "chain": "shu>263:cao",
+  "bio": "",
+  "source": "三國志 卷34",
+  "verified": false
+ },
+ {
+  "id": 10090,
+  "birth": 212,
+  "death": 244,
+  "chain": "shu",
+  "bio": "",
+  "source": "三國志 卷34",
+  "verified": true
+ },
+ {
+  "id": 10093,
+  "birth": 165,
+  "death": 197,
+  "chain": "yi",
+  "bio": "유언의 아들로 오씨를 아내로 맞았으나 일찍 죽었고, 과부가 된 오씨는 뒤에 유비의 황후가 되었다.",
+  "source": "三國志 卷34",
+  "verified": false
+ },
+ {
+  "id": 10095,
+  "birth": 165,
+  "death": 225,
+  "chain": "yi",
+  "bio": "유장의 장수로 부성에서 유비군을 막았으나 패해 면죽으로 물러났다.",
+  "source": "三國志 卷32",
+  "verified": false
+ },
+ {
+  "id": 10097,
+  "birth": 168,
+  "death": 210,
+  "chain": "jing",
+  "bio": "유표의 조카로 황충과 함께 장사를 지켰다고 전하는 형주의 장수이다.",
+  "source": "三國志 卷36",
+  "verified": false
+ },
+ {
+  "id": 10106,
+  "birth": 185,
+  "death": 254,
+  "chain": "wu",
+  "bio": "",
+  "source": "三國志 卷51",
+  "verified": false
+ },
+ {
+  "id": 10108,
+  "birth": 157,
+  "death": 187,
+  "chain": "hj",
+  "bio": "장사 일대에서 장군을 자칭하며 1만여 명을 모아 반란을 일으켰으나 184년 말 장사태수 손견에게 평정되었다.",
+  "source": "資治通鑑 卷58",
+  "verified": false
+ },
+ {
+  "id": 10109,
+  "birth": 160,
+  "death": 215,
+  "chain": "di>211:hansui",
+  "bio": "",
+  "source": "三國志 卷30",
+  "verified": false
+ },
+ {
+  "id": 10111,
+  "birth": 175,
+  "death": 240,
+  "chain": "yi>212:shu",
+  "bio": "",
+  "source": "三國志 卷32",
+  "verified": false
+ },
+ {
+  "id": 10114,
+  "birth": 160,
+  "death": 230,
+  "chain": "cao",
+  "bio": "조조의 부인으로 조비·조창·조식·조웅을 낳았고, 조조 사후 왕태후와 황태후를 거쳐 명제 때 태황태후가 되었으며 검소한 장례를 당부하고 세상을 떠났다.",
+  "source": "三國志 卷5",
+  "verified": false
+ },
+ {
+  "id": 10116,
+  "birth": 160,
+  "death": 198,
+  "chain": "",
+  "bio": "성만 전하는 여성 인물로, 사서에서 같은 인물을 특정할 근거를 찾지 못했다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10118,
+  "birth": 142,
+  "death": 197,
+  "chain": "",
+  "bio": "오군의 호족으로 손책이 강동을 평정할 때 맞서다 패한 세력가이다.",
+  "source": "三國志 卷46",
+  "verified": false
+ },
+ {
+  "id": 10120,
+  "birth": 145,
+  "death": 197,
+  "chain": "",
+  "bio": "엄백호의 아우로 손책에게 맞서 싸우다 패하는 인물이며, 사서에는 화의를 청하러 갔다 살해된 것으로 전한다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10122,
+  "birth": 195,
+  "death": 260,
+  "chain": "shu",
+  "bio": "촉한 강유 휘하의 아문장으로 국산성을 지키다가 위군에게 포위되어 항복한 장수이다.",
+  "source": "三國志 卷33",
+  "verified": false
+ },
+ {
+  "id": 10123,
+  "birth": 190,
+  "death": 250,
+  "chain": "shu",
+  "bio": "",
+  "source": "三國志 卷43",
+  "verified": false
+ },
+ {
+  "id": 10125,
+  "birth": 190,
+  "death": 260,
+  "chain": "wu",
+  "bio": "연의에서 반장의 부장으로 나와 황충과 싸우다 베이는 「연의 인물」이다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10132,
+  "birth": 171,
+  "death": 217,
+  "chain": "cao",
+  "bio": "하내 온현 출신으로 사마의의 형이며, 조조의 사공연속으로 출사해 지방관을 거쳐 연주자사가 되었고 217년 조조의 오 정벌 때 군중에 퍼진 전염병으로 죽었다.",
+  "source": "三國志 卷15",
+  "verified": true
+ },
+ {
+  "id": 10135,
+  "birth": 175,
+  "death": 250,
+  "chain": "cao",
+  "bio": "",
+  "source": "三國志 卷12",
+  "verified": false
+ },
+ {
+  "id": 10140,
+  "birth": 175,
+  "death": 251,
+  "chain": "yi>214:shu",
+  "bio": "남양 출신으로 아버지를 따라 익주에 살았고, 유비가 염철을 맡는 염부교위를 두자 그 속관이 되어 재정 실무를 맡았다. 뒤에 동윤의 뒤를 이어 상서령에 올랐으며 법 집행이 엄했으나 청렴하다는 평을 받았다.",
+  "source": "三國志 卷39",
+  "verified": true
+ },
+ {
+  "id": 10141,
+  "birth": 150,
+  "death": 200,
+  "chain": "jing",
+  "bio": "연의에서 유표의 용장으로 나와 손견을 매복으로 쏘아 죽이는 인물로, 사서에서 같은 이름은 확인되지 않는 「연의 인물」이다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10143,
+  "birth": 175,
+  "death": 238,
+  "chain": "wu",
+  "bio": "오나라 손권이 신임한 중서교사로 가혹하게 관리를 감찰하며 대신들을 모함했으나 뒤에 죄가 드러나 처형되었다.",
+  "source": "三國志 卷47",
+  "verified": false
+ },
+ {
+  "id": 10147,
+  "birth": 170,
+  "death": 230,
+  "chain": "cao",
+  "bio": "",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10150,
+  "birth": 180,
+  "death": 230,
+  "chain": "lu",
+  "bio": "후대 소설과 게임에서 여포의 딸로 설정된 인물로 사서에는 이름이 없고, 연의에도 이름이 확인되지 않는 후대 창작 인물이다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10155,
+  "birth": 160,
+  "death": 220,
+  "chain": "han",
+  "bio": "",
+  "source": "後漢書 卷69",
+  "verified": false
+ },
+ {
+  "id": 10156,
+  "birth": 161,
+  "death": 222,
+  "chain": "wu",
+  "bio": "연의에서 손견의 부인 오씨를 가리키는 호칭으로 쓰이며 손권과 유비의 혼사를 성사시키는 「연의 인물」이다. 사서의 오부인은 202년에 죽었다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10157,
+  "birth": 151,
+  "death": 211,
+  "chain": "jing",
+  "bio": "유표가 보낸 창오태수로, 교주를 맡은 뢰공과 함께 있다가 오의 보즐에게 살해되었다.",
+  "source": "三國志 卷49",
+  "verified": false
+ },
+ {
+  "id": 10159,
+  "birth": 165,
+  "death": 225,
+  "chain": "lu>198:cao",
+  "bio": "태산·낭야 일대에서 장패·손관·윤례 등과 함께 무리를 이룬 세력가로, 뒤에 조조 휘하에 편입되었다.",
+  "source": "三國志 卷18",
+  "verified": false
+ },
+ {
+  "id": 10162,
+  "birth": 165,
+  "death": 226,
+  "chain": "wu",
+  "bio": "",
+  "source": "三國志 卷63",
+  "verified": false
+ },
+ {
+  "id": 10167,
+  "birth": 150,
+  "death": 195,
+  "chain": "",
+  "bio": "사료 색인에서 확인되지 않는 인물로, 이름 외에 행적을 특정하지 못했다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10168,
+  "birth": 170,
+  "death": 215,
+  "chain": "wu",
+  "bio": "",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10170,
+  "birth": 162,
+  "death": 195,
+  "chain": "yuan",
+  "bio": "원소가 구강태수로 삼은 장수로, 191년 양성에서 원술 쪽의 손견과 맞섰다.",
+  "source": "三國志 卷8",
+  "verified": false
+ },
+ {
+  "id": 10172,
+  "birth": 152,
+  "death": 187,
+  "chain": "",
+  "bio": "세 군에 걸쳐 일어난 도적 두목으로 소마 등과 함께 오의 주치에게 토벌되었다.",
+  "source": "三國志 卷56",
+  "verified": false
+ },
+ {
+  "id": 10175,
+  "birth": 165,
+  "death": 235,
+  "chain": "yi>214:shu",
+  "bio": "",
+  "source": "三國志 卷42",
+  "verified": false
+ },
+ {
+  "id": 10176,
+  "birth": 205,
+  "death": 239,
+  "chain": "wu",
+  "bio": "주유의 아들로 오의 도향후가 되어 공안에 병력을 두었으나 죄를 지어 여릉으로 유배되었고, 제갈근·보즐이 용서를 청한 일이 있다.",
+  "source": "資治通鑑 卷74",
+  "verified": false
+ },
+ {
+  "id": 10177,
+  "birth": 175,
+  "death": 225,
+  "chain": "",
+  "bio": "사료 색인에서 같은 이름의 구체적 인물을 확인하지 못했다(주공과 소공을 뜻하는 용례만 보임).",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10181,
+  "birth": 235,
+  "death": 294,
+  "chain": "cao",
+  "bio": "위·진의 무장으로 서융교위·옹주자사를 지냈고, 279년 파촉의 병력을 이끌고 장강을 따라 내려가 오 정벌에 참여했다.",
+  "source": "晉書 卷42",
+  "verified": false
+ },
+ {
+  "id": 10183,
+  "birth": 191,
+  "death": 233,
+  "chain": "man",
+  "bio": "연의에서 남만 왕 올돌골 휘하 오과국의 장수로 나오는 「연의 인물」이다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10186,
+  "birth": 135,
+  "death": 195,
+  "chain": "han",
+  "bio": "후한 말의 관료로 왕윤과 함께 동탁 제거를 모의하고 여포를 끌어들였으며, 동탁이 죽은 뒤 공을 사양해 화를 면했다. 뒤에 헌제를 따라 동쪽으로 가다 난병에게 죽었다.",
+  "source": "後漢書 卷66",
+  "verified": true
+ },
+ {
+  "id": 10187,
+  "birth": 185,
+  "death": 226,
+  "chain": "jiao",
+  "bio": "사섭의 아들로 건안 말 오에 인질로 보내져 무창태수가 되었고, 사씨 집안이 몰락한 뒤 서인이 되어 병으로 죽었다.",
+  "source": "三國志 卷49",
+  "verified": false
+ },
+ {
+  "id": 10189,
+  "birth": 150,
+  "death": 200,
+  "chain": "",
+  "bio": "사료 색인에서 같은 이름의 구체적 인물을 확인하지 못했다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10192,
+  "birth": 207,
+  "death": 257,
+  "chain": "cao",
+  "bio": "조상의 사촌동생 조문숙의 아내로, 일찍 과부가 되어 아버지의 재가 강요에 귀를 잘라 수절을 맹세한 일로 알려진 여성이다.",
+  "source": "資治通鑑 卷75",
+  "verified": false
+ },
+ {
+  "id": 10193,
+  "birth": 175,
+  "death": 240,
+  "chain": "cao",
+  "bio": "위나라 호군·장수로 제갈량 북벌 때 구원군에 포함되었고, 훗날 정촉호군을 지냈다.",
+  "source": "三國志 卷9",
+  "verified": false
+ },
+ {
+  "id": 10201,
+  "birth": 195,
+  "death": 219,
+  "chain": "cao",
+  "bio": "하후연의 아들로 알려진 인물로 어린 나이에 아버지와 함께 한중 전투에서 죽었다고 전하며, 이 항목은 색인에서 직접 대응 문장을 찾지 못했다.",
+  "source": "三國志 卷9",
+  "verified": false
+ },
+ {
+  "id": 10205,
+  "birth": 190,
+  "death": 250,
+  "chain": "cao",
+  "bio": "위나라에서 영군장군을 지낸 장수로 조상 등과 함께 이름이 보인다.",
+  "source": "三國志 卷14",
+  "verified": false
+ },
+ {
+  "id": 10207,
+  "birth": 170,
+  "death": 220,
+  "chain": "cao",
+  "bio": "연의에서 박망파 전투의 조조군 부장으로, 또 조운의 고향 친구로 나오는 「연의 인물」이다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10209,
+  "birth": 177,
+  "death": 215,
+  "chain": "wu",
+  "bio": "교공의 큰딸로 손책의 아내가 된 여성이며, 연의에서는 조조가 노린다는 소문의 미끼로 쓰인다.",
+  "source": "三國志 卷54",
+  "verified": false
+ },
+ {
+  "id": 10212,
+  "birth": 191,
+  "death": 233,
+  "chain": "man",
+  "bio": "연의에서 남만 올돌골 휘하 두 부장 중 한 사람으로 나오는 「연의 인물」이다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10213,
+  "birth": 190,
+  "death": 260,
+  "chain": "shu",
+  "bio": "",
+  "source": "華陽國志 卷7",
+  "verified": false
+ },
+ {
+  "id": 10214,
+  "birth": 165,
+  "death": 235,
+  "chain": "han",
+  "bio": "양부의 외사촌 형으로 역성에서 거병하여 마초를 토벌하는 데 호응한 천수 출신 관리이다.",
+  "source": "三國志 卷25",
+  "verified": false
+ },
+ {
+  "id": 10216,
+  "birth": 143,
+  "death": 212,
+  "chain": "cao",
+  "bio": "조조 휘하의 모사로 유종이 부절을 들고 항복했을 때 그 진심을 믿어도 된다고 건의한 인물이다.",
+  "source": "資治通鑑 卷65",
+  "verified": false
+ },
+ {
+  "id": 10217,
+  "birth": 165,
+  "death": 204,
+  "chain": "wu",
+  "bio": "손익의 부하로 대원과 짜고 손익을 죽였고 손하까지 살해했으나, 손익의 아내 서씨의 계략으로 손고·부영 등에게 처단되었다.",
+  "source": "三國志 卷51",
+  "verified": true
+ },
+ {
+  "id": 10221,
+  "birth": 170,
+  "death": 260,
+  "chain": "yi>214:shu",
+  "bio": "",
+  "source": "三國志 卷42",
+  "verified": false
+ },
+ {
+  "id": 10222,
+  "birth": 216,
+  "death": 271,
+  "chain": "wu",
+  "bio": "오나라 관료로 손호 즉위 후 이름을 맹인으로 고쳤고, 어머니 상에 허락 없이 달려갔다 용서받은 일로 알려졌으며 뒤에 사공에 올랐다.",
+  "source": "三國志 卷48",
+  "verified": true
+ },
+ {
+  "id": 10223,
+  "birth": 170,
+  "death": 230,
+  "chain": "cao",
+  "bio": "",
+  "source": "三國志 卷15",
+  "verified": false
+ },
+ {
+  "id": 10226,
+  "birth": 155,
+  "death": 198,
+  "chain": "",
+  "bio": "사료 색인에서 확인되지 않는 인물로, 이름 외에 행적을 특정하지 못했다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10231,
+  "birth": 227,
+  "death": 276,
+  "chain": "wu",
+  "bio": "연의에서 손호가 육항의 병권을 빼앗은 뒤 후임으로 앉히는 좌장군으로 나오는 「연의 인물」이다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10235,
+  "birth": 220,
+  "death": 259,
+  "chain": "wu>256:cao",
+  "bio": "오의 종실 장수로 거기장군으로서 하구를 지켰으나 256년 손침의 공격을 피해 위로 달아나 거기장군·오후가 되었고, 259년 첩에게 살해되었다.",
+  "source": "三國志 卷48",
+  "verified": true
+ },
+ {
+  "id": 10236,
+  "birth": 195,
+  "death": 234,
+  "chain": "wu",
+  "bio": "",
+  "source": "三國志 卷51",
+  "verified": false
+ },
+ {
+  "id": 10237,
+  "birth": 225,
+  "death": 270,
+  "chain": "wu",
+  "bio": "",
+  "source": "三國志 卷59",
+  "verified": false
+ },
+ {
+  "id": 10238,
+  "birth": 193,
+  "death": 222,
+  "chain": "wu>209:shu",
+  "bio": "손견의 딸이자 손권의 누이로, 유비의 부인이 되었으나 유비가 입촉한 뒤 오로 돌아갔다. 이름 상향은 후대에 붙은 것이다.",
+  "source": "三國志 卷37",
+  "verified": false
+ },
+ {
+  "id": 10240,
+  "birth": 190,
+  "death": 252,
+  "chain": "wu",
+  "bio": "오의 중서령으로 손권 말기 태자 폐위 소동에 관여했고, 손권 사후 제갈각에게 처단된 것으로 알려진다.",
+  "source": "資治通鑑 卷75",
+  "verified": false
+ },
+ {
+  "id": 10241,
+  "birth": 213,
+  "death": 232,
+  "chain": "wu",
+  "bio": "",
+  "source": "三國志 卷59",
+  "verified": false
+ },
+ {
+  "id": 10243,
+  "birth": 187,
+  "death": 226,
+  "chain": "wu",
+  "bio": "오 손씨 일족으로 입력된 인물이나 같은 이름의 후한·진 인물이 섞여 있어 사서에서 구체적 행적을 특정하지 못했다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10244,
+  "birth": 200,
+  "death": 231,
+  "chain": "",
+  "bio": "사료 색인에서 같은 이름의 구체적 인물을 확인하지 못했다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10248,
+  "birth": 188,
+  "death": 250,
+  "chain": "wu",
+  "bio": "오 손씨 일족의 여성으로 입력된 인물이나 사서에서 구체적 행적을 특정하지 못했다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10249,
+  "birth": 165,
+  "death": 204,
+  "chain": "wu",
+  "bio": "",
+  "source": "三國志 卷50",
+  "verified": true
+ },
+ {
+  "id": 10254,
+  "birth": 180,
+  "death": 250,
+  "chain": "cao",
+  "bio": "곧은 성품으로 알려진 위나라 관료로 조상과 갈등해 처벌받았다가 복직했고, 조상이 제거된 뒤 사례교위를 거쳐 사공에 올랐다.",
+  "source": "三國志 卷24",
+  "verified": true
+ },
+ {
+  "id": 10259,
+  "birth": 224,
+  "death": 250,
+  "chain": "wu",
+  "bio": "",
+  "source": "三國志 卷59",
+  "verified": true
+ },
+ {
+  "id": 10261,
+  "birth": 160,
+  "death": 210,
+  "chain": "wu",
+  "bio": "",
+  "source": "三國志 卷51",
+  "verified": false
+ },
+ {
+  "id": 10262,
+  "birth": 175,
+  "death": 251,
+  "chain": "cao",
+  "bio": "",
+  "source": "三國志 卷14",
+  "verified": false
+ },
+ {
+  "id": 10263,
+  "birth": 165,
+  "death": 215,
+  "chain": "wu",
+  "bio": "",
+  "source": "三國志 卷51",
+  "verified": false
+ },
+ {
+  "id": 10264,
+  "birth": 163,
+  "death": 225,
+  "chain": "wu",
+  "bio": "",
+  "source": "三國志 卷47",
+  "verified": true
+ },
+ {
+  "id": 10265,
+  "birth": 234,
+  "death": 280,
+  "chain": "wu",
+  "bio": "오 말기의 장수로 승상 장제와 함께 진군을 막으러 나섰다가 280년 전투에서 전사했다.",
+  "source": "三國志 卷48",
+  "verified": true
+ },
+ {
+  "id": 10268,
+  "birth": 205,
+  "death": 260,
+  "chain": "wu",
+  "bio": "손권과 보부인 사이의 맏딸로 자는 대호이며, 처음 주순에게 뒤에 전종에게 시집갔고 손준과 사통했다고 전한다.",
+  "source": "三國志 卷50",
+  "verified": false
+ },
+ {
+  "id": 10269,
+  "birth": 208,
+  "death": 255,
+  "chain": "wu",
+  "bio": "손권과 보부인 사이의 둘째 딸로 자는 소호이며, 처음 주거에게 뒤에 유찬에게 시집갔다. 손준 암살 모의에 연루되어 죽었다.",
+  "source": "三國志 卷50",
+  "verified": true
+ },
+ {
+  "id": 10270,
+  "birth": 150,
+  "death": 215,
+  "chain": "jing",
+  "bio": "형주의 학자로 유표 아래에서 기모개 등과 오경장구를 편찬했으며 사마휘와 함께 학문을 가르친 인물로 전한다.",
+  "source": "三國志 卷42",
+  "verified": false
+ },
+ {
+  "id": 10273,
+  "birth": 175,
+  "death": 264,
+  "chain": "shu",
+  "bio": "",
+  "source": "三國志 卷45",
+  "verified": false
+ },
+ {
+  "id": 10274,
+  "birth": 170,
+  "death": 204,
+  "chain": "yuan",
+  "bio": "",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10276,
+  "birth": 165,
+  "death": 220,
+  "chain": "",
+  "bio": "사료 색인에서 독립된 행적이 확인되지 않으며, 손견을 쏘아 죽였다는 문장에서 이름이 오독되었을 가능성이 있다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10277,
+  "birth": 170,
+  "death": 225,
+  "chain": "yi>214:shu",
+  "bio": "촉한의 의중랑장으로 유비의 황제 즉위를 권하는 상소에 이름을 올린 신료이다.",
+  "source": "三國志 卷32",
+  "verified": false
+ },
+ {
+  "id": 10278,
+  "birth": 178,
+  "death": 212,
+  "chain": "wu",
+  "bio": "교공의 작은딸로 주유의 아내가 된 여성으로, 연의에서는 조조의 동작대 야욕과 엮여 나온다.",
+  "source": "三國志 卷54",
+  "verified": false
+ },
+ {
+  "id": 10279,
+  "birth": 190,
+  "death": 230,
+  "chain": "shanyue",
+  "bio": "",
+  "source": "三國志 卷58",
+  "verified": false
+ },
+ {
+  "id": 10281,
+  "birth": 165,
+  "death": 204,
+  "chain": "yuan",
+  "bio": "원상 쪽 무안장으로 모성에 주둔하며 상당 방면 군량 수송로를 지키다 조조에게 격파된 장수이다.",
+  "source": "三國志 卷1",
+  "verified": false
+ },
+ {
+  "id": 10282,
+  "birth": 165,
+  "death": 225,
+  "chain": "lu>198:cao",
+  "bio": "태산 일대에서 장패·손관·오돈 등과 함께 무리를 이룬 세력가로, 뒤에 조조 휘하에 편입되었다.",
+  "source": "三國志 卷18",
+  "verified": false
+ },
+ {
+  "id": 10285,
+  "birth": 170,
+  "death": 219,
+  "chain": "cao",
+  "bio": "연의에서 제갈량의 목우유마를 빼앗아 가는 위나라 진원장군으로 나오는 「연의 인물」이다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10287,
+  "birth": 160,
+  "death": 220,
+  "chain": "dong",
+  "bio": "연의에서 곽사의 장수로 나와 양봉과 싸우다 서황에게 베이는 「연의 인물」이다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10288,
+  "birth": 165,
+  "death": 225,
+  "chain": "",
+  "bio": "",
+  "source": "三國志 卷35",
+  "verified": false
+ },
+ {
+  "id": 10290,
+  "birth": 175,
+  "death": 235,
+  "chain": "",
+  "bio": "성만 전하는 여성 인물로, 사서에서 같은 인물을 특정할 근거를 찾지 못했다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10292,
+  "birth": 224,
+  "death": 263,
+  "chain": "cao",
+  "bio": "",
+  "source": "晉書 卷49",
+  "verified": false
+ },
+ {
+  "id": 10294,
+  "birth": 232,
+  "death": 280,
+  "chain": "wu",
+  "bio": "오의 장군으로 육항 휘하에서 서릉 방어 작전에 참가했다.",
+  "source": "三國志 卷58",
+  "verified": false
+ },
+ {
+  "id": 10295,
+  "birth": 170,
+  "death": 220,
+  "chain": "han",
+  "bio": "이각·곽사의 난 때 양정의 일당으로 종집과 함께 단외가 반란하려 한다고 모함한 인물이며, 연의에서는 헌제 수레를 호송하는 인물로 나온다.",
+  "source": "資治通鑑 卷61",
+  "verified": false
+ },
+ {
+  "id": 10298,
+  "birth": 160,
+  "death": 245,
+  "chain": "cao",
+  "bio": "하내 온현 출신으로 어려서부터 예절로 이름이 났고, 조조 정권에서 전농중랑장·광록대부 등을 지낸 위나라 관료이다.",
+  "source": "三國志 卷23",
+  "verified": false
+ },
+ {
+  "id": 10304,
+  "birth": 160,
+  "death": 200,
+  "chain": "jing",
+  "bio": "",
+  "source": "資治通鑑 卷63",
+  "verified": true
+ },
+ {
+  "id": 10306,
+  "birth": 187,
+  "death": 222,
+  "chain": "shu",
+  "bio": "촉한의 장수로 유비의 이릉 출정 때 풍습과 함께 선봉에 섰다가 전사했다.",
+  "source": "華陽國志 卷6",
+  "verified": true
+ },
+ {
+  "id": 10307,
+  "birth": 187,
+  "death": 222,
+  "chain": "yuan",
+  "bio": "동명이인이 여럿(촉의 장수 장남, 원희의 부장 장남 등)이라 어느 쪽인지 특정하기 어렵다. 원희의 부장 장남은 초촉과 함께 원희를 공격해 조조에게 귀순했다.",
+  "source": "後漢書 卷74",
+  "verified": false
+ },
+ {
+  "id": 10313,
+  "birth": 178,
+  "death": 244,
+  "chain": "wu",
+  "bio": "장소의 아들로 오의 위위·분위장군을 지냈고, 제갈각이 훗날 멸망하리라 예견한 일화로 알려진 인물이다.",
+  "source": "三國志 卷52",
+  "verified": false
+ },
+ {
+  "id": 10314,
+  "birth": 150,
+  "death": 188,
+  "chain": "han>187:wuhuan",
+  "bio": "어양 출신으로 장순과 함께 오환과 연합해 반란하며 천자를 자칭한 인물이다.",
+  "source": "後漢書 卷8",
+  "verified": false
+ },
+ {
+  "id": 10316,
+  "birth": 189,
+  "death": 257,
+  "chain": "cao",
+  "bio": "",
+  "source": "晉書 卷49",
+  "verified": false
+ },
+ {
+  "id": 10319,
+  "birth": 143,
+  "death": 184,
+  "chain": "hj",
+  "bio": "남양 황건의 우두머리로 스스로 신상사라 칭하며 수만 명을 모아 태수 저공을 죽였으나 태수 진힐에게 죽었다.",
+  "source": "後漢書 卷71",
+  "verified": true
+ },
+ {
+  "id": 10324,
+  "birth": 207,
+  "death": 237,
+  "chain": "shu",
+  "bio": "장비의 딸로 촉한 후주 유선의 첫 황후이며, 237년 세상을 떠나 경애황후라는 시호를 받았다.",
+  "source": "華陽國志 卷7",
+  "verified": true
+ },
+ {
+  "id": 10325,
+  "birth": 190,
+  "death": 219,
+  "chain": "",
+  "bio": "사료 색인에서 확인되지 않는 인물로, 이름 외에 행적을 특정하지 못했다(진서에는 동명의 다른 시대 인물만 보인다).",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10329,
+  "birth": 209,
+  "death": 265,
+  "chain": "cao",
+  "bio": "위나라 아문장군으로 253년 제갈각이 합비 신성을 공격했을 때 성을 지켜 오군의 공세를 버텨 냈다.",
+  "source": "資治通鑑 卷76",
+  "verified": false
+ },
+ {
+  "id": 10330,
+  "birth": 201,
+  "death": 263,
+  "chain": "cao",
+  "bio": "연의에서 위 명제가 오 정벌에 보내는 효장으로 나오는 「연의 인물」이다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10331,
+  "birth": 160,
+  "death": 205,
+  "chain": "yuan",
+  "bio": "홍농의 호족으로 장성·고간 등과 함께 병주·하동 일대에서 반란에 가담한 인물이다.",
+  "source": "三國志 卷13",
+  "verified": false
+ },
+ {
+  "id": 10332,
+  "birth": 150,
+  "death": 212,
+  "chain": "cao",
+  "bio": "하내 출신으로 난세에 몸을 숨기다 조조에게 불려 의랑·참승상군사가 되었고, 조조가 원정할 때 세자 조비와 함께 후방을 지켰다.",
+  "source": "三國志 卷11",
+  "verified": false
+ },
+ {
+  "id": 10333,
+  "birth": 160,
+  "death": 215,
+  "chain": "yi",
+  "bio": "장송의 형으로 광한태수를 지냈으며, 입촉한 유비에게 병력과 물자를 보내 환대했다.",
+  "source": "三國志 卷31",
+  "verified": false
+ },
+ {
+  "id": 10334,
+  "birth": 152,
+  "death": 189,
+  "chain": "han>187:wuhuan",
+  "bio": "전 중산상 출신으로 장거와 함께 오환 세력과 손잡아 반란하며 대장군을 자칭했고, 189년 문객 왕정에게 살해되었다.",
+  "source": "資治通鑑 卷59",
+  "verified": true
+ },
+ {
+  "id": 10339,
+  "birth": 155,
+  "death": 200,
+  "chain": "jing",
+  "bio": "형주 장사태수였으나 유표에게 반기를 들어 조조와 연결하려 했고, 유표의 포위 속에 병으로 죽었다.",
+  "source": "三國志 卷6",
+  "verified": true
+ },
+ {
+  "id": 10344,
+  "birth": 180,
+  "death": 240,
+  "chain": "shu",
+  "bio": "연의에서 유비 휘하 아장으로 한중 전투 때 조조의 출병을 알리는 「연의 인물」이다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10347,
+  "birth": 167,
+  "death": 230,
+  "chain": "yi>214:shu",
+  "bio": "촉한의 관료로 유장 아래에서 효렴으로 천거되었고, 옹개의 반란 때 포로로 오에 보내졌다가 돌아와 승상부 참군·장사로서 제갈량의 북벌을 보좌했다.",
+  "source": "三國志 卷41",
+  "verified": false
+ },
+ {
+  "id": 10349,
+  "birth": 168,
+  "death": 196,
+  "chain": "han>194:lu",
+  "bio": "장막의 동생으로 광릉태수를 지냈고, 형과 함께 여포를 맞아들여 조조에게 맞섰다가 옹구에서 포위되어 자살하고 삼족이 멸해졌다.",
+  "source": "資治通鑑 卷61",
+  "verified": false
+ },
+ {
+  "id": 10350,
+  "birth": 175,
+  "death": 222,
+  "chain": "shu>221:wu",
+  "bio": "장비의 부하로 범강과 함께 장비를 죽이고 그 머리를 가지고 오로 달아난 장수이다.",
+  "source": "三國志 卷36",
+  "verified": false
+ },
+ {
+  "id": 10356,
+  "birth": 165,
+  "death": 205,
+  "chain": "yuan>204:cao",
+  "bio": "",
+  "source": "三國志 卷1",
+  "verified": false
+ },
+ {
+  "id": 10360,
+  "birth": 170,
+  "death": 230,
+  "chain": "cao",
+  "bio": "",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10361,
+  "birth": 165,
+  "death": 219,
+  "chain": "cao",
+  "bio": "",
+  "source": "三國志 卷12",
+  "verified": false
+ },
+ {
+  "id": 10362,
+  "birth": 170,
+  "death": 236,
+  "chain": "cao",
+  "bio": "",
+  "source": "三國志 卷22",
+  "verified": false
+ },
+ {
+  "id": 10366,
+  "birth": 183,
+  "death": 232,
+  "chain": "wu",
+  "bio": "서곤의 딸로 손권의 부인이 되었으나 투기와 행실 문제로 폐출되어 오에서 죽었다.",
+  "source": "三國志 卷50",
+  "verified": false
+ },
+ {
+  "id": 10367,
+  "birth": 170,
+  "death": 215,
+  "chain": "wu",
+  "bio": "",
+  "source": "三國志 卷46",
+  "verified": false
+ },
+ {
+  "id": 10368,
+  "birth": 149,
+  "death": 208,
+  "chain": "han",
+  "bio": "후한의 관료로 형주자사로서 황건적을 토벌했고, 원술에게서 얻은 전국새를 헌제에게 바쳤으며 태상으로서 조조를 승상에 임명하는 사신이 되었다.",
+  "source": "後漢書 卷48",
+  "verified": false
+ },
+ {
+  "id": 10370,
+  "birth": 180,
+  "death": 240,
+  "chain": "wu",
+  "bio": "오의 관료로 손권의 사자로 조조에게 화평을 청하러 갔고, 시의·호종과 함께 군국의 비밀 업무를 맡았다.",
+  "source": "三國志 卷62",
+  "verified": false
+ },
+ {
+  "id": 10375,
+  "birth": 150,
+  "death": 204,
+  "chain": "han>195:yuan",
+  "bio": "",
+  "source": "後漢書 卷48",
+  "verified": false
+ },
+ {
+  "id": 10376,
+  "birth": 160,
+  "death": 205,
+  "chain": "ys",
+  "bio": "원술이 자기 부하로 삼아 양주자사에 임명한 인물로, 손책과 싸움 중이던 195년경의 기록에 보인다.",
+  "source": "資治通鑑 卷61",
+  "verified": false
+ },
+ {
+  "id": 10379,
+  "birth": 168,
+  "death": 199,
+  "chain": "lu",
+  "bio": "여포의 용맹한 측근 장수로 위월 등과 함께 적진을 돌파하는 선봉을 맡았다.",
+  "source": "三國志 卷1",
+  "verified": false
+ },
+ {
+  "id": 10380,
+  "birth": 157,
+  "death": 196,
+  "chain": "cao",
+  "bio": "영천 출신으로 조조가 아낀 초기 모사였으나 일찍 죽어 순욱이 곽가를 대신 추천했다.",
+  "source": "三國志 卷14",
+  "verified": false
+ },
+ {
+  "id": 10381,
+  "birth": 166,
+  "death": 204,
+  "chain": "wu",
+  "bio": "손익의 부하로 규람과 짜고 손익을 죽였으나, 서씨의 계략으로 손고·부영 등에게 처단되었다.",
+  "source": "三國志 卷51",
+  "verified": true
+ },
+ {
+  "id": 10382,
+  "birth": 199,
+  "death": 258,
+  "chain": "cao",
+  "bio": "위 문제 때 장수교위로 사냥을 자주 하지 말라고 간언했다가 노여움을 사 사형에서 감형되었고, 뒤에 제갈량 북벌 방어군에도 이름이 보인다.",
+  "source": "三國志 卷2",
+  "verified": false
+ },
+ {
+  "id": 10383,
+  "birth": 164,
+  "death": 199,
+  "chain": "",
+  "bio": "문칙(文則)은 자(字)로 쓰이는 경우가 많아 사서에서 이 이름의 독립 인물을 특정하지 못했다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10389,
+  "birth": 153,
+  "death": 190,
+  "chain": "han",
+  "bio": "연의에서 하내의 명장으로 나와 여포에게 단번에 베이는 「연의 인물」이다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10391,
+  "birth": 226,
+  "death": 268,
+  "chain": "wu",
+  "bio": "오의 무위사로 258년 손침이 반역을 꾀한다고 손휴에게 고해 손침 제거의 계기를 만들었다.",
+  "source": "三國志 卷64",
+  "verified": false
+ },
+ {
+  "id": 10392,
+  "birth": 165,
+  "death": 206,
+  "chain": "cao",
+  "bio": "태산·낭야 일대에서 반복적으로 반란한 세력가로 조조에게 귀순했다가 다시 반란하여 우금의 토벌을 받았다.",
+  "source": "三國志 卷9",
+  "verified": false
+ },
+ {
+  "id": 10393,
+  "birth": 165,
+  "death": 245,
+  "chain": "wu",
+  "bio": "",
+  "source": "三國志 卷62",
+  "verified": false
+ },
+ {
+  "id": 10400,
+  "birth": 170,
+  "death": 197,
+  "chain": "cao",
+  "bio": "연의에서 조조의 조카로 나와 장제의 아내 추씨를 소개한 뒤 완성 전투에서 전사하는 「연의 인물」이다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10401,
+  "birth": 195,
+  "death": 251,
+  "chain": "cao",
+  "bio": "",
+  "source": "三國志 卷29",
+  "verified": true
+ },
+ {
+  "id": 10404,
+  "birth": 195,
+  "death": 260,
+  "chain": "cao",
+  "bio": "",
+  "source": "後漢書 卷10",
+  "verified": false
+ },
+ {
+  "id": 10408,
+  "birth": 196,
+  "death": 208,
+  "chain": "cao",
+  "bio": "조조의 아들 조충으로 자는 창서이며, 코끼리 무게를 재는 지혜로 알려졌으나 열세 살에 병으로 죽어 조조가 크게 슬퍼했다.",
+  "source": "三國志 卷20",
+  "verified": true
+ },
+ {
+  "id": 10417,
+  "birth": 200,
+  "death": 260,
+  "chain": "cao",
+  "bio": "",
+  "source": "後漢書 卷10",
+  "verified": false
+ },
+ {
+  "id": 10420,
+  "birth": 209,
+  "death": 250,
+  "chain": "cao",
+  "bio": "",
+  "source": "三國志 卷20",
+  "verified": true
+ },
+ {
+  "id": 10424,
+  "birth": 170,
+  "death": 220,
+  "chain": "cao",
+  "bio": "조조가 여강태수로 삼아 환성에 주둔시킨 장수로, 둔전을 일구다가 오의 여몽·감녕에게 사로잡혔다.",
+  "source": "三國志 卷54",
+  "verified": false
+ },
+ {
+  "id": 10430,
+  "birth": 204,
+  "death": 270,
+  "chain": "wu",
+  "bio": "주연의 아들로 시적이라는 이름으로도 전하며, 아버지의 뒤를 이어 오의 군권을 맡다가 좌대사마에 올랐고 건형 2년(270) 세상을 떠났다.",
+  "source": "三國志 卷48",
+  "verified": true
+ },
+ {
+  "id": 10431,
+  "birth": 170,
+  "death": 230,
+  "chain": "",
+  "bio": "후한 환제 때 형주 군졸로 오래 변방 수자리를 서다 계양의 호란과 함께 반란한 지도자이다.",
+  "source": "後漢書 卷38",
+  "verified": false
+ },
+ {
+  "id": 10433,
+  "birth": 175,
+  "death": 222,
+  "chain": "cao",
+  "bio": "조진의 동향 친구로 조준과 함께 조조를 섬기다 일찍 죽었으며, 연의에서는 조진의 부선봉으로 나와 조운에게 베인다.",
+  "source": "三國志 卷9",
+  "verified": false
+ },
+ {
+  "id": 10434,
+  "birth": 174,
+  "death": 253,
+  "chain": "cao",
+  "bio": "조비가 태자일 때 사우(四友)로 불린 인물 중 하나로 중령군을 지냈다.",
+  "source": "三國志 卷21",
+  "verified": false
+ },
+ {
+  "id": 10442,
+  "birth": 176,
+  "death": 211,
+  "chain": "hansui",
+  "bio": "하동 출신으로 정은·후선 등과 함께 마초·한수 연합에 속했으며, 211년 조조에게 격파되어 성의와 함께 참수되었다.",
+  "source": "三國志 卷1",
+  "verified": true
+ },
+ {
+  "id": 10443,
+  "birth": 165,
+  "death": 225,
+  "chain": "yuan>204:cao",
+  "bio": "",
+  "source": "三國志 卷6",
+  "verified": false
+ },
+ {
+  "id": 10444,
+  "birth": 224,
+  "death": 287,
+  "chain": "shu",
+  "bio": "건위 출신으로 촉한의 상서랑을 지냈고, 진 무제가 불렀을 때 「진정표」로 할머니 봉양을 이유로 사양한 일로 유명하다.",
+  "source": "晉書 卷88",
+  "verified": false
+ },
+ {
+  "id": 10445,
+  "birth": 160,
+  "death": 195,
+  "chain": "lu",
+  "bio": "여포의 장수로 설란과 함께 거야에 주둔하다 195년 조조의 공격으로 베였다.",
+  "source": "三國志 卷1",
+  "verified": true
+ },
+ {
+  "id": 10447,
+  "birth": 175,
+  "death": 223,
+  "chain": "shu",
+  "bio": "광한 출신으로 아우 이소와 함께 이름이 높았던 촉한의 인물로 자는 영남이다.",
+  "source": "華陽國志 卷10",
+  "verified": false
+ },
+ {
+  "id": 10448,
+  "birth": 150,
+  "death": 197,
+  "chain": "han",
+  "bio": "",
+  "source": "資治通鑑 卷62",
+  "verified": true
+ },
+ {
+  "id": 10449,
+  "birth": 195,
+  "death": 260,
+  "chain": "shu",
+  "bio": "촉한의 아문장으로 구안과 함께 국산성을 지키다 위군에게 포위되어 항복한 장수이다.",
+  "source": "三國志 卷22",
+  "verified": false
+ },
+ {
+  "id": 10450,
+  "birth": 165,
+  "death": 225,
+  "chain": "",
+  "bio": "성만 전하는 여성 인물로, 사서에서 같은 인물을 특정할 근거를 찾지 못했다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10452,
+  "birth": 185,
+  "death": 245,
+  "chain": "yi>214:shu",
+  "bio": "재동 사람으로 촉한의 상서복야를 지내다 전감군·대장군사마를 겸한 인물이다.",
+  "source": "華陽國志 卷7",
+  "verified": false
+ },
+ {
+  "id": 10454,
+  "birth": 150,
+  "death": 192,
+  "chain": "dong",
+  "bio": "",
+  "source": "三國志 卷6",
+  "verified": false
+ },
+ {
+  "id": 10455,
+  "birth": 185,
+  "death": 245,
+  "chain": "wu",
+  "bio": "오의 단양태수로 낭야왕 손휴를 괴롭혔다가 훗날 보복이 두려워 위로 달아나려 했으나, 손휴가 용서하고 오히려 관직을 준 일화가 전한다.",
+  "source": "三國志 卷48",
+  "verified": false
+ },
+ {
+  "id": 10457,
+  "birth": 204,
+  "death": 260,
+  "chain": "shu",
+  "bio": "",
+  "source": "三國志 卷40",
+  "verified": false
+ },
+ {
+  "id": 10458,
+  "birth": 204,
+  "death": 260,
+  "chain": "shu",
+  "bio": "",
+  "source": "三國志 卷40",
+  "verified": false
+ },
+ {
+  "id": 10459,
+  "birth": 190,
+  "death": 240,
+  "chain": "cao",
+  "bio": "위나라 장수로 종회·등애의 촉 정벌 때 전장군으로 참가했다.",
+  "source": "晉書 卷2",
+  "verified": false
+ },
+ {
+  "id": 10461,
+  "birth": 175,
+  "death": 225,
+  "chain": "shu",
+  "bio": "광한 출신으로 형 이조와 함께 촉에서 이름이 있던 관료이다.",
+  "source": "華陽國志 卷7",
+  "verified": false
+ },
+ {
+  "id": 10462,
+  "birth": 172,
+  "death": 236,
+  "chain": "lu>198:cao",
+  "bio": "원래 진의록의 아내였으나 조조가 얻어 소실이 되었고, 조림과 조곤을 낳은 두부인으로 알려진 여성이다.",
+  "source": "三國志 卷20",
+  "verified": false
+ },
+ {
+  "id": 10463,
+  "birth": 165,
+  "death": 250,
+  "chain": "yi>214:shu",
+  "bio": "",
+  "source": "三國志 卷42",
+  "verified": false
+ },
+ {
+  "id": 10465,
+  "birth": 165,
+  "death": 230,
+  "chain": "jing>196:cao",
+  "bio": "",
+  "source": "三國志 卷23",
+  "verified": false
+ },
+ {
+  "id": 10467,
+  "birth": 165,
+  "death": 261,
+  "chain": "jing",
+  "bio": "",
+  "source": "三國志 卷42",
+  "verified": false
+ },
+ {
+  "id": 10468,
+  "birth": 155,
+  "death": 205,
+  "chain": "liaodong",
+  "bio": "",
+  "source": "三國志 卷8",
+  "verified": false
+ },
+ {
+  "id": 10469,
+  "birth": 187,
+  "death": 270,
+  "chain": "shu",
+  "bio": "촉 출신으로 황금독과 서하태수를 지냈다고 전하는 관료이다.",
+  "source": "華陽國志 卷11",
+  "verified": false
+ },
+ {
+  "id": 10471,
+  "birth": 160,
+  "death": 226,
+  "chain": "jiao",
+  "bio": "교지 사람으로 사섭이 천거한 관리였고, 사섭이 죽은 뒤 사휘가 오가 임명한 새 태수를 거부하자 이를 말리다 매질로 살해되었다. 그의 형 집안이 복수 군사를 일으켰다.",
+  "source": "三國志 卷49",
+  "verified": true
+ },
+ {
+  "id": 10473,
+  "birth": 160,
+  "death": 197,
+  "chain": "ys",
+  "bio": "원술의 부장으로 교유·이풍·악취 등과 함께 진 지방을 침공했다가 조조에게 격파되어 참수되었다.",
+  "source": "三國志 卷1",
+  "verified": true
+ },
+ {
+  "id": 10474,
+  "birth": 198,
+  "death": 260,
+  "chain": "cao",
+  "bio": "천수군 공조로 강유와 같은 군의 관리였으며, 제갈량의 북벌 때 천수태수를 따라다닌 위나라 관리이다.",
+  "source": "三國志 卷44",
+  "verified": false
+ },
+ {
+  "id": 10477,
+  "birth": 170,
+  "death": 215,
+  "chain": "zl",
+  "bio": "장로의 장수로 양앙과 함께 양평관을 지켰으나 215년 조조의 공격으로 베였다.",
+  "source": "三國志 卷1",
+  "verified": true
+ },
+ {
+  "id": 10480,
+  "birth": 150,
+  "death": 197,
+  "chain": "dong",
+  "bio": "",
+  "source": "後漢書 卷72",
+  "verified": false
+ },
+ {
+  "id": 10481,
+  "birth": 170,
+  "death": 220,
+  "chain": "han",
+  "bio": "중랑장으로 이각·곽사의 난에서 곽사가 양표를 죽이려 하자 강하게 말려 막은 인물이다.",
+  "source": "資治通鑑 卷61",
+  "verified": false
+ },
+ {
+  "id": 10482,
+  "birth": 152,
+  "death": 212,
+  "chain": "ys",
+  "bio": "원술 쪽 장수로 입력된 인물이나 사서에는 위 말 왕릉의 모의를 알린 같은 이름의 장군도 보여 동명이인을 구분하기 어렵다.",
+  "source": "三國志 卷28",
+  "verified": false
+ },
+ {
+  "id": 10485,
+  "birth": 190,
+  "death": 261,
+  "chain": "shu",
+  "bio": "",
+  "source": "三國志 卷45",
+  "verified": false
+ },
+ {
+  "id": 10486,
+  "birth": 190,
+  "death": 250,
+  "chain": "shu",
+  "bio": "촉한의 독농으로, 장완이 일처리가 어리석다고 비방했으나 장완은 화내지 않았다고 전한다.",
+  "source": "三國志 卷44",
+  "verified": false
+ },
+ {
+  "id": 10487,
+  "birth": 172,
+  "death": 215,
+  "chain": "zl",
+  "bio": "장로의 대장으로 아우 양임과 함께 양평관을 지켰으나 조조의 공격으로 패했다.",
+  "source": "三國志 卷1",
+  "verified": false
+ },
+ {
+  "id": 10491,
+  "birth": 175,
+  "death": 235,
+  "chain": "",
+  "bio": "성만 전하는 여성 인물로, 사서에서 같은 인물을 특정할 근거를 찾지 못했다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10492,
+  "birth": 165,
+  "death": 228,
+  "chain": "yi>214:shu",
+  "bio": "",
+  "source": "三國志 卷41",
+  "verified": false
+ },
+ {
+  "id": 10493,
+  "birth": 226,
+  "death": 291,
+  "chain": "cao",
+  "bio": "서진 초 외척으로 관군장군·태자태보를 지냈고 오 정벌 때 가충의 부장을 맡았으며, 형 양준이 실각하자 함께 처형되었다.",
+  "source": "晉書 卷3",
+  "verified": false
+ },
+ {
+  "id": 10496,
+  "birth": 223,
+  "death": 283,
+  "chain": "cao",
+  "bio": "서진 초 형주자사로 오에서 항복한 보천을 구원하러 갔다가 육항에게 패했다.",
+  "source": "晉書 卷3",
+  "verified": false
+ },
+ {
+  "id": 10500,
+  "birth": 178,
+  "death": 239,
+  "chain": "cao",
+  "bio": "천수 사람으로 마초가 양주를 장악하자 군사를 일으켜 격퇴했고, 위 명제에게 궁궐 공사를 줄이라고 직언한 강직한 관료이다.",
+  "source": "三國志 卷25",
+  "verified": false
+ },
+ {
+  "id": 10503,
+  "birth": 157,
+  "death": 197,
+  "chain": "ys",
+  "bio": "원술의 부장으로 교유·이풍·양강 등과 함께 진 지방을 침공했다가 조조에게 참수되었다.",
+  "source": "三國志 卷1",
+  "verified": true
+ },
+ {
+  "id": 10507,
+  "birth": 183,
+  "death": 225,
+  "chain": "",
+  "bio": "연의에서 계양태수 조범의 형수로 나와 조운에게 혼사를 청하는 인물로 보이는 「연의 인물」이다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10509,
+  "birth": 158,
+  "death": 195,
+  "chain": "han",
+  "bio": "양주자사 유요의 장수로 장영과 함께 횡강에서 손책에게 맞서다 패했다.",
+  "source": "三國志 卷49",
+  "verified": false
+ },
+ {
+  "id": 10511,
+  "birth": 143,
+  "death": 197,
+  "chain": "ys",
+  "bio": "원술의 대장으로 장훈과 함께 대장군에 올랐고, 197년 진 지방 침입 때 조조에게 격파되어 참수되었다.",
+  "source": "三國志 卷6",
+  "verified": true
+ },
+ {
+  "id": 10515,
+  "birth": 198,
+  "death": 238,
+  "chain": "wu",
+  "bio": "임회 회음 출신으로 보즐과 같은 집안이며 손권의 총애를 받아 두 딸을 낳았고, 238년 세상을 떠난 뒤 황후로 추존되었다.",
+  "source": "資治通鑑 卷74",
+  "verified": true
+ },
+ {
+  "id": 10518,
+  "birth": 148,
+  "death": 209,
+  "chain": "dong",
+  "bio": "동탁의 부장 출신으로 화음에서 군을 거느렸고, 헌제가 동쪽으로 갈 때 군량과 호위를 맡았으며 뒤에 대홍려에 올랐다.",
+  "source": "後漢書 卷72",
+  "verified": false
+ },
+ {
+  "id": 10519,
+  "birth": 180,
+  "death": 240,
+  "chain": "wu",
+  "bio": "오의 영릉태수로 손권에게 천하의 형세를 진언했고 이름난 선비로 평가되었다.",
+  "source": "三國志 卷47",
+  "verified": false
+ },
+ {
+  "id": 10520,
+  "birth": 170,
+  "death": 225,
+  "chain": "cao",
+  "bio": "위나라 평난장군으로 조엄이 도독호군으로 군을 맡았을 때 함께 편제된 장수이다.",
+  "source": "三國志 卷23",
+  "verified": false
+ },
+ {
+  "id": 10521,
+  "birth": 165,
+  "death": 215,
+  "chain": "shu",
+  "bio": "유비가 형주를 다스릴 때의 주부로, 손권과 함께 촉을 치자는 제안에 반대해 오에게 이용당할 위험을 지적했다.",
+  "source": "三國志 卷32",
+  "verified": false
+ },
+ {
+  "id": 10523,
+  "birth": 224,
+  "death": 284,
+  "chain": "cao",
+  "bio": "관구검의 장남으로, 연의에서는 사마사의 폐립에 분노한 아버지에게 거병을 권하는 인물로 나온다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10524,
+  "birth": 206,
+  "death": 266,
+  "chain": "cao",
+  "bio": "관구검 가문의 후손으로 입력된 인물이나 사서에서 구체 행적을 확인하지 못했다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10525,
+  "birth": 170,
+  "death": 235,
+  "chain": "cao",
+  "bio": "건안 16년 안정태수로 부임하면서 조조에게 이민족과의 접촉을 삼가라는 훈계를 들은 위나라 관료이다.",
+  "source": "三國志 卷1",
+  "verified": false
+ },
+ {
+  "id": 10530,
+  "birth": 184,
+  "death": 204,
+  "chain": "yuan",
+  "bio": "원상의 장수로 한단을 지켰으나 조조에게 격파되었다.",
+  "source": "三國志 卷1",
+  "verified": false
+ },
+ {
+  "id": 10531,
+  "birth": 195,
+  "death": 250,
+  "chain": "xianbei",
+  "bio": "",
+  "source": "三國志 卷30",
+  "verified": false
+ },
+ {
+  "id": 10533,
+  "birth": 145,
+  "death": 184,
+  "chain": "hj",
+  "bio": "영천 황건의 대방 우두머리로 184년 주준을 격파했으나 황보숭·조조 등의 장사 전투에서 패했다.",
+  "source": "後漢書 卷71",
+  "verified": false
+ },
+ {
+  "id": 10534,
+  "birth": 165,
+  "death": 225,
+  "chain": "cao",
+  "bio": "",
+  "source": "三國志 卷11",
+  "verified": false
+ },
+ {
+  "id": 10537,
+  "birth": 175,
+  "death": 240,
+  "chain": "cao",
+  "bio": "위나라에서 무위태수를 지낸 관료로 장기 열전에 함께 이름이 보인다.",
+  "source": "三國志 卷15",
+  "verified": false
+ },
+ {
+  "id": 10541,
+  "birth": 200,
+  "death": 252,
+  "chain": "wu",
+  "bio": "손권의 부인으로 손량의 어머니이며 황후에 올랐으나 252년 신봉 원년에 세상을 떠났다.",
+  "source": "三國志 卷47",
+  "verified": true
+ },
+ {
+  "id": 10544,
+  "birth": 168,
+  "death": 225,
+  "chain": "shanyue",
+  "bio": "회계 일대에서 오래 해를 끼치던 산월 도적 두목으로 육손의 토벌을 받았다.",
+  "source": "三國志 卷58",
+  "verified": false
+ },
+ {
+  "id": 10547,
+  "birth": 219,
+  "death": 266,
+  "chain": "cao",
+  "bio": "제갈탄의 심복 모사로 장반과 함께 수춘이 포위되자 탈출·투항 대책을 건의했다.",
+  "source": "三國志 卷28",
+  "verified": false
+ },
+ {
+  "id": 10548,
+  "birth": 159,
+  "death": 208,
+  "chain": "yuan>205:cao",
+  "bio": "원희의 부하로 장남과 함께 원희를 공격해 조조에게 귀순하고 열후에 봉해졌다.",
+  "source": "後漢書 卷74",
+  "verified": false
+ },
+ {
+  "id": 10558,
+  "birth": 165,
+  "death": 213,
+  "chain": "yi",
+  "bio": "",
+  "source": "華陽國志 卷3",
+  "verified": false
+ },
+ {
+  "id": 10559,
+  "birth": 190,
+  "death": 255,
+  "chain": "shu",
+  "bio": "",
+  "source": "三國志 卷45",
+  "verified": false
+ },
+ {
+  "id": 10562,
+  "birth": 160,
+  "death": 200,
+  "chain": "han",
+  "bio": "거기장군 동승과 함께 조조를 제거하려다 건안 5년(200) 계획이 발각되어 처형된 한 조정의 인사이다.",
+  "source": "三國志 卷32",
+  "verified": true
+ },
+ {
+  "id": 10565,
+  "birth": 152,
+  "death": 214,
+  "chain": "cao",
+  "bio": "조조 휘하 장수로 연의에서는 유비를 치러 갔다가 패하는 인물로 나온다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10566,
+  "birth": 165,
+  "death": 235,
+  "chain": "cao",
+  "bio": "위나라 관료로 대사농을 지냈고 엄격한 성품으로 알려졌다.",
+  "source": "三國志 卷14",
+  "verified": false
+ },
+ {
+  "id": 10567,
+  "birth": 198,
+  "death": 256,
+  "chain": "wu",
+  "bio": "오나라 장군으로 256년 손헌과 함께 손침을 죽이려 했으나 계획이 새어 손침에게 살해되었다.",
+  "source": "資治通鑑 卷77",
+  "verified": true
+ },
+ {
+  "id": 10569,
+  "birth": 155,
+  "death": 195,
+  "chain": "dong",
+  "bio": "이각 계열 장수로 번주·이몽과 함께 장안을 포위했다.",
+  "source": "三國志 卷6",
+  "verified": false
+ },
+ {
+  "id": 10572,
+  "birth": 220,
+  "death": 280,
+  "chain": "cao",
+  "bio": "위 고귀향공 조모가 사마소를 치려 할 때 왕침과 함께 이를 사마소에게 알린 측근 신하이다.",
+  "source": "晉書 卷2",
+  "verified": false
+ },
+ {
+  "id": 10573,
+  "birth": 155,
+  "death": 198,
+  "chain": "cao>194:lu",
+  "bio": "조조 휘하 종사중랑이었다가 허사와 함께 모반에 가담해 여포 쪽으로 돌아선 인물이다.",
+  "source": "三國志 卷7",
+  "verified": false
+ },
+ {
+  "id": 10574,
+  "birth": 200,
+  "death": 266,
+  "chain": "cao",
+  "bio": "",
+  "source": "晉書 卷39",
+  "verified": true
+ },
+ {
+  "id": 10580,
+  "birth": 184,
+  "death": 268,
+  "chain": "cao",
+  "bio": "낭야 출신의 효자로 계모를 극진히 섬긴 일화로 알려졌고, 위에서 대사농·사공 등을 지내다 서진 개국 후 태보에 올라 85세로 죽었다.",
+  "source": "晉書 卷33",
+  "verified": true
+ },
+ {
+  "id": 10586,
+  "birth": 175,
+  "death": 260,
+  "chain": "cao",
+  "bio": "",
+  "source": "三國志 卷24",
+  "verified": true
+ },
+ {
+  "id": 10587,
+  "birth": 165,
+  "death": 225,
+  "chain": "yi>214:shu",
+  "bio": "한가 출신으로 촉한에서 별가·태수를 지내고 관내후에 봉해졌다.",
+  "source": "華陽國志 卷7",
+  "verified": false
+ },
+ {
+  "id": 10588,
+  "birth": 165,
+  "death": 225,
+  "chain": "yi>214:shu",
+  "bio": "",
+  "source": "三國志 卷41",
+  "verified": false
+ },
+ {
+  "id": 10590,
+  "birth": 210,
+  "death": 269,
+  "chain": "",
+  "bio": "사료 색인에서 같은 이름의 구체적 인물을 확인하지 못했다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10592,
+  "birth": 170,
+  "death": 230,
+  "chain": "cao",
+  "bio": "조조의 후궁 환부인으로 조충·조거·조우를 낳았다.",
+  "source": "三國志 卷20",
+  "verified": false
+ },
+ {
+  "id": 10594,
+  "birth": 174,
+  "death": 222,
+  "chain": "jing>208:wu",
+  "bio": "파군 임강 출신으로 협객이었다가 유표·황조를 거쳐 손권에게 귀순해 황조 격파와 합비·유수 전투에서 공을 세운 오의 용장이다.",
+  "source": "三國志 卷55",
+  "verified": false
+ },
+ {
+  "id": 10595,
+  "birth": 175,
+  "death": 210,
+  "chain": "shu",
+  "bio": "유비의 부인으로 유선의 생모이며 뒤에 황후로 추존되었다.",
+  "source": "三國志 卷34",
+  "verified": false
+ },
+ {
+  "id": 10596,
+  "birth": 234,
+  "death": 294,
+  "chain": "shu",
+  "bio": "연의에서 강유의 부장으로 음평교가 끊긴 뒤 옹주로 진군하자고 건의하는 「연의 인물」이다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10607,
+  "birth": 190,
+  "death": 249,
+  "chain": "cao",
+  "bio": "",
+  "source": "三國志 卷9",
+  "verified": true
+ },
+ {
+  "id": 10609,
+  "birth": 215,
+  "death": 263,
+  "chain": "cao",
+  "bio": "연의에서 종회의 휘하 장수로 이름이 나오는 「연의 인물」이다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10610,
+  "birth": 225,
+  "death": 276,
+  "chain": "wu",
+  "bio": "오의 건평태수로 263년 촉이 위에 공격받는 틈을 타 군사를 이끌고 촉의 파동을 포위하러 나선 장수이다.",
+  "source": "三國志 卷48",
+  "verified": false
+ },
+ {
+  "id": 10612,
+  "birth": 183,
+  "death": 257,
+  "chain": "cao",
+  "bio": "",
+  "source": "三國志 卷22",
+  "verified": true
+ },
+ {
+  "id": 10613,
+  "birth": 155,
+  "death": 200,
+  "chain": "yuan",
+  "bio": "원소군의 독장으로 200년 조조의 오소 습격 때 베였다.",
+  "source": "三國志 卷1",
+  "verified": true
+ },
+ {
+  "id": 10614,
+  "birth": 151,
+  "death": 199,
+  "chain": "hs>198:yuan",
+  "bio": "흑산적 장수였다가 양추를 죽이고 원소에게 귀속했으며, 199년 사견에서 조조군에게 격파되어 죽었다.",
+  "source": "三國志 卷1",
+  "verified": true
+ },
+ {
+  "id": 10616,
+  "birth": 200,
+  "death": 294,
+  "chain": "cao",
+  "bio": "",
+  "source": "晉書 卷44",
+  "verified": true
+ },
+ {
+  "id": 10617,
+  "birth": 170,
+  "death": 240,
+  "chain": "jing",
+  "bio": "제갈량의 형주 시절 친구 석광원으로 알려진 인물로 뒤에 위에서 군수·전농교위를 지냈고, 연의에도 이름이 나온다.",
+  "source": "三國志 卷35",
+  "verified": false
+ },
+ {
+  "id": 10621,
+  "birth": 168,
+  "death": 199,
+  "chain": "lu",
+  "bio": "여포의 사자로 원술과 장양 사이를 오갔고, 아내 두씨를 얻으려 한 관우·조조 일화와 함께 이름이 전한다.",
+  "source": "華陽國志 卷6",
+  "verified": false
+ },
+ {
+  "id": 10623,
+  "birth": 165,
+  "death": 205,
+  "chain": "wu",
+  "bio": "",
+  "source": "三國志 卷53",
+  "verified": false
+ },
+ {
+  "id": 10624,
+  "birth": 185,
+  "death": 240,
+  "chain": "wu",
+  "bio": "연의에서 정보의 큰아들로 아버지 대신 주유를 맞아 나오는 「연의 인물」이다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10628,
+  "birth": 170,
+  "death": 222,
+  "chain": "yi>214:shu",
+  "bio": "파서 낭중 출신으로 촉한 종사좨주를 지냈고, 이릉 전투 때 오군을 맞아 싸우다 전사한 것으로 전해진다.",
+  "source": "華陽國志 卷6",
+  "verified": false
+ },
+ {
+  "id": 10635,
+  "birth": 160,
+  "death": 210,
+  "chain": "",
+  "bio": "장광 일대에서 3천여 가를 거느린 해적·도적 두목으로 206년경 조조군에게 격파되었다.",
+  "source": "三國志 卷1",
+  "verified": false
+ },
+ {
+  "id": 10636,
+  "birth": 165,
+  "death": 205,
+  "chain": "han",
+  "bio": "",
+  "source": "三國志 卷11",
+  "verified": false
+ },
+ {
+  "id": 10638,
+  "birth": 176,
+  "death": 208,
+  "chain": "xu",
+  "bio": "미축의 누이로 유비의 부인이 된 미부인으로 알려졌으며, 장판 전투 때 조운이 지켜 주었다는 일화가 전한다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10641,
+  "birth": 155,
+  "death": 199,
+  "chain": "ys",
+  "bio": "원술의 장수로 197년 소패의 유비를 공격했으나 여포의 중재로 군을 물렸다.",
+  "source": "三國志 卷7",
+  "verified": false
+ },
+ {
+  "id": 10643,
+  "birth": 214,
+  "death": 278,
+  "chain": "cao",
+  "bio": "",
+  "source": "晉書 卷31",
+  "verified": false
+ },
+ {
+  "id": 10645,
+  "birth": 190,
+  "death": 250,
+  "chain": "wu",
+  "bio": "오의 관료로 공손연에게 사신으로 파견되었고 인물 감식안으로 평가받았다.",
+  "source": "三國志 卷47",
+  "verified": false
+ },
+ {
+  "id": 10646,
+  "birth": 189,
+  "death": 221,
+  "chain": "",
+  "bio": "형주 양양 습씨 일족으로 입력된 인물이나 사서에서 구체 행적을 특정하지 못했다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10647,
+  "birth": 181,
+  "death": 229,
+  "chain": "",
+  "bio": "형주 양양 습씨 일족으로 입력된 인물이나 사서에서 구체 행적을 특정하지 못했다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10648,
+  "birth": 150,
+  "death": 191,
+  "chain": "han",
+  "bio": "기주목 한복의 장사로 원소의 입성에 반대해 민순과 함께 칼을 들고 막았으나, 191년 원소에게 죽임을 당했다.",
+  "source": "資治通鑑 卷60",
+  "verified": true
+ },
+ {
+  "id": 10649,
+  "birth": 170,
+  "death": 218,
+  "chain": "han",
+  "bio": "",
+  "source": "三國志 卷1",
+  "verified": true
+ },
+ {
+  "id": 10650,
+  "birth": 195,
+  "death": 253,
+  "chain": "wu",
+  "bio": "오의 장군으로 육개와 함께 주애·담이를 정벌했고 단양태수를 지냈으며 제갈각과 친했다.",
+  "source": "三國志 卷47",
+  "verified": false
+ },
+ {
+  "id": 10652,
+  "birth": 220,
+  "death": 290,
+  "chain": "wu",
+  "bio": "오의 중서령으로 호종의 아들이며, 280년 손호의 항복 문서를 작성하는 데 참여했다.",
+  "source": "三國志 卷48",
+  "verified": false
+ },
+ {
+  "id": 10653,
+  "birth": 235,
+  "death": 300,
+  "chain": "cao",
+  "bio": "",
+  "source": "資治通鑑 卷78",
+  "verified": false
+ },
+ {
+  "id": 10654,
+  "birth": 207,
+  "death": 264,
+  "chain": "shu",
+  "bio": "의양 출신 촉한 장수로 강유의 북벌에 참여했다가 256년 상규에서 약속 날짜를 어겨 강유의 패배를 불렀다.",
+  "source": "資治通鑑 卷77",
+  "verified": false
+ },
+ {
+  "id": 10655,
+  "birth": 225,
+  "death": 270,
+  "chain": "cao",
+  "bio": "위의 장수로 종회·등애의 촉 정벌에 참전했고 아들 호연이 종회의 반란을 알렸으며, 진 때 진주자사로서 270년 만곡퇴에서 전사했다.",
+  "source": "晉書 卷3",
+  "verified": true
+ },
+ {
+  "id": 10657,
+  "birth": 183,
+  "death": 243,
+  "chain": "wu",
+  "bio": "",
+  "source": "三國志 卷62",
+  "verified": false
+ },
+ {
+  "id": 10660,
+  "birth": 146,
+  "death": null,
+  "chain": "dong",
+  "bio": "동탁의 장수로 191년 양인 전투에서 손견에게 패했고 192년 이각에게 항복했다.",
+  "source": "後漢書 卷72",
+  "verified": false
+ },
+ {
+  "id": 10662,
+  "birth": 190,
+  "death": 279,
+  "chain": "wu",
+  "bio": "수칙의 아들로 오의 합포태수·계림태수를 지냈고, 279년 계림태수로 죽자 그 부곡의 처리 문제가 곽마의 반란 발단이 되었다.",
+  "source": "資治通鑑 卷80",
+  "verified": true
+ },
+ {
+  "id": 10663,
+  "birth": 150,
+  "death": 268,
+  "chain": "wu",
+  "bio": "오의 전부독으로 268년 교지를 공격하러 갔다가 진의 모경에게 패해 전사했다.",
+  "source": "三國志 卷48",
+  "verified": true
+ },
+ {
+  "id": 10666,
+  "birth": 191,
+  "death": 233,
+  "chain": "man",
+  "bio": "후대 소설에서 남만 왕 맹획의 딸로 나오는 인물로 사서에는 보이지 않는 후대 창작 인물이다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10667,
+  "birth": 174,
+  "death": 222,
+  "chain": "shu>221:wu",
+  "bio": "장비의 부하로 장달과 함께 장비를 죽이고 그 머리를 가지고 오로 달아난 장수이다.",
+  "source": "三國志 卷36",
+  "verified": false
+ },
+ {
+  "id": 10668,
+  "birth": 160,
+  "death": 195,
+  "chain": "gsz",
+  "bio": "공손찬이 연주자사 유대를 돕기 위해 기병과 함께 보낸 종사이다.",
+  "source": "三國志 卷14",
+  "verified": false
+ },
+ {
+  "id": 10671,
+  "birth": 190,
+  "death": 225,
+  "chain": "cao",
+  "bio": "",
+  "source": "三國志 卷10",
+  "verified": false
+ },
+ {
+  "id": 10673,
+  "birth": 160,
+  "death": 197,
+  "chain": "ys",
+  "bio": "연의에서 기령의 부장으로 나와 관우와 맞서는 「연의 인물」이다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10674,
+  "birth": 128,
+  "death": 190,
+  "chain": "han",
+  "bio": "영천 출신 대학자로 순숙의 여덟 아들 중 하나였으며, 동탁의 징소로 평원상·광록훈을 거쳐 사공에 올랐으나 190년 곧 세상을 떠났다.",
+  "source": "後漢書 卷62",
+  "verified": true
+ },
+ {
+  "id": 10675,
+  "birth": 209,
+  "death": 238,
+  "chain": "cao",
+  "bio": "",
+  "source": "三國志 卷10",
+  "verified": false
+ },
+ {
+  "id": 10685,
+  "birth": 125,
+  "death": 195,
+  "chain": "han>188:yi",
+  "bio": "광한 출신 학자로 영제 때 시중으로 불렸고, 유언에게 익주에 천자의 기운이 있다고 말해 함께 입촉했다.",
+  "source": "後漢書 卷82",
+  "verified": false
+ },
+ {
+  "id": 10689,
+  "birth": 221,
+  "death": 281,
+  "chain": "wu",
+  "bio": "오의 중서랑으로 258년 손휴 옹립에 참여했고, 손호 때는 중서령으로 육개의 말을 전하는 역할을 맡았다.",
+  "source": "三國志 卷48",
+  "verified": false
+ },
+ {
+  "id": 10690,
+  "birth": 165,
+  "death": 192,
+  "chain": "dong",
+  "bio": "",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10691,
+  "birth": 173,
+  "death": 192,
+  "chain": "dong",
+  "bio": "동탁의 손녀로 어려서 위양군에 봉해졌다고 전하며, 동백이라는 이름은 후대 서사에서 널리 쓰인다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10693,
+  "birth": 170,
+  "death": 219,
+  "chain": "",
+  "bio": "부곡장 동초와 함께 언급되는 장수로 정확한 소속과 행적은 사서에서 확인하지 못했다.",
+  "source": "三國志 卷18",
+  "verified": false
+ },
+ {
+  "id": 10696,
+  "birth": 216,
+  "death": 263,
+  "chain": "shu",
+  "bio": "장완의 아들로 한성을 지키다가 종회의 군을 맞은 촉한 장수이다.",
+  "source": "三國志 卷44",
+  "verified": false
+ },
+ {
+  "id": 10699,
+  "birth": 227,
+  "death": 282,
+  "chain": "cao",
+  "bio": "제갈탄의 심복 장수로 수춘이 포위되자 초이와 함께 활로를 모색한 인물이다.",
+  "source": "三國志 卷28",
+  "verified": false
+ },
+ {
+  "id": 10703,
+  "birth": 215,
+  "death": 264,
+  "chain": "shu",
+  "bio": "촉한의 태복으로 후주 유선의 명을 받들어 강유에게 종회에게 항복하라는 칙서를 전한 사람이다.",
+  "source": "資治通鑑 卷78",
+  "verified": false
+ },
+ {
+  "id": 10707,
+  "birth": 150,
+  "death": 205,
+  "chain": "jing",
+  "bio": "",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10709,
+  "birth": 159,
+  "death": 212,
+  "chain": "jing",
+  "bio": "유표의 후처로 아우 채모와 함께 아들 유종을 후계로 세웠다.",
+  "source": "後漢書 卷74",
+  "verified": false
+ },
+ {
+  "id": 10713,
+  "birth": 165,
+  "death": 240,
+  "chain": "cao",
+  "bio": "연주 종사로서 정욱과 협력해 견성 등 세 성을 지켰고 뒤에 태산태수 등을 맡은 조조 계열 관료이다.",
+  "source": "三國志 卷14",
+  "verified": false
+ },
+ {
+  "id": 10716,
+  "birth": 155,
+  "death": 195,
+  "chain": "xu",
+  "bio": "서주목 도겸에게 몰려 말릉에 주둔하다 195년경 손책에게 격파된 팽성상이다.",
+  "source": "三國志 卷49",
+  "verified": false
+ },
+ {
+  "id": 10718,
+  "birth": 160,
+  "death": 195,
+  "chain": "lu",
+  "bio": "여포의 장수로 이봉과 함께 거야에 주둔하다 195년 조조의 공격으로 베였다.",
+  "source": "三國志 卷1",
+  "verified": true
+ },
+ {
+  "id": 10719,
+  "birth": 170,
+  "death": 223,
+  "chain": "cao",
+  "bio": "",
+  "source": "三國志 卷16",
+  "verified": false
+ },
+ {
+  "id": 10720,
+  "birth": 164,
+  "death": 210,
+  "chain": "yuan>204:cao",
+  "bio": "원상 휘하 장수로 심배와 함께 업을 지켰으나 조조에게 내응하려다 실패하고 항복했다.",
+  "source": "三國志 卷6",
+  "verified": false
+ },
+ {
+  "id": 10724,
+  "birth": 220,
+  "death": 291,
+  "chain": "cao",
+  "bio": "위·진의 중신으로 종회·등애의 촉 정벌에 감군으로 참여했고, 서진에서 태보에 올랐으나 291년 가후의 모략으로 아들·손자와 함께 살해되었다.",
+  "source": "晉書 卷36",
+  "verified": true
+ },
+ {
+  "id": 10725,
+  "birth": 175,
+  "death": 250,
+  "chain": "cao",
+  "bio": "",
+  "source": "三國志 卷22",
+  "verified": false
+ },
+ {
+  "id": 10726,
+  "birth": 150,
+  "death": 190,
+  "chain": "cao",
+  "bio": "진류태수 장막의 부장으로 190년 조조를 따라 반동탁 전쟁에 나섰다가 형양 변수에서 서영에게 패해 전사했다고 전한다.",
+  "source": "三國志 卷1",
+  "verified": false
+ },
+ {
+  "id": 10728,
+  "birth": 175,
+  "death": 225,
+  "chain": "",
+  "bio": "사료 색인에서 확인되지 않는 인물로, 이름 외에 행적을 특정하지 못했다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10731,
+  "birth": 177,
+  "death": 206,
+  "chain": "ys",
+  "bio": "원술의 아들로 원술 사후 손책 쪽에 의탁했고, 딸이 손권의 부인이 되었다고 전한다.",
+  "source": "三國志 卷6",
+  "verified": false
+ },
+ {
+  "id": 10736,
+  "birth": 150,
+  "death": 192,
+  "chain": "yuan",
+  "bio": "원소의 사촌형으로 산양태수로 반동탁 연합에 참가했고, 192년 원소가 양주자사에 임명했으나 원술에게 패해 도주 중 병사에게 죽었다.",
+  "source": "資治通鑑 卷60",
+  "verified": true
+ },
+ {
+  "id": 10738,
+  "birth": 170,
+  "death": 244,
+  "chain": "jing>208:cao",
+  "bio": "",
+  "source": "三國志 卷23",
+  "verified": false
+ },
+ {
+  "id": 10741,
+  "birth": 165,
+  "death": 225,
+  "chain": "yi>214:shu",
+  "bio": "",
+  "source": "三國志 卷38",
+  "verified": false
+ },
+ {
+  "id": 10742,
+  "birth": 165,
+  "death": 245,
+  "chain": "yi>214:shu",
+  "bio": "남양 출신으로 유희의 제자이며 건안 연간에 허정 등과 교주를 거쳐 입촉해 박사로 일했고, 뒤에 대장추에 올랐다.",
+  "source": "三國志 卷42",
+  "verified": false
+ },
+ {
+  "id": 10744,
+  "birth": 163,
+  "death": null,
+  "chain": "cao>194:lu",
+  "bio": "처음 조조의 종사중랑이었다가 여포를 맞아들이는 모의에 가담했고, 뒤에 형주에서 유비와 함께 지내며 진등을 평가한 일화로 유명하다.",
+  "source": "後漢書 卷56",
+  "verified": false
+ },
+ {
+  "id": 10749,
+  "birth": 204,
+  "death": 228,
+  "chain": "shu",
+  "bio": "제갈근의 둘째 아들로 자는 백송이며, 아들이 없던 제갈량의 양자로 가서 한중에 따라갔다가 25세에 죽었다.",
+  "source": "三國志 卷35",
+  "verified": true
+ },
+ {
+  "id": 10755,
+  "birth": 218,
+  "death": 286,
+  "chain": "cao",
+  "bio": "위의 옹주자사로 종회·등애의 촉 정벌 때 무가에서 강유를 가로막았고, 뒤에 서진에서 위위를 지냈다.",
+  "source": "晉書 卷2",
+  "verified": false
+ },
+ {
+  "id": 10756,
+  "birth": 205,
+  "death": 253,
+  "chain": "wu",
+  "bio": "",
+  "source": "資治通鑑 卷76",
+  "verified": true
+ },
+ {
+  "id": 10760,
+  "birth": 190,
+  "death": 250,
+  "chain": "wu",
+  "bio": "",
+  "source": "三國志 卷52",
+  "verified": false
+ },
+ {
+  "id": 10763,
+  "birth": 175,
+  "death": 240,
+  "chain": "wu",
+  "bio": "손권의 측근 감독관으로 215년 합비 소요진에서 손권이 위기에 처했을 때 말을 몰게 해 탈출을 도운 인물이다.",
+  "source": "資治通鑑 卷67",
+  "verified": false
+ },
+ {
+  "id": 10764,
+  "birth": 176,
+  "death": 230,
+  "chain": "han",
+  "bio": "연의에서 왕윤의 양녀로 나와 연환계로 동탁과 여포를 갈라놓는 「연의 인물」이다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10767,
+  "birth": 192,
+  "death": 228,
+  "chain": "cao",
+  "bio": "위나라 장군으로 제갈량의 북벌 때 방어군에 참가했고, 연의에서는 중호군 대장으로 나온다.",
+  "source": "資治通鑑 卷71",
+  "verified": false
+ },
+ {
+  "id": 10768,
+  "birth": 170,
+  "death": 225,
+  "chain": "yi>214:shu",
+  "bio": "형주 강하 출신으로 유장의 인척이었으며, 입촉한 유비에게 투항해 면죽을 지킨 뒤 파군태수와 강주도독을 지냈다.",
+  "source": "三國志 卷32",
+  "verified": false
+ },
+ {
+  "id": 10771,
+  "birth": 190,
+  "death": 233,
+  "chain": "wu",
+  "bio": "오나라 장군으로 233년 장미·허안 등과 만 명을 이끌고 공손연에게 가서 구석을 전하려다 공손연에게 살해되었다.",
+  "source": "三國志 卷47",
+  "verified": true
+ },
+ {
+  "id": 10772,
+  "birth": 170,
+  "death": 225,
+  "chain": "cao",
+  "bio": "조조 휘하 장수로 건안 8년경 여양에 주둔했다.",
+  "source": "三國志 卷1",
+  "verified": false
+ },
+ {
+  "id": 10775,
+  "birth": 176,
+  "death": 222,
+  "chain": "wu",
+  "bio": "연의에서 손권의 호위 장수로 송겸과 함께 나오는 「연의 인물」이다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10779,
+  "birth": 171,
+  "death": 245,
+  "chain": "jing>196:cao",
+  "bio": "",
+  "source": "三國志 卷23",
+  "verified": true
+ },
+ {
+  "id": 10780,
+  "birth": 160,
+  "death": 200,
+  "chain": "yuan",
+  "bio": "",
+  "source": "三國志 卷1",
+  "verified": true
+ },
+ {
+  "id": 10781,
+  "birth": 175,
+  "death": 240,
+  "chain": "wu",
+  "bio": "남양 출신 오나라 대신으로 손권의 사신으로 위에 가서 문제와 응대한 일로 알려졌다.",
+  "source": "三國志 卷47",
+  "verified": false
+ },
+ {
+  "id": 10782,
+  "birth": 150,
+  "death": 210,
+  "chain": "han",
+  "bio": "주천 출신 여성으로 아버지를 죽인 이수를 직접 죽여 복수한 효열로 알려졌으며 방육의 어머니이다.",
+  "source": "三國志 卷18",
+  "verified": false
+ },
+ {
+  "id": 10785,
+  "birth": 170,
+  "death": 225,
+  "chain": "han",
+  "bio": "",
+  "source": "三國志 卷25",
+  "verified": false
+ },
+ {
+  "id": 10786,
+  "birth": 150,
+  "death": 193,
+  "chain": "xu",
+  "bio": "서주목 도겸의 별가로 광릉태수가 되었으나 착융에게 살해되었다.",
+  "source": "後漢書 卷73",
+  "verified": false
+ },
+ {
+  "id": 10787,
+  "birth": 190,
+  "death": 250,
+  "chain": "shu",
+  "bio": "",
+  "source": "三國志 卷40",
+  "verified": false
+ },
+ {
+  "id": 10788,
+  "birth": 225,
+  "death": 248,
+  "chain": "",
+  "bio": "베트남 전승에서 조씨정(조구)으로 알려진 구진 지방의 여성 반란 지도자로, 248년 오나라 교주자사 육윤에게 평정되었다고 전한다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10792,
+  "birth": 175,
+  "death": 240,
+  "chain": "wu",
+  "bio": "",
+  "source": "三國志 卷63",
+  "verified": false
+ },
+ {
+  "id": 10794,
+  "birth": 165,
+  "death": 225,
+  "chain": "cao",
+  "bio": "",
+  "source": "三國志 卷9",
+  "verified": false
+ },
+ {
+  "id": 10798,
+  "birth": 170,
+  "death": 235,
+  "chain": "shu",
+  "bio": "남군 출신으로 유비의 이릉 출정 때 전부 독의 한 사람이었고 뒤에 호군을 지냈다.",
+  "source": "三國志 卷45",
+  "verified": false
+ },
+ {
+  "id": 10799,
+  "birth": 191,
+  "death": 269,
+  "chain": "cao",
+  "bio": "신비의 딸로 양탐의 아내이며, 종회가 반란할 것을 예견해 조카 양수를 지킨 지혜로운 여성으로 전한다.",
+  "source": "晉書 卷96",
+  "verified": false
+ },
+ {
+  "id": 10800,
+  "birth": 210,
+  "death": 272,
+  "chain": "cao",
+  "bio": "신비의 아들로 조상의 참군이었는데 사마의의 정변 때 누이 신헌영의 조언에 따라 조상에게 합류했다가 용서받았다.",
+  "source": "資治通鑑 卷75",
+  "verified": false
+ },
+ {
+  "id": 10806,
+  "birth": 132,
+  "death": 221,
+  "chain": "jing>208:cao",
+  "bio": "서체와 고문에 능한 학자로 형주에서 조조 휘하로 들어가 조비·조식 곁에서 문사로 활동했고, 『소림』을 지었다고 전한다.",
+  "source": "三國志 卷21",
+  "verified": false
+ },
+ {
+  "id": 10809,
+  "birth": 175,
+  "death": 230,
+  "chain": "shu>219:wu",
+  "bio": "",
+  "source": "資治通鑑 卷71",
+  "verified": true
+ },
+ {
+  "id": 10810,
+  "birth": 156,
+  "death": null,
+  "chain": "lu",
+  "bio": "하내 출신 여포의 장수로 반란을 일으켰다가 진압된 인물이다.",
+  "source": "三國志 卷7",
+  "verified": false
+ },
+ {
+  "id": 10815,
+  "birth": 184,
+  "death": 235,
+  "chain": "cao",
+  "bio": "조비의 황후로 문덕황후 곽씨이며 자는 여왕이다. 위 명제 때 황태후가 되었다가 세상을 떠났다.",
+  "source": "三國志 卷5",
+  "verified": false
+ },
+ {
+  "id": 10816,
+  "birth": 162,
+  "death": 205,
+  "chain": "yuan",
+  "bio": "종요의 외조카로 원소의 조카 고간 휘하에서 하동을 공격했으나 마등·한수 연합군과 종요에게 격파되어 전사했다.",
+  "source": "三國志 卷13",
+  "verified": false
+ },
+ {
+  "id": 10820,
+  "birth": 158,
+  "death": 187,
+  "chain": "hj",
+  "bio": "후한 말 황건 계열 인물로 입력되었으나 사서에서 구체 행적을 특정하지 못했다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10823,
+  "birth": 148,
+  "death": 193,
+  "chain": "han",
+  "bio": "유우가 임명한 어양태수로 공손찬과 싸우다 193년 노수 북쪽에서 전사했다.",
+  "source": "後漢書 卷73",
+  "verified": true
+ },
+ {
+  "id": 10824,
+  "birth": 165,
+  "death": 200,
+  "chain": "dong",
+  "bio": "장제의 아내로 장제 사후 조카 장수 곁에 있었으나 조조가 그녀를 거둬 장수의 반란을 불렀다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10825,
+  "birth": 144,
+  "death": 193,
+  "chain": "han",
+  "bio": "후한 말 북군중후·교위로 유비가 속한 군을 이끌고 황건 토벌에 공을 세웠고 오환 방비 대책을 올렸다.",
+  "source": "後漢書 卷48",
+  "verified": false
+ },
+ {
+  "id": 10827,
+  "birth": 170,
+  "death": 221,
+  "chain": "yi>214:shu",
+  "bio": "남군 출신으로 유비 때 건녕·남중을 맡은 장강 남쪽 도독이었으나 재직 중 죽어 이회가 후임이 되었다.",
+  "source": "三國志 卷43",
+  "verified": false
+ },
+ {
+  "id": 10828,
+  "birth": 155,
+  "death": 220,
+  "chain": "jing",
+  "bio": "형주 명사로 유표에게 간언했으나 받아들여지지 않자 병을 핑계로 물러났고 조조가 형주를 얻은 뒤 한숭과 함께 등용되었다.",
+  "source": "後漢書 卷74",
+  "verified": false
+ },
+ {
+  "id": 10833,
+  "birth": 160,
+  "death": 208,
+  "chain": "jing",
+  "bio": "황조의 장수로 수천 군을 거느리고 시상으로 쳐들어왔다가 오군에게 격파되었다.",
+  "source": "三國志 卷54",
+  "verified": false
+ },
+ {
+  "id": 10834,
+  "birth": 205,
+  "death": 270,
+  "chain": "wu",
+  "bio": "오의 사자로 양도·손이와 함께 233년 요동 방면에 보내져 위의 수비 장수를 공격한 인물이다.",
+  "source": "三國志 卷47",
+  "verified": false
+ },
+ {
+  "id": 10835,
+  "birth": 160,
+  "death": 215,
+  "chain": "yi",
+  "bio": "유장의 신하로 유비가 쳐들어오면 들의 곡식을 불태워 지구전을 펴자고 건의했으나 받아들여지지 않았다.",
+  "source": "三國志 卷37",
+  "verified": false
+ },
+ {
+  "id": 10836,
+  "birth": 170,
+  "death": 230,
+  "chain": "wu",
+  "bio": "진군 출신의 박학한 인물로 술을 아주 좋아했고 손권이 신임해 223년 백제성의 유비에게 사신으로 보냈다.",
+  "source": "三國志 卷47",
+  "verified": false
+ },
+ {
+  "id": 10837,
+  "birth": 150,
+  "death": 192,
+  "chain": "han",
+  "bio": "",
+  "source": "三國志 卷10",
+  "verified": false
+ },
+ {
+  "id": 10838,
+  "birth": 165,
+  "death": 235,
+  "chain": "cao",
+  "bio": "",
+  "source": "三國志 卷16",
+  "verified": false
+ },
+ {
+  "id": 10839,
+  "birth": 150,
+  "death": 197,
+  "chain": "han>192:ys",
+  "bio": "헌제가 임명한 연주자사였으나 조조에게 막혀 원술에게 달아났고, 원술이 칭제하며 태위 자리를 권하자 거부해 살해되었다.",
+  "source": "資治通鑑 卷62",
+  "verified": true
+ },
+ {
+  "id": 10842,
+  "birth": 177,
+  "death": 218,
+  "chain": "han",
+  "bio": "한 조정의 관료로 소부 경기·사직 위황 등과 함께 건안 23년(218) 조조에 대항해 거병했다가 실패했다.",
+  "source": "資治通鑑 卷68",
+  "verified": true
+ },
+ {
+  "id": 10844,
+  "birth": 223,
+  "death": 263,
+  "chain": "cao",
+  "bio": "종요의 아들로 정위·진군장군 등을 역임했고 아우 종회와 함께 이름난 위의 문신이다.",
+  "source": "三國志 卷9",
+  "verified": false
+ },
+ {
+  "id": 10846,
+  "birth": 150,
+  "death": 215,
+  "chain": "cao",
+  "bio": "연의에서 종요의 동생으로 나와 서문을 지키다 마초군에게 패하는 「연의 인물」이다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10850,
+  "birth": 150,
+  "death": 191,
+  "chain": "han",
+  "bio": "한복의 별가로 원소의 입성에 반대하다 191년 원소에게 죽임을 당했다(연의에서는 관순 표기).",
+  "source": "資治通鑑 卷60",
+  "verified": true
+ },
+ {
+  "id": 10855,
+  "birth": 204,
+  "death": 271,
+  "chain": "shu",
+  "bio": "후대 소설에서 관우의 딸로 설정된 인물로 사서에는 보이지 않는 후대 창작 인물이다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10860,
+  "birth": 170,
+  "death": 213,
+  "chain": "cao",
+  "bio": "천수 사람으로 양주 별가로서 마초의 포위 속에 성을 빠져나가 하후연에게 구원을 청하려다 붙잡혀 마초의 회유를 거부하고 죽었다.",
+  "source": "三國志 卷18",
+  "verified": false
+ },
+ {
+  "id": 10861,
+  "birth": 159,
+  "death": 215,
+  "chain": "hansui",
+  "bio": "한수의 사위이자 부장으로 알려졌으며, 마초·한수 연합의 패전 후 조조에게 귀순했다고 전한다.",
+  "source": "三國志 卷15",
+  "verified": false
+ },
+ {
+  "id": 10862,
+  "birth": 158,
+  "death": 199,
+  "chain": "ys",
+  "bio": "원술의 주부로 원술의 칭제 논의에 반대하는 발언을 한 인물이다.",
+  "source": "三國志 卷6",
+  "verified": false
+ },
+ {
+  "id": 10864,
+  "birth": 210,
+  "death": 263,
+  "chain": "cao",
+  "bio": "",
+  "source": "晉書 卷49",
+  "verified": true
+ },
+ {
+  "id": 10865,
+  "birth": 190,
+  "death": 225,
+  "chain": "man",
+  "bio": "연의에서 남만 맹획 휘하 삼동 원수의 하나로 나오는 「연의 인물」이다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10866,
+  "birth": 160,
+  "death": 215,
+  "chain": "di",
+  "bio": "",
+  "source": "三國志 卷30",
+  "verified": false
+ },
+ {
+  "id": 10867,
+  "birth": 160,
+  "death": 220,
+  "chain": "yuan>204:cao",
+  "bio": "원상이 조조에게 항복 의사를 전하기 위해 진림과 함께 보낸 사자이다.",
+  "source": "三國志 卷6",
+  "verified": false
+ },
+ {
+  "id": 10869,
+  "birth": 180,
+  "death": 240,
+  "chain": "wu",
+  "bio": "여남 출신 오나라 관료로 손권의 사자로 위에 가서 조비를 당당히 응대했다고 전한다.",
+  "source": "三國志 卷47",
+  "verified": false
+ },
+ {
+  "id": 10872,
+  "birth": 174,
+  "death": 208,
+  "chain": "jing",
+  "bio": "황조의 도독으로 수군을 이끌고 맞섰으나 208년 여몽에게 참수되었다.",
+  "source": "三國志 卷54",
+  "verified": true
+ },
+ {
+  "id": 10874,
+  "birth": 172,
+  "death": 208,
+  "chain": "jing",
+  "bio": "연의에서 계양태수 조범 휘하 교위로 나와 조운에게 패하는 「연의 인물」이다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10879,
+  "birth": 160,
+  "death": 217,
+  "chain": "han>190:yuan",
+  "bio": "건안칠자의 한 사람으로 하진의 주부였다가 원소 밑에서 조조를 비난하는 격문을 썼고, 원씨 멸망 후 조조에게 귀의했다.",
+  "source": "三國志 卷21",
+  "verified": false
+ },
+ {
+  "id": 10882,
+  "birth": 190,
+  "death": 258,
+  "chain": "shu",
+  "bio": "여남 출신으로 동윤 사후 상서령에 올라 황호와 결탁해 후주의 신임을 받았다고 평가받는다.",
+  "source": "三國志 卷39",
+  "verified": false
+ },
+ {
+  "id": 10885,
+  "birth": 190,
+  "death": 230,
+  "chain": "",
+  "bio": "",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10886,
+  "birth": 157,
+  "death": 204,
+  "chain": "ys",
+  "bio": "원술 휘하에서 뇌박과 함께 잠산에 거점을 두었다가 조조 쪽에 격파된 여강의 장수이다.",
+  "source": "三國志 卷6",
+  "verified": false
+ },
+ {
+  "id": 10895,
+  "birth": 180,
+  "death": 239,
+  "chain": "wu",
+  "bio": "육손의 아우로 학문과 의리를 중시하며 손권에게 공손연 친정을 만류하는 상소를 올린 인물이다.",
+  "source": "三國志 卷57",
+  "verified": false
+ },
+ {
+  "id": 10897,
+  "birth": 200,
+  "death": 270,
+  "chain": "wu",
+  "bio": "육개의 아우로 248년 교주자사·안남교위가 되어 구진·교지의 반란을 은혜와 신의로 진정시켰다.",
+  "source": "資治通鑑 卷75",
+  "verified": false
+ },
+ {
+  "id": 10899,
+  "birth": 195,
+  "death": 255,
+  "chain": "wu",
+  "bio": "사서 근거가 불명확한 오 출신 인물로 입력되었으며 구체 행적을 확인하지 못했다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10900,
+  "birth": 205,
+  "death": 233,
+  "chain": "cao",
+  "bio": "청주 출신으로 오에 귀순해 상서를 올려 인정받았고, 정위감이 되어 호걸과 교제하다 처형된 것으로 전한다.",
+  "source": "三國志 卷62",
+  "verified": false
+ },
+ {
+  "id": 10903,
+  "birth": 170,
+  "death": 210,
+  "chain": "dong",
+  "bio": "연의에서 장수의 부장으로 장선과 함께 출전하는 「연의 인물」이다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10904,
+  "birth": 165,
+  "death": 210,
+  "chain": "",
+  "bio": "여강 출신 무리를 이끈 수령으로 208년 수만 구를 거느리고 유비에게 귀부했다.",
+  "source": "三國志 卷32",
+  "verified": false
+ },
+ {
+  "id": 10910,
+  "birth": 168,
+  "death": 213,
+  "chain": "han",
+  "bio": "위단의 아들로 양주자사였으며 213년 마초가 기성을 포위했을 때 항복했다가 살해되었다.",
+  "source": "後漢書 卷9",
+  "verified": true
+ },
+ {
+  "id": 10914,
+  "birth": 171,
+  "death": 228,
+  "chain": "qiang",
+  "bio": "연의에서 서량의 대장으로 큰 도끼를 쓰는 한덕 사형제로 나오는 「연의 인물」이다.",
+  "source": "三國演義",
+  "verified": false
+ },
+ {
+  "id": 10918,
+  "birth": 159,
+  "death": 238,
+  "chain": "jing>208:cao",
+  "bio": "남양 출신으로 형주에서 지내다 조조에게 등용되었고, 물레방아 풀무(수배)를 개량해 철 생산을 늘렸으며 사도에 올랐다.",
+  "source": "資治通鑑 卷74",
+  "verified": true
+ },
+ {
+  "id": 10920,
+  "birth": 155,
+  "death": 200,
+  "chain": "yuan",
+  "bio": "원소의 장수로 군량 수송을 맡았다가 조조군에 의해 군수품을 잃었다.",
+  "source": "三國志 卷10",
+  "verified": false
+ },
+ {
+  "id": 10922,
+  "birth": 165,
+  "death": 225,
+  "chain": "yuan",
+  "bio": "원씨 부자에 대한 충성으로 조조와의 맹세에 응하지 않았고, 조조가 절개를 높이 평가했으나 끝내 벼슬하지 않았다.",
+  "source": "三國志 卷6",
+  "verified": false
+ },
+ {
+  "id": 10923,
+  "birth": 165,
+  "death": 205,
+  "chain": "",
+  "bio": "사료 색인에서 같은 이름의 구체적 삼국 시대 인물을 확인하지 못했다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10924,
+  "birth": 195,
+  "death": 252,
+  "chain": "wu>227:cao",
+  "bio": "",
+  "source": "三國志 卷48",
+  "verified": true
+ },
+ {
+  "id": 10925,
+  "birth": 155,
+  "death": 197,
+  "chain": "ys",
+  "bio": "원술의 사자로 칭제 사실을 여포에게 알리고 혼사를 추진했으나 여포에게 붙잡혀 압송되었다.",
+  "source": "後漢書 卷75",
+  "verified": false
+ },
+ {
+  "id": 10926,
+  "birth": 158,
+  "death": 200,
+  "chain": "yuan",
+  "bio": "원소군의 기독으로 200년 조조의 오소 습격 때 베였다.",
+  "source": "三國志 卷1",
+  "verified": true
+ },
+ {
+  "id": 10927,
+  "birth": 170,
+  "death": 230,
+  "chain": "",
+  "bio": "",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10930,
+  "birth": 160,
+  "death": 225,
+  "chain": "jing>208:shu",
+  "bio": "영릉 출신으로 유표가 교주자사로 보냈으나 오거와 불화한 끝에 물러났고, 뒤에 유비 정권의 태상이 되어 칭제 상소에 이름을 올렸다.",
+  "source": "三國志 卷49",
+  "verified": false
+ },
+ {
+  "id": 10932,
+  "birth": 210,
+  "death": 260,
+  "chain": "wu",
+  "bio": "",
+  "source": "三國志 卷58",
+  "verified": false
+ },
+ {
+  "id": 10934,
+  "birth": 190,
+  "death": 225,
+  "chain": "wu",
+  "bio": "",
+  "source": "三國志 卷52",
+  "verified": false
+ },
+ {
+  "id": 10938,
+  "birth": 165,
+  "death": 225,
+  "chain": "yuan>204:cao",
+  "bio": "원상의 장수로 장의와 함께 전투 중 조조에게 항복한 인물이다.",
+  "source": "三國志 卷1",
+  "verified": false
+ },
+ {
+  "id": 10941,
+  "birth": 130,
+  "death": 194,
+  "chain": "han",
+  "bio": "마융의 족손으로 노식·채옹 등과 경서를 교정했고 태위·태부에 올랐으며, 194년 원술에게 사절로 갔다가 수춘에서 죽었다.",
+  "source": "後漢書 卷9",
+  "verified": true
+ },
+ {
+  "id": 10943,
+  "birth": 187,
+  "death": 222,
+  "chain": "jing>208:shu",
+  "bio": "양양 의성 출신으로 마씨 오상 중 백미로 불렸으며, 유비의 종사로 오와 외교를 맡았고 이릉 전쟁 때 오계 이민족을 위무하다 죽었다.",
+  "source": "三國志 卷39",
+  "verified": true
+ },
+ {
+  "id": 10947,
+  "birth": 221,
+  "death": 266,
+  "chain": "shu>263:cao",
+  "bio": "등애가 음평으로 진격했을 때 강유 수비 장수로 항복한 촉한 장수이다.",
+  "source": "三國志 卷28",
+  "verified": false
+ },
+ {
+  "id": 10951,
+  "birth": 190,
+  "death": 235,
+  "chain": "",
+  "bio": "후대 소설과 게임에서 마초의 누이로 설정된 인물로 사서에는 이름이 보이지 않는 후대 창작 인물이다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10953,
+  "birth": 190,
+  "death": 250,
+  "chain": "cao",
+  "bio": "조조의 명으로 조엄이 감독하게 된 일곱 군의 장수 가운데 한 사람으로 이름이 보인다.",
+  "source": "三國志 卷23",
+  "verified": false
+ },
+ {
+  "id": 10954,
+  "birth": 170,
+  "death": 199,
+  "chain": "",
+  "bio": "성만 전하는 인물로, 사서에서 같은 인물을 특정할 근거를 찾지 못했다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10964,
+  "birth": 165,
+  "death": 205,
+  "chain": "yuan",
+  "bio": "원씨 쪽 위군태수로 하수 가에 주둔해 조조군의 보급로를 끊으려 한 장수이다.",
+  "source": "三國志 卷18",
+  "verified": false
+ },
+ {
+  "id": 10971,
+  "birth": 170,
+  "death": 199,
+  "chain": "lu",
+  "bio": "여포의 용맹한 측근으로 성렴 등과 함께 적진을 돌파하는 선봉에 섰다.",
+  "source": "後漢書 卷75",
+  "verified": false
+ },
+ {
+  "id": 10972,
+  "birth": 221,
+  "death": 268,
+  "chain": "wu",
+  "bio": "오의 장군으로 258년 손휴에게 손침이 밖에 있으면 변고가 있을 것이라 간언한 인물이다.",
+  "source": "三國志 卷64",
+  "verified": false
+ },
+ {
+  "id": 10975,
+  "birth": 191,
+  "death": 240,
+  "chain": "shu",
+  "bio": "후대 소설에서 관삭의 아내로 나오는 인물로 사서에는 보이지 않는 후대 창작 인물이다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10979,
+  "birth": 159,
+  "death": 190,
+  "chain": "cao",
+  "bio": "포신의 동생으로 190년 반동탁 전쟁의 형양 변수 전투에 형과 함께 참전했다가 전사한 것으로 전해지나, 색인에서 직접 대응 문장은 확인하지 못했다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10980,
+  "birth": 170,
+  "death": null,
+  "chain": "wu",
+  "bio": "오의 장수로 222년 이릉 전투에서 육손 휘하 5만 병력에 속했고, 뒤에 미방과 함께 기춘을 습격한 일이 전한다.",
+  "source": "三國志 卷58",
+  "verified": false
+ },
+ {
+  "id": 10982,
+  "birth": 190,
+  "death": 230,
+  "chain": "hansui>215:cao",
+  "bio": "서평 출신으로 한수 휘하 금성 제장이었다가 한수를 베어 조조에게 바쳤고, 뒤에 반란을 일으켰다.",
+  "source": "三國志 卷1",
+  "verified": false
+ },
+ {
+  "id": 10983,
+  "birth": 148,
+  "death": null,
+  "chain": "yuan",
+  "bio": "원소의 장수로 팔백 병력의 선등으로 공손찬을 격파했으나 교만해져 원소에게 죽임을 당했다.",
+  "source": "三國志 卷6",
+  "verified": false
+ },
+ {
+  "id": 10984,
+  "birth": 200,
+  "death": 264,
+  "chain": "shanyue",
+  "bio": "오군 일대의 산월 도적 두목으로 상구 등과 함께 한때 세력을 키웠다.",
+  "source": "三國志 卷60",
+  "verified": false
+ },
+ {
+  "id": 10985,
+  "birth": 175,
+  "death": 208,
+  "chain": "jing",
+  "bio": "황조의 아들로 장릉태수를 지냈고 예형을 아낀 문사로 알려졌으며, 부친이 죽은 208년 전후의 행적은 불분명하다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10986,
+  "birth": 208,
+  "death": 263,
+  "chain": "shu",
+  "bio": "황권의 아들로 상서랑을 지냈고, 제갈첨과 함께 면죽에서 등애를 막다 전사했다.",
+  "source": "華陽國志 卷7",
+  "verified": true
+ },
+ {
+  "id": 10988,
+  "birth": 186,
+  "death": 235,
+  "chain": "jing",
+  "bio": "제갈량의 아내로, 사서(양양기)에는 황승언의 딸로만 전하며 월영이라는 이름은 후대에 붙은 것이다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10990,
+  "birth": 141,
+  "death": 192,
+  "chain": "han",
+  "bio": "후한 말 사도·태위를 지낸 중신으로 왕윤과 함께 동탁 제거를 모의했고, 192년 이각·곽사의 난 때 피살되었다.",
+  "source": "後漢書 卷9",
+  "verified": true
+ },
+ {
+  "id": 10994,
+  "birth": 205,
+  "death": 272,
+  "chain": "cao",
+  "bio": "방덕의 아들로 등애를 따라 촉을 정벌했고 강유를 추격한 장수이다.",
+  "source": "三國志 卷28",
+  "verified": false
+ },
+ {
+  "id": 10996,
+  "birth": 180,
+  "death": 240,
+  "chain": "jing",
+  "bio": "방통의 동생으로 전해지는 인물로 형주에서 유비 정권에 출사한 것으로 알려졌으나 사서 직접 근거는 확인하지 못했다.",
+  "source": "",
+  "verified": false
+ },
+ {
+  "id": 10997,
+  "birth": 165,
+  "death": 235,
+  "chain": "cao",
+  "bio": "주천 출신으로 어머니 조아가 복수한 일화로 알려졌으며 서해태수 등을 지냈다.",
+  "source": "三國志 卷18",
+  "verified": false
+ }
+]

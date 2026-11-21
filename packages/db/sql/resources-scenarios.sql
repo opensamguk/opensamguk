@@ -181,6 +181,10 @@
 --
 -- `packages/rules/src/monthly/disaster.ts`의 분기·확률·배율·문구·부상은 사용자 제공 core2026 `81e101f`의 `app/game-engine/src/turn/monthlyDisasterAction.ts`를 옮겼다. 계략 상태32와 출병 상태43은 같은 판의 `che_선동.ts`, `che_탈취.ts`, `che_파괴.ts`, `che_출병.ts`를 참고했다. 위 devsam MIT 고지를 유지한다.
 --
+-- ## 새 지도·시나리오 초안
+--
+-- `resources/map-drafts/san10-v2/`의 출처와 권리는 [그 폴더의 고지](./map-drafts/san10-v2/NOTICE.md)에 따로 적었다. 게임 런타임은 이 폴더를 읽지 않는다.
+--
 
 DO $t4_46_init$
 DECLARE

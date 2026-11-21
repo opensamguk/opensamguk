@@ -1,0 +1,3602 @@
+[
+{
+"person": 10308,
+"master": 10348,
+"from": 184,
+"to": 185,
+"relation": "LIEUTENANT",
+"basis": "열전",
+"note": "후한서 황보숭전: 지공장군 장보, 장각의 동생"
+},
+{
+"person": 10321,
+"master": 10348,
+"from": 184,
+"to": 185,
+"relation": "LIEUTENANT",
+"basis": "열전",
+"note": "후한서 황보숭전: 인공장군 장량"
+},
+{
+"person": 10533,
+"master": 10348,
+"from": 184,
+"to": 184,
+"relation": "LIEUTENANT",
+"basis": "열전",
+"note": "영천 황건 거수 파재 (황보숭전)"
+},
+{
+"person": 10319,
+"master": 10348,
+"from": 184,
+"to": 184,
+"relation": "LIEUTENANT",
+"basis": "열전",
+"note": "남양 황건 거수 장만성 (주준전)"
+},
+{
+"person": 10229,
+"master": 10915,
+"from": 184,
+"to": 184,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "한충 사후 잔당(손하/손중)이 이어받음 (주준전), 동일인 여부 추정"
+},
+{
+"person": 10105,
+"master": 10023,
+"from": 192,
+"to": 195,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "여남 황건 유벽·하의·황소 연합 (무제기 초평3), 서열은 추정"
+},
+{
+"person": 11000,
+"master": 10023,
+"from": 192,
+"to": 195,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "여남 황건 공도, 하의 휘하"
+},
+{
+"person": 11000,
+"master": 10105,
+"from": 196,
+"to": 198,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "하의 사후 유벽과 합류"
+},
+{
+"person": 10105,
+"master": 10732,
+"from": 199,
+"to": 199,
+"relation": "LIEUTENANT",
+"basis": "열전",
+"note": "선주전: 여남 황건 유벽이 원소에 호응"
+},
+{
+"person": 10071,
+"master": 10732,
+"from": 200,
+"to": 200,
+"relation": "GUEST",
+"basis": "사서",
+"note": "선주전: 유비가 원소에게 의탁"
+},
+{
+"person": 10012,
+"master": 10328,
+"from": 188,
+"to": 193,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "흑산 장연 휘하 소두목 우독 (후한서 효령제기·장연 전승)"
+},
+{
+"person": 10614,
+"master": 10328,
+"from": 190,
+"to": 194,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "흑산군 휴고(眭固)는 처음 장연 계열"
+},
+{
+"person": 10614,
+"master": 10322,
+"from": 195,
+"to": 198,
+"relation": "LIEUTENANT",
+"basis": "열전",
+"note": "무제기 건안3: 휴고가 장양 장수로 있다가 장양 살해 후 병력 장악"
+},
+{
+"person": 10322,
+"master": 10002,
+"from": 189,
+"to": 190,
+"relation": "LIEUTENANT",
+"basis": "열전",
+"note": "장양은 정원의 속관 출신 (장양전)"
+},
+{
+"person": 10732,
+"master": 20962,
+"from": 188,
+"to": 188,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "서원팔교위: 상군 건석 아래 중군교위 원소 (영제기 중평5)"
+},
+{
+"person": 10405,
+"master": 20962,
+"from": 188,
+"to": 188,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "서원팔교위 전군교위 조조"
+},
+{
+"person": 20963,
+"master": 20962,
+"from": 188,
+"to": 189,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "하군교위 포홍"
+},
+{
+"person": 20964,
+"master": 20962,
+"from": 188,
+"to": 189,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "조군좌교위 조융"
+},
+{
+"person": 21335,
+"master": 20962,
+"from": 188,
+"to": 189,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "조군우교위 풍방"
+},
+{
+"person": 21336,
+"master": 20962,
+"from": 188,
+"to": 189,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "좌교위 하모"
+},
+{
+"person": 10535,
+"master": 20962,
+"from": 188,
+"to": 189,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "우교위 순우경"
+},
+{
+"person": 10405,
+"master": 10608,
+"from": 184,
+"to": 184,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "무제기: 기도위로 영천 황건 토벌 (황보숭·주준 휘하)"
+},
+{
+"person": 10234,
+"master": 10423,
+"from": 184,
+"to": 185,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "손견전: 주준이 표를 올려 임용, 황건 토벌"
+},
+{
+"person": 10732,
+"master": 10031,
+"from": 189,
+"to": 189,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "하진이 환관 주살을 도모하며 원소 기용 (원소전)"
+},
+{
+"person": 10734,
+"master": 10031,
+"from": 189,
+"to": 189,
+"relation": "LIEUTENANT",
+"basis": "열전",
+"note": "후한서 원술전: 하진 정권에서 호분중랑장"
+},
+{
+"person": 10405,
+"master": 10031,
+"from": 189,
+"to": 189,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "무제기: 하진이 조조를 불러 협력"
+},
+{
+"person": 10837,
+"master": 10031,
+"from": 189,
+"to": 189,
+"relation": "STAFF",
+"basis": "열전",
+"note": "후한서 정태전: 하진이 정태를 등용"
+},
+{
+"person": 10672,
+"master": 10031,
+"from": 189,
+"to": 189,
+"relation": "STAFF",
+"basis": "열전",
+"note": "위서 순유전: 하진이 불러 황문시랑"
+},
+{
+"person": 20706,
+"master": 10031,
+"from": 189,
+"to": 189,
+"relation": "STAFF",
+"basis": "열전",
+"note": "후한서 하옹전: 하진이 북군중후로 기용"
+},
+{
+"person": 10146,
+"master": 10002,
+"from": 189,
+"to": 189,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "여포전: 병주자사 정원의 주부"
+},
+{
+"person": 10352,
+"master": 10002,
+"from": 188,
+"to": 189,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "장료전: 병주자사 정원의 종사"
+},
+{
+"person": 10438,
+"master": 10682,
+"from": 190,
+"to": 192,
+"relation": "STAFF",
+"basis": "열전",
+"note": "후한서 동탁전: 낭중령 이유가 짐독 사자 (참모)"
+},
+{
+"person": 10146,
+"master": 10682,
+"from": 190,
+"to": 191,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "여포전: 동탁이 양자로 삼아 기도위"
+},
+{
+"person": 10549,
+"master": 10682,
+"from": 190,
+"to": 192,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "동탁전: 사위 우보 중랑장 군 지휘"
+},
+{
+"person": 10365,
+"master": 10682,
+"from": 190,
+"to": 191,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "동탁전: 서영이 양인에서 조조를 격파"
+},
+{
+"person": 10660,
+"master": 10682,
+"from": 190,
+"to": 190,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "동탁전·오서 손견전: 호진이 양인 전투 지휘"
+},
+{
+"person": 10687,
+"master": 10682,
+"from": 190,
+"to": 192,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "동탁전: 동생 동민 좌장군"
+},
+{
+"person": 10712,
+"master": 10682,
+"from": 191,
+"to": 192,
+"relation": "STAFF",
+"basis": "사서",
+"note": "채옹전: 동탁이 불러 시어사·시중"
+},
+{
+"person": 10680,
+"master": 10660,
+"from": 190,
+"to": 190,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "오서 손견전: 호진·화웅 양인 전투, 호진 휘하"
+},
+{
+"person": 10690,
+"master": 10687,
+"from": 190,
+"to": 192,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "동탁 조카 동황은 동민 아래 중랑장"
+},
+{
+"person": 10437,
+"master": 10549,
+"from": 190,
+"to": 191,
+"relation": "LIEUTENANT",
+"basis": "열전",
+"note": "동탁전: 우보가 이각·곽사·장제 등을 거느림"
+},
+{
+"person": 10818,
+"master": 10549,
+"from": 190,
+"to": 191,
+"relation": "LIEUTENANT",
+"basis": "열전",
+"note": "동탁전"
+},
+{
+"person": 10326,
+"master": 10549,
+"from": 190,
+"to": 191,
+"relation": "LIEUTENANT",
+"basis": "열전",
+"note": "동탁전"
+},
+{
+"person": 10508,
+"master": 10549,
+"from": 190,
+"to": 191,
+"relation": "LIEUTENANT",
+"basis": "열전",
+"note": "동탁전: 우보 휘하 번조"
+},
+{
+"person": 10454,
+"master": 10549,
+"from": 190,
+"to": 191,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "이몽·왕방은 동탁 부장 (후한서 동탁전)"
+},
+{
+"person": 10569,
+"master": 10549,
+"from": 190,
+"to": 191,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "위와 같음"
+},
+{
+"person": 10146,
+"master": 10554,
+"from": 192,
+"to": 192,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "여포전: 동탁 살해 후 왕윤과 정사 주관"
+},
+{
+"person": 10186,
+"master": 10554,
+"from": 192,
+"to": 192,
+"relation": "STAFF",
+"basis": "사서",
+"note": "후한서 왕윤전: 사손서가 동탁 암살 모의 참가"
+},
+{
+"person": 10818,
+"master": 10437,
+"from": 192,
+"to": 194,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "이각·곽사의 장안 정권, 이각이 주도 (동탁전)"
+},
+{
+"person": 10326,
+"master": 10437,
+"from": 192,
+"to": 195,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "동탁전: 이각 정권의 표기장군 장제"
+},
+{
+"person": 10508,
+"master": 10437,
+"from": 192,
+"to": 192,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "이각 정권의 우장군 번조"
+},
+{
+"person": 10776,
+"master": 10437,
+"from": 192,
+"to": 194,
+"relation": "STAFF",
+"basis": "열전",
+"note": "위서 가후전: 이각 휘하 참모 (상서·선위장군)"
+},
+{
+"person": 10479,
+"master": 10437,
+"from": 192,
+"to": 194,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "양봉이 이각 휘하 장수였다가 배반 (동탁전)"
+},
+{
+"person": 10569,
+"master": 10437,
+"from": 192,
+"to": 195,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "이각 계열 장수"
+},
+{
+"person": 10338,
+"master": 10326,
+"from": 190,
+"to": 196,
+"relation": "LIEUTENANT",
+"basis": "열전",
+"note": "장수전: 종부 장제 군을 이어받음"
+},
+{
+"person": 10022,
+"master": 10818,
+"from": 194,
+"to": 197,
+"relation": "LIEUTENANT",
+"basis": "열전",
+"note": "곽사 부장 오습 (동탁전 주)"
+},
+{
+"person": 10480,
+"master": 10818,
+"from": 194,
+"to": 197,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "헌제기: 양정이 곽사 부장 시절 헌제 동귀 호위"
+},
+{
+"person": 10776,
+"master": 10518,
+"from": 195,
+"to": 195,
+"relation": "STAFF",
+"basis": "열전",
+"note": "가후전: 이각을 떠나 단외에게 의탁"
+},
+{
+"person": 10776,
+"master": 10338,
+"from": 196,
+"to": 198,
+"relation": "STAFF",
+"basis": "사서",
+"note": "가후전: 장수에게 의탁, 완성 방어 책모"
+},
+{
+"person": 10659,
+"master": 10338,
+"from": 196,
+"to": 206,
+"relation": "LIEUTENANT",
+"basis": "열전",
+"note": "장수전: 장수 휘하 호거아 (조조 정벌 때 동행)"
+},
+{
+"person": 10338,
+"master": 10395,
+"from": 199,
+"to": 207,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "무제기 건안4: 장수 항복 (조인 방면 배치는 추정)"
+},
+{
+"person": 10518,
+"master": 10405,
+"from": 200,
+"to": 209,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "조조 정권 하의 단외 (후한서 동탁전 주), 연도는 추정"
+},
+{
+"person": 10364,
+"master": 10479,
+"from": 195,
+"to": 195,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "서황전: 양봉의 기도위"
+},
+{
+"person": 10529,
+"master": 10929,
+"from": 190,
+"to": 191,
+"relation": "STAFF",
+"basis": "사서",
+"note": "저수전: 한복의 별가"
+},
+{
+"person": 10275,
+"master": 10929,
+"from": 189,
+"to": 190,
+"relation": "STAFF",
+"basis": "사서",
+"note": "심배전: 한복의 치중"
+},
+{
+"person": 10600,
+"master": 10929,
+"from": 190,
+"to": 190,
+"relation": "STAFF",
+"basis": "사서",
+"note": "전풍전: 한복의 별가"
+},
+{
+"person": 10648,
+"master": 10929,
+"from": 189,
+"to": 191,
+"relation": "STAFF",
+"basis": "사서",
+"note": "한복전: 장사 경무"
+},
+{
+"person": 10850,
+"master": 10929,
+"from": 189,
+"to": 191,
+"relation": "STAFF",
+"basis": "사서",
+"note": "한복전: 관순"
+},
+{
+"person": 10354,
+"master": 10929,
+"from": 190,
+"to": 191,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "장합전: 한복 휘하 군사마"
+},
+{
+"person": 10529,
+"master": 10732,
+"from": 192,
+"to": 200,
+"relation": "STAFF",
+"basis": "사서",
+"note": "저수전: 원소가 기용, 감군"
+},
+{
+"person": 10600,
+"master": 10732,
+"from": 191,
+"to": 200,
+"relation": "STAFF",
+"basis": "사서",
+"note": "전풍전: 원소 휘하 별가"
+},
+{
+"person": 10275,
+"master": 10732,
+"from": 191,
+"to": 202,
+"relation": "STAFF",
+"basis": "사서",
+"note": "심배전: 원소 휘하"
+},
+{
+"person": 10804,
+"master": 10732,
+"from": 192,
+"to": 202,
+"relation": "STAFF",
+"basis": "사서",
+"note": "봉기전: 원소의 모사"
+},
+{
+"person": 10931,
+"master": 10732,
+"from": 190,
+"to": 200,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "안량전: 원소 장수, 백마에서 전사"
+},
+{
+"person": 10387,
+"master": 10732,
+"from": 190,
+"to": 200,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "문추전: 관도 연진에서 전사"
+},
+{
+"person": 10983,
+"master": 10732,
+"from": 191,
+"to": 191,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "국의전: 공손찬 격파 후 원소와 불화"
+},
+{
+"person": 10535,
+"master": 10931,
+"from": 190,
+"to": 200,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "원소 휘하 순우경 (조직 편제는 추정)"
+},
+{
+"person": 10354,
+"master": 10931,
+"from": 195,
+"to": 199,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "원소 군 장합 (안량/문추 휘하 편제 추정)"
+},
+{
+"person": 10965,
+"master": 10931,
+"from": 195,
+"to": 199,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "원소 군 고람"
+},
+{
+"person": 10920,
+"master": 10387,
+"from": 195,
+"to": 200,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "원소 군 한맹"
+},
+{
+"person": 10813,
+"master": 10275,
+"from": 195,
+"to": 202,
+"relation": "STAFF",
+"basis": "추정",
+"note": "곽도는 원소 책사"
+},
+{
+"person": 10802,
+"master": 10275,
+"from": 195,
+"to": 202,
+"relation": "STAFF",
+"basis": "추정",
+"note": "신평은 원소 책사"
+},
+{
+"person": 10879,
+"master": 10275,
+"from": 196,
+"to": 202,
+"relation": "STAFF",
+"basis": "추정",
+"note": "진림은 원소 기실"
+},
+{
+"person": 10291,
+"master": 10275,
+"from": 194,
+"to": 202,
+"relation": "STAFF",
+"basis": "추정",
+"note": "최염은 원소 막하 (최염전)"
+},
+{
+"person": 10585,
+"master": 10735,
+"from": 196,
+"to": 204,
+"relation": "STAFF",
+"basis": "열전",
+"note": "왕수전: 원담의 별가"
+},
+{
+"person": 10813,
+"master": 10735,
+"from": 203,
+"to": 205,
+"relation": "STAFF",
+"basis": "사서",
+"note": "원소전: 곽도·신평이 원담 보좌"
+},
+{
+"person": 10802,
+"master": 10735,
+"from": 203,
+"to": 204,
+"relation": "STAFF",
+"basis": "사서",
+"note": "원소전"
+},
+{
+"person": 10275,
+"master": 10727,
+"from": 203,
+"to": 204,
+"relation": "STAFF",
+"basis": "사서",
+"note": "원소전: 심배가 원상 옹립"
+},
+{
+"person": 10443,
+"master": 10727,
+"from": 203,
+"to": 204,
+"relation": "STAFF",
+"basis": "열전",
+"note": "이부전: 원상의 주부"
+},
+{
+"person": 10938,
+"master": 10727,
+"from": 203,
+"to": 204,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "원상 군 마연·장의"
+},
+{
+"person": 10356,
+"master": 10727,
+"from": 203,
+"to": 204,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "위와 같음"
+},
+{
+"person": 10735,
+"master": 10732,
+"from": 201,
+"to": 202,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "원담전: 청주자사"
+},
+{
+"person": 10730,
+"master": 10732,
+"from": 201,
+"to": 202,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "원희: 유주자사"
+},
+{
+"person": 10959,
+"master": 10732,
+"from": 201,
+"to": 202,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "고간전: 원소의 외조카, 병주자사"
+},
+{
+"person": 10727,
+"master": 10732,
+"from": 201,
+"to": 202,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "원상: 원소의 후계자 지위"
+},
+{
+"person": 10548,
+"master": 10730,
+"from": 203,
+"to": 205,
+"relation": "LIEUTENANT",
+"basis": "열전",
+"note": "초촉전: 원희의 유주 장수"
+},
+{
+"person": 10959,
+"master": 10727,
+"from": 203,
+"to": 206,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "고간전: 원상 편 병주 방어"
+},
+{
+"person": 10727,
+"master": 10795,
+"from": 206,
+"to": 207,
+"relation": "GUEST",
+"basis": "사서",
+"note": "원소전: 원상·원희가 오환 답돈에게 의탁"
+},
+{
+"person": 10730,
+"master": 10795,
+"from": 206,
+"to": 207,
+"relation": "GUEST",
+"basis": "사서",
+"note": "위와 같음"
+},
+{
+"person": 10641,
+"master": 10734,
+"from": 191,
+"to": 199,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "원술전: 원술의 장수 기령"
+},
+{
+"person": 10305,
+"master": 10734,
+"from": 191,
+"to": 199,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "원술전: 장훈"
+},
+{
+"person": 10511,
+"master": 10734,
+"from": 192,
+"to": 195,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "원술전: 교유 장수"
+},
+{
+"person": 10862,
+"master": 10734,
+"from": 191,
+"to": 199,
+"relation": "STAFF",
+"basis": "열전",
+"note": "염상: 원술의 주부 (원술전 주)"
+},
+{
+"person": 10482,
+"master": 10734,
+"from": 195,
+"to": 199,
+"relation": "STAFF",
+"basis": "열전",
+"note": "위서 원술전: 양홍"
+},
+{
+"person": 10925,
+"master": 10862,
+"from": 196,
+"to": 197,
+"relation": "STAFF",
+"basis": "추정",
+"note": "원술 참모 한윤"
+},
+{
+"person": 10075,
+"master": 10305,
+"from": 194,
+"to": 198,
+"relation": "LIEUTENANT",
+"basis": "열전",
+"note": "유훈전: 원술 휘하 여강태수 (편제 추정)"
+},
+{
+"person": 10905,
+"master": 10641,
+"from": 195,
+"to": 198,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "원술 장수 뇌박·진란"
+},
+{
+"person": 10886,
+"master": 10641,
+"from": 195,
+"to": 198,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "위와 같음"
+},
+{
+"person": 10234,
+"master": 10734,
+"from": 190,
+"to": 191,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "손견전: 원술이 손견을 파로장군으로 임용"
+},
+{
+"person": 10256,
+"master": 10734,
+"from": 194,
+"to": 195,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "손책전: 원술에게 의탁"
+},
+{
+"person": 10870,
+"master": 10405,
+"from": 190,
+"to": 193,
+"relation": "STAFF",
+"basis": "열전",
+"note": "진궁전: 조조를 따라 연주 장악"
+},
+{
+"person": 10870,
+"master": 10353,
+"from": 194,
+"to": 194,
+"relation": "STAFF",
+"basis": "사서",
+"note": "무제기: 진궁이 장막과 모의, 연주 배반"
+},
+{
+"person": 10870,
+"master": 10146,
+"from": 195,
+"to": 198,
+"relation": "STAFF",
+"basis": "사서",
+"note": "여포전: 진궁의 모책"
+},
+{
+"person": 10966,
+"master": 10146,
+"from": 192,
+"to": 198,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "고순전: 여포 휘하 함진영"
+},
+{
+"person": 10352,
+"master": 10146,
+"from": 190,
+"to": 198,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "장료전: 여포를 따라 여러 곳을 전전"
+},
+{
+"person": 10969,
+"master": 10146,
+"from": 195,
+"to": 198,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "여포전: 위속이 반역 때 내응"
+},
+{
+"person": 10032,
+"master": 10969,
+"from": 195,
+"to": 198,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "여포전: 후성이 하비에서 위속·송헌과 반역 (편제 추정)"
+},
+{
+"person": 10271,
+"master": 10969,
+"from": 195,
+"to": 198,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "여포 군 장수 송헌 (위속 휘하 편제 추정)"
+},
+{
+"person": 10379,
+"master": 10966,
+"from": 195,
+"to": 198,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "여포 군 장수 성렴 (고순 휘하 편제 추정)"
+},
+{
+"person": 10403,
+"master": 10966,
+"from": 195,
+"to": 198,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "여포 군 장수 조성"
+},
+{
+"person": 10810,
+"master": 10146,
+"from": 193,
+"to": 195,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "여포전: 학맹이 반란을 일으킴 (194)"
+},
+{
+"person": 10744,
+"master": 10870,
+"from": 196,
+"to": 198,
+"relation": "STAFF",
+"basis": "추정",
+"note": "여포 막료 허사·왕해"
+},
+{
+"person": 10573,
+"master": 10870,
+"from": 196,
+"to": 198,
+"relation": "STAFF",
+"basis": "추정",
+"note": "위와 같음"
+},
+{
+"person": 10878,
+"master": 10870,
+"from": 196,
+"to": 198,
+"relation": "STAFF",
+"basis": "사서",
+"note": "진규전: 여포 휘하 서주 관리 (편제 추정)"
+},
+{
+"person": 10880,
+"master": 10870,
+"from": 196,
+"to": 197,
+"relation": "STAFF",
+"basis": "사서",
+"note": "진등전: 여포 시절 서주 (편제 추정)"
+},
+{
+"person": 10345,
+"master": 10966,
+"from": 195,
+"to": 198,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "여포 군 장수"
+},
+{
+"person": 10146,
+"master": 10353,
+"from": 195,
+"to": 195,
+"relation": "GUEST",
+"basis": "사서",
+"note": "여포전: 장막에게 의탁"
+},
+{
+"person": 10352,
+"master": 10405,
+"from": 199,
+"to": 220,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "장료전: 하비 항복 후 중랑장"
+},
+{
+"person": 10419,
+"master": 10892,
+"from": 190,
+"to": 194,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "도겸전: 서주 장수 조표"
+},
+{
+"person": 10639,
+"master": 10892,
+"from": 192,
+"to": 194,
+"relation": "STAFF",
+"basis": "사서",
+"note": "미축전: 도겸의 별가"
+},
+{
+"person": 10786,
+"master": 10892,
+"from": 192,
+"to": 193,
+"relation": "STAFF",
+"basis": "열전",
+"note": "조욱전: 광릉태수"
+},
+{
+"person": 10355,
+"master": 10892,
+"from": 190,
+"to": 193,
+"relation": "LIEUTENANT",
+"basis": "열전",
+"note": "도겸전: 도겸 도위 장개가 조숭 살해"
+},
+{
+"person": 10880,
+"master": 10892,
+"from": 192,
+"to": 194,
+"relation": "STAFF",
+"basis": "사서",
+"note": "진등전: 도겸이 전농교위로 임명"
+},
+{
+"person": 10878,
+"master": 10892,
+"from": 191,
+"to": 194,
+"relation": "STAFF",
+"basis": "열전",
+"note": "진규전: 도겸 휘하 서주 관리"
+},
+{
+"person": 10227,
+"master": 10639,
+"from": 192,
+"to": 194,
+"relation": "STAFF",
+"basis": "추정",
+"note": "손건은 도겸 막하 (선주전 주)"
+},
+{
+"person": 10071,
+"master": 10892,
+"from": 194,
+"to": 194,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "선주전: 유비가 도겸을 도와 조조 방어"
+},
+{
+"person": 10419,
+"master": 10071,
+"from": 195,
+"to": 196,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "선주전: 장비가 조표를 죽이다"
+},
+{
+"person": 10880,
+"master": 10071,
+"from": 195,
+"to": 195,
+"relation": "STAFF",
+"basis": "사서",
+"note": "진등전"
+},
+{
+"person": 10353,
+"master": 10732,
+"from": 190,
+"to": 192,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "무제기·장막전: 반동탁 연합의 진류태수"
+},
+{
+"person": 10349,
+"master": 10353,
+"from": 190,
+"to": 195,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "장초는 장막의 동생"
+},
+{
+"person": 10976,
+"master": 10079,
+"from": 190,
+"to": 191,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "포신전: 제북상 포신"
+},
+{
+"person": 10976,
+"master": 10405,
+"from": 192,
+"to": 192,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "포신전: 연주목 조조를 맞아 황건과 싸우다 전사"
+},
+{
+"person": 10013,
+"master": 10976,
+"from": 191,
+"to": 192,
+"relation": "LIEUTENANT",
+"basis": "열전",
+"note": "우금전: 포신 군을 따라 종군"
+},
+{
+"person": 10146,
+"master": 10732,
+"from": 193,
+"to": 193,
+"relation": "GUEST",
+"basis": "사서",
+"note": "여포전: 원소에게 의탁했으나 불화 (장연과 함께 활동)"
+},
+{
+"person": 10665,
+"master": 10146,
+"from": 195,
+"to": 198,
+"relation": "LIEUTENANT",
+"basis": "열전",
+"note": "장패전: 도겸 사후 여포를 따름"
+},
+{
+"person": 10105,
+"master": 10071,
+"from": 200,
+"to": 200,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "선주전: 원소가 유비를 보내 여남의 유벽 등과 연계"
+},
+{
+"person": 11000,
+"master": 10071,
+"from": 200,
+"to": 200,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "선주전: 위와 같음"
+},
+{
+"person": 10743,
+"master": 10275,
+"from": 190,
+"to": 199,
+"relation": "STAFF",
+"basis": "추정",
+"note": "허유는 원소 막료 (참모 서열은 추정)"
+},
+{
+"person": 20707,
+"master": 10676,
+"from": 200,
+"to": 200,
+"relation": "GUEST",
+"basis": "추정",
+"note": "정현은 원소 군중에서 사망 (순심 중개는 추정)"
+},
+{
+"person": 10453,
+"master": 10682,
+"from": 190,
+"to": 190,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "동탁전: 호분중랑장 이숙이 여포를 설득"
+},
+{
+"person": 10200,
+"master": 10405,
+"from": 190,
+"to": 220,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "위서 하후돈전: 거병 때부터 종군, 전장군"
+},
+{
+"person": 10395,
+"master": 10405,
+"from": 190,
+"to": 219,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "조인전: 거병 때부터 종군, 대장군"
+},
+{
+"person": 10625,
+"master": 10405,
+"from": 190,
+"to": 220,
+"relation": "STAFF",
+"basis": "사서",
+"note": "정욱전: 견성 수비, 위위"
+},
+{
+"person": 10776,
+"master": 10405,
+"from": 199,
+"to": 219,
+"relation": "STAFF",
+"basis": "사서",
+"note": "가후전: 장수와 함께 조조에게 귀의"
+},
+{
+"person": 10406,
+"master": 10405,
+"from": 195,
+"to": 197,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "무제기: 완성에서 장수에게 패해 조앙 전사"
+},
+{
+"person": 10204,
+"master": 10200,
+"from": 190,
+"to": 219,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "하후연은 하후돈의 족제로 연주 방면 군 지휘 (편제 추정)"
+},
+{
+"person": 10439,
+"master": 10200,
+"from": 192,
+"to": 214,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "이전전: 연주 방면 군 (조조 직속이나 편제 추정)"
+},
+{
+"person": 10505,
+"master": 10200,
+"from": 190,
+"to": 214,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "악진전: 조조 휘하 군 (편제 추정)"
+},
+{
+"person": 10919,
+"master": 10200,
+"from": 190,
+"to": 218,
+"relation": "LIEUTENANT",
+"basis": "열전",
+"note": "한호전: 하후돈의 군 호군 (하후돈전·한호전)"
+},
+{
+"person": 10066,
+"master": 10200,
+"from": 191,
+"to": 191,
+"relation": "LIEUTENANT",
+"basis": "열전",
+"note": "전위전: 하후돈이 전위를 천거"
+},
+{
+"person": 10066,
+"master": 10405,
+"from": 192,
+"to": 197,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "전위전: 조조 친위, 완성에서 전사"
+},
+{
+"person": 10665,
+"master": 10200,
+"from": 199,
+"to": 220,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "장패전: 조조에게 귀의 후 서주 방면 (편제 추정)"
+},
+{
+"person": 10260,
+"master": 10665,
+"from": 195,
+"to": 217,
+"relation": "LIEUTENANT",
+"basis": "열전",
+"note": "장패전: 손관·오돈·윤례가 장패와 함께 독립 세력"
+},
+{
+"person": 10159,
+"master": 10665,
+"from": 195,
+"to": 220,
+"relation": "LIEUTENANT",
+"basis": "열전",
+"note": "장패전: 위와 같음"
+},
+{
+"person": 10282,
+"master": 10665,
+"from": 195,
+"to": 220,
+"relation": "LIEUTENANT",
+"basis": "열전",
+"note": "장패전: 위와 같음"
+},
+{
+"person": 10392,
+"master": 10665,
+"from": 195,
+"to": 198,
+"relation": "LIEUTENANT",
+"basis": "열전",
+"note": "장패전: 창희"
+},
+{
+"person": 10392,
+"master": 10405,
+"from": 199,
+"to": 203,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "무제기 건안4~8: 창희 항복·반복"
+},
+{
+"person": 10013,
+"master": 10395,
+"from": 193,
+"to": 219,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "우금전: 조조 군 장수 (조인 방면 편제 추정, 번성 전투)"
+},
+{
+"person": 10364,
+"master": 10405,
+"from": 196,
+"to": 196,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "서황전: 양봉을 떠나 조조에게 귀의"
+},
+{
+"person": 10364,
+"master": 10395,
+"from": 197,
+"to": 219,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "서황전: 번성 구원 (조인 방면 편제 추정)"
+},
+{
+"person": 10538,
+"master": 10395,
+"from": 208,
+"to": 219,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "조인전·만총전: 번성 전투 정남 방면"
+},
+{
+"person": 10460,
+"master": 10395,
+"from": 200,
+"to": 209,
+"relation": "LIEUTENANT",
+"basis": "열전",
+"note": "이통전: 조인과 형주 방면 정벌"
+},
+{
+"person": 10385,
+"master": 10395,
+"from": 208,
+"to": 219,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "문빙전: 형주 항복 후 조인 방면"
+},
+{
+"person": 10414,
+"master": 10395,
+"from": 200,
+"to": 210,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "조순전: 호표기 독 (편제 추정)"
+},
+{
+"person": 10354,
+"master": 10204,
+"from": 215,
+"to": 219,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "장합전: 한중에서 하후연 사후 군을 수습"
+},
+{
+"person": 10412,
+"master": 10204,
+"from": 213,
+"to": 219,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "조진전: 서방 정벌 참가"
+},
+{
+"person": 10819,
+"master": 10204,
+"from": 217,
+"to": 219,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "곽회전: 하후연 사후 군 수습에 가담"
+},
+{
+"person": 10412,
+"master": 10395,
+"from": 201,
+"to": 212,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "조진전: 조조 양자 격 (추정)"
+},
+{
+"person": 10745,
+"master": 10409,
+"from": 197,
+"to": 220,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "허저전: 호위 (조조 친위 편제 추정)"
+},
+{
+"person": 10396,
+"master": 10409,
+"from": 197,
+"to": 219,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "조휴전: 조조 친족 장군 (편제 추정)"
+},
+{
+"person": 10399,
+"master": 10409,
+"from": 210,
+"to": 220,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "조씨 친족 (추정)"
+},
+{
+"person": 10439,
+"master": 10352,
+"from": 215,
+"to": 216,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "장료전: 합비 수비 장료·악진·이전"
+},
+{
+"person": 10505,
+"master": 10352,
+"from": 215,
+"to": 218,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "장료전: 합비 수비"
+},
+{
+"person": 10672,
+"master": 10670,
+"from": 196,
+"to": 212,
+"relation": "STAFF",
+"basis": "사서",
+"note": "순유전: 순욱의 조카, 군사"
+},
+{
+"person": 10812,
+"master": 10670,
+"from": 196,
+"to": 207,
+"relation": "STAFF",
+"basis": "사서",
+"note": "곽가전: 순욱 추천으로 조조에게 등용"
+},
+{
+"person": 10845,
+"master": 10670,
+"from": 196,
+"to": 212,
+"relation": "STAFF",
+"basis": "사서",
+"note": "종요전: 순욱 천거"
+},
+{
+"person": 10086,
+"master": 10670,
+"from": 198,
+"to": 212,
+"relation": "STAFF",
+"basis": "추정",
+"note": "유엽전: 조조 참모 (편제 추정)"
+},
+{
+"person": 20701,
+"master": 10670,
+"from": 196,
+"to": 208,
+"relation": "STAFF",
+"basis": "추정",
+"note": "순열전: 순욱 종형 (편제 추정)"
+},
+{
+"person": 10538,
+"master": 10670,
+"from": 196,
+"to": 207,
+"relation": "STAFF",
+"basis": "추정",
+"note": "만총전: 여남태수 (편제 추정)"
+},
+{
+"person": 10880,
+"master": 10672,
+"from": 198,
+"to": 207,
+"relation": "STAFF",
+"basis": "사서",
+"note": "진등전: 광릉태수 (편제 추정)"
+},
+{
+"person": 10526,
+"master": 10672,
+"from": 198,
+"to": 214,
+"relation": "STAFF",
+"basis": "추정",
+"note": "모개전: 동조연 (편제 추정)"
+},
+{
+"person": 10291,
+"master": 10672,
+"from": 204,
+"to": 214,
+"relation": "STAFF",
+"basis": "추정",
+"note": "최염전 (편제 추정)"
+},
+{
+"person": 10018,
+"master": 10672,
+"from": 196,
+"to": 204,
+"relation": "STAFF",
+"basis": "추정",
+"note": "임준전: 둔전 담당 (편제 추정)"
+},
+{
+"person": 10465,
+"master": 10672,
+"from": 200,
+"to": 214,
+"relation": "STAFF",
+"basis": "추정",
+"note": "두습전 (편제 추정)"
+},
+{
+"person": 10779,
+"master": 10672,
+"from": 201,
+"to": 214,
+"relation": "STAFF",
+"basis": "추정",
+"note": "조엄전 (편제 추정)"
+},
+{
+"person": 10845,
+"master": 10884,
+"from": 213,
+"to": 219,
+"relation": "STAFF",
+"basis": "추정",
+"note": "종요 대리 상국 (편제 추정)"
+},
+{
+"person": 10086,
+"master": 10884,
+"from": 213,
+"to": 220,
+"relation": "STAFF",
+"basis": "추정",
+"note": "유엽전 (편제 추정)"
+},
+{
+"person": 10678,
+"master": 10884,
+"from": 215,
+"to": 219,
+"relation": "STAFF",
+"basis": "추정",
+"note": "화흠전: 위국 어사대부 (편제 추정)"
+},
+{
+"person": 10582,
+"master": 10884,
+"from": 213,
+"to": 217,
+"relation": "STAFF",
+"basis": "추정",
+"note": "왕찬: 시중 (편제 추정)"
+},
+{
+"person": 10132,
+"master": 10884,
+"from": 213,
+"to": 217,
+"relation": "STAFF",
+"basis": "추정",
+"note": "사마랑: 승상 주부 (편제 추정)"
+},
+{
+"person": 10526,
+"master": 10884,
+"from": 215,
+"to": 216,
+"relation": "STAFF",
+"basis": "추정",
+"note": "모개전: 동조연"
+},
+{
+"person": 10465,
+"master": 10845,
+"from": 215,
+"to": 220,
+"relation": "STAFF",
+"basis": "추정",
+"note": "두습전 (편제 추정)"
+},
+{
+"person": 10779,
+"master": 10845,
+"from": 215,
+"to": 220,
+"relation": "STAFF",
+"basis": "추정",
+"note": "조엄전 (편제 추정)"
+},
+{
+"person": 10838,
+"master": 10845,
+"from": 213,
+"to": 220,
+"relation": "STAFF",
+"basis": "추정",
+"note": "정혼전 (편제 추정)"
+},
+{
+"person": 10672,
+"master": 10884,
+"from": 213,
+"to": 214,
+"relation": "STAFF",
+"basis": "추정",
+"note": "순유 위국 상서령"
+},
+{
+"person": 10129,
+"master": 10394,
+"from": 211,
+"to": 219,
+"relation": "STAFF",
+"basis": "사서",
+"note": "진서 선제기: 태자 중서자"
+},
+{
+"person": 10196,
+"master": 10394,
+"from": 211,
+"to": 220,
+"relation": "STAFF",
+"basis": "사서",
+"note": "하후상전: 오관중랑장 문학"
+},
+{
+"person": 10165,
+"master": 10394,
+"from": 211,
+"to": 219,
+"relation": "STAFF",
+"basis": "사서",
+"note": "오질전: 태자 중서자"
+},
+{
+"person": 10127,
+"master": 10394,
+"from": 211,
+"to": 219,
+"relation": "STAFF",
+"basis": "사서",
+"note": "사마부: 태자 중서자"
+},
+{
+"person": 10395,
+"master": 10394,
+"from": 220,
+"to": 223,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "조인전: 대사마"
+},
+{
+"person": 10396,
+"master": 10394,
+"from": 220,
+"to": 226,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "조휴전: 진남장군"
+},
+{
+"person": 10129,
+"master": 10394,
+"from": 220,
+"to": 226,
+"relation": "STAFF",
+"basis": "사서",
+"note": "선제기: 무군대장군"
+},
+{
+"person": 10776,
+"master": 10394,
+"from": 220,
+"to": 223,
+"relation": "STAFF",
+"basis": "사서",
+"note": "가후전: 태위"
+},
+{
+"person": 10352,
+"master": 10396,
+"from": 221,
+"to": 222,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "장료전: 병중에 장료 방오 (편제 추정)"
+},
+{
+"person": 10665,
+"master": 10396,
+"from": 221,
+"to": 228,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "장패전: 동구 전투 조휴 휘하"
+},
+{
+"person": 10777,
+"master": 10396,
+"from": 224,
+"to": 228,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "가규전: 석정 전투 조휴 도독"
+},
+{
+"person": 10364,
+"master": 10412,
+"from": 220,
+"to": 228,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "서황전: 남군 전투 조진 휘하"
+},
+{
+"person": 10196,
+"master": 10412,
+"from": 221,
+"to": 225,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "하후상전: 남군 공략 조진과 함께"
+},
+{
+"person": 10354,
+"master": 10412,
+"from": 220,
+"to": 229,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "장합전: 서방 방어 조진 휘하"
+},
+{
+"person": 10819,
+"master": 10412,
+"from": 220,
+"to": 231,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "곽회전: 옹주 방면"
+},
+{
+"person": 10571,
+"master": 10884,
+"from": 221,
+"to": 226,
+"relation": "STAFF",
+"basis": "추정",
+"note": "왕랑 사공 (편제 추정)"
+},
+{
+"person": 10678,
+"master": 10884,
+"from": 220,
+"to": 226,
+"relation": "STAFF",
+"basis": "추정",
+"note": "화흠 사도 (편제 추정)"
+},
+{
+"person": 10845,
+"master": 10884,
+"from": 220,
+"to": 226,
+"relation": "STAFF",
+"basis": "추정",
+"note": "종요 태위 (편제 추정)"
+},
+{
+"person": 10129,
+"master": 10397,
+"from": 227,
+"to": 239,
+"relation": "STAFF",
+"basis": "사서",
+"note": "선제기: 도독 옹량"
+},
+{
+"person": 10396,
+"master": 10397,
+"from": 227,
+"to": 228,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "조휴전: 대사마"
+},
+{
+"person": 10084,
+"master": 10397,
+"from": 227,
+"to": 239,
+"relation": "STAFF",
+"basis": "사서",
+"note": "유방: 중서감"
+},
+{
+"person": 10262,
+"master": 10397,
+"from": 227,
+"to": 239,
+"relation": "STAFF",
+"basis": "사서",
+"note": "손자: 중서령"
+},
+{
+"person": 10411,
+"master": 10412,
+"from": 227,
+"to": 231,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "조진의 아들"
+},
+{
+"person": 10411,
+"master": 10397,
+"from": 232,
+"to": 239,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "조상전: 무위장군"
+},
+{
+"person": 10538,
+"master": 10397,
+"from": 232,
+"to": 239,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "만총전: 정동장군"
+},
+{
+"person": 10801,
+"master": 10884,
+"from": 227,
+"to": 235,
+"relation": "STAFF",
+"basis": "추정",
+"note": "신비전 (편제 추정)"
+},
+{
+"person": 10500,
+"master": 10884,
+"from": 227,
+"to": 235,
+"relation": "STAFF",
+"basis": "추정",
+"note": "양부전 (편제 추정)"
+},
+{
+"person": 10957,
+"master": 10884,
+"from": 227,
+"to": 235,
+"relation": "STAFF",
+"basis": "추정",
+"note": "고당륭전 (편제 추정)"
+},
+{
+"person": 10961,
+"master": 10884,
+"from": 227,
+"to": 235,
+"relation": "STAFF",
+"basis": "추정",
+"note": "고유전 (편제 추정)"
+},
+{
+"person": 10819,
+"master": 10129,
+"from": 232,
+"to": 239,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "곽회전: 사마의 서방 도독"
+},
+{
+"person": 10354,
+"master": 10129,
+"from": 230,
+"to": 231,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "장합전: 사마의 휘하 제갈량 방어"
+},
+{
+"person": 10829,
+"master": 10129,
+"from": 240,
+"to": 251,
+"relation": "STAFF",
+"basis": "사서",
+"note": "등애전: 사마의가 등용"
+},
+{
+"person": 10128,
+"master": 10129,
+"from": 241,
+"to": 251,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "진서 경제기"
+},
+{
+"person": 10131,
+"master": 10129,
+"from": 241,
+"to": 251,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "진서 문제기"
+},
+{
+"person": 10293,
+"master": 10129,
+"from": 228,
+"to": 239,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "주태전: 맹달 토벌 사마의 휘하"
+},
+{
+"person": 10801,
+"master": 10397,
+"from": 236,
+"to": 239,
+"relation": "STAFF",
+"basis": "사서",
+"note": "신비전"
+},
+{
+"person": 10411,
+"master": 10416,
+"from": 240,
+"to": 249,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "조상전: 대장군"
+},
+{
+"person": 10129,
+"master": 10416,
+"from": 240,
+"to": 251,
+"relation": "STAFF",
+"basis": "사서",
+"note": "선제기: 태부"
+},
+{
+"person": 10415,
+"master": 10411,
+"from": 240,
+"to": 249,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "조상전: 중령군"
+},
+{
+"person": 10418,
+"master": 10411,
+"from": 240,
+"to": 249,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "조상전: 산기상시"
+},
+{
+"person": 10206,
+"master": 10411,
+"from": 240,
+"to": 249,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "하후현전: 정시 고사"
+},
+{
+"person": 10025,
+"master": 10411,
+"from": 240,
+"to": 249,
+"relation": "STAFF",
+"basis": "사서",
+"note": "하안전: 이부상서"
+},
+{
+"person": 20774,
+"master": 10025,
+"from": 240,
+"to": 249,
+"relation": "STAFF",
+"basis": "추정",
+"note": "등양: 하안 일당 (편제 추정)"
+},
+{
+"person": 10440,
+"master": 10025,
+"from": 240,
+"to": 249,
+"relation": "STAFF",
+"basis": "추정",
+"note": "이승 (편제 추정)"
+},
+{
+"person": 21286,
+"master": 10025,
+"from": 240,
+"to": 249,
+"relation": "STAFF",
+"basis": "추정",
+"note": "정밀 (편제 추정)"
+},
+{
+"person": 10607,
+"master": 10025,
+"from": 240,
+"to": 249,
+"relation": "STAFF",
+"basis": "추정",
+"note": "필궤 (편제 추정)"
+},
+{
+"person": 10470,
+"master": 10025,
+"from": 240,
+"to": 249,
+"relation": "STAFF",
+"basis": "추정",
+"note": "환범 (편제 추정)"
+},
+{
+"person": 10128,
+"master": 10416,
+"from": 252,
+"to": 254,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "진서 경제기: 대장군"
+},
+{
+"person": 10131,
+"master": 10128,
+"from": 252,
+"to": 255,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "진서 문제기"
+},
+{
+"person": 10843,
+"master": 10128,
+"from": 252,
+"to": 255,
+"relation": "STAFF",
+"basis": "사서",
+"note": "종회전: 사마사 막료"
+},
+{
+"person": 10773,
+"master": 10128,
+"from": 254,
+"to": 255,
+"relation": "STAFF",
+"basis": "추정",
+"note": "진서 가충전"
+},
+{
+"person": 10829,
+"master": 10128,
+"from": 252,
+"to": 255,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "등애전"
+},
+{
+"person": 10560,
+"master": 10128,
+"from": 252,
+"to": 255,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "왕기전"
+},
+{
+"person": 10877,
+"master": 10128,
+"from": 252,
+"to": 255,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "진태전"
+},
+{
+"person": 10661,
+"master": 10129,
+"from": 240,
+"to": 251,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "호준전"
+},
+{
+"person": 10843,
+"master": 10131,
+"from": 256,
+"to": 264,
+"relation": "STAFF",
+"basis": "사서",
+"note": "종회전"
+},
+{
+"person": 10829,
+"master": 10131,
+"from": 256,
+"to": 264,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "등애전"
+},
+{
+"person": 10773,
+"master": 10131,
+"from": 256,
+"to": 264,
+"relation": "STAFF",
+"basis": "사서",
+"note": "가충전"
+},
+{
+"person": 10889,
+"master": 10131,
+"from": 256,
+"to": 264,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "진건전"
+},
+{
+"person": 10677,
+"master": 10131,
+"from": 256,
+"to": 264,
+"relation": "STAFF",
+"basis": "사서",
+"note": "순의전"
+},
+{
+"person": 10026,
+"master": 10131,
+"from": 256,
+"to": 264,
+"relation": "STAFF",
+"basis": "사서",
+"note": "하증전"
+},
+{
+"person": 20825,
+"master": 10677,
+"from": 256,
+"to": 264,
+"relation": "STAFF",
+"basis": "추정",
+"note": "산도전"
+},
+{
+"person": 10864,
+"master": 20825,
+"from": 258,
+"to": 263,
+"relation": "STAFF",
+"basis": "추정",
+"note": "완적전: 종사중랑 (편제 추정)"
+},
+{
+"person": 10292,
+"master": 20825,
+"from": 256,
+"to": 262,
+"relation": "GUEST",
+"basis": "추정",
+"note": "혜강전: 산도와 교유 (편제 추정)"
+},
+{
+"person": 10724,
+"master": 10843,
+"from": 263,
+"to": 264,
+"relation": "STAFF",
+"basis": "사서",
+"note": "위관전: 감군"
+},
+{
+"person": 21306,
+"master": 10843,
+"from": 263,
+"to": 264,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "호열전"
+},
+{
+"person": 10599,
+"master": 10829,
+"from": 263,
+"to": 264,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "등애전"
+},
+{
+"person": 10296,
+"master": 10829,
+"from": 263,
+"to": 264,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "등애전"
+},
+{
+"person": 10826,
+"master": 10829,
+"from": 263,
+"to": 264,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "등애전"
+},
+{
+"person": 10755,
+"master": 10843,
+"from": 263,
+"to": 264,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "제갈서"
+},
+{
+"person": 10740,
+"master": 10843,
+"from": 263,
+"to": 263,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "허의"
+},
+{
+"person": 10010,
+"master": 10843,
+"from": 263,
+"to": 264,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "구건"
+},
+{
+"person": 10215,
+"master": 10843,
+"from": 263,
+"to": 264,
+"relation": "GUEST",
+"basis": "사서",
+"note": "강유전"
+},
+{
+"person": 10384,
+"master": 10522,
+"from": 255,
+"to": 255,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "관구검전"
+},
+{
+"person": 10388,
+"master": 10384,
+"from": 255,
+"to": 255,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "문앙"
+},
+{
+"person": 10384,
+"master": 10757,
+"from": 257,
+"to": 258,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "제갈탄전"
+},
+{
+"person": 10388,
+"master": 10757,
+"from": 257,
+"to": 258,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "위와 같음"
+},
+{
+"person": 10386,
+"master": 10757,
+"from": 257,
+"to": 258,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "위와 같음"
+},
+{
+"person": 10015,
+"master": 10757,
+"from": 257,
+"to": 258,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "우전"
+},
+{
+"person": 10699,
+"master": 10757,
+"from": 257,
+"to": 257,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "장반"
+},
+{
+"person": 10547,
+"master": 10757,
+"from": 257,
+"to": 257,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "초이"
+},
+{
+"person": 10016,
+"master": 10575,
+"from": 240,
+"to": 249,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "왕릉전"
+},
+{
+"person": 10773,
+"master": 10134,
+"from": 265,
+"to": 282,
+"relation": "STAFF",
+"basis": "사서",
+"note": "가충전"
+},
+{
+"person": 10026,
+"master": 10134,
+"from": 265,
+"to": 278,
+"relation": "STAFF",
+"basis": "사서",
+"note": "하증전"
+},
+{
+"person": 10677,
+"master": 10134,
+"from": 265,
+"to": 274,
+"relation": "STAFF",
+"basis": "사서",
+"note": "순의전"
+},
+{
+"person": 10644,
+"master": 10134,
+"from": 265,
+"to": 278,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "양호전"
+},
+{
+"person": 10889,
+"master": 10134,
+"from": 265,
+"to": 290,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "진건전"
+},
+{
+"person": 10724,
+"master": 10773,
+"from": 265,
+"to": 282,
+"relation": "STAFF",
+"basis": "추정",
+"note": "위관전 (편제 추정)"
+},
+{
+"person": 10466,
+"master": 10644,
+"from": 272,
+"to": 278,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "두예전"
+},
+{
+"person": 10466,
+"master": 10773,
+"from": 279,
+"to": 282,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "두예전: 오 정벌 가충 대도독 하"
+},
+{
+"person": 10577,
+"master": 10644,
+"from": 273,
+"to": 278,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "왕준전: 양호가 천거"
+},
+{
+"person": 10577,
+"master": 10773,
+"from": 279,
+"to": 282,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "왕준전: 오 정벌"
+},
+{
+"person": 10576,
+"master": 10773,
+"from": 279,
+"to": 282,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "왕혼전: 오 정벌"
+},
+{
+"person": 10739,
+"master": 10026,
+"from": 265,
+"to": 271,
+"relation": "STAFF",
+"basis": "추정",
+"note": "배수전 (편제 추정)"
+},
+{
+"person": 20825,
+"master": 10677,
+"from": 265,
+"to": 274,
+"relation": "STAFF",
+"basis": "추정",
+"note": "산도전 (편제 추정)"
+},
+{
+"person": 10615,
+"master": 10889,
+"from": 265,
+"to": 272,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "석포전 (편제 추정)"
+},
+{
+"person": 10062,
+"master": 10061,
+"from": 191,
+"to": 199,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "공손찬전: 종제 공손범 발해태수"
+},
+{
+"person": 10063,
+"master": 10062,
+"from": 192,
+"to": 199,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "공손찬 종제 공손속 (편제 추정)"
+},
+{
+"person": 10064,
+"master": 10061,
+"from": 190,
+"to": 192,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "공손찬전: 공손월이 원술 편에서 손견을 도우러 갔다 전사"
+},
+{
+"person": 10119,
+"master": 10061,
+"from": 191,
+"to": 192,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "공손찬전: 엄강이 계교에서 국의에게 패사"
+},
+{
+"person": 10823,
+"master": 10061,
+"from": 192,
+"to": 193,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "공손찬전: 추단이 유우 토벌 중 전사"
+},
+{
+"person": 10112,
+"master": 10597,
+"from": 192,
+"to": 194,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "공손찬전: 단경 청주 방면 (편제 추정)"
+},
+{
+"person": 10597,
+"master": 10061,
+"from": 191,
+"to": 199,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "공손찬전: 청주자사 전해"
+},
+{
+"person": 10856,
+"master": 10061,
+"from": 195,
+"to": 199,
+"relation": "STAFF",
+"basis": "사서",
+"note": "공손찬전: 관정이 공손찬과 함께 최후"
+},
+{
+"person": 10793,
+"master": 10061,
+"from": 191,
+"to": 194,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "조운전: 공손찬 휘하"
+},
+{
+"person": 10071,
+"master": 10597,
+"from": 192,
+"to": 193,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "선주전: 전해를 따라 청주 동쪽 주둔"
+},
+{
+"person": 10981,
+"master": 10100,
+"from": 190,
+"to": 193,
+"relation": "LIEUTENANT",
+"basis": "열전",
+"note": "유우 아래 선우보 (공손찬전 주)"
+},
+{
+"person": 20712,
+"master": 10100,
+"from": 190,
+"to": 193,
+"relation": "LIEUTENANT",
+"basis": "열전",
+"note": "유우 아래 선우은"
+},
+{
+"person": 20713,
+"master": 10100,
+"from": 190,
+"to": 193,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "유우 막하 (공손찬전 주)"
+},
+{
+"person": 10057,
+"master": 10056,
+"from": 190,
+"to": 204,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "공손도전: 아들 공손강"
+},
+{
+"person": 10468,
+"master": 10056,
+"from": 190,
+"to": 204,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "공손도 휘하 유의"
+},
+{
+"person": 20720,
+"master": 10056,
+"from": 196,
+"to": 204,
+"relation": "GUEST",
+"basis": "사서",
+"note": "위서 관녕전: 공손도가 예우한 식객"
+},
+{
+"person": 20721,
+"master": 10056,
+"from": 196,
+"to": 204,
+"relation": "GUEST",
+"basis": "사서",
+"note": "병원전"
+},
+{
+"person": 21046,
+"master": 10056,
+"from": 190,
+"to": 201,
+"relation": "GUEST",
+"basis": "사서",
+"note": "왕열전"
+},
+{
+"person": 10058,
+"master": 10057,
+"from": 205,
+"to": 210,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "공손공은 공손강의 아우"
+},
+{
+"person": 10110,
+"master": 10060,
+"from": 228,
+"to": 238,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "공손연전: 비연"
+},
+{
+"person": 10494,
+"master": 10060,
+"from": 228,
+"to": 238,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "공손연전: 양조"
+},
+{
+"person": 20716,
+"master": 10060,
+"from": 228,
+"to": 238,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "공손연 휘하"
+},
+{
+"person": 20717,
+"master": 10060,
+"from": 228,
+"to": 238,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "공손연 휘하"
+},
+{
+"person": 10952,
+"master": 10928,
+"from": 187,
+"to": 191,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "마등전: 한수와 연합"
+},
+{
+"person": 10945,
+"master": 10952,
+"from": 190,
+"to": 210,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "마초전"
+},
+{
+"person": 10936,
+"master": 10952,
+"from": 192,
+"to": 211,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "마등전"
+},
+{
+"person": 10949,
+"master": 10952,
+"from": 192,
+"to": 211,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "마등전"
+},
+{
+"person": 10937,
+"master": 10952,
+"from": 200,
+"to": 210,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "마대전"
+},
+{
+"person": 10995,
+"master": 10952,
+"from": 200,
+"to": 211,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "방덕전: 마등 휘하"
+},
+{
+"person": 10861,
+"master": 10928,
+"from": 190,
+"to": 212,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "염행: 한수의 사위"
+},
+{
+"person": 10495,
+"master": 10928,
+"from": 205,
+"to": 211,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "관중 십부 양추"
+},
+{
+"person": 10378,
+"master": 10928,
+"from": 205,
+"to": 211,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "위서 무제기: 성의"
+},
+{
+"person": 10631,
+"master": 10928,
+"from": 205,
+"to": 211,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "정은"
+},
+{
+"person": 10034,
+"master": 10378,
+"from": 205,
+"to": 211,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "관중 십부 후선 (편제 추정)"
+},
+{
+"person": 10442,
+"master": 10378,
+"from": 205,
+"to": 211,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "관중 십부 이감 (편제 추정)"
+},
+{
+"person": 10942,
+"master": 10631,
+"from": 211,
+"to": 211,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "마완"
+},
+{
+"person": 10476,
+"master": 10442,
+"from": 211,
+"to": 211,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "양흥"
+},
+{
+"person": 10945,
+"master": 10928,
+"from": 211,
+"to": 211,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "관중군 연합"
+},
+{
+"person": 10995,
+"master": 10945,
+"from": 212,
+"to": 213,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "방덕전"
+},
+{
+"person": 10937,
+"master": 10945,
+"from": 211,
+"to": 213,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "마대"
+},
+{
+"person": 10861,
+"master": 10405,
+"from": 213,
+"to": 215,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "염행"
+},
+{
+"person": 10995,
+"master": 10405,
+"from": 215,
+"to": 218,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "방덕전"
+},
+{
+"person": 10995,
+"master": 10013,
+"from": 219,
+"to": 219,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "방덕전"
+},
+{
+"person": 10328,
+"master": 10409,
+"from": 205,
+"to": 210,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "무제기 건안10 장연 항복 (소속 편제는 추정)"
+},
+{
+"person": 10801,
+"master": 10735,
+"from": 202,
+"to": 204,
+"relation": "STAFF",
+"basis": "사서",
+"note": "신비전: 원담의 사자로 조조에게"
+},
+{
+"person": 10556,
+"master": 10732,
+"from": 190,
+"to": 190,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "반동탁 연합 하내태수 왕광 (원소전)"
+},
+{
+"person": 10354,
+"master": 10200,
+"from": 200,
+"to": 214,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "장합전: 관도에서 항복, 조조 휘하 (편제 추정)"
+},
+{
+"person": 10965,
+"master": 10354,
+"from": 200,
+"to": 201,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "고람은 장합과 함께 조조에게 귀순"
+},
+{
+"person": 10071,
+"master": 10061,
+"from": 191,
+"to": 191,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "선주전: 공손찬의 별부사마로 청주 지원"
+},
+{
+"person": 10601,
+"master": 10061,
+"from": 191,
+"to": 193,
+"relation": "STAFF",
+"basis": "열전",
+"note": "전예전: 공손찬이 등용"
+},
+{
+"person": 10208,
+"master": 10819,
+"from": 240,
+"to": 248,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "하후패전: 정서장군 곽회와 불화"
+},
+{
+"person": 10877,
+"master": 10819,
+"from": 240,
+"to": 249,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "진태전: 옹주자사, 곽회와 협력"
+},
+{
+"person": 10560,
+"master": 10129,
+"from": 240,
+"to": 251,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "왕기전 (편제 추정)"
+},
+{
+"person": 10133,
+"master": 10131,
+"from": 257,
+"to": 264,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "사마망전: 정서 방면 강유 방어"
+},
+{
+"person": 10808,
+"master": 10412,
+"from": 227,
+"to": 229,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "학소전: 진창 방어, 제갈량 격퇴 (조진 도독)"
+},
+{
+"person": 10202,
+"master": 10412,
+"from": 228,
+"to": 229,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "하후무전: 안서장군으로 관중 방어"
+},
+{
+"person": 10538,
+"master": 10396,
+"from": 220,
+"to": 226,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "만총전: 정동장군 (편제 추정)"
+},
+{
+"person": 10725,
+"master": 10884,
+"from": 227,
+"to": 235,
+"relation": "STAFF",
+"basis": "추정",
+"note": "위진전 (편제 추정)"
+},
+{
+"person": 10612,
+"master": 10884,
+"from": 227,
+"to": 235,
+"relation": "STAFF",
+"basis": "추정",
+"note": "노육전 (편제 추정)"
+},
+{
+"person": 10698,
+"master": 10395,
+"from": 219,
+"to": 219,
+"relation": "STAFF",
+"basis": "사서",
+"note": "장제전: 번성 전투 참모"
+},
+{
+"person": 10698,
+"master": 10394,
+"from": 220,
+"to": 226,
+"relation": "STAFF",
+"basis": "사서",
+"note": "장제전: 시중"
+},
+{
+"person": 10698,
+"master": 10129,
+"from": 227,
+"to": 239,
+"relation": "STAFF",
+"basis": "추정",
+"note": "장제전 (편제 추정)"
+},
+{
+"person": 10472,
+"master": 10394,
+"from": 211,
+"to": 219,
+"relation": "STAFF",
+"basis": "사서",
+"note": "환계전: 태자 중서자 겸 문학"
+},
+{
+"person": 10343,
+"master": 10677,
+"from": 265,
+"to": 274,
+"relation": "STAFF",
+"basis": "추정",
+"note": "장화전 (편제 추정)"
+},
+{
+"person": 10343,
+"master": 10669,
+"from": 275,
+"to": 285,
+"relation": "STAFF",
+"basis": "추정",
+"note": "장화전 (편제 추정)"
+},
+{
+"person": 20820,
+"master": 10677,
+"from": 265,
+"to": 274,
+"relation": "STAFF",
+"basis": "추정",
+"note": "부현전 (편제 추정)"
+},
+{
+"person": 21213,
+"master": 10026,
+"from": 265,
+"to": 278,
+"relation": "STAFF",
+"basis": "추정",
+"note": "임개전 (편제 추정)"
+},
+{
+"person": 10568,
+"master": 10026,
+"from": 265,
+"to": 278,
+"relation": "STAFF",
+"basis": "추정",
+"note": "왕융전 (편제 추정)"
+},
+{
+"person": 10126,
+"master": 10134,
+"from": 270,
+"to": 283,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "사마주전: 오 정벌 도독"
+},
+{
+"person": 10910,
+"master": 10405,
+"from": 212,
+"to": 213,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "위강전: 양주자사"
+},
+{
+"person": 10500,
+"master": 10910,
+"from": 213,
+"to": 213,
+"relation": "STAFF",
+"basis": "사서",
+"note": "양부전: 위강 별가"
+},
+{
+"person": 10785,
+"master": 10910,
+"from": 213,
+"to": 213,
+"relation": "STAFF",
+"basis": "사서",
+"note": "조앙전"
+},
+{
+"person": 10214,
+"master": 10910,
+"from": 213,
+"to": 213,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "강서(姜叙): 마초 공격에 대응"
+},
+{
+"person": 10945,
+"master": 10358,
+"from": 214,
+"to": 214,
+"relation": "GUEST",
+"basis": "사서",
+"note": "마초전: 한중 장로에게 의탁"
+},
+{
+"person": 10995,
+"master": 10358,
+"from": 214,
+"to": 214,
+"relation": "GUEST",
+"basis": "사서",
+"note": "방덕전"
+},
+{
+"person": 10682,
+"master": 20994,
+"from": 187,
+"to": 187,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "동탁전: 장온 서정 때 파로장군"
+},
+{
+"person": 10234,
+"master": 20994,
+"from": 187,
+"to": 187,
+"relation": "LIEUTENANT",
+"basis": "사서",
+"note": "손견전: 장온이 손견을 참군으로 요청"
+},
+{
+"person": 10448,
+"master": 10479,
+"from": 195,
+"to": 197,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "헌제기 건안: 백파 이락과 양봉 동귀"
+},
+{
+"person": 10917,
+"master": 10479,
+"from": 195,
+"to": 196,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "헌제기: 한섬·양봉"
+},
+{
+"person": 21004,
+"master": 10479,
+"from": 195,
+"to": 196,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "헌제기: 백파 호재"
+},
+{
+"person": 10743,
+"master": 10812,
+"from": 200,
+"to": 204,
+"relation": "STAFF",
+"basis": "사서",
+"note": "허유전: 관도에서 귀의해 조조 막하 (곽가 휘하 편제는 추정)"
+},
+{
+"person": 10814,
+"master": 10394,
+"from": 211,
+"to": 219,
+"relation": "STAFF",
+"basis": "사서",
+"note": "곽혁전: 곽가의 아들, 태자 중서자"
+},
+{
+"person": 10568,
+"master": 10843,
+"from": 263,
+"to": 264,
+"relation": "STAFF",
+"basis": "사서",
+"note": "왕융전: 종회가 참군으로 요청"
+},
+{
+"person": 10720,
+"master": 10727,
+"from": 203,
+"to": 204,
+"relation": "LIEUTENANT",
+"basis": "열전",
+"note": "원상 부장 소유가 조조에 내응하려다 발각"
+},
+{
+"person": 10585,
+"master": 10845,
+"from": 205,
+"to": 218,
+"relation": "STAFF",
+"basis": "추정",
+"note": "왕수전: 조조 휘하 (편제 추정)"
+},
+{
+"person": 10879,
+"master": 10884,
+"from": 213,
+"to": 217,
+"relation": "STAFF",
+"basis": "추정",
+"note": "진림: 조조 군모제주 (편제 추정)"
+},
+{
+"person": 10495,
+"master": 10204,
+"from": 212,
+"to": 219,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "무제기 건안16: 양추 항복 후 관중 방어 (편제 추정)"
+},
+{
+"person": 10676,
+"master": 10275,
+"from": 192,
+"to": 204,
+"relation": "STAFF",
+"basis": "추정",
+"note": "순심: 원소 휘하 참모 (심배 휘하 편제 추정)"
+},
+{
+"person": 10375,
+"master": 10275,
+"from": 197,
+"to": 202,
+"relation": "STAFF",
+"basis": "추정",
+"note": "응소전: 연주 불화 뒤 원소 진영에 귀의 (편제 추정)"
+},
+{
+"person": 10729,
+"master": 10734,
+"from": 193,
+"to": 195,
+"relation": "STAFF",
+"basis": "열전",
+"note": "원환전: 강회로 피난해 원술에게 의지"
+},
+{
+"person": 10729,
+"master": 10146,
+"from": 196,
+"to": 197,
+"relation": "STAFF",
+"basis": "열전",
+"note": "원환전: 원술을 떠나 여포 아래 서주에 머묾"
+},
+{
+"person": 10464,
+"master": 10845,
+"from": 196,
+"to": 213,
+"relation": "STAFF",
+"basis": "추정",
+"note": "두기전: 하동태수, 사례교위 종요의 지휘 하 (편제 추정)"
+},
+{
+"person": 20990,
+"master": 10549,
+"from": 190,
+"to": 191,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "동탁 휘하 동월 (우보 군 편제 추정)"
+},
+{
+"person": 10146,
+"master": 10322,
+"from": 194,
+"to": 194,
+"relation": "GUEST",
+"basis": "사서",
+"note": "여포전: 하내 장양에게 의탁"
+},
+{
+"person": 10670,
+"master": 10732,
+"from": 190,
+"to": 190,
+"relation": "STAFF",
+"basis": "사서",
+"note": "순욱전: 처음 원소에게 갔다가 조조에게 감"
+},
+{
+"person": 10812,
+"master": 10732,
+"from": 190,
+"to": 190,
+"relation": "STAFF",
+"basis": "사서",
+"note": "곽가전: 처음 원소를 찾았으나 떠남"
+},
+{
+"person": 10952,
+"master": 10204,
+"from": 208,
+"to": 211,
+"relation": "LIEUTENANT",
+"basis": "추정",
+"note": "마등전: 건안13 입조 때까지 조조 정권 소속 (편제 추정)"
+},
+{
+"person": 10881,
+"master": 10845,
+"from": 215,
+"to": 220,
+"relation": "STAFF",
+"basis": "추정",
+"note": "진교전 (편제 추정)"
+},
+{
+"person": 10372,
+"master": 10845,
+"from": 215,
+"to": 220,
+"relation": "STAFF",
+"basis": "추정",
+"note": "서막전 (편제 추정)"
+}
+]
